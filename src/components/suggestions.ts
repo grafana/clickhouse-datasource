@@ -13,12 +13,33 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
     return getVariableSuggestions(range);
   }
 
-  const upperText = text.toUpperCase();
-  if (upperText.endsWith('SELECT ') || upperText.endsWith('FROM ')) {
+  const keyWords = ['select', 'from', 'where'];
+  let normalized = text.replace(/[\n\r]/g, ' ');  // remove crlf;
+  for (const v of keyWords) {
+    normalized = normalized.replace(v, v.toUpperCase());
+  }
+  if (normalized.endsWith('SELECT ') || normalized.endsWith('FROM ') || normalized.endsWith(', ')) {
     if (schema.defaultDatabase !== undefined) {
       return fetchTableSuggestions(schema, range);
     }
     return fetchDatabaseSuggestions(schema, range);
+  }
+
+  if (normalized.endsWith('WHERE ')) {
+    // only show the tables we selected from
+    // TODO: could also show the fields since where clause doesn't require the table name
+    const parts = normalized.split('FROM ');
+    const lastPart = parts[parts.length - 1];
+    const subparts = lastPart.split(' WHERE');
+    const tablesString = subparts[0];
+    const tables = tablesString.split(',').map(t => t.trim());
+    return tables.map(val => ({
+      label: val,
+      kind: SchemaKind.TABLE,
+      documentation: 'Table',
+      insertText: val,
+      range,
+    }));
   }
 
   if (text.endsWith('.')) {
