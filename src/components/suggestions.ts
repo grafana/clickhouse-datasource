@@ -9,7 +9,7 @@ export interface Schema {
 }
 
 export async function fetchSuggestions(text: string, schema: Schema, range: Range): Promise<Suggestion[]> {
-  if (isAfterDollar(text)) {
+  if (text.endsWith('$')) {
     return getVariableSuggestions(range);
   }
 
@@ -47,11 +47,11 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
     const current = parts[parts.length - 1];
     const subparts = current.split('.');
     if (schema.defaultDatabase !== undefined) {
-      // table. scenario - fetch the fields for the table
+      // format: table. scenario - fetch the fields for the table
       const table = subparts[0];
       return fetchFieldSuggestions(schema, range, table);
     }
-    // no default database defined - assume db.table.field
+    // no default database defined - assume format: db.table.field
     if (subparts.length === 2) {
       // show tables
       const db = subparts[0];
@@ -114,8 +114,4 @@ function getVariableSuggestions(range: Range) {
       range,
     };
   });
-}
-
-function isAfterDollar(text: string) {
-  return /^select.*\$$/i.test(text);
 }
