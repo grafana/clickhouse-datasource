@@ -14,7 +14,7 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
   }
 
   const keyWords = ['select', 'from', 'where'];
-  let normalized = text.replace(/[\n\r]/g, ' ');  // remove crlf;
+  let normalized = text.replace(/[\n\r]/g, ' '); // remove crlf;
   for (const v of keyWords) {
     normalized = normalized.replace(v, v.toUpperCase());
   }
