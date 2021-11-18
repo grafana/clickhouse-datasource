@@ -1,26 +1,27 @@
 import { DataQuery, DataSourceJsonData } from '@grafana/data';
 
-export interface MyQuery extends DataQuery {
-  queryText?: string;
-  constant: number;
+export interface CHQuery extends DataQuery {
   withStreaming: boolean;
+  rawSql: string;
 }
 
-export const defaultQuery: Partial<MyQuery> = {
-  constant: 6.5,
+export const defaultQuery: Partial<CHQuery> = {
   withStreaming: false,
 };
 
-/**
- * These are options configured for each DataSource instance.
- */
-export interface MyDataSourceOptions extends DataSourceJsonData {
-  path?: string;
+export interface CHConfig extends DataSourceJsonData {
+  username: string;
+  server: string;
+  port: number;
+  defaultDatabase?: string;
+  tlsSkipVerify?: boolean;
+  tlsAuth?: boolean;
+  tlsAuthWithCACert?: boolean;
 }
 
-/**
- * Value that is used in the backend, but never sent over HTTP to the frontend
- */
-export interface MySecureJsonData {
-  apiKey?: string;
+export interface CHSecureConfig {
+  password: string;
+  tlsCACert?: string;
+  tlsClientCert?: string;
+  tlsClientKey?: string;
 }
