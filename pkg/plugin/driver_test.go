@@ -8,6 +8,7 @@ import (
 )
 
 func TestConnect(t *testing.T) {
+	t.Skip()
 	clickhouse := Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		_, err := clickhouse.Connect(backend.DataSourceInstanceSettings{JSONData: []byte(`{ "server": "localhost", "port": 8123 }`), DecryptedSecureJSONData: map[string]string{}})
