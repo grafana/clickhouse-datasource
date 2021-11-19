@@ -7,11 +7,11 @@ import (
 	"fmt"
 
 	"github.com/ClickHouse/clickhouse-go"
+	"github.com/grafana/clickhouse-datasource/pkg/converters"
+	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/grafana-starter-datasource-backend/pkg/converters"
-	"github.com/grafana/grafana-starter-datasource-backend/pkg/macros"
 	"github.com/grafana/sqlds"
 )
 
