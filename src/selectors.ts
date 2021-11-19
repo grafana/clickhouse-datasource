@@ -54,6 +54,8 @@ export const Components = {
   QueryEditor: {
     CodeEditor: {
       input: () => '.monaco-editor textarea',
+      container: 'data-testid-code-editor-container',
+      Run: 'data-testid-code-editor-run-button',
     },
   },
 };

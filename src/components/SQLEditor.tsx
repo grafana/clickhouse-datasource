@@ -6,6 +6,7 @@ import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHQuery, CHConfig } from '../types';
 import { styles } from '../styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
+import { selectors } from 'selectors';
 
 type SQLEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -31,7 +32,11 @@ export const SQLEditor = (props: SQLEditorProps) => {
   const handleMount = (editor: any) => registerSQL('chSql', editor, fetchSuggestions);
   return (
     <div className={styles.Common.wrapper}>
-      <a onClick={() => onSqlChange(query.rawSql || '')} className={styles.Common.run}>
+      <a
+        onClick={() => onSqlChange(query.rawSql || '')}
+        className={styles.Common.run}
+        data-testid={selectors.components.QueryEditor.CodeEditor.Run}
+      >
         <i className="fa fa-play"></i>
       </a>
       <CodeEditor

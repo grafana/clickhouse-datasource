@@ -85,7 +85,7 @@ export const ConfigEditor: React.FC<Props> = props => {
   return (
     <>
       <div className="gf-form-group">
-        <h3>HTTP</h3>
+        <h3>Server</h3>
         <br />
         <div className="gf-form">
           <FormField
@@ -114,7 +114,7 @@ export const ConfigEditor: React.FC<Props> = props => {
         </div>
       </div>
       <div className="gf-form-group">
-        <h3>Auth</h3>
+        <h3>Credentials</h3>
         <br />
         <div className="gf-form">
           <FormField

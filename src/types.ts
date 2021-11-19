@@ -1,13 +1,10 @@
 import { DataQuery, DataSourceJsonData } from '@grafana/data';
 
 export interface CHQuery extends DataQuery {
-  withStreaming: boolean;
   rawSql: string;
 }
 
-export const defaultQuery: Partial<CHQuery> = {
-  withStreaming: false,
-};
+export const defaultQuery: Partial<CHQuery> = {};
 
 export interface CHConfig extends DataSourceJsonData {
   username: string;
