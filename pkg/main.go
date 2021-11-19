@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
+	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/datasource"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	"github.com/grafana/grafana-starter-datasource-backend/pkg/plugin"
 	"github.com/grafana/sqlds"
 )
 
