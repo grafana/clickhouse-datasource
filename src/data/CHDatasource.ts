@@ -1,13 +1,59 @@
-import { DataFrame, DataQueryRequest, DataQueryResponse, DataSourceInstanceSettings, vectorator } from '@grafana/data';
-import { DataSourceWithBackend } from '@grafana/runtime';
+import {
+  DataFrame,
+  DataQueryRequest,
+  DataQueryResponse,
+  DataSourceInstanceSettings,
+  ScopedVars,
+  vectorator,
+} from '@grafana/data';
+import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
+  // This enables default annotation support for 7.2+
+  annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
+  }
+
+  async metricFindQuery(query: CHQuery) {
+    if (!query.rawSql) {
+      return [];
+    }
+    const frame = await this.runQuery(query);
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    if (frame?.fields?.length === 1) {
+      return vectorator(frame?.fields[0]?.values).map(text => ({ text, value: text }));
+    }
+    // convention - assume the first field is an id field
+    const ids = frame?.fields[0]?.values;
+    return vectorator(frame?.fields[1]?.values).map((text, i) => ({ text, value: ids.get(i) }));
+  }
+
+  applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
+    return {
+      ...query,
+      rawSql: this.replace(query.rawSql || '') || '',
+    };
+  }
+
+  replace(value?: string, scopedVars?: ScopedVars) {
+    if (value !== undefined) {
+      return getTemplateSrv().replace(value, scopedVars, this.format);
+    }
+    return value;
+  }
+
+  format(value: any) {
+    if (Array.isArray(value)) {
+      return `'${value.join("','")}'`;
+    }
+    return value;
   }
 
   getDefaultDatabase() {
