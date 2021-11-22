@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/grafana/sqlds"
 )
@@ -25,7 +26,10 @@ func newTimeFilter(queryType timeQueryType, query *sqlds.Query) (string, error) 
 	if queryType == timeQueryTypeTo {
 		date = query.TimeRange.To
 	}
-	return fmt.Sprintf("toDateTime(intDiv(%d,1000))", date.UnixMilli()), nil
+	millis := date.UnixNano() / int64(time.Millisecond)
+	// TODO - when drone pipeline supports go 1.17
+	// return fmt.Sprintf("toDateTime(intDiv(%d,1000))", date.UnixMilli()), nil
+	return fmt.Sprintf("toDateTime(intDiv(%d,1000))", millis), nil
 }
 
 // FromTimeFilter return time filter query based on grafana's timepicker's from time
