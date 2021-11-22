@@ -104,16 +104,13 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings) (*sql.DB
 
 // Converters defines list of string convertors
 func (h *Clickhouse) Converters() []sqlutil.Converter {
-	return []sqlutil.Converter{converters.SECONDTIME}
+	return []sqlutil.Converter{converters.SECONDTIME, converters.FLOAT32}
 }
 
 // Macros returns list of macro functions convert the macros of raw query
 func (h *Clickhouse) Macros() sqlds.Macros {
 	return map[string]sqlds.MacroFunc{
-		"timeFilter":      macros.TimeFilter,
-		"fromTimeFilter":  macros.FromTimeFilter,
-		"toTimeFilter":    macros.ToTimeFilter,
-		"timeFilterEpoch": macros.TimeFilterEpoch, // undocumented macro.
-		"unixEpochFilter": macros.TimeFilterEpoch, // alias for timeFilterEpoch. To match mysql, postgres
+		"from": macros.FromTimeFilter,
+		"to":   macros.ToTimeFilter,
 	}
 }
