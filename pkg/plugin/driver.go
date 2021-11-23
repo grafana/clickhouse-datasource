@@ -102,9 +102,9 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings) (*sql.DB
 	return db, settings.isValid()
 }
 
-// Converters defines list of string convertors
+// Converters defines list of data type converters
 func (h *Clickhouse) Converters() []sqlutil.Converter {
-	return []sqlutil.Converter{converters.SECONDTIME, converters.FLOAT32}
+	return converters.CLICKHOUSE_CONVERTERS
 }
 
 // Macros returns list of macro functions convert the macros of raw query
