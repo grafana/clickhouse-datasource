@@ -13,14 +13,14 @@
   "author": "Grafana Labs",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@grafana/data": "latest",
-    "@grafana/runtime": "latest",
-    "@grafana/toolkit": "latest",
-    "@grafana/ui": "latest",
+    "@grafana/data": "7.4.1",
+    "@grafana/runtime": "7.4.1",
+    "@grafana/toolkit": "7.4.1",
+    "@grafana/ui": "7.4.1",
     "@types/lodash": "latest"
   },
   "resolutions": {
-    "rxjs": "7.3.0"
+    "rxjs": "6.6.3"
   },
   "engines": {
     "node": ">=14"
