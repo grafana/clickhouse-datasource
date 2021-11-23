@@ -11,7 +11,7 @@ import { CHConfig, CHSecureConfig } from './../types';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
-export const ConfigEditor: React.FC<Props> = props => {
+export const ConfigEditor: React.FC<Props> = (props) => {
   const theme = useTheme();
   const { FormField, SecretFormField } = LegacyForms;
   const { options, onOptionsChange } = props;
@@ -105,7 +105,7 @@ export const ConfigEditor: React.FC<Props> = props => {
             inputWidth={20}
             type="number"
             value={jsonData.port || ''}
-            onChange={e => onPortChange(e.currentTarget.value)}
+            onChange={(e) => onPortChange(e.currentTarget.value)}
             label={Components.ConfigEditor.ServerPort.label}
             aria-label={Components.ConfigEditor.ServerPort.label}
             placeholder={Components.ConfigEditor.ServerPort.placeholder}
@@ -156,7 +156,7 @@ export const ConfigEditor: React.FC<Props> = props => {
               css={{}}
               className="gf-form"
               value={jsonData.tlsSkipVerify || false}
-              onChange={e => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
+              onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
             />
           </div>
         </div>
@@ -169,7 +169,7 @@ export const ConfigEditor: React.FC<Props> = props => {
               css={{}}
               className="gf-form"
               value={jsonData.tlsAuth || false}
-              onChange={e => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
+              onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
             />
           </div>
           <InlineFormLabel width={12} tooltip={Components.ConfigEditor.TLSAuthWithCACert.tooltip}>
@@ -180,14 +180,14 @@ export const ConfigEditor: React.FC<Props> = props => {
               css={{}}
               className="gf-form"
               value={jsonData.tlsAuthWithCACert || false}
-              onChange={e => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)}
+              onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)}
             />
           </div>
         </div>
         {jsonData.tlsAuthWithCACert && (
           <CertificationKey
             hasCert={!!hasTLSCACert}
-            onChange={e => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
+            onChange={(e) => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
             placeholder={Components.ConfigEditor.TLSCACert.placeholder}
             label={Components.ConfigEditor.TLSCACert.label}
             onClick={() => onResetClickFactory('tlsCACert')}
@@ -197,7 +197,7 @@ export const ConfigEditor: React.FC<Props> = props => {
           <>
             <CertificationKey
               hasCert={!!hasTLSClientCert}
-              onChange={e => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
+              onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
               placeholder={Components.ConfigEditor.TLSClientCert.placeholder}
               label={Components.ConfigEditor.TLSClientCert.label}
               onClick={() => onResetClickFactory('tlsClientCert')}
@@ -206,7 +206,7 @@ export const ConfigEditor: React.FC<Props> = props => {
               hasCert={!!hasTLSClientKey}
               placeholder={Components.ConfigEditor.TLSClientKey.placeholder}
               label={Components.ConfigEditor.TLSClientKey.label}
-              onChange={e => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
+              onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
               onClick={() => onResetClickFactory('tlsClientKey')}
             />
           </>

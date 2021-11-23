@@ -36,7 +36,7 @@ describe('SQL Editor', () => {
   });
   it('Should Run Query', async () => {
     let value = 'test';
-    const onChangeValue = jest.fn().mockImplementation(newValue => {
+    const onChangeValue = jest.fn().mockImplementation((newValue) => {
       value = newValue;
     });
     const onRunQuery = jest.fn();

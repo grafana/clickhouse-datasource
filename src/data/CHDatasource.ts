@@ -28,7 +28,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       return [];
     }
     if (frame?.fields?.length === 1) {
-      return vectorator(frame?.fields[0]?.values).map(text => ({ text, value: text }));
+      return vectorator(frame?.fields[0]?.values).map((text) => ({ text, value: text }));
     }
     // convention - assume the first field is an id field
     const ids = frame?.fields[0]?.values;
@@ -79,7 +79,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   runQuery(request: Partial<CHQuery>): Promise<DataFrame> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
       } as DataQueryRequest<CHQuery>;
@@ -93,6 +93,6 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     if (frame.fields?.length === 0) {
       return [];
     }
-    return vectorator(frame?.fields[0]?.values).map(text => text);
+    return vectorator(frame?.fields[0]?.values).map((text) => text);
   }
 }
