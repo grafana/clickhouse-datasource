@@ -24,7 +24,7 @@ describe('Query Editor', () => {
     const rawSql = 'foo';
     render(
       <QueryEditor
-        query={{ rawSql, refId: 'A' }}
+        query={{ rawSql, refId: 'A', format: 1 }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}
