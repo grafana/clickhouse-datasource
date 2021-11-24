@@ -26,7 +26,7 @@ describe('SQL Editor', () => {
     const rawSql = 'foo';
     render(
       <SQLEditor
-        query={{ rawSql, refId: 'A' }}
+        query={{ rawSql, refId: 'A', format: 1 }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}
@@ -43,7 +43,7 @@ describe('SQL Editor', () => {
     await act(async () => {
       render(
         <SQLEditor
-          query={{ rawSql: value, refId: 'A' }}
+          query={{ rawSql: value, refId: 'A', format: 1 }}
           onChange={onChangeValue}
           onRunQuery={onRunQuery}
           datasource={mockDatasource}

@@ -196,6 +196,8 @@ github.com/gorilla/websocket v0.0.0-20170926233335-4201258b820c/go.mod h1:E7qHFY
 github.com/grafana/grafana-plugin-sdk-go v0.94.0/go.mod h1:3VXz4nCv6wH5SfgB3mlW39s+c+LetqSCjFj7xxPC5+M=
 github.com/grafana/grafana-plugin-sdk-go v0.117.0 h1:9dO4ts44maTboq4CDeHDn4Ymyr1fygOmZ98B00T+who=
 github.com/grafana/grafana-plugin-sdk-go v0.117.0/go.mod h1:F3F8qNzdsf6e+Yq35AgwaNOiCv+txpzGURyz+gJ5CuM=
+github.com/grafana/grafana-plugin-sdk-go v0.119.0 h1:FRmfzdjlVWIxDLQvcKpEcf1kmdLbk662YpmXrqg+GAM=
+github.com/grafana/grafana-plugin-sdk-go v0.119.0/go.mod h1:Mhy+5mC6rSqEhnzop1wEh//n/fgkzNK5pRgg3DfCp4g=
 github.com/grafana/sqlds v1.3.0 h1:xAFsJKXTgGTBactch1qsO37IF8GkHTT7EI41uQ+bieY=
 github.com/grafana/sqlds v1.3.0/go.mod h1:YAUp48fa9P65GPkbyjlPWAAkcipS4ksx/QsVqw5Gs/k=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=

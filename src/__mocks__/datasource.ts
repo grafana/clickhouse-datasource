@@ -35,4 +35,4 @@ export const mockDatasource = new Datasource({
     },
   },
 });
-export const mockQuery: CHQuery = { rawSql: 'select * from foo', refId: '' };
+export const mockQuery: CHQuery = { rawSql: 'select * from foo', refId: '', format: 1 };

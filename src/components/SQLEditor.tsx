@@ -13,7 +13,7 @@ type SQLEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 export const SQLEditor = (props: SQLEditorProps) => {
   const { query, onRunQuery, onChange, datasource } = props;
   const onSqlChange = (sql: string) => {
-    onChange({ ...query, rawSql: sql });
+    onChange({ ...query, rawSql: sql, format: 1 });
     onRunQuery();
   };
 

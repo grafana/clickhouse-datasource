@@ -2,6 +2,7 @@ import { DataQuery, DataSourceJsonData } from '@grafana/data';
 
 export interface CHQuery extends DataQuery {
   rawSql: string;
+  format: number;
 }
 
 export const defaultQuery: Partial<CHQuery> = {};
