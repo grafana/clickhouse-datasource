@@ -32,8 +32,8 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
     const lastPart = parts[parts.length - 1];
     const subparts = lastPart.split(' WHERE');
     const tablesString = subparts[0];
-    const tables = tablesString.split(',').map(t => t.trim());
-    return tables.map(val => ({
+    const tables = tablesString.split(',').map((t) => t.trim());
+    return tables.map((val) => ({
       label: val,
       kind: SchemaKind.TABLE,
       documentation: 'Table',
@@ -66,7 +66,7 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
 
 async function fetchDatabaseSuggestions(schema: Schema, range: Range) {
   const databases = await schema.databases();
-  return databases.map(val => ({
+  return databases.map((val) => ({
     label: val,
     kind: SchemaKind.DATABASE,
     documentation: 'Database',
@@ -77,7 +77,7 @@ async function fetchDatabaseSuggestions(schema: Schema, range: Range) {
 
 async function fetchTableSuggestions(schema: Schema, range: Range, database?: string) {
   const tables = await schema.tables(database);
-  return tables.map(val => ({
+  return tables.map((val) => ({
     label: val,
     kind: SchemaKind.TABLE,
     documentation: 'Table',
@@ -88,7 +88,7 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database?: st
 
 async function fetchFieldSuggestions(schema: Schema, range: Range, table: string) {
   const fields = await schema.fields(table);
-  return fields.map(val => ({
+  return fields.map((val) => ({
     label: val,
     kind: SchemaKind.FIELD,
     documentation: 'Field',
@@ -102,7 +102,7 @@ function getVariableSuggestions(range: Range) {
   if (!templateSrv) {
     return [];
   }
-  return templateSrv.getVariables().map(variable => {
+  return templateSrv.getVariables().map((variable) => {
     const label = `\${${variable.name}}`;
     const val = templateSrv.replace(label);
     return {
