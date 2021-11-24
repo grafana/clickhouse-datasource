@@ -20,7 +20,7 @@ export const SQLEditor = (props: SQLEditorProps) => {
   const schema: Schema = {
     databases: () => datasource.fetchDatabases(),
     tables: (db?: string) => datasource.fetchTables(db),
-    fields: table => datasource.fetchFields(table),
+    fields: (table) => datasource.fetchFields(table),
     defaultDatabase: datasource.getDefaultDatabase(),
   };
 
@@ -47,7 +47,7 @@ export const SQLEditor = (props: SQLEditorProps) => {
         onSave={onSqlChange}
         showMiniMap={false}
         showLineNumbers={true}
-        onBlur={text => onChange({ ...query, rawSql: text })}
+        onBlur={(text) => onChange({ ...query, rawSql: text })}
         onEditorDidMount={handleMount}
       />
     </div>
