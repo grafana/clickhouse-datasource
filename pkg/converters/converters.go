@@ -2,9 +2,12 @@ package converters
 
 import (
 	"database/sql"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"reflect"
 	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -95,19 +98,32 @@ func NullableDate() sqlutil.Converter {
 	}
 }
 
-var decimalMatch, _ = regexp.Compile(`^Nullable\(Decimal`)
+var decimalMatch, _ = regexp.Compile(`^Nullable\(Decimal|^Decimal`)
 
 func NullableDecimal() sqlutil.Converter {
 	kind := "Nullable(Decimal)"
 	return sqlutil.Converter{
 		Name:           kind,
-		InputScanType:  reflect.TypeOf(sql.NullFloat64{}),
+		InputScanType:  reflect.TypeOf(sql.RawBytes{}),
 		InputTypeRegex: decimalMatch,
 		InputTypeName:  kind,
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType: data.FieldTypeFloat64.NullableType(),
-			ConverterFunc: func(in interface{}) (interface{}, error) {
-				return sqlFloat64ToFloat64(in)
+			ConvertWithColumn: func(in interface{}, col sql.ColumnType) (interface{}, error) {
+				if in == nil {
+					return nil, nil
+				}
+				v := in.(*sql.RawBytes)
+				s := string(*v)
+				f, err := strconv.ParseFloat(s, 64)
+				if err != nil {
+					bits := binary.LittleEndian.Uint32(*v)
+					f = float64(bits)
+				}
+				_, scale, _ := col.DecimalSize()
+				div := math.Pow(10, float64(scale))
+				fv := f / div
+				return &fv, nil
 			},
 		},
 	}
