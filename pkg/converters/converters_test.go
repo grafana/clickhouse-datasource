@@ -62,6 +62,23 @@ func TestNullableDecimal(t *testing.T) {
 	assert.Equal(t, val, *actual)
 }
 
+func TestNullableString(t *testing.T) {
+	value := sql.NullString{String: "foo", Valid: true}
+	sut := converters.NullableString()
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, value.String, *actual)
+}
+
+func TestNullableStringNotValid(t *testing.T) {
+	value := sql.NullString{String: "foo", Valid: false}
+	sut := converters.NullableString()
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Nil(t, v)
+}
+
 func floatToRawBytes(val float64) sql.RawBytes {
 	raw := []byte(fmt.Sprintf("%f", val))
 	value := sql.RawBytes{}
