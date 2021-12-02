@@ -20,6 +20,7 @@ var INT_ALIAS = []string{"TINYINT", "BOOL", "BOOLEAN", "INT1", "SMALLINT", "INT2
 var FLOAT_TYPES = []string{"Float32", "Float64"}
 var NUMERIC_TYPES = NumericTypes()
 var WILDCARD_TYPES = []string{"Date", "Decimal"}
+var STRING_TYPES = []string{"String"}
 var CLICKHOUSE_CONVERTERS = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {

@@ -15,6 +15,7 @@ func TestConverters(t *testing.T) {
 	conv := converters.ClickHouseConverters()
 	types := converters.NumericTypes()
 	types = append(types, converters.WILDCARD_TYPES...)
+	types = append(types, converters.STRING_TYPES...)
 	for _, c := range conv {
 		contains := false
 		for _, v := range types {
@@ -25,7 +26,6 @@ func TestConverters(t *testing.T) {
 		}
 		assert.True(t, contains)
 	}
-	assert.Equal(t, 24, len(conv))
 }
 
 func TestNullableDate(t *testing.T) {
