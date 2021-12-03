@@ -18,11 +18,11 @@ https://clickhouse.com/docs/en/getting-started/example-datasets/brown-benchmark/
 ### Create database and tables using commands from above link (can use a SQL Editor like DBeaver: https://dbeaver.io/)
 
 ### Load the tables from the downloaded csv files
-sudo cat $HOME/workspace/clickhouse/mgbench/mgbench1.csv | docker run -i --rm --link some-clickhouse-server:clickhouse-server yandex/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs1 FORMAT CSVWithNames"
+sudo cat $HOME/workspace/clickhouse/mgbench/mgbench1.csv | docker run -i --rm --link grafana-clickhouse-server:clickhouse-server yandex/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs1 FORMAT CSVWithNames"
 
-sudo cat $HOME/workspace/clickhouse/mgbench/mgbench2.csv | docker run -i --rm --link some-clickhouse-server:clickhouse-server yandex/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs2 FORMAT CSVWithNames"
+sudo cat $HOME/workspace/clickhouse/mgbench/mgbench2.csv | docker run -i --rm --link grafana-clickhouse-server:clickhouse-server yandex/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs2 FORMAT CSVWithNames"
 
-sudo cat $HOME/workspace/clickhouse/mgbench/mgbench3.csv | docker run -i --rm --link some-clickhouse-server:clickhouse-server yandex/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs3 FORMAT CSVWithNames"
+sudo cat $HOME/workspace/clickhouse/mgbench/mgbench3.csv | docker run -i --rm --link grafana-clickhouse-server:clickhouse-server yandex/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs3 FORMAT CSVWithNames"
 
 ## Connect from the Plugin (minimum requirements)
 server address: localhost
