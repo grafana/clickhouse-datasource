@@ -15,6 +15,7 @@ func TestConverters(t *testing.T) {
 	conv := converters.ClickHouseConverters()
 	types := converters.NumericTypes()
 	types = append(types, converters.WILDCARD_TYPES...)
+	types = append(types, converters.STRING_TYPES...)
 	for _, c := range conv {
 		contains := false
 		for _, v := range types {
@@ -25,7 +26,6 @@ func TestConverters(t *testing.T) {
 		}
 		assert.True(t, contains)
 	}
-	assert.Equal(t, 24, len(conv))
 }
 
 func TestNullableDate(t *testing.T) {
@@ -60,6 +60,23 @@ func TestNullableDecimal(t *testing.T) {
 	assert.Nil(t, err)
 	actual := v.(*float64)
 	assert.Equal(t, val, *actual)
+}
+
+func TestNullableString(t *testing.T) {
+	value := sql.NullString{String: "foo", Valid: true}
+	sut := converters.NullableString()
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, value.String, *actual)
+}
+
+func TestNullableStringNotValid(t *testing.T) {
+	value := sql.NullString{String: "foo", Valid: false}
+	sut := converters.NullableString()
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Nil(t, v)
 }
 
 func floatToRawBytes(val float64) sql.RawBytes {

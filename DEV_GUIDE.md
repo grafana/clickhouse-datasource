@@ -9,7 +9,7 @@ docker run -d -p 8123:8123 -p 9000:9000 --name grafana-clickhouse-server --ulimi
 ## clickhouse client (optional, if you want to query from the command line)
 docker run -it --rm --link some-clickhouse-server:clickhouse-server yandex/clickhouse-client --host clickhouse-server
 
-## Data loading
+## Data loading - MGBench test data
 
 ### Timeseries data - Brown benchmark using docker clickhouse client
 https://clickhouse.com/docs/en/getting-started/example-datasets/brown-benchmark/

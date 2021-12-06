@@ -5,6 +5,7 @@
   "id": "grafana-clickhouse-datasource",
   "metrics": true,
   "backend": true,
+  "logs": true,
   "executable": "gpx_clickhouse",
 
   "info": {

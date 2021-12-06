@@ -20,12 +20,14 @@ var INT_ALIAS = []string{"TINYINT", "BOOL", "BOOLEAN", "INT1", "SMALLINT", "INT2
 var FLOAT_TYPES = []string{"Float32", "Float64"}
 var NUMERIC_TYPES = NumericTypes()
 var WILDCARD_TYPES = []string{"Date", "Decimal"}
+var STRING_TYPES = []string{"String"}
 var CLICKHOUSE_CONVERTERS = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {
 	var list = NullableNumeric()
 	list = append(list, NullableDate())
 	list = append(list, NullableDecimal())
+	list = append(list, NullableString())
 	return list
 }
 
@@ -124,6 +126,31 @@ func NullableDecimal() sqlutil.Converter {
 				div := math.Pow(10, float64(scale))
 				fv := f / div
 				return &fv, nil
+			},
+		},
+	}
+}
+
+var stringMatch, _ = regexp.Compile(`Nullable\(String`)
+
+func NullableString() sqlutil.Converter {
+	kind := "Nullable(String)"
+	return sqlutil.Converter{
+		Name:           kind,
+		InputScanType:  reflect.TypeOf(sql.NullString{}),
+		InputTypeRegex: stringMatch,
+		InputTypeName:  kind,
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType: data.FieldTypeNullableString,
+			ConverterFunc: func(in interface{}) (interface{}, error) {
+				if in == nil {
+					return nil, nil
+				}
+				v := in.(*sql.NullString)
+				if !v.Valid {
+					return (*string)(nil), nil
+				}
+				return &v.String, nil
 			},
 		},
 	}
