@@ -1,7 +1,7 @@
 {
-  "name": "simple-datasource-backend",
-  "version": "1.0.0",
-  "description": "Grafana Data Source Backend Plugin Template",
+  "name": "clickhouse-datasource",
+  "version": "0.9.0",
+  "description": "Clickhouse Datasource",
   "scripts": {
     "build": "grafana-toolkit plugin:build",
     "test": "grafana-toolkit plugin:test",

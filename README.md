@@ -2,6 +2,9 @@
 
 The ClickHouse data source plugin allows you to query and visualize ClickHouse data from within Grafana.
 
+# Beta
+This plugin is currently in Beta development and subject to change.
+
 ## Requirements
 
 The ClickHouse data source has the following requirements:

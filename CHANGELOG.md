@@ -1,5 +1,5 @@
 # Changelog
 
-## 1.0.0 (Unreleased)
+## 0.9.0
 
-Initial release.
+Initial Beta release.
