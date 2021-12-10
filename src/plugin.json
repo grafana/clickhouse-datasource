@@ -11,7 +11,7 @@
   "info": {
     "description": "ClickHouse datasource plugin for Grafana",
     "author": {
-      "name": "Your Name"
+      "name": "Grafana Labs"
     },
     "keywords": ["Simple"],
     "logos": {
