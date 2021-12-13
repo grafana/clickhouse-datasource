@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Clickhouse Datasource",
   "scripts": {
     "build": "grafana-toolkit plugin:build",

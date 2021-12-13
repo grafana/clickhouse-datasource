@@ -75,6 +75,10 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings) (*sql.DB
 		connStr = fmt.Sprintf("%s%sskip_verify=%s", connStr, sep, "true")
 		sep = "&"
 	}
+	if settings.Secure {
+		connStr = fmt.Sprintf("%s%ssecure=%s", connStr, sep, "true")
+		sep = "&"
+	}
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err := getTLSConfig(settings)
 		if err != nil {

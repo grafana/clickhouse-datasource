@@ -47,6 +47,18 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
+  const onSwitchToggle = (
+    key: keyof Pick<CHConfig, 'secure'>,
+    value: boolean
+  ) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        [key]: value,
+      },
+    });
+  };
   const onCertificateChangeFactory = (key: keyof Omit<CHSecureConfig, 'password'>, value: string) => {
     onOptionsChange({
       ...options,
@@ -111,6 +123,19 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             placeholder={Components.ConfigEditor.ServerPort.placeholder}
             tooltip={Components.ConfigEditor.ServerPort.tooltip}
           />
+        </div>
+        <div className="gf-form">
+          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
+            {Components.ConfigEditor.Secure.label}
+          </InlineFormLabel>
+          <div style={switchContainerStyle}>
+            <Switch
+              css={{}}
+              className="gf-form"
+              value={jsonData.secure || false}
+              onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
+            />
+          </div>
         </div>
       </div>
       <div className="gf-form-group">
