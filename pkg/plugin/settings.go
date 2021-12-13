@@ -48,6 +48,7 @@ type Settings struct {
 	TlsCACert          string
 	TlsClientCert      string
 	TlsClientKey       string
+	Secure             bool `json:"secure,omitempty"`
 }
 
 func (settings *Settings) isValid() (err error) {

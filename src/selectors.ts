@@ -9,7 +9,7 @@ export const Components = {
     ServerPort: {
       label: 'Server port',
       placeholder: 'Server port',
-      tooltip: 'ClickHouse server port. Typically this will be 9000 for ClickHouse.',
+      tooltip: 'ClickHouse native TCP port. Typically 9000 for unsecure, 9440 for secure',
     },
     Username: {
       label: 'Username',
@@ -49,6 +49,10 @@ export const Components = {
       label: 'Default database',
       placeholder: 'Default database',
       tooltip: 'Default database to be used. Can be empty.',
+    },
+    Secure: {
+      label: 'Secure Connection',
+      tooltip: 'Toggle on if the connection is secure',
     },
   },
   QueryEditor: {

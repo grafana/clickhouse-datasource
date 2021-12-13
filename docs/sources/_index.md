@@ -8,19 +8,6 @@ The ClickHouse data source plugin allows you to query and visualize ClickHouse d
 
 # Beta
 This plugin is currently in Beta development and subject to change.
-
-## Requirements
-
-The ClickHouse data source has the following requirements:
-
-* Valid license for Grafana Enterprise; refer to [Activate an Enterprise license](https://grafana.com/docs/grafana/latest/enterprise/activate-license/).
-* Grafana user with a server or organization administration role; refer to [Permissions](https://grafana.com/docs/grafana/latest/permissions/).
-* ClickHouse instance with an user.
-
-## Known limitations
-
-* _A list of known limitations about the capabilities of this plugin._
-* _If there are no known limitations:_ There are no known limitations for this plugin.
     
 ## Install the plugin
 
@@ -28,11 +15,6 @@ The ClickHouse data source has the following requirements:
 2. From the left-hand menu, click the **Install plugin** button.
 
    The **Installation** tab is displayed.
-
-### Meet compatibility requirements
-
-* _A list of compatibility requirements for this plugin._
-* _If there are no compatibility requirements:_ There are no compatibility requirements for this plugin.
 
 ### Verify that the plugin is installed
 
@@ -48,10 +30,6 @@ The ClickHouse data source has the following requirements:
 Set up an ClickHouse user account with `readonly` permission and access to databases and tables you want to query. Grafana does not validate that queries are safe. Queries can contain any SQL statement. For example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'` and `DROP TABLE sadTable;` would be executed.
 
 ## Configure the data source in Grafana
-
-_Describe each way the data source can be configured._
-
-_Write a paragraph under this header listing each way the data source can be configured. Make a subheading for each listed configuration type. Detail each configuration under a subheading using definition._
 
 Follow [these instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/) to add a new ClickHouse data source, and enter configuration options:
 
@@ -118,8 +96,6 @@ The plugin also supports notation using braces {}. Use this notation when querie
 ### Templates and variables
 
 To add a new ClickHouse query variable, refer to [Add a query variable](https://grafana.com/docs/grafana/latest/variables/variable-types/add-query-variable/). Use your ClickHouse data source as your data source for the following available queries:
-
-`Explain each field in the query template editor using definitions`
 
 After creating a variable, you can use it in your ClickHouse queries by using [Variable syntax](https://grafana.com/docs/grafana/latest/variables/syntax/). For more information about variables, refer to [Templates and variables](https://grafana.com/docs/grafana/latest/variables/).
 

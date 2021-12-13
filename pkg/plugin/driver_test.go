@@ -15,3 +15,14 @@ func TestConnect(t *testing.T) {
 		assert.Equal(t, nil, err)
 	})
 }
+
+func TestConnectSecure(t *testing.T) {
+	t.Skip()
+	clickhouse := Clickhouse{}
+	t.Run("should not error when valid settings passed", func(t *testing.T) {
+		json := `{ "server": "server", "port": 9440, "username": "foo", "secure": true }`
+		secure := map[string]string{}
+		_, err := clickhouse.Connect(backend.DataSourceInstanceSettings{JSONData: []byte(json), DecryptedSecureJSONData: secure})
+		assert.Equal(t, nil, err)
+	})
+}
