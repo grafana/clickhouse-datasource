@@ -7,34 +7,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
-type ConnectionSettings struct {
-	User       string `json:"user"`
-	Password   string `json:"password"`
-	Path       string `json:"path"`
-	Cert       string `json:"cert"`
-	PrivateKey string `json:"privateKey"`
-	AuthType   string `json:"authType"`
-}
-
-func GetSettings(s backend.DataSourceInstanceSettings) (*ConnectionSettings, error) {
-	settings := &ConnectionSettings{}
-	if err := json.Unmarshal(s.JSONData, settings); err != nil {
-		return nil, err
-	}
-
-	if val, ok := s.DecryptedSecureJSONData["password"]; ok {
-		settings.Password = val
-	}
-	if val, ok := s.DecryptedSecureJSONData["cert"]; ok {
-		settings.Cert = val
-	}
-	if val, ok := s.DecryptedSecureJSONData["privateKey"]; ok {
-		settings.PrivateKey = val
-	}
-
-	return settings, nil
-}
-
 // Settings - data loaded from grafana settings database
 type Settings struct {
 	Server             string `json:"server,omitempty"`
