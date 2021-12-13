@@ -47,10 +47,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
-  const onSwitchToggle = (
-    key: keyof Pick<CHConfig, 'secure'>,
-    value: boolean
-  ) => {
+  const onSwitchToggle = (key: keyof Pick<CHConfig, 'secure'>, value: boolean) => {
     onOptionsChange({
       ...options,
       jsonData: {
