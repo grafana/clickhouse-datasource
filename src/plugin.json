@@ -7,7 +7,7 @@
   "backend": true,
   "logs": true,
   "executable": "gpx_clickhouse",
-
+  "category": "sql",
   "info": {
     "description": "ClickHouse datasource plugin for Grafana",
     "author": {
