@@ -14,7 +14,7 @@ type Settings struct {
 	Username           string `json:"username,omitempty"`
 	DefaultDatabase    string `json:"defaultDatabase,omitempty"`
 	InsecureSkipVerify bool   `json:"tlsSkipVerify,omitempty"`
-	TlsClientAuth      bool   `json:"tlsClientAuth,omitempty"`
+	TlsClientAuth      bool   `json:"tlsAuth,omitempty"`
 	TlsAuthWithCACert  bool   `json:"tlsAuthWithCACert,omitempty"`
 	Password           string `json:"-,omitempty"`
 	TlsCACert          string
