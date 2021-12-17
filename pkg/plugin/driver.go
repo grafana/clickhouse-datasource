@@ -102,7 +102,8 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings) (*sql.DB
 		} else {
 			log.DefaultLogger.Error(err.Error())
 		}
-		return nil, err
+		// TODO - if we return the error here, the message is not displayed - check sdk
+		return db, nil
 	}
 	return db, settings.isValid()
 }
