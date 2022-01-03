@@ -10,6 +10,7 @@ import (
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds"
@@ -97,11 +98,12 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings) (*sql.DB
 	}
 	if err := db.Ping(); err != nil {
 		if exception, ok := err.(*clickhouse.Exception); ok {
-			fmt.Printf("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
+			log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
 		} else {
-			fmt.Println(err)
+			log.DefaultLogger.Error(err.Error())
 		}
-		return nil, err
+		// TODO - if we return the error here, the message is not displayed - check sdk
+		return db, nil
 	}
 	return db, settings.isValid()
 }
