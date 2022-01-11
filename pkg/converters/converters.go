@@ -31,6 +31,7 @@ func ClickHouseConverters() []sqlutil.Converter {
 	list = append(list, NullableDecimal())
 	list = append(list, NullableString())
 	list = append(list, StringArray())
+	list = append(list, NumericArrays()...)
 	return list
 }
 
@@ -159,6 +160,9 @@ func NullableString() sqlutil.Converter {
 	}
 }
 
+// Array types
+
+// String array
 var stringArrayMatch, _ = regexp.Compile(`Array\(String`)
 
 func StringArray() sqlutil.Converter {
@@ -170,7 +174,7 @@ func StringArray() sqlutil.Converter {
 		InputTypeName:  kind,
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType: data.FieldTypeNullableString,
-			ConvertWithColumn: func(in interface{}, col sql.ColumnType) (interface{}, error) {
+			ConverterFunc: func(in interface{}) (interface{}, error) {
 				if in == nil {
 					return nil, nil
 				}
@@ -180,4 +184,126 @@ func StringArray() sqlutil.Converter {
 			},
 		},
 	}
+}
+
+// Numeric Arrays
+func NumericArrays() []sqlutil.Converter {
+	var list []sqlutil.Converter
+	for _, c := range arrayConverters {
+		list = append(list, NumericArrayToCommaDelimitedString(c.name, c.kind, c.convert))
+	}
+	return list
+}
+
+func NumericArrayToCommaDelimitedString(kind string, i interface{}, c func(in interface{}) (interface{}, bool)) sqlutil.Converter {
+	kind = fmt.Sprintf("Array(%s)", kind)
+	return sqlutil.Converter{
+		Name:          kind,
+		InputScanType: reflect.TypeOf(i),
+		InputTypeName: kind,
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType: data.FieldTypeNullableString,
+			ConverterFunc: func(in interface{}) (interface{}, error) {
+				if in == nil {
+					return (*string)(nil), nil
+				}
+				v, ok := c(in)
+				if !ok {
+					return (*string)(nil), nil
+				}
+				val := strings.Replace(fmt.Sprint(v), "&", "", 1)
+				val = strings.Trim(strings.Join(strings.Fields(val), ","), "[]")
+				return &val, nil
+			},
+		},
+	}
+}
+
+type ArrayConverter struct {
+	name    string
+	kind    interface{}
+	convert func(in interface{}) (interface{}, bool)
+}
+
+var arrayConverters = []ArrayConverter{
+	{
+		"Int8",
+		[]int8{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]int8)
+			return v, ok
+		},
+	},
+	{
+		"Int16",
+		[]int16{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]int16)
+			return v, ok
+		},
+	},
+	{
+		"Int32",
+		[]int32{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]int32)
+			return v, ok
+		},
+	},
+	{
+		"Int64",
+		[]int64{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]int64)
+			return v, ok
+		},
+	},
+	{
+		"UInt8",
+		[]uint8{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]uint8)
+			return v, ok
+		},
+	},
+	{
+		"UInt16",
+		[]uint16{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]uint16)
+			return v, ok
+		},
+	},
+	{
+		"UInt32",
+		[]uint32{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]uint32)
+			return v, ok
+		},
+	},
+	{
+		"UInt64",
+		[]uint64{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]uint64)
+			return v, ok
+		},
+	},
+	{
+		"Float32",
+		[]float32{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]float32)
+			return v, ok
+		},
+	},
+	{
+		"Float64",
+		[]float64{},
+		func(in interface{}) (interface{}, bool) {
+			v, ok := in.(*[]float64)
+			return v, ok
+		},
+	},
 }
