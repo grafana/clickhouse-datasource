@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 )
@@ -30,8 +29,7 @@ func ClickHouseConverters() []sqlutil.Converter {
 	list = append(list, NullableDate())
 	list = append(list, NullableDecimal())
 	list = append(list, NullableString())
-	list = append(list, StringArray())
-	list = append(list, NumericArrays()...)
+	list = append(list, ArrayConverters()...)
 	return list
 }
 
@@ -160,42 +158,17 @@ func NullableString() sqlutil.Converter {
 	}
 }
 
-// Array types
+// Array converters
 
-// String array
-var stringArrayMatch, _ = regexp.Compile(`Array\(String`)
-
-func StringArray() sqlutil.Converter {
-	kind := "StringArray"
-	return sqlutil.Converter{
-		Name:           kind,
-		InputScanType:  reflect.TypeOf(clickhouse.Array([]string{})),
-		InputTypeRegex: stringArrayMatch,
-		InputTypeName:  kind,
-		FrameConverter: sqlutil.FrameConverter{
-			FieldType: data.FieldTypeNullableString,
-			ConverterFunc: func(in interface{}) (interface{}, error) {
-				if in == nil {
-					return nil, nil
-				}
-				v := in.(*[]string)
-				val := strings.Join(*v, ",")
-				return &val, nil
-			},
-		},
-	}
-}
-
-// Numeric Arrays
-func NumericArrays() []sqlutil.Converter {
+func ArrayConverters() []sqlutil.Converter {
 	var list []sqlutil.Converter
-	for _, c := range arrayConverters {
-		list = append(list, NumericArrayToCommaDelimitedString(c.name, c.kind, c.convert))
+	for _, c := range arrayTypes {
+		list = append(list, ArrayToCommaDelimitedString(c.name, c.kind))
 	}
 	return list
 }
 
-func NumericArrayToCommaDelimitedString(kind string, i interface{}, c func(in interface{}) (interface{}, bool)) sqlutil.Converter {
+func ArrayToCommaDelimitedString(kind string, i interface{}) sqlutil.Converter {
 	kind = fmt.Sprintf("Array(%s)", kind)
 	return sqlutil.Converter{
 		Name:          kind,
@@ -207,11 +180,7 @@ func NumericArrayToCommaDelimitedString(kind string, i interface{}, c func(in in
 				if in == nil {
 					return (*string)(nil), nil
 				}
-				v, ok := c(in)
-				if !ok {
-					return (*string)(nil), nil
-				}
-				val := strings.Replace(fmt.Sprint(v), "&", "", 1)
+				val := strings.Replace(fmt.Sprint(in), "&", "", 1)
 				val = strings.Trim(strings.Join(strings.Fields(val), ","), "[]")
 				return &val, nil
 			},
@@ -219,91 +188,21 @@ func NumericArrayToCommaDelimitedString(kind string, i interface{}, c func(in in
 	}
 }
 
-type ArrayConverter struct {
-	name    string
-	kind    interface{}
-	convert func(in interface{}) (interface{}, bool)
+type ArrayType struct {
+	name string
+	kind interface{}
 }
 
-var arrayConverters = []ArrayConverter{
-	{
-		"Int8",
-		[]int8{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]int8)
-			return v, ok
-		},
-	},
-	{
-		"Int16",
-		[]int16{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]int16)
-			return v, ok
-		},
-	},
-	{
-		"Int32",
-		[]int32{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]int32)
-			return v, ok
-		},
-	},
-	{
-		"Int64",
-		[]int64{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]int64)
-			return v, ok
-		},
-	},
-	{
-		"UInt8",
-		[]uint8{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]uint8)
-			return v, ok
-		},
-	},
-	{
-		"UInt16",
-		[]uint16{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]uint16)
-			return v, ok
-		},
-	},
-	{
-		"UInt32",
-		[]uint32{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]uint32)
-			return v, ok
-		},
-	},
-	{
-		"UInt64",
-		[]uint64{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]uint64)
-			return v, ok
-		},
-	},
-	{
-		"Float32",
-		[]float32{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]float32)
-			return v, ok
-		},
-	},
-	{
-		"Float64",
-		[]float64{},
-		func(in interface{}) (interface{}, bool) {
-			v, ok := in.(*[]float64)
-			return v, ok
-		},
-	},
+var arrayTypes = []ArrayType{
+	{"String", []string{}},
+	{"Int8", []int8{}},
+	{"Int16", []int16{}},
+	{"Int32", []int32{}},
+	{"Int64", []int64{}},
+	{"UInt8", []uint8{}},
+	{"UInt16", []uint16{}},
+	{"UInt32", []uint32{}},
+	{"UInt64", []uint64{}},
+	{"Float32", []float32{}},
+	{"Float64", []float64{}},
 }
