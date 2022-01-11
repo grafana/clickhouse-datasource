@@ -10,27 +10,24 @@ import {
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
-import AdHocManager from './adHocManager';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   templateSrv: TemplateSrv;
-  adHocManager: AdHocManager;
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
     this.templateSrv = getTemplateSrv();
-    this.adHocManager = new AdHocManager();
   }
 
-  async metricFindQuery(rawQuery: string) {
-    if (!rawQuery) {
+  async metricFindQuery(query: string | CHQuery) {
+    if (!query) {
       return [];
     }
-    const frame = await this.runQuery({rawSql: rawQuery} as Partial<CHQuery>);
+    const frame = await this.runQuery(typeof query === 'string' ? {rawSql: query} as Partial<CHQuery> : query);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -43,7 +40,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
-    let adHocQuery = this.adHocManager.apply(query.rawSql, (this.templateSrv as any)?.getAdhocFilters(this.name));
+    let adHocQuery = this.applyAdHocFilter(query.rawSql, (this.templateSrv as any)?.getAdhocFilters(this.name));
     return {
       ...query,
       rawSql: this.replace(adHocQuery, scoped) || '',
@@ -104,6 +101,19 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return vectorator(frame?.fields[0]?.values).map((text) => text);
   }
 
+  applyAdHocFilter(rawSql: string, adHocFilters: AdHocVariableFilter[]): string {
+    if (rawSql != '' && adHocFilters && Object.keys(adHocFilters).length > 0) {
+      let whereClause = 'WHERE';
+      for (let k of adHocFilters) {
+        let v = isNaN(Number(k.value)) ? `'${k.value}'` : Number(k.value)
+        whereClause += ` ${k.key} ${k.operator} ${v} ${k.condition ? k.condition : 'AND'}`;
+      }
+      // if there is not a where clause, then the ad hoc filter will not be applied. 
+      return rawSql.replace(/where/i, whereClause);
+    }
+    return rawSql;
+  }
+
   async getTagKeys(): Promise<MetricFindValue[]> {
     const frame = await this.fetchTags();
     return frame.fields.map((f) => ({ text: f.name }));
@@ -133,3 +143,10 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     }
   }
 }
+
+export type AdHocVariableFilter = {
+  key: string;
+  operator: string;
+  value: string;
+  condition: string;
+};
