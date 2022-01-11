@@ -8,8 +8,10 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 )
@@ -28,6 +30,7 @@ func ClickHouseConverters() []sqlutil.Converter {
 	list = append(list, NullableDate())
 	list = append(list, NullableDecimal())
 	list = append(list, NullableString())
+	list = append(list, StringArray())
 	return list
 }
 
@@ -151,6 +154,29 @@ func NullableString() sqlutil.Converter {
 					return (*string)(nil), nil
 				}
 				return &v.String, nil
+			},
+		},
+	}
+}
+
+var stringArrayMatch, _ = regexp.Compile(`Array\(String`)
+
+func StringArray() sqlutil.Converter {
+	kind := "StringArray"
+	return sqlutil.Converter{
+		Name:           kind,
+		InputScanType:  reflect.TypeOf(clickhouse.Array([]string{})),
+		InputTypeRegex: stringArrayMatch,
+		InputTypeName:  kind,
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType: data.FieldTypeNullableString,
+			ConvertWithColumn: func(in interface{}, col sql.ColumnType) (interface{}, error) {
+				if in == nil {
+					return nil, nil
+				}
+				v := in.(*[]string)
+				val := strings.Join(*v, ",")
+				return &val, nil
 			},
 		},
 	}
