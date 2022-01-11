@@ -28,7 +28,7 @@ describe('ClickHouseDatasource', () => {
         fields: [{ name: 'field', type: 'number', values: mockedValues }],
       };
       const expectedValues = mockedValues.map((v) => ({ text: v, value: v }));
-      const values = await createInstance({ queryResponse }).metricFindQuery({ rawSql: 'mock' } as CHQuery);
+      const values = await createInstance({ queryResponse }).metricFindQuery('mock');
       expect(values).toEqual(expectedValues);
     });
 
@@ -42,7 +42,7 @@ describe('ClickHouseDatasource', () => {
         ],
       };
       const expectedValues = mockedValues.map((v, i) => ({ text: v, value: mockedIds[i] }));
-      const values = await createInstance({ queryResponse }).metricFindQuery({ rawSql: 'mock' } as CHQuery);
+      const values = await createInstance({ queryResponse }).metricFindQuery('mock' );
       expect(values).toEqual(expectedValues);
     });
   });

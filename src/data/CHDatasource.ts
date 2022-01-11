@@ -1,29 +1,36 @@
 import {
+  ArrayDataFrame,
   DataFrame,
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
+  MetricFindValue,
   ScopedVars,
   vectorator,
 } from '@grafana/data';
-import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
+import AdHocManager from './adHocManager';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
+  templateSrv: TemplateSrv;
+  adHocManager: AdHocManager;
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
+    this.templateSrv = getTemplateSrv();
+    this.adHocManager = new AdHocManager();
   }
 
-  async metricFindQuery(query: CHQuery) {
-    if (!query.rawSql) {
+  async metricFindQuery(rawQuery: string) {
+    if (!rawQuery) {
       return [];
     }
-    const frame = await this.runQuery(query);
+    const frame = await this.runQuery({rawSql: rawQuery} as Partial<CHQuery>);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -36,9 +43,10 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
+    let adHocQuery = this.adHocManager.apply(query.rawSql, (this.templateSrv as any)?.getAdhocFilters(this.name));
     return {
       ...query,
-      rawSql: this.replace(query.rawSql || '') || '',
+      rawSql: this.replace(adHocQuery, scoped) || '',
     };
   }
 
@@ -94,5 +102,34 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       return [];
     }
     return vectorator(frame?.fields[0]?.values).map((text) => text);
+  }
+
+  async getTagKeys(): Promise<MetricFindValue[]> {
+    const frame = await this.fetchTags();
+    return frame.fields.map((f) => ({ text: f.name }));
+  }
+
+  async getTagValues({ key }: any): Promise<MetricFindValue[]> {
+    const frame = await this.fetchTags();
+    const field = frame.fields.find((f) => f.name === key);
+    if (field) {
+      // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
+      return vectorator(field.values)
+        .filter((value) => value !== null)
+        .map((value) => {
+          return { text: String(value) };
+        });
+    }
+    return [];
+  }
+
+  async fetchTags(): Promise<DataFrame> {
+    // @todo https://github.com/grafana/grafana/issues/13109
+    const rawSql = this.templateSrv.replace('$clickhouse_adhoc_query');
+    if (rawSql === '$clickhouse_adhoc_query') {
+      return new ArrayDataFrame([]);
+    } else {
+      return await this.runQuery({ rawSql, format: 1 });
+    }
   }
 }
