@@ -64,6 +64,17 @@ Time series visualization options are selectable after adding a `datetime` field
 
 Table visualizations will always be available for any valid ClickHouse query.
 
+### Visualizing logs with the Logs Panel
+
+To use the Logs panel your query must return a timestamp and string values.
+
+For example:
+```sql
+SELECT log_time as time, machine_group, toString(avg(disk_free)) as avg_disk_free
+from logs1
+group by machine_group, log_time
+order by log_time
+```
 
 ### Macros
 

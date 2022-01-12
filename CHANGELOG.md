@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.3
+
+Bug - Support Array data types.
+
 ## 0.9.2
 
 Bug - Fix TLS model.
