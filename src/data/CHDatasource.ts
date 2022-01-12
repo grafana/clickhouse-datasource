@@ -8,6 +8,7 @@ import {
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
+import { isString } from 'lodash';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -19,11 +20,12 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     this.settings = instanceSettings;
   }
 
-  async metricFindQuery(query: CHQuery) {
-    if (!query.rawSql) {
+  async metricFindQuery(query: CHQuery | string) {
+    const chQuery = isString(query) ? { rawSql: query } : query;
+    if (!chQuery.rawSql) {
       return [];
     }
-    const frame = await this.runQuery(query);
+    const frame = await this.runQuery(chQuery);
     if (frame.fields?.length === 0) {
       return [];
     }
