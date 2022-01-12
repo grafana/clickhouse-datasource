@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.4
+
+Bug - Fix query type variables.
+
 ## 0.9.3
 
 Bug - Support Array data types.
