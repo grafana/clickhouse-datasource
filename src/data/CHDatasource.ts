@@ -10,18 +10,20 @@ import {
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
-import { applyAdHocFilter } from './adHocFilter';
+import { AdHocManager } from './adHocFilter';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   templateSrv: TemplateSrv;
+  adHocManager: AdHocManager;
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
     this.templateSrv = getTemplateSrv();
+    this.adHocManager = new AdHocManager();
   }
 
   async metricFindQuery(query: string | CHQuery) {
@@ -41,7 +43,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
-    let adHocQuery = applyAdHocFilter(query.rawSql, (this.templateSrv as any)?.getAdhocFilters(this.name));
+    let adHocQuery = this.adHocManager.apply(query.rawSql, (this.templateSrv as any)?.getAdhocFilters(this.name));
     return {
       ...query,
       rawSql: this.replace(adHocQuery, scoped) || '',
@@ -127,7 +129,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     if (rawSql === '$clickhouse_adhoc_query') {
       return new ArrayDataFrame([]);
     } else {
-      return await this.runQuery({ rawSql, format: 1 });
+      this.adHocManager.setTargetTable(rawSql);
+      return await this.runQuery({ rawSql });
     }
   }
 }
