@@ -27,48 +27,59 @@ export class AdHocManager {
       }
     }
 
-    const clauses = this.applyFiltersToTree(this.getClauseTree(rawSql), whereClause);
-    return this.clausesToRawSql(clauses);
+    const clauses = this.sqlToAST(rawSql);
+    const filteredClauses = this.applyFiltersToTree(clauses, whereClause);
+    return this.clausesToRawSql(filteredClauses);
   }
 
   applyFiltersToTree(clauses: Map<string, Clause>, whereClause: string) {
-    //find which statements have to same table as the adhoc filter, so we can append
-    if (clauses.get('FROM')?.statement.trim() === this.targetTable) {
-      if (clauses.has('WHERE')) {
-        clauses.get('WHERE')!.statement += whereClause;
+    if (!clauses) {
+      return new Map<string, Clause>();
+    }
+    //find which statements have the same table as the adhoc filter so we can append
+    if (typeof clauses.get('FROM') === 'string' && clauses.get('FROM')?.toString().trim() === this.targetTable) {
+      if (clauses.get('WHERE')) {
+        clauses.set('WHERE', `${whereClause} AND ${clauses.get('WHERE')!}`);
       } else {
-        clauses.set('WHERE', {statement: whereClause} as Clause);
+        clauses.set('WHERE', whereClause);
       }
     } 
-    else if (clauses.get('FROM')?.clauses) {
-      clauses.get('FROM')!.clauses = this.applyFiltersToTree(clauses.get('FROM')!.clauses, whereClause);
+    else if (typeof clauses.get('FROM') === 'object') {
+      clauses.set('FROM', this.applyFiltersToTree(clauses.get('FROM')! as Map<string, Clause>, whereClause));
     }
     return clauses;
   }
 
-  getClauseTree(sql: string) {
-    let clauses = new Map<string, Clause>();
+  sqlToAST(sql: string) {
+    let clauses = this.createStatement();
     let regExpArray: RegExpExecArray | null;
-    const statementRE = /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/ig;
-    let bc = 0;
-    let lastAdded = '';
-    while ((regExpArray = statementRE.exec(sql)) !== null) {
+    const re = /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/ig;
+    let bracketCount = 0;
+    let lastBracketCount = 0;
+    let lastAddedOp = '';
+    let nodePhrase = '';
+    while ((regExpArray = re.exec(sql)) !== null) {
       const found = regExpArray[0];
-      const st = sql.substring(statementRE.lastIndex, sql.length).split(statementRE);
-      if(bc > 0) {
-        clauses.get(lastAdded)!.statement += found + st[0];
+      const phrase = sql.substring(re.lastIndex, sql.length).split(re)[0];
+      // if a bracket was found we need to add each element 
+      if(bracketCount > 0) {
+        nodePhrase += found + phrase;
       } else {
-        clauses.set(found, {statement: st[0]} as Clause);
-        lastAdded = found;
+        clauses.set(found, phrase);
+        lastAddedOp = found;
       }
-      bc += (st[0].match(/\(/g) || []).length;
-      if (st[0].includes(')')) {
-        bc -= (st[0].match(/\)/g) || []).length;
-        if (bc === 0) {
-          const st = clauses.get(lastAdded)!.statement;
-          clauses.get(lastAdded)!.clauses = this.getClauseTree(st.substring(1, st.length-2))
+      bracketCount += (phrase.match(/\(/g) || []).length;
+      bracketCount -= (phrase.match(/\)/g) || []).length;
+      if (bracketCount <= 0 && lastBracketCount > 0) {
+        //phrase is complete. Lets parse it
+        if (lastAddedOp === 'FROM') {
+          clauses.set(lastAddedOp, this.sqlToAST(nodePhrase));
+        } else {
+          let p = (clauses.get(lastAddedOp) as string).concat(nodePhrase);
+          clauses.set(lastAddedOp, p);
         }
       }
+      lastBracketCount = bracketCount;
     }
     return clauses;
   }
@@ -76,14 +87,36 @@ export class AdHocManager {
   clausesToRawSql(clauses: Map<string, Clause>) {
     let r = '';
     clauses.forEach((c: Clause, key: string) => {
-      r += key;
-      if (c.clauses && c.clauses.keys.length > 0) {
-        r += ` (${this.clausesToRawSql(c.clauses)}) `;
-      } else {
-        r += ` ${c.statement.trim()} `;
+      if (typeof c === 'string') {
+        r += `${key} ${c.trim()} `;
+      } else if (c) {
+        r += `${key} (${this.clausesToRawSql(c)} `;
       }
     });
     return r;
+  }
+
+  createStatement() {
+    let clauses = new Map<string, Clause>();
+    clauses.set('WITH', null);
+    clauses.set('SELECT', null);
+    clauses.set('DISTINCT', null);
+    clauses.set('FROM', null);
+    clauses.set('SAMPLE', null);
+    clauses.set('JOIN', null);
+    clauses.set('PREWHERE', null);
+    clauses.set('WHERE', null);
+    clauses.set('GROUP BY', null);
+    clauses.set('LIMIT BY', null);
+    clauses.set('HAVING', null);
+    clauses.set('LIMIT', null);
+    clauses.set('OFFSET', null);
+    clauses.set('UNION', null);
+    clauses.set('INTERSECT', null);
+    clauses.set('EXCEPT', null);
+    clauses.set('INTO OUTFILE', null);
+    clauses.set('FORMAT', null);
+    return clauses;
   }
 }
 
@@ -94,7 +127,4 @@ export type AdHocVariableFilter = {
   condition: string;
 };
 
-export type Clause = {
-  statement: string;
-  clauses: Map<string, Clause>;
-}
+type Clause = string | Map<string, Clause> | null;
