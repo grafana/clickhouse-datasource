@@ -40,7 +40,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
     return {
       ...query,
-      rawSql: this.replace(query.rawSql || '') || '',
+      rawSql: this.replace(query.rawSql || '', scoped) || '',
     };
   }
 
