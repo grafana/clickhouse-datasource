@@ -12,14 +12,6 @@ This plugin is currently in Beta development and subject to change.
 
    The **Installation** tab is displayed.
 
-### Verify that the plugin is installed
-
-1. In Grafana Enterprise from the left-hand menu, navigate to **Configuration** > **Data sources**.
-2. From the top-right corner, click the **Add data source** button.
-3. Search for ClickHouse in the search field, and hover over the ClickHouse search result.
-4. Click the **Select** button for ClickHouse.
-   * If you can click the **Select** button, then it is installed.
-   * If the button is missing or disabled, then the plugin is not installed. Check to see if your Grafana Enterprise license is valid, and reinstall the plugin. If you still need help, [contact Grafana Labs](https://grafana.com/contact).
 
 ## Configure ClickHouse for the data source
 
@@ -112,6 +104,12 @@ After creating a variable, you can use it in your ClickHouse queries by using [V
 Follow these [instructions](https://grafana.com/docs/grafana/latest/dashboards/export-import/#importing-a-dashboard) for importing a dashboard.
 
 Imported dashboards can be found in Configuration > Data Sources > select your ClickHouse data source > select the Dashboards tab to see available pre-made dashboards.
+
+### Using Ad-Hoc Filters
+
+A second helper variable must be created in addition to the standard ad-hoc filter type variable of any name. It should be a `constant` type named `clickhouse_adhoc_query` and contain a valid ClickHouse query. The query results will be used to populate your ad-hoc filter's selectable filters. You may choose to hide this variable from view as it serves no further purpose.
+
+If `clickhouse_adhoc_query` is set to `SELECT DISTINCT machine_name FROM mgbench.logs1` you would be able to select which machine names are filtered for in the dashboard.
 
 ## Learn more
 
