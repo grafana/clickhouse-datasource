@@ -92,8 +92,8 @@ WHERE $__timeFilter(date_time)
 | Macro example | Description |
 | -- | --|
 | *$__timeFilter(dataRow)* | Will be replaced by a time range filter using the specified name. |
-| *$__fromTime* | Will be replaced by the start of the currently active time range filter selection. |
-| *$__toTime* | Will be replaced by the end of the currently active time range filter selection. |
+| *$__fromTime* | Replaced by the start of time range in ms wrapped by toDateTime function. Example: toDateTime(intDiv(1415792726371,1000)) |
+| *$__toTime* | Replaced by the end of time range in ms wrapped by toDateTime function. Example: toDateTime(intDiv(1415792726371,1000)) |
 | *$__table* | Will be replaced by the table in use. |
 | *$__column* | Will be replaced by the column in use. |
 
