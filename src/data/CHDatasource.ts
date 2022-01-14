@@ -10,27 +10,28 @@ import {
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
-import { AdHocManager } from './adHocFilter';
+import { AdHocFilter } from './adHocFilter';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   templateSrv: TemplateSrv;
-  adHocManager: AdHocManager;
+  adHocFilter: AdHocFilter;
+  skipAdHocFilter = false;
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
     this.templateSrv = getTemplateSrv();
-    this.adHocManager = new AdHocManager();
+    this.adHocFilter = new AdHocFilter();
   }
 
   async metricFindQuery(query: string | CHQuery) {
     if (!query) {
       return [];
     }
-    const frame = await this.runQuery(typeof query === 'string' ? {rawSql: query} as Partial<CHQuery> : query);
+    const frame = await this.runQuery(typeof query === 'string' ? ({ rawSql: query } as Partial<CHQuery>) : query);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -43,10 +44,15 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
-    let adHocQuery = this.adHocManager.apply(query.rawSql, (this.templateSrv as any)?.getAdhocFilters(this.name));
+    let rawQuery = query.rawSql;
+    // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
+    if (!this.skipAdHocFilter) {
+      rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
+    }
+    this.skipAdHocFilter = false;
     return {
       ...query,
-      rawSql: this.replace(adHocQuery, scoped) || '',
+      rawSql: this.replace(rawQuery, scoped) || '',
     };
   }
 
@@ -129,7 +135,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     if (rawSql === '$clickhouse_adhoc_query') {
       return new ArrayDataFrame([]);
     } else {
-      this.adHocManager.setTargetTable(rawSql);
+      this.skipAdHocFilter = true;
+      this.adHocFilter.setTargetTable(rawSql);
       return await this.runQuery({ rawSql });
     }
   }

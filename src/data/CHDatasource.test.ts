@@ -41,7 +41,7 @@ describe('ClickHouseDatasource', () => {
         ],
       };
       const expectedValues = mockedValues.map((v, i) => ({ text: v, value: mockedIds[i] }));
-      const values = await createInstance({ queryResponse }).metricFindQuery('mock' );
+      const values = await createInstance({ queryResponse }).metricFindQuery('mock');
       expect(values).toEqual(expectedValues);
     });
   });

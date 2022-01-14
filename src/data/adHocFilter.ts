@@ -1,102 +1,116 @@
+export class AdHocFilter {
+  private _targetTable = '';
 
-export class AdHocManager {
-  targetTable = '';
   setTargetTable(query: string) {
-    const fromSplit = query.split(/\bfrom\b/i);
-    if (fromSplit.length == 2) {
-      this.targetTable = fromSplit[1].trim().split(' ')[0].replace(';', '');
-    }
-    else {
-      //warning
+    const fromSplit = query.split(/\b\FROM\b/i);
+    if (fromSplit.length === 2) {
+      this._targetTable = this.getTableName(fromSplit[1]);
     }
   }
 
-  apply(rawSql: string, adHocFilters: AdHocVariableFilter[]): string {
-    if (rawSql == '' || !adHocFilters || adHocFilters.length == 0) {
-      return rawSql;
+  apply(sql: string, adHocFilters: AdHocVariableFilter[]): string {
+    if (this._targetTable === '' || sql === '' || !adHocFilters || adHocFilters.length === 0) {
+      return sql;
     }
-    
-    //create the adhoc where clause
     let whereClause = '';
     for (let i = 0; i < adHocFilters.length; i++) {
       const filter = adHocFilters[i];
-      const v = isNaN(Number(filter.value)) ? `'${filter.value}'` : Number(filter.value)
+      const v = isNaN(Number(filter.value)) ? `'${filter.value}'` : Number(filter.value);
       whereClause += ` ${filter.key} ${filter.operator} ${v} `;
       if (i !== adHocFilters.length - 1) {
         whereClause += filter.condition ? filter.condition : 'AND';
       }
     }
-
-    const clauses = this.sqlToAST(rawSql);
-    const filteredClauses = this.applyFiltersToTree(clauses, whereClause);
-    return this.clausesToRawSql(filteredClauses);
+    // Semicolons are not required and cause problems when building the SQL
+    sql = sql.replace(';', '');
+    const ast = this.sqlToAST(sql);
+    const filteredAST = this.applyFiltersToAST(ast, whereClause);
+    return this.clausesToSql(filteredAST);
   }
 
-  applyFiltersToTree(clauses: Map<string, Clause>, whereClause: string) {
-    if (!clauses) {
-      return new Map<string, Clause>();
-    }
-    //find which statements have the same table as the adhoc filter so we can append
-    if (typeof clauses.get('FROM') === 'string' && clauses.get('FROM')?.toString().trim() === this.targetTable) {
-      if (clauses.get('WHERE')) {
-        clauses.set('WHERE', `${whereClause} AND ${clauses.get('WHERE')!}`);
-      } else {
-        clauses.set('WHERE', whereClause);
-      }
-    } 
-    else if (typeof clauses.get('FROM') === 'object') {
-      clauses.set('FROM', this.applyFiltersToTree(clauses.get('FROM')! as Map<string, Clause>, whereClause));
-    }
-    return clauses;
-  }
-
-  sqlToAST(sql: string) {
-    let clauses = this.createStatement();
-    let regExpArray: RegExpExecArray | null;
-    const re = /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/ig;
+  private sqlToAST(sql: string): Map<string, Clause> {
+    const ast = this.createStatement();
+    const re =
+      /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
     let bracketCount = 0;
     let lastBracketCount = 0;
-    let lastAddedOp = '';
-    let nodePhrase = '';
+    let lastNode = '';
+    let bracketPhrase = '';
+    let regExpArray: RegExpExecArray | null;
     while ((regExpArray = re.exec(sql)) !== null) {
-      const found = regExpArray[0];
+      // Sets foundNode to a SQL keyword from the regular expression
+      const foundNode = regExpArray[0].toUpperCase();
       const phrase = sql.substring(re.lastIndex, sql.length).split(re)[0];
-      // if a bracket was found we need to add each element 
-      if(bracketCount > 0) {
-        nodePhrase += found + phrase;
+      // If there is a greater number of open brackets than closed,
+      // add the the bracket phrase that will eventually be added the the last node
+      if (bracketCount > 0) {
+        bracketPhrase += foundNode + phrase;
       } else {
-        clauses.set(found, phrase);
-        lastAddedOp = found;
+        ast.set(foundNode, phrase);
+        lastNode = foundNode;
       }
       bracketCount += (phrase.match(/\(/g) || []).length;
       bracketCount -= (phrase.match(/\)/g) || []).length;
       if (bracketCount <= 0 && lastBracketCount > 0) {
-        //phrase is complete. Lets parse it
-        if (lastAddedOp === 'FROM') {
-          clauses.set(lastAddedOp, this.sqlToAST(nodePhrase));
+        // The phrase brackets is complete
+        // If it is a FROM phrase lets make a branch node
+        // If it is anything else lets make a leaf node
+        if (lastNode === 'FROM') {
+          ast.set(lastNode, this.sqlToAST(bracketPhrase));
         } else {
-          let p = (clauses.get(lastAddedOp) as string).concat(nodePhrase);
-          clauses.set(lastAddedOp, p);
+          const p = (ast.get(lastNode) as string).concat(bracketPhrase);
+          ast.set(lastNode, p);
         }
       }
       lastBracketCount = bracketCount;
     }
-    return clauses;
+    return ast;
   }
 
-  clausesToRawSql(clauses: Map<string, Clause>) {
+  private applyFiltersToAST(ast: Map<string, Clause>, whereClause: string): Map<string, Clause> {
+    if (typeof ast.get('FROM') === 'string') {
+      const fromPhrase = ast.get('FROM')!.toString().trim();
+      const tableName = this.getTableName(fromPhrase);
+      if (tableName !== this._targetTable) {
+        return ast;
+      }
+      // If there is no defined WHERE clause create one
+      // Else add an ad hoc filter to the existing WHERE clause
+      if (ast.get('WHERE') === null) {
+        ast.set('FROM', ` ${tableName} `);
+        // set where clause to ad hoc filter and add the remaining part of the from phrase to the new WHERE phrase
+        return ast.set('WHERE', `${whereClause} ${fromPhrase.substring(tableName.length)}`);
+      }
+      return ast.set('WHERE', `${whereClause} AND ${ast.get('WHERE')}`);
+    }
+    const fromAST = this.applyFiltersToAST(ast.get('FROM')! as Map<string, Clause>, whereClause);
+    return ast.set('FROM', fromAST);
+  }
+
+  private clausesToSql(ast: Map<string, Clause>): string {
     let r = '';
-    clauses.forEach((c: Clause, key: string) => {
+    ast.forEach((c: Clause, key: string) => {
       if (typeof c === 'string') {
         r += `${key} ${c.trim()} `;
-      } else if (c) {
-        r += `${key} (${this.clausesToRawSql(c)} `;
+      } else if (c !== null) {
+        r += `${key} (${this.clausesToSql(c)} `;
       }
     });
-    return r;
+    // Remove all of the consecutive spaces to make things more readable when debugging
+    return r.trim().replace(/\s+/g, ' ');
   }
 
-  createStatement() {
+  // Returns a table name found in the FROM phrase
+  // FROM phrases might contain more than just the table name
+  private getTableName(fromPhrase: string): string {
+    return fromPhrase
+      .trim()
+      .split(' ')[0]
+      .replace(/(;|\(|\))/g, '');
+  }
+
+  // Creates a statement with all the keywords to preserve the keyword order
+  private createStatement() {
     let clauses = new Map<string, Clause>();
     clauses.set('WITH', null);
     clauses.set('SELECT', null);
