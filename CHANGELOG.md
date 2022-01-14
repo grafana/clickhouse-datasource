@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.6
+
+Bug - Change time template variable names.
+
 ## 0.9.5
 
 Bug - Fix global template variables.
