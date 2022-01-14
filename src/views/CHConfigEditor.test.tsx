@@ -33,7 +33,7 @@ describe('ConfigEditor', () => {
     expect(a.textContent).toBe('Reset');
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
   });
-  it('with secure connection', async() => {
+  it('with secure connection', async () => {
     render(
       <ConfigEditor
         {...mockConfigEditorProps()}
@@ -44,7 +44,7 @@ describe('ConfigEditor', () => {
       />
     );
     expect(screen.queryByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(true))).toBeInTheDocument();
-  })
+  });
   it('without tlsCACert', async () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
     expect(screen.queryByPlaceholderText(Components.ConfigEditor.TLSCACert.placeholder)).not.toBeInTheDocument();
