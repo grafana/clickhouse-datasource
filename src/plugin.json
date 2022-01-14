@@ -19,8 +19,8 @@
       "large": "img/logo.png"
     },
     "links": [
-      {"name": "Website", "url": "https://github.com/grafana/grafana-starter-datasource-backend"},
-      {"name": "License", "url": "https://github.com/grafana/grafana-starter-datasource-backend/blob/master/LICENSE"}
+      {"name": "Website", "url": "https://github.com/grafana/clickhouse-datasource"},
+      {"name": "License", "url": "https://github.com/grafana/clickhouse-datasource/blob/master/LICENSE"}
     ],
     "screenshots": [],
     "version": "%VERSION%",
