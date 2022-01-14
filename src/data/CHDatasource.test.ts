@@ -4,7 +4,6 @@ import { mockDatasource } from '__mocks__/datasource';
 import { CHQuery } from 'types';
 
 interface InstanceConfig {
-  adHocQuery?: string;
   queryResponse: {} | [];
 }
 
@@ -14,7 +13,7 @@ jest.mock('@grafana/runtime', () => ({
   getTemplateSrv: () => templateSrvMock,
 }));
 
-const createInstance = ({ adHocQuery, queryResponse }: Partial<InstanceConfig> = {}) => {
+const createInstance = ({ queryResponse }: Partial<InstanceConfig> = {}) => {
   const instance = mockDatasource;
   jest.spyOn(instance, 'query').mockImplementation((request) => of({ data: [toDataFrame(queryResponse ?? [])] }));
   return instance;
@@ -28,7 +27,7 @@ describe('ClickHouseDatasource', () => {
         fields: [{ name: 'field', type: 'number', values: mockedValues }],
       };
       const expectedValues = mockedValues.map((v) => ({ text: v, value: v }));
-      const values = await createInstance({ queryResponse }).metricFindQuery({ rawSql: 'mock' } as CHQuery);
+      const values = await createInstance({ queryResponse }).metricFindQuery('mock');
       expect(values).toEqual(expectedValues);
     });
 
@@ -42,7 +41,7 @@ describe('ClickHouseDatasource', () => {
         ],
       };
       const expectedValues = mockedValues.map((v, i) => ({ text: v, value: mockedIds[i] }));
-      const values = await createInstance({ queryResponse }).metricFindQuery({ rawSql: 'mock' } as CHQuery);
+      const values = await createInstance({ queryResponse }).metricFindQuery('mock');
       expect(values).toEqual(expectedValues);
     });
   });
