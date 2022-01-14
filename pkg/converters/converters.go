@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -28,6 +29,7 @@ func ClickHouseConverters() []sqlutil.Converter {
 	list = append(list, NullableDate())
 	list = append(list, NullableDecimal())
 	list = append(list, NullableString())
+	list = append(list, ArrayConverters()...)
 	return list
 }
 
@@ -154,4 +156,53 @@ func NullableString() sqlutil.Converter {
 			},
 		},
 	}
+}
+
+// Array converters
+
+func ArrayConverters() []sqlutil.Converter {
+	var list []sqlutil.Converter
+	for _, c := range arrayTypes {
+		list = append(list, ArrayToCommaDelimitedString(c.name, c.kind))
+	}
+	return list
+}
+
+func ArrayToCommaDelimitedString(kind string, i interface{}) sqlutil.Converter {
+	kind = fmt.Sprintf("Array(%s)", kind)
+	return sqlutil.Converter{
+		Name:          kind,
+		InputScanType: reflect.TypeOf(i),
+		InputTypeName: kind,
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType: data.FieldTypeNullableString,
+			ConverterFunc: func(in interface{}) (interface{}, error) {
+				if in == nil {
+					return (*string)(nil), nil
+				}
+				val := strings.Replace(fmt.Sprint(in), "&", "", 1)
+				val = strings.Trim(strings.Join(strings.Fields(val), ","), "[]")
+				return &val, nil
+			},
+		},
+	}
+}
+
+type ArrayType struct {
+	name string
+	kind interface{}
+}
+
+var arrayTypes = []ArrayType{
+	{"String", []string{}},
+	{"Int8", []int8{}},
+	{"Int16", []int16{}},
+	{"Int32", []int32{}},
+	{"Int64", []int64{}},
+	{"UInt8", []uint8{}},
+	{"UInt16", []uint16{}},
+	{"UInt32", []uint32{}},
+	{"UInt64", []uint64{}},
+	{"Float32", []float32{}},
+	{"Float64", []float64{}},
 }

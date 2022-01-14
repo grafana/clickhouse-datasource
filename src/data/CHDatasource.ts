@@ -11,6 +11,7 @@ import {
 import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery } from '../types';
 import { AdHocFilter } from './adHocFilter';
+import { isString } from 'lodash';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -27,11 +28,12 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     this.adHocFilter = new AdHocFilter();
   }
 
-  async metricFindQuery(query: string | CHQuery) {
-    if (!query) {
+  async metricFindQuery(query: CHQuery | string) {
+    const chQuery = isString(query) ? { rawSql: query } : query;
+    if (!chQuery.rawSql) {
       return [];
     }
-    const frame = await this.runQuery(typeof query === 'string' ? ({ rawSql: query } as Partial<CHQuery>) : query);
+    const frame = await this.runQuery(chQuery);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -44,7 +46,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
-    let rawQuery = query.rawSql;
+    let rawQuery = query.rawSql || '';
     // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
     if (!this.skipAdHocFilter) {
       rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
