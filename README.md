@@ -81,13 +81,13 @@ FROM test_data
 WHERE $__timeFilter(date_time)
 ```
 
-| Macro example            | Description                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------------- |
-| *$__timeFilter(dataRow)* | Will be replaced by a time range filter using the specified name.                  |
-| *$__from*                | Will be replaced by the start of the currently active time range filter selection. |
-| *$__to*                  | Will be replaced by the end of the currently active time range filter selection.   |
-| *$__table*               | Will be replaced by the table in use.                                              |
-| *$__column*              | Will be replaced by the column in use.                                             |
+| Macro example | Description |
+| -- | --|
+| *$__timeFilter(dataRow)* | Will be replaced by a time range filter using the specified name. |
+| *$__fromTime* | Replaced by the start of time range in ms wrapped by toDateTime function. Example: toDateTime(intDiv(1415792726371,1000)) |
+| *$__toTime* | Replaced by the end of time range in ms wrapped by toDateTime function. Example: toDateTime(intDiv(1415792726371,1000)) |
+| *$__table* | Will be replaced by the table in use. |
+| *$__column* | Will be replaced by the column in use. |
 
 The plugin also supports notation using braces {}. Use this notation when queries are needed inside parameters.
 
