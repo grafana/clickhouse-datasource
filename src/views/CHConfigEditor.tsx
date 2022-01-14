@@ -130,7 +130,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             onChange={(e) => onPortChange(e.currentTarget.value)}
             label={Components.ConfigEditor.ServerPort.label}
             aria-label={Components.ConfigEditor.ServerPort.label}
-            placeholder={Components.ConfigEditor.ServerPort.placeholder(jsonData.secure || false)}
+            placeholder={Components.ConfigEditor.ServerPort.placeholder(jsonData.secure?.toString() || 'false')}
             tooltip={Components.ConfigEditor.ServerPort.tooltip}
           />
         </div>

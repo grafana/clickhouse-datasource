@@ -9,7 +9,7 @@ describe('ConfigEditor', () => {
   it('new editor', () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerAddress.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(false))).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('false'))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
@@ -26,7 +26,7 @@ describe('ConfigEditor', () => {
       />
     );
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerAddress.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(false))).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('false'))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     const a = screen.getByRole('button');
     expect(a).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe('ConfigEditor', () => {
         }}
       />
     );
-    expect(screen.queryByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(true))).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('true'))).toBeInTheDocument();
   });
   it('without tlsCACert', async () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
