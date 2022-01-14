@@ -8,7 +8,7 @@ export const Components = {
     },
     ServerPort: {
       label: 'Server port',
-      placeholder: 'Server port',
+      placeholder: (secure: boolean) => `Typically ${secure ? '9440' : '9000'}`,
       tooltip: 'ClickHouse native TCP port. Typically 9000 for unsecure, 9440 for secure',
     },
     Username: {

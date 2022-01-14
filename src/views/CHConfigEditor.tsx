@@ -97,6 +97,19 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <h3>Server</h3>
         <br />
         <div className="gf-form">
+          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
+            {Components.ConfigEditor.Secure.label}
+          </InlineFormLabel>
+          <div style={switchContainerStyle}>
+            <Switch
+              css={{}}
+              className="gf-form"
+              value={jsonData.secure || false}
+              onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
+            />
+          </div>
+        </div>
+        <div className="gf-form">
           <FormField
             labelWidth={12}
             inputWidth={20}
@@ -117,22 +130,9 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             onChange={(e) => onPortChange(e.currentTarget.value)}
             label={Components.ConfigEditor.ServerPort.label}
             aria-label={Components.ConfigEditor.ServerPort.label}
-            placeholder={Components.ConfigEditor.ServerPort.placeholder}
+            placeholder={Components.ConfigEditor.ServerPort.placeholder(jsonData.secure || false)}
             tooltip={Components.ConfigEditor.ServerPort.tooltip}
           />
-        </div>
-        <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
-            {Components.ConfigEditor.Secure.label}
-          </InlineFormLabel>
-          <div style={switchContainerStyle}>
-            <Switch
-              css={{}}
-              className="gf-form"
-              value={jsonData.secure || false}
-              onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
-            />
-          </div>
         </div>
       </div>
       <div className="gf-form-group">
