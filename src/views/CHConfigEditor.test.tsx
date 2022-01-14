@@ -9,7 +9,7 @@ describe('ConfigEditor', () => {
   it('new editor', () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerAddress.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(false))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
@@ -26,13 +26,25 @@ describe('ConfigEditor', () => {
       />
     );
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerAddress.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(false))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     const a = screen.getByRole('button');
     expect(a).toBeInTheDocument();
     expect(a.textContent).toBe('Reset');
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
   });
+  it('with secure connection', async() => {
+    render(
+      <ConfigEditor
+        {...mockConfigEditorProps()}
+        options={{
+          ...mockConfigEditorProps().options,
+          jsonData: { ...mockConfigEditorProps().options.jsonData, secure: true },
+        }}
+      />
+    );
+    expect(screen.queryByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder(true))).toBeInTheDocument();
+  })
   it('without tlsCACert', async () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
     expect(screen.queryByPlaceholderText(Components.ConfigEditor.TLSCACert.placeholder)).not.toBeInTheDocument();
