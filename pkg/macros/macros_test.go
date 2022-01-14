@@ -18,7 +18,7 @@ func TestMacroFromTimeFilter(t *testing.T) {
 			From: from,
 			To:   to,
 		},
-		RawSQL: "select foo from foo where bar > $__from",
+		RawSQL: "select foo from foo where bar > $__fromTime",
 	}
 	tests := []struct {
 		want    string
@@ -50,6 +50,7 @@ func TestMacroToTimeFilter(t *testing.T) {
 			From: from,
 			To:   to,
 		},
+		RawSQL: "select foo from foo where bar > $__toTime",
 	}
 	tests := []struct {
 		want    string

@@ -92,8 +92,8 @@ WHERE $__timeFilter(date_time)
 | Macro example | Description |
 | -- | --|
 | *$__timeFilter(dataRow)* | Will be replaced by a time range filter using the specified name. |
-| *$__from* | Will be replaced by the start of the currently active time range filter selection. |
-| *$__to* | Will be replaced by the end of the currently active time range filter selection. |
+| *$__fromTime* | Will be replaced by the start of the currently active time range filter selection. |
+| *$__toTime* | Will be replaced by the end of the currently active time range filter selection. |
 | *$__table* | Will be replaced by the table in use. |
 | *$__column* | Will be replaced by the column in use. |
 
