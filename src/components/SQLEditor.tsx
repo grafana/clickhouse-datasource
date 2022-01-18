@@ -23,7 +23,7 @@ export const SQLEditor = (props: SQLEditorProps) => {
     if (isString(select)) {
       const fields = select.split(',');
       if (fields.length > 1) {
-        return fields[0].endsWith('as time') ? Format.TIMESERIES : Format.TABLE;
+        return fields[0].toLowerCase().endsWith('as time') ? Format.TIMESERIES : Format.TABLE;
       }
     }
     return Format.TABLE;
