@@ -52,6 +52,21 @@ The query editor allows you to query ClickHouse to return time series or tabular
 
 Time series visualization options are selectable after adding a `datetime` field type to your query. This field will be used as the timestamp You can select time series visualizations using the visualization options. Grafana interprets timestamp rows without explicit time zone as UTC. Any column except time is treated as a value column.
 
+#### Multi-line time series
+
+To create multi-line time series, the query must return at least 3 fields.
+- field 1:  `datetime` field with an alias of `time`
+- field 2:  value to group by
+- field 3+: the metric values
+
+For example:
+```sql
+SELECT log_time as time, machine_group, avg(disk_free) as avg_disk_free
+from mgbench.logs1
+group by machine_group, log_time
+order by log_time
+```
+
 ### Query as table
 
 Table visualizations will always be available for any valid ClickHouse query.

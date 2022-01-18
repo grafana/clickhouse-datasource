@@ -24,3 +24,8 @@ export interface CHSecureConfig {
   tlsClientCert?: string;
   tlsClientKey?: string;
 }
+
+export enum Format {
+  TABLE = 1,
+  TIMESERIES = 2,
+}
