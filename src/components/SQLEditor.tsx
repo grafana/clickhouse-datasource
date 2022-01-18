@@ -20,14 +20,14 @@ export const SQLEditor = (props: SQLEditorProps) => {
     // first field as "time" alias and requires at least 2 fields (time and metric)
     const ast = sqlToAST(sql);
     const select = ast.get('SELECT');
-    if ( isString(select) ) {
+    if (isString(select)) {
       const fields = select.split(',');
       if (fields.length > 1) {
         return fields[0].endsWith('as time') ? 0 : 1;
       }
     }
     return 0;
-  }
+  };
 
   const onSqlChange = (sql: string) => {
     const format = getFormat(sql);
