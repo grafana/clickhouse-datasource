@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.7
+
+Feature - Multi-line time series.
+
 ## 0.9.6
 
 Bug - Change time template variable names.

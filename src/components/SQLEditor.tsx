@@ -7,13 +7,31 @@ import { CHQuery, CHConfig } from '../types';
 import { styles } from '../styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
 import { selectors } from 'selectors';
+import sqlToAST from '../data/ast';
+import { isString } from 'lodash';
 
 type SQLEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 export const SQLEditor = (props: SQLEditorProps) => {
   const { query, onRunQuery, onChange, datasource } = props;
+
+  const getFormat = (sql: string): number => {
+    // convention to format as time series
+    // first field as "time" alias and requires at least 2 fields (time and metric)
+    const ast = sqlToAST(sql);
+    const select = ast.get('SELECT');
+    if ( isString(select) ) {
+      const fields = select.split(',');
+      if (fields.length > 1) {
+        return fields[0].endsWith('as time') ? 0 : 1;
+      }
+    }
+    return 0;
+  }
+
   const onSqlChange = (sql: string) => {
-    onChange({ ...query, rawSql: sql, format: 1 });
+    const format = getFormat(sql);
+    onChange({ ...query, rawSql: sql, format });
     onRunQuery();
   };
 
