@@ -27,5 +27,5 @@ export interface CHSecureConfig {
 
 export enum Format {
   TABLE = 1,
-  TIMESERIES = 2
+  TIMESERIES = 2,
 }
