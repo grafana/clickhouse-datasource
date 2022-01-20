@@ -49,19 +49,11 @@ func TimeFilter(query *sqlds.Query, args []string) (string, error) {
 
 	var (
 		column = args[0]
-		from   = query.TimeRange.From.UTC().UnixMilli()
-		to     = query.TimeRange.To.UTC().UnixMilli()
+		from   = query.TimeRange.From.UTC().Unix()
+		to     = query.TimeRange.To.UTC().Unix()
 	)
 
 	return fmt.Sprintf("%s >= '%d' AND %s <= '%d'", column, from, column, to), nil
-}
-
-func Table(query *sqlds.Query, args []string) (string, error) {
-	return query.Table, nil
-}
-
-func Column(query *sqlds.Query, args []string) (string, error) {
-	return query.Column, nil
 }
 
 // RemoveQuotesInArgs remove all quotes from macro arguments and return

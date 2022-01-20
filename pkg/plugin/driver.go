@@ -119,7 +119,5 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 		"fromTime":   macros.FromTimeFilter,
 		"toTime":     macros.ToTimeFilter,
 		"timeFilter": macros.TimeFilter,
-		"table":      macros.Table,
-		"column":     macros.Column,
 	}
 }
