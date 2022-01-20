@@ -21,7 +21,9 @@ export const SQLEditor = (props: SQLEditorProps) => {
     const ast = sqlToAST(sql);
     const select = ast.get('SELECT');
     if (isString(select)) {
-      const fields = select.split(',');
+      // remove function parms that may contain commas
+      const cleanSelect = select.replace(/\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)/, '');
+      const fields = cleanSelect.split(',');
       if (fields.length > 1) {
         return fields[0].toLowerCase().endsWith('as time') ? Format.TIMESERIES : Format.TABLE;
       }

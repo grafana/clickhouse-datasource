@@ -54,7 +54,7 @@ Time series visualization options are selectable after adding a `datetime` field
 
 #### Multi-line time series
 
-To create multi-line time series, the query must return at least 3 fields.
+To create multi-line time series, the query must return at least 3 fields in the following order:
 - field 1:  `datetime` field with an alias of `time`
 - field 2:  value to group by
 - field 3+: the metric values
