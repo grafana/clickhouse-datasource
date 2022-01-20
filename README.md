@@ -96,12 +96,12 @@ FROM test_data
 WHERE $__timeFilter(date_time)
 ```
 
-| Macro                            | Description                                                                                                                      | Output example                                          |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| *$__timeFilter(columnName)*      | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in seconds      | `time >= '1480001790' AND time <= '1482576232' )`       |
-| *$__timeFilterMilli(columnName)* | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds | `time >= '1480001790671' AND time <= '1482576232479' )` |
-| *$__fromTime*                    | Replaced by the starting time of the range of the panel casted to DateTime                                                       | `toDateTime(intDiv(1415792726371,1000))`                |
-| *$__toTime*                      | Replaced by the ending time of the range of the panel casted to DateTime                                                         | `toDateTime(intDiv(1415792726371,1000))`                |
+| Macro                          | Description                                                                                                                      | Output example                                          |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| *$__timeFilter(columnName)*    | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in seconds      | `time >= '1480001790' AND time <= '1482576232' )`       |
+| *$__timeFilter_ms(columnName)* | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds | `time >= '1480001790671' AND time <= '1482576232479' )` |
+| *$__fromTime*                  | Replaced by the starting time of the range of the panel casted to DateTime                                                       | `toDateTime(intDiv(1415792726371,1000))`                |
+| *$__toTime*                    | Replaced by the ending time of the range of the panel casted to DateTime                                                         | `toDateTime(intDiv(1415792726371,1000))`                |
 
 The plugin also supports notation using braces {}. Use this notation when queries are needed inside parameters.
 
