@@ -116,8 +116,9 @@ func (h *Clickhouse) Converters() []sqlutil.Converter {
 // Macros returns list of macro functions convert the macros of raw query
 func (h *Clickhouse) Macros() sqlds.Macros {
 	return map[string]sqlds.MacroFunc{
-		"fromTime":   macros.FromTimeFilter,
-		"toTime":     macros.ToTimeFilter,
-		"timeFilter": macros.TimeFilter,
+		"fromTime":        macros.FromTimeFilter,
+		"toTime":          macros.ToTimeFilter,
+		"timeFilterMilli": macros.TimeFilterMilli,
+		"timeFilter":      macros.TimeFilter,
 	}
 }
