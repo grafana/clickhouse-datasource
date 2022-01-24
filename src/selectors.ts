@@ -61,6 +61,78 @@ export const Components = {
       container: 'data-testid-code-editor-container',
       Run: 'data-testid-code-editor-run-button',
     },
+    Types: {
+      label: 'Query Type',
+      tooltip: 'Query Type',
+      options: {
+        SQLEditor: 'SQL Editor',
+        QueryBuilder: 'Query Builder',
+      },
+      switcher: {
+        title: 'Are you sure?',
+        body: 'You will loose manual changes done to the SQL if you go back to the query builder.',
+        confirmText: 'Reset and Switch',
+        dismissText: 'No, continue edit SQL manually',
+      },
+    },
+    QueryBuilder: {
+      TYPES: {
+        label: 'Show as',
+        tooltip: 'Show as',
+        options: {
+          LIST: 'Table',
+          AGGREGATE: 'Aggregate',
+          TREND: 'Timeseries',
+        },
+      },
+      DATABASE: {
+        label: 'Database',
+        tooltip: 'Clickhouse database to query from',
+      },
+      FROM: {
+        label: 'Table',
+        tooltip: 'Clickhouse table to query from',
+      },
+      SELECT: {
+        label: 'Fields',
+        tooltipTable: 'List of fields to show. Use Standard/All/Custom to show all fields',
+        tooltipAggregate: `List of metrics to show. Use any of the given aggregation along with the field`,
+        ALIAS: {
+          label: 'as',
+          tooltip: 'alias',
+        },
+        AddLabel: 'Add Field',
+        RemoveLabel: '',
+      },
+      WHERE: {
+        label: 'Filters',
+        tooltip: `List of filters`,
+        AddLabel: 'Add Filter',
+        RemoveLabel: '',
+      },
+      GROUP_BY: {
+        label: 'Group by',
+        tooltip: 'Group the results by specific field',
+      },
+      ORDER_BY: {
+        label: 'Order by',
+        tooltip: 'Order by field',
+        AddLabel: 'Add Order by',
+        RemoveLabel: '',
+      },
+      LIMIT: {
+        label: 'Limit',
+        tooltip: 'Number of records/results to show.',
+      },
+      TIME_FIELD: {
+        label: 'Time field',
+        tooltip: 'Select the time field for trending over time',
+      },
+      PREVIEW: {
+        label: 'SQL Preview',
+        tooltip: 'SQL Preview. You can safely switch to SQL Editor to customize the generated query',
+      },
+    },
   },
 };
 export const selectors: { components: E2ESelectors<typeof Components> } = {

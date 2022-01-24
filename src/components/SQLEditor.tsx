@@ -3,7 +3,7 @@ import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor } from '@grafana/ui';
 import { Datasource } from '../data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
-import { CHQuery, CHConfig, Format } from '../types';
+import { CHQuery, CHConfig, Format, QueryType } from '../types';
 import { styles } from '../styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
 import { selectors } from 'selectors';
@@ -33,7 +33,7 @@ export const SQLEditor = (props: SQLEditorProps) => {
 
   const onSqlChange = (sql: string) => {
     const format = getFormat(sql);
-    onChange({ ...query, rawSql: sql, format });
+    onChange({ ...query, rawSql: sql, format, queryType: QueryType.SQL });
     onRunQuery();
   };
 

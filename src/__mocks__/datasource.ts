@@ -1,5 +1,5 @@
 import { PluginType } from '@grafana/data';
-import { CHQuery } from '../types';
+import { CHQuery, QueryType } from '../types';
 import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
@@ -35,4 +35,4 @@ export const mockDatasource = new Datasource({
     },
   },
 });
-export const mockQuery: CHQuery = { rawSql: 'select * from foo', refId: '', format: 1 };
+export const mockQuery: CHQuery = { rawSql: 'select * from foo', refId: '', format: 1, queryType: QueryType.SQL };

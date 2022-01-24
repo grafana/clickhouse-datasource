@@ -26,6 +26,7 @@
     "node": ">=14"
   },
   "dependencies": {
+    "@testing-library/dom": "^7.31.0",
     "@testing-library/jest-dom": "^5.15.0",
     "@testing-library/react": "^12.1.2",
     "@testing-library/user-event": "^13.5.0",
