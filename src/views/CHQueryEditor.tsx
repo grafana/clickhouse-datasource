@@ -7,15 +7,16 @@ import { getSQLFromQueryOptions } from 'components/queryBuilder/utils';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { Preview } from 'components/queryBuilder/Preview';
 import { QueryTypeSwitcher } from 'components/QueryTypeSwitcher';
+import { Button } from '@grafana/ui';
+import { styles } from 'styles';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
-  const { query, onRunQuery, onChange } = props;
+  const { query, onChange } = props;
   const onBuilderOptionsChange = (builderOptions: SqlBuilderOptions) => {
     const sql = getSQLFromQueryOptions(builderOptions);
     onChange({ ...query, queryType: QueryType.Builder, rawSql: sql, builderOptions });
-    onRunQuery();
   };
 
   switch (query.queryType) {
@@ -39,7 +40,6 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
         let { rawSql, builderOptions } = defaultCHBuilderQuery;
         newQuery = { ...newQuery, rawSql, builderOptions };
         onChange({ ...newQuery });
-        onRunQuery();
       }
       return (
         <div data-testid="query-editor-section-builder">
@@ -57,7 +57,12 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
   return (
     <>
-      <QueryTypeSwitcher {...props} />
+      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+        <span>
+          <QueryTypeSwitcher {...props} />
+        </span>
+        <Button onClick={() => props.onRunQuery()}>Run Query</Button>
+      </div>
       <CHEditorByType {...props} />
     </>
   );

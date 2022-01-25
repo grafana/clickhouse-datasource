@@ -55,9 +55,9 @@ export enum BuilderMode {
 
 export interface SqlBuilderOptionsList {
   mode: BuilderMode.List;
-  database: string;
-  table: string;
-  fields: string[];
+  database?: string;
+  table?: string;
+  fields?: string[];
   filters?: Filter[];
   orderBy?: OrderBy[];
   limit?: number;
@@ -136,8 +136,8 @@ export interface OrderBy {
 }
 
 export enum FilterOperator {
-  IsNull = '= null',
-  IsNotNull = '!= null',
+  IsNull = 'IS NULL',
+  IsNotNull = 'IS NOT NULL',
   Equals = '=',
   NotEquals = '!=',
   LessThan = '<',
@@ -211,13 +211,13 @@ export type Filter = NullFilter | BooleanFilter | NumberFilter | DateFilter | St
 export const defaultQueryType: QueryType = QueryType.Builder;
 export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
   queryType: QueryType.Builder,
-  rawSql: 'SELECT name from system.databases limit 5',
+  rawSql: '',
   builderOptions: {
     mode: BuilderMode.List,
-    database: 'system',
-    table: 'databases',
-    fields: ['name'],
-    limit: 5,
+    // database: 'system',
+    // table: undefined,
+    fields: [],
+    limit: 100,
   },
 };
 export const defaultCHSQLQuery: Omit<CHSQLQuery, 'refId'> = {

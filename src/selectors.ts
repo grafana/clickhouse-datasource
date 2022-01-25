@@ -70,9 +70,9 @@ export const Components = {
       },
       switcher: {
         title: 'Are you sure?',
-        body: 'You will loose manual changes done to the SQL if you go back to the query builder.',
-        confirmText: 'Reset and Switch',
-        dismissText: 'No, continue edit SQL manually',
+        body: 'You will lose manual changes done to the SQL if you go back to the query builder.',
+        confirmText: 'Yes',
+        dismissText: 'Cancel',
       },
     },
     QueryBuilder: {

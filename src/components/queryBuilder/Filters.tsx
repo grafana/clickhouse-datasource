@@ -169,7 +169,6 @@ export const FilterEditor = (props: {
   index: number;
   filter: Filter;
   onFilterChange: (index: number, filter: Filter) => void;
-  // getReferenceFieldSchema: (field: FullField) => void;
 }) => {
   const { index, filter, fieldsList, onFilterChange } = props;
   const [isOpen, setIsOpen] = useState(false);
@@ -225,55 +224,43 @@ export const FilterEditor = (props: {
     }
   };
   const onFilterNameChange = (fieldName: string) => {
-    // let action = 'UNKNOWN';
-    // let matchingField: FullField | undefined = props.fieldsList.find((f) => fieldName && f.name === fieldName);
-    // if (matchingField && matchingField.type === 'reference' && matchingField.referenceTo.length > 0) {
-    //   action = 'CLICKED_REFERENCE_FIELD';
-    // }
-    // if (action === 'CLICKED_REFERENCE_FIELD') {
-    //   if (matchingField) {
-    //     setIsOpen(true);
-    //     props.getReferenceFieldSchema(matchingField);
-    //   }
-    // } else {
-      setIsOpen(false);
-      const matchingFiled = fieldsList.find((f) => f.name === fieldName);
-      if (matchingFiled) {
-        var newFilter: Filter;
-        if (utils.isBooleanType(matchingFiled.type)) {
-          let boolFilter: BooleanFilter = {
-            filterType: 'custom',
-            key: matchingFiled.name,
-            type: 'boolean',
-            condition: filter.condition || 'AND',
-            operator: FilterOperator.Equals,
-            value: false,
-          };
-          newFilter = boolFilter;
-        } else if (utils.isDateType(matchingFiled.type)) {
-          let timeFilter: DateFilter = {
-            filterType: 'custom',
-            key: matchingFiled.name,
-            type: matchingFiled.type as 'date',
-            condition: filter.condition || 'AND',
-            operator: FilterOperator.Equals,
-            value: 'TODAY',
-          };
-          newFilter = timeFilter;
-        } else {
-          let nullFilter: NullFilter = {
-            filterType: 'custom',
-            key: matchingFiled.name,
-            type: matchingFiled.type,
-            condition: filter.condition || 'AND',
-            operator: FilterOperator.IsNotNull,
-          };
-          newFilter = nullFilter;
-        }
-        onFilterChange(index, newFilter);
+    setIsOpen(false);
+    const matchingFiled = fieldsList.find((f) => f.name === fieldName);
+    if (matchingFiled) {
+      var newFilter: Filter;
+      if (utils.isBooleanType(matchingFiled.type)) {
+        let boolFilter: BooleanFilter = {
+          filterType: 'custom',
+          key: matchingFiled.name,
+          type: 'boolean',
+          condition: filter.condition || 'AND',
+          operator: FilterOperator.Equals,
+          value: false,
+        };
+        newFilter = boolFilter;
+      } else if (utils.isDateType(matchingFiled.type)) {
+        let timeFilter: DateFilter = {
+          filterType: 'custom',
+          key: matchingFiled.name,
+          type: matchingFiled.type as 'date',
+          condition: filter.condition || 'AND',
+          operator: FilterOperator.Equals,
+          value: 'TODAY',
+        };
+        newFilter = timeFilter;
+      } else {
+        let nullFilter: NullFilter = {
+          filterType: 'custom',
+          key: matchingFiled.name,
+          type: matchingFiled.type,
+          condition: filter.condition || 'AND',
+          operator: FilterOperator.IsNotNull,
+        };
+        newFilter = nullFilter;
       }
+      onFilterChange(index, newFilter);
     }
-  // };
+  }
   const onFilterOperatorChange = (operator: FilterOperator) => {
     let newFilter: Filter = filter;
     newFilter.operator = operator;
@@ -323,7 +310,6 @@ export const FiltersEditor = (props: {
   fieldsList: FullField[];
   filters: Filter[];
   onFiltersChange: (filters: Filter[]) => void;
-  // getReferenceFieldSchema: (field: FullField) => void;
 }) => {
   const { filters = [], onFiltersChange, fieldsList = [] } = props;
   const { label, tooltip, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.WHERE;
@@ -370,11 +356,10 @@ export const FiltersEditor = (props: {
               <div className={`width-8 ${styles.Common.firstLabel}`}></div>
             )}
             <FilterEditor
-              fieldsList={fieldsList.filter((f) => f.filterable)}
+              fieldsList={fieldsList}
               filter={filter}
               onFilterChange={onFilterChange}
               index={index}
-              // getReferenceFieldSchema={props.getReferenceFieldSchema}
             />
             <Button
               data-testid="query-builder-filters-remove-button"

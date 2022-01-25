@@ -54,10 +54,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   }, [props.datasource, builder.table]);
 
   const onDatabaseChange = (database = '') => {
+    setBaseFieldsList([]);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       database,
-      table: '',
       fields: [],
       filters: [],
       orderBy: [],
@@ -66,6 +66,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
 
   const onTableChange = (table = '') => {
+    // setTable(table);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       table,

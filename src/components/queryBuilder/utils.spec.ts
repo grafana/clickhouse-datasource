@@ -9,13 +9,13 @@ import { getSQLFromQueryOptions as convert } from './utils';
 describe('Utils', () => {
   it('getSQLFromQueryOptions', () => {
     expect(convert({ mode: BuilderMode.List, database: 'db', table: '', fields: ['name'] })).toBe(
-      'SELECT name FROM db.databases LIMIT 100'
+      'SELECT name FROM db'
     );
     expect(convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['name'] })).toBe(
-      'SELECT name FROM db.foo LIMIT 100'
+      'SELECT name FROM db.foo'
     );
     expect(convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['field1', 'field2'] })).toBe(
-      'SELECT field1, field2 FROM db.foo LIMIT 100'
+      'SELECT field1, field2 FROM db.foo'
     );
     expect(convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['field1', 'field2'], limit: 20 })).toBe(
       'SELECT field1, field2 FROM db.foo LIMIT 20'
@@ -34,7 +34,7 @@ describe('Utils', () => {
       })
     ).toBe('SELECT field1, field2 FROM db.foo ORDER BY field1 ASC LIMIT 20');
     expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', metrics: [] })).toBe(
-      'SELECT count(Id) total_count FROM db.databases'
+      'SELECT count(Id) total_count FROM db'
     );
     expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: 'foo', metrics: [] })).toBe(
       'SELECT count(Id) total_count FROM db.foo'
@@ -89,7 +89,7 @@ describe('Utils', () => {
         ],
         groupBy: ['field3'],
       })
-    ).toBe('SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM db.foo GROUP BY field3 LIMIT 100');
+    ).toBe('SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM db.foo GROUP BY field3');
     expect(
       convert({
         mode: BuilderMode.Aggregate,
@@ -102,7 +102,7 @@ describe('Utils', () => {
         groupBy: ['StageName', 'Type'],
       })
     ).toBe(
-      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type LIMIT 100'
+      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type'
     );
     expect(
       convert({
@@ -117,7 +117,7 @@ describe('Utils', () => {
         orderBy: [{ name: 'count(Id)', dir: OrderByDirection.DESC }],
       })
     ).toBe(
-      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type ORDER BY count(Id) DESC LIMIT 100'
+      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type ORDER BY count(Id) DESC'
     );
     expect(
       convert({
@@ -135,7 +135,7 @@ describe('Utils', () => {
         ],
       })
     ).toBe(
-      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC LIMIT 100'
+      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC'
     );
     expect(
       convert({

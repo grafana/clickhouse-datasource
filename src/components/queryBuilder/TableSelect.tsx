@@ -8,17 +8,26 @@ import { styles } from '../../styles';
 export type Props = { datasource: Datasource; database?: string; table?: string; onTableChange: (value: string) => void };
 
 export const TableSelect = (props: Props) => {
-  const { datasource, onTableChange, database } = props;
+  const { datasource, onTableChange, database, table } = props;
   const [list, setList] = useState<Array<SelectableValue<string>>>([]);
+  const [value, setValue] = useState<string | undefined>(table);
   const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.FROM;
   useEffect(() => {
     async function fetchTables() {
       const tables = await datasource.fetchTables(database)
       const values = tables.map((t) => ({ label: t, value: t }));
       setList(values);
+      const val = values.length > 0 ? values[0] : undefined;
+      setValue(val?.value);
     }
     fetchTables();
   }, [datasource, database]);
+
+  const onChange = (value: string) => {
+    setValue(value);
+    onTableChange(value);
+  }
+
   return (
     <>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
@@ -26,9 +35,9 @@ export const TableSelect = (props: Props) => {
       </InlineFormLabel>
       <Select
         className={`width-15 ${styles.Common.inlineSelect}`}
-        onChange={(e) => onTableChange(e.value!)}
+        onChange={(e) => onChange(e.value!)}
         options={list}
-        value={props.table}
+        value={value}
         menuPlacement={'auto'}
       ></Select>
     </>

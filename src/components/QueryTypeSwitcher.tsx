@@ -12,7 +12,7 @@ interface QueryTypeSwitcherProps {
 }
 
 export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
-  const { query, onChange, onRunQuery } = props;
+  const { query, onChange } = props;
   const { label, tooltip, options: queryTypeLabels, switcher } = selectors.components.QueryEditor.Types;
   let queryType: QueryType =
     query.queryType ||
@@ -44,7 +44,6 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
       } else if (queryType === QueryType.Builder) {
         onChange({ ...query, queryType, rawSql: getSQLFromQueryOptions(builderOptions), builderOptions });
       }
-      onRunQuery();
     }
   };
   const onConfirmQueryTypeChange = () => {
@@ -52,7 +51,7 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
     setConfirmModalState(false);
   };
   return (
-    <div className="gf-form">
+    <>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
@@ -67,6 +66,6 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
         onConfirm={onConfirmQueryTypeChange}
         onDismiss={() => setConfirmModalState(false)}
       />
-    </div>
+    </>
   );
 };

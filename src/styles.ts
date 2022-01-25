@@ -48,6 +48,13 @@ export const styles = {
       padding: 5px 0 5px 0;
     `,
   },
-  QueryEditor: {},
+  QueryEditor: {
+    queryType: css`
+      justify-content: space-between;
+      span {
+        display: flex;
+      }
+    `
+  },
   VariablesEditor: {},
 };

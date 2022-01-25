@@ -60,14 +60,13 @@ const getTimeField = (timeField: string, timeFieldType: string): string => {
   }
 };
 
-const getListQuery = (database: string, table: string, fields: string[]): string => {
-  table = table || 'databases';
+const getListQuery = (database: string = '', table: string = '', fields: string[] = []): string => {
+  const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
-  return `SELECT ${fields.join(', ')} FROM ${database}.${table}`;
+  return `SELECT ${fields.join(', ')} FROM ${database}${sep}${table}`;
 };
 
-const getAggregationQuery = (database: string, table: string, metrics: BuilderMetricField[] = [], groupBy: string[] = []): string => {
-  table = table || 'databases';
+const getAggregationQuery = (database: string = '', table: string = '', metrics: BuilderMetricField[] = [], groupBy: string[] = []): string => {
   metrics =
     metrics && metrics.length > 0
       ? metrics
@@ -81,7 +80,8 @@ const getAggregationQuery = (database: string, table: string, metrics: BuilderMe
   if (groupBy && groupBy.length > 0) {
     metricsQuery = groupBy.map((g) => `${g}`).join(', ') + ', ' + metricsQuery;
   }
-  return `SELECT ${metricsQuery} FROM ${database}.${table}`;
+  const sep = database === '' || table === '' ? '' : '.';
+  return `SELECT ${metricsQuery} FROM ${database}${sep}${table}`;
 };
 
 const getTrendByQuery = (
@@ -91,7 +91,7 @@ const getTrendByQuery = (
   timeField = 'CreatedDate',
   timeFieldType = ''
 ): string => {
-  table = table || 'Opportunity';
+  // table = table || 'Opportunity';
   metrics =
     metrics && metrics.length > 0
       ? metrics
@@ -213,7 +213,7 @@ const getLimit = (limit?: number): string => {
 };
 
 export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
-  const limit = getLimit(options.limit);
+  const limit = options.limit ? getLimit(options.limit) : '';
   let query = ``;
   switch (options.mode) {
     case BuilderMode.Aggregate:
