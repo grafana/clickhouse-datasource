@@ -15,11 +15,10 @@ import {
   defaultCHBuilderQuery,
   OrderBy,
   BuilderMode,
-  BuilderMetricField,
-  BuilderMetricFieldAggregation,
   FullField,
   Filter,
   SqlBuilderOptionsTrend,
+  BuilderMetricField,
 } from './../../types';
 import { DatabaseSelect } from './DatabaseSelect';
 
@@ -66,7 +65,6 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
 
   const onTableChange = (table = '') => {
-    // setTable(table);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       table,
@@ -86,9 +84,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         ...builder,
         mode,
         orderBy: [],
-        metrics: builder.metrics || [
-          { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_count' },
-        ],
+        metrics: builder.metrics || [],
       };
       props.onBuilderOptionsChange(queryOptions);
     } else if (mode === BuilderMode.Trend) {
@@ -97,9 +93,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         mode: BuilderMode.Trend,
         timeField: builder.timeField || 'CreatedDate',
         timeFieldType: builder.timeFieldType || 'datetime',
-        metrics: builder.metrics || [
-          { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_count' },
-        ],
+        metrics: builder.metrics || [],
       };
       props.onBuilderOptionsChange(queryOptions);
     }
@@ -111,9 +105,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
 
   const onMetricsChange = (
-    metrics: BuilderMetricField[] = [
-      { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_count' },
-    ]
+    metrics: BuilderMetricField[] = []
   ) => {
     const queryOptions: SqlBuilderOptions = { ...builder, metrics };
     props.onBuilderOptionsChange(queryOptions);

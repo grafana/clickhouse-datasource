@@ -23,7 +23,7 @@ const MetricEditor = (props: {
     { value: BuilderMetricFieldAggregation.Min, label: 'Min' },
     { value: BuilderMetricFieldAggregation.Max, label: 'Max' },
     { value: BuilderMetricFieldAggregation.Average, label: 'Average' },
-    { value: BuilderMetricFieldAggregation.Count_Distinct, label: 'Distinct Count' },
+    // { value: BuilderMetricFieldAggregation.Count_Distinct, label: 'Distinct Count' },
   ];
   const onMetricFieldChange = (e: SelectableValue<string>) => {
     setIsOpen(false);
@@ -87,7 +87,7 @@ export const MetricsEditor = (props: MetricsEditorProps) => {
   const { metrics, onMetricsChange, fieldsList = [] } = props;
   const { label, tooltipAggregate, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.SELECT;
   const onMetricAdd = () => {
-    const newMetric: BuilderMetricField = { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count };
+    const newMetric: BuilderMetricField = { field: '', aggregation: BuilderMetricFieldAggregation.Count };
     onMetricsChange([...metrics, newMetric]);
   };
   const onMetricRemove = (index: number) => {
@@ -108,7 +108,7 @@ export const MetricsEditor = (props: MetricsEditorProps) => {
               <div className={`width-8 ${styles.Common.firstLabel}`}></div>
             )}
             <MetricEditor
-              fieldsList={fieldsList.filter((f) => f.aggregatable)}
+              fieldsList={fieldsList}
               index={index}
               metric={metric}
               metrics={metrics}
