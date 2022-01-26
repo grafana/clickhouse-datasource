@@ -14,7 +14,7 @@ interface TimeFieldEditorProps {
 export const TimeFieldEditor = (props: TimeFieldEditorProps) => {
   const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.TIME_FIELD;
   const columns: SelectableValue[] = (props.fieldsList || [])
-    .filter((f) => f.type === 'datetime' || f.type === 'date')
+    .filter((f) => f.type.toLowerCase() === 'datetime' || f.type.toLowerCase() === 'date')
     .map((f) => ({ label: f.label, value: f.name }));
   const getColumnType = (columnName: string): string => {
     const matchedColumn = props.fieldsList.find((f) => f.name === columnName);

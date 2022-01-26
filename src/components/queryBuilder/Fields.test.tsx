@@ -12,21 +12,13 @@ describe('FieldsEditor', () => {
     { name: 'Dummy', label: 'Dummy', type: 'string', picklistValues: [] },
   ];
   it('should render default value when no options passed', () => {
-    const result = render(
-      <FieldsEditor fieldsList={[]} fields={[]} onFieldsChange={() => {}} />
-    );
+    const result = render(<FieldsEditor fieldsList={[]} fields={[]} onFieldsChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId('query-builder-fields-multi-select-container')).toBeInTheDocument();
   });
   it('should render the correct values when passed', () => {
     const onFieldsChange = jest.fn();
-    const result = render(
-      <FieldsEditor
-        fieldsList={list}
-        fields={fields}
-        onFieldsChange={onFieldsChange}
-      />
-    );
+    const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId('query-builder-fields-multi-select-container')).toBeInTheDocument();
     expect(result.queryAllByText('Standard Fields').length).toBe(0);
@@ -34,18 +26,11 @@ describe('FieldsEditor', () => {
     expect(result.getByText('Stage')).toBeInTheDocument();
     expect(result.queryAllByText('Dummy').length).toBe(0);
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
-
   });
   it('should render the popup values when clicked', () => {
     const onFieldsChange = jest.fn();
 
-    const result = render(
-      <FieldsEditor
-        fieldsList={list}
-        fields={fields}
-        onFieldsChange={onFieldsChange}
-      />
-    );
+    const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
 
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
@@ -65,13 +50,7 @@ describe('FieldsEditor', () => {
   it('should close when clicked outside', () => {
     const onFieldsChange = jest.fn();
 
-    const result = render(
-      <FieldsEditor
-        fieldsList={list}
-        fields={fields}
-        onFieldsChange={onFieldsChange}
-      />
-    );
+    const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
 
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
@@ -81,6 +60,5 @@ describe('FieldsEditor', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Esc' });
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
-
   });
 });

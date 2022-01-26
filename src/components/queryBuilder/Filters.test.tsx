@@ -9,13 +9,7 @@ describe('FiltersEditor', () => {
   describe('FiltersEditor', () => {
     it('renders correctly', () => {
       const onFiltersChange = jest.fn();
-      const result = render(
-        <FiltersEditor
-          fieldsList={[]}
-          filters={[]}
-          onFiltersChange={onFiltersChange}
-        />
-      );
+      const result = render(<FiltersEditor fieldsList={[]} filters={[]} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
@@ -41,13 +35,7 @@ describe('FiltersEditor', () => {
           operator: FilterOperator.IsNotNull,
         },
       ];
-      const result = render(
-        <FiltersEditor
-          fieldsList={[]}
-          filters={filters}
-          onFiltersChange={() => {}}
-        />
-      );
+      const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={() => {}} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -73,13 +61,7 @@ describe('FiltersEditor', () => {
         },
       ];
       const onFiltersChange = jest.fn();
-      const result = render(
-        <FiltersEditor
-          fieldsList={[]}
-          filters={filters}
-          onFiltersChange={onFiltersChange}
-        />
-      );
+      const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();

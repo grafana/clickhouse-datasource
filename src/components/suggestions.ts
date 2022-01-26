@@ -4,7 +4,7 @@ import { Range, SchemaKind, Suggestion } from './sqlProvider';
 export interface Schema {
   databases: () => Promise<string[]>;
   tables: (db?: string) => Promise<string[]>;
-  fields: (table: string) => Promise<string[]>;
+  fields: (db: string, table: string) => Promise<string[]>;
   defaultDatabase?: string;
 }
 
@@ -49,7 +49,7 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
     if (schema.defaultDatabase !== undefined) {
       // format: table. scenario - fetch the fields for the table
       const table = subparts[0];
-      return fetchFieldSuggestions(schema, range, table);
+      return fetchFieldSuggestions(schema, range, '', table);
     }
     // no default database defined - assume format: db.table.field
     if (subparts.length === 2) {
@@ -58,8 +58,9 @@ export async function fetchSuggestions(text: string, schema: Schema, range: Rang
       return fetchTableSuggestions(schema, range, db);
     }
     // show fields
+    const db = subparts[0];
     const table = subparts[1];
-    return fetchFieldSuggestions(schema, range, table);
+    return fetchFieldSuggestions(schema, range, db, table);
   }
   return [];
 }
@@ -86,8 +87,8 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database?: st
   }));
 }
 
-async function fetchFieldSuggestions(schema: Schema, range: Range, table: string) {
-  const fields = await schema.fields(table);
+async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string) {
+  const fields = await schema.fields(db, table);
   return fields.map((val) => ({
     label: val,
     kind: SchemaKind.FIELD,

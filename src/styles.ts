@@ -54,7 +54,7 @@ export const styles = {
       span {
         display: flex;
       }
-    `
+    `,
   },
   VariablesEditor: {},
 };

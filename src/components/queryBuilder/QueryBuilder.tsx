@@ -32,9 +32,9 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   const [baseFieldsList, setBaseFieldsList] = useState<FullField[]>([]);
   const builder = defaultsDeep(props.builderOptions, defaultCHBuilderQuery.builderOptions);
   useEffect(() => {
-    const fetchBaseFields = async (table: string) => {
+    const fetchBaseFields = async (database: string, table: string) => {
       props.datasource
-        .fetchFieldsFull(table)
+        .fetchFieldsFull(database, table)
         .then(async (fields) => {
           setBaseFieldsList(fields);
         })
@@ -43,9 +43,9 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           throw ex;
         });
     };
-    
+
     if (builder.table) {
-      fetchBaseFields(builder.table);
+      fetchBaseFields(builder.database, builder.table);
     }
     // We want to run this only when the table changes or first time load.
     // If we add 'builder.fields' / 'builder.groupBy' / 'builder.metrics' / 'builder.filters' to the deps array, this will be called every time query editor changes
@@ -91,7 +91,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       const queryOptions: SqlBuilderOptionsTrend = {
         ...builder,
         mode: BuilderMode.Trend,
-        timeField: builder.timeField || 'CreatedDate',
+        timeField: builder.timeField || '',
         timeFieldType: builder.timeFieldType || 'datetime',
         metrics: builder.metrics || [],
       };
@@ -104,9 +104,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     props.onBuilderOptionsChange(queryOptions);
   };
 
-  const onMetricsChange = (
-    metrics: BuilderMetricField[] = []
-  ) => {
+  const onMetricsChange = (metrics: BuilderMetricField[] = []) => {
     const queryOptions: SqlBuilderOptions = { ...builder, metrics };
     props.onBuilderOptionsChange(queryOptions);
   };
@@ -150,28 +148,21 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         <DatabaseSelect datasource={props.datasource} value={builder.database} onChange={onDatabaseChange} />
       </div>
       <div className="gf-form">
-        <TableSelect datasource={props.datasource} database={builder.database} table={builder.table} onTableChange={onTableChange} />
+        <TableSelect
+          datasource={props.datasource}
+          database={builder.database}
+          table={builder.table}
+          onTableChange={onTableChange}
+        />
         <ModeEditor mode={builder.mode} onModeChange={onModeChange} />
       </div>
       {builder.mode === BuilderMode.List && (
-        <FieldsEditor
-          fields={builder.fields || []}
-          onFieldsChange={onFieldsChange}
-          fieldsList={fieldsList}
-        />
+        <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
       )}
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
-        <MetricsEditor
-          metrics={builder.metrics || []}
-          onMetricsChange={onMetricsChange}
-          fieldsList={fieldsList}
-        />
+        <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
       )}
-      <FiltersEditor
-        filters={builder.filters || []}
-        onFiltersChange={onFiltersChange}
-        fieldsList={fieldsList}
-      />
+      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
       {builder.mode === BuilderMode.Trend && (
         <TimeFieldEditor
           timeField={builder.timeField}
@@ -181,11 +172,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         />
       )}
       {builder.mode === BuilderMode.Aggregate && (
-        <GroupByEditor
-          groupBy={builder.groupBy || []}
-          onGroupByChange={onGroupByChange}
-          fieldsList={fieldsList}
-        />
+        <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
       )}
       {builder.mode !== BuilderMode.Trend && (
         <>

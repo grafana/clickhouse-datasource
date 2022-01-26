@@ -1,9 +1,4 @@
-import {
-  BuilderMetricFieldAggregation,
-  BuilderMode,
-  FilterOperator,
-  OrderByDirection,
-} from 'types';
+import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDirection } from 'types';
 import { getSQLFromQueryOptions as convert } from './utils';
 
 describe('Utils', () => {
@@ -17,11 +12,18 @@ describe('Utils', () => {
     expect(convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['field1', 'field2'] })).toBe(
       'SELECT field1, field2 FROM db.foo'
     );
-    expect(convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['field1', 'field2'], limit: 20 })).toBe(
-      'SELECT field1, field2 FROM db.foo LIMIT 20'
-    );
     expect(
-      convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['field1', 'field2'], orderBy: [], limit: 20 })
+      convert({ mode: BuilderMode.List, database: 'db', table: 'foo', fields: ['field1', 'field2'], limit: 20 })
+    ).toBe('SELECT field1, field2 FROM db.foo LIMIT 20');
+    expect(
+      convert({
+        mode: BuilderMode.List,
+        database: 'db',
+        table: 'foo',
+        fields: ['field1', 'field2'],
+        orderBy: [],
+        limit: 20,
+      })
     ).toBe('SELECT field1, field2 FROM db.foo LIMIT 20');
     expect(
       convert({
@@ -33,11 +35,9 @@ describe('Utils', () => {
         limit: 20,
       })
     ).toBe('SELECT field1, field2 FROM db.foo ORDER BY field1 ASC LIMIT 20');
-    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', metrics: [] })).toBe(
-      'SELECT count(Id) total_count FROM db'
-    );
+    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', metrics: [] })).toBe('SELECT  FROM db');
     expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: 'foo', metrics: [] })).toBe(
-      'SELECT count(Id) total_count FROM db.foo'
+      'SELECT  FROM db.foo'
     );
     expect(
       convert({
@@ -94,21 +94,19 @@ describe('Utils', () => {
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [
           { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
           { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
         ],
         groupBy: ['StageName', 'Type'],
       })
-    ).toBe(
-      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type'
-    );
+    ).toBe('SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.foo GROUP BY StageName, Type');
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [
           { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
           { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -117,13 +115,13 @@ describe('Utils', () => {
         orderBy: [{ name: 'count(Id)', dir: OrderByDirection.DESC }],
       })
     ).toBe(
-      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type ORDER BY count(Id) DESC'
+      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.foo GROUP BY StageName, Type ORDER BY count(Id) DESC'
     );
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [
           { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
           { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -135,21 +133,21 @@ describe('Utils', () => {
         ],
       })
     ).toBe(
-      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.Opportunity GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC'
+      'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.foo GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC'
     );
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
       })
-    ).toBe('SELECT count(Id) FROM db.Opportunity');
+    ).toBe('SELECT count(Id) FROM db.foo');
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -162,12 +160,12 @@ describe('Utils', () => {
           },
         ],
       })
-    ).toBe(`SELECT count(Id) FROM db.Opportunity WHERE   ( StageName IN ('Deal Won', 'Deal Lost' ) )`);
+    ).toBe(`SELECT count(Id) FROM db.foo WHERE   ( StageName IN ('Deal Won', 'Deal Lost' ) )`);
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -180,12 +178,12 @@ describe('Utils', () => {
           },
         ],
       })
-    ).toBe(`SELECT count(Id) FROM db.Opportunity WHERE   ( StageName NOT IN ('Deal Won', 'Deal Lost' ) )`);
+    ).toBe(`SELECT count(Id) FROM db.foo WHERE   ( StageName NOT IN ('Deal Won', 'Deal Lost' ) )`);
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -198,14 +196,12 @@ describe('Utils', () => {
           },
         ],
       })
-    ).toBe(
-      `SELECT count(Id) FROM db.Opportunity WHERE   ( CreatedDate  >= \${__from:date} AND CreatedDate <= \${__to:date} )`
-    );
+    ).toBe(`SELECT count(Id) FROM db.foo WHERE   ( CreatedDate  >= \${__from:date} AND CreatedDate <= \${__to:date} )`);
     expect(
       convert({
         mode: BuilderMode.Aggregate,
         database: 'db',
-        table: 'Opportunity',
+        table: 'foo',
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -219,7 +215,7 @@ describe('Utils', () => {
         ],
       })
     ).toBe(
-      `SELECT count(Id) FROM db.Opportunity WHERE   (  NOT ( CloseDate  >= \${__from:date:YYYY-MM-DD} AND CloseDate <= \${__to:date:YYYY-MM-DD} ) )`
+      `SELECT count(Id) FROM db.foo WHERE   (  NOT ( CloseDate  >= \${__from:date:YYYY-MM-DD} AND CloseDate <= \${__to:date:YYYY-MM-DD} ) )`
     );
   });
 });

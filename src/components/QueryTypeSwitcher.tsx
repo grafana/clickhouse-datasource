@@ -40,7 +40,13 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
           break;
       }
       if (queryType === QueryType.SQL) {
-        onChange({ ...query, queryType, rawSql: getSQLFromQueryOptions(builderOptions), meta: { builderOptions }, format: Format.TABLE });
+        onChange({
+          ...query,
+          queryType,
+          rawSql: getSQLFromQueryOptions(builderOptions),
+          meta: { builderOptions },
+          format: Format.TABLE,
+        });
       } else if (queryType === QueryType.Builder) {
         onChange({ ...query, queryType, rawSql: getSQLFromQueryOptions(builderOptions), builderOptions });
       }

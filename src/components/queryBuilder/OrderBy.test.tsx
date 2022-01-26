@@ -100,9 +100,7 @@ describe('OrderByEditor', () => {
     expect(onOrderByItemsChange).toBeCalledTimes(0);
     userEvent.click(result.getByTestId('query-builder-orderby-add-button'));
     expect(onOrderByItemsChange).toBeCalledTimes(1);
-    expect(onOrderByItemsChange).toBeCalledWith([
-      { name: 'foo', dir: OrderByDirection.ASC },
-    ]);
+    expect(onOrderByItemsChange).toBeCalledWith([{ name: 'foo', dir: OrderByDirection.ASC }]);
   });
   it('should add and remove items when remove button clicked', () => {
     const onOrderByItemsChange = jest.fn();
@@ -126,12 +124,8 @@ describe('OrderByEditor', () => {
     userEvent.click(result.getAllByTestId('query-builder-orderby-remove-button')[0]);
     userEvent.click(result.getAllByTestId('query-builder-orderby-inline-add-button')[0]);
     expect(onOrderByItemsChange).toBeCalledTimes(3);
-    expect(onOrderByItemsChange).toHaveBeenNthCalledWith(1, [
-      { name: 'foo', dir: OrderByDirection.ASC },
-    ]);
-    expect(onOrderByItemsChange).toHaveBeenNthCalledWith(2, [
-      { name: 'bar', dir: OrderByDirection.ASC },
-    ]);
+    expect(onOrderByItemsChange).toHaveBeenNthCalledWith(1, [{ name: 'foo', dir: OrderByDirection.ASC }]);
+    expect(onOrderByItemsChange).toHaveBeenNthCalledWith(2, [{ name: 'bar', dir: OrderByDirection.ASC }]);
     expect(onOrderByItemsChange).toHaveBeenNthCalledWith(3, [
       { name: 'foo', dir: OrderByDirection.ASC },
       { name: 'bar', dir: OrderByDirection.ASC },

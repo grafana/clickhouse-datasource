@@ -260,7 +260,7 @@ export const FilterEditor = (props: {
       }
       onFilterChange(index, newFilter);
     }
-  }
+  };
   const onFilterOperatorChange = (operator: FilterOperator) => {
     let newFilter: Filter = filter;
     newFilter.operator = operator;
@@ -355,12 +355,7 @@ export const FiltersEditor = (props: {
             ) : (
               <div className={`width-8 ${styles.Common.firstLabel}`}></div>
             )}
-            <FilterEditor
-              fieldsList={fieldsList}
-              filter={filter}
-              onFilterChange={onFilterChange}
-              index={index}
-            />
+            <FilterEditor fieldsList={fieldsList} filter={filter} onFilterChange={onFilterChange} index={index} />
             <Button
               data-testid="query-builder-filters-remove-button"
               icon="trash-alt"

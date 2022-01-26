@@ -13,7 +13,6 @@ describe('QueryBuilder', () => {
       return Promise.resolve([]);
     });
     mockDs.fetchEntities = jest.fn(() => Promise.resolve([]));
-    mockDs.fetchEntitiesFull = jest.fn(() => Promise.resolve([]));
     const useStateMock: any = (initState: any) => [initState, setState];
     jest.spyOn(React, 'useState').mockImplementation(useStateMock);
     const result = render(

@@ -40,7 +40,7 @@ export const SQLEditor = (props: SQLEditorProps) => {
   const schema: Schema = {
     databases: () => datasource.fetchDatabases(),
     tables: (db?: string) => datasource.fetchTables(db),
-    fields: (table) => datasource.fetchFields(table),
+    fields: (db: string, table: string) => datasource.fetchFields(db, table),
     defaultDatabase: datasource.getDefaultDatabase(),
   };
 

@@ -1,6 +1,5 @@
 import {
   BuilderMetricField,
-  BuilderMetricFieldAggregation,
   BuilderMode,
   OrderBy,
   SqlBuilderOptions,
@@ -52,25 +51,19 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
   return isStringType(filter.type) && [FilterOperator.In, FilterOperator.NotIn].includes(filter.operator);
 };
 
-const getTimeField = (timeField: string, timeFieldType: string): string => {
-  if (timeFieldType === 'datetime') {
-    return `DAY_ONLY(${timeField})`;
-  } else {
-    return timeField;
-  }
-};
-
-const getListQuery = (database: string = '', table: string = '', fields: string[] = []): string => {
+const getListQuery = (database = '', table = '', fields: string[] = []): string => {
   const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
   return `SELECT ${fields.join(', ')} FROM ${database}${sep}${table}`;
 };
 
-const getAggregationQuery = (database: string = '', table: string = '', metrics: BuilderMetricField[] = [], groupBy: string[] = []): string => {
-  metrics =
-    metrics && metrics.length > 0
-      ? metrics
-      : [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_count' }];
+const getAggregationQuery = (
+  database = '',
+  table = '',
+  metrics: BuilderMetricField[] = [],
+  groupBy: string[] = []
+): string => {
+  metrics = metrics && metrics.length > 0 ? metrics : [];
   let metricsQuery = metrics
     .map((m) => {
       const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
@@ -85,17 +78,13 @@ const getAggregationQuery = (database: string = '', table: string = '', metrics:
 };
 
 const getTrendByQuery = (
-  database: string,
-  table: string,
+  database = '',
+  table = '',
   metrics: BuilderMetricField[] = [],
-  timeField = 'CreatedDate',
+  timeField = '',
   timeFieldType = ''
 ): string => {
-  // table = table || 'Opportunity';
-  metrics =
-    metrics && metrics.length > 0
-      ? metrics
-      : [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_count' }];
+  metrics = metrics && metrics.length > 0 ? metrics : [];
 
   let metricsQuery = metrics
     .map((m) => {
@@ -103,8 +92,9 @@ const getTrendByQuery = (
       return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
-  metricsQuery = `${getTimeField(timeField, timeFieldType)}, ${metricsQuery}`;
-  return `SELECT ${metricsQuery} FROM ${database}.${table}`;
+  metricsQuery = `${timeField}, ${metricsQuery}`;
+  const sep = database === '' || table === '' ? '' : '.';
+  return `SELECT ${metricsQuery} FROM ${database}${sep}${table}`;
 };
 
 const getFilters = (filters: Filter[]): string => {
@@ -225,7 +215,13 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       query += getGroupBy(options.groupBy);
       break;
     case BuilderMode.Trend:
-      query += getTrendByQuery(options.database, options.table, options.metrics, options.timeField, options.timeFieldType);
+      query += getTrendByQuery(
+        options.database,
+        options.table,
+        options.metrics,
+        options.timeField,
+        options.timeFieldType
+      );
       if (options.timeFieldType === 'datetime') {
         query += ` WHERE ${options.timeField} >= \${__from:date} AND ${options.timeField} <= \${__to:date}`;
       } else if (options.timeFieldType === 'date') {
@@ -233,7 +229,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       }
       let trendFilters = getFilters(options.filters || []);
       query += trendFilters ? ` AND ${trendFilters}` : '';
-      query += ` GROUP BY ${getTimeField(options.timeField, options.timeFieldType)}`;
+      query += ` GROUP BY ${options.timeField}`;
       break;
     case BuilderMode.List:
     default:
@@ -244,7 +240,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       }
   }
   if (options.mode === BuilderMode.Trend) {
-    query += ` ORDER BY ${getTimeField(options.timeField, options.timeFieldType)} ASC`;
+    query += ` ORDER BY ${options.timeField} ASC`;
   } else {
     query += getOrderBy(options.orderBy);
     query += canHaveLimit(options.mode, options.mode === BuilderMode.Aggregate ? options.groupBy : []) ? limit : '';

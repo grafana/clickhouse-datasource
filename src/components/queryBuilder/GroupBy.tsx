@@ -11,14 +11,13 @@ interface GroupByEditorProps {
   onGroupByChange: (groupBy: string[]) => void;
 }
 export const GroupByEditor = (props: GroupByEditorProps) => {
-  const columns: SelectableValue[] = (props.fieldsList || [])
-    .map((f) => ({ label: f.label, value: f.name }));
+  const columns: SelectableValue[] = (props.fieldsList || []).map((f) => ({ label: f.label, value: f.name }));
   const [isOpen, setIsOpen] = useState(false);
   const [groupBy, setGroupBy] = useState<string[]>(props.groupBy || []);
   const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.GROUP_BY;
   const onChange = (e: Array<SelectableValue<string>>) => {
-      setIsOpen(false);
-      setGroupBy(e.map((item) => item.value!));
+    setIsOpen(false);
+    setGroupBy(e.map((item) => item.value!));
   };
   return (
     <div className="gf-form">

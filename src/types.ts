@@ -214,8 +214,6 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
   rawSql: '',
   builderOptions: {
     mode: BuilderMode.List,
-    // database: 'system',
-    // table: undefined,
     fields: [],
     limit: 100,
   },
@@ -223,6 +221,6 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
 export const defaultCHSQLQuery: Omit<CHSQLQuery, 'refId'> = {
   queryType: QueryType.SQL,
   rawSql: '',
-  format: Format.TABLE
+  format: Format.TABLE,
 };
 //#endregion
