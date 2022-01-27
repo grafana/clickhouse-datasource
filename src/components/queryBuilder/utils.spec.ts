@@ -35,7 +35,9 @@ describe('Utils', () => {
         limit: 20,
       })
     ).toBe('SELECT field1, field2 FROM db.foo ORDER BY field1 ASC LIMIT 20');
-    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', fields: [], metrics: [] })).toBe('SELECT  FROM db');
+    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', fields: [], metrics: [] })).toBe(
+      'SELECT  FROM db'
+    );
     expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: 'foo', fields: [], metrics: [] })).toBe(
       'SELECT  FROM db.foo'
     );
