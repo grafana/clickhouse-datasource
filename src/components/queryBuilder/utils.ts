@@ -60,10 +60,12 @@ const getListQuery = (database = '', table = '', fields: string[] = []): string 
 const getAggregationQuery = (
   database = '',
   table = '',
+  fields: string[] = [],
   metrics: BuilderMetricField[] = [],
   groupBy: string[] = []
 ): string => {
   metrics = metrics && metrics.length > 0 ? metrics : [];
+  const selected = fields.length > 0 ? `${fields.join(', ')},` : '';
   let metricsQuery = metrics
     .map((m) => {
       const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
@@ -74,12 +76,13 @@ const getAggregationQuery = (
     metricsQuery = groupBy.map((g) => `${g}`).join(', ') + ', ' + metricsQuery;
   }
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${metricsQuery} FROM ${database}${sep}${table}`;
+  return `SELECT ${selected}${metricsQuery} FROM ${database}${sep}${table}`;
 };
 
 const getTrendByQuery = (
   database = '',
   table = '',
+  fields: string[] = [],
   metrics: BuilderMetricField[] = [],
   timeField = '',
   timeFieldType = ''
@@ -92,7 +95,15 @@ const getTrendByQuery = (
       return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
-  metricsQuery = `${timeField}, ${metricsQuery}`;
+  if (metricsQuery !== '') {
+    const selected = fields.length > 0 ? `${fields.join(', ')},` : '';
+    metricsQuery = `${timeField}, ${selected}${metricsQuery}`;
+  } else {
+    const selected = fields.length > 0 ? `${fields.join(', ')}` : '';
+    const sep = selected !== '' ? ',' : '';
+    metricsQuery = `${timeField}${sep}${selected}`;
+  }
+
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${metricsQuery} FROM ${database}${sep}${table}`;
 };
@@ -183,21 +194,6 @@ const getOrderBy = (orderBy?: OrderBy[]): string => {
     : '';
 };
 
-const canHaveLimit = (mode: BuilderMode, groupBy: string[] = []): boolean => {
-  switch (mode) {
-    case BuilderMode.Aggregate:
-      if (groupBy.length === 0) {
-        return false;
-      }
-      return true;
-    case BuilderMode.Trend:
-      return false;
-    case BuilderMode.List:
-    default:
-      return true;
-  }
-};
-
 const getLimit = (limit?: number): string => {
   return ` LIMIT ` + (limit || 100);
 };
@@ -207,7 +203,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   let query = ``;
   switch (options.mode) {
     case BuilderMode.Aggregate:
-      query += getAggregationQuery(options.database, options.table, options.metrics, options.groupBy);
+      query += getAggregationQuery(options.database, options.table, options.fields, options.metrics, options.groupBy);
       let aggregateFilters = getFilters(options.filters || []);
       if (aggregateFilters) {
         query += ` WHERE ${aggregateFilters}`;
@@ -218,6 +214,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       query += getTrendByQuery(
         options.database,
         options.table,
+        options.fields,
         options.metrics,
         options.timeField,
         options.timeFieldType
@@ -227,23 +224,24 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       } else if (options.timeFieldType === 'date') {
         query += ` WHERE ${options.timeField} >= \${__from:date:YYYY-MM-DD} AND ${options.timeField} <= \${__to:date:YYYY-MM-DD}`;
       }
-      let trendFilters = getFilters(options.filters || []);
+      const trendFilters = getFilters(options.filters || []);
       query += trendFilters ? ` AND ${trendFilters}` : '';
-      query += ` GROUP BY ${options.timeField}`;
+      query += getGroupBy(options.groupBy);
       break;
     case BuilderMode.List:
     default:
       query += getListQuery(options.database, options.table, options.fields);
-      let filters = getFilters(options.filters || []);
+      const filters = getFilters(options.filters || []);
       if (filters) {
         query += ` WHERE ${filters}`;
       }
   }
   if (options.mode === BuilderMode.Trend) {
     query += ` ORDER BY ${options.timeField} ASC`;
+    query += limit;
   } else {
     query += getOrderBy(options.orderBy);
-    query += canHaveLimit(options.mode, options.mode === BuilderMode.Aggregate ? options.groupBy : []) ? limit : '';
+    query += limit;
   }
   return query;
 };

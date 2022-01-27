@@ -95,19 +95,30 @@ export const Components = {
       },
       SELECT: {
         label: 'Fields',
-        tooltipTable: 'List of fields to show. Use Standard/All/Custom to show all fields',
+        tooltipTable: 'List of fields to show',
         tooltipAggregate: `List of metrics to show. Use any of the given aggregation along with the field`,
         ALIAS: {
           label: 'as',
           tooltip: 'alias',
         },
-        AddLabel: 'Add Field',
+        AddLabel: 'Field',
+        RemoveLabel: '',
+      },
+      AGGREGATES: {
+        label: 'Aggregates',
+        tooltipTable: 'Aggregate functions to use',
+        tooltipAggregate: `Aggregate functions to use`,
+        ALIAS: {
+          label: 'as',
+          tooltip: 'alias',
+        },
+        AddLabel: 'Aggregate',
         RemoveLabel: '',
       },
       WHERE: {
         label: 'Filters',
         tooltip: `List of filters`,
-        AddLabel: 'Add Filter',
+        AddLabel: 'Filter',
         RemoveLabel: '',
       },
       GROUP_BY: {
@@ -117,7 +128,7 @@ export const Components = {
       ORDER_BY: {
         label: 'Order by',
         tooltip: 'Order by field',
-        AddLabel: 'Add Order by',
+        AddLabel: 'Order by',
         RemoveLabel: '',
       },
       LIMIT: {

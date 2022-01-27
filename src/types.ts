@@ -43,6 +43,7 @@ export interface CHBuilderQuery extends DataQuery {
   queryType: QueryType.Builder;
   rawSql: string;
   builderOptions: SqlBuilderOptions;
+  format: Format;
 }
 
 export type CHQuery = CHSQLQuery | CHBuilderQuery;
@@ -79,6 +80,7 @@ export interface SqlBuilderOptionsAggregate {
   mode: BuilderMode.Aggregate;
   database: string;
   table: string;
+  fields: string[];
   metrics: BuilderMetricField[];
   groupBy?: string[];
   filters?: Filter[];
@@ -89,6 +91,7 @@ export interface SqlBuilderOptionsTrend {
   mode: BuilderMode.Trend;
   database: string;
   table: string;
+  fields: string[];
   metrics: BuilderMetricField[];
   filters?: Filter[];
   groupBy?: string[];
@@ -217,6 +220,7 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
     fields: [],
     limit: 100,
   },
+  format: Format.TABLE,
 };
 export const defaultCHSQLQuery: Omit<CHSQLQuery, 'refId'> = {
   queryType: QueryType.SQL,

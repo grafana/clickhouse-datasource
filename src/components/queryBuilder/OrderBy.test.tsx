@@ -140,37 +140,25 @@ describe('getOrderByFields', () => {
       name: 'field1',
       label: 'Field1',
       type: 'string',
-      relationshipName: '',
-      referenceTo: [],
       picklistValues: [],
-      sortable: true,
     },
     {
       name: 'field11',
       label: 'Field11',
       type: 'string',
-      relationshipName: '',
-      referenceTo: [],
       picklistValues: [],
-      sortable: false,
     },
     {
       name: 'field2',
       label: 'Field2',
       type: 'string',
-      relationshipName: '',
-      referenceTo: [],
       picklistValues: [],
-      sortable: true,
     },
     {
       name: 'field3',
       label: 'Field3',
       type: 'string',
-      relationshipName: '',
-      referenceTo: [],
       picklistValues: [],
-      sortable: true,
     },
   ];
   it('list view', () => {
@@ -190,6 +178,10 @@ describe('getOrderByFields', () => {
         value: 'field1',
       },
       {
+        label: 'Field11',
+        value: 'field11',
+      },
+      {
         label: 'Field2',
         value: 'field2',
       },
@@ -206,6 +198,7 @@ describe('getOrderByFields', () => {
           mode: BuilderMode.Aggregate,
           database: 'db',
           table: 'foo',
+          fields: [],
           metrics: [],
         },
         sampleFields
@@ -219,6 +212,7 @@ describe('getOrderByFields', () => {
           mode: BuilderMode.Aggregate,
           database: 'db',
           table: 'foo',
+          fields: [],
           metrics: [
             { field: 'field2', aggregation: BuilderMetricFieldAggregation.Max },
             { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -244,6 +238,7 @@ describe('getOrderByFields', () => {
           mode: BuilderMode.Aggregate,
           database: 'db',
           table: 'foo',
+          fields: [],
           metrics: [],
           groupBy: ['field3', 'field1'],
         },
@@ -267,6 +262,7 @@ describe('getOrderByFields', () => {
           mode: BuilderMode.Aggregate,
           database: 'db',
           table: 'foo',
+          fields: [],
           metrics: [
             { field: 'field2', aggregation: BuilderMetricFieldAggregation.Max },
             { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -301,6 +297,7 @@ describe('getOrderByFields', () => {
           mode: BuilderMode.Trend,
           database: 'db',
           table: 'foo',
+          fields: [],
           metrics: [{ field: 'field2', aggregation: BuilderMetricFieldAggregation.Max }],
           timeField: 'field3',
           timeFieldType: 'datetime',
@@ -311,6 +308,10 @@ describe('getOrderByFields', () => {
       {
         label: 'Field1',
         value: 'field1',
+      },
+      {
+        label: 'Field11',
+        value: 'field11',
       },
       {
         label: 'Field2',

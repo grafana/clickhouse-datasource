@@ -1,7 +1,7 @@
 import React from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from '../data/CHDatasource';
-import { CHConfig, CHQuery, SqlBuilderOptions, QueryType, defaultCHBuilderQuery } from '../types';
+import { CHConfig, CHQuery, SqlBuilderOptions, QueryType, defaultCHBuilderQuery, BuilderMode, Format } from '../types';
 import { SQLEditor } from 'components/SQLEditor';
 import { getSQLFromQueryOptions } from 'components/queryBuilder/utils';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -16,7 +16,8 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange } = props;
   const onBuilderOptionsChange = (builderOptions: SqlBuilderOptions) => {
     const sql = getSQLFromQueryOptions(builderOptions);
-    onChange({ ...query, queryType: QueryType.Builder, rawSql: sql, builderOptions });
+    const format = builderOptions.mode === BuilderMode.Trend ? Format.TIMESERIES : Format.TABLE;
+    onChange({ ...query, queryType: QueryType.Builder, rawSql: sql, builderOptions, format });
   };
 
   switch (query.queryType) {

@@ -16,7 +16,7 @@ const MetricEditor = (props: {
   const [isOpen, setIsOpen] = useState(false);
   const { metric, index, metrics, onMetricsChange } = props;
   const [alias, setAlias] = useState(metric.alias || '');
-  const { ALIAS } = selectors.components.QueryEditor.QueryBuilder.SELECT;
+  const { ALIAS } = selectors.components.QueryEditor.QueryBuilder.AGGREGATES;
   const aggregationTypes: Array<SelectableValue<BuilderMetricFieldAggregation>> = [
     { value: BuilderMetricFieldAggregation.Count, label: 'Count' },
     { value: BuilderMetricFieldAggregation.Sum, label: 'Sum' },
@@ -85,7 +85,7 @@ interface MetricsEditorProps {
 }
 export const MetricsEditor = (props: MetricsEditorProps) => {
   const { metrics, onMetricsChange, fieldsList = [] } = props;
-  const { label, tooltipAggregate, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.SELECT;
+  const { label, tooltipAggregate, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.AGGREGATES;
   const onMetricAdd = () => {
     const newMetric: BuilderMetricField = { field: '', aggregation: BuilderMetricFieldAggregation.Count };
     onMetricsChange([...metrics, newMetric]);

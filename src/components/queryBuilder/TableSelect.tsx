@@ -15,21 +15,19 @@ export type Props = {
 export const TableSelect = (props: Props) => {
   const { datasource, onTableChange, database, table } = props;
   const [list, setList] = useState<Array<SelectableValue<string>>>([]);
-  const [value, setValue] = useState<string | undefined>(table);
   const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.FROM;
   useEffect(() => {
     async function fetchTables() {
       const tables = await datasource.fetchTables(database);
       const values = tables.map((t) => ({ label: t, value: t }));
+      // TODO - can't seem to reset the select to unselected
       values.push({ label: '-- Choose --', value: '' });
       setList(values);
-      setValue('');
     }
     fetchTables();
   }, [datasource, database]);
 
   const onChange = (value: string) => {
-    setValue(value);
     onTableChange(value);
   };
 
@@ -42,7 +40,7 @@ export const TableSelect = (props: Props) => {
         className={`width-15 ${styles.Common.inlineSelect}`}
         onChange={(e) => onChange(e.value!)}
         options={list}
-        value={value}
+        value={table}
         menuPlacement={'auto'}
       ></Select>
     </>

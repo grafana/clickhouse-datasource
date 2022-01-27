@@ -57,6 +57,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       database,
+      table: '',
       fields: [],
       filters: [],
       orderBy: [],
@@ -156,13 +157,6 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         />
         <ModeEditor mode={builder.mode} onModeChange={onModeChange} />
       </div>
-      {builder.mode === BuilderMode.List && (
-        <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
-      )}
-      {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
-        <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
-      )}
-      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
       {builder.mode === BuilderMode.Trend && (
         <TimeFieldEditor
           timeField={builder.timeField}
@@ -171,19 +165,22 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           fieldsList={fieldsList}
         />
       )}
-      {builder.mode === BuilderMode.Aggregate && (
+      <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
+      {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
+        <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
+      )}
+      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
+      {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
       )}
-      {builder.mode !== BuilderMode.Trend && (
-        <>
-          <OrderByEditor
-            orderBy={builder.orderBy || []}
-            onOrderByItemsChange={onOrderByChange}
-            fieldsList={getOrderByFields(builder, fieldsList)}
-          />
-          <LimitEditor limit={builder.limit || 20} onLimitChange={onLimitChange} />
-        </>
-      )}
+      <>
+        <OrderByEditor
+          orderBy={builder.orderBy || []}
+          onOrderByItemsChange={onOrderByChange}
+          fieldsList={getOrderByFields(builder, fieldsList)}
+        />
+        <LimitEditor limit={builder.limit || 20} onLimitChange={onLimitChange} />
+      </>
     </>
   ) : null;
 };

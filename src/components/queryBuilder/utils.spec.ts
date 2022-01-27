@@ -35,8 +35,8 @@ describe('Utils', () => {
         limit: 20,
       })
     ).toBe('SELECT field1, field2 FROM db.foo ORDER BY field1 ASC LIMIT 20');
-    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', metrics: [] })).toBe('SELECT  FROM db');
-    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: 'foo', metrics: [] })).toBe(
+    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: '', fields: [], metrics: [] })).toBe('SELECT  FROM db');
+    expect(convert({ mode: BuilderMode.Aggregate, database: 'db', table: 'foo', fields: [], metrics: [] })).toBe(
       'SELECT  FROM db.foo'
     );
     expect(
@@ -44,6 +44,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum }],
       })
     ).toBe('SELECT sum(field1) FROM db.foo');
@@ -52,6 +53,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' }],
       })
     ).toBe('SELECT sum(field1) total_records FROM db.foo');
@@ -60,6 +62,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         table: 'foo',
         database: 'db',
+        fields: [],
         metrics: [
           { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
           { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
@@ -71,6 +74,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         table: 'foo',
         database: 'db',
+        fields: [],
         metrics: [
           { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
           { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
@@ -83,6 +87,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         table: 'foo',
         database: 'db',
+        fields: [],
         metrics: [
           { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
           { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
@@ -95,6 +100,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [
           { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
           { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -107,6 +113,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [
           { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
           { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -122,6 +129,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [
           { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
           { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
@@ -140,6 +148,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
       })
     ).toBe('SELECT count(Id) FROM db.foo');
@@ -148,6 +157,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -166,6 +176,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -184,6 +195,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {
@@ -202,6 +214,7 @@ describe('Utils', () => {
         mode: BuilderMode.Aggregate,
         database: 'db',
         table: 'foo',
+        fields: [],
         metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
         filters: [
           {

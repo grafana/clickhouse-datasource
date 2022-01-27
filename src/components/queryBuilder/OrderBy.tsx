@@ -159,6 +159,9 @@ export const getOrderByFields = (
   switch (builder.mode) {
     case BuilderMode.Aggregate:
       return [
+        ...(builder.fields || []).map((g) => {
+          return { value: g, label: g };
+        }),
         ...((builder.metrics as BuilderMetricField[]) || []).map((m) => {
           return { value: `${m.aggregation}(${m.field})`, label: `${m.aggregation}(${m.field})` };
         }),
@@ -169,7 +172,6 @@ export const getOrderByFields = (
     case BuilderMode.List:
     default:
       return fieldsList
-        .filter((f) => f.sortable)
         .map((m) => {
           return { value: m.name, label: m.label };
         });
