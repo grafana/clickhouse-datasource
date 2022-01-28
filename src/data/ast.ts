@@ -11,12 +11,13 @@ export default function sqlToAST(sql: string): AST {
   let bracketPhrase = '';
   let regExpArray: RegExpExecArray | null;
   ast.set('', [sql.split(re, 2)[0]]);
+
   while ((regExpArray = re.exec(sql)) !== null) {
     // Sets foundNode to a SQL keyword from the regular expression
     const foundNode = regExpArray[0].toUpperCase();
     const phrase = sql.substring(re.lastIndex, sql.length).split(re, 2)[0];
     // If there is a greater number of open brackets than closed,
-    // add the the bracket phrase that will eventually be added the the last node
+    // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
     if (bracketCount > 0) {
       bracketPhrase += foundNode + phrase;
     } else {
@@ -27,13 +28,11 @@ export default function sqlToAST(sql: string): AST {
     bracketCount += (phrase.match(/\(/g) || []).length;
     bracketCount -= (phrase.match(/\)/g) || []).length;
     if (bracketCount <= 0 && lastBracketCount > 0) {
-      // The phrase brackets is complete
-      // If it is a FROM phrase lets make a branch node
-      // If it is anything else lets make a leaf node
-      
-      const testRE = /\b(AND|OR|,)\b/gi;
+      // The phrase is complete
+      // If it contains the keyword SELECT, make new branches
+      // If it does not, make a leaf node
       if (bracketPhrase.match(/\bSELECT\b/gi)) {
-          ast.set(lastNode, listSplitAST(testRE, bracketPhrase));
+        ast.set(lastNode, getASTBranches(bracketPhrase));
       } else {
         ast.set(lastNode, [bracketPhrase]);
       }
@@ -46,74 +45,74 @@ export default function sqlToAST(sql: string): AST {
 export function ASTToSql(ast: AST): string {
   let r = '';
   ast.forEach((clauses: Clause[], key: string) => {
-      let bc = `${key} `
-      for (let c of clauses) {
-        if (typeof c === 'string') {
-            bc += `${c.trim()} `;
-        } else if (c !== null) {
-            bc += `${ASTToSql(c)} `;
-        }
+    let bc = `${key} `
+    for (let c of clauses) {
+      if (typeof c === 'string') {
+        bc += `${c.trim()} `;
+      } else if (c !== null) {
+        bc += `${ASTToSql(c)} `;
       }
-      if (bc !== `${key} `)
-        r+=bc;
+    }
+    if (bc !== `${key} `)
+      r += bc;
   });
   // Remove all of the consecutive spaces to make things more readable when debugging
   return r.trim().replace(/\s+/g, ' ');
 }
 
-function listSplitAST(re: RegExp, sql: string): Clause[] {
-  let clasues: Clause[] = [];
+function getASTBranches(sql: string): Clause[] {
+  const clauses: Clause[] = [];
+  const re = /\b(AND|OR|,)\b/gi;
   let bracketCount = 0;
   let lastBracketCount = 0;
   let bracketPhrase = '';
   let regExpArray: RegExpExecArray | null;
-  let index = 0;
-  let lastStart = 0;
+  let index = -1;
+  let lastPhraseIndex = 0;
+
   while ((regExpArray = re.exec(sql)) !== null) {
-      // Sets foundNode to a SQL keyword from the regular expression
-      const foundNode = regExpArray[0].toUpperCase();
-      const phrase = sql.substring(lastStart, regExpArray.index);
-      lastStart = re.lastIndex;
-      // If there is a greater number of open brackets than closed,
-      // add the the bracket phrase that will eventually be added the the last node
-      if (bracketCount > 0) {
-          bracketPhrase += phrase + foundNode;
-      } else {
-          clasues.push(phrase + foundNode);
-          index++;
-          bracketPhrase = phrase + foundNode;
-      }
-      bracketCount += (phrase.match(/\(/g) || []).length;
-      bracketCount -= (phrase.match(/\)/g) || []).length;
-      if (bracketCount <= 0 && lastBracketCount > 0) {
-          // The phrase brackets is complete
-          // If it is a FROM phrase lets make a branch node
-          // If it is anything else lets make a leaf node
-          
-          if (bracketPhrase.match(/\bSELECT\b/gi)) {
-              clasues[index-1] = sqlToAST(bracketPhrase);
-          } else {
-              clasues[index-1] = bracketPhrase;
-          }
-      }
-      lastBracketCount = bracketCount;
+    const foundSplitter = regExpArray[0].toUpperCase();
+    const phrase = sql.substring(lastPhraseIndex, regExpArray.index);
+    lastPhraseIndex = re.lastIndex;
+
+    // If there is a greater number of open brackets than closed,
+    // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
+    if (bracketCount > 0) {
+      bracketPhrase += phrase + foundSplitter;
+    } else {
+      clauses.push(phrase + foundSplitter);
+      index++;
+      bracketPhrase = phrase + foundSplitter;
+    }
+    bracketCount += (phrase.match(/\(/g) || []).length;
+    bracketCount -= (phrase.match(/\)/g) || []).length;
+    if (bracketCount <= 0 && lastBracketCount > 0) {
+      completePhrase(clauses, bracketPhrase, index);
+    }
+    lastBracketCount = bracketCount;
   }
 
-  const phrase = sql.substring(lastStart, sql.length);
-          console.log(bracketCount + ' ' + lastBracketCount + phrase);
+  // add the phrase after the last splitter
+  const phrase = sql.substring(lastPhraseIndex, sql.length);
   if (bracketCount > 0) {
-          bracketPhrase += phrase;
-      } else {
-          bracketPhrase = phrase;
-          index++;
-      }
-      console.log(bracketCount + ' ' + lastBracketCount + bracketPhrase);
-      if (bracketPhrase.match(/\bSELECT\b/gi)) {
-          clasues[index-1] = sqlToAST(bracketPhrase);
-      } else {
-          clasues[index-1] = bracketPhrase;
-      }
-  return clasues;
+    bracketPhrase += phrase;
+  } else {
+    bracketPhrase = phrase;
+    index++;
+  }
+  completePhrase(clauses, bracketPhrase, index);
+  return clauses;
+}
+
+function completePhrase(clauses: Clause[], bracketPhrase: string, index: number) {
+  // The phrase is complete
+  // If it contains the keyword SELECT, build the AST for the phrase
+  // If it does not, make a leaf node
+  if (bracketPhrase.match(/\bSELECT\b/gi)) {
+    clauses[index] = sqlToAST(bracketPhrase);
+  } else {
+    clauses[index] = bracketPhrase;
+  }
 }
 
 // Creates a statement with all the keywords to preserve the keyword order

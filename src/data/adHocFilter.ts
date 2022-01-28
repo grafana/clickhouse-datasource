@@ -4,10 +4,20 @@ export class AdHocFilter {
   private _targetTable = '';
 
   setTargetTable(query: string) {
-    const fromSplit = query.split(/\b\FROM\b/i);
-    if (fromSplit.length === 2) {
-      this._targetTable = this.getTableName(fromSplit[1]);
+    const ast = sqlToAST(query);
+    this.setTargetTableFroAST(ast);
+  }
+
+  private setTargetTableFroAST(ast: AST) {
+    if (!ast.get('FROM')) {
+      return;
     }
+    const from = ast.get('FROM')![0];
+    if (typeof from === 'string') {
+      this._targetTable = from.trim().replace(/(\(|\)|,)/gi, '');
+      return;
+    }
+    this.setTargetTableFroAST(from!);
   }
 
   apply(sql: string, adHocFilters: AdHocVariableFilter[]): string {
@@ -33,48 +43,45 @@ export class AdHocFilter {
   private applyFiltersToAST(ast: AST, whereClause: string): AST {
     if (!ast || !ast.get('FROM')) return ast;
 
-    const fromPhrase = ast.get('FROM')![ast.get('FROM')!.length - 1]!.toString().trim();
-    for (let c of ast.get('FROM')!) {
-        if (typeof c === 'string') {
-            const tableName = this.getTableName(fromPhrase);
-            const tableRE = RegExp(`\\b${tableName}\\b`, 'g');
-            if (!c.match(tableRE)) continue;
-            const where = ast.get('WHERE');
-            // If there is no defined WHERE clause create one
-            // Else add an ad hoc filter to the existing WHERE clause
-            if (where?.length === 0) {
-              let asdf = ast.get('FROM')!.indexOf(c);
-              ast.get('FROM')![asdf] = ` ${tableName} `;
-                // set where clause to ad hoc filter and add the remaining part of the from phrase to the new WHERE phrase
-                ast.set('WHERE', [`${whereClause} ${fromPhrase.substring(tableName.length)}`]);
-                //ast.set('WHERE', [`${whereClause}`]);
-            }
-            else {
-                where!.unshift(`${whereClause} AND `);
-            }
+    const tableName = this._targetTable;
+    if (!tableName) return ast;
+
+    for (let clause of ast.get('FROM')!) {
+      if (typeof clause === 'string') {
+        const tableRE = RegExp(`\\b${tableName}\\b`, 'g');
+        if (!clause.match(tableRE)) continue;
+        const where = ast.get('WHERE');
+        // If there is no defined WHERE clause create one
+        // Else add an ad hoc filter to the existing WHERE clause
+        if (where?.length === 0) {
+          // set WHERE clause to ad hoc filter and add the remaining part of the FROM clause to the new WHERE clause
+          // example: "(SELECT * FROM table) as r" will have a FROM clause of "table) as r". We need ") as r" to be after the new WHERE clause
+
+          // first we get the remaining part of the FROM phrase. ") as r"
+          const fromPhraseAfterTableName = ast.get('FROM')![ast.get('FROM')!.length - 1]!.toString().trim().substring(tableName.length);
+          // apply the remaining part of the FROM phrase to the end of the new WHERE clause
+          ast.set('WHERE', [`${whereClause} ${fromPhraseAfterTableName}`]);
+          // set the FROM clause to only have the table name
+          const index = ast.get('FROM')!.indexOf(clause);
+          ast.get('FROM')![index] = ` ${tableName} `;
+          continue;
         }
+        where!.unshift(`${whereClause} AND `);
+      }
     }
 
-    ast.forEach((clauses: Clause[], key: string) => {
-        for (let c of clauses) {
-            if (typeof c === 'string') {
-                
-            } else if (c !== null) {
-              this.applyFiltersToAST(c, whereClause);
-            }
+    // Each node in the AST needs to be checked to see if ad hoc filters should be applied
+    ast.forEach((clauses: Clause[]) => {
+      for (let c of clauses) {
+        if (typeof c === 'string') {
+
+        } else if (c !== null) {
+          this.applyFiltersToAST(c, whereClause);
         }
+      }
     });
 
     return ast;
-  }
-
-  // Returns a table name found in the FROM phrase
-  // FROM phrases might contain more than just the table name
-  private getTableName(fromPhrase: string): string {
-    return fromPhrase
-      .trim()
-      .split(' ')[0]
-      .replace(/(;|\(|\))/g, '');
   }
 }
 

@@ -22,12 +22,12 @@ describe('AdHocManager', () => {
   it('apply ad hoc filter with an inner query without existing WHERE', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTable('SELECT * FROM table');
-    const val = ahm.apply(`SELECT stuff FROM (SELECT * FROM table) as r GROUP BY s ORDER BY s`, [
+    const val = ahm.apply(`SELECT stuff FROM (SELECT * FROM table) as r, table2 GROUP BY s ORDER BY s`, [
       { key: 'key', operator: '=', value: 'val' },
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM ( SELECT * FROM table WHERE key = 'val' AND keyNum = 123 ) as r GROUP BY s ORDER BY s`
+      `SELECT stuff FROM ( SELECT * FROM table WHERE key = 'val' AND keyNum = 123 ) as r, table2 GROUP BY s ORDER BY s`
     );
   });
   it('apply ad hoc filter with an inner from query with existing WHERE', () => {
@@ -58,5 +58,21 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual('SELECT stuff FROM table');
+  });
+  it('apply ad hoc filter when the ad hoc options are from a query with a from inline query', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTable('SELECT * FROM (select * from table)');
+    const val = ahm.apply('select stuff from table', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(`SELECT stuff FROM table WHERE key = 'val'`);
+  });
+  it('apply ad hoc filter when the ad hoc options are from a query with a where inline query', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTable('SELECT * FROM table where stuff = stuff and (repo in (select * from table)) order by stuff');
+    const val = ahm.apply('select stuff from table', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(`SELECT stuff FROM table WHERE key = 'val'`);
   });
 });
