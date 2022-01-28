@@ -1,6 +1,7 @@
 const standard = require('@grafana/toolkit/src/config/jest.plugin.config');
 const globals = standard.jestConfig().globals;
 const tsJest = globals['ts-jest'];
+const JestRunner = require('jest-runner');
 
 module.exports = {
   ...{
@@ -14,5 +15,6 @@ module.exports = {
         tsconfig: tsJest.tsConfig,
       },
     },
+    ...{runner: './jest-runner-serial.js'}
   },
 };

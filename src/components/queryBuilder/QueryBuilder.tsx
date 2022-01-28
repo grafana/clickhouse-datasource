@@ -36,6 +36,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       props.datasource
         .fetchFieldsFull(database, table)
         .then(async (fields) => {
+          fields.push({ name: '*', label: 'ALL', type: 'string', picklistValues: [] });
           setBaseFieldsList(fields);
         })
         .catch((ex: any) => {
@@ -147,6 +148,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     <>
       <div className="gf-form">
         <DatabaseSelect datasource={props.datasource} value={builder.database} onChange={onDatabaseChange} />
+        <ModeEditor mode={builder.mode} onModeChange={onModeChange} />
       </div>
       <div className="gf-form">
         <TableSelect
@@ -155,7 +157,6 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           table={builder.table}
           onTableChange={onTableChange}
         />
-        <ModeEditor mode={builder.mode} onModeChange={onModeChange} />
       </div>
       {builder.mode === BuilderMode.Trend && (
         <TimeFieldEditor

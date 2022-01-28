@@ -71,7 +71,7 @@ export const Components = {
       switcher: {
         title: 'Are you sure?',
         body: 'You will lose manual changes done to the SQL if you go back to the query builder.',
-        confirmText: 'Yes',
+        confirmText: 'Continue',
         dismissText: 'Cancel',
       },
     },
@@ -82,7 +82,7 @@ export const Components = {
         options: {
           LIST: 'Table',
           AGGREGATE: 'Aggregate',
-          TREND: 'Timeseries',
+          TREND: 'Time Series',
         },
       },
       DATABASE: {
