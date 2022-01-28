@@ -1,3 +1,5 @@
+import { isString } from 'lodash';
+
 export type Clause = string | AST | null;
 export type AST = Map<string, Clause[]>;
 
@@ -5,10 +7,8 @@ export default function sqlToAST(sql: string): AST {
   const ast = createStatement();
   const re =
     /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
-  let bracketCount = 0;
-  let lastBracketCount = 0;
+  const bracket = { count: 0, lastCount: 0, phrase: '' };
   let lastNode = '';
-  let bracketPhrase = '';
   let regExpArray: RegExpExecArray | null;
   ast.set('', [sql.split(re, 2)[0]]);
 
@@ -18,26 +18,26 @@ export default function sqlToAST(sql: string): AST {
     const phrase = sql.substring(re.lastIndex, sql.length).split(re, 2)[0];
     // If there is a greater number of open brackets than closed,
     // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
-    if (bracketCount > 0) {
-      bracketPhrase += foundNode + phrase;
+    if (bracket.count > 0) {
+      bracket.phrase += foundNode + phrase;
     } else {
       ast.set(foundNode, [phrase]);
       lastNode = foundNode;
-      bracketPhrase = phrase;
+      bracket.phrase = phrase;
     }
-    bracketCount += (phrase.match(/\(/g) || []).length;
-    bracketCount -= (phrase.match(/\)/g) || []).length;
-    if (bracketCount <= 0 && lastBracketCount > 0) {
+    bracket.count += (phrase.match(/\(/g) || []).length;
+    bracket.count -= (phrase.match(/\)/g) || []).length;
+    if (bracket.count <= 0 && bracket.lastCount > 0) {
       // The phrase is complete
       // If it contains the keyword SELECT, make new branches
       // If it does not, make a leaf node
-      if (bracketPhrase.match(/\bSELECT\b/gi)) {
-        ast.set(lastNode, getASTBranches(bracketPhrase));
+      if (bracket.phrase.match(/\bSELECT\b/gi)) {
+        ast.set(lastNode, getASTBranches(bracket.phrase));
       } else {
-        ast.set(lastNode, [bracketPhrase]);
+        ast.set(lastNode, [bracket.phrase]);
       }
     }
-    lastBracketCount = bracketCount;
+    bracket.lastCount = bracket.count;
   }
   return ast;
 }
@@ -46,8 +46,8 @@ export function ASTToSql(ast: AST): string {
   let r = '';
   ast.forEach((clauses: Clause[], key: string) => {
     let keyAndClauses = `${key} `;
-    for (let c of clauses) {
-      if (typeof c === 'string') {
+    for (const c of clauses) {
+      if (isString(c)) {
         keyAndClauses += `${c.trim()} `;
       } else if (c !== null) {
         keyAndClauses += `${ASTToSql(c)} `;
@@ -65,9 +65,7 @@ export function ASTToSql(ast: AST): string {
 function getASTBranches(sql: string): Clause[] {
   const clauses: Clause[] = [];
   const re = /\b(AND|OR|,)\b/gi;
-  let bracketCount = 0;
-  let lastBracketCount = 0;
-  let bracketPhrase = '';
+  const bracket = { count: 0, lastCount: 0, phrase: '' };
   let regExpArray: RegExpExecArray | null;
   let index = -1;
   let lastPhraseIndex = 0;
@@ -79,30 +77,30 @@ function getASTBranches(sql: string): Clause[] {
 
     // If there is a greater number of open brackets than closed,
     // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
-    if (bracketCount > 0) {
-      bracketPhrase += phrase + foundSplitter;
+    if (bracket.count > 0) {
+      bracket.phrase += phrase + foundSplitter;
     } else {
       clauses.push(phrase + foundSplitter);
       index++;
-      bracketPhrase = phrase + foundSplitter;
+      bracket.phrase = phrase + foundSplitter;
     }
-    bracketCount += (phrase.match(/\(/g) || []).length;
-    bracketCount -= (phrase.match(/\)/g) || []).length;
-    if (bracketCount <= 0 && lastBracketCount > 0) {
-      completePhrase(clauses, bracketPhrase, index);
+    bracket.count += (phrase.match(/\(/g) || []).length;
+    bracket.count -= (phrase.match(/\)/g) || []).length;
+    if (bracket.count <= 0 && bracket.lastCount > 0) {
+      completePhrase(clauses, bracket.phrase, index);
     }
-    lastBracketCount = bracketCount;
+    bracket.lastCount = bracket.count;
   }
 
   // add the phrase after the last splitter
   const phrase = sql.substring(lastPhraseIndex, sql.length);
-  if (bracketCount > 0) {
-    bracketPhrase += phrase;
+  if (bracket.count > 0) {
+    bracket.phrase += phrase;
   } else {
-    bracketPhrase = phrase;
+    bracket.phrase = phrase;
     index++;
   }
-  completePhrase(clauses, bracketPhrase, index);
+  completePhrase(clauses, bracket.phrase, index);
   return clauses;
 }
 

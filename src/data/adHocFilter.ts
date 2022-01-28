@@ -1,3 +1,4 @@
+import { isString } from 'lodash';
 import sqlToAST, { ASTToSql, Clause, AST } from './ast';
 
 export class AdHocFilter {
@@ -13,7 +14,7 @@ export class AdHocFilter {
       return;
     }
     const from = ast.get('FROM')![0];
-    if (typeof from === 'string') {
+    if (isString(from)) {
       this._targetTable = from.trim().replace(/(\(|\)|,)/gi, '');
       return;
     }
@@ -50,8 +51,8 @@ export class AdHocFilter {
       return ast;
     }
 
-    for (let clause of ast.get('FROM')!) {
-      if (typeof clause === 'string') {
+    for (const clause of ast.get('FROM')!) {
+      if (isString(clause)) {
         const tableRE = RegExp(`\\b${tableName}\\b`, 'g');
         if (!clause.match(tableRE)) {
           continue;
@@ -82,8 +83,8 @@ export class AdHocFilter {
 
     // Each node in the AST needs to be checked to see if ad hoc filters should be applied
     ast.forEach((clauses: Clause[]) => {
-      for (let c of clauses) {
-        if (c !== null && typeof c !== 'string') {
+      for (const c of clauses) {
+        if (c !== null && !isString(c)) {
           this.applyFiltersToAST(c, whereClause);
         }
       }
