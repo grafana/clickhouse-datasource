@@ -41,15 +41,21 @@ export class AdHocFilter {
   }
 
   private applyFiltersToAST(ast: AST, whereClause: string): AST {
-    if (!ast || !ast.get('FROM')) return ast;
+    if (!ast || !ast.get('FROM')) {
+      return ast;
+    }
 
     const tableName = this._targetTable;
-    if (!tableName) return ast;
+    if (!tableName) {
+      return ast;
+    }
 
     for (let clause of ast.get('FROM')!) {
       if (typeof clause === 'string') {
         const tableRE = RegExp(`\\b${tableName}\\b`, 'g');
-        if (!clause.match(tableRE)) continue;
+        if (!clause.match(tableRE)) {
+          continue;
+        }
         const where = ast.get('WHERE');
         // If there is no defined WHERE clause create one
         // Else add an ad hoc filter to the existing WHERE clause
@@ -58,7 +64,11 @@ export class AdHocFilter {
           // example: "(SELECT * FROM table) as r" will have a FROM clause of "table) as r". We need ") as r" to be after the new WHERE clause
 
           // first we get the remaining part of the FROM phrase. ") as r"
-          const fromPhraseAfterTableName = ast.get('FROM')![ast.get('FROM')!.length - 1]!.toString().trim().substring(tableName.length);
+          const fromPhrase = ast.get('FROM');
+          const fromPhraseAfterTableName = fromPhrase!
+            [fromPhrase!.length - 1]!.toString()
+            .trim()
+            .substring(tableName.length);
           // apply the remaining part of the FROM phrase to the end of the new WHERE clause
           ast.set('WHERE', [`${whereClause} ${fromPhraseAfterTableName}`]);
           // set the FROM clause to only have the table name
@@ -73,9 +83,7 @@ export class AdHocFilter {
     // Each node in the AST needs to be checked to see if ad hoc filters should be applied
     ast.forEach((clauses: Clause[]) => {
       for (let c of clauses) {
-        if (typeof c === 'string') {
-
-        } else if (c !== null) {
+        if (c !== null && typeof c !== 'string') {
           this.applyFiltersToAST(c, whereClause);
         }
       }

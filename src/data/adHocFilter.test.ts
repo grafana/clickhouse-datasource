@@ -44,9 +44,10 @@ describe('AdHocManager', () => {
   it('apply ad hoc filter with an inner where query with existing WHERE', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTable('SELECT * FROM table');
-    const val = ahm.apply(`SELECT * FROM table WHERE (name = stuff) AND (name IN ( SELECT * FROM table WHERE (field = 'hello') GROUP BY name ORDER BY count() DESC LIMIT 10 )) GROUP BY name, time ORDER BY time`, [
-      { key: 'key', operator: '=', value: 'val' },
-    ] as AdHocVariableFilter[]);
+    const val = ahm.apply(
+      `SELECT * FROM table WHERE (name = stuff) AND (name IN ( SELECT * FROM table WHERE (field = 'hello') GROUP BY name ORDER BY count() DESC LIMIT 10 )) GROUP BY name, time ORDER BY time`,
+      [{ key: 'key', operator: '=', value: 'val' }] as AdHocVariableFilter[]
+    );
     expect(val).toEqual(
       `SELECT * FROM table WHERE key = 'val' AND (name = stuff) AND (name IN ( SELECT * FROM table WHERE key = 'val' AND (field = 'hello') GROUP BY name ORDER BY count() DESC LIMIT 10 )) GROUP BY name, time ORDER BY time`
     );

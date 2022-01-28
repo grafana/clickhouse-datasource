@@ -45,16 +45,18 @@ export default function sqlToAST(sql: string): AST {
 export function ASTToSql(ast: AST): string {
   let r = '';
   ast.forEach((clauses: Clause[], key: string) => {
-    let bc = `${key} `
+    let keyAndClauses = `${key} `;
     for (let c of clauses) {
       if (typeof c === 'string') {
-        bc += `${c.trim()} `;
+        keyAndClauses += `${c.trim()} `;
       } else if (c !== null) {
-        bc += `${ASTToSql(c)} `;
+        keyAndClauses += `${ASTToSql(c)} `;
       }
     }
-    if (bc !== `${key} `)
-      r += bc;
+    // do not add the keys that do not have nodes
+    if (keyAndClauses !== `${key} `) {
+      r += keyAndClauses;
+    }
   });
   // Remove all of the consecutive spaces to make things more readable when debugging
   return r.trim().replace(/\s+/g, ' ');
