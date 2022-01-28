@@ -62,6 +62,57 @@ export function ASTToSql(ast: AST): string {
   return r.trim().replace(/\s+/g, ' ');
 }
 
+export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: string): AST {
+  if (!ast || !ast.get('FROM')) {
+    return ast;
+  }
+
+  if (!targetTable) {
+    return ast;
+  }
+
+  for (const clause of ast.get('FROM')!) {
+    if (isString(clause)) {
+      const tableRE = RegExp(`\\b${targetTable}\\b`, 'g');
+      if (!clause.match(tableRE)) {
+        continue;
+      }
+      const where = ast.get('WHERE');
+      // If there is no defined WHERE clause create one
+      // Else add an ad hoc filter to the existing WHERE clause
+      if (where?.length === 0) {
+        // set WHERE clause to ad hoc filter and add the remaining part of the FROM clause to the new WHERE clause
+        // example: "(SELECT * FROM table) as r" will have a FROM clause of "table) as r". We need ") as r" to be after the new WHERE clause
+
+        // first we get the remaining part of the FROM phrase. ") as r"
+        const fromPhrase = ast.get('FROM');
+        const fromPhraseAfterTableName = fromPhrase!
+          [fromPhrase!.length - 1]!.toString()
+          .trim()
+          .substring(targetTable.length);
+        // apply the remaining part of the FROM phrase to the end of the new WHERE clause
+        ast.set('WHERE', [`${whereClause} ${fromPhraseAfterTableName}`]);
+        // set the FROM clause to only have the table name
+        const index = ast.get('FROM')!.indexOf(clause);
+        ast.get('FROM')![index] = ` ${targetTable} `;
+        continue;
+      }
+      where!.unshift(`${whereClause} AND `);
+    }
+  }
+
+  // Each node in the AST needs to be checked to see if ad hoc filters should be applied
+  ast.forEach((clauses: Clause[]) => {
+    for (const c of clauses) {
+      if (c !== null && !isString(c)) {
+        applyFiltersToAST(c, whereClause, targetTable);
+      }
+    }
+  });
+
+  return ast;
+}
+
 function getASTBranches(sql: string): Clause[] {
   const clauses: Clause[] = [];
   const re = /\b(AND|OR|,)\b/gi;
