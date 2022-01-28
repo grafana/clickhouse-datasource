@@ -1,4 +1,4 @@
-import sqlToAST, { clausesToSql, Clause } from './ast';
+import sqlToAST, { ASTToSql, Clause, AST } from './ast';
 
 export class AdHocFilter {
   private _targetTable = '';
@@ -26,28 +26,46 @@ export class AdHocFilter {
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
     const ast = sqlToAST(sql);
-    const filteredAST = this.applyFiltersToAST(ast, whereClause);
-    return clausesToSql(filteredAST);
+    this.applyFiltersToAST(ast, whereClause);
+    return ASTToSql(ast);
   }
 
-  private applyFiltersToAST(ast: Map<string, Clause>, whereClause: string): Map<string, Clause> {
-    if (typeof ast.get('FROM') === 'string') {
-      const fromPhrase = ast.get('FROM')!.toString().trim();
-      const tableName = this.getTableName(fromPhrase);
-      if (tableName !== this._targetTable) {
-        return ast;
-      }
-      // If there is no defined WHERE clause create one
-      // Else add an ad hoc filter to the existing WHERE clause
-      if (ast.get('WHERE') === null) {
-        ast.set('FROM', ` ${tableName} `);
-        // set where clause to ad hoc filter and add the remaining part of the from phrase to the new WHERE phrase
-        return ast.set('WHERE', `${whereClause} ${fromPhrase.substring(tableName.length)}`);
-      }
-      return ast.set('WHERE', `${whereClause} AND ${ast.get('WHERE')}`);
+  private applyFiltersToAST(ast: AST, whereClause: string): AST {
+    if (!ast || !ast.get('FROM')) return ast;
+
+    const fromPhrase = ast.get('FROM')![ast.get('FROM')!.length - 1]!.toString().trim();
+    for (let c of ast.get('FROM')!) {
+        if (typeof c === 'string') {
+            const tableName = this.getTableName(fromPhrase);
+            const tableRE = RegExp(`\\b${tableName}\\b`, 'g');
+            if (!c.match(tableRE)) continue;
+            const where = ast.get('WHERE');
+            // If there is no defined WHERE clause create one
+            // Else add an ad hoc filter to the existing WHERE clause
+            if (where?.length === 0) {
+              let asdf = ast.get('FROM')!.indexOf(c);
+              ast.get('FROM')![asdf] = ` ${tableName} `;
+                // set where clause to ad hoc filter and add the remaining part of the from phrase to the new WHERE phrase
+                ast.set('WHERE', [`${whereClause} ${fromPhrase.substring(tableName.length)}`]);
+                //ast.set('WHERE', [`${whereClause}`]);
+            }
+            else {
+                where!.unshift(`${whereClause} AND `);
+            }
+        }
     }
-    const fromAST = this.applyFiltersToAST(ast.get('FROM')! as Map<string, Clause>, whereClause);
-    return ast.set('FROM', fromAST);
+
+    ast.forEach((clauses: Clause[], key: string) => {
+        for (let c of clauses) {
+            if (typeof c === 'string') {
+                
+            } else if (c !== null) {
+              this.applyFiltersToAST(c, whereClause);
+            }
+        }
+    });
+
+    return ast;
   }
 
   // Returns a table name found in the FROM phrase
