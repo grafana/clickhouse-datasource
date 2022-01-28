@@ -18,26 +18,18 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
   const [fields, setFields] = useState<string[]>(props.fields || []);
   const { label, tooltipTable } = selectors.components.QueryEditor.QueryBuilder.SELECT;
 
-  const getCustomFields = (fields: string[]) => {
-    return fields
-      .filter((f) => {
-        return columns.findIndex((c) => c.value === f) === -1;
-      })
-      .map((f) => ({ label: f, value: f }));
-  };
-
   useEffect(() => {
-    if (columns.length === 0) {
+    if (props.fieldsList.length === 0) {
       return;
     }
-    const customFields = getCustomFields(fields);
+    const customFields = getCustomFields(props.fields, props.fieldsList);
     setCustom(customFields);
-  }, [props.fieldsList]);
+  }, [props.fieldsList, props.fields, getCustomFields]);
 
   const onFieldsChange = (fields: string[]) => {
     const cleanFields = cleanupFields(fields);
     setFields(cleanFields);
-    const customFields = getCustomFields(fields);
+    const customFields = getCustomFields(fields, props.fieldsList);
     setCustom(customFields);
   };
 
@@ -79,4 +71,12 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
       </div>
     </div>
   );
+};
+
+const getCustomFields = (fields: string[], columns: FullField[]) => {
+  return fields
+    .filter((f) => {
+      return columns.findIndex((c) => c.name === f) === -1;
+    })
+    .map((f) => ({ label: f, value: f }));
 };
