@@ -7,7 +7,7 @@ This plugin is currently in Beta development and subject to change.
     
 ## Install the plugin
 
-1. Navigate to [ClickHouse](https://grafana.com/grafana/plugins/clickhouse-datasource/) plugin homepage.
+1. Navigate to [ClickHouse](https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/) plugin homepage.
 2. From the left-hand menu, click the **Install plugin** button.
 
    The **Installation** tab is displayed.

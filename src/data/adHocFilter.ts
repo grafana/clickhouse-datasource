@@ -1,13 +1,24 @@
-import sqlToAST, { clausesToSql, Clause } from './ast';
+import { isString } from 'lodash';
+import sqlToAST, { ASTToSql, AST, applyFiltersToAST } from './ast';
 
 export class AdHocFilter {
   private _targetTable = '';
 
   setTargetTable(query: string) {
-    const fromSplit = query.split(/\b\FROM\b/i);
-    if (fromSplit.length === 2) {
-      this._targetTable = this.getTableName(fromSplit[1]);
+    const ast = sqlToAST(query);
+    this.setTargetTableFroAST(ast);
+  }
+
+  private setTargetTableFroAST(ast: AST) {
+    if (!ast.get('FROM')) {
+      return;
     }
+    const from = ast.get('FROM')![0];
+    if (isString(from)) {
+      this._targetTable = from.trim().replace(/(\(|\)|,)/gi, '');
+      return;
+    }
+    this.setTargetTableFroAST(from!);
   }
 
   apply(sql: string, adHocFilters: AdHocVariableFilter[]): string {
@@ -26,37 +37,8 @@ export class AdHocFilter {
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
     const ast = sqlToAST(sql);
-    const filteredAST = this.applyFiltersToAST(ast, whereClause);
-    return clausesToSql(filteredAST);
-  }
-
-  private applyFiltersToAST(ast: Map<string, Clause>, whereClause: string): Map<string, Clause> {
-    if (typeof ast.get('FROM') === 'string') {
-      const fromPhrase = ast.get('FROM')!.toString().trim();
-      const tableName = this.getTableName(fromPhrase);
-      if (tableName !== this._targetTable) {
-        return ast;
-      }
-      // If there is no defined WHERE clause create one
-      // Else add an ad hoc filter to the existing WHERE clause
-      if (ast.get('WHERE') === null) {
-        ast.set('FROM', ` ${tableName} `);
-        // set where clause to ad hoc filter and add the remaining part of the from phrase to the new WHERE phrase
-        return ast.set('WHERE', `${whereClause} ${fromPhrase.substring(tableName.length)}`);
-      }
-      return ast.set('WHERE', `${whereClause} AND ${ast.get('WHERE')}`);
-    }
-    const fromAST = this.applyFiltersToAST(ast.get('FROM')! as Map<string, Clause>, whereClause);
-    return ast.set('FROM', fromAST);
-  }
-
-  // Returns a table name found in the FROM phrase
-  // FROM phrases might contain more than just the table name
-  private getTableName(fromPhrase: string): string {
-    return fromPhrase
-      .trim()
-      .split(' ')[0]
-      .replace(/(;|\(|\))/g, '');
+    applyFiltersToAST(ast, whereClause, this._targetTable);
+    return ASTToSql(ast);
   }
 }
 
