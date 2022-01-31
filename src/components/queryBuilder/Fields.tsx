@@ -24,7 +24,7 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
     }
     const customFields = getCustomFields(props.fields, props.fieldsList);
     setCustom(customFields);
-  }, [props.fieldsList, props.fields, getCustomFields]);
+  }, [props.fieldsList, props.fields]);
 
   const onFieldsChange = (fields: string[]) => {
     const cleanFields = cleanupFields(fields);
@@ -73,10 +73,10 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
   );
 };
 
-const getCustomFields = (fields: string[], columns: FullField[]) => {
+function getCustomFields(fields: string[], columns: FullField[]) {
   return fields
     .filter((f) => {
       return columns.findIndex((c) => c.name === f) === -1;
     })
     .map((f) => ({ label: f, value: f }));
-};
+}
