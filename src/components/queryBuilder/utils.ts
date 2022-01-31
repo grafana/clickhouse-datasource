@@ -15,13 +15,15 @@ import {
 } from 'types';
 
 export const isBooleanType = (type: string): boolean => {
-  return ['boolean'].includes(type);
+  return ['boolean'].includes(type.toLowerCase());
 };
 export const isNumberType = (type: string): boolean => {
-  return ['number', 'currency', 'percent', 'int', 'double'].includes(type);
+  const numericTypes = ['int', 'float', 'decimal'];
+  const match = numericTypes.find((t) => type.toLowerCase().includes(t));
+  return match !== undefined;
 };
 export const isDateType = (type: string): boolean => {
-  return ['date', 'datetime'].includes(type);
+  return ['date', 'datetime'].includes(type.toLowerCase());
 };
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
