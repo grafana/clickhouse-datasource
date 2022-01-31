@@ -6,6 +6,7 @@ import { SQLEditor } from './SQLEditor';
 import { Components } from '../selectors';
 import * as ui from '@grafana/ui';
 import { mockDatasource } from '__mocks__/datasource';
+import { QueryType } from 'types';
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
@@ -26,7 +27,7 @@ describe('SQL Editor', () => {
     const rawSql = 'foo';
     render(
       <SQLEditor
-        query={{ rawSql, refId: 'A', format: 1 }}
+        query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}
@@ -43,7 +44,7 @@ describe('SQL Editor', () => {
     await act(async () => {
       render(
         <SQLEditor
-          query={{ rawSql: value, refId: 'A', format: 1 }}
+          query={{ rawSql: value, refId: 'A', format: 1, queryType: QueryType.SQL }}
           onChange={onChangeValue}
           onRunQuery={onRunQuery}
           datasource={mockDatasource}

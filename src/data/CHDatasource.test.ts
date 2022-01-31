@@ -1,7 +1,7 @@
 import { toDataFrame } from '@grafana/data';
 import { of } from 'rxjs';
 import { mockDatasource } from '__mocks__/datasource';
-import { CHQuery } from 'types';
+import { CHQuery, QueryType } from 'types';
 
 interface InstanceConfig {
   queryResponse: {} | [];
@@ -50,10 +50,10 @@ describe('ClickHouseDatasource', () => {
     it('interpolates', async () => {
       const rawSql = 'foo';
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => rawSql);
-      const query = { rawSql: 'select' } as CHQuery;
+      const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
       const val = await createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql });
+      expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
     });
   });
 });

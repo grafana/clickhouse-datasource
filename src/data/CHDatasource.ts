@@ -1,6 +1,7 @@
 import {
   ArrayDataFrame,
   DataFrame,
+  DataFrameView,
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
@@ -9,7 +10,7 @@ import {
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
-import { CHConfig, CHQuery } from '../types';
+import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString } from 'lodash';
 
@@ -29,11 +30,16 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   async metricFindQuery(query: CHQuery | string) {
-    const chQuery = isString(query) ? { rawSql: query } : query;
+    const chQuery = isString(query) ? { rawSql: query, queryType: QueryType.SQL } : query;
+
+    if (!(chQuery.queryType === QueryType.SQL || chQuery.queryType === QueryType.Builder || !chQuery.queryType)) {
+      return [];
+    }
+
     if (!chQuery.rawSql) {
       return [];
     }
-    const frame = await this.runQuery(chQuery);
+    const frame = await this.runQuery({ ...chQuery, queryType: chQuery.queryType || QueryType.SQL });
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -46,16 +52,19 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
-    let rawQuery = query.rawSql || '';
-    // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
-    if (!this.skipAdHocFilter) {
-      rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
+    if (query.queryType === QueryType.SQL || query.queryType === QueryType.Builder) {
+      let rawQuery = query.rawSql || '';
+      // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
+      if (!this.skipAdHocFilter) {
+        rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
+      }
+      this.skipAdHocFilter = false;
+      return {
+        ...query,
+        rawSql: this.replace(rawQuery, scoped) || '',
+      };
     }
-    this.skipAdHocFilter = false;
-    return {
-      ...query,
-      rawSql: this.replace(rawQuery, scoped) || '',
-    };
+    return query;
   }
 
   replace(value?: string, scopedVars?: ScopedVars) {
@@ -85,8 +94,28 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return this.fetchData(rawSql);
   }
 
-  async fetchFields(table: string): Promise<string[]> {
-    return this.fetchData(`DESC TABLE ${table}`);
+  async fetchEntities() {
+    return this.fetchTables();
+  }
+
+  async fetchFields(database: string, table: string): Promise<string[]> {
+    return this.fetchData(`DESC TABLE ${database}.${table}`);
+  }
+
+  async fetchFieldsFull(database: string, table: string): Promise<FullField[]> {
+    const sep = database === '' ? '' : '.';
+    const rawSql = `DESC TABLE ${database}${sep}${table}`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const view = new DataFrameView(frame);
+    return view.map((item) => ({
+      name: item[0],
+      type: item[1],
+      label: item[0],
+      picklistValues: [],
+    }));
   }
 
   async fetchData(rawSql: string) {
