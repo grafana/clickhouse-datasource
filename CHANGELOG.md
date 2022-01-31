@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.9
+
+Feature - Query Builder.
+
 ## 0.9.8
 
 Fix - Detect Multi-line time series. Handle cases with functions.
