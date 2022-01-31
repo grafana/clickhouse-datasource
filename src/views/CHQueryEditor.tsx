@@ -40,7 +40,6 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       if (!query.rawSql || !query.builderOptions) {
         let { rawSql, builderOptions } = defaultCHBuilderQuery;
         newQuery = { ...newQuery, rawSql, builderOptions };
-        onChange({ ...newQuery });
       }
       return (
         <div data-testid="query-editor-section-builder">
