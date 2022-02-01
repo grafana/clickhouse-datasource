@@ -52,19 +52,16 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
-    if (query.queryType === QueryType.SQL || query.queryType === QueryType.Builder) {
-      let rawQuery = query.rawSql || '';
-      // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
-      if (!this.skipAdHocFilter) {
-        rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
-      }
-      this.skipAdHocFilter = false;
-      return {
-        ...query,
-        rawSql: this.replace(rawQuery, scoped) || '',
-      };
+    let rawQuery = query.rawSql || '';
+    // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
+    if (!this.skipAdHocFilter) {
+      rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
     }
-    return query;
+    this.skipAdHocFilter = false;
+    return {
+      ...query,
+      rawSql: this.replace(rawQuery, scoped) || '',
+    };
   }
 
   replace(value?: string, scopedVars?: ScopedVars) {

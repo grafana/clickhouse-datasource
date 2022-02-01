@@ -3,33 +3,16 @@ import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor } from '@grafana/ui';
 import { Datasource } from '../data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
-import { CHQuery, CHConfig, Format, QueryType } from '../types';
+import { CHQuery, CHConfig, QueryType } from '../types';
 import { styles } from '../styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
 import { selectors } from 'selectors';
-import sqlToAST from '../data/ast';
-import { isString } from 'lodash';
+import { getFormat } from './editor';
 
 type SQLEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 export const SQLEditor = (props: SQLEditorProps) => {
   const { query, onRunQuery, onChange, datasource } = props;
-
-  const getFormat = (sql: string): Format => {
-    // convention to format as time series
-    // first field as "time" alias and requires at least 2 fields (time and metric)
-    const ast = sqlToAST(sql);
-    const select = ast.get('SELECT');
-    if (isString(select)) {
-      // remove function parms that may contain commas
-      const cleanSelect = select.replace(/\((?:[^)(]+|\((?:[^)(]+|\([^)(]*\))*\))*\)/, '');
-      const fields = cleanSelect.split(',');
-      if (fields.length > 1) {
-        return fields[0].toLowerCase().endsWith('as time') ? Format.TIMESERIES : Format.TABLE;
-      }
-    }
-    return Format.TABLE;
-  };
 
   const onSqlChange = (sql: string) => {
     const format = getFormat(sql);
