@@ -9,6 +9,7 @@ import { Preview } from 'components/queryBuilder/Preview';
 import { QueryTypeSwitcher } from 'components/QueryTypeSwitcher';
 import { Button } from '@grafana/ui';
 import { styles } from 'styles';
+import { getFormat } from 'components/editor';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -55,13 +56,25 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 };
 
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
+  const { query, onChange, onRunQuery } = props;
+
+  const runQuery = () => {
+    if (query.queryType === QueryType.SQL) {
+      const format = getFormat(query.rawSql);
+      if (format !== query.format) {
+        onChange({ ...query, format });
+      }
+      onRunQuery();
+    }
+  };
+
   return (
     <>
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
         <span>
           <QueryTypeSwitcher {...props} />
         </span>
-        <Button onClick={() => props.onRunQuery()}>Run Query</Button>
+        <Button onClick={() => runQuery()}>Run Query</Button>
       </div>
       <CHEditorByType {...props} />
     </>
