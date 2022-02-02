@@ -102,6 +102,8 @@ WHERE $__timeFilter(date_time)
 | *$__timeFilter_ms(columnName)* | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds | `time >= '1480001790671' AND time <= '1482576232479' )` |
 | *$__fromTime*                  | Replaced by the starting time of the range of the panel casted to DateTime                                                       | `toDateTime(intDiv(1415792726371,1000))`                |
 | *$__toTime*                    | Replaced by the ending time of the range of the panel casted to DateTime                                                         | `toDateTime(intDiv(1415792726371,1000))`                |
+| *$__interval_s*                | Replaced by the interval in seconds                                                                                              | `20`                                                    |
+| *$__timeInterval(columnName)*  | Replaced by a function calculating the interval based on window size, useful when grouping                                       | `toStartOfInterval(column, INTERVAL 20 second)`         |
 
 The plugin also supports notation using braces {}. Use this notation when queries are needed inside parameters.
 
