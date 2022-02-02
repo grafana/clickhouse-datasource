@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.12
+
+Fix - format check after ast change
+
 ## 0.9.11
 
 Feature - $__timeInterval(column) and $__interval_s macros
