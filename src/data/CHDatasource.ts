@@ -13,6 +13,7 @@ import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/run
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString } from 'lodash';
+import { removeConditionalAlls } from './removeConditionalAlls';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -58,10 +59,34 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
     }
     this.skipAdHocFilter = false;
+    rawQuery = this.applyConditionalTest(rawQuery); // option use front end macro
+    rawQuery = removeConditionalAlls(rawQuery, getTemplateSrv().getVariables()); // option use AST to find where ALL is being used in where conditions
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
     };
+  }
+
+  applyConditionalTest(rawQuery: string): string {
+
+    if (!rawQuery) {
+      return rawQuery;
+    }
+
+    const paramsStr = rawQuery.split(/\b__conditionalTest\b/g, 2);
+    if (paramsStr.length === 1) {
+      return rawQuery;
+    }
+    const params = paramsStr[1].split(/\(|\)|,/g, 4);
+    const name = params[2].trim().substring(1, params[2].trim().length);
+    const key = getTemplateSrv().getVariables().find(x => x.name === name) as any;
+    const rw = `__conditionalTest(${params[1]},${params[2]})`;
+    let phrase = params[1];
+    if (key?.current.value.toString() === '$__all') {
+      phrase = '';
+    }
+    rawQuery = rawQuery.replace(rw, phrase);
+    return rawQuery;
   }
 
   replace(value?: string, scopedVars?: ScopedVars) {
