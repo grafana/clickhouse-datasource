@@ -83,7 +83,7 @@ export function ApplyFiltersToAST(ast: AST, whereClause: string, targetTable: st
         // first we get the remaining part of the FROM phrase. ") as r"
         const fromPhrase = ast.get('FROM');
         const fromPhraseAfterTableName = fromPhrase!
-        [fromPhrase!.length - 1]!.toString()
+          [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
         // apply the remaining part of the FROM phrase to the end of the new WHERE clause
@@ -118,7 +118,7 @@ export function RemoveConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
   if (where) {
     for (let i = 0; i < where.length; i++) {
       const c = where[i];
-      if (isString(c) && queryVarNames.some(v => c.includes(v))) {
+      if (isString(c) && queryVarNames.some((v) => c.includes(v))) {
         where[i] = null;
         // remove AND/OR before this condition if this is the last condition
         if (i === where.length - 1) {
@@ -163,14 +163,11 @@ function movePhraseEnding(c: string, ast: AST) {
   // these are the logical places in priority to move the phrase ending
   if (ast.get('PREWHERE')?.length !== 0) {
     ast.get('PREWHERE')?.push(phraseEnding);
-  }
-  else if (ast.get('JOIN')?.length !== 0) {
+  } else if (ast.get('JOIN')?.length !== 0) {
     ast.get('JOIN')?.push(phraseEnding);
-  }
-  else if (ast.get('SAMPLE')?.length !== 0) {
+  } else if (ast.get('SAMPLE')?.length !== 0) {
     ast.get('SAMPLE')?.push(phraseEnding);
-  }
-  else if (ast.get('FROM')?.length !== 0) {
+  } else if (ast.get('FROM')?.length !== 0) {
     ast.get('FROM')?.push(phraseEnding);
   }
 }

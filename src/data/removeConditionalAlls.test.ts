@@ -1,5 +1,5 @@
-import { VariableModel } from "@grafana/data";
-import { RemoveConditionalAlls } from "./removeConditionalAlls";
+import { VariableModel } from '@grafana/data';
+import { RemoveConditionalAlls } from './removeConditionalAlls';
 
 describe('RemoveConditionalAlls', () => {
   const testCasesWithAllTempVar = [
@@ -51,12 +51,12 @@ describe('RemoveConditionalAlls', () => {
       expect: 'SELECT * FROM table WHERE col in ($tempVar)',
     },
   ];
-  const tempVarsWithAll = [{ type: 'query', name: 'tempVar', label: '', current: { value: '$__all' } },];
+  const tempVarsWithAll = [{ type: 'query', name: 'tempVar', label: '', current: { value: '$__all' } }];
   for (let t of testCasesWithAllTempVar) {
     testCondition(t.name, t.input, t.expect, tempVarsWithAll);
   }
 
-  const tempVarsWithoutAll = [{ type: 'query', name: 'tempVar', label: '', current: { value: 'val' } },];
+  const tempVarsWithoutAll = [{ type: 'query', name: 'tempVar', label: '', current: { value: 'val' } }];
   for (let t of testCasesWithoutAllTempVar) {
     testCondition(t.name, t.input, t.expect, tempVarsWithoutAll);
   }

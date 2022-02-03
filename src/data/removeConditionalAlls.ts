@@ -1,5 +1,5 @@
-import { VariableModel } from "@grafana/data";
-import SqlToAST, { ASTToSql, RemoveConditionalAllsFromAST } from "./ast";
+import { VariableModel } from '@grafana/data';
+import SqlToAST, { ASTToSql, RemoveConditionalAllsFromAST } from './ast';
 
 export function RemoveConditionalAlls(sql: string, queryVars: VariableModel[]): string {
   if (sql === '' || !queryVars || queryVars.length === 0) {
@@ -21,4 +21,3 @@ export function RemoveConditionalAlls(sql: string, queryVars: VariableModel[]): 
   RemoveConditionalAllsFromAST(ast, varNames);
   return ASTToSql(ast);
 }
-
