@@ -120,5 +120,7 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 		"toTime":        macros.ToTimeFilter,
 		"timeFilter_ms": macros.TimeFilterMs,
 		"timeFilter":    macros.TimeFilter,
+		"timeInterval":  macros.TimeInterval,
+		"interval_s":    macros.IntervalSeconds,
 	}
 }

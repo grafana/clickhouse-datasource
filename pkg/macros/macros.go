@@ -70,6 +70,20 @@ func TimeFilterMs(query *sqlds.Query, args []string) (string, error) {
 	return fmt.Sprintf("%s >= '%d' AND %s <= '%d'", column, from, column, to), nil
 }
 
+func TimeInterval(query *sqlds.Query, args []string) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+	}
+
+	seconds := query.Interval.Seconds()
+	return fmt.Sprintf("toStartOfInterval(%s, INTERVAL %d second)", args[0], int(seconds)), nil
+}
+
+func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
+	seconds := query.Interval.Seconds()
+	return fmt.Sprintf("%d", int(seconds)), nil
+}
+
 // RemoveQuotesInArgs remove all quotes from macro arguments and return
 func RemoveQuotesInArgs(args []string) []string {
 	updatedArgs := []string{}

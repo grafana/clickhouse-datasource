@@ -73,3 +73,23 @@ func TestMacroToTimeFilter(t *testing.T) {
 		})
 	}
 }
+
+func TestMacroTimeInterval(t *testing.T) {
+	query := sqlds.Query{
+		RawSQL:   "select $__timeInterval(col) from foo",
+		Interval: time.Duration(20000000000),
+	}
+	got, err := macros.TimeInterval(&query, []string{"col"})
+	assert.Nil(t, err)
+	assert.Equal(t, "toStartOfInterval(col, INTERVAL 20 second)", got)
+}
+
+func TestMacroIntervalSeconds(t *testing.T) {
+	query := sqlds.Query{
+		RawSQL:   "select toStartOfInterval(col, INTERVAL $__interval_s second) AS time from foo",
+		Interval: time.Duration(20000000000),
+	}
+	got, err := macros.IntervalSeconds(&query, []string{})
+	assert.Nil(t, err)
+	assert.Equal(t, "20", got)
+}

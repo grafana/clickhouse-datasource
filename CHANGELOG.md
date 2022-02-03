@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.12
+
+Fix - format check after ast change
+
+## 0.9.11
+
+Feature - $__timeInterval(column) and $__interval_s macros
+
 ## 0.9.10
 
 Fix - Set format when using the new Run Query button.
