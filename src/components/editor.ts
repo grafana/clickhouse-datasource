@@ -1,11 +1,11 @@
-import sqlToAST from 'data/ast';
+import SqlToAST from 'data/ast';
 import { Format } from 'types';
 import { isString } from 'lodash';
 
 export const getFormat = (sql: string): Format => {
   // convention to format as time series
   // first field as "time" alias and requires at least 2 fields (time and metric)
-  const ast = sqlToAST(sql);
+  const ast = SqlToAST(sql);
   const select = ast.get('SELECT');
   if (isString(select)) {
     // remove function parms that may contain commas

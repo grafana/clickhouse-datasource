@@ -1,11 +1,11 @@
 import { isString } from 'lodash';
-import sqlToAST, { ASTToSql, AST, applyFiltersToAST } from './ast';
+import SqlToAST, { ASTToSql, AST, ApplyFiltersToAST } from './ast';
 
 export class AdHocFilter {
   private _targetTable = '';
 
   setTargetTable(query: string) {
-    const ast = sqlToAST(query);
+    const ast = SqlToAST(query);
     this.setTargetTableFroAST(ast);
   }
 
@@ -36,8 +36,8 @@ export class AdHocFilter {
     }
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
-    const ast = sqlToAST(sql);
-    applyFiltersToAST(ast, whereClause, this._targetTable);
+    const ast = SqlToAST(sql);
+    ApplyFiltersToAST(ast, whereClause, this._targetTable);
     return ASTToSql(ast);
   }
 }

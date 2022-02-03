@@ -7,7 +7,7 @@ interface InstanceConfig {
   queryResponse: {} | [];
 }
 
-const templateSrvMock = { replace: jest.fn() };
+const templateSrvMock = { replace: jest.fn(), getVariables: jest.fn() };
 jest.mock('@grafana/runtime', () => ({
   ...(jest.requireActual('@grafana/runtime') as unknown as object),
   getTemplateSrv: () => templateSrvMock,
