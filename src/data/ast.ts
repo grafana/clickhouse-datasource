@@ -128,35 +128,14 @@ export function RemoveConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
         if (where.length > 1) {
           where[i + 1] = null;
         }
-        let count = (c.match(/\)/g) || []).length - (c.match(/\(/g) || []).length;
-        if (count <= 0) {
-          continue;
-        }
-        let regExpArray: RegExpExecArray | null;
-        const re = /\)/g;
-        const num: number[] = [];
-        while ((regExpArray = re.exec(c)) !== null) {
-          num.push(re.lastIndex);
-        }
-        const asphrase = c.substring(num[num.length - count] - 1, c.length);
-        if (ast.get('PREWHERE')?.length !== 0) {
-          ast.get('PREWHERE')?.push(asphrase);
-        }
-        else if (ast.get('JOIN')?.length !== 0) {
-          ast.get('JOIN')?.push(asphrase);
-        }
-        else if (ast.get('SAMPLE')?.length !== 0) {
-          ast.get('SAMPLE')?.push(asphrase);
-        }
-        else if (ast.get('FROM')?.length !== 0) {
-          ast.get('FROM')?.push(asphrase);
-        }
+        // moves the ending of the phrase, like ')', to the next logical place
+        movePhraseEnding(c, ast);
       }
     }
   }
 
   // Each node in the AST needs to be checked to see if it contains a conditional all template variable
-  ast.forEach((clauses: Clause[], key: string) => {
+  ast.forEach((clauses: Clause[]) => {
     for (const c of clauses) {
       if (c !== null && !isString(c)) {
         RemoveConditionalAllsFromAST(c, queryVarNames);
@@ -165,6 +144,35 @@ export function RemoveConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
   });
 
   return ast;
+}
+
+function movePhraseEnding(c: string, ast: AST) {
+  let count = (c.match(/\)/g) || []).length - (c.match(/\(/g) || []).length;
+  if (count <= 0) {
+    return;
+  }
+  const re = /\)/g;
+  const indices: number[] = [];
+  // get all indices of ')'
+  while (re.exec(c) !== null) {
+    indices.push(re.lastIndex);
+  }
+  // get the first ')' that does not have a beginning bracket in this phrase
+  const firstUnmatchedBracketIndex = indices[indices.length - count] - 1;
+  const phraseEnding = c.substring(firstUnmatchedBracketIndex, c.length);
+  // these are the logical places in priority to move the phrase ending
+  if (ast.get('PREWHERE')?.length !== 0) {
+    ast.get('PREWHERE')?.push(phraseEnding);
+  }
+  else if (ast.get('JOIN')?.length !== 0) {
+    ast.get('JOIN')?.push(phraseEnding);
+  }
+  else if (ast.get('SAMPLE')?.length !== 0) {
+    ast.get('SAMPLE')?.push(phraseEnding);
+  }
+  else if (ast.get('FROM')?.length !== 0) {
+    ast.get('FROM')?.push(phraseEnding);
+  }
 }
 
 function getASTBranches(sql: string): Clause[] {
