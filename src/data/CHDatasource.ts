@@ -13,6 +13,7 @@ import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/run
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString } from 'lodash';
+import { removeConditionalAlls } from './removeConditionalAlls';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -58,6 +59,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
     }
     this.skipAdHocFilter = false;
+    rawQuery = removeConditionalAlls(rawQuery, getTemplateSrv().getVariables());
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',

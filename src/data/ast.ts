@@ -21,7 +21,7 @@ export default function sqlToAST(sql: string): AST {
     if (bracket.count > 0) {
       bracket.phrase += foundNode + phrase;
     } else {
-      ast.set(foundNode, [phrase]);
+      ast.set(foundNode, getASTBranches(phrase));
       lastNode = foundNode;
       bracket.phrase = phrase;
     }
@@ -31,18 +31,14 @@ export default function sqlToAST(sql: string): AST {
       // The phrase is complete
       // If it contains the keyword SELECT, make new branches
       // If it does not, make a leaf node
-      if (bracket.phrase.match(/\bSELECT\b/gi)) {
-        ast.set(lastNode, getASTBranches(bracket.phrase));
-      } else {
-        ast.set(lastNode, [bracket.phrase]);
-      }
+      ast.set(lastNode, getASTBranches(bracket.phrase));
     }
     bracket.lastCount = bracket.count;
   }
   return ast;
 }
 
-export function ASTToSql(ast: AST): string {
+export function astToSql(ast: AST): string {
   let r = '';
   ast.forEach((clauses: Clause[], key: string) => {
     let keyAndClauses = `${key} `;
@@ -50,7 +46,7 @@ export function ASTToSql(ast: AST): string {
       if (isString(c)) {
         keyAndClauses += `${c.trim()} `;
       } else if (c !== null) {
-        keyAndClauses += `${ASTToSql(c)} `;
+        keyAndClauses += `${astToSql(c)} `;
       }
     }
     // do not add the keys that do not have nodes
@@ -113,12 +109,74 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
   return ast;
 }
 
+export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]): AST {
+  if (!ast || !ast.get('FROM')) {
+    return ast;
+  }
+
+  const where = ast.get('WHERE');
+  if (where) {
+    for (let i = 0; i < where.length; i++) {
+      const c = where[i];
+      if (isString(c) && queryVarNames.some((v) => c.includes(v))) {
+        where[i] = null;
+        // remove AND/OR before this condition if this is the last condition
+        if (i === where.length - 1) {
+          where[i - 1] = null;
+        }
+        // remove AND/OR after this condition
+        if (where.length > 1) {
+          where[i + 1] = null;
+        }
+        // moves the ending of the phrase, like ')', to the next logical place
+        movePhraseEnding(c, ast);
+      }
+    }
+  }
+
+  // Each node in the AST needs to be checked to see if it contains a conditional all template variable
+  ast.forEach((clauses: Clause[]) => {
+    for (const c of clauses) {
+      if (c !== null && !isString(c)) {
+        removeConditionalAllsFromAST(c, queryVarNames);
+      }
+    }
+  });
+
+  return ast;
+}
+
+function movePhraseEnding(c: string, ast: AST) {
+  let count = (c.match(/\)/g) || []).length - (c.match(/\(/g) || []).length;
+  if (count <= 0) {
+    return;
+  }
+  const re = /\)/g;
+  const indices: number[] = [];
+  // get all indices of ')'
+  while (re.exec(c) !== null) {
+    indices.push(re.lastIndex);
+  }
+  // get the first ')' that does not have a beginning bracket in this phrase
+  const firstUnmatchedBracketIndex = indices[indices.length - count] - 1;
+  const phraseEnding = c.substring(firstUnmatchedBracketIndex, c.length);
+  // these are the logical places in priority to move the phrase ending
+  if (ast.get('PREWHERE')?.length !== 0) {
+    ast.get('PREWHERE')?.push(phraseEnding);
+  } else if (ast.get('JOIN')?.length !== 0) {
+    ast.get('JOIN')?.push(phraseEnding);
+  } else if (ast.get('SAMPLE')?.length !== 0) {
+    ast.get('SAMPLE')?.push(phraseEnding);
+  } else if (ast.get('FROM')?.length !== 0) {
+    ast.get('FROM')?.push(phraseEnding);
+  }
+}
+
 function getASTBranches(sql: string): Clause[] {
   const clauses: Clause[] = [];
   const re = /\b(AND|OR|,)\b/gi;
   const bracket = { count: 0, lastCount: 0, phrase: '' };
   let regExpArray: RegExpExecArray | null;
-  let index = -1;
   let lastPhraseIndex = 0;
 
   while ((regExpArray = re.exec(sql)) !== null) {
@@ -126,19 +184,19 @@ function getASTBranches(sql: string): Clause[] {
     const phrase = sql.substring(lastPhraseIndex, regExpArray.index);
     lastPhraseIndex = re.lastIndex;
 
+    bracket.count += (phrase.match(/\(/g) || []).length;
+    bracket.count -= (phrase.match(/\)/g) || []).length;
     // If there is a greater number of open brackets than closed,
     // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
     if (bracket.count > 0) {
       bracket.phrase += phrase + foundSplitter;
     } else {
-      clauses.push(phrase + foundSplitter);
-      index++;
-      bracket.phrase = phrase + foundSplitter;
+      clauses.push(phrase);
+      clauses.push(foundSplitter);
     }
-    bracket.count += (phrase.match(/\(/g) || []).length;
-    bracket.count -= (phrase.match(/\)/g) || []).length;
     if (bracket.count <= 0 && bracket.lastCount > 0) {
-      completePhrase(clauses, bracket.phrase, index);
+      completePhrase(clauses, bracket.phrase);
+      bracket.phrase = '';
     }
     bracket.lastCount = bracket.count;
   }
@@ -149,20 +207,19 @@ function getASTBranches(sql: string): Clause[] {
     bracket.phrase += phrase;
   } else {
     bracket.phrase = phrase;
-    index++;
   }
-  completePhrase(clauses, bracket.phrase, index);
+  completePhrase(clauses, bracket.phrase);
   return clauses;
 }
 
-function completePhrase(clauses: Clause[], bracketPhrase: string, index: number) {
+function completePhrase(clauses: Clause[], bracketPhrase: string) {
   // The phrase is complete
   // If it contains the keyword SELECT, build the AST for the phrase
   // If it does not, make a leaf node
   if (bracketPhrase.match(/\bSELECT\b/gi)) {
-    clauses[index] = sqlToAST(bracketPhrase);
+    clauses.push(sqlToAST(bracketPhrase));
   } else {
-    clauses[index] = bracketPhrase;
+    clauses.push(bracketPhrase);
   }
 }
 

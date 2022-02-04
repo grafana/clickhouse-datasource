@@ -1,5 +1,5 @@
 import { isString } from 'lodash';
-import sqlToAST, { ASTToSql, AST, applyFiltersToAST } from './ast';
+import sqlToAST, { astToSql, AST, applyFiltersToAST } from './ast';
 
 export class AdHocFilter {
   private _targetTable = '';
@@ -38,7 +38,7 @@ export class AdHocFilter {
     sql = sql.replace(';', '');
     const ast = sqlToAST(sql);
     applyFiltersToAST(ast, whereClause, this._targetTable);
-    return ASTToSql(ast);
+    return astToSql(ast);
   }
 }
 
