@@ -35,24 +35,21 @@ describe('SQL Editor', () => {
     );
     expect(screen.queryByText(rawSql)).toBeInTheDocument();
   });
-  it('Should Run Query', async () => {
-    let value = 'test';
-    const onChangeValue = jest.fn().mockImplementation((newValue) => {
-      value = newValue;
-    });
+  it('Should Expand Query', async () => {
+    const onChangeValue = jest.fn();
     const onRunQuery = jest.fn();
     await act(async () => {
       render(
         <SQLEditor
-          query={{ rawSql: value, refId: 'A', format: 1, queryType: QueryType.SQL }}
+          query={{ rawSql: 'test', refId: 'A', format: 1, queryType: QueryType.SQL }}
           onChange={onChangeValue}
           onRunQuery={onRunQuery}
           datasource={mockDatasource}
         />
       );
       expect(screen.queryByText('test')).toBeInTheDocument();
-      userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Run));
-      expect(onRunQuery).toHaveBeenCalledTimes(1);
+      userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
+      expect(onChangeValue).toHaveBeenCalledTimes(1);
     });
   });
 });

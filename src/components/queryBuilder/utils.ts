@@ -67,7 +67,7 @@ const getAggregationQuery = (
   groupBy: string[] = []
 ): string => {
   metrics = metrics && metrics.length > 0 ? metrics : [];
-  const selected = fields.length > 0 ? `${fields.join(', ')},` : '';
+  let selected = fields.length > 0 ? fields.join(', ') : '';
   let metricsQuery = metrics
     .map((m) => {
       const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
@@ -76,6 +76,9 @@ const getAggregationQuery = (
     .join(', ');
   if (groupBy && groupBy.length > 0) {
     metricsQuery = groupBy.map((g) => `${g}`).join(', ') + ', ' + metricsQuery;
+  }
+  if (metricsQuery !== '' && selected !== '') {
+    selected = `${selected},`;
   }
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${selected}${metricsQuery} FROM ${database}${sep}${table}`;

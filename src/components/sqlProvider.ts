@@ -41,7 +41,7 @@ export type Fetcher = {
 
 export async function registerSQL(lang: string, editor: any, fetchSuggestions: Fetcher) {
   // so options are visible outside query editor
-  editor.updateOptions({ fixedOverflowWidgets: true });
+  editor.updateOptions({ fixedOverflowWidgets: true, scrollBeyondLastLine: false });
 
   const registeredLang = monaco.languages.getLanguages().find((l: Lang) => l.id === lang);
   if (registeredLang !== undefined) {
