@@ -1,5 +1,5 @@
 import { VariableModel } from '@grafana/data';
-import { RemoveConditionalAlls } from './removeConditionalAlls';
+import { removeConditionalAlls } from './removeConditionalAlls';
 
 describe('RemoveConditionalAlls', () => {
   const testCasesWithAllTempVar = [
@@ -64,7 +64,7 @@ describe('RemoveConditionalAlls', () => {
 
 function testCondition(name: string, input: string, expected: string, tempVars: any) {
   it(name, () => {
-    const val = RemoveConditionalAlls(input, tempVars as VariableModel[]);
+    const val = removeConditionalAlls(input, tempVars as VariableModel[]);
     expect(val).toEqual(expected);
   });
 }

@@ -3,7 +3,7 @@ import { isString } from 'lodash';
 export type Clause = string | AST | null;
 export type AST = Map<string, Clause[]>;
 
-export default function SqlToAST(sql: string): AST {
+export default function sqlToAST(sql: string): AST {
   const ast = createStatement();
   const re =
     /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
@@ -38,7 +38,7 @@ export default function SqlToAST(sql: string): AST {
   return ast;
 }
 
-export function ASTToSql(ast: AST): string {
+export function astToSql(ast: AST): string {
   let r = '';
   ast.forEach((clauses: Clause[], key: string) => {
     let keyAndClauses = `${key} `;
@@ -46,7 +46,7 @@ export function ASTToSql(ast: AST): string {
       if (isString(c)) {
         keyAndClauses += `${c.trim()} `;
       } else if (c !== null) {
-        keyAndClauses += `${ASTToSql(c)} `;
+        keyAndClauses += `${astToSql(c)} `;
       }
     }
     // do not add the keys that do not have nodes
@@ -58,7 +58,7 @@ export function ASTToSql(ast: AST): string {
   return r.trim().replace(/\s+/g, ' ');
 }
 
-export function ApplyFiltersToAST(ast: AST, whereClause: string, targetTable: string): AST {
+export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: string): AST {
   if (!ast || !ast.get('FROM')) {
     return ast;
   }
@@ -101,7 +101,7 @@ export function ApplyFiltersToAST(ast: AST, whereClause: string, targetTable: st
   ast.forEach((clauses: Clause[]) => {
     for (const c of clauses) {
       if (c !== null && !isString(c)) {
-        ApplyFiltersToAST(c, whereClause, targetTable);
+        applyFiltersToAST(c, whereClause, targetTable);
       }
     }
   });
@@ -109,7 +109,7 @@ export function ApplyFiltersToAST(ast: AST, whereClause: string, targetTable: st
   return ast;
 }
 
-export function RemoveConditionalAllsFromAST(ast: AST, queryVarNames: string[]): AST {
+export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]): AST {
   if (!ast || !ast.get('FROM')) {
     return ast;
   }
@@ -138,7 +138,7 @@ export function RemoveConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
   ast.forEach((clauses: Clause[]) => {
     for (const c of clauses) {
       if (c !== null && !isString(c)) {
-        RemoveConditionalAllsFromAST(c, queryVarNames);
+        removeConditionalAllsFromAST(c, queryVarNames);
       }
     }
   });
@@ -217,7 +217,7 @@ function completePhrase(clauses: Clause[], bracketPhrase: string) {
   // If it contains the keyword SELECT, build the AST for the phrase
   // If it does not, make a leaf node
   if (bracketPhrase.match(/\bSELECT\b/gi)) {
-    clauses.push(SqlToAST(bracketPhrase));
+    clauses.push(sqlToAST(bracketPhrase));
   } else {
     clauses.push(bracketPhrase);
   }
