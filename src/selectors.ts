@@ -59,7 +59,7 @@ export const Components = {
     CodeEditor: {
       input: () => '.monaco-editor textarea',
       container: 'data-testid-code-editor-container',
-      Run: 'data-testid-code-editor-run-button',
+      Expand: 'data-testid-code-editor-expand-button',
     },
     Types: {
       label: 'Query Type',

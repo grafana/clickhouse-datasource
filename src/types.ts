@@ -30,6 +30,7 @@ export enum QueryType {
   SQL = 'sql',
   Builder = 'builder',
 }
+
 export interface CHSQLQuery extends DataQuery {
   queryType: QueryType.SQL;
   rawSql: string;
@@ -38,7 +39,9 @@ export interface CHSQLQuery extends DataQuery {
     builderOptions?: SqlBuilderOptions;
   };
   format: Format;
+  expand?: boolean;
 }
+
 export interface CHBuilderQuery extends DataQuery {
   queryType: QueryType.Builder;
   rawSql: string;
@@ -226,5 +229,10 @@ export const defaultCHSQLQuery: Omit<CHSQLQuery, 'refId'> = {
   queryType: QueryType.SQL,
   rawSql: '',
   format: Format.TABLE,
+  expand: false,
 };
 //#endregion
+
+export enum EditorOption {
+  lineHeight = 59,
+}

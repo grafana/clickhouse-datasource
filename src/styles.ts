@@ -22,12 +22,12 @@ export const styles = {
     firstLabel: css`
       margin-right: 5px;
     `,
-    run: css`
+    expand: css`
       position: absolute;
-      top: -1px;
+      top: 2px;
       left: 6px;
       z-index: 100;
-      color: green;
+      color: gray;
     `,
   },
   ConfigEditor: {
