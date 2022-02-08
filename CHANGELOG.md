@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.9.13
+
+Fix - update sdk to show streaming errors
+
 ## 0.9.12
 
 Fix - format check after ast change
