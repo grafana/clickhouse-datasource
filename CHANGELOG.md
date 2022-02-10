@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0
+
+Feature - Time series: Hide fields, use group by in select, use time field in group by
+
+## 0.10.0
+
+Feature - Ad-Hoc sourced by database or table
+
 ## 0.9.13
 
 Fix - update sdk to show streaming errors
