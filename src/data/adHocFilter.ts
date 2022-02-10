@@ -4,12 +4,16 @@ import sqlToAST, { astToSql, AST, applyFiltersToAST } from './ast';
 export class AdHocFilter {
   private _targetTable = '';
 
-  setTargetTable(query: string) {
-    const ast = sqlToAST(query);
-    this.setTargetTableFroAST(ast);
+  setTargetTable(table: string) {
+    this._targetTable = table;
   }
 
-  private setTargetTableFroAST(ast: AST) {
+  setTargetTableFromQuery(query: string) {
+    const ast = sqlToAST(query);
+    this.setTargetTableFromAST(ast);
+  }
+
+  private setTargetTableFromAST(ast: AST) {
     if (!ast.get('FROM')) {
       return;
     }
@@ -18,11 +22,20 @@ export class AdHocFilter {
       this._targetTable = from.trim().replace(/(\(|\)|,)/gi, '');
       return;
     }
-    this.setTargetTableFroAST(from!);
+    if (from) {
+      this.setTargetTableFromAST(from);
+    }
   }
 
   apply(sql: string, adHocFilters: AdHocVariableFilter[]): string {
-    if (this._targetTable === '' || sql === '' || !adHocFilters || adHocFilters.length === 0) {
+    if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
+      return sql;
+    }
+    const filter = adHocFilters[0];
+    if (filter.key.includes('.')) {
+      this._targetTable = filter.key.split('.')[0];
+    }
+    if (this._targetTable === '') {
       return sql;
     }
     let whereClause = '';
