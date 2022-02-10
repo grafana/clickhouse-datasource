@@ -19,7 +19,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   adHocFilter: AdHocFilter;
-  skipAdHoc = false; // don't apply adhoc filters to the query
+  skipAdHocFilter = false; // don't apply adhoc filters to the query
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -53,11 +53,11 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     let rawQuery = query.rawSql || '';
     // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
     const templateSrv = getTemplateSrv();
-    if (!this.skipAdHoc) {
+    if (!this.skipAdHocFilter) {
       const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
-    this.skipAdHoc = false;
+    this.skipAdHocFilter = false;
     rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables());
     return {
       ...query,
@@ -152,7 +152,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
 
   async getTagValues({ key }: any): Promise<MetricFindValue[]> {
     const { type } = this.getTagSource();
-    this.skipAdHoc = true;
+    this.skipAdHocFilter = true;
     if (type === TagType.query) {
       return this.fetchTagValuesFromQuery(key);
     }
@@ -193,7 +193,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
 
   private async fetchTags(): Promise<Tags> {
     const tagSource = this.getTagSource();
-    this.skipAdHoc = true;
+    this.skipAdHocFilter = true;
 
     if (tagSource.source === undefined) {
       this.adHocFilter.setTargetTable('default');
