@@ -20,9 +20,9 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
     setGroupBy(e.map((item) => item.value!));
   };
   // Add selected value to the list if it does not exist.
-  groupBy.forEach(x => {
-    if (!columns.some(y => y.value === x)) {
-      columns.push({ value: x, label: x});
+  groupBy.forEach((x) => {
+    if (!columns.some((y) => y.value === x)) {
+      columns.push({ value: x, label: x });
     }
   });
   return (
@@ -41,6 +41,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
           onBlur={() => props.onGroupByChange(groupBy)}
           value={groupBy}
           allowCustomValue={true}
+          menuPlacement={'bottom'}
         />
       </div>
     </div>

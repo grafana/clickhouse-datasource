@@ -68,6 +68,7 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
           onChange={onChange}
           onBlur={onUpdateField}
           allowCustomValue={true}
+          menuPlacement={'bottom'}
         />
       </div>
     </div>

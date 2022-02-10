@@ -92,8 +92,8 @@ const getAggregationQuery = (
 const getTrendByQuery = (
   database = '',
   table = '',
-  fields: string[] = [],
   metrics: BuilderMetricField[] = [],
+  groupBy: string[] = [],
   timeField = '',
   timeFieldType = ''
 ): string => {
@@ -106,12 +106,12 @@ const getTrendByQuery = (
     })
     .join(', ');
   if (metricsQuery !== '') {
-    const selected = fields.length > 0 ? `${fields.join(', ')},` : '';
-    metricsQuery = `${timeField}, ${selected}${metricsQuery}`;
+    const group = groupBy.length > 0 ? `${groupBy.join(', ')},` : '';
+    metricsQuery = `${timeField}, ${group} ${metricsQuery}`;
+  } else if (groupBy.length > 0) {
+    metricsQuery = `${timeField}, ${groupBy.join(', ')}`;
   } else {
-    const selected = fields.length > 0 ? `${fields.join(', ')}` : '';
-    const sep = selected !== '' ? ',' : '';
-    metricsQuery = `${timeField}${sep}${selected}`;
+    metricsQuery = `${timeField}`;
   }
 
   const sep = database === '' || table === '' ? '' : '.';
@@ -188,8 +188,15 @@ const getFilters = (filters: Filter[]): string => {
   }, '');
 };
 
-const getGroupBy = (groupBy: string[] = []): string => {
-  return groupBy.length > 0 ? ` GROUP BY ` + groupBy.map((g) => g).join(', ') : '';
+const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
+  const clause = groupBy.length > 0 ? ` GROUP BY ${groupBy.join(', ')}` : '';
+  if (timeField === undefined) {
+    return clause;
+  }
+  if (groupBy.length === 0) {
+    return ` GROUP BY ${timeField}`;
+  }
+  return `${clause}, ${timeField}`;
 };
 
 const getOrderBy = (orderBy?: OrderBy[]): string => {
@@ -224,8 +231,8 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       query += getTrendByQuery(
         options.database,
         options.table,
-        options.fields,
         options.metrics,
+        options.groupBy,
         options.timeField,
         options.timeFieldType
       );
@@ -236,7 +243,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       }
       const trendFilters = getFilters(options.filters || []);
       query += trendFilters ? ` AND ${trendFilters}` : '';
-      query += getGroupBy(options.groupBy);
+      query += getGroupBy(options.groupBy, options.timeField);
       break;
     case BuilderMode.List:
     default:

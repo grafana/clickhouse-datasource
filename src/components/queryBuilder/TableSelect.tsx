@@ -21,7 +21,7 @@ export const TableSelect = (props: Props) => {
       const tables = await datasource.fetchTables(database);
       const values = tables.map((t) => ({ label: t, value: t }));
       // Add selected value to the list if it does not exist.
-      if (table && !tables.find(x => x === table)) {
+      if (table && !tables.find((x) => x === table)) {
         values.push({ label: table!, value: table! });
       }
       // TODO - can't seem to reset the select to unselected
@@ -45,7 +45,7 @@ export const TableSelect = (props: Props) => {
         onChange={(e) => onChange(e.value ? e.value : '')}
         options={list}
         value={table}
-        menuPlacement={'auto'}
+        menuPlacement={'bottom'}
         allowCustomValue={true}
       ></Select>
     </>

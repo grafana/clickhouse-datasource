@@ -177,7 +177,7 @@ export const FilterEditor = (props: {
       return { label: f.label, value: f.name };
     });
     // Add selected value to the list if it does not exist.
-    if (filter && filter.key && !values.find(x => x.value === filter.key )) {
+    if (filter && filter.key && !values.find((x) => x.value === filter.key)) {
       values.push({ label: filter.key!, value: filter.key! });
     }
     return values;
@@ -299,6 +299,7 @@ export const FilterEditor = (props: {
         onCloseMenu={() => setIsOpen(false)}
         onChange={(e) => onFilterNameChange(e.value!)}
         allowCustomValue={true}
+        menuPlacement={'bottom'}
       />
       <Select
         value={filter.operator}
@@ -306,6 +307,7 @@ export const FilterEditor = (props: {
         className={styles.Common.inlineSelect}
         options={getFilterOperatorsByType(filter.type)}
         onChange={(e) => onFilterOperatorChange(e.value!)}
+        menuPlacement={'bottom'}
       />
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} fieldsList={fieldsList} />
     </>

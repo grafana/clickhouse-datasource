@@ -1,5 +1,4 @@
 import {
-  ArrayDataFrame,
   DataFrame,
   DataFrameView,
   DataQueryRequest,
@@ -9,24 +8,22 @@ import {
   ScopedVars,
   vectorator,
 } from '@grafana/data';
-import { DataSourceWithBackend, getTemplateSrv, TemplateSrv } from '@grafana/runtime';
+import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
-import { isString } from 'lodash';
+import { isString, isEmpty } from 'lodash';
 import { removeConditionalAlls } from './removeConditionalAlls';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
-  templateSrv: TemplateSrv;
   adHocFilter: AdHocFilter;
-  skipAdHocFilter = false;
+  skipAdHocFilter = false; // don't apply adhoc filters to the query
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
-    this.templateSrv = getTemplateSrv();
     this.adHocFilter = new AdHocFilter();
   }
 
@@ -55,25 +52,27 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
     let rawQuery = query.rawSql || '';
     // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
+    const templateSrv = getTemplateSrv();
     if (!this.skipAdHocFilter) {
-      rawQuery = this.adHocFilter.apply(rawQuery, (this.templateSrv as any)?.getAdhocFilters(this.name));
+      const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
+      rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
-    rawQuery = removeConditionalAlls(rawQuery, getTemplateSrv().getVariables());
+    rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables());
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
     };
   }
 
-  replace(value?: string, scopedVars?: ScopedVars) {
+  private replace(value?: string, scopedVars?: ScopedVars) {
     if (value !== undefined) {
       return getTemplateSrv().replace(value, scopedVars, this.format);
     }
     return value;
   }
 
-  format(value: any) {
+  private format(value: any) {
     if (Array.isArray(value)) {
       return `'${value.join("','")}'`;
     }
@@ -117,12 +116,12 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     }));
   }
 
-  async fetchData(rawSql: string) {
+  private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
   }
 
-  runQuery(request: Partial<CHQuery>): Promise<DataFrame> {
+  private runQuery(request: Partial<CHQuery>): Promise<DataFrame> {
     return new Promise((resolve) => {
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
@@ -133,7 +132,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     });
   }
 
-  values(frame: DataFrame) {
+  private values(frame: DataFrame) {
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -141,12 +140,45 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   async getTagKeys(): Promise<MetricFindValue[]> {
-    const frame = await this.fetchTags();
-    return frame.fields.map((f) => ({ text: f.name }));
+    const { type, frame } = await this.fetchTags();
+    if (type === TagType.query) {
+      return frame.fields.map((f) => ({ text: f.name }));
+    }
+    const view = new DataFrameView(frame);
+    return view.map((item) => ({
+      text: `${item[2]}.${item[0]}`,
+    }));
   }
 
   async getTagValues({ key }: any): Promise<MetricFindValue[]> {
-    const frame = await this.fetchTags();
+    const { type } = this.getTagSource();
+    this.skipAdHocFilter = true;
+    if (type === TagType.query) {
+      return this.fetchTagValuesFromQuery(key);
+    }
+    return this.fetchTagValuesFromSchema(key);
+  }
+
+  private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
+    const { from } = this.getTagSource();
+    const [table, col] = key.split('.');
+    const source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
+    const rawSql = `select distinct ${col} from ${source} limit 1000`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const field = frame.fields[0];
+    // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
+    return vectorator(field.values)
+      .filter((value) => value !== null)
+      .map((value) => {
+        return { text: String(value) };
+      });
+  }
+
+  private async fetchTagValuesFromQuery(key: string): Promise<MetricFindValue[]> {
+    const { frame } = await this.fetchTags();
     const field = frame.fields.find((f) => f.name === key);
     if (field) {
       // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
@@ -159,15 +191,59 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return [];
   }
 
-  async fetchTags(): Promise<DataFrame> {
-    // @todo https://github.com/grafana/grafana/issues/13109
-    const rawSql = this.templateSrv.replace('$clickhouse_adhoc_query');
-    if (rawSql === '$clickhouse_adhoc_query') {
-      return new ArrayDataFrame([]);
-    } else {
-      this.skipAdHocFilter = true;
-      this.adHocFilter.setTargetTable(rawSql);
-      return await this.runQuery({ rawSql });
+  private async fetchTags(): Promise<Tags> {
+    const tagSource = this.getTagSource();
+    this.skipAdHocFilter = true;
+
+    if (tagSource.source === undefined) {
+      this.adHocFilter.setTargetTable('default');
+      const rawSql = 'SELECT name, type, table FROM system.columns';
+      const results = await this.runQuery({ rawSql });
+      return { type: TagType.schema, frame: results };
     }
+
+    if (tagSource.type === TagType.query) {
+      this.adHocFilter.setTargetTableFromQuery(tagSource.source);
+    } else {
+      let table = tagSource.from;
+      if (table?.includes('.')) {
+        table = table.split('.')[1];
+      }
+      this.adHocFilter.setTargetTable(table || '');
+    }
+
+    const results = await this.runQuery({ rawSql: tagSource.source });
+    return { type: tagSource.type, frame: results };
   }
+
+  private getTagSource() {
+    // @todo https://github.com/grafana/grafana/issues/13109
+    const ADHOC_VAR = '$clickhouse_adhoc_query';
+    const defaultDatabase = this.getDefaultDatabase();
+    let source = getTemplateSrv().replace(ADHOC_VAR);
+    if (source === ADHOC_VAR && isEmpty(defaultDatabase)) {
+      return { type: TagType.schema, source: undefined };
+    }
+    source = source === ADHOC_VAR ? defaultDatabase! : source;
+    if (source.toLowerCase().startsWith('select')) {
+      return { type: TagType.query, source };
+    }
+    if (!source.includes('.')) {
+      const sql = `SELECT name, type, table FROM system.columns WHERE database IN ('${source}')`;
+      return { type: TagType.schema, source: sql, from: source };
+    }
+    const [db, table] = source.split('.');
+    const sql = `SELECT name, type, table FROM system.columns WHERE database IN ('${db}') AND table = '${table}'`;
+    return { type: TagType.schema, source: sql, from: source };
+  }
+}
+
+enum TagType {
+  query,
+  schema,
+}
+
+interface Tags {
+  type?: TagType;
+  frame: DataFrame;
 }

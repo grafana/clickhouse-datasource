@@ -47,6 +47,7 @@ const OrderByItem = (props: {
         options={columns}
         onChange={(e) => onOrderBySortFieldUpdate(e.value!)}
         allowCustomValue={true}
+        menuPlacement={'bottom'}
       ></Select>
       <Select<OrderByDirection>
         value={orderByItem.dir}
@@ -54,6 +55,7 @@ const OrderByItem = (props: {
         width={12}
         options={sortOptions}
         onChange={(e) => onOrderBySortDirectionUpdate(e.value!)}
+        menuPlacement={'bottom'}
       />
     </>
   );
@@ -158,10 +160,10 @@ export const getOrderByFields = (
   builder: SqlBuilderOptions,
   fieldsList: FullField[]
 ): Array<SelectableValue<string>> => {
-  let values: SelectableValue<string>[] | { value: string; label: string; }[] = [];
+  let values: SelectableValue<string>[] | { value: string; label: string }[] = [];
   switch (builder.mode) {
     case BuilderMode.Aggregate:
-      values =  [
+      values = [
         ...(builder.fields || []).map((g) => {
           return { value: g, label: g };
         }),
@@ -180,8 +182,8 @@ export const getOrderByFields = (
       });
   }
   // Add selected value to the list if it does not exist.
-  (builder as SqlBuilderOptionsAggregate).orderBy?.forEach(x => {
-    if (!values.some(y => y.value === x.name)) {
+  (builder as SqlBuilderOptionsAggregate).orderBy?.forEach((x) => {
+    if (!values.some((y) => y.value === x.name)) {
       values.push({ value: x.name, label: x.name });
     }
   });

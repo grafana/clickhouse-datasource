@@ -123,7 +123,11 @@ Imported dashboards can be found in Configuration > Data Sources > select your C
 
 ### Using Ad-Hoc Filters
 
-A second helper variable must be created in addition to the standard ad-hoc filter type variable of any name. It should be a `constant` type named `clickhouse_adhoc_query` and contain a valid ClickHouse query. The query results will be used to populate your ad-hoc filter's selectable filters. You may choose to hide this variable from view as it serves no further purpose.
+By default, Ad-Hoc filters will be populated with all Tables and Columns.  If you have a default database defined in the Datasource settings, all Tables from that database will be used to populate the filters. As this could be slow/expensive, you can introduce a second variable to allow limiting the Ad-Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query` and can contain: a comma delimited list of databases, just one database, or a database.table combination to show only columns for a single table.
+
+#### Using a query for Ad-Hoc filters
+
+The second `clickhouse_adhoc_query` also allows any valid Clickhouse query. The query results will be used to populate your ad-hoc filter's selectable filters. You may choose to hide this variable from view as it serves no further purpose.
 
 If `clickhouse_adhoc_query` is set to `SELECT DISTINCT machine_name FROM mgbench.logs1` you would be able to select which machine names are filtered for in the dashboard.
 

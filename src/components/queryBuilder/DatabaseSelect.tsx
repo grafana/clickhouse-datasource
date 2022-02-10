@@ -16,7 +16,7 @@ export const DatabaseSelect = (props: Props) => {
       const list = await datasource.fetchDatabases();
       const values = list.map((t) => ({ label: t, value: t }));
       // Add selected value to the list if it does not exist.
-      if (value && !list.find(x => x === value)) {
+      if (value && !list.find((x) => x === value)) {
         values.push({ label: value!, value: value! });
       }
       setList(values);
@@ -33,7 +33,7 @@ export const DatabaseSelect = (props: Props) => {
         onChange={(e) => onChange(e.value!)}
         options={list}
         value={value}
-        menuPlacement={'auto'}
+        menuPlacement={'bottom'}
         allowCustomValue={true}
       ></Select>
     </>
