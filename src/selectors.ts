@@ -70,7 +70,7 @@ export const Components = {
       },
       switcher: {
         title: 'Are you sure?',
-        body: 'You will lose manual changes done to the SQL if you go back to the query builder.',
+        body: 'Queries that are too complex for the Query Builder will be altered.',
         confirmText: 'Continue',
         dismissText: 'Cancel',
       },

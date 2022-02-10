@@ -1,3 +1,5 @@
+import sqlToAST, { Clause } from 'data/ast';
+import { isString } from 'lodash';
 import {
   BuilderMetricField,
   BuilderMode,
@@ -12,6 +14,7 @@ import {
   MultiFilter,
   FilterOperator,
   DateFilterWithoutValue,
+  BuilderMetricFieldAggregation,
 } from 'types';
 
 export const isBooleanType = (type: string): boolean => {
@@ -75,7 +78,9 @@ const getAggregationQuery = (
     })
     .join(', ');
   if (groupBy && groupBy.length > 0) {
-    metricsQuery = groupBy.map((g) => `${g}`).join(', ') + ', ' + metricsQuery;
+    metricsQuery = groupBy.map((g) => `${g}`)
+      .filter(x => !fields.some(y => y === x)) // not adding field if its already is selected
+      .join(', ') + ', ' + metricsQuery;
   }
   if (metricsQuery !== '' && selected !== '') {
     selected = `${selected},`;
@@ -190,12 +195,12 @@ const getGroupBy = (groupBy: string[] = []): string => {
 const getOrderBy = (orderBy?: OrderBy[]): string => {
   return orderBy && orderBy.filter((o) => o.name).length > 0
     ? ` ORDER BY ` +
-        orderBy
-          .filter((o) => o.name)
-          .map((o) => {
-            return `${o.name} ${o.dir}`;
-          })
-          .join(', ')
+    orderBy
+      .filter((o) => o.name)
+      .map((o) => {
+        return `${o.name} ${o.dir}`;
+      })
+      .join(', ')
     : '';
 };
 
@@ -250,6 +255,119 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   }
   return query;
 };
+
+export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
+  const ast = sqlToAST(sql);
+  const fromPhrase = ast.get('FROM');
+  if (!fromPhrase || fromPhrase.length > 1 || !isString(fromPhrase[0])) {
+    return {} as SqlBuilderOptions;
+  }
+
+  const databaseAndTable = fromPhrase[0].trim().split('.');
+  const where = ast.get('WHERE');
+  const orderBy = ast.get('ORDER BY');
+  const limit = ast.get('LIMIT');
+  const groupBy = ast.get('GROUP BY');
+
+  const fieldsAndMetrics = getMetricsFromAst(ast.get('SELECT')!);
+
+  return {
+    mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
+    database: databaseAndTable[0].trim(),
+    table: databaseAndTable[1] ? databaseAndTable[1].trim() : '',
+    fields: fieldsAndMetrics.fields,
+    filters: where && where.length > 0 ? getFiltersFromAst(where) : undefined,
+    orderBy: orderBy?.map<OrderBy | null>(phrase => {
+      if (!isString(phrase) || phrase.trim() === ',') {
+        return null;
+      }
+      const orderBySplit = phrase.trim().split(' ');
+      return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
+    }).filter(x => x),
+    limit: limit && limit.length > 0 ? Number.parseInt(limit[0]!.toString()) : undefined,
+    metrics: fieldsAndMetrics.metrics,
+    groupBy: groupBy?.map(field => {
+      if (!isString(field) || field.trim() === ',') {
+        return null;
+      }
+      return field.trim();
+    }).filter(x => x),
+  } as SqlBuilderOptions;
+}
+
+function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
+  const filters: Filter[] = [{} as Filter];
+  for (let c of whereClauses) {
+    if (!isString(c)) {
+      continue;
+    }
+    if (c.trim().toUpperCase() === 'AND') {
+      filters.push({ condition: 'AND' } as Filter);
+      continue;
+    }
+    else if (c.trim().toUpperCase() === 'OR') {
+      filters.push({ condition: 'OR' } as Filter);
+      continue;
+    }
+    const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
+    if (!phrases) {
+      continue;
+    }
+    const opAndVal = getOperator(phrases);
+    filters[filters.length - 1] = {
+      ...filters[filters.length - 1],
+      key: phrases[0],
+      operator: opAndVal.f,
+      value: opAndVal.v,
+      type: '',
+    } as Filter;
+  }
+  return filters;
+}
+
+function getOperator(phrases: string[]): { f: FilterOperator, v: any } {
+  let op = phrases[1];
+  if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
+    return { f: op.toUpperCase() as FilterOperator, v: phrases.slice(2, phrases.length) };
+  }
+  for (let i = 2; i < phrases.length; i++) {
+    op += ` ${phrases[i]}`;
+    if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
+      return { f: op.toUpperCase() as FilterOperator, v: phrases.slice(i + 1, phrases.length) };
+    }
+  }
+  return { f: '' as FilterOperator, v: null };
+}
+
+function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[], fields: string[] } {
+  const metrics: BuilderMetricField[] = [];
+  const fields: string[] = [];
+  for (let c of selectClauses) {
+    if (!isString(c) || !c.trim() || c.trim() === ',') {
+      continue;
+    }
+    let isMetric = false;
+    for (let agg of Object.values(BuilderMetricFieldAggregation)) {
+      if (c.trim().toLowerCase().startsWith(`${agg}`)) {
+        const phrases = c.match(/\w+|\$(\w+)/g);
+        if (!phrases) {
+          continue;
+        }
+        metrics.push({
+          field: phrases[1] ? phrases[1] : '',
+          aggregation: agg,
+          alias: phrases[3] ? phrases[3] : '',
+
+        } as BuilderMetricField);
+        isMetric = true;
+      }
+    }
+    if (!isMetric) {
+      fields.push(c.trim());
+    }
+  }
+  return { metrics, fields };
+}
 
 export const operMap = new Map<string, FilterOperator>([
   ['equals', FilterOperator.Equals],

@@ -19,6 +19,12 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
     setIsOpen(false);
     setGroupBy(e.map((item) => item.value!));
   };
+  // Add selected value to the list if it does not exist.
+  groupBy.forEach(x => {
+    if (!columns.some(y => y.value === x)) {
+      columns.push({ value: x, label: x});
+    }
+  });
   return (
     <div className="gf-form">
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
@@ -34,6 +40,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
           onChange={onChange}
           onBlur={() => props.onGroupByChange(groupBy)}
           value={groupBy}
+          allowCustomValue={true}
         />
       </div>
     </div>

@@ -38,6 +38,24 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         .then(async (fields) => {
           fields.push({ name: '*', label: 'ALL', type: 'string', picklistValues: [] });
           setBaseFieldsList(fields);
+          
+          // When changing from SQL Editor to Query Builder, we need to find out if the
+          // first value is a datetime or date so we can change the mode to Time Series
+          if (builder.fields?.length > 0) {
+            const fieldName = builder.fields[0];
+            const timeFields = fields.filter((f) => f.type.toLowerCase() === 'datetime' || f.type.toLowerCase() === 'date');
+            const timeField = timeFields.find(x => x.name === fieldName);
+            if (timeField) {
+              const queryOptions: SqlBuilderOptions = {
+                ...builder,
+                timeField: timeField.name,
+                timeFieldType: timeField.type,
+                mode: BuilderMode.Trend,
+                fields: builder.fields.slice(1, builder.fields.length),
+              };
+              props.onBuilderOptionsChange(queryOptions);
+            }
+          }
         })
         .catch((ex: any) => {
           console.error(ex);

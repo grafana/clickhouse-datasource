@@ -173,9 +173,14 @@ export const FilterEditor = (props: {
   const { index, filter, fieldsList, onFilterChange } = props;
   const [isOpen, setIsOpen] = useState(false);
   const getFields = () => {
-    return fieldsList.map((f) => {
+    const values = fieldsList.map((f) => {
       return { label: f.label, value: f.name };
     });
+    // Add selected value to the list if it does not exist.
+    if (filter && filter.key && !values.find(x => x.value === filter.key )) {
+      values.push({ label: filter.key!, value: filter.key! });
+    }
+    return values;
   };
   const getFilterOperatorsByType = (type = 'string'): Array<SelectableValue<FilterOperator>> => {
     if (utils.isBooleanType(type)) {
@@ -293,6 +298,7 @@ export const FilterEditor = (props: {
         onOpenMenu={() => setIsOpen(true)}
         onCloseMenu={() => setIsOpen(false)}
         onChange={(e) => onFilterNameChange(e.value!)}
+        allowCustomValue={true}
       />
       <Select
         value={filter.operator}

@@ -6,7 +6,7 @@ export type AST = Map<string, Clause[]>;
 export default function sqlToAST(sql: string): AST {
   const ast = createStatement();
   const re =
-    /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
+    /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|ORDER BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
   const bracket = { count: 0, lastCount: 0, phrase: '' };
   let lastNode = '';
   let regExpArray: RegExpExecArray | null;
@@ -83,7 +83,7 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
         // first we get the remaining part of the FROM phrase. ") as r"
         const fromPhrase = ast.get('FROM');
         const fromPhraseAfterTableName = fromPhrase!
-          [fromPhrase!.length - 1]!.toString()
+        [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
         // apply the remaining part of the FROM phrase to the end of the new WHERE clause
@@ -174,7 +174,7 @@ function movePhraseEnding(c: string, ast: AST) {
 
 function getASTBranches(sql: string): Clause[] {
   const clauses: Clause[] = [];
-  const re = /\b(AND|OR|,)\b/gi;
+  const re = /(\bAND\b|\bOR\b|,)/gi;
   const bracket = { count: 0, lastCount: 0, phrase: '' };
   let regExpArray: RegExpExecArray | null;
   let lastPhraseIndex = 0;
@@ -238,6 +238,7 @@ function createStatement(): AST {
   clauses.set('GROUP BY', []);
   clauses.set('LIMIT BY', []);
   clauses.set('HAVING', []);
+  clauses.set('ORDER BY', []);
   clauses.set('LIMIT', []);
   clauses.set('OFFSET', []);
   clauses.set('UNION', []);

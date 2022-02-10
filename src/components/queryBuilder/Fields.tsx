@@ -22,6 +22,7 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
     if (props.fieldsList.length === 0) {
       return;
     }
+    setFields(props.fields);
     const customFields = getCustomFields(props.fields, props.fieldsList);
     setCustom(customFields);
   }, [props.fieldsList, props.fields]);

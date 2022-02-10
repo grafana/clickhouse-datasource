@@ -1,5 +1,5 @@
 import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDirection } from 'types';
-import { getSQLFromQueryOptions as convert } from './utils';
+import { getQueryOptionsFromSql, getSQLFromQueryOptions as convert } from './utils';
 
 describe('Utils', () => {
   it('getSQLFromQueryOptions', () => {
@@ -232,5 +232,28 @@ describe('Utils', () => {
     ).toBe(
       `SELECT count(Id) FROM db.foo WHERE   (  NOT ( CloseDate  >= \${__from:date:YYYY-MM-DD} AND CloseDate <= \${__to:date:YYYY-MM-DD} ) )`
     );
+  });
+  it('getQueryOptionsFromSql', () => {
+    expect(
+      getQueryOptionsFromSql(
+        `SELECT count(Id) FROM db.foo WHERE   (  NOT ( CloseDate  >= \${__from:date:YYYY-MM-DD} AND CloseDate <= \${__to:date:YYYY-MM-DD} ) )`
+      )).toBe({
+        mode: BuilderMode.Aggregate,
+        database: 'db',
+        table: 'foo',
+        fields: [],
+        metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+        filters: [
+          {
+            filterType: 'custom',
+            key: 'CloseDate',
+            operator: FilterOperator.OutsideGrafanaTimeRange,
+            type: 'date',
+            value: '',
+            condition: 'AND',
+          },
+        ],
+      }
+      );
   });
 });
