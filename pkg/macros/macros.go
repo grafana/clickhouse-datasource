@@ -76,7 +76,7 @@ func TimeInterval(query *sqlds.Query, args []string) (string, error) {
 	}
 
 	seconds := query.Interval.Seconds()
-	return fmt.Sprintf("toStartOfInterval(%s, INTERVAL %d second)", args[0], int(seconds)), nil
+	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", args[0], int(seconds)), nil
 }
 
 func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
