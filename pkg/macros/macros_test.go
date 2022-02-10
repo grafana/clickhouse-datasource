@@ -81,7 +81,7 @@ func TestMacroTimeInterval(t *testing.T) {
 	}
 	got, err := macros.TimeInterval(&query, []string{"col"})
 	assert.Nil(t, err)
-	assert.Equal(t, "toStartOfInterval(col, INTERVAL 20 second)", got)
+	assert.Equal(t, "toStartOfInterval(toDateTime(col), INTERVAL 20 second)", got)
 }
 
 func TestMacroIntervalSeconds(t *testing.T) {
