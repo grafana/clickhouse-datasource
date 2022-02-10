@@ -189,7 +189,7 @@ const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
     return clause;
   }
   if (groupBy.length === 0) {
-    return `${clause} ${timeField}`;
+    return ` GROUP BY ${timeField}`;
   }
   return `${clause}, ${timeField}`;
 };
