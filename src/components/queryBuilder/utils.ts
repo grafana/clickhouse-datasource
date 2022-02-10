@@ -184,7 +184,7 @@ const getFilters = (filters: Filter[]): string => {
 };
 
 const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
-  const clause = groupBy.length > 0 ? ` GROUP BY ` + groupBy.map((g) => g).join(', ') : '';
+  const clause = groupBy.length > 0 ? ` GROUP BY ${groupBy.join(', ')}` : '';
   if (timeField === undefined) {
     return clause;
   }
