@@ -191,7 +191,7 @@ function getASTBranches(sql: string): Clause[] {
     if (bracket.count > 0) {
       bracket.phrase += phrase + foundSplitter;
     } else {
-      clauses.push(phrase);
+      completePhrase(clauses, phrase);
       clauses.push(foundSplitter);
     }
     if (bracket.count <= 0 && bracket.lastCount > 0) {
