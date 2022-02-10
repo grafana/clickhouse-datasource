@@ -123,7 +123,7 @@ Imported dashboards can be found in Configuration > Data Sources > select your C
 
 ### Using Ad-Hoc Filters
 
-By default, Ad-Hoc filters will be populated with all Tables and Columns. As this could be slow/expensive, you can introduce a second variable to allow limiting the Ad-Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query` and can contain: a comma delimited list of databases, just one database, or a database.table combination to show only columns for a single table.
+By default, Ad-Hoc filters will be populated with all Tables and Columns.  If you have a default database defined in the Datasource settings, all Tables from that database will be used to populate the filters. As this could be slow/expensive, you can introduce a second variable to allow limiting the Ad-Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query` and can contain: a comma delimited list of databases, just one database, or a database.table combination to show only columns for a single table.
 
 #### Using a query for Ad-Hoc filters
 
