@@ -29,7 +29,7 @@ export const DatabaseSelect = (props: Props) => {
         onChange={(e) => onChange(e.value!)}
         options={list}
         value={props.value}
-        menuPlacement={'auto'}
+        menuPlacement={'bottom'}
       ></Select>
     </>
   );

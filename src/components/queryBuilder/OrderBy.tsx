@@ -45,6 +45,7 @@ const OrderByItem = (props: {
         width={20}
         options={columns}
         onChange={(e) => onOrderBySortFieldUpdate(e.value!)}
+        menuPlacement={'bottom'}
       ></Select>
       <Select<OrderByDirection>
         value={orderByItem.dir}
@@ -52,6 +53,7 @@ const OrderByItem = (props: {
         width={12}
         options={sortOptions}
         onChange={(e) => onOrderBySortDirectionUpdate(e.value!)}
+        menuPlacement={'bottom'}
       />
     </>
   );

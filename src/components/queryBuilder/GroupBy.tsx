@@ -34,6 +34,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
           onChange={onChange}
           onBlur={() => props.onGroupByChange(groupBy)}
           value={groupBy}
+          menuPlacement={'bottom'}
         />
       </div>
     </div>

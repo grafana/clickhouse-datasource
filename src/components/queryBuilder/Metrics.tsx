@@ -52,6 +52,7 @@ const MetricEditor = (props: {
         options={aggregationTypes}
         onChange={(e) => onMetricAggregationChange(e.value!)}
         value={metric.aggregation}
+        menuPlacement={'bottom'}
       />
       <Select<string>
         width={28}
@@ -62,6 +63,7 @@ const MetricEditor = (props: {
         onCloseMenu={() => setIsOpen(false)}
         onChange={onMetricFieldChange}
         value={metric.field}
+        menuPlacement={'bottom'}
       />
       <InlineFormLabel width={2} className="query-keyword">
         {ALIAS.label}

@@ -293,6 +293,7 @@ export const FilterEditor = (props: {
         onOpenMenu={() => setIsOpen(true)}
         onCloseMenu={() => setIsOpen(false)}
         onChange={(e) => onFilterNameChange(e.value!)}
+        menuPlacement={'bottom'}
       />
       <Select
         value={filter.operator}
@@ -300,6 +301,7 @@ export const FilterEditor = (props: {
         className={styles.Common.inlineSelect}
         options={getFilterOperatorsByType(filter.type)}
         onChange={(e) => onFilterOperatorChange(e.value!)}
+        menuPlacement={'bottom'}
       />
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} fieldsList={fieldsList} />
     </>
