@@ -64,8 +64,8 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
       if (format !== query.format) {
         onChange({ ...query, format });
       }
-      onRunQuery();
     }
+    onRunQuery();
   };
 
   return (

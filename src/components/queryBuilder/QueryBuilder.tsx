@@ -166,7 +166,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           fieldsList={fieldsList}
         />
       )}
-      <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
+      {builder.mode !== BuilderMode.Trend && (
+        <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
+      )}
+
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
       )}

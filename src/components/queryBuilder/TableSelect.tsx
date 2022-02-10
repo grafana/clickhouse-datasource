@@ -41,7 +41,7 @@ export const TableSelect = (props: Props) => {
         onChange={(e) => onChange(e.value!)}
         options={list}
         value={table}
-        menuPlacement={'auto'}
+        menuPlacement={'bottom'}
       ></Select>
     </>
   );

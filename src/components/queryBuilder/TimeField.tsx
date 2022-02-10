@@ -30,6 +30,7 @@ export const TimeFieldEditor = (props: TimeFieldEditorProps) => {
         width={20}
         onChange={(e) => props.onTimeFieldChange(e.value, getColumnType(e.value))}
         value={props.timeField}
+        menuPlacement={'bottom'}
       />
     </div>
   );
