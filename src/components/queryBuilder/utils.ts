@@ -15,6 +15,7 @@ import {
   FilterOperator,
   DateFilterWithoutValue,
   BuilderMetricFieldAggregation,
+  SqlBuilderOptionsAggregate,
 } from 'types';
 
 export const isBooleanType = (type: string): boolean => {
@@ -272,38 +273,59 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
 
   const databaseAndTable = fromPhrase[0].trim().split('.');
   const where = ast.get('WHERE');
-  const orderBy = ast.get('ORDER BY');
   const limit = ast.get('LIMIT');
-  const groupBy = ast.get('GROUP BY');
 
   const fieldsAndMetrics = getMetricsFromAst(ast.get('SELECT')!);
 
-  return {
+  let builder = {
     mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
     database: databaseAndTable[0].trim(),
     table: databaseAndTable[1] ? databaseAndTable[1].trim() : '',
-    fields: fieldsAndMetrics.fields,
-    filters: where && where.length > 0 ? getFiltersFromAst(where) : undefined,
-    orderBy: orderBy?.map<OrderBy | null>(phrase => {
-      if (!isString(phrase) || phrase.trim() === ',') {
-        return null;
-      }
-      const orderBySplit = phrase.trim().split(' ');
-      return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
-    }).filter(x => x),
-    limit: limit && limit.length > 0 ? Number.parseInt(limit[0]!.toString()) : undefined,
-    metrics: fieldsAndMetrics.metrics,
-    groupBy: groupBy?.map(field => {
-      if (!isString(field) || field.trim() === ',') {
-        return null;
-      }
-      return field.trim();
-    }).filter(x => x),
   } as SqlBuilderOptions;
+
+  if (fieldsAndMetrics.fields) {
+    builder.fields = fieldsAndMetrics.fields;
+  }
+
+  if (where && where.length > 0) {
+    builder.filters = getFiltersFromAst(where);
+  }
+
+  const orderBy = ast.get('ORDER BY')?.map<OrderBy>(phrase => {
+    if (!isString(phrase) || phrase.trim() === ',') {
+      return {} as OrderBy;
+    }
+    const orderBySplit = phrase.trim().split(' ');
+    return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
+  }).filter(x => x);
+
+  if (orderBy && orderBy.length > 0) {
+    (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
+  }
+
+  if (limit && limit.length > 0) {
+    builder.limit = Number.parseInt(limit[0]!.toString());
+  }
+
+  if (fieldsAndMetrics.metrics.length > 0) {
+    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
+  }
+
+  const groupBy = ast.get('GROUP BY')?.map(field => {
+    if (!isString(field) || field.trim() === ',') {
+      return '';
+    }
+    return field.trim();
+  }).filter(x => x !== '');
+  if (groupBy && groupBy.length > 0) {
+    (builder as SqlBuilderOptionsAggregate).groupBy = groupBy;
+  }
+  return builder;
 }
 
 function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
-  const filters: Filter[] = [{} as Filter];
+  // first condition is always AND but is not used
+  const filters: Filter[] = [{ condition: 'AND' } as Filter];
   for (let c of whereClauses) {
     if (!isString(c)) {
       continue;
@@ -316,31 +338,39 @@ function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
       filters.push({ condition: 'OR' } as Filter);
       continue;
     }
+    const stringPhrases = c.match(/(["'])(?:(?=(\\?))\2.)*?\1/g)?.map(x => x = x.substring(1, x.length - 1));
     const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
     if (!phrases) {
       continue;
     }
-    const opAndVal = getOperator(phrases);
+    const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
     filters[filters.length - 1] = {
       ...filters[filters.length - 1],
+      filterType: 'custom',
       key: phrases[0],
-      operator: opAndVal.f,
-      value: opAndVal.v,
-      type: '',
+      operator: opAndVal.f ? opAndVal.f : '',
+      value: opAndVal.v ? opAndVal.v : '',
+      type: stringPhrases && stringPhrases.length > 0 ? 'string' : '',
     } as Filter;
   }
   return filters;
 }
 
-function getOperator(phrases: string[]): { f: FilterOperator, v: any } {
+function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator, v: any } {
   let op = phrases[1];
   if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
-    return { f: op.toUpperCase() as FilterOperator, v: phrases.slice(2, phrases.length) };
+    return {
+      f: op.toUpperCase() as FilterOperator,
+      v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(2, phrases.length)
+    };
   }
   for (let i = 2; i < phrases.length; i++) {
     op += ` ${phrases[i]}`;
     if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
-      return { f: op.toUpperCase() as FilterOperator, v: phrases.slice(i + 1, phrases.length) };
+      return {
+        f: op.toUpperCase() as FilterOperator,
+        v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(i + 1, phrases.length)
+      };
     }
   }
   return { f: '' as FilterOperator, v: null };
@@ -360,12 +390,18 @@ function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricFie
         if (!phrases) {
           continue;
         }
-        metrics.push({
+        const metric = {
           field: phrases[1] ? phrases[1] : '',
           aggregation: agg,
-          alias: phrases[3] ? phrases[3] : '',
+        } as BuilderMetricField;
 
-        } as BuilderMetricField);
+        if (phrases[2]) {
+          metric.alias = phrases[2];
+        }
+        if (phrases[3]) {
+          metric.alias = phrases[3];
+        }
+        metrics.push(metric);
         isMetric = true;
       }
     }

@@ -39,6 +39,9 @@ export const SQLEditor = (props: SQLEditorProps) => {
     const icon = on ? 'minus' : 'plus';
     onChange({ ...sqlQuery, expand: on });
 
+    if (!codeEditor) {
+      return;
+    }
     if (on) {
       codeEditor.expanded = true;
       const height = getEditorHeight(codeEditor);
