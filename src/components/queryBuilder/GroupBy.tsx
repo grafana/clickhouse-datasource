@@ -20,11 +20,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
     setGroupBy(e.map((item) => item.value!));
   };
   // Add selected value to the list if it does not exist.
-  groupBy.forEach((x) => {
-    if (!columns.some((y) => y.value === x)) {
-      columns.push({ value: x, label: x });
-    }
-  });
+  groupBy.filter((x) => !columns.some((y) => y.value === x)).forEach((x) => columns.push({ value: x, label: x }));
   return (
     <div className="gf-form">
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>

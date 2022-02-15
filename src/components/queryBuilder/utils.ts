@@ -405,47 +405,52 @@ function isWithInTimeRangeFilter(phrases: string[]): boolean {
   if (!phrases || phrases.length === 0) {
     return false;
   }
-  let hasFrom = false;
-  let hasTo = false;
+  const has = { from: false, to: false };
   for (const p of phrases) {
     if (p === '__from') {
-      hasFrom = true;
+      has.from = true;
     } else if (p === '__to') {
-      hasTo = true;
+      has.to = true;
     }
   }
-  return hasFrom && hasTo;
+  return has.from && has.to;
 }
 
 function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[]; fields: string[] } {
-  const metrics: BuilderMetricField[] = [];
+  let metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
   for (const c of selectClauses) {
     if (!isString(c) || !c.trim() || c.trim() === ',') {
       continue;
     }
     let isMetric = false;
-    for (const agg of Object.values(BuilderMetricFieldAggregation)) {
-      if (c.trim().toLowerCase().startsWith(`${agg}`)) {
-        const phrases = c.match(/\w+|\$(\w+)/g);
-        if (!phrases) {
-          continue;
-        }
-        const metric = {
-          field: phrases[1] ? phrases[1] : '',
-          aggregation: agg,
-        } as BuilderMetricField;
+    metrics = metrics.concat(
+      Object.values(BuilderMetricFieldAggregation)
+        .filter((x) => c.trim().toLowerCase().startsWith(`${x}`))
+        .map((x) => {
+          const phrases = c.match(/\w+|\$(\w+)/g);
+          if (!phrases) {
+            return null;
+          }
+          const metric = {
+            field: phrases[1] ? phrases[1] : '',
+            aggregation: x,
+          } as BuilderMetricField;
 
-        if (phrases[2]) {
-          metric.alias = phrases[2];
-        }
-        if (phrases[3]) {
-          metric.alias = phrases[3];
-        }
-        metrics.push(metric);
-        isMetric = true;
-      }
-    }
+          // Alias does use 'as' like sum(field) total_Fields
+          if (phrases[2]) {
+            metric.alias = phrases[2];
+          }
+          // Alias does use 'as' like field as aliasField
+          if (phrases[3]) {
+            metric.alias = phrases[3];
+          }
+          isMetric = true;
+          return metric;
+        })
+        .filter((x) => x) as BuilderMetricField[]
+    );
+
     if (!isMetric) {
       fields.push(c.trim());
     }
