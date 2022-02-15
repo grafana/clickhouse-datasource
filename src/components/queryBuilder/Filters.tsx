@@ -177,7 +177,7 @@ export const FilterEditor = (props: {
       return { label: f.label, value: f.name };
     });
     // Add selected value to the list if it does not exist.
-    if (filter && filter.key && !values.find((x) => x.value === filter.key)) {
+    if (filter?.key && !values.find((x) => x.value === filter.key)) {
       values.push({ label: filter.key!, value: filter.key! });
     }
     return values;

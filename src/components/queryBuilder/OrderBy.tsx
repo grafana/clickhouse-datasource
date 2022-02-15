@@ -183,7 +183,7 @@ export const getOrderByFields = (
   }
   // Add selected value to the list if it does not exist.
   (builder as SqlBuilderOptionsAggregate).orderBy?.forEach((x) => {
-    if (!values.some((y) => y.value === x.name)) {
+    if (!values.some((y: { value: string; label: string } | SelectableValue<string>) => y.value === x.name)) {
       values.push({ value: x.name, label: x.name });
     }
   });

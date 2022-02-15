@@ -2,10 +2,10 @@ import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDire
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './utils';
 
 describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
-  testCondition('handles a database without a table', 'SELECT name FROM db', {
+  testCondition('handles a table without a database', 'SELECT name FROM table', {
     mode: BuilderMode.List,
-    database: 'db',
-    table: '',
+    database: '',
+    table: 'table',
     fields: ['name'],
   });
 

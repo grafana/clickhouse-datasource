@@ -22,7 +22,7 @@ export const DatabaseSelect = (props: Props) => {
       setList(values);
     }
     fetchList();
-  }, [datasource]);
+  }, [datasource, value]);
   return (
     <>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>

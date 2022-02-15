@@ -119,14 +119,14 @@ export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
     for (let i = 0; i < where.length; i++) {
       const c = where[i];
       if (isString(c) && queryVarNames.some((v) => c.includes(v))) {
-        where[i] = null;
         // remove AND/OR before this condition if this is the last condition
         if (i === where.length - 1) {
-          where[i - 1] = null;
+          where.splice(i - 1, 2);
         }
         // remove AND/OR after this condition
         if (where.length > 1) {
-          where[i + 1] = null;
+          where.splice(i, 2);
+          i--;
         }
         // moves the ending of the phrase, like ')', to the next logical place
         movePhraseEnding(c, ast);

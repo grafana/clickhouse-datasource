@@ -81,7 +81,6 @@ const getAggregationQuery = (
   if (groupBy && groupBy.length > 0) {
     metricsQuery =
       groupBy
-        .map((g) => `${g}`)
         .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
         .join(', ') + (metricsQuery ? `, ${metricsQuery}` : '');
   }
@@ -279,8 +278,8 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
 
   let builder = {
     mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
-    database: databaseAndTable[0].trim(),
-    table: databaseAndTable[1] ? databaseAndTable[1].trim() : '',
+    database: databaseAndTable[1] ? databaseAndTable[0].trim() : '',
+    table: databaseAndTable[1] ? databaseAndTable[1].trim() : databaseAndTable[0].trim(),
   } as SqlBuilderOptions;
 
   if (fieldsAndMetrics.fields) {
@@ -332,7 +331,7 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
 function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
   // first condition is always AND but is not used
   const filters: Filter[] = [{ condition: 'AND' } as Filter];
-  for (let c of whereClauses) {
+  for (const c of whereClauses) {
     if (!isString(c)) {
       continue;
     }
@@ -421,12 +420,12 @@ function isWithInTimeRangeFilter(phrases: string[]): boolean {
 function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[]; fields: string[] } {
   const metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
-  for (let c of selectClauses) {
+  for (const c of selectClauses) {
     if (!isString(c) || !c.trim() || c.trim() === ',') {
       continue;
     }
     let isMetric = false;
-    for (let agg of Object.values(BuilderMetricFieldAggregation)) {
+    for (const agg of Object.values(BuilderMetricFieldAggregation)) {
       if (c.trim().toLowerCase().startsWith(`${agg}`)) {
         const phrases = c.match(/\w+|\$(\w+)/g);
         if (!phrases) {

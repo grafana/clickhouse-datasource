@@ -29,7 +29,7 @@ export const TableSelect = (props: Props) => {
       setList(values);
     }
     fetchTables();
-  }, [datasource, database]);
+  }, [datasource, database, table]);
 
   const onChange = (value: string) => {
     onTableChange(value);
