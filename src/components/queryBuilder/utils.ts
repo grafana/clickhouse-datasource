@@ -81,10 +81,7 @@ const getAggregationQuery = (
   if (groupBy && groupBy.length > 0) {
     metricsQuery = groupBy.map((g) => `${g}`)
       .filter(x => !fields.some(y => y === x)) // not adding field if its already is selected
-      .join(', ') + ', ' + metricsQuery;
-  }
-  if (metricsQuery !== '' && selected !== '') {
-    selected = `${selected},`;
+      .join(', ') + (metricsQuery ? `, ${metricsQuery}` : '');
   }
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${selected}${metricsQuery} FROM ${database}${sep}${table}`;
@@ -338,25 +335,33 @@ function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
       filters.push({ condition: 'OR' } as Filter);
       continue;
     }
-    const stringPhrases = c.match(/(["'])(?:(?=(\\?))\2.)*?\1/g)?.map(x => x = x.substring(1, x.length - 1));
+    const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map(x => x = x.substring(1, x.length - 1));
     const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
     if (!phrases) {
       continue;
     }
+    const isNotClause = phrases[0] === 'NOT';
     const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
     filters[filters.length - 1] = {
       ...filters[filters.length - 1],
       filterType: 'custom',
-      key: phrases[0],
+      key: isNotClause ? phrases[1] : phrases[0],
       operator: opAndVal.f ? opAndVal.f : '',
       value: opAndVal.v ? opAndVal.v : '',
-      type: stringPhrases && stringPhrases.length > 0 ? 'string' : '',
+      type: getFilterType(c, stringPhrases),
     } as Filter;
   }
   return filters;
 }
 
 function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator, v: any } {
+  if (isWithInTimeRangeFilter(phrases)) {
+    return {
+      f: phrases[0] === 'NOT' ? FilterOperator.OutsideGrafanaTimeRange : FilterOperator.WithInGrafanaTimeRange,
+      v: ''
+    };
+  }
+
   let op = phrases[1];
   if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
     return {
@@ -375,6 +380,37 @@ function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: 
   }
   return { f: '' as FilterOperator, v: null };
 }
+
+function getFilterType(whereClause: string, stringPhrases?: string[]): '' | 'datetime' | 'date' | 'string' {
+  if (stringPhrases && stringPhrases.length > 0) {
+    return 'string'
+  }
+  if (whereClause.includes(':date:YYYY-MM-DD')) {
+    return 'date';
+  }
+  if (whereClause.includes(':date')) {
+    return 'datetime';
+  }
+  return '';
+}
+
+function isWithInTimeRangeFilter(phrases: string[]): boolean {
+  if (!phrases || phrases.length === 0) {
+    return false;
+  }
+  let hasFrom = false;
+  let hasTo = false;
+  for (const p of phrases) {
+    if (p === '__from') {
+      hasFrom = true;
+    }
+    else if (p === '__to') {
+      hasTo = true;
+    }
+  }
+  return hasFrom && hasTo;
+}
+
 
 function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[], fields: string[] } {
   const metrics: BuilderMetricField[] = [];
@@ -411,7 +447,6 @@ function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricFie
   }
   return { metrics, fields };
 }
-
 export const operMap = new Map<string, FilterOperator>([
   ['equals', FilterOperator.Equals],
   ['contains', FilterOperator.Like],
