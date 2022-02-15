@@ -160,7 +160,7 @@ export const getOrderByFields = (
   builder: SqlBuilderOptions,
   fieldsList: FullField[]
 ): Array<SelectableValue<string>> => {
-  let values: SelectableValue<string>[] | { value: string; label: string }[] = [];
+  let values: Array<SelectableValue<string>> | Array<{ value: string; label: string }> = [];
   switch (builder.mode) {
     case BuilderMode.Aggregate:
       values = [

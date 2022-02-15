@@ -31,14 +31,19 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     limit: 20,
   });
 
-  testCondition('handles empty orderBy array', 'SELECT field1, field2 FROM db.foo LIMIT 20', {
-    mode: BuilderMode.List,
-    database: 'db',
-    table: 'foo',
-    fields: ['field1', 'field2'],
-    orderBy: [],
-    limit: 20,
-  }, false);
+  testCondition(
+    'handles empty orderBy array',
+    'SELECT field1, field2 FROM db.foo LIMIT 20',
+    {
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      fields: ['field1', 'field2'],
+      orderBy: [],
+      limit: 20,
+    },
+    false
+  );
 
   testCondition('handles order by', 'SELECT field1, field2 FROM db.foo ORDER BY field1 ASC LIMIT 20', {
     mode: BuilderMode.List,
@@ -49,13 +54,18 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     limit: 20,
   });
 
-  testCondition('handles no select', 'SELECT  FROM db', {
-    mode: BuilderMode.Aggregate,
-    database: 'db',
-    table: '',
-    fields: [],
-    metrics: [],
-  }, false);
+  testCondition(
+    'handles no select',
+    'SELECT  FROM db',
+    {
+      mode: BuilderMode.Aggregate,
+      database: 'db',
+      table: '',
+      fields: [],
+      metrics: [],
+    },
+    false
+  );
 
   testCondition('handles aggregation function', 'SELECT sum(field1) FROM db.foo', {
     mode: BuilderMode.Aggregate,
@@ -73,16 +83,20 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     metrics: [{ field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' }],
   });
 
-  testCondition('handles 2 aggregations', 'SELECT sum(field1) total_records, count(field2) total_records2 FROM db.foo', {
-    mode: BuilderMode.Aggregate,
-    table: 'foo',
-    database: 'db',
-    fields: [],
-    metrics: [
-      { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
-      { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
-    ],
-  });
+  testCondition(
+    'handles 2 aggregations',
+    'SELECT sum(field1) total_records, count(field2) total_records2 FROM db.foo',
+    {
+      mode: BuilderMode.Aggregate,
+      table: 'foo',
+      database: 'db',
+      fields: [],
+      metrics: [
+        { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
+        { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
+      ],
+    }
+  );
 
   testCondition(
     'handles aggregation with groupBy',
@@ -138,41 +152,49 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     false
   );
 
-  testCondition('handles aggregation with a IN filter', `SELECT count(Id) FROM db.foo WHERE   ( StageName IN ('Deal Won', 'Deal Lost' ) )`, {
-    mode: BuilderMode.Aggregate,
-    database: 'db',
-    table: 'foo',
-    fields: [],
-    metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
-    filters: [
-      {
-        filterType: 'custom',
-        key: 'StageName',
-        operator: FilterOperator.In,
-        value: ['Deal Won', 'Deal Lost'],
-        type: 'string',
-        condition: 'AND',
-      },
-    ],
-  });
+  testCondition(
+    'handles aggregation with a IN filter',
+    `SELECT count(Id) FROM db.foo WHERE   ( StageName IN ('Deal Won', 'Deal Lost' ) )`,
+    {
+      mode: BuilderMode.Aggregate,
+      database: 'db',
+      table: 'foo',
+      fields: [],
+      metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+      filters: [
+        {
+          filterType: 'custom',
+          key: 'StageName',
+          operator: FilterOperator.In,
+          value: ['Deal Won', 'Deal Lost'],
+          type: 'string',
+          condition: 'AND',
+        },
+      ],
+    }
+  );
 
-  testCondition('handles aggregation with a NOT IN filter', `SELECT count(Id) FROM db.foo WHERE   ( StageName NOT IN ('Deal Won', 'Deal Lost' ) )`, {
-    mode: BuilderMode.Aggregate,
-    database: 'db',
-    table: 'foo',
-    fields: [],
-    metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
-    filters: [
-      {
-        filterType: 'custom',
-        key: 'StageName',
-        operator: FilterOperator.NotIn,
-        value: ['Deal Won', 'Deal Lost'],
-        type: 'string',
-        condition: 'AND',
-      },
-    ],
-  });
+  testCondition(
+    'handles aggregation with a NOT IN filter',
+    `SELECT count(Id) FROM db.foo WHERE   ( StageName NOT IN ('Deal Won', 'Deal Lost' ) )`,
+    {
+      mode: BuilderMode.Aggregate,
+      database: 'db',
+      table: 'foo',
+      fields: [],
+      metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+      filters: [
+        {
+          filterType: 'custom',
+          key: 'StageName',
+          operator: FilterOperator.NotIn,
+          value: ['Deal Won', 'Deal Lost'],
+          type: 'string',
+          condition: 'AND',
+        },
+      ],
+    }
+  );
 
   testCondition(
     'handles aggregation with datetime filter',
@@ -222,6 +244,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 function testCondition(name: string, sql: string, builder: any, testQueryOptionsFromSql = true) {
   it(name, () => {
     expect(getSQLFromQueryOptions(builder)).toBe(sql);
-    testQueryOptionsFromSql ? expect(getQueryOptionsFromSql(sql)).toEqual(builder) : {};
+    if (testQueryOptionsFromSql) {
+      expect(getQueryOptionsFromSql(sql)).toEqual(builder);
+    }
   });
 }

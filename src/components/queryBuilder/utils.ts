@@ -79,9 +79,11 @@ const getAggregationQuery = (
     })
     .join(', ');
   if (groupBy && groupBy.length > 0) {
-    metricsQuery = groupBy.map((g) => `${g}`)
-      .filter(x => !fields.some(y => y === x)) // not adding field if its already is selected
-      .join(', ') + (metricsQuery ? `, ${metricsQuery}` : '');
+    metricsQuery =
+      groupBy
+        .map((g) => `${g}`)
+        .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
+        .join(', ') + (metricsQuery ? `, ${metricsQuery}` : '');
   }
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${selected}${metricsQuery} FROM ${database}${sep}${table}`;
@@ -201,12 +203,12 @@ const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
 const getOrderBy = (orderBy?: OrderBy[]): string => {
   return orderBy && orderBy.filter((o) => o.name).length > 0
     ? ` ORDER BY ` +
-    orderBy
-      .filter((o) => o.name)
-      .map((o) => {
-        return `${o.name} ${o.dir}`;
-      })
-      .join(', ')
+        orderBy
+          .filter((o) => o.name)
+          .map((o) => {
+            return `${o.name} ${o.dir}`;
+          })
+          .join(', ')
     : '';
 };
 
@@ -289,32 +291,38 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
     builder.filters = getFiltersFromAst(where);
   }
 
-  const orderBy = ast.get('ORDER BY')?.map<OrderBy>(phrase => {
-    if (!isString(phrase) || phrase.trim() === ',') {
-      return {} as OrderBy;
-    }
-    const orderBySplit = phrase.trim().split(' ');
-    return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
-  }).filter(x => x);
+  const orderBy = ast
+    .get('ORDER BY')
+    ?.map<OrderBy>((phrase) => {
+      if (!isString(phrase) || phrase.trim() === ',') {
+        return {} as OrderBy;
+      }
+      const orderBySplit = phrase.trim().split(' ');
+      return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
+    })
+    .filter((x) => x);
 
   if (orderBy && orderBy.length > 0) {
     (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
   }
 
   if (limit && limit.length > 0) {
-    builder.limit = Number.parseInt(limit[0]!.toString());
+    builder.limit = Number.parseInt(limit[0]!.toString(), 10);
   }
 
   if (fieldsAndMetrics.metrics.length > 0) {
     (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
   }
 
-  const groupBy = ast.get('GROUP BY')?.map(field => {
-    if (!isString(field) || field.trim() === ',') {
-      return '';
-    }
-    return field.trim();
-  }).filter(x => x !== '');
+  const groupBy = ast
+    .get('GROUP BY')
+    ?.map((field) => {
+      if (!isString(field) || field.trim() === ',') {
+        return '';
+      }
+      return field.trim();
+    })
+    .filter((x) => x !== '');
   if (groupBy && groupBy.length > 0) {
     (builder as SqlBuilderOptionsAggregate).groupBy = groupBy;
   }
@@ -331,12 +339,11 @@ function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
     if (c.trim().toUpperCase() === 'AND') {
       filters.push({ condition: 'AND' } as Filter);
       continue;
-    }
-    else if (c.trim().toUpperCase() === 'OR') {
+    } else if (c.trim().toUpperCase() === 'OR') {
       filters.push({ condition: 'OR' } as Filter);
       continue;
     }
-    const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map(x => x = x.substring(1, x.length - 1));
+    const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map((x) => (x = x.substring(1, x.length - 1)));
     const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
     if (!phrases) {
       continue;
@@ -355,11 +362,11 @@ function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
   return filters;
 }
 
-function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator, v: any } {
+function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator; v: any } {
   if (isWithInTimeRangeFilter(phrases)) {
     return {
       f: phrases[0] === 'NOT' ? FilterOperator.OutsideGrafanaTimeRange : FilterOperator.WithInGrafanaTimeRange,
-      v: ''
+      v: '',
     };
   }
 
@@ -367,7 +374,7 @@ function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: 
   if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
     return {
       f: op.toUpperCase() as FilterOperator,
-      v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(2, phrases.length)
+      v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(2, phrases.length),
     };
   }
   for (let i = 2; i < phrases.length; i++) {
@@ -375,7 +382,7 @@ function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: 
     if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
       return {
         f: op.toUpperCase() as FilterOperator,
-        v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(i + 1, phrases.length)
+        v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(i + 1, phrases.length),
       };
     }
   }
@@ -384,7 +391,7 @@ function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: 
 
 function getFilterType(whereClause: string, stringPhrases?: string[]): '' | 'datetime' | 'date' | 'string' {
   if (stringPhrases && stringPhrases.length > 0) {
-    return 'string'
+    return 'string';
   }
   if (whereClause.includes(':date:YYYY-MM-DD')) {
     return 'date';
@@ -404,16 +411,14 @@ function isWithInTimeRangeFilter(phrases: string[]): boolean {
   for (const p of phrases) {
     if (p === '__from') {
       hasFrom = true;
-    }
-    else if (p === '__to') {
+    } else if (p === '__to') {
       hasTo = true;
     }
   }
   return hasFrom && hasTo;
 }
 
-
-function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[], fields: string[] } {
+function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[]; fields: string[] } {
   const metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
   for (let c of selectClauses) {

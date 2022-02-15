@@ -83,7 +83,7 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
         // first we get the remaining part of the FROM phrase. ") as r"
         const fromPhrase = ast.get('FROM');
         const fromPhraseAfterTableName = fromPhrase!
-        [fromPhrase!.length - 1]!.toString()
+          [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
         // apply the remaining part of the FROM phrase to the end of the new WHERE clause
