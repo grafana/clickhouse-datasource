@@ -103,13 +103,14 @@ const getTrendByQuery = (
       return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
+  const time = `$__timeInterval(${timeField})`;
   if (metricsQuery !== '') {
     const group = groupBy.length > 0 ? `${groupBy.join(', ')},` : '';
-    metricsQuery = `${timeField}, ${group} ${metricsQuery}`;
+    metricsQuery = `${time}, ${group} ${metricsQuery}`;
   } else if (groupBy.length > 0) {
-    metricsQuery = `${timeField}, ${groupBy.join(', ')}`;
+    metricsQuery = `${time}, ${groupBy.join(', ')}`;
   } else {
-    metricsQuery = `${timeField}`;
+    metricsQuery = `${time}`;
   }
 
   const sep = database === '' || table === '' ? '' : '.';
