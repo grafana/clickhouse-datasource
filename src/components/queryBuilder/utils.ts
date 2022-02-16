@@ -70,22 +70,20 @@ const getAggregationQuery = (
   metrics: BuilderMetricField[] = [],
   groupBy: string[] = []
 ): string => {
-  metrics = metrics && metrics.length > 0 ? metrics : [];
   let selected = fields.length > 0 ? fields.join(', ') : '';
   let metricsQuery = metrics
     .map((m) => {
-      const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
+      const alias = m.alias ? ` ${m.alias.replace(/ /g, '_')}` : '';
       return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
-  if (groupBy && groupBy.length > 0) {
-    metricsQuery =
-      groupBy
-        .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
-        .join(', ') + (metricsQuery ? `, ${metricsQuery}` : '');
-  }
+  const groupByQuery = groupBy
+    .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
+    .join(', ');
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${selected}${metricsQuery} FROM ${database}${sep}${table}`;
+  return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
+    metricsQuery && groupByQuery ? ', ' : ''
+  }${metricsQuery} FROM ${database}${sep}${table}`;
 };
 
 const getTrendByQuery = (
