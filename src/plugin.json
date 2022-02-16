@@ -8,7 +8,8 @@
   "logs": true,
   "alerting": true,
   "executable": "gpx_clickhouse",
-  "includes": [{ "type": "dashboard", "name": "Query Analysis", "path": "dashboards/query-analysis.json" }],
+  "includes": [{ "type": "dashboard", "name": "Query Analysis", "path": "dashboards/query-analysis.json" },
+    { "type": "dashboard", "name": "Data Analysis", "path": "dashboards/data-analysis.json" }],
   "category": "sql",
   "info": {
     "description": "ClickHouse datasource plugin for Grafana",
