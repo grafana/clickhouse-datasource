@@ -43,6 +43,11 @@ describe('RemoveConditionalAlls', () => {
       input: `SELECT * FROM $tempVar`,
       expect: `SELECT * FROM $tempVar`,
     },
+    {
+      name: 'removes template variables when there are two in single WHERE statement',
+      input: `Select * from table WHERE active AND database IN (\${tempVar}) AND table IN (\${tempVar}) GROUP BY row`,
+      expect: `SELECT * FROM table WHERE active GROUP BY row`,
+    },
   ];
   const testCasesWithoutAllTempVar = [
     {

@@ -8,6 +8,7 @@ import {
   FullField,
   BuilderMode,
   BuilderMetricField,
+  SqlBuilderOptionsAggregate,
 } from './../../types';
 import { selectors } from './../../selectors';
 import { styles } from '../../styles';
@@ -45,6 +46,7 @@ const OrderByItem = (props: {
         width={20}
         options={columns}
         onChange={(e) => onOrderBySortFieldUpdate(e.value!)}
+        allowCustomValue={true}
         menuPlacement={'bottom'}
       ></Select>
       <Select<OrderByDirection>
@@ -158,9 +160,10 @@ export const getOrderByFields = (
   builder: SqlBuilderOptions,
   fieldsList: FullField[]
 ): Array<SelectableValue<string>> => {
+  let values: Array<SelectableValue<string>> | Array<{ value: string; label: string }> = [];
   switch (builder.mode) {
     case BuilderMode.Aggregate:
-      return [
+      values = [
         ...(builder.fields || []).map((g) => {
           return { value: g, label: g };
         }),
@@ -171,10 +174,16 @@ export const getOrderByFields = (
           return { value: g, label: g };
         }),
       ];
+      break;
     case BuilderMode.List:
     default:
-      return fieldsList.map((m) => {
+      values = fieldsList.map((m) => {
         return { value: m.name, label: m.label };
       });
   }
+  // Add selected value to the list if it does not exist.
+  (builder as SqlBuilderOptionsAggregate).orderBy
+    ?.filter((x) => !values.some((y: { value: string; label: string } | SelectableValue<string>) => y.value === x.name))
+    .forEach((x) => values.push({ value: x.name, label: x.name }));
+  return values;
 };

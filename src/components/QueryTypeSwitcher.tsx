@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
-import { getSQLFromQueryOptions } from './queryBuilder/utils';
+import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
 import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery, Format } from 'types';
 
@@ -34,7 +34,8 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
           builderOptions = query.builderOptions;
           break;
         case QueryType.SQL:
-          builderOptions = query.meta?.builderOptions || defaultCHBuilderQuery.builderOptions;
+          builderOptions = getQueryOptionsFromSql(query.rawSql) || defaultCHBuilderQuery.builderOptions;
+          break;
         default:
           builderOptions = defaultCHBuilderQuery.builderOptions;
           break;
