@@ -20,12 +20,16 @@ export const TableSelect = (props: Props) => {
     async function fetchTables() {
       const tables = await datasource.fetchTables(database);
       const values = tables.map((t) => ({ label: t, value: t }));
+      // Add selected value to the list if it does not exist.
+      if (table && !tables.find((x) => x === table)) {
+        values.push({ label: table!, value: table! });
+      }
       // TODO - can't seem to reset the select to unselected
       values.push({ label: '-- Choose --', value: '' });
       setList(values);
     }
     fetchTables();
-  }, [datasource, database]);
+  }, [datasource, database, table]);
 
   const onChange = (value: string) => {
     onTableChange(value);
@@ -38,10 +42,11 @@ export const TableSelect = (props: Props) => {
       </InlineFormLabel>
       <Select
         className={`width-15 ${styles.Common.inlineSelect}`}
-        onChange={(e) => onChange(e.value!)}
+        onChange={(e) => onChange(e.value ? e.value : '')}
         options={list}
         value={table}
         menuPlacement={'bottom'}
+        allowCustomValue={true}
       ></Select>
     </>
   );

@@ -6,7 +6,7 @@ export type AST = Map<string, Clause[]>;
 export default function sqlToAST(sql: string): AST {
   const ast = createStatement();
   const re =
-    /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
+    /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|ORDER BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
   const bracket = { count: 0, lastCount: 0, phrase: '' };
   let lastNode = '';
   let regExpArray: RegExpExecArray | null;
@@ -119,14 +119,14 @@ export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
     for (let i = 0; i < where.length; i++) {
       const c = where[i];
       if (isString(c) && queryVarNames.some((v) => c.includes(v))) {
-        where[i] = null;
         // remove AND/OR before this condition if this is the last condition
         if (i === where.length - 1) {
-          where[i - 1] = null;
+          where.splice(i - 1, 2);
         }
         // remove AND/OR after this condition
         if (where.length > 1) {
-          where[i + 1] = null;
+          where.splice(i, 2);
+          i--;
         }
         // moves the ending of the phrase, like ')', to the next logical place
         movePhraseEnding(c, ast);
@@ -174,7 +174,7 @@ function movePhraseEnding(c: string, ast: AST) {
 
 function getASTBranches(sql: string): Clause[] {
   const clauses: Clause[] = [];
-  const re = /\b(AND|OR|,)\b/gi;
+  const re = /(\bAND\b|\bOR\b|,)/gi;
   const bracket = { count: 0, lastCount: 0, phrase: '' };
   let regExpArray: RegExpExecArray | null;
   let lastPhraseIndex = 0;
@@ -191,7 +191,7 @@ function getASTBranches(sql: string): Clause[] {
     if (bracket.count > 0) {
       bracket.phrase += phrase + foundSplitter;
     } else {
-      clauses.push(phrase);
+      completePhrase(clauses, phrase);
       clauses.push(foundSplitter);
     }
     if (bracket.count <= 0 && bracket.lastCount > 0) {
@@ -238,6 +238,7 @@ function createStatement(): AST {
   clauses.set('GROUP BY', []);
   clauses.set('LIMIT BY', []);
   clauses.set('HAVING', []);
+  clauses.set('ORDER BY', []);
   clauses.set('LIMIT', []);
   clauses.set('OFFSET', []);
   clauses.set('UNION', []);

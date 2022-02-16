@@ -1,3 +1,5 @@
+import sqlToAST, { Clause } from 'data/ast';
+import { isString } from 'lodash';
 import {
   BuilderMetricField,
   BuilderMode,
@@ -12,6 +14,8 @@ import {
   MultiFilter,
   FilterOperator,
   DateFilterWithoutValue,
+  BuilderMetricFieldAggregation,
+  SqlBuilderOptionsAggregate,
 } from 'types';
 
 export const isBooleanType = (type: string): boolean => {
@@ -66,22 +70,20 @@ const getAggregationQuery = (
   metrics: BuilderMetricField[] = [],
   groupBy: string[] = []
 ): string => {
-  metrics = metrics && metrics.length > 0 ? metrics : [];
   let selected = fields.length > 0 ? fields.join(', ') : '';
   let metricsQuery = metrics
     .map((m) => {
-      const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
+      const alias = m.alias ? ` ${m.alias.replace(/ /g, '_')}` : '';
       return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
-  if (groupBy && groupBy.length > 0) {
-    metricsQuery = groupBy.map((g) => `${g}`).join(', ') + ', ' + metricsQuery;
-  }
-  if (metricsQuery !== '' && selected !== '') {
-    selected = `${selected},`;
-  }
+  const groupByQuery = groupBy
+    .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
+    .join(', ');
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${selected}${metricsQuery} FROM ${database}${sep}${table}`;
+  return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
+    metricsQuery && groupByQuery ? ', ' : ''
+  }${metricsQuery} FROM ${database}${sep}${table}`;
 };
 
 const getTrendByQuery = (
@@ -259,6 +261,200 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   return query;
 };
 
+export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
+  const ast = sqlToAST(sql);
+  const fromPhrase = ast.get('FROM');
+  if (!fromPhrase || fromPhrase.length > 1 || !isString(fromPhrase[0])) {
+    return {} as SqlBuilderOptions;
+  }
+
+  const databaseAndTable = fromPhrase[0].trim().split('.');
+  const where = ast.get('WHERE');
+  const limit = ast.get('LIMIT');
+
+  const fieldsAndMetrics = getMetricsFromAst(ast.get('SELECT')!);
+
+  let builder = {
+    mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
+    database: databaseAndTable[1] ? databaseAndTable[0].trim() : '',
+    table: databaseAndTable[1] ? databaseAndTable[1].trim() : databaseAndTable[0].trim(),
+  } as SqlBuilderOptions;
+
+  if (fieldsAndMetrics.fields) {
+    builder.fields = fieldsAndMetrics.fields;
+  }
+
+  if (where && where.length > 0) {
+    builder.filters = getFiltersFromAst(where);
+  }
+
+  const orderBy = ast
+    .get('ORDER BY')
+    ?.map<OrderBy>((phrase) => {
+      if (!isString(phrase) || phrase.trim() === ',') {
+        return {} as OrderBy;
+      }
+      const orderBySplit = phrase.trim().split(' ');
+      return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
+    })
+    .filter((x) => x);
+
+  if (orderBy && orderBy.length > 0) {
+    (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
+  }
+
+  if (limit && limit.length > 0) {
+    builder.limit = Number.parseInt(limit[0]!.toString(), 10);
+  }
+
+  if (fieldsAndMetrics.metrics.length > 0) {
+    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
+  }
+
+  const groupBy = ast
+    .get('GROUP BY')
+    ?.map((field) => {
+      if (!isString(field) || field.trim() === ',') {
+        return '';
+      }
+      return field.trim();
+    })
+    .filter((x) => x !== '');
+  if (groupBy && groupBy.length > 0) {
+    (builder as SqlBuilderOptionsAggregate).groupBy = groupBy;
+  }
+  return builder;
+}
+
+function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
+  // first condition is always AND but is not used
+  const filters: Filter[] = [{ condition: 'AND' } as Filter];
+  for (const c of whereClauses) {
+    if (!isString(c)) {
+      continue;
+    }
+    if (c.trim().toUpperCase() === 'AND') {
+      filters.push({ condition: 'AND' } as Filter);
+      continue;
+    } else if (c.trim().toUpperCase() === 'OR') {
+      filters.push({ condition: 'OR' } as Filter);
+      continue;
+    }
+    const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map((x) => (x = x.substring(1, x.length - 1)));
+    const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
+    if (!phrases) {
+      continue;
+    }
+    const isNotClause = phrases[0] === 'NOT';
+    const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
+    filters[filters.length - 1] = {
+      ...filters[filters.length - 1],
+      filterType: 'custom',
+      key: isNotClause ? phrases[1] : phrases[0],
+      operator: opAndVal.f ? opAndVal.f : '',
+      value: opAndVal.v ? opAndVal.v : '',
+      type: getFilterType(c, stringPhrases),
+    } as Filter;
+  }
+  return filters;
+}
+
+function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator; v: any } {
+  if (isWithInTimeRangeFilter(phrases)) {
+    return {
+      f: phrases[0] === 'NOT' ? FilterOperator.OutsideGrafanaTimeRange : FilterOperator.WithInGrafanaTimeRange,
+      v: '',
+    };
+  }
+
+  let op = phrases[1];
+  if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
+    return {
+      f: op.toUpperCase() as FilterOperator,
+      v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(2, phrases.length),
+    };
+  }
+  for (let i = 2; i < phrases.length; i++) {
+    op += ` ${phrases[i]}`;
+    if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
+      return {
+        f: op.toUpperCase() as FilterOperator,
+        v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(i + 1, phrases.length),
+      };
+    }
+  }
+  return { f: '' as FilterOperator, v: null };
+}
+
+function getFilterType(whereClause: string, stringPhrases?: string[]): '' | 'datetime' | 'date' | 'string' {
+  if (stringPhrases && stringPhrases.length > 0) {
+    return 'string';
+  }
+  if (whereClause.includes(':date:YYYY-MM-DD')) {
+    return 'date';
+  }
+  if (whereClause.includes(':date')) {
+    return 'datetime';
+  }
+  return '';
+}
+
+function isWithInTimeRangeFilter(phrases: string[]): boolean {
+  if (!phrases || phrases.length === 0) {
+    return false;
+  }
+  const has = { from: false, to: false };
+  for (const p of phrases) {
+    if (p === '__from') {
+      has.from = true;
+    } else if (p === '__to') {
+      has.to = true;
+    }
+  }
+  return has.from && has.to;
+}
+
+function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[]; fields: string[] } {
+  let metrics: BuilderMetricField[] = [];
+  const fields: string[] = [];
+  for (const c of selectClauses) {
+    if (!isString(c) || !c.trim() || c.trim() === ',') {
+      continue;
+    }
+    let isMetric = false;
+    metrics = metrics.concat(
+      Object.values(BuilderMetricFieldAggregation)
+        .filter((x) => c.trim().toLowerCase().startsWith(`${x}`))
+        .map((x) => {
+          const phrases = c.match(/\w+|\$(\w+)/g);
+          if (!phrases) {
+            return null;
+          }
+          const metric = {
+            field: phrases[1] ? phrases[1] : '',
+            aggregation: x,
+          } as BuilderMetricField;
+
+          // Alias does use 'as' like sum(field) total_Fields
+          if (phrases[2]) {
+            metric.alias = phrases[2];
+          }
+          // Alias does use 'as' like field as aliasField
+          if (phrases[3]) {
+            metric.alias = phrases[3];
+          }
+          isMetric = true;
+          return metric;
+        })
+        .filter((x) => x) as BuilderMetricField[]
+    );
+
+    if (!isMetric) {
+      fields.push(c.trim());
+    }
+  }
+  return { metrics, fields };
+}
 export const operMap = new Map<string, FilterOperator>([
   ['equals', FilterOperator.Equals],
   ['contains', FilterOperator.Like],
