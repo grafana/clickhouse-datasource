@@ -48,6 +48,27 @@ describe('RemoveConditionalAlls', () => {
       input: `Select * from table WHERE active AND database IN (\${tempVar}) AND table IN (\${tempVar}) GROUP BY row`,
       expect: `SELECT * FROM table WHERE active GROUP BY row`,
     },
+    {
+      name: 'query with functions',
+      input: `SELECT engine, count() as "Number of tables" FROM system.tables WHERE notLike(engine,'System%') AND name IN (\${tempVar}) GROUP BY engine ORDER BY count() DESC`,
+      expect: `SELECT engine , count() as "Number of tables" FROM system.tables WHERE notLike(engine,'System%') GROUP BY engine ORDER BY count() DESC`,
+    },
+    {
+      name: ' complex query test',
+      input: `SELECT concatAssumeInjective(table.database, '.', name) as name,
+              col_stats.col_count as total_columns
+              FROM system.tables table
+                LEFT JOIN (SELECT database, table, count() as col_count FROM system.columns  GROUP BY table, database) as col_stats
+                  ON table.name = col_stats.table AND col_stats.database = table.database
+              WHERE database IN (\${database}) AND table IN (\${table}) AND var<$tempVar ORDER BY total_columns DESC LIMIT 10;`,
+      expect:
+        `SELECT concatAssumeInjective(table.database, '.', name) as name , ` +
+        `col_stats.col_count as total_columns ` +
+        `FROM system.tables table ` +
+        `LEFT JOIN ( SELECT database , table , count() as col_count FROM system.columns GROUP BY table , database) as col_stats ` +
+        `ON table.name = col_stats.table AND col_stats.database = table.database ` +
+        `WHERE database IN (\${database}) AND table IN (\${table}) ORDER BY total_columns DESC LIMIT 10`,
+    },
   ];
   const testCasesWithoutAllTempVar = [
     {

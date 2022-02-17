@@ -190,12 +190,14 @@ function getASTBranches(sql: string): Clause[] {
     // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
     if (bracket.count > 0) {
       bracket.phrase += phrase + foundSplitter;
-    } else {
+    } else if (bracket.lastCount <= 0) {
       completePhrase(clauses, phrase);
       clauses.push(foundSplitter);
     }
     if (bracket.count <= 0 && bracket.lastCount > 0) {
+      bracket.phrase += phrase;
       completePhrase(clauses, bracket.phrase);
+      clauses.push(foundSplitter);
       bracket.phrase = '';
     }
     bracket.lastCount = bracket.count;
