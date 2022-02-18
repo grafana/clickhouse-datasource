@@ -54,6 +54,10 @@ export const Components = {
       label: 'Secure Connection',
       tooltip: 'Toggle on if the connection is secure',
     },
+    Validate: {
+      label: 'Validate SQL',
+      tooltip: 'Validate Sql in the editor.',
+    },
   },
   QueryEditor: {
     CodeEditor: {

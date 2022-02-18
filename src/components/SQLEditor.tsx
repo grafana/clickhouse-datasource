@@ -8,6 +8,7 @@ import { styles } from '../styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
 import { selectors } from 'selectors';
 import { getFormat } from './editor';
+import { validate } from 'data/validate';
 
 type SQLEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -65,13 +66,39 @@ export const SQLEditor = (props: SQLEditorProps) => {
     return Promise.resolve({ suggestions });
   };
 
+  const validateSql = (sql: string, model: any, me: any) => {
+    const v = validate(sql);
+    const errorSeverity = 8;
+    if (v.valid) {
+      me.setModelMarkers(model, 'clickhouse', []);
+    } else {
+      const err = v.error!;
+      me.setModelMarkers(model, 'clickhouse', [
+        {
+          startLineNumber: err.startLine,
+          startColumn: err.startCol,
+          endLineNumber: err.endLine,
+          endColumn: err.endCol,
+          message: err.expected,
+          severity: errorSeverity,
+        },
+      ]);
+    }
+  };
+
   const handleMount = (editor: any) => {
-    registerSQL('chSql', editor, fetchSuggestions);
+    const me = registerSQL('chSql', editor, fetchSuggestions);
     editor.expanded = (query as CHSQLQuery).expand;
     editor.onDidChangeModelDecorations((a: any) => {
       if (editor.expanded) {
         const height = getEditorHeight(editor);
         setExpand({ height: `${height}px`, on: true, icon: 'minus' });
+      }
+    });
+    editor.onKeyUp((e: any) => {
+      if (datasource.settings.jsonData.validate) {
+        const sql = editor.getValue();
+        validateSql(sql, editor.getModel(), me);
       }
     });
     setCodeEditor(editor);
