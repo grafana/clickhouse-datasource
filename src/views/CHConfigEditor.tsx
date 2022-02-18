@@ -47,7 +47,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
-  const onSwitchToggle = (key: keyof Pick<CHConfig, 'secure'>, value: boolean) => {
+  const onSwitchToggle = (key: keyof Pick<CHConfig, 'secure' | 'validate'>, value: boolean) => {
     onOptionsChange({
       ...options,
       jsonData: {
@@ -248,6 +248,19 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             placeholder={Components.ConfigEditor.DefaultDatabase.placeholder}
             tooltip={Components.ConfigEditor.DefaultDatabase.tooltip}
           />
+        </div>
+        <div className="gf-form">
+          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Validate.tooltip}>
+            {Components.ConfigEditor.Validate.label}
+          </InlineFormLabel>
+          <div style={switchContainerStyle}>
+            <Switch
+              css={{}}
+              className="gf-form"
+              value={jsonData.validate || false}
+              onChange={(e) => onSwitchToggle('validate', e.currentTarget.checked)}
+            />
+          </div>
         </div>
       </div>
     </>

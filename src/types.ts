@@ -11,6 +11,7 @@ export interface CHConfig extends DataSourceJsonData {
   tlsAuth?: boolean;
   tlsAuthWithCACert?: boolean;
   secure?: boolean;
+  validate?: boolean;
 }
 
 export interface CHSecureConfig {

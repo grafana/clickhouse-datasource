@@ -39,13 +39,13 @@ export type Fetcher = {
   (text: string, range: Range): Promise<SuggestionResponse>;
 };
 
-export async function registerSQL(lang: string, editor: any, fetchSuggestions: Fetcher) {
+export function registerSQL(lang: string, editor: any, fetchSuggestions: Fetcher) {
   // so options are visible outside query editor
   editor.updateOptions({ fixedOverflowWidgets: true, scrollBeyondLastLine: false });
 
   const registeredLang = monaco.languages.getLanguages().find((l: Lang) => l.id === lang);
   if (registeredLang !== undefined) {
-    return;
+    return monaco.editor;
   }
 
   monaco.languages.register({ id: lang });
@@ -72,6 +72,8 @@ export async function registerSQL(lang: string, editor: any, fetchSuggestions: F
       return fetchSuggestions(textUntilPosition, range);
     },
   });
+
+  return monaco.editor;
 }
 
 export enum SchemaKind {
