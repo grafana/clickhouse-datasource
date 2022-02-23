@@ -118,7 +118,7 @@ export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
   if (where) {
     for (let i = 0; i < where.length; i++) {
       const c = where[i];
-      if (isString(c) && queryVarNames.some((v) => c.includes(v))) {
+      if (isString(c) && queryVarNames.some((v) => c.includes(v)) && c.includes('$')) {
         // remove AND/OR before this condition if this is the last condition
         if (i === where.length - 1) {
           where.splice(i - 1, 2);
