@@ -37,13 +37,15 @@ const addClickhousePanel = (query: string) => {
       // adding fake button to dom
       .document()
       .then($document => {
-        const f = $document.createElement('button');
-        // old e2e selector looks for this
-        f.setAttribute('aria-label', 'RefreshPicker run button');
-        f.innerHTML = 'Refresh';
-        f.style.zIndex = '5000';
         const toolbar = $document.querySelector('.page-toolbar');
-        toolbar!.appendChild(f);
+        if (toolbar) {  // grafana 8.3+
+          const f = $document.createElement('button');
+          // old e2e selector looks for this
+          f.setAttribute('aria-label', 'RefreshPicker run button');
+          f.innerHTML = 'Refresh';
+          f.style.zIndex = '5000';
+          toolbar!.appendChild(f);
+        }
       })
       // end workaround
       .get('.query-editor-row').contains('SQL Editor')
