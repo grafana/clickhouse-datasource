@@ -97,20 +97,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <h3>Server</h3>
         <br />
         <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
-            {Components.ConfigEditor.Secure.label}
-          </InlineFormLabel>
-          <div style={switchContainerStyle}>
-            <Switch
-              css={{}}
-              className="gf-form"
-              value={jsonData.secure || false}
-              onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
-            />
-          </div>
-        </div>
-        <div className="gf-form">
           <FormField
+            name="server"
             labelWidth={12}
             inputWidth={20}
             value={jsonData.server || ''}
@@ -123,6 +111,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         </div>
         <div className="gf-form">
           <FormField
+            name="port"
             labelWidth={12}
             inputWidth={20}
             type="number"
@@ -134,12 +123,27 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             tooltip={Components.ConfigEditor.ServerPort.tooltip}
           />
         </div>
+        <div className="gf-form">
+          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
+            {Components.ConfigEditor.Secure.label}
+          </InlineFormLabel>
+          <div style={switchContainerStyle}>
+            <Switch
+              id="secure"
+              css={{}}
+              className="gf-form"
+              value={jsonData.secure || false}
+              onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
+            />
+          </div>
+        </div>
       </div>
       <div className="gf-form-group">
         <h3>Credentials</h3>
         <br />
         <div className="gf-form">
           <FormField
+            name="user"
             labelWidth={12}
             inputWidth={20}
             value={jsonData.username || ''}
@@ -152,6 +156,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         </div>
         <div className="gf-form">
           <SecretFormField
+            name="pwd"
             labelWidth={12}
             inputWidth={20}
             required
