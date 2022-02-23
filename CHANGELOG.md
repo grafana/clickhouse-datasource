@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.2
+
+Fix - when removing conditional all, only remove lines with variables
+
 ## 0.12.1
 
 Fix - handle large decimals properly
