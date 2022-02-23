@@ -3,8 +3,8 @@ export const Components = {
   ConfigEditor: {
     ServerAddress: {
       label: 'Server address',
-      placeholder: 'Server address',
-      tooltip: 'ClickHouse server address',
+      placeholder: 'Server TCP address',
+      tooltip: 'ClickHouse native TCP server address',
     },
     ServerPort: {
       label: 'Server port',
