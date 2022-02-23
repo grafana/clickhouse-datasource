@@ -67,7 +67,7 @@ const addClickhousePanel = (query: string) => {
 
   // This gets auto-removed within `afterEach` of @grafana/e2e
   e2e.flows.addPanel({
-    matchScreenshot: true,
+    // matchScreenshot: true,
     queriesForm: () => {
       e2e.components.QueryEditorRows.rows().within(() => fillQuery());
     },
