@@ -121,7 +121,7 @@ func NullableDecimal() sqlutil.Converter {
 				s := string(*v)
 				f, err := strconv.ParseFloat(s, 64)
 				if err != nil {
-					bits := binary.LittleEndian.Uint32(*v)
+					bits := binary.LittleEndian.Uint64(*v)
 					f = float64(bits)
 				}
 				_, scale, _ := col.DecimalSize()
