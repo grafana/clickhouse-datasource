@@ -19,7 +19,9 @@ Set up an ClickHouse user account with `readonly` permission and access to datab
 
 ## Configure the data source in Grafana
 
-Follow [these instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/) to add a new ClickHouse data source, and enter configuration options:
+Follow [these instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/) to add a new ClickHouse data source, and enter configuration options. 
+
+**Note:** this plugin uses the [native ClickHouse TCP interface](https://clickhouse.com/docs/en/interfaces/tcp/) to connect and run queries. Make sure you configure the server address and port accordingly.
 
 
 ### Configure the data source with provisioning
