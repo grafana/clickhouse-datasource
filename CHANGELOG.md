@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.4
+
+Fix - timeseries where clause. make default db the default in visual editor
+
 ## 0.12.3
 
 Fix - when removing conditional all, check scoped vars (support repeating panels)
