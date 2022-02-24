@@ -234,9 +234,9 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
         options.timeField,
         options.timeFieldType
       );
-      if (options.timeFieldType === 'datetime') {
+      if (options.timeFieldType.toLowerCase() === 'datetime') {
         query += ` WHERE ${options.timeField} >= \${__from:date} AND ${options.timeField} <= \${__to:date}`;
-      } else if (options.timeFieldType === 'date') {
+      } else if (options.timeFieldType.toLowerCase() === 'date') {
         query += ` WHERE ${options.timeField} >= \${__from:date:YYYY-MM-DD} AND ${options.timeField} <= \${__to:date:YYYY-MM-DD}`;
       }
       const trendFilters = getFilters(options.filters || []);

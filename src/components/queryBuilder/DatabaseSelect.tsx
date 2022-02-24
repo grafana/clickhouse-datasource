@@ -23,6 +23,9 @@ export const DatabaseSelect = (props: Props) => {
     }
     fetchList();
   }, [datasource, value]);
+  
+  const defaultDatabase = datasource.settings.jsonData.defaultDatabase;
+  const db = value ?? defaultDatabase;
   return (
     <>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
@@ -32,7 +35,7 @@ export const DatabaseSelect = (props: Props) => {
         className={`width-15 ${styles.Common.inlineSelect}`}
         onChange={(e) => onChange(e.value!)}
         options={list}
-        value={value}
+        value={db}
         menuPlacement={'bottom'}
         allowCustomValue={true}
       ></Select>
