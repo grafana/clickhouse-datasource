@@ -58,7 +58,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
-    rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables());
+    rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables(), scoped);
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',

@@ -1,32 +1,40 @@
 # ClickHouse data source for Grafana
 
-The ClickHouse data source plugin allows you to query and visualize ClickHouse data from within Grafana.
+The ClickHouse data source plugin allows you to query and visualize ClickHouse
+data from within Grafana. **This plugin is currently in Beta development and
+subject to change.**
 
-# Beta
-This plugin is currently in Beta development and subject to change.
-    
-## Install the plugin
+## Installation
 
-1. Navigate to [ClickHouse](https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/) plugin homepage.
-2. From the left-hand menu, click the **Install plugin** button.
+For detailed instructions on how to install the plugin on Grafana Cloud or
+locally, please checkout the [Plugin installation docs](https://grafana.com/docs/grafana/latest/plugins/installation/).
 
-   The **Installation** tab is displayed.
+## Configuration
+
+### ClickHouse user for the data source
+
+Set up an ClickHouse user account with `readonly` permission and access to
+databases and tables you want to query. Please note that Grafana does not
+validate that queries are safe. Queries can contain any SQL statement. For
+example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'`
+and `DROP TABLE sadTable;` would be executed.
+
+### Manual configuration
+Once the plugin is installed on your Grafana instance, follow [these
+instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/)
+to add a new ClickHouse data source, and enter configuration options.
+
+**Note:** this plugin uses the [native ClickHouse TCP
+interface](https://clickhouse.com/docs/en/interfaces/tcp/) to connect and run
+queries. Make sure you configure the server address and port accordingly.
 
 
-## Configure ClickHouse for the data source
+### With a configuration file
 
-Set up an ClickHouse user account with `readonly` permission and access to databases and tables you want to query. Grafana does not validate that queries are safe. Queries can contain any SQL statement. For example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'` and `DROP TABLE sadTable;` would be executed.
-
-## Configure the data source in Grafana
-
-Follow [these instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/) to add a new ClickHouse data source, and enter configuration options. 
-
-**Note:** this plugin uses the [native ClickHouse TCP interface](https://clickhouse.com/docs/en/interfaces/tcp/) to connect and run queries. Make sure you configure the server address and port accordingly.
-
-
-### Configure the data source with provisioning
-
-It is possible to configure data sources using configuration files with Grafana’s provisioning system. To read about how it works, including and all the settings that you can set for this data source, refer to [Provisioning Grafana data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources).
+It is possible to configure data sources using configuration files with
+Grafana’s provisioning system. To read about how it works, including all the
+settings that you can set for this data source, refer to [Provisioning Grafana
+data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources).
 
 Here are some provisioning examples for this data source using basic authentication:
 
@@ -46,30 +54,37 @@ datasources:
       password: password
 ```
 
-## Query the data source
+## Building queries
 
-The query editor allows you to query ClickHouse to return time series or tabular data. Queries can contain macros which simplify syntax and allow for dynamic parts.
+The query editor allows you to query ClickHouse to return time series or
+tabular data. Queries can contain macros which simplify syntax and allow for
+dynamic parts.
 
-### Query as time series
+### Time series
 
-Time series visualization options are selectable after adding a `datetime` field type to your query. This field will be used as the timestamp You can select time series visualizations using the visualization options. Grafana interprets timestamp rows without explicit time zone as UTC. Any column except time is treated as a value column.
+Time series visualization options are selectable after adding a `datetime`
+field type to your query. This field will be used as the timestamp. You can
+select time series visualizations using the visualization options. Grafana
+interprets timestamp rows without explicit time zone as UTC. Any column except
+`time` is treated as a value column.
 
 #### Multi-line time series
 
-To create multi-line time series, the query must return at least 3 fields in the following order:
+To create multi-line time series, the query must return at least 3 fields in
+the following order:
 - field 1:  `datetime` field with an alias of `time`
 - field 2:  value to group by
 - field 3+: the metric values
 
 For example:
 ```sql
-SELECT log_time as time, machine_group, avg(disk_free) as avg_disk_free
-from mgbench.logs1
-group by machine_group, log_time
-order by log_time
+SELECT log_time AS time, machine_group, avg(disk_free) AS avg_disk_free
+FROM mgbench.logs1
+GROUP BY machine_group, log_time
+ORDER BY log_time
 ```
 
-### Query as table
+### Tables
 
 Table visualizations will always be available for any valid ClickHouse query.
 
@@ -79,10 +94,10 @@ To use the Logs panel your query must return a timestamp and string values.
 
 For example:
 ```sql
-SELECT log_time as time, machine_group, toString(avg(disk_free)) as avg_disk_free
-from logs1
-group by machine_group, log_time
-order by log_time
+SELECT log_time AS time, machine_group, toString(avg(disk_free)) AS avg_disk_free
+FROM logs1
+GROUP BY machine_group, log_time
+ORDER BY log_time
 ```
 
 ### Macros
@@ -91,9 +106,7 @@ To simplify syntax and to allow for dynamic parts, like date range filters, the 
 
 Here is an example of a query with a macro that will use Grafana's time filter:
 ```sql
-SELECT 
-      date_time,
-      data_stuff,
+SELECT date_time, data_stuff
 FROM test_data
 WHERE $__timeFilter(date_time)
 ```
@@ -112,16 +125,23 @@ The plugin also supports notation using braces {}. Use this notation when querie
 
 ### Templates and variables
 
-To add a new ClickHouse query variable, refer to [Add a query variable](https://grafana.com/docs/grafana/latest/variables/variable-types/add-query-variable/). Use your ClickHouse data source as your data source for the following available queries:
+To add a new ClickHouse query variable, refer to [Add a query
+variable](https://grafana.com/docs/grafana/latest/variables/variable-types/add-query-variable/).
 
-After creating a variable, you can use it in your ClickHouse queries by using [Variable syntax](https://grafana.com/docs/grafana/latest/variables/syntax/). For more information about variables, refer to [Templates and variables](https://grafana.com/docs/grafana/latest/variables/).
+After creating a variable, you can use it in your ClickHouse queries by using
+[Variable syntax](https://grafana.com/docs/grafana/latest/variables/syntax/).
+For more information about variables, refer to [Templates and
+variables](https://grafana.com/docs/grafana/latest/variables/).
 
+### Importing dashboards for ClickHouse
 
-### Import a dashboard for ClickHouse
+Follow these
+[instructions](https://grafana.com/docs/grafana/latest/dashboards/export-import/#import-dashboard)
+to import a dashboard.
 
-Follow these [instructions](https://grafana.com/docs/grafana/latest/dashboards/export-import/#importing-a-dashboard) for importing a dashboard.
-
-Imported dashboards can be found in Configuration > Data Sources > select your ClickHouse data source > select the Dashboards tab to see available pre-made dashboards.
+You can also find available, pre-made dashboards by navigating to the data
+sources configuration page, selecting the ClickHouse data source and clicking
+on the Dashboards tab.
 
 We distribute the following dashboards with the plugin. These are aimed at assisting with support analysis of a ClickHouse cluster and do not rely on external datasets. The querying user requires access to the `system` database.
 
@@ -129,15 +149,32 @@ We distribute the following dashboards with the plugin. These are aimed at assis
 2. Data Analysis - an overview of current databases and tables, including their respective sizes, partitions and parts.
 3. Query Analysis - an analysis of queries by type, performance and resource consumption.
 
-### Using Ad-Hoc Filters
+### Ad Hoc Filters
 
-By default, Ad-Hoc filters will be populated with all Tables and Columns.  If you have a default database defined in the Datasource settings, all Tables from that database will be used to populate the filters. As this could be slow/expensive, you can introduce a second variable to allow limiting the Ad-Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query` and can contain: a comma delimited list of databases, just one database, or a database.table combination to show only columns for a single table.
+Ad hoc filters allow you to add key/value filters that are automatically added
+to all metric queries that use the specified data source, without being
+explicitly used in queries.
 
-#### Using a query for Ad-Hoc filters
+By default, Ad Hoc filters will be populated with all Tables and Columns.  If
+you have a default database defined in the Datasource settings, all Tables from
+that database will be used to populate the filters. As this could be
+slow/expensive, you can introduce a second variable to allow limiting the
+Ad Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query`
+and can contain: a comma delimited list of databases, just one database, or a
+database.table combination to show only columns for a single table.
 
-The second `clickhouse_adhoc_query` also allows any valid Clickhouse query. The query results will be used to populate your ad-hoc filter's selectable filters. You may choose to hide this variable from view as it serves no further purpose.
+For more information on Ad Hoc filters, check the [Grafana
+docs](https://grafana.com/docs/grafana/latest/variables/variable-types/add-ad-hoc-filters/)
 
-If `clickhouse_adhoc_query` is set to `SELECT DISTINCT machine_name FROM mgbench.logs1` you would be able to select which machine names are filtered for in the dashboard.
+#### Using a query for Ad Hoc filters
+
+The second `clickhouse_adhoc_query` also allows any valid Clickhouse query. The
+query results will be used to populate your ad-hoc filter's selectable filters.
+You may choose to hide this variable from view as it serves no further purpose.
+
+For example, if `clickhouse_adhoc_query` is set to `SELECT DISTINCT
+machine_name FROM mgbench.logs1` you would be able to select which machine
+names are filtered for in the dashboard.
 
 ## Learn more
 

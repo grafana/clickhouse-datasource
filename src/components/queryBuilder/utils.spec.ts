@@ -198,7 +198,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with datetime filter',
-    `SELECT count(Id) FROM db.foo WHERE   ( CreatedDate  >= \${__from:date} AND CreatedDate <= \${__to:date} )`,
+    `SELECT count(Id) FROM db.foo WHERE   ( CreatedDate  >= \$__fromTime AND CreatedDate <= \$__toTime )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -220,7 +220,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with date filter',
-    `SELECT count(Id) FROM db.foo WHERE   (  NOT ( CloseDate  >= \${__from:date:YYYY-MM-DD} AND CloseDate <= \${__to:date:YYYY-MM-DD} ) )`,
+    `SELECT count(Id) FROM db.foo WHERE   (  NOT ( CloseDate  >= \$__fromTime AND CloseDate <= \$__toTime ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -232,7 +232,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
           filterType: 'custom',
           key: 'CloseDate',
           operator: FilterOperator.OutsideGrafanaTimeRange,
-          type: 'date',
+          type: 'datetime',
           value: '',
           condition: 'AND',
         },
