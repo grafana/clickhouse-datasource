@@ -1,4 +1,4 @@
-import { VariableModel } from '@grafana/data';
+import { ScopedVars, VariableModel } from '@grafana/data';
 import { removeConditionalAlls } from './removeConditionalAlls';
 
 describe('RemoveConditionalAlls', () => {
@@ -79,18 +79,23 @@ describe('RemoveConditionalAlls', () => {
   ];
   const tempVarsWithAll = [{ type: 'query', name: 'tempVar', label: '', current: { value: '$__all' } }];
   for (let t of testCasesWithAllTempVar) {
-    testCondition(t.name, t.input, t.expect, tempVarsWithAll);
+    testCondition(t.name, t.input, t.expect, tempVarsWithAll, {});
   }
 
   const tempVarsWithoutAll = [{ type: 'query', name: 'tempVar', label: '', current: { value: 'val' } }];
   for (let t of testCasesWithoutAllTempVar) {
-    testCondition(t.name, t.input, t.expect, tempVarsWithoutAll);
+    testCondition(t.name, t.input, t.expect, tempVarsWithoutAll, {});
+  }
+
+  const scopedVars = { tempVar: { text: 'val', value: 'val', selected: false } };
+  for (let t of testCasesWithoutAllTempVar) {
+    testCondition(t.name, t.input, t.expect, tempVarsWithAll, scopedVars);
   }
 });
 
-function testCondition(name: string, input: string, expected: string, tempVars: any) {
+function testCondition(name: string, input: string, expected: string, tempVars: any, scopedVars: ScopedVars) {
   it(name, () => {
-    const val = removeConditionalAlls(input, tempVars as VariableModel[]);
+    const val = removeConditionalAlls(input, tempVars as VariableModel[], scopedVars);
     expect(val).toEqual(expected);
   });
 }
