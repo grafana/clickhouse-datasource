@@ -102,7 +102,7 @@ const getTrendByQuery = (
       return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
-  const time = `$__timeInterval(${timeField})`;
+  const time = `$__timeInterval(${timeField}) as time`;
   if (metricsQuery !== '') {
     const group = groupBy.length > 0 ? `${groupBy.join(', ')},` : '';
     metricsQuery = `${time}, ${group} ${metricsQuery}`;
@@ -144,25 +144,19 @@ const getFilters = (filters: Filter[]): string => {
       filter += ` ${currentFilter.value || '0'}`;
     } else if (isDateFilter(currentFilter)) {
       if (isDateFilterWithOutValue(currentFilter)) {
-        if (currentFilter.type === 'datetime') {
-          filter += ` >= \${__from:date} AND ${currentFilter.key} <= \${__to:date}`;
-        } else if (currentFilter.type === 'date') {
-          filter += ` >= \${__from:date:YYYY-MM-DD} AND ${currentFilter.key} <= \${__to:date:YYYY-MM-DD}`;
+        if (isDateType(currentFilter.type)) {
+          filter += ` >= \$__fromTime AND ${currentFilter.key} <= \$__toTime`;
         }
       } else {
         switch (currentFilter.value) {
           case 'GRAFANA_START_TIME':
-            if (currentFilter.type === 'datetime') {
-              filter += ` \${__from:date}`;
-            } else if (currentFilter.type === 'date') {
-              filter += ` \${__from:date:YYYY-MM-DD}`;
+            if (isDateType(currentFilter.type)) {
+              filter += ` \$__fromTime`;
             }
             break;
           case 'GRAFANA_END_TIME':
-            if (currentFilter.type === 'datetime') {
-              filter += ` \${__to:date}`;
-            } else if (currentFilter.type === 'date') {
-              filter += ` \${__to:date:YYYY-MM-DD}`;
+            if (isDateType(currentFilter.type)) {
+              filter += ` \$__toTime`;
             }
             break;
           default:
@@ -197,9 +191,10 @@ const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
   return `${clause}, ${timeField}`;
 };
 
-const getOrderBy = (orderBy?: OrderBy[]): string => {
+const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
+  const pfx = prefix ? ' ORDER BY ' : '';
   return orderBy && orderBy.filter((o) => o.name).length > 0
-    ? ` ORDER BY ` +
+    ? pfx +
         orderBy
           .filter((o) => o.name)
           .map((o) => {
@@ -234,10 +229,8 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
         options.timeField,
         options.timeFieldType
       );
-      if (options.timeFieldType.toLowerCase() === 'datetime') {
-        query += ` WHERE ${options.timeField} >= \${__from:date} AND ${options.timeField} <= \${__to:date}`;
-      } else if (options.timeFieldType.toLowerCase() === 'date') {
-        query += ` WHERE ${options.timeField} >= \${__from:date:YYYY-MM-DD} AND ${options.timeField} <= \${__to:date:YYYY-MM-DD}`;
+      if (isDateType(options.timeFieldType)) {
+        query += ` WHERE $__timeFilter(${options.timeField})`;
       }
       const trendFilters = getFilters(options.filters || []);
       query += trendFilters ? ` AND ${trendFilters}` : '';
@@ -253,6 +246,10 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   }
   if (options.mode === BuilderMode.Trend) {
     query += ` ORDER BY ${options.timeField} ASC`;
+    const orderBy = getOrderBy(options.orderBy, false);
+    if (orderBy.trim() !== '') {
+      query += `, ${orderBy}`;
+    }
     query += limit;
   } else {
     query += getOrderBy(options.orderBy);
@@ -390,10 +387,7 @@ function getFilterType(whereClause: string, stringPhrases?: string[]): '' | 'dat
   if (stringPhrases && stringPhrases.length > 0) {
     return 'string';
   }
-  if (whereClause.includes(':date:YYYY-MM-DD')) {
-    return 'date';
-  }
-  if (whereClause.includes(':date')) {
+  if (whereClause.includes('__time') || whereClause.includes('__from') || whereClause.includes('__to')) {
     return 'datetime';
   }
   return '';
@@ -405,9 +399,9 @@ function isWithInTimeRangeFilter(phrases: string[]): boolean {
   }
   const has = { from: false, to: false };
   for (const p of phrases) {
-    if (p === '__from') {
+    if (p.includes('__from')) {
       has.from = true;
-    } else if (p === '__to') {
+    } else if (p.includes('__to')) {
       has.to = true;
     }
   }

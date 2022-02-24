@@ -7,7 +7,7 @@ import { BuilderMode } from 'types';
 describe('QueryBuilder', () => {
   it('renders correctly', () => {
     const setState = jest.fn();
-    const mockDs = {} as Datasource;
+    const mockDs = { settings: { jsonData: {} } } as Datasource;
     mockDs.fetchFieldsFull = jest.fn(() => {
       setState();
       return Promise.resolve([]);
