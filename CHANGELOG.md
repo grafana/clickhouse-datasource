@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.12.2
+
+Fix - when removing conditional all, only remove lines with variables
+
+## 0.12.1
+
+Fix - handle large decimals properly
+
 ## 0.12.0
 
 Feature - Time series builder: use $__timeInterval macro on time field so buckets can be adjusted from query options.

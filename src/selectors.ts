@@ -3,8 +3,8 @@ export const Components = {
   ConfigEditor: {
     ServerAddress: {
       label: 'Server address',
-      placeholder: 'Server address',
-      tooltip: 'ClickHouse server address',
+      placeholder: 'Server TCP address',
+      tooltip: 'ClickHouse native TCP server address',
     },
     ServerPort: {
       label: 'Server port',
@@ -53,6 +53,10 @@ export const Components = {
     Secure: {
       label: 'Secure Connection',
       tooltip: 'Toggle on if the connection is secure',
+    },
+    Validate: {
+      label: 'Validate SQL',
+      tooltip: 'Validate Sql in the editor.',
     },
   },
   QueryEditor: {

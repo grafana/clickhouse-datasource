@@ -30,3 +30,7 @@ e2e-results/
 .idea
 
 pkg/__debug_bin
+
+provisioning
+cypress/report.json
+cypress/videos

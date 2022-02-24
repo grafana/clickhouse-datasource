@@ -118,7 +118,7 @@ export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]):
   if (where) {
     for (let i = 0; i < where.length; i++) {
       const c = where[i];
-      if (isString(c) && queryVarNames.some((v) => c.includes(v))) {
+      if (isString(c) && queryVarNames.some((v) => c.includes(v)) && c.includes('$')) {
         // remove AND/OR before this condition if this is the last condition
         if (i === where.length - 1) {
           where.splice(i - 1, 2);
@@ -190,12 +190,14 @@ function getASTBranches(sql: string): Clause[] {
     // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
     if (bracket.count > 0) {
       bracket.phrase += phrase + foundSplitter;
-    } else {
+    } else if (bracket.lastCount <= 0) {
       completePhrase(clauses, phrase);
       clauses.push(foundSplitter);
     }
     if (bracket.count <= 0 && bracket.lastCount > 0) {
+      bracket.phrase += phrase;
       completePhrase(clauses, bracket.phrase);
+      clauses.push(foundSplitter);
       bracket.phrase = '';
     }
     bracket.lastCount = bracket.count;
