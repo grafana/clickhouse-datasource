@@ -143,6 +143,12 @@ You can also find available, pre-made dashboards by navigating to the data
 sources configuration page, selecting the ClickHouse data source and clicking
 on the Dashboards tab.
 
+We distribute the following dashboards with the plugin. These are aimed at assisting with support analysis of a ClickHouse cluster and do not rely on external datasets. The querying user requires access to the `system` database.
+
+1. Cluster Analysis - an overview of configured clusters, merges, mutations and data replication.
+2. Data Analysis - an overview of current databases and tables, including their respective sizes, partitions and parts.
+3. Query Analysis - an analysis of queries by type, performance and resource consumption.
+
 ### Ad Hoc Filters
 
 Ad hoc filters allow you to add key/value filters that are automatically added
