@@ -23,7 +23,7 @@ export const DatabaseSelect = (props: Props) => {
     }
     fetchList();
   }, [datasource, value]);
-  
+
   const defaultDatabase = datasource.settings.jsonData.defaultDatabase;
   const db = value ?? defaultDatabase;
   return (
