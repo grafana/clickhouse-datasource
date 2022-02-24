@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.5
+
+Chore - dashboards
+
 ## 0.12.4
 
 Fix - timeseries where clause. make default db the default in visual editor
