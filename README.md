@@ -123,6 +123,12 @@ Follow these [instructions](https://grafana.com/docs/grafana/latest/dashboards/e
 
 Imported dashboards can be found in Configuration > Data Sources > select your ClickHouse data source > select the Dashboards tab to see available pre-made dashboards.
 
+We distribute the following dashboards with the plugin. These are aimed at assisting with support analysis of a ClickHouse cluster and do not rely on external datasets. The querying user requires access to the `system` database.
+
+1. Cluster Analysis - an overview of configured clusters, merges, mutations and data replication.
+2. Data Analysis - an overview of current databases and tables, including their respective sizes, partitions and parts.
+3. Query Analysis - an analysis of queries by type, performance and resource consumption.
+
 ### Using Ad-Hoc Filters
 
 By default, Ad-Hoc filters will be populated with all Tables and Columns.  If you have a default database defined in the Datasource settings, all Tables from that database will be used to populate the filters. As this could be slow/expensive, you can introduce a second variable to allow limiting the Ad-Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query` and can contain: a comma delimited list of databases, just one database, or a database.table combination to show only columns for a single table.
