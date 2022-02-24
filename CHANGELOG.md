@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.3
+
+Fix - when removing conditional all, check scoped vars (support repeating panels)
+
 ## 0.12.2
 
 Fix - when removing conditional all, only remove lines with variables
