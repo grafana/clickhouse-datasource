@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.7
+
+Fix - ignore template vars when validating sql
+
 ## 0.12.6
 
 Fix - Time series builder - use time alias when grouping/ordering
