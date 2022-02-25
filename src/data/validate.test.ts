@@ -21,6 +21,7 @@ describe('Validate', () => {
     const validationError: ParseError = {
       message: 'foo\nbar\njunk\nexpected',
       hash: {
+        text: 'foo',
         loc: {
           first_line: 1,
           last_line: 1,
