@@ -186,9 +186,9 @@ const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
     return clause;
   }
   if (groupBy.length === 0) {
-    return ` GROUP BY ${timeField}`;
+    return ` GROUP BY time`;
   }
-  return `${clause}, ${timeField}`;
+  return `${clause}, time`;
 };
 
 const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
@@ -245,7 +245,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       }
   }
   if (options.mode === BuilderMode.Trend) {
-    query += ` ORDER BY ${options.timeField} ASC`;
+    query += ` ORDER BY time ASC`;
     const orderBy = getOrderBy(options.orderBy, false);
     if (orderBy.trim() !== '') {
       query += `, ${orderBy}`;
