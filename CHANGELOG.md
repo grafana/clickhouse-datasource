@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.12.6
+
+Fix - Time series builder - use time alias when grouping/ordering
+
 ## 0.12.5
 
 Chore - dashboards
