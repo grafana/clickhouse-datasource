@@ -17,6 +17,7 @@ export interface Validation {
 export interface ParseError {
   message: string;
   hash: {
+    text: string;
     loc: {
       first_line: number;
       last_line: number;
@@ -41,6 +42,19 @@ export function validate(sql: string): Validation {
     const line = lines[loc.first_line - 1];
     const bad = line.substring(loc.first_column, loc.last_column);
     if (allow.includes(bad.toUpperCase())) {
+      return { valid: true };
+    }
+
+    if (line.trim() === bad) {
+      // issue is on next line
+      const nextLine = lines[loc.first_line];
+      if (nextLine?.trim().startsWith('$')) {
+        return { valid: true };
+      }
+    }
+
+    const badSection = line.substring(loc.last_column + 1);
+    if (badSection.trim().startsWith('$')) {
       return { valid: true };
     }
 
