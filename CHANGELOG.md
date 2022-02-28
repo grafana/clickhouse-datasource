@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+Feature - add convention for showing logs panel in Explore
+
 ## 0.12.7
 
 Fix - ignore template vars when validating sql
