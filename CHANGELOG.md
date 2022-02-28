@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.0
+
+Official release
+
 ## 0.12.7
 
 Fix - ignore template vars when validating sql
