@@ -22,8 +22,9 @@ export interface CHSecureConfig {
 }
 
 export enum Format {
+  TIMESERIES = 0,
   TABLE = 1,
-  TIMESERIES = 2,
+  LOGS = 2,
 }
 
 //#region Query

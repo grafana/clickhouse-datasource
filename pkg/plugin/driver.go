@@ -4,7 +4,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
@@ -13,18 +15,11 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/sqlds"
+	"github.com/grafana/sqlds/v2"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct{}
-
-// FillMode defines how to fill null values
-func (h *Clickhouse) FillMode() *data.FillMissing {
-	return &data.FillMissing{
-		Mode: data.FillModeNull,
-	}
-}
 
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
@@ -53,7 +48,7 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 }
 
 // Connect opens a sql.DB connection using datasource settings
-func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings) (*sql.DB, error) {
+func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
 	settings, err := LoadSettings(config)
 	if err != nil {
 		return nil, err
@@ -122,5 +117,14 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 		"timeFilter":    macros.TimeFilter,
 		"timeInterval":  macros.TimeInterval,
 		"interval_s":    macros.IntervalSeconds,
+	}
+}
+
+func (h *Clickhouse) Settings(backend.DataSourceInstanceSettings) sqlds.DriverSettings {
+	return sqlds.DriverSettings{
+		Timeout: time.Second * 30,
+		FillMode: &data.FillMissing{
+			Mode: data.FillModeNull,
+		},
 	}
 }
