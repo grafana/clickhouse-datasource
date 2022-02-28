@@ -1,8 +1,12 @@
 # Changelog
 
-## 1.0.0
+## 1.1.0
 
 Feature - add convention for showing logs panel in Explore
+
+## 1.0.0
+
+Official release
 
 ## 0.12.7
 
