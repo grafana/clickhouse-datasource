@@ -3,6 +3,7 @@ import { CHQuery, QueryType } from '../types';
 import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
+  access: 'direct',
   id: 1,
   uid: 'sap_hana_ds',
   type: 'grafana-clickhouse-datasource',
