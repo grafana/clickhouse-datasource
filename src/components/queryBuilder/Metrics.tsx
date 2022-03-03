@@ -69,6 +69,7 @@ const MetricEditor = (props: {
         {ALIAS.label}
       </InlineFormLabel>
       <Input
+        css={null}
         width={20}
         value={alias}
         onChange={(e) => setAlias(e.currentTarget.value)}

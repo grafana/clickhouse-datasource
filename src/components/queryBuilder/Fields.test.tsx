@@ -34,14 +34,14 @@ describe('FieldsEditor', () => {
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
 
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
-    fireEvent.focus(screen.getByRole('combobox'));
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    fireEvent.focus(screen.getByRole('textbox'));
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'ArrowDown' });
     expect(result.getByText('Dummy')).toBeInTheDocument(); // Popup should be in the open state
     expect(result.getByText('Field Type')).toBeInTheDocument();
     fireEvent.click(result.getByText('Field Type'));
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
     expect(result.getByText('Field Type')).toBeInTheDocument();
-    fireEvent.blur(screen.getByRole('combobox'));
+    fireEvent.blur(screen.getByRole('textbox'));
     expect(onFieldsChange).toHaveBeenCalledTimes(1);
 
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
@@ -54,10 +54,10 @@ describe('FieldsEditor', () => {
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
 
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
-    fireEvent.focus(screen.getByRole('combobox'));
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+    fireEvent.focus(screen.getByRole('textbox'));
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'ArrowDown' });
     expect(result.getByText('Dummy')).toBeInTheDocument(); // Popup should be in the open state
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Esc' });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Esc' });
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
   });

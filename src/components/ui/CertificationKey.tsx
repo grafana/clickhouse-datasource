@@ -15,13 +15,13 @@ export const CertificationKey: FC<Props> = ({ hasCert, label, onChange, onClick,
       <InlineFormLabel width={12}>{label}</InlineFormLabel>
       {hasCert ? (
         <>
-          <Input type="text" disabled value="configured" width={24} />
+          <Input css={{}} type="text" disabled value="configured" width={24} />
           <Button variant="secondary" onClick={onClick} style={{ marginLeft: 4 }}>
             Reset
           </Button>
         </>
       ) : (
-        <TextArea rows={7} onChange={onChange} placeholder={placeholder} required />
+        <TextArea css={{}} rows={7} onChange={onChange} placeholder={placeholder} required />
       )}
     </div>
   );

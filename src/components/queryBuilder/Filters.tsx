@@ -50,6 +50,7 @@ const FilterValueNumberItem = (props: { value: number; onChange: (value: number)
   return (
     <div data-testid="query-builder-filters-number-value-container">
       <Input
+        css={null}
         data-testid="query-builder-filters-number-value-input"
         type="number"
         value={value}
@@ -65,6 +66,7 @@ const FilterValueSingleStringItem = (props: { value: string; onChange: (value: s
   return (
     <div data-testid="query-builder-filters-single-string-value-container">
       <Input
+        css={null}
         type="text"
         value={value}
         onChange={(e) => setValue(e.currentTarget.value)}
@@ -79,6 +81,7 @@ const FilterValueMultiStringItem = (props: { value: string[]; onChange: (value: 
   return (
     <div data-testid="query-builder-filters-multi-string-value-container">
       <Input
+        css={null}
         type="text"
         value={value.join(',')}
         placeholder="comma separated values"

@@ -15,6 +15,7 @@ export const LimitEditor = (props: LimitEditorProps) => {
         {label}
       </InlineFormLabel>
       <Input
+        css={null}
         width={10}
         value={limit}
         type="number"
