@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/sqlds"
+	"github.com/grafana/sqlds/v2"
 )
 
 var (

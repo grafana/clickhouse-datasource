@@ -89,11 +89,11 @@ Table visualizations will always be available for any valid ClickHouse query.
 
 ### Visualizing logs with the Logs Panel
 
-To use the Logs panel your query must return a timestamp and string values.
+To use the Logs panel your query must return a timestamp and string values. To default to the logs visualization in Explore mode, set the timestamp alias to *log_time*.
 
 For example:
 ```sql
-SELECT log_time AS time, machine_group, toString(avg(disk_free)) AS avg_disk_free
+SELECT log_time AS log_time, machine_group, toString(avg(disk_free)) AS avg_disk_free
 FROM logs1
 GROUP BY machine_group, log_time
 ORDER BY log_time

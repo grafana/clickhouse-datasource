@@ -6,7 +6,7 @@ import (
 
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/sqlds"
+	"github.com/grafana/sqlds/v2"
 	"github.com/stretchr/testify/assert"
 )
 

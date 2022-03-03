@@ -9,7 +9,13 @@ export const getFormat = (sql: string): Format => {
   const selectList = ast.get('SELECT') || [];
   // if there are more than 2 fields, index 1 will be a ','
   if (selectList.length > 2 && isString(selectList[0])) {
-    return selectList[0].trim().toLowerCase().endsWith('as time') ? Format.TIMESERIES : Format.TABLE;
+    const firstProjection = selectList[0].trim().toLowerCase();
+    if (firstProjection.endsWith('as time')) {
+      return Format.TIMESERIES;
+    }
+    if (firstProjection.endsWith('as log_time')) {
+      return Format.LOGS;
+    }
   }
   return Format.TABLE;
 };

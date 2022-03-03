@@ -3,9 +3,9 @@ module github.com/grafana/clickhouse-datasource
 go 1.17
 
 require (
-	github.com/ClickHouse/clickhouse-go v1.5.1
+	github.com/ClickHouse/clickhouse-go v1.5.4
 	github.com/grafana/grafana-plugin-sdk-go v0.125.1
-	github.com/grafana/sqlds v1.3.0
+	github.com/grafana/sqlds/v2 v2.3.6
 	github.com/pkg/errors v0.9.1
 	github.com/stretchr/testify v1.7.0
 )
