@@ -129,8 +129,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               id="secure"
+              css={{}}
               className="gf-form"
               value={jsonData.secure || false}
               onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
