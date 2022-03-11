@@ -40,6 +40,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	if err := json.Unmarshal(config.JSONData, &settings); err != nil {
 		return settings, fmt.Errorf("%s: %w", err.Error(), ErrorMessageInvalidJSON)
 	}
+	if strings.TrimSpace(settings.Timeout) == "" {
+		settings.Timeout = "10"
+	}
 	val, ok := config.DecryptedSecureJSONData["password"]
 	if !ok {
 		return settings, settings.isValid()
@@ -56,9 +59,6 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	tlsClientKey, ok := config.DecryptedSecureJSONData["tlsClientKey"]
 	if ok {
 		settings.TlsClientKey = tlsClientKey
-	}
-	if strings.TrimSpace(settings.Timeout) == "" {
-		settings.Timeout = "10"
 	}
 	return settings, settings.isValid()
 }
