@@ -102,7 +102,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 
 	t, err := strconv.Atoi(settings.Timeout)
 	if err != nil {
-		return nil, errors.New("invalid timeout")
+		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
 
 	timeout := time.Duration(t)

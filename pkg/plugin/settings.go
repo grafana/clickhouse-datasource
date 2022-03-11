@@ -3,6 +3,7 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
@@ -56,7 +57,7 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	if ok {
 		settings.TlsClientKey = tlsClientKey
 	}
-	if settings.Timeout == "" {
+	if strings.TrimSpace(settings.Timeout) == "" {
 		settings.Timeout = "10"
 	}
 	return settings, settings.isValid()
