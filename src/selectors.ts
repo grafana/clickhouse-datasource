@@ -50,6 +50,11 @@ export const Components = {
       placeholder: 'Default database',
       tooltip: 'Default database to be used. Can be empty.',
     },
+    Timeout: {
+      label: 'Timeout (seconds)',
+      placeholder: '10',
+      tooltip: 'Timeout in seconds for connection and read queries',
+    },
     Secure: {
       label: 'Secure Connection',
       tooltip: 'Toggle on if the connection is secure',

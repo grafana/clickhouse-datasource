@@ -25,7 +25,7 @@ func TestLoadSettings(t *testing.T) {
 				name: "should parse and set all the json fields correctly",
 				args: args{
 					config: backend.DataSourceInstanceSettings{
-						JSONData:                []byte(`{ "server": "foo", "port": 443, "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true}`),
+						JSONData:                []byte(`{ "server": "foo", "port": 443, "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10"}`),
 						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey"},
 					},
 				},
@@ -41,6 +41,7 @@ func TestLoadSettings(t *testing.T) {
 					TlsCACert:          "caCert",
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
+					Timeout:            "10",
 				},
 				wantErr: nil,
 			},

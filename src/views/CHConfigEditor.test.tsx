@@ -13,6 +13,7 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
   });
   it('with password', async () => {
     render(
@@ -32,6 +33,7 @@ describe('ConfigEditor', () => {
     expect(a).toBeInTheDocument();
     expect(a.textContent).toBe('Reset');
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
   });
   it('with secure connection', async () => {
     render(

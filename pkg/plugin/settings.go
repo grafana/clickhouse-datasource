@@ -20,7 +20,8 @@ type Settings struct {
 	TlsCACert          string
 	TlsClientCert      string
 	TlsClientKey       string
-	Secure             bool `json:"secure,omitempty"`
+	Secure             bool   `json:"secure,omitempty"`
+	Timeout            string `json:"timeout,omitempty"`
 }
 
 func (settings *Settings) isValid() (err error) {
@@ -54,6 +55,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	tlsClientKey, ok := config.DecryptedSecureJSONData["tlsClientKey"]
 	if ok {
 		settings.TlsClientKey = tlsClientKey
+	}
+	if settings.Timeout == "" {
+		settings.Timeout = "10"
 	}
 	return settings, settings.isValid()
 }
