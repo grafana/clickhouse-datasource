@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.1
+
+Bug - add timeout
+
 ## 1.1.0
 
 Feature - add convention for showing logs panel in Explore

@@ -1,11 +1,13 @@
 package plugin
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go"
@@ -16,6 +18,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v2"
+	"github.com/pkg/errors"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
@@ -75,6 +78,11 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		connStr = fmt.Sprintf("%s%ssecure=%s", connStr, sep, "true")
 		sep = "&"
 	}
+	if settings.Timeout != "" {
+		connStr = fmt.Sprintf("%s%sread_timeout=%s", connStr, sep, settings.Timeout)
+		sep = "&"
+	}
+
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err := getTLSConfig(settings)
 		if err != nil {
@@ -91,15 +99,37 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if err != nil {
 		return nil, err
 	}
-	if err := db.Ping(); err != nil {
-		if exception, ok := err.(*clickhouse.Exception); ok {
-			log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-		} else {
-			log.DefaultLogger.Error(err.Error())
-		}
-		// TODO - if we return the error here, the message is not displayed - check sdk
-		return db, nil
+
+	t, err := strconv.Atoi(settings.Timeout)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
+
+	timeout := time.Duration(t)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
+	defer cancel()
+
+	chErr := make(chan error, 1)
+	go func() {
+		err = db.PingContext(ctx)
+		chErr <- err
+	}()
+
+	select {
+	case err := <-chErr:
+		if err != nil {
+			// sql ds will ping again and show error
+			if exception, ok := err.(*clickhouse.Exception); ok {
+				log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
+			} else {
+				log.DefaultLogger.Error(err.Error())
+			}
+			return db, nil
+		}
+	case <-time.After(timeout * time.Second):
+		return db, errors.New("connection timed out")
+	}
+
 	return db, settings.isValid()
 }
 

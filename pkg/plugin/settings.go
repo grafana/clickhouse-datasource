@@ -3,6 +3,7 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
@@ -20,7 +21,8 @@ type Settings struct {
 	TlsCACert          string
 	TlsClientCert      string
 	TlsClientKey       string
-	Secure             bool `json:"secure,omitempty"`
+	Secure             bool   `json:"secure,omitempty"`
+	Timeout            string `json:"timeout,omitempty"`
 }
 
 func (settings *Settings) isValid() (err error) {
@@ -37,6 +39,9 @@ func (settings *Settings) isValid() (err error) {
 func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings, err error) {
 	if err := json.Unmarshal(config.JSONData, &settings); err != nil {
 		return settings, fmt.Errorf("%s: %w", err.Error(), ErrorMessageInvalidJSON)
+	}
+	if strings.TrimSpace(settings.Timeout) == "" {
+		settings.Timeout = "10"
 	}
 	val, ok := config.DecryptedSecureJSONData["password"]
 	if !ok {
