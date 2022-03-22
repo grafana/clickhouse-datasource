@@ -93,7 +93,7 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
         // first we get the remaining part of the FROM phrase. ") as r"
         const fromPhrase = ast.get('FROM');
         const fromPhraseAfterTableName = fromPhrase!
-        [fromPhrase!.length - 1]!.toString()
+          [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
         // if the fromPhraseAfterTheTableName is not the ending of a bracket statement, then don't more it.
