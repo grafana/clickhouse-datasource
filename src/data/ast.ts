@@ -96,7 +96,8 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
           [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
-        // if the fromPhraseAfterTheTableName is not the ending of a bracket statement, then don't more it.
+
+        // if the fromPhraseAfterTheTableName is not the ending of a bracket statement, then don't add it
         if (!fromPhraseAfterTableName.includes(')')) {
           ast.set('WHERE', [whereClause]);
           continue;
