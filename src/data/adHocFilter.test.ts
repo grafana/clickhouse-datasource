@@ -83,9 +83,12 @@ describe('AdHocManager', () => {
     ahm.setTargetTableFromQuery(
       'SELECT * FROM table where stuff = stuff and (repo in (select * from table)) order by stuff'
     );
-    const val = ahm.apply(`SELECT number, letter FROM table AS x INNER JOIN (SELECT number FROM system.numbers LIMIT 5) AS inner_numbers ON inner_numbers.number = x.number ARRAY JOIN ['a', 'b'] AS letter LIMIT 5`, [
-      { key: 'key', operator: '=', value: 'val' },
-    ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`SELECT number , letter FROM table AS x INNER JOIN ( SELECT number FROM system.numbers LIMIT 5) AS inner_numbers ON inner_numbers.number = x.number ARRAY JOIN ['a' , 'b'] AS letter WHERE key = 'val' LIMIT 5`);
+    const val = ahm.apply(
+      `SELECT number, letter FROM table AS x INNER JOIN (SELECT number FROM system.numbers LIMIT 5) AS inner_numbers ON inner_numbers.number = x.number ARRAY JOIN ['a', 'b'] AS letter LIMIT 5`,
+      [{ key: 'key', operator: '=', value: 'val' }] as AdHocVariableFilter[]
+    );
+    expect(val).toEqual(
+      `SELECT number , letter FROM table AS x INNER JOIN ( SELECT number FROM system.numbers LIMIT 5) AS inner_numbers ON inner_numbers.number = x.number ARRAY JOIN ['a' , 'b'] AS letter WHERE key = 'val' LIMIT 5`
+    );
   });
 });

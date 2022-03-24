@@ -41,8 +41,7 @@ export default function sqlToAST(sql: string): AST {
     const nodePhrase = ast.get(foundNode);
     if (nodePhrase && nodePhrase.length !== 0) {
       ast.set(foundNode, nodePhrase.concat(foundNode, getASTBranches(phrase)));
-    }
-    else {
+    } else {
       ast.set(foundNode, getASTBranches(phrase));
     }
   }
