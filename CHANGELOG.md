@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+Bug - add timerange to metricFindQuery
+
 ## 1.1.1
 
 Bug - add timeout
