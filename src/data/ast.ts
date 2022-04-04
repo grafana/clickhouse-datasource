@@ -21,7 +21,7 @@ export default function sqlToAST(sql: string): AST {
     if (bracket.count > 0) {
       bracket.phrase += foundNode + phrase;
     } else {
-      ast.set(foundNode, getASTBranches(phrase));
+      addToPhrase(foundNode, phrase);
       lastNode = foundNode;
       bracket.phrase = phrase;
     }
@@ -36,6 +36,15 @@ export default function sqlToAST(sql: string): AST {
     bracket.lastCount = bracket.count;
   }
   return ast;
+
+  function addToPhrase(foundNode: string, phrase: string) {
+    const nodePhrase = ast.get(foundNode);
+    if (nodePhrase && nodePhrase.length !== 0) {
+      ast.set(foundNode, nodePhrase.concat(foundNode, getASTBranches(phrase)));
+    } else {
+      ast.set(foundNode, getASTBranches(phrase));
+    }
+  }
 }
 
 export function astToSql(ast: AST): string {
@@ -86,6 +95,12 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
           [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
+
+        // if the fromPhraseAfterTheTableName is not the ending of a bracket statement, then don't add it
+        if (!fromPhraseAfterTableName.includes(')')) {
+          ast.set('WHERE', [whereClause]);
+          continue;
+        }
         // apply the remaining part of the FROM phrase to the end of the new WHERE clause
         ast.set('WHERE', [`${whereClause} ${fromPhraseAfterTableName}`]);
         // set the FROM clause to only have the table name

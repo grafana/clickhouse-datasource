@@ -27,7 +27,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     this.adHocFilter = new AdHocFilter();
   }
 
-  async metricFindQuery(query: CHQuery | string) {
+  async metricFindQuery(query: CHQuery | string, options: any) {
     const chQuery = isString(query) ? { rawSql: query, queryType: QueryType.SQL } : query;
 
     if (!(chQuery.queryType === QueryType.SQL || chQuery.queryType === QueryType.Builder || !chQuery.queryType)) {
@@ -37,7 +37,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     if (!chQuery.rawSql) {
       return [];
     }
-    const frame = await this.runQuery({ ...chQuery, queryType: chQuery.queryType || QueryType.SQL });
+    const q = { ...chQuery, queryType: chQuery.queryType || QueryType.SQL };
+    const frame = await this.runQuery(q, options);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -121,10 +122,11 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return this.values(frame);
   }
 
-  private runQuery(request: Partial<CHQuery>): Promise<DataFrame> {
+  private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
     return new Promise((resolve) => {
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
+        range: options?.range,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
         resolve(res.data[0] || { fields: [] });
