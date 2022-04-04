@@ -12,6 +12,7 @@ interface GroupByEditorProps {
   groupBy: string[];
   having: Filter[]; 
   onGroupByChange: (groupBy: string[]) => void;
+  onHavingChange: (filters: Filter[]) => void;
 }
 export const GroupByEditor = (props: GroupByEditorProps) => {
   const columns: SelectableValue[] = (props.fieldsList || []).map((f) => ({ label: f.label, value: f.name }));
@@ -49,7 +50,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
         clause="HAVING" 
         filters={props.having} 
         fieldsList={props.fieldsList} 
-        onFiltersChange={(f) => {}} />
+        onFiltersChange={props.onHavingChange} />
     </>
   );
 };

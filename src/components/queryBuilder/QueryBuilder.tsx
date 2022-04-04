@@ -131,13 +131,18 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     props.onBuilderOptionsChange(queryOptions);
   };
 
-  const onFiltersChange = (filters: Filter[] = []) => {
+  const onWhereChange = (filters: Filter[] = []) => {
     const queryOptions: SqlBuilderOptions = { ...builder, filters };
     props.onBuilderOptionsChange(queryOptions);
   };
 
   const onGroupByChange = (groupBy: string[] = []) => {
     const queryOptions: SqlBuilderOptions = { ...builder, groupBy };
+    props.onBuilderOptionsChange(queryOptions);
+  };
+
+  const onHavingChange = (having: Filter[] = []) => {
+    const queryOptions: SqlBuilderOptions = { ...builder, having };
     props.onBuilderOptionsChange(queryOptions);
   };
 
@@ -193,9 +198,14 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
       )}
-      <FiltersEditor clause="WHERE" filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
+      <FiltersEditor clause="WHERE" filters={builder.filters || []} onFiltersChange={onWhereChange} fieldsList={fieldsList} />
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
-        <GroupByEditor having={[]} groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
+        <GroupByEditor 
+          having={builder.having || []} 
+          groupBy={builder.groupBy || []} 
+          onGroupByChange={onGroupByChange}
+          onHavingChange={onHavingChange}
+          fieldsList={fieldsList} />
       )}
       <>
         <OrderByEditor
