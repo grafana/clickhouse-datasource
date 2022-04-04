@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { Button, InlineFormLabel, RadioButtonGroup, Select, Input, MultiSelect } from '@grafana/ui';
-import { Filter, FullField, FilterOperator, NullFilter, BooleanFilter, DateFilter } from './../../types';
+import { 
+  Filter, 
+  FullField, 
+  FilterOperator, 
+  NullFilter, 
+  BooleanFilter, 
+  DateFilter, 
+  FilterClause
+} from './../../types';
 import * as utils from './utils';
 import { selectors } from './../../selectors';
 import { styles } from '../../styles';
@@ -317,10 +325,11 @@ export const FilterEditor = (props: {
 export const FiltersEditor = (props: {
   fieldsList: FullField[];
   filters: Filter[];
+  clause: FilterClause;
   onFiltersChange: (filters: Filter[]) => void;
 }) => {
   const { filters = [], onFiltersChange, fieldsList = [] } = props;
-  const { label, tooltip, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.WHERE;
+  const { label, tooltip, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder[props.clause];
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
   };

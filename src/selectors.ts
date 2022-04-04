@@ -125,14 +125,20 @@ export const Components = {
         RemoveLabel: '',
       },
       WHERE: {
-        label: 'Filters',
-        tooltip: `List of filters`,
+        label: 'Where',
+        tooltip: 'List of "where" filters',
         AddLabel: 'Filter',
         RemoveLabel: '',
       },
       GROUP_BY: {
         label: 'Group by',
         tooltip: 'Group the results by specific field',
+      },
+      HAVING: {
+        label: 'Having',
+        tooltip: 'List of "having" filters',
+        AddLabel: 'Filter',
+        RemoveLabel: '',
       },
       ORDER_BY: {
         label: 'Order by',

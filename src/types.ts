@@ -91,6 +91,7 @@ export interface SqlBuilderOptionsAggregate {
   groupBy?: string[];
   filters?: Filter[];
   orderBy?: OrderBy[];
+  having?: Filter[];
   limit?: number;
 }
 export interface SqlBuilderOptionsTrend {
@@ -161,6 +162,13 @@ export enum FilterOperator {
   WithInGrafanaTimeRange = 'WITH IN DASHBOARD TIME RANGE',
   OutsideGrafanaTimeRange = 'OUTSIDE DASHBOARD TIME RANGE',
 }
+
+/**
+ * Determines whether the filter is being applied
+ * to a WHERE clause or a HAVING clause.
+ */
+export type FilterClause = 'WHERE' | 'HAVING';
+
 export interface CommonFilterProps {
   filterType: 'custom';
   key: string;

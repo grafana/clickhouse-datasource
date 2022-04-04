@@ -193,9 +193,9 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
       )}
-      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
+      <FiltersEditor clause="WHERE" filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
-        <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
+        <GroupByEditor having={[]} groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
       )}
       <>
         <OrderByEditor
