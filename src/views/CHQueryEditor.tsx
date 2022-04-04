@@ -74,9 +74,9 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
         <span>
           <QueryTypeSwitcher {...props} />
         </span>
-        <Button onClick={() => runQuery()}>Run Query</Button>
       </div>
       <CHEditorByType {...props} />
+      <Button icon="play" onClick={() => runQuery()}>Run Query</Button>
     </>
   );
 };
