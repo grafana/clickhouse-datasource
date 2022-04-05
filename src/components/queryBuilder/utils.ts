@@ -214,11 +214,15 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   switch (options.mode) {
     case BuilderMode.Aggregate:
       query += getAggregationQuery(options.database, options.table, options.fields, options.metrics, options.groupBy);
-      let aggregateFilters = getFilters(options.filters || []);
-      if (aggregateFilters) {
-        query += ` WHERE ${aggregateFilters}`;
-      }
+      
+      // Add "WHERE" clause
+      let whereFilters = getFilters(options.filters || []);
+      query += whereFilters ? ` WHERE ${whereFilters}` : '';
+      
+      // Add "GROUPY BY" along with "HAVING" if it's set
       query += getGroupBy(options.groupBy);
+      let havingFilters = getFilters(options.having || []);
+      query += havingFilters ? ` HAVING ${havingFilters}` : '';
       break;
     case BuilderMode.Trend:
       query += getTrendByQuery(
