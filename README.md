@@ -39,7 +39,6 @@ Here are some provisioning examples for this data source using basic authenticat
 
 ```yaml
 apiVersion: 1
-
 datasources:
   - name: ClickHouse
     type: grafana-clickhouse-datasource
