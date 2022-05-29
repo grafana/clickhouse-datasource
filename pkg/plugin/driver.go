@@ -7,18 +7,20 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strconv"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go"
-	"github.com/grafana/clickhouse-datasource/pkg/converters"
-	"github.com/grafana/clickhouse-datasource/pkg/macros"
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v2"
 	"github.com/pkg/errors"
+
+	"github.com/grafana/clickhouse-datasource/pkg/converters"
+	"github.com/grafana/clickhouse-datasource/pkg/macros"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
@@ -54,52 +56,32 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
 	settings, err := LoadSettings(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("load settings: %w", err)
 	}
-	connStr := fmt.Sprintf("tcp://%s:%d", settings.Server, settings.Port)
-	sep := "?"
-	if settings.Username != "" {
-		connStr = fmt.Sprintf("%s%susername=%s", connStr, sep, settings.Username)
-		sep = "&"
-	}
-	if settings.Password != "" {
-		connStr = fmt.Sprintf("%s%spassword=%s", connStr, sep, settings.Password)
-		sep = "&"
-	}
-	if settings.DefaultDatabase != "" {
-		connStr = fmt.Sprintf("%s%sdatabase=%s", connStr, sep, settings.DefaultDatabase)
-		sep = "&"
-	}
-	if settings.InsecureSkipVerify {
-		connStr = fmt.Sprintf("%s%sskip_verify=%s", connStr, sep, "true")
-		sep = "&"
-	}
+	var tlsConfig *tls.Config
 	if settings.Secure {
-		connStr = fmt.Sprintf("%s%ssecure=%s", connStr, sep, "true")
-		sep = "&"
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: settings.InsecureSkipVerify,
+		}
 	}
-	if settings.Timeout != "" {
-		connStr = fmt.Sprintf("%s%sread_timeout=%s", connStr, sep, settings.Timeout)
-		sep = "&"
-	}
-
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
-		tlsConfig, err := getTLSConfig(settings)
+		tlsConfig, err = getTLSConfig(settings)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("get TLS config: %w", err)
 		}
-		err = clickhouse.RegisterTLSConfig(config.UID, tlsConfig)
-		if err != nil {
-			return nil, err
-		}
-		connStr = fmt.Sprintf("%s%stls_config=%s", connStr, sep, config.UID)
 	}
-
-	db, err := sql.Open("clickhouse", connStr)
-	if err != nil {
-		return nil, err
-	}
-
+	db := clickhouse.OpenDB(&clickhouse.Options{
+		// TODO: Implement settings.Timeout for read timeouts.
+		TLS: tlsConfig,
+		Auth: clickhouse.Auth{
+			Username: settings.Username,
+			Password: settings.Password,
+			Database: settings.DefaultDatabase,
+		},
+		Addr: []string{
+			net.JoinHostPort(settings.Server, strconv.FormatInt(settings.Port, 10)),
+		},
+	})
 	t, err := strconv.Atoi(settings.Timeout)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
