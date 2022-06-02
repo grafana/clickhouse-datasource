@@ -82,6 +82,10 @@
   "liveNow": false,
   "panels": [
     {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
+      },
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -181,6 +185,10 @@
       "type": "stat"
     },
     {
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "${DS_CLICKHOUSE}"
+      },
       "description": "",
       "fieldConfig": {
         "defaults": {
