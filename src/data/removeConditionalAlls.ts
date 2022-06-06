@@ -1,5 +1,6 @@
 import { ScopedVars, VariableModel } from '@grafana/data';
-import sqlToAST, { astToSql, removeConditionalAllsFromAST } from './ast';
+import { astToSql } from './ast';
+import { removeConditionalAllsFromAST } from './grammar';
 
 export function removeConditionalAlls(sql: string, queryVars: VariableModel[], scopedVars?: ScopedVars): string {
   if (sql === '' || !queryVars || queryVars.length === 0) {
@@ -16,9 +17,5 @@ export function removeConditionalAlls(sql: string, queryVars: VariableModel[], s
       varNames.push(qv.name);
     }
   }
-  // Semicolons are not required and cause problems when building the SQL
-  sql = sql.replace(';', '');
-  const ast = sqlToAST(sql);
-  removeConditionalAllsFromAST(ast, varNames);
-  return astToSql(ast);
+  return astToSql(removeConditionalAllsFromAST(sql, varNames));
 }

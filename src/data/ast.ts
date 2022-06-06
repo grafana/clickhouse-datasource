@@ -1,50 +1,14 @@
 import { isString } from 'lodash';
+import build from './grammar';
 
 export type Clause = string | AST | null;
 export type AST = Map<string, Clause[]>;
 
 export default function sqlToAST(sql: string): AST {
-  const ast = createStatement();
-  const re =
-    /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|ORDER BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
-  const bracket = { count: 0, lastCount: 0, phrase: '' };
-  let lastNode = '';
-  let regExpArray: RegExpExecArray | null;
-  ast.set('', [sql.split(re, 2)[0]]);
 
-  while ((regExpArray = re.exec(sql)) !== null) {
-    // Sets foundNode to a SQL keyword from the regular expression
-    const foundNode = regExpArray[0].toUpperCase();
-    const phrase = sql.substring(re.lastIndex, sql.length).split(re, 2)[0];
-    // If there is a greater number of open brackets than closed,
-    // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
-    if (bracket.count > 0) {
-      bracket.phrase += foundNode + phrase;
-    } else {
-      addToPhrase(foundNode, phrase);
-      lastNode = foundNode;
-      bracket.phrase = phrase;
-    }
-    bracket.count += (phrase.match(/\(/g) || []).length;
-    bracket.count -= (phrase.match(/\)/g) || []).length;
-    if (bracket.count <= 0 && bracket.lastCount > 0) {
-      // The phrase is complete
-      // If it contains the keyword SELECT, make new branches
-      // If it does not, make a leaf node
-      ast.set(lastNode, getASTBranches(bracket.phrase));
-    }
-    bracket.lastCount = bracket.count;
-  }
+  const ast = build(sql);
+
   return ast;
-
-  function addToPhrase(foundNode: string, phrase: string) {
-    const nodePhrase = ast.get(foundNode);
-    if (nodePhrase && nodePhrase.length !== 0) {
-      ast.set(foundNode, nodePhrase.concat(foundNode, getASTBranches(phrase)));
-    } else {
-      ast.set(foundNode, getASTBranches(phrase));
-    }
-  }
 }
 
 export function astToSql(ast: AST): string {
@@ -92,7 +56,7 @@ export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: st
         // first we get the remaining part of the FROM phrase. ") as r"
         const fromPhrase = ast.get('FROM');
         const fromPhraseAfterTableName = fromPhrase!
-          [fromPhrase!.length - 1]!.toString()
+        [fromPhrase!.length - 1]!.toString()
           .trim()
           .substring(targetTable.length);
 
@@ -246,7 +210,6 @@ function createStatement(): AST {
   clauses.set('', []);
   clauses.set('WITH', []);
   clauses.set('SELECT', []);
-  clauses.set('DISTINCT', []);
   clauses.set('FROM', []);
   clauses.set('SAMPLE', []);
   clauses.set('JOIN', []);
