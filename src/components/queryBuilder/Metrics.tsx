@@ -23,6 +23,7 @@ const MetricEditor = (props: {
     { value: BuilderMetricFieldAggregation.Min, label: 'Min' },
     { value: BuilderMetricFieldAggregation.Max, label: 'Max' },
     { value: BuilderMetricFieldAggregation.Average, label: 'Average' },
+    { value: BuilderMetricFieldAggregation.Any, label: 'Any' },
     // { value: BuilderMetricFieldAggregation.Count_Distinct, label: 'Distinct Count' },
   ];
   const onMetricFieldChange = (e: SelectableValue<string>) => {
