@@ -75,6 +75,7 @@ export enum BuilderMetricFieldAggregation {
   Min = 'min',
   Max = 'max',
   Count = 'count',
+  Any = 'any',
   // Count_Distinct = 'count_distinct',
 }
 export type BuilderMetricField = {
