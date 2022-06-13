@@ -126,7 +126,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return new Promise((resolve) => {
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
-        range: options?.range,
+        range: options ? options.range : (getTemplateSrv() as any).timeRange,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
         resolve(res.data[0] || { fields: [] });
