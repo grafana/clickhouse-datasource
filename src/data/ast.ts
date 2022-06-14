@@ -1,14 +1,17 @@
 import { isString } from 'lodash';
-import build from './grammar';
+//import build from './grammar';
+import { parse, parseFirst, Statement } from 'pgsql-ast-parser';
 
 export type Clause = string | AST | null;
 export type AST = Map<string, Clause[]>;
 
 export default function sqlToAST(sql: string): AST {
 
-  const ast = build(sql);
+  //const ast = build(sql);
+  // parse a single statement
+  const ast: Statement = parseFirst(sql);
 
-  return ast;
+  return {} as AST;
 }
 
 export function astToSql(ast: AST): string {

@@ -40,6 +40,7 @@
     "js-sql-parser": "^1.4.1",
     "moo": "^0.5.1",
     "nearley": "^2.20.1",
+    "pgsql-ast-parser": "^10.3.1",
     "tslib": "^2.3.1"
   }
 }
