@@ -12,6 +12,7 @@ import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
+import { removeConditionalAlls } from './removeConditionalAlls';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -49,27 +50,40 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return vectorator(frame?.fields[1]?.values).map((text, i) => ({ text, value: ids.get(i) }));
   }
 
-  skipStuff: boolean = false;
+  explainAST = '';
+  lastQuery = '';
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
     let rawQuery = query.rawSql || '';
     // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
-    //const templateSrv = getTemplateSrv();
-    if (!this.skipAdHocFilter && !this.skipStuff) {
-      //this.skipStuff = true;
-      //const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
-      //const rawSql = `${rawQuery}`;
-      //let explainAST = '';
-      // this.runQuery({ rawSql: rawSql }).then(x => {
-      //   explainAST = 'dsf';//x.fields[0].values.toArray().join('\n');
-      //   this.skipStuff = false;
-      // }).catch(x => {
-      //   console.debug(x);
-      // });
+    const templateSrv = getTemplateSrv();
+
+    const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
+    const rawSql = `explain ast ${rawQuery}`;
+    // //let isDone = false;
+    // const frame = await this.runQuery({ rawSql });
+    // if (frame.fields?.length !== 0) {
+    //   const view = new DataFrameView(frame);
+    // }
+    // const k = await Promise.resolve(this.runQuery({ rawSql: rawSql, queryType: QueryType.SQL }));
+    // if (k.fields.length > 0) {
+    //   explainAST = k.fields[0].values.toArray().join('\n');
+    //   rawQuery = this.adHocFilter.apply(explainAST, adHocFilters);
+    // }
+
+    const k = this.runQuery({ rawSql }).then(x => {
+      if (x.fields.length > 0) {
+        this.explainAST = x.fields[0].values.toArray().join('\n');
+      }
+    }).catch(x => {
+    });
+
+    if (!this.skipAdHocFilter && this.explainAST !== '' && this.lastQuery === rawQuery) {
+      rawQuery = this.adHocFilter.apply(this.explainAST, adHocFilters);
       //while (explainAST === '') { }
-      //rawQuery = this.adHocFilter.apply(explainAST, adHocFilters);
     }
+    this.lastQuery = rawQuery;
     this.skipAdHocFilter = false;
-    //rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables(), scoped);
+    rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables(), scoped);
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
