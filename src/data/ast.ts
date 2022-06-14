@@ -151,80 +151,80 @@ function movePhraseEnding(c: string, ast: AST) {
   }
 }
 
-function getASTBranches(sql: string): Clause[] {
-  const clauses: Clause[] = [];
-  const re = /(\bAND\b|\bOR\b|,)/gi;
-  const bracket = { count: 0, lastCount: 0, phrase: '' };
-  let regExpArray: RegExpExecArray | null;
-  let lastPhraseIndex = 0;
+// function getASTBranches(sql: string): Clause[] {
+//   const clauses: Clause[] = [];
+//   const re = /(\bAND\b|\bOR\b|,)/gi;
+//   const bracket = { count: 0, lastCount: 0, phrase: '' };
+//   let regExpArray: RegExpExecArray | null;
+//   let lastPhraseIndex = 0;
 
-  while ((regExpArray = re.exec(sql)) !== null) {
-    const foundSplitter = regExpArray[0].toUpperCase();
-    const phrase = sql.substring(lastPhraseIndex, regExpArray.index);
-    lastPhraseIndex = re.lastIndex;
+//   while ((regExpArray = re.exec(sql)) !== null) {
+//     const foundSplitter = regExpArray[0].toUpperCase();
+//     const phrase = sql.substring(lastPhraseIndex, regExpArray.index);
+//     lastPhraseIndex = re.lastIndex;
 
-    bracket.count += (phrase.match(/\(/g) || []).length;
-    bracket.count -= (phrase.match(/\)/g) || []).length;
-    // If there is a greater number of open brackets than closed,
-    // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
-    if (bracket.count > 0) {
-      bracket.phrase += phrase + foundSplitter;
-    } else if (bracket.lastCount <= 0) {
-      completePhrase(clauses, phrase);
-      clauses.push(foundSplitter);
-    }
-    if (bracket.count <= 0 && bracket.lastCount > 0) {
-      bracket.phrase += phrase;
-      completePhrase(clauses, bracket.phrase);
-      clauses.push(foundSplitter);
-      bracket.phrase = '';
-    }
-    bracket.lastCount = bracket.count;
-  }
+//     bracket.count += (phrase.match(/\(/g) || []).length;
+//     bracket.count -= (phrase.match(/\)/g) || []).length;
+//     // If there is a greater number of open brackets than closed,
+//     // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
+//     if (bracket.count > 0) {
+//       bracket.phrase += phrase + foundSplitter;
+//     } else if (bracket.lastCount <= 0) {
+//       completePhrase(clauses, phrase);
+//       clauses.push(foundSplitter);
+//     }
+//     if (bracket.count <= 0 && bracket.lastCount > 0) {
+//       bracket.phrase += phrase;
+//       completePhrase(clauses, bracket.phrase);
+//       clauses.push(foundSplitter);
+//       bracket.phrase = '';
+//     }
+//     bracket.lastCount = bracket.count;
+//   }
 
-  // add the phrase after the last splitter
-  const phrase = sql.substring(lastPhraseIndex, sql.length);
-  if (bracket.count > 0) {
-    bracket.phrase += phrase;
-  } else {
-    bracket.phrase = phrase;
-  }
-  completePhrase(clauses, bracket.phrase);
-  return clauses;
-}
+//   // add the phrase after the last splitter
+//   const phrase = sql.substring(lastPhraseIndex, sql.length);
+//   if (bracket.count > 0) {
+//     bracket.phrase += phrase;
+//   } else {
+//     bracket.phrase = phrase;
+//   }
+//   completePhrase(clauses, bracket.phrase);
+//   return clauses;
+// }
 
-function completePhrase(clauses: Clause[], bracketPhrase: string) {
-  // The phrase is complete
-  // If it contains the keyword SELECT, build the AST for the phrase
-  // If it does not, make a leaf node
-  if (bracketPhrase.match(/\bSELECT\b/gi)) {
-    clauses.push(sqlToAST(bracketPhrase));
-  } else {
-    clauses.push(bracketPhrase);
-  }
-}
+// function completePhrase(clauses: Clause[], bracketPhrase: string) {
+//   // The phrase is complete
+//   // If it contains the keyword SELECT, build the AST for the phrase
+//   // If it does not, make a leaf node
+//   if (bracketPhrase.match(/\bSELECT\b/gi)) {
+//     clauses.push(sqlToAST(bracketPhrase));
+//   } else {
+//     clauses.push(bracketPhrase);
+//   }
+// }
 
-// Creates a statement with all the keywords to preserve the keyword order
-function createStatement(): AST {
-  const clauses = new Map<string, Clause[]>();
-  clauses.set('', []);
-  clauses.set('WITH', []);
-  clauses.set('SELECT', []);
-  clauses.set('FROM', []);
-  clauses.set('SAMPLE', []);
-  clauses.set('JOIN', []);
-  clauses.set('PREWHERE', []);
-  clauses.set('WHERE', []);
-  clauses.set('GROUP BY', []);
-  clauses.set('LIMIT BY', []);
-  clauses.set('HAVING', []);
-  clauses.set('ORDER BY', []);
-  clauses.set('LIMIT', []);
-  clauses.set('OFFSET', []);
-  clauses.set('UNION', []);
-  clauses.set('INTERSECT', []);
-  clauses.set('EXCEPT', []);
-  clauses.set('INTO OUTFILE', []);
-  clauses.set('FORMAT', []);
-  return clauses as AST;
-}
+// // Creates a statement with all the keywords to preserve the keyword order
+// function createStatement(): AST {
+//   const clauses = new Map<string, Clause[]>();
+//   clauses.set('', []);
+//   clauses.set('WITH', []);
+//   clauses.set('SELECT', []);
+//   clauses.set('FROM', []);
+//   clauses.set('SAMPLE', []);
+//   clauses.set('JOIN', []);
+//   clauses.set('PREWHERE', []);
+//   clauses.set('WHERE', []);
+//   clauses.set('GROUP BY', []);
+//   clauses.set('LIMIT BY', []);
+//   clauses.set('HAVING', []);
+//   clauses.set('ORDER BY', []);
+//   clauses.set('LIMIT', []);
+//   clauses.set('OFFSET', []);
+//   clauses.set('UNION', []);
+//   clauses.set('INTERSECT', []);
+//   clauses.set('EXCEPT', []);
+//   clauses.set('INTO OUTFILE', []);
+//   clauses.set('FORMAT', []);
+//   return clauses as AST;
+// }

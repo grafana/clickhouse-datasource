@@ -12,7 +12,6 @@ import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
-import { removeConditionalAlls } from './removeConditionalAlls';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -50,16 +49,27 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return vectorator(frame?.fields[1]?.values).map((text, i) => ({ text, value: ids.get(i) }));
   }
 
+  skipStuff: boolean = false;
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
     let rawQuery = query.rawSql || '';
     // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
-    const templateSrv = getTemplateSrv();
-    if (!this.skipAdHocFilter) {
-      const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
-      rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
+    //const templateSrv = getTemplateSrv();
+    if (!this.skipAdHocFilter && !this.skipStuff) {
+      //this.skipStuff = true;
+      //const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
+      //const rawSql = `${rawQuery}`;
+      //let explainAST = '';
+      // this.runQuery({ rawSql: rawSql }).then(x => {
+      //   explainAST = 'dsf';//x.fields[0].values.toArray().join('\n');
+      //   this.skipStuff = false;
+      // }).catch(x => {
+      //   console.debug(x);
+      // });
+      //while (explainAST === '') { }
+      //rawQuery = this.adHocFilter.apply(explainAST, adHocFilters);
     }
     this.skipAdHocFilter = false;
-    rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables(), scoped);
+    //rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables(), scoped);
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
