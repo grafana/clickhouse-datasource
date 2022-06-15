@@ -1,5 +1,6 @@
 import sqlToAST, { Clause } from 'data/ast';
-import { isString } from 'lodash';
+import { astVisitor, Expr, FromTable, parse, parseFirst, LogicOperator, ExprRef, SelectedColumn } from 'pgsql-ast-parser';
+import { isNil, isString } from 'lodash';
 import {
   BuilderMetricField,
   BuilderMode,
@@ -17,6 +18,7 @@ import {
   BuilderMetricFieldAggregation,
   SqlBuilderOptionsAggregate,
 } from 'types';
+import Select from '@grafana/ui/components/Forms/Legacy/Select/Select';
 
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type.toLowerCase());
@@ -81,9 +83,8 @@ const getAggregationQuery = (
     .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
     .join(', ');
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
-    metricsQuery && groupByQuery ? ', ' : ''
-  }${metricsQuery} FROM ${database}${sep}${table}`;
+  return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${metricsQuery && groupByQuery ? ', ' : ''
+    }${metricsQuery} FROM ${database}${sep}${table}`;
 };
 
 const getTrendByQuery = (
@@ -195,12 +196,12 @@ const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
   const pfx = prefix ? ' ORDER BY ' : '';
   return orderBy && orderBy.filter((o) => o.name).length > 0
     ? pfx +
-        orderBy
-          .filter((o) => o.name)
-          .map((o) => {
-            return `${o.name} ${o.dir}`;
-          })
-          .join(', ')
+    orderBy
+      .filter((o) => o.name)
+      .map((o) => {
+        return `${o.name} ${o.dir}`;
+      })
+      .join(', ')
     : '';
 };
 
@@ -259,40 +260,51 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
 };
 
 export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
-  const ast = sqlToAST(sql);
-  const fromPhrase = ast.get('FROM');
-  if (!fromPhrase || fromPhrase.length > 1 || !isString(fromPhrase[0])) {
+  //const ast = sqlToAST(sql);
+
+  //let where: string;
+  //let limit: string;
+
+  const ast = parseFirst(sql);
+
+  if (ast.type !== 'select') {
+    console.error("Not a select statement");
     return {} as SqlBuilderOptions;
   }
+  if (!ast.from || ast.from.length !== 1) {
+    console.error("Too many from clauses");
+    return {} as SqlBuilderOptions;
+  }
+  if (ast.from[0].type !== 'table') {
+    console.error("From clause is not a table");
+    return {} as SqlBuilderOptions;
+  }
+  const fromTable = ast.from[0] as FromTable;
 
-  const databaseAndTable = fromPhrase[0].trim().split('.');
-  const where = ast.get('WHERE');
-  const limit = ast.get('LIMIT');
+  const where = ast.where;
 
-  const fieldsAndMetrics = getMetricsFromAst(ast.get('SELECT')!);
+  const fieldsAndMetrics = getMetricsFromAst(ast.columns!);
 
   let builder = {
     mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
-    database: databaseAndTable[1] ? databaseAndTable[0].trim() : '',
-    table: databaseAndTable[1] ? databaseAndTable[1].trim() : databaseAndTable[0].trim(),
+    database: fromTable.name.schema,
+    table: fromTable.name.name,
   } as SqlBuilderOptions;
 
   if (fieldsAndMetrics.fields) {
     builder.fields = fieldsAndMetrics.fields;
   }
 
-  if (where && where.length > 0) {
+  if (where) {
     builder.filters = getFiltersFromAst(where);
   }
 
-  const orderBy = ast
-    .get('ORDER BY')
-    ?.map<OrderBy>((phrase) => {
-      if (!isString(phrase) || phrase.trim() === ',') {
+  const orderBy = ast.orderBy
+    ?.map<OrderBy>((ob) => {
+      if (ob.by.type !== 'ref') {
         return {} as OrderBy;
       }
-      const orderBySplit = phrase.trim().split(' ');
-      return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
+      return { name: ob.by.name, dir: ob.order } as OrderBy;
     })
     .filter((x) => x);
 
@@ -300,21 +312,18 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
     (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
   }
 
-  if (limit && limit.length > 0) {
-    builder.limit = Number.parseInt(limit[0]!.toString(), 10);
-  }
+  builder.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
 
   if (fieldsAndMetrics.metrics.length > 0) {
     (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
   }
 
-  const groupBy = ast
-    .get('GROUP BY')
-    ?.map((field) => {
-      if (!isString(field) || field.trim() === ',') {
+  const groupBy = ast.groupBy
+    ?.map((gb) => {
+      if (gb.type !== 'ref') {
         return '';
       }
-      return field.trim();
+      return gb.name;
     })
     .filter((x) => x !== '');
   if (groupBy && groupBy.length > 0) {
@@ -323,36 +332,80 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   return builder;
 }
 
-function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
+function getFiltersFromAst(expr: Expr): Filter[] {
+  //SELECT a, j, q FROM t WHERE   ( f != 'a' ) AND ( g = 'a' ) AND ( h = 'a' ) AND ( i = 'a' ) AND ( Id IS NOT NULL ) ORDER BY j ASC LIMIT 100
+
+  const filters: Filter[] = [];
+  let i = 0;
+  const visitor = astVisitor(map => ({
+    expr: e => {
+      console.log(e);
+      switch (e.type) {
+        case 'binary':
+          if (e.op === 'AND' || e.op === 'OR') {
+            filters.unshift({
+              condition: e.op,
+            } as Filter);
+          }
+          else if (e.op === '!=' || e.op === '=' || e.op === '<=' || e.op === '>=' || e.op === '>' || e.op === 'LIKE') {
+            if (i === 0) filters.unshift({} as Filter);
+            filters[i].operator = e.op as FilterOperator;
+          }
+          break;
+        case 'ref':
+          filters[i].key = e.name;
+          if (filters[i].operator === FilterOperator.IsNotNull) {
+            i++;
+          }
+          break;
+        case 'string':
+          filters[i] = { ...filters[i], value: e.value, type: 'string' } as Filter;
+          i++;
+          break;
+        case 'unary':
+          if (i === 0) filters.unshift({} as Filter);
+          filters[i].operator = e.op as FilterOperator;
+          break;
+        default:
+          console.debug(expr.type + ' add this type');
+          break;
+      }
+      map.super().expr(e);
+    },
+  }))
+
+  // start traversing a statement
+  visitor.expr(expr);
+
   // first condition is always AND but is not used
-  const filters: Filter[] = [{ condition: 'AND' } as Filter];
-  for (const c of whereClauses) {
-    if (!isString(c)) {
-      continue;
-    }
-    if (c.trim().toUpperCase() === 'AND') {
-      filters.push({ condition: 'AND' } as Filter);
-      continue;
-    } else if (c.trim().toUpperCase() === 'OR') {
-      filters.push({ condition: 'OR' } as Filter);
-      continue;
-    }
-    const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map((x) => (x = x.substring(1, x.length - 1)));
-    const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
-    if (!phrases) {
-      continue;
-    }
-    const isNotClause = phrases[0] === 'NOT';
-    const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
-    filters[filters.length - 1] = {
-      ...filters[filters.length - 1],
-      filterType: 'custom',
-      key: isNotClause ? phrases[1] : phrases[0],
-      operator: opAndVal.f ? opAndVal.f : '',
-      value: opAndVal.v ? opAndVal.v : '',
-      type: getFilterType(c, stringPhrases),
-    } as Filter;
-  }
+  //const filters: Filter[] = [{ condition: 'AND' } as Filter];
+  // for (const c of whereClauses) {
+  //   if (!isString(c)) {
+  //     continue;
+  //   }
+  //   if (c.trim().toUpperCase() === 'AND') {
+  //     filters.push({ condition: 'AND' } as Filter);
+  //     continue;
+  //   } else if (c.trim().toUpperCase() === 'OR') {
+  //     filters.push({ condition: 'OR' } as Filter);
+  //     continue;
+  //   }
+  //   const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map((x) => (x = x.substring(1, x.length - 1)));
+  //   const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
+  //   if (!phrases) {
+  //     continue;
+  //   }
+  //   const isNotClause = phrases[0] === 'NOT';
+  //   const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
+  //   filters[filters.length - 1] = {
+  //     ...filters[filters.length - 1],
+  //     filterType: 'custom',
+  //     key: isNotClause ? phrases[1] : phrases[0],
+  //     operator: opAndVal.f ? opAndVal.f : '',
+  //     value: opAndVal.v ? opAndVal.v : '',
+  //     type: getFilterType(c, stringPhrases),
+  //   } as Filter;
+  // }
   return filters;
 }
 
@@ -408,7 +461,7 @@ function isWithInTimeRangeFilter(phrases: string[]): boolean {
   return has.from && has.to;
 }
 
-function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[]; fields: string[] } {
+function getMetricsFromAst(selectClauses: SelectedColumn[]): { metrics: BuilderMetricField[]; fields: string[] } {
   let metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
   for (const c of selectClauses) {
@@ -449,6 +502,7 @@ function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricFie
   }
   return { metrics, fields };
 }
+
 export const operMap = new Map<string, FilterOperator>([
   ['equals', FilterOperator.Equals],
   ['contains', FilterOperator.Like],
