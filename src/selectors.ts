@@ -83,6 +83,9 @@ export const Components = {
         confirmText: 'Continue',
         dismissText: 'Cancel',
       },
+      cannotConvert: {
+        title: 'Cannot convert - The query is too complex to convert to the visual query builder',
+      }
     },
     QueryBuilder: {
       TYPES: {

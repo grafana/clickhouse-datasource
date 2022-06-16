@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
+import { RadioButtonGroup, ConfirmModal, InlineFormLabel, Modal } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
 import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery, Format } from 'types';
@@ -13,19 +13,21 @@ interface QueryTypeSwitcherProps {
 
 export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   const { query, onChange } = props;
-  const { label, tooltip, options: queryTypeLabels, switcher } = selectors.components.QueryEditor.Types;
+  const { label, tooltip, options: queryTypeLabels, switcher, cannotConvert } = selectors.components.QueryEditor.Types;
   let queryType: QueryType =
     query.queryType ||
     ((query as CHSQLQuery).rawSql && !(query as CHQuery).queryType ? QueryType.SQL : QueryType.Builder);
   const [editor, setEditor] = useState<QueryType>(queryType);
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
+  const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
   const options: Array<SelectableValue<QueryType>> = [
     { label: queryTypeLabels.SQLEditor, value: QueryType.SQL },
     { label: queryTypeLabels.QueryBuilder, value: QueryType.Builder },
   ];
   const onQueryTypeChange = (queryType: QueryType, confirm = false) => {
     if (query.queryType === QueryType.SQL && queryType === QueryType.Builder && !confirm) {
-      setConfirmModalState(true);
+      if (getQueryOptionsFromSql(query.rawSql).table) setConfirmModalState(true);
+      else setCannotConvertModalState(true);
     } else {
       setEditor(queryType);
       let builderOptions: SqlBuilderOptions;
@@ -72,6 +74,12 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
         icon="exclamation-triangle"
         onConfirm={onConfirmQueryTypeChange}
         onDismiss={() => setConfirmModalState(false)}
+      />
+      <Modal
+        title={cannotConvert.title}
+        isOpen={cannotConvertModalState}
+        icon="exclamation-triangle"
+        onDismiss={() => setCannotConvertModalState(false)}
       />
     </>
   );

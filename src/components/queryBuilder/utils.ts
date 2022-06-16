@@ -1,6 +1,6 @@
 import sqlToAST, { Clause } from 'data/ast';
-import { astVisitor, Expr, FromTable, parse, parseFirst, LogicOperator, ExprRef, SelectedColumn } from 'pgsql-ast-parser';
-import { isNil, isString } from 'lodash';
+import { astVisitor, Expr, FromTable, parse, parseFirst, LogicOperator, ExprRef, SelectedColumn, Statement } from 'pgsql-ast-parser';
+import { isNil, isString, mapKeys } from 'lodash';
 import {
   BuilderMetricField,
   BuilderMode,
@@ -21,15 +21,15 @@ import {
 import Select from '@grafana/ui/components/Forms/Legacy/Select/Select';
 
 export const isBooleanType = (type: string): boolean => {
-  return ['boolean'].includes(type.toLowerCase());
+  return ['boolean'].includes(type?.toLowerCase());
 };
 export const isNumberType = (type: string): boolean => {
   const numericTypes = ['int', 'float', 'decimal'];
-  const match = numericTypes.find((t) => type.toLowerCase().includes(t));
+  const match = numericTypes.find((t) => type?.toLowerCase().includes(t));
   return match !== undefined;
 };
 export const isDateType = (type: string): boolean => {
-  return ['date', 'datetime'].includes(type.toLowerCase());
+  return ['date', 'datetime'].includes(type?.toLowerCase());
 };
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
@@ -265,7 +265,13 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   //let where: string;
   //let limit: string;
 
-  const ast = parseFirst(sql);
+  let ast: Statement;
+  try {
+    ast = parseFirst(sql);
+  } catch (err) {
+    //err invalid sql
+    return {} as SqlBuilderOptions;
+  }
 
   if (ast.type !== 'select') {
     console.error("Not a select statement");
@@ -281,8 +287,6 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   }
   const fromTable = ast.from[0] as FromTable;
 
-  const where = ast.where;
-
   const fieldsAndMetrics = getMetricsFromAst(ast.columns!);
 
   let builder = {
@@ -295,8 +299,8 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
     builder.fields = fieldsAndMetrics.fields;
   }
 
-  if (where) {
-    builder.filters = getFiltersFromAst(where);
+  if (ast.where) {
+    builder.filters = getFiltersFromAst(ast.where);
   }
 
   const orderBy = ast.orderBy
@@ -340,14 +344,14 @@ function getFiltersFromAst(expr: Expr): Filter[] {
   const visitor = astVisitor(map => ({
     expr: e => {
       console.log(e);
-      switch (e.type) {
+      switch (e?.type) {
         case 'binary':
           if (e.op === 'AND' || e.op === 'OR') {
             filters.unshift({
               condition: e.op,
             } as Filter);
           }
-          else if (e.op === '!=' || e.op === '=' || e.op === '<=' || e.op === '>=' || e.op === '>' || e.op === 'LIKE') {
+          else if (Object.values(FilterOperator).find(x => e.op === x)) {
             if (i === 0) filters.unshift({} as Filter);
             filters[i].operator = e.op as FilterOperator;
           }
@@ -362,12 +366,21 @@ function getFiltersFromAst(expr: Expr): Filter[] {
           filters[i] = { ...filters[i], value: e.value, type: 'string' } as Filter;
           i++;
           break;
+        case 'integer':
+          filters[i] = { ...filters[i], value: e.value, type: 'int' } as Filter;
+          i++;
+          break;
         case 'unary':
           if (i === 0) filters.unshift({} as Filter);
           filters[i].operator = e.op as FilterOperator;
           break;
+        case 'call':
+          const val = `${e.function.name}(${e.args.map<string>(x => (x as ExprRef).name).join(',')})`
+          filters[i] = { ...filters[i], value: val, type: 'datetime' } as Filter;
+          i++;
+          break;
         default:
-          console.debug(expr.type + ' add this type');
+          console.debug(e?.type + ' add this type');
           break;
       }
       map.super().expr(e);
@@ -461,43 +474,36 @@ function isWithInTimeRangeFilter(phrases: string[]): boolean {
   return has.from && has.to;
 }
 
-function getMetricsFromAst(selectClauses: SelectedColumn[]): { metrics: BuilderMetricField[]; fields: string[] } {
-  let metrics: BuilderMetricField[] = [];
-  const fields: string[] = [];
-  for (const c of selectClauses) {
-    if (!isString(c) || !c.trim() || c.trim() === ',') {
-      continue;
+function selectCallFunc(s: SelectedColumn): BuilderMetricField {
+  if (s.expr.type !== 'call') return {} as BuilderMetricField;
+  let fields = s.expr.args.map(x => {
+    if (x.type !== 'ref') {
+      //err
+      return '';
     }
-    let isMetric = false;
-    metrics = metrics.concat(
-      Object.values(BuilderMetricFieldAggregation)
-        .filter((x) => c.trim().toLowerCase().startsWith(`${x}`))
-        .map((x) => {
-          const phrases = c.match(/\w+|\$(\w+)/g);
-          if (!phrases) {
-            return null;
-          }
-          const metric = {
-            field: phrases[1] ? phrases[1] : '',
-            aggregation: x,
-          } as BuilderMetricField;
+    return x.name;
+  });
+  if (fields.length > 1) {
+    //err
+  }
+  return { aggregation: s.expr.function.name as BuilderMetricFieldAggregation, field: fields[0], alias: s.alias?.name } as BuilderMetricField;
+}
 
-          // Alias does use 'as' like sum(field) total_Fields
-          if (phrases[2]) {
-            metric.alias = phrases[2];
-          }
-          // Alias does use 'as' like field as aliasField
-          if (phrases[3]) {
-            metric.alias = phrases[3];
-          }
-          isMetric = true;
-          return metric;
-        })
-        .filter((x) => x) as BuilderMetricField[]
-    );
+function getMetricsFromAst(selectClauses: SelectedColumn[]): { metrics: BuilderMetricField[]; fields: string[] } {
+  const metrics: BuilderMetricField[] = [];
+  const fields: string[] = [];
 
-    if (!isMetric) {
-      fields.push(c.trim());
+  for (let s of selectClauses) {
+    switch (s.expr.type) {
+      case 'ref':
+        fields.push(s.expr.name);
+        break;
+      case 'call':
+        metrics.push(selectCallFunc(s));
+        break;
+      default:
+        //error
+        break;
     }
   }
   return { metrics, fields };
