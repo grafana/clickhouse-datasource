@@ -1,6 +1,5 @@
-import sqlToAST, { Clause } from 'data/ast';
-import { astVisitor, Expr, FromTable, parse, parseFirst, LogicOperator, ExprRef, SelectedColumn, Statement } from 'pgsql-ast-parser';
-import { isNil, isString, mapKeys } from 'lodash';
+import { astVisitor, Expr, FromTable, parseFirst, ExprRef, SelectedColumn, Statement, astMapper } from 'pgsql-ast-parser';
+import { isString } from 'lodash';
 import {
   BuilderMetricField,
   BuilderMode,
@@ -17,8 +16,8 @@ import {
   DateFilterWithoutValue,
   BuilderMetricFieldAggregation,
   SqlBuilderOptionsAggregate,
+  SqlBuilderOptionsTrend,
 } from 'types';
-import Select from '@grafana/ui/components/Forms/Legacy/Select/Select';
 
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type?.toLowerCase());
@@ -259,20 +258,59 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   return query;
 };
 
-export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
-  //const ast = sqlToAST(sql);
+function createAST(sql: string): Statement {
+  const replaceFuncs = [] as {
+    startIndex: number,
+    name: string,
+    replacementName: string,
+  }[];
+  const re = /(\$__timeInterval|\$__timeFilter|\$__fromTime|\$__toTime)/gi
+  let regExpArray: RegExpExecArray | null;
+  while ((regExpArray = re.exec(sql)) !== null) {
+    replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' })
+  }
 
-  //let where: string;
-  //let limit: string;
+  //need to process in reverse so starting positions aren't effected by replacing other things
+  for (let i = replaceFuncs.length - 1; i >= 0; i--) {
+    const si = replaceFuncs[i].startIndex;
+    const replacementName = 'f' + (Math.random() + 1).toString(36).substring(7);
+    replaceFuncs[i].replacementName = replacementName;
+    sql = sql.substring(0, si) + replacementName + sql.substring(si + replaceFuncs[i].name.length);
+  }
 
   let ast: Statement;
   try {
     ast = parseFirst(sql);
   } catch (err) {
     //err invalid sql
-    return {} as SqlBuilderOptions;
+    return {} as Statement;
   }
 
+  const mapper = astMapper(map => ({
+    ref: r => {
+      const rf = replaceFuncs.find(x => x.replacementName === r.name);
+      if (rf) {
+        return { ...r, name: rf.name };
+      }
+      return map.super().ref(r);
+    },
+    call: c => {
+      const rf = replaceFuncs.find(x => x.replacementName === c.function.name);
+      if (rf) {
+        return { ...c, function: { ...c.function, name: rf.name } };
+      }
+      return map.super().call(c);
+    }
+  }));
+  return mapper.statement(ast)!;
+}
+
+export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
+  const ast = createAST(sql);
+  if (!ast) {
+    console.error("Issues with select parsing select statement");
+    return {} as SqlBuilderOptions;
+  }
   if (ast.type !== 'select') {
     console.error("Not a select statement");
     return {} as SqlBuilderOptions;
@@ -290,13 +328,23 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   const fieldsAndMetrics = getMetricsFromAst(ast.columns!);
 
   let builder = {
-    mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
+    mode: BuilderMode.List,
     database: fromTable.name.schema,
     table: fromTable.name.name,
   } as SqlBuilderOptions;
 
   if (fieldsAndMetrics.fields) {
     builder.fields = fieldsAndMetrics.fields;
+  }
+
+  if (fieldsAndMetrics.metrics.length > 0) {
+    builder.mode = BuilderMode.Aggregate;
+    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
+  }
+
+  if (fieldsAndMetrics.timeField) {
+    builder.mode = BuilderMode.Trend;
+    (builder as SqlBuilderOptionsTrend).timeField = fieldsAndMetrics.timeField;
   }
 
   if (ast.where) {
@@ -317,10 +365,6 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   }
 
   builder.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
-
-  if (fieldsAndMetrics.metrics.length > 0) {
-    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
-  }
 
   const groupBy = ast.groupBy
     ?.map((gb) => {
@@ -355,6 +399,7 @@ function getFiltersFromAst(expr: Expr): Filter[] {
             if (i === 0) filters.unshift({} as Filter);
             filters[i].operator = e.op as FilterOperator;
           }
+          map.super().expr(e);
           break;
         case 'ref':
           filters[i].key = e.name;
@@ -375,106 +420,21 @@ function getFiltersFromAst(expr: Expr): Filter[] {
           filters[i].operator = e.op as FilterOperator;
           break;
         case 'call':
-          const val = `${e.function.name}(${e.args.map<string>(x => (x as ExprRef).name).join(',')})`
+          const val = `${e.function.name}(${e.args.map<string>(x => (x as ExprRef).name).join(',')})`;
           filters[i] = { ...filters[i], value: val, type: 'datetime' } as Filter;
-          i++;
+          if (!val) i++;
           break;
         default:
           console.debug(e?.type + ' add this type');
           break;
       }
-      map.super().expr(e);
     },
   }))
-
-  // start traversing a statement
   visitor.expr(expr);
-
-  // first condition is always AND but is not used
-  //const filters: Filter[] = [{ condition: 'AND' } as Filter];
-  // for (const c of whereClauses) {
-  //   if (!isString(c)) {
-  //     continue;
-  //   }
-  //   if (c.trim().toUpperCase() === 'AND') {
-  //     filters.push({ condition: 'AND' } as Filter);
-  //     continue;
-  //   } else if (c.trim().toUpperCase() === 'OR') {
-  //     filters.push({ condition: 'OR' } as Filter);
-  //     continue;
-  //   }
-  //   const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map((x) => (x = x.substring(1, x.length - 1)));
-  //   const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
-  //   if (!phrases) {
-  //     continue;
-  //   }
-  //   const isNotClause = phrases[0] === 'NOT';
-  //   const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
-  //   filters[filters.length - 1] = {
-  //     ...filters[filters.length - 1],
-  //     filterType: 'custom',
-  //     key: isNotClause ? phrases[1] : phrases[0],
-  //     operator: opAndVal.f ? opAndVal.f : '',
-  //     value: opAndVal.v ? opAndVal.v : '',
-  //     type: getFilterType(c, stringPhrases),
-  //   } as Filter;
-  // }
   return filters;
 }
 
-function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator; v: any } {
-  if (isWithInTimeRangeFilter(phrases)) {
-    return {
-      f: phrases[0] === 'NOT' ? FilterOperator.OutsideGrafanaTimeRange : FilterOperator.WithInGrafanaTimeRange,
-      v: '',
-    };
-  }
-
-  let op = phrases[1];
-  if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
-    return {
-      f: op.toUpperCase() as FilterOperator,
-      v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(2, phrases.length),
-    };
-  }
-  for (let i = 2; i < phrases.length; i++) {
-    op += ` ${phrases[i]}`;
-    if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
-      return {
-        f: op.toUpperCase() as FilterOperator,
-        v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(i + 1, phrases.length),
-      };
-    }
-  }
-  return { f: '' as FilterOperator, v: null };
-}
-
-function getFilterType(whereClause: string, stringPhrases?: string[]): '' | 'datetime' | 'date' | 'string' {
-  if (stringPhrases && stringPhrases.length > 0) {
-    return 'string';
-  }
-  if (whereClause.includes('__time') || whereClause.includes('__from') || whereClause.includes('__to')) {
-    return 'datetime';
-  }
-  return '';
-}
-
-function isWithInTimeRangeFilter(phrases: string[]): boolean {
-  if (!phrases || phrases.length === 0) {
-    return false;
-  }
-  const has = { from: false, to: false };
-  for (const p of phrases) {
-    if (p.includes('__from')) {
-      has.from = true;
-    } else if (p.includes('__to')) {
-      has.to = true;
-    }
-  }
-  return has.from && has.to;
-}
-
-function selectCallFunc(s: SelectedColumn): BuilderMetricField {
+function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
   if (s.expr.type !== 'call') return {} as BuilderMetricField;
   let fields = s.expr.args.map(x => {
     if (x.type !== 'ref') {
@@ -486,12 +446,15 @@ function selectCallFunc(s: SelectedColumn): BuilderMetricField {
   if (fields.length > 1) {
     //err
   }
-  return { aggregation: s.expr.function.name as BuilderMetricFieldAggregation, field: fields[0], alias: s.alias?.name } as BuilderMetricField;
+  if (Object.values(BuilderMetricFieldAggregation).includes(s.expr.function.name.toLocaleLowerCase() as BuilderMetricFieldAggregation))
+    return { aggregation: s.expr.function.name as BuilderMetricFieldAggregation, field: fields[0], alias: s.alias?.name } as BuilderMetricField;
+  return fields[0];
 }
 
-function getMetricsFromAst(selectClauses: SelectedColumn[]): { metrics: BuilderMetricField[]; fields: string[] } {
+function getMetricsFromAst(selectClauses: SelectedColumn[]): { timeField: string, metrics: BuilderMetricField[]; fields: string[] } {
   const metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
+  let timeField = '';
 
   for (let s of selectClauses) {
     switch (s.expr.type) {
@@ -499,14 +462,20 @@ function getMetricsFromAst(selectClauses: SelectedColumn[]): { metrics: BuilderM
         fields.push(s.expr.name);
         break;
       case 'call':
-        metrics.push(selectCallFunc(s));
+        const f = selectCallFunc(s)
+        if (isString(f)) {
+          timeField = f;
+        }
+        else {
+          metrics.push(f);
+        }
         break;
       default:
         //error
         break;
     }
   }
-  return { metrics, fields };
+  return { timeField: timeField, metrics, fields };
 }
 
 export const operMap = new Map<string, FilterOperator>([

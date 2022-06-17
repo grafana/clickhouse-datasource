@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { RadioButtonGroup, ConfirmModal, InlineFormLabel, Modal } from '@grafana/ui';
+import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
 import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery, Format } from 'types';
@@ -58,6 +58,7 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   const onConfirmQueryTypeChange = () => {
     onQueryTypeChange(QueryType.Builder, true);
     setConfirmModalState(false);
+    setCannotConvertModalState(false);
   };
   return (
     <>
@@ -75,10 +76,13 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
         onConfirm={onConfirmQueryTypeChange}
         onDismiss={() => setConfirmModalState(false)}
       />
-      <Modal
+      <ConfirmModal
         title={cannotConvert.title}
+        body={cannotConvert.body}
         isOpen={cannotConvertModalState}
         icon="exclamation-triangle"
+        onConfirm={onConfirmQueryTypeChange}
+        confirmText={switcher.confirmText}
         onDismiss={() => setCannotConvertModalState(false)}
       />
     </>
