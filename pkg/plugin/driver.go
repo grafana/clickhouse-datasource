@@ -79,9 +79,6 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			Password: settings.Password,
 			Database: settings.DefaultDatabase,
 		},
-		Settings: clickhouse.Settings{
-			"max_execution_time": t,
-		},
 		Compression: &clickhouse.Compression{
 			Method: clickhouse.CompressionLZ4,
 		},
