@@ -3,6 +3,7 @@ package macros
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -75,7 +76,7 @@ func TimeInterval(query *sqlds.Query, args []string) (string, error) {
 		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
 	}
 
-	seconds := query.Interval.Seconds()
+	seconds := math.Max(query.Interval.Seconds(), 1)
 	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", args[0], int(seconds)), nil
 }
 
