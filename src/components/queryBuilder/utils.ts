@@ -325,7 +325,7 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   }
   const fromTable = ast.from[0] as FromTable;
 
-  const fieldsAndMetrics = getMetricsFromAst(ast.columns!);
+  const fieldsAndMetrics = getMetricsFromAst(ast.columns ? ast.columns : null);
 
   let builder = {
     mode: BuilderMode.List,
@@ -344,21 +344,22 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
 
   if (fieldsAndMetrics.timeField) {
     builder.mode = BuilderMode.Trend;
+    (builder as SqlBuilderOptionsTrend).timeFieldType = 'datetime';
     (builder as SqlBuilderOptionsTrend).timeField = fieldsAndMetrics.timeField;
   }
 
   if (ast.where) {
-    builder.filters = getFiltersFromAst(ast.where);
+    builder.filters = getFiltersFromAst(ast.where, fieldsAndMetrics.timeField);
   }
 
   const orderBy = ast.orderBy
     ?.map<OrderBy>((ob) => {
-      if (ob.by.type !== 'ref') {
+      if (ob.by.type !== 'ref' || ob.by.name === 'time') {
         return {} as OrderBy;
       }
       return { name: ob.by.name, dir: ob.order } as OrderBy;
     })
-    .filter((x) => x);
+    .filter((x) => x.name);
 
   if (orderBy && orderBy.length > 0) {
     (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
@@ -368,7 +369,7 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
 
   const groupBy = ast.groupBy
     ?.map((gb) => {
-      if (gb.type !== 'ref') {
+      if (gb.type !== 'ref' || gb.name === 'time') {
         return '';
       }
       return gb.name;
@@ -380,14 +381,11 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   return builder;
 }
 
-function getFiltersFromAst(expr: Expr): Filter[] {
-  //SELECT a, j, q FROM t WHERE   ( f != 'a' ) AND ( g = 'a' ) AND ( h = 'a' ) AND ( i = 'a' ) AND ( Id IS NOT NULL ) ORDER BY j ASC LIMIT 100
-
+function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
   const filters: Filter[] = [];
   let i = 0;
   const visitor = astVisitor(map => ({
     expr: e => {
-      console.log(e);
       switch (e?.type) {
         case 'binary':
           if (e.op === 'AND' || e.op === 'OR') {
@@ -416,11 +414,17 @@ function getFiltersFromAst(expr: Expr): Filter[] {
           i++;
           break;
         case 'unary':
-          if (i === 0) filters.unshift({} as Filter);
+          if (filters.length === 0) filters.unshift({} as Filter);
           filters[i].operator = e.op as FilterOperator;
+          map.super().expr(e);
           break;
         case 'call':
           const val = `${e.function.name}(${e.args.map<string>(x => (x as ExprRef).name).join(',')})`;
+          //make sure this isn't the timeFilter that is used when using time series.
+          if (val === `$__timeFilter(${timeField})`) {
+            filters.splice(i, 1);
+            break;
+          }
           filters[i] = { ...filters[i], value: val, type: 'datetime' } as Filter;
           if (!val) i++;
           break;
@@ -451,10 +455,11 @@ function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
   return fields[0];
 }
 
-function getMetricsFromAst(selectClauses: SelectedColumn[]): { timeField: string, metrics: BuilderMetricField[]; fields: string[] } {
+function getMetricsFromAst(selectClauses: SelectedColumn[] | null): { timeField: string, metrics: BuilderMetricField[]; fields: string[] } {
   const metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
   let timeField = '';
+  if (!selectClauses) return { timeField, metrics, fields };
 
   for (let s of selectClauses) {
     switch (s.expr.type) {
@@ -462,7 +467,7 @@ function getMetricsFromAst(selectClauses: SelectedColumn[]): { timeField: string
         fields.push(s.expr.name);
         break;
       case 'call':
-        const f = selectCallFunc(s)
+        const f = selectCallFunc(s);
         if (isString(f)) {
           timeField = f;
         }
@@ -475,7 +480,7 @@ function getMetricsFromAst(selectClauses: SelectedColumn[]): { timeField: string
         break;
     }
   }
-  return { timeField: timeField, metrics, fields };
+  return { timeField, metrics, fields };
 }
 
 export const operMap = new Map<string, FilterOperator>([
