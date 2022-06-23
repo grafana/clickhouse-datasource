@@ -7,10 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strconv"
-	"time"
-
-	"github.com/ClickHouse/clickhouse-go"
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -19,6 +16,8 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v2"
 	"github.com/pkg/errors"
+	"strconv"
+	"time"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
@@ -56,54 +55,37 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if err != nil {
 		return nil, err
 	}
-	connStr := fmt.Sprintf("tcp://%s:%d", settings.Server, settings.Port)
-	sep := "?"
-	if settings.Username != "" {
-		connStr = fmt.Sprintf("%s%susername=%s", connStr, sep, settings.Username)
-		sep = "&"
-	}
-	if settings.Password != "" {
-		connStr = fmt.Sprintf("%s%spassword=%s", connStr, sep, settings.Password)
-		sep = "&"
-	}
-	if settings.DefaultDatabase != "" {
-		connStr = fmt.Sprintf("%s%sdatabase=%s", connStr, sep, settings.DefaultDatabase)
-		sep = "&"
-	}
-	if settings.InsecureSkipVerify {
-		connStr = fmt.Sprintf("%s%sskip_verify=%s", connStr, sep, "true")
-		sep = "&"
-	}
-	if settings.Secure {
-		connStr = fmt.Sprintf("%s%ssecure=%s", connStr, sep, "true")
-		sep = "&"
-	}
-	if settings.Timeout != "" {
-		connStr = fmt.Sprintf("%s%sread_timeout=%s", connStr, sep, settings.Timeout)
-		sep = "&"
-	}
-
+	var tlsConfig *tls.Config
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
-		tlsConfig, err := getTLSConfig(settings)
+		tlsConfig, err = getTLSConfig(settings)
 		if err != nil {
 			return nil, err
 		}
-		err = clickhouse.RegisterTLSConfig(config.UID, tlsConfig)
-		if err != nil {
-			return nil, err
+	} else if settings.Secure {
+		tlsConfig = &tls.Config{
+			InsecureSkipVerify: settings.InsecureSkipVerify,
 		}
-		connStr = fmt.Sprintf("%s%stls_config=%s", connStr, sep, config.UID)
 	}
-
-	db, err := sql.Open("clickhouse", connStr)
-	if err != nil {
-		return nil, err
-	}
-
 	t, err := strconv.Atoi(settings.Timeout)
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
+
+	db := clickhouse.OpenDB(&clickhouse.Options{
+		TLS:  tlsConfig,
+		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
+		Auth: clickhouse.Auth{
+			Username: settings.Username,
+			Password: settings.Password,
+			Database: settings.DefaultDatabase,
+		},
+		Compression: &clickhouse.Compression{
+			Method: clickhouse.CompressionLZ4,
+		},
+		DialTimeout: time.Duration(t) * time.Second,
+		// next driver will support
+		//		ReadTimeout: time.Duration(t) * time.Second,
+	})
 
 	timeout := time.Duration(t)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)

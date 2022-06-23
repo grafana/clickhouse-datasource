@@ -237,7 +237,3 @@ export const defaultCHSQLQuery: Omit<CHSQLQuery, 'refId'> = {
   expand: false,
 };
 //#endregion
-
-export enum EditorOption {
-  lineHeight = 59,
-}

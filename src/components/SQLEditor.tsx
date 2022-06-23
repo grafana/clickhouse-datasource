@@ -3,7 +3,7 @@ import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor } from '@grafana/ui';
 import { Datasource } from '../data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
-import { CHQuery, CHConfig, QueryType, CHSQLQuery, EditorOption } from '../types';
+import { CHQuery, CHConfig, QueryType, CHSQLQuery } from '../types';
 import { styles } from '../styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
 import { selectors } from 'selectors';
@@ -134,7 +134,6 @@ const getEditorHeight = (editor: any): number | undefined => {
     return;
   }
 
-  const lineHeight = editor.getOption(EditorOption.lineHeight);
   const lineCount = editor.getModel()?.getLineCount() || 1;
-  return editor.getTopForLineNumber(lineCount + 1) + lineHeight + 40;
+  return editor.getTopForLineNumber(lineCount + 1) + 40;
 };
