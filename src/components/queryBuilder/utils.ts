@@ -442,13 +442,12 @@ function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
   if (s.expr.type !== 'call') return {} as BuilderMetricField;
   let fields = s.expr.args.map(x => {
     if (x.type !== 'ref') {
-      //err
       return '';
     }
     return x.name;
   });
   if (fields.length > 1) {
-    //err
+    return '';
   }
   if (Object.values(BuilderMetricFieldAggregation).includes(s.expr.function.name.toLocaleLowerCase() as BuilderMetricFieldAggregation))
     return { aggregation: s.expr.function.name as BuilderMetricFieldAggregation, field: fields[0], alias: s.alias?.name } as BuilderMetricField;
@@ -456,10 +455,10 @@ function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
 }
 
 function getMetricsFromAst(selectClauses: SelectedColumn[] | null): { timeField: string, metrics: BuilderMetricField[]; fields: string[] } {
+  if (!selectClauses) return { timeField: '', metrics: [], fields: [] };
   const metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
   let timeField = '';
-  if (!selectClauses) return { timeField, metrics, fields };
 
   for (let s of selectClauses) {
     switch (s.expr.type) {
@@ -468,6 +467,7 @@ function getMetricsFromAst(selectClauses: SelectedColumn[] | null): { timeField:
         break;
       case 'call':
         const f = selectCallFunc(s);
+        if (!f) return { timeField: '', metrics: [], fields: [] };
         if (isString(f)) {
           timeField = f;
         }
@@ -476,8 +476,7 @@ function getMetricsFromAst(selectClauses: SelectedColumn[] | null): { timeField:
         }
         break;
       default:
-        //error
-        break;
+        return { timeField: '', metrics: [], fields: [] };
     }
   }
   return { timeField, metrics, fields };
