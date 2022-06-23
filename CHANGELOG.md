@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.0
+
+Bug - visual query builder can use any date type for time field
+Fix - 'any' is now an aggregation type in the visual query builder
+Fix - time filter macros can be used in the adhoc query
+Bug - time interval macro cannot have an interval of 0
+Fix - update drive to v2.1.0
+Bug - expand query button works with grafana 8.0+
+Fix - added column macro
+
 ## 1.1.2
 
 Bug - add timerange to metricFindQuery
