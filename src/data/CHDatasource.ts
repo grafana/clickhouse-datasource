@@ -8,7 +8,7 @@ import {
   ScopedVars,
   vectorator,
 } from '@grafana/data';
-import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { DataSourceWithBackend, getTemplateSrv, locationService } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
@@ -56,6 +56,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     const templateSrv = getTemplateSrv();
     if (!this.skipAdHocFilter) {
       const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
+      scoped = this.addColumnTemplateVariable(scoped, adHocFilters);
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
@@ -64,6 +65,13 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
     };
+  }
+
+  private addColumnTemplateVariable(scoped: ScopedVars, adHocFilters: any): ScopedVars {
+    if (!adHocFilters || !scoped) return scoped;
+    const col = adHocFilters.length > 0 ? adHocFilters[0].key : '';
+    scoped['__column'] = { text: col, value: col };
+    return scoped;
   }
 
   private replace(value?: string, scopedVars?: ScopedVars) {
