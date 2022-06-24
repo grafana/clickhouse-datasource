@@ -8,7 +8,7 @@ Fix - time filter macros can be used in the adhoc query
 Bug - time interval macro cannot have an interval of 0
 Fix - update drive to v2.1.0
 Bug - expand query button works with grafana 8.0+
-Fix - added column macro
+Fix - added adhoc columns macro
 
 ## 1.1.2
 

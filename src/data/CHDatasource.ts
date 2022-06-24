@@ -8,7 +8,7 @@ import {
   ScopedVars,
   vectorator,
 } from '@grafana/data';
-import { DataSourceWithBackend, getTemplateSrv, locationService } from '@grafana/runtime';
+import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
@@ -67,11 +67,16 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     };
   }
 
-  private addColumnTemplateVariable(scoped: ScopedVars, adHocFilters: any): ScopedVars {
-    if (!adHocFilters || !scoped) return scoped;
-    const col = adHocFilters.length > 0 ? adHocFilters[0].key : '';
-    scoped['__column'] = { text: col, value: col };
-    return scoped;
+  private addColumnTemplateVariable(scoped: ScopedVars, adHocFilters: Array<{ key: string }>): ScopedVars {
+    if (!adHocFilters || !scoped) {
+      return scoped;
+    }
+    const distinctColumns = adHocFilters.filter((value, i, arr) => arr.findIndex((x) => x.key === value.key) === i);
+    let col = distinctColumns.map((x) => x.key).join(', ');
+    if (!col) {
+      col = `'no adhoc filters set'`;
+    }
+    return { ...scoped, __adhocColumns: { text: col, value: col } };
   }
 
   private replace(value?: string, scopedVars?: ScopedVars) {

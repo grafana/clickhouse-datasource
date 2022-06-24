@@ -121,7 +121,7 @@ WHERE $__timeFilter(date_time)
 | *$__toTime*                    | Replaced by the ending time of the range of the panel casted to DateTime                                                         | `toDateTime(intDiv(1415792726371,1000))`                |
 | *$__interval_s*                | Replaced by the interval in seconds                                                                                              | `20`                                                    |
 | *$__timeInterval(columnName)*  | Replaced by a function calculating the interval based on window size, useful when grouping                                       | `toStartOfInterval(column, INTERVAL 20 second)`         |
-| *$__column*                    | Replaced by the column name selected by the adhoc filter                                                                         | `column_name`                                           |
+| *$__adhocColumns*              | Replaced by the column names selected by the adhoc filter                                                                        | `column_name1, column_name2`                            |
 
 The plugin also supports notation using braces {}. Use this notation when queries are needed inside parameters.
 
