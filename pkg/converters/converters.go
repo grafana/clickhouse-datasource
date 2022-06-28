@@ -49,7 +49,7 @@ func NumericTypes() []string {
 func NullableNumeric() []sqlutil.Converter {
 	var list []sqlutil.Converter
 	for _, kind := range NUMERIC_TYPES {
-		list = append(list, NullableFloat(kind))
+		list = append(list, NewNullableConverter(kind))
 	}
 	return list
 }
@@ -68,8 +68,8 @@ var defaultNumericConverter = NumericConverter{
 }
 
 var numericConversions = map[string]NumericConverter{
-	"UInt64": {
-		scanType: reflect.PtrTo(reflect.TypeOf(uint64(0))),
+	"Nullable(UInt64)": {
+		scanType: reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint64(0)))),
 		convertFunc: func(in interface{}) (interface{}, error) {
 			if in == nil {
 				return (*uint64)(nil), nil
@@ -85,7 +85,8 @@ var numericConversions = map[string]NumericConverter{
 	},
 }
 
-func NullableFloat(kind string) sqlutil.Converter {
+func NewNullableConverter(kind string) sqlutil.Converter {
+	inputType := fmt.Sprintf("Nullable(%s)", kind)
 	converter, ok := numericConversions[kind]
 	if !ok {
 		converter = defaultNumericConverter
@@ -93,7 +94,7 @@ func NullableFloat(kind string) sqlutil.Converter {
 	return sqlutil.Converter{
 		Name:          kind,
 		InputScanType: converter.scanType,
-		InputTypeName: fmt.Sprintf("Nullable(%s)", kind),
+		InputTypeName: inputType,
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType:     converter.fieldType,
 			ConverterFunc: converter.convertFunc,
