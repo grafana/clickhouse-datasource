@@ -3,6 +3,7 @@ package converters
 import (
 	"database/sql"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math"
 	"reflect"
@@ -30,6 +31,9 @@ func ClickHouseConverters() []sqlutil.Converter {
 	list = append(list, NullableDecimal())
 	list = append(list, NullableString())
 	list = append(list, ArrayConverters()...)
+	list = append(list, TupleConverter())
+	list = append(list, NestedConverter())
+	list = append(list, MapConverter())
 	return list
 }
 
@@ -50,16 +54,49 @@ func NullableNumeric() []sqlutil.Converter {
 	return list
 }
 
+type NumericConverter struct {
+	scanType    reflect.Type
+	convertFunc func(in interface{}) (interface{}, error)
+	fieldType   data.FieldType
+}
+
+var defaultNumericConverter = NumericConverter{
+	scanType: reflect.TypeOf(sql.NullFloat64{}),
+	convertFunc: func(in interface{}) (interface{}, error) {
+		return sqlFloat64ToFloat64(in)
+	},
+}
+
+var numericConversions = map[string]NumericConverter{
+	"UInt64": {
+		scanType: reflect.PtrTo(reflect.TypeOf(uint64(0))),
+		convertFunc: func(in interface{}) (interface{}, error) {
+			if in == nil {
+				return (*uint64)(nil), nil
+			}
+			v, ok := in.(*uint64)
+			if !ok {
+				return (*uint64)(nil), nil
+			}
+			f := v
+			return &f, nil
+		},
+		fieldType: data.FieldTypeNullableUint64,
+	},
+}
+
 func NullableFloat(kind string) sqlutil.Converter {
+	converter, ok := numericConversions[kind]
+	if !ok {
+		converter = defaultNumericConverter
+	}
 	return sqlutil.Converter{
 		Name:          kind,
-		InputScanType: reflect.TypeOf(sql.NullFloat64{}),
+		InputScanType: converter.scanType,
 		InputTypeName: fmt.Sprintf("Nullable(%s)", kind),
 		FrameConverter: sqlutil.FrameConverter{
-			FieldType: data.FieldTypeFloat64.NullableType(),
-			ConverterFunc: func(in interface{}) (interface{}, error) {
-				return sqlFloat64ToFloat64(in)
-			},
+			FieldType:     converter.fieldType,
+			ConverterFunc: converter.convertFunc,
 		},
 	}
 }
@@ -159,12 +196,24 @@ func NullableString() sqlutil.Converter {
 }
 
 // Array converters
+var nestedArrayMatch, _ = regexp.Compile(`^Array\(.*\)`)
 
 func ArrayConverters() []sqlutil.Converter {
 	var list []sqlutil.Converter
 	for _, c := range arrayTypes {
 		list = append(list, ArrayToCommaDelimitedString(c.name, c.kind))
 	}
+	// complex array converter - e.g. Array(Tuple), Array(Nested), Array(Map) etc.
+	var scanType interface{}
+	list = append(list, sqlutil.Converter{
+		Name:           "Array()",
+		InputScanType:  reflect.TypeOf(scanType),
+		InputTypeRegex: nestedArrayMatch,
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType:     data.FieldTypeNullableString,
+			ConverterFunc: jsonConverter,
+		},
+	})
 	return list
 }
 
@@ -205,4 +254,76 @@ var arrayTypes = []ArrayType{
 	{"UInt64", []uint64{}},
 	{"Float32", []float32{}},
 	{"Float64", []float64{}},
+}
+
+// Tuple Converter
+var tupleMatch, _ = regexp.Compile(`^Tuple\(.*\)`)
+
+// MarshalJSON marshals the enum as a quoted json string
+func marshalJSON(in interface{}) (string, error) {
+	jBytes, err := json.Marshal(in)
+	if err != nil {
+		return "", err
+	}
+	return string(jBytes), nil
+}
+func jsonConverter(in interface{}) (interface{}, error) {
+	if in == nil {
+		return (*string)(nil), nil
+	}
+	json, err := marshalJSON(in)
+	if err != nil {
+		return nil, err
+	}
+	return &json, nil
+}
+
+func TupleConverter() sqlutil.Converter {
+	kind := "Tuple()"
+	var scanType interface{}
+	return sqlutil.Converter{
+		Name:           kind,
+		InputTypeName:  kind,
+		InputTypeRegex: tupleMatch,
+		InputScanType:  reflect.TypeOf(scanType),
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType:     data.FieldTypeNullableString,
+			ConverterFunc: jsonConverter,
+		},
+	}
+}
+
+var nestedMatch, _ = regexp.Compile(`^Nested\(.*\)`)
+
+// NestedConverter currently only supports flatten_nested=0 only which can be marshalled into []map[string]interface{}
+func NestedConverter() sqlutil.Converter {
+	kind := "Nested()"
+	return sqlutil.Converter{
+		Name:           kind,
+		InputTypeName:  kind,
+		InputTypeRegex: nestedMatch,
+		InputScanType:  reflect.TypeOf([]map[string]interface{}{}),
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType:     data.FieldTypeNullableString,
+			ConverterFunc: jsonConverter,
+		},
+	}
+}
+
+// Map Converter
+var mapMatch, _ = regexp.Compile(`^Map\(.*\)`)
+
+func MapConverter() sqlutil.Converter {
+	kind := "Map()"
+	var scanType interface{}
+	return sqlutil.Converter{
+		Name:           kind,
+		InputTypeName:  kind,
+		InputTypeRegex: mapMatch,
+		InputScanType:  reflect.TypeOf(scanType),
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType:     data.FieldTypeNullableString,
+			ConverterFunc: jsonConverter,
+		},
+	}
 }
