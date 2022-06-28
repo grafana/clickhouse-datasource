@@ -16,20 +16,20 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 )
 
-var INT_TYPES = []string{"Int8", "Int16", "Int32", "Int64"}
-var UINT_TYPES = []string{"UInt8", "UInt16", "UInt32", "UInt64", "UInt128", "UInt256"}
-var INT_ALIAS = []string{"TINYINT", "BOOL", "BOOLEAN", "INT1", "SMALLINT", "INT2", "INT", "INT4", "INTEGER", "BIGINT"}
-var FLOAT_TYPES = []string{"Float32", "Float64"}
-var NUMERIC_TYPES = NumericTypes()
-var WILDCARD_TYPES = []string{"Date", "Decimal"}
-var STRING_TYPES = []string{"String"}
-var CLICKHOUSE_CONVERTERS = ClickHouseConverters()
+var IntTypes = []string{"Int8", "Int16", "Int32", "Int64", "Bool"}
+var UintTypes = []string{"UInt8", "UInt16", "UInt32", "UInt64", "UInt128", "UInt256"}
+var FloatTypes = []string{"Float32", "Float64"}
+var NumericTypes = AllNumericTypes()
+var WildcardTypes = []string{"Date", "Decimal"}
+var StringTypes = []string{"String"}
+var ComplexTypes = []string{"Tuple", "Nested", "Map", "Array"}
+var ClickhouseConverters = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {
-	var list = NullableNumeric()
-	list = append(list, NullableDate())
-	list = append(list, NullableDecimal())
-	list = append(list, NullableString())
+	var list = NumericConverters()
+	list = append(list, NullableDateConverter())
+	list = append(list, NullableDecimalConverter())
+	list = append(list, NullableStringConverter())
 	list = append(list, ArrayConverters()...)
 	list = append(list, TupleConverter())
 	list = append(list, NestedConverter())
@@ -37,69 +37,176 @@ func ClickHouseConverters() []sqlutil.Converter {
 	return list
 }
 
-func NumericTypes() []string {
+func AllNumericTypes() []string {
 	var types []string
-	types = append(types, INT_TYPES...)
-	types = append(types, UINT_TYPES...)
-	types = append(types, INT_ALIAS...)
-	types = append(types, FLOAT_TYPES...)
+	types = append(types, IntTypes...)
+	types = append(types, UintTypes...)
+	types = append(types, FloatTypes...)
 	return types
 }
 
-func NullableNumeric() []sqlutil.Converter {
+func NumericConverters() []sqlutil.Converter {
 	var list []sqlutil.Converter
-	for _, kind := range NUMERIC_TYPES {
-		list = append(list, NewNullableConverter(kind))
+	for _, kind := range NumericTypes {
+		list = append(list, NumericConverter(kind))
+		list = append(list, NullableNumericConverter(kind))
 	}
 	return list
 }
 
-type NumericConverter struct {
+type Converter struct {
 	scanType    reflect.Type
 	convertFunc func(in interface{}) (interface{}, error)
 	fieldType   data.FieldType
 }
 
-var defaultNumericConverter = NumericConverter{
+var defaultNumericConverter = Converter{
 	scanType: reflect.TypeOf(sql.NullFloat64{}),
 	convertFunc: func(in interface{}) (interface{}, error) {
 		return sqlFloat64ToFloat64(in)
 	},
+	fieldType: data.FieldTypeNullableFloat64,
 }
 
-var numericConversions = map[string]NumericConverter{
+func convert(in interface{}) (interface{}, error) {
+	if in == nil {
+		return reflect.Zero(reflect.TypeOf(in)).Interface(), nil
+	}
+	return reflect.ValueOf(in).Elem().Interface(), nil
+}
+
+var conversions = map[string]Converter{
+	"Bool": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(true)),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeBool,
+	},
+	"Nullable(Bool)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(true))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableBool,
+	},
+	"Float64": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(float64(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeFloat64,
+	},
+	"Float32": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(float32(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeFloat32,
+	},
+	"Nullable(Float32)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(float32(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableFloat32,
+	},
+	"Nullable(Float64)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(float64(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableFloat64,
+	},
+	"Int64": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(int64(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeInt64,
+	},
+	"Int32": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(int32(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeInt32,
+	},
+	"Int16": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(int16(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeInt16,
+	},
+	"Int8": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(int8(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeInt8,
+	},
+	"UInt64": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(uint64(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeUint64,
+	},
+	"UInt32": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(uint32(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeUint32,
+	},
+	"UInt16": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(uint16(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeUint16,
+	},
+	"UInt8": {
+		scanType:    reflect.PtrTo(reflect.TypeOf(uint8(0))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeUint8,
+	},
 	"Nullable(UInt64)": {
-		scanType: reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint64(0)))),
-		convertFunc: func(in interface{}) (interface{}, error) {
-			if in == nil {
-				return (*uint64)(nil), nil
-			}
-			v, ok := in.(*uint64)
-			if !ok {
-				return (*uint64)(nil), nil
-			}
-			f := v
-			return &f, nil
-		},
-		fieldType: data.FieldTypeNullableUint64,
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint64(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableUint64,
+	},
+	"Nullable(UInt32)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint32(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableUint32,
+	},
+	"Nullable(UInt16)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint16(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableUint16,
+	},
+	"Nullable(UInt8)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint8(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableUint8,
+	},
+	"Nullable(Int64)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int64(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableInt64,
+	},
+	"Nullable(Int32)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int32(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableInt32,
+	},
+	"Nullable(Int16)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int16(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableInt16,
+	},
+	"Nullable(Int8)": {
+		scanType:    reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int8(0)))),
+		convertFunc: convert,
+		fieldType:   data.FieldTypeNullableInt8,
 	},
 }
 
-func NewNullableConverter(kind string) sqlutil.Converter {
-	inputType := fmt.Sprintf("Nullable(%s)", kind)
-	converter, ok := numericConversions[kind]
+func NumericConverter(kind string) sqlutil.Converter {
+	converter, ok := conversions[kind]
 	if !ok {
 		converter = defaultNumericConverter
 	}
 	return sqlutil.Converter{
 		Name:          kind,
 		InputScanType: converter.scanType,
-		InputTypeName: inputType,
+		InputTypeName: kind,
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType:     converter.fieldType,
 			ConverterFunc: converter.convertFunc,
 		},
 	}
+
+}
+
+func NullableNumericConverter(kind string) sqlutil.Converter {
+	return NumericConverter(fmt.Sprintf("Nullable(%s)", kind))
 }
 
 func sqlFloat64ToFloat64(in interface{}) (interface{}, error) {
@@ -116,7 +223,7 @@ func sqlFloat64ToFloat64(in interface{}) (interface{}, error) {
 
 var dateTimeMatch, _ = regexp.Compile(`^Nullable\(Date`)
 
-func NullableDate() sqlutil.Converter {
+func NullableDateConverter() sqlutil.Converter {
 	kind := "Nullable(DateTime)"
 	return sqlutil.Converter{
 		Name:           kind,
@@ -142,7 +249,7 @@ func NullableDate() sqlutil.Converter {
 
 var decimalMatch, _ = regexp.Compile(`^Nullable\(Decimal|^Decimal`)
 
-func NullableDecimal() sqlutil.Converter {
+func NullableDecimalConverter() sqlutil.Converter {
 	kind := "Nullable(Decimal)"
 	return sqlutil.Converter{
 		Name:           kind,
@@ -173,7 +280,7 @@ func NullableDecimal() sqlutil.Converter {
 
 var stringMatch, _ = regexp.Compile(`Nullable\(String`)
 
-func NullableString() sqlutil.Converter {
+func NullableStringConverter() sqlutil.Converter {
 	kind := "Nullable(String)"
 	return sqlutil.Converter{
 		Name:           kind,
@@ -208,6 +315,7 @@ func ArrayConverters() []sqlutil.Converter {
 	var scanType interface{}
 	list = append(list, sqlutil.Converter{
 		Name:           "Array()",
+		InputTypeName:  "Array()",
 		InputScanType:  reflect.TypeOf(scanType),
 		InputTypeRegex: nestedArrayMatch,
 		FrameConverter: sqlutil.FrameConverter{
@@ -243,6 +351,7 @@ type ArrayType struct {
 	kind interface{}
 }
 
+//TODO: arrays of any type of numeric
 var arrayTypes = []ArrayType{
 	{"String", []string{}},
 	{"Int8", []int8{}},
@@ -268,6 +377,7 @@ func marshalJSON(in interface{}) (string, error) {
 	}
 	return string(jBytes), nil
 }
+
 func jsonConverter(in interface{}) (interface{}, error) {
 	if in == nil {
 		return (*string)(nil), nil
@@ -281,12 +391,11 @@ func jsonConverter(in interface{}) (interface{}, error) {
 
 func TupleConverter() sqlutil.Converter {
 	kind := "Tuple()"
-	var scanType interface{}
 	return sqlutil.Converter{
 		Name:           kind,
 		InputTypeName:  kind,
 		InputTypeRegex: tupleMatch,
-		InputScanType:  reflect.TypeOf(scanType),
+		InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType:     data.FieldTypeNullableString,
 			ConverterFunc: jsonConverter,
@@ -316,12 +425,11 @@ var mapMatch, _ = regexp.Compile(`^Map\(.*\)`)
 
 func MapConverter() sqlutil.Converter {
 	kind := "Map()"
-	var scanType interface{}
 	return sqlutil.Converter{
 		Name:           kind,
 		InputTypeName:  kind,
 		InputTypeRegex: mapMatch,
-		InputScanType:  reflect.TypeOf(scanType),
+		InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType:     data.FieldTypeNullableString,
 			ConverterFunc: jsonConverter,

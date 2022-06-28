@@ -120,7 +120,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 
 // Converters defines list of data type converters
 func (h *Clickhouse) Converters() []sqlutil.Converter {
-	return converters.CLICKHOUSE_CONVERTERS
+	return converters.ClickhouseConverters
 }
 
 // Macros returns list of macro functions convert the macros of raw query
