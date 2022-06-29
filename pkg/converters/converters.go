@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"reflect"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -208,7 +207,6 @@ var Types = map[string]Converter{
 		matchRegex: nestedMatch,
 		convert:    jsonConverter,
 	},
-	//complex arrays - simple arrays are added first and matched first
 	"Array()": {
 		fieldType:  data.FieldTypeNullableString,
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
@@ -228,35 +226,11 @@ type ArrayType struct {
 	kind interface{}
 }
 
-var arrayTypes = []ArrayType{
-	{"String", []string{}},
-	{"Int8", []int8{}},
-	{"Int16", []int16{}},
-	{"Int32", []int32{}},
-	{"Int64", []int64{}},
-	{"UInt8", []uint8{}},
-	{"UInt16", []uint16{}},
-	{"UInt32", []uint32{}},
-	{"UInt64", []uint64{}},
-	{"Float32", []float32{}},
-	{"Float64", []float64{}},
-}
-
-// test unnamed tuples, lists of nullable e.g. Array(Nullable(Int64))
-
 var ComplexTypes = []string{"Map"}
 var ClickhouseConverters = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {
 	var list []sqlutil.Converter
-	for _, array := range arrayTypes {
-		list = append(list, CreateConverter(fmt.Sprintf("Array(%s)", array.name), Converter{
-			scanType:  reflect.TypeOf(array.kind),
-			fieldType: data.FieldTypeNullableString,
-			convert:   arrayConverter,
-		}))
-	}
-
 	for name, converter := range Types {
 		list = append(list, CreateConverter(name, converter))
 	}
@@ -287,15 +261,6 @@ func marshalJSON(in interface{}) (string, error) {
 		return "", err
 	}
 	return string(jBytes), nil
-}
-
-func arrayConverter(in interface{}) (interface{}, error) {
-	if in == nil {
-		return (*string)(nil), nil
-	}
-	val := strings.Replace(fmt.Sprint(in), "&", "", 1)
-	val = strings.Trim(strings.Join(strings.Fields(val), ","), "[]")
-	return &val, nil
 }
 
 func jsonConverter(in interface{}) (interface{}, error) {
