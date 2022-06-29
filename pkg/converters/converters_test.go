@@ -3,31 +3,12 @@ package converters_test
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/stretchr/testify/assert"
 )
-
-func TestConverters(t *testing.T) {
-	conv := converters.ClickHouseConverters()
-	types := converters.AllNumericTypes()
-	types = append(types, converters.WildcardTypes...)
-	types = append(types, converters.StringTypes...)
-	types = append(types, converters.ComplexTypes...)
-	for _, c := range conv {
-		contains := false
-		for _, v := range types {
-			if strings.Contains(c.InputTypeName, v) {
-				contains = true
-				break
-			}
-		}
-		assert.True(t, contains)
-	}
-}
 
 func TestNullableDate(t *testing.T) {
 	layout := "2006-01-02T15:04:05.000Z"
@@ -92,7 +73,7 @@ func floatToRawBytes(val float64) sql.RawBytes {
 func TestNullableUInt8(t *testing.T) {
 	value := uint8(100)
 	val := &value
-	sut := converters.NullableNumericConverter("UInt8")
+	sut := converters.CreateConverter("UInt8", converters.Types["UInt8"])
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint8)
@@ -102,7 +83,7 @@ func TestNullableUInt8(t *testing.T) {
 func TestNullableUInt16(t *testing.T) {
 	value := uint16(100)
 	val := &value
-	sut := converters.NullableNumericConverter("UInt16")
+	sut := converters.CreateConverter("UInt8", converters.Types["UInt16"])
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint16)
@@ -112,7 +93,7 @@ func TestNullableUInt16(t *testing.T) {
 func TestNullableUInt32(t *testing.T) {
 	value := uint32(100)
 	val := &value
-	sut := converters.NullableNumericConverter("UInt32")
+	sut := converters.CreateConverter("UInt8", converters.Types["UInt32"])
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint32)
@@ -122,7 +103,7 @@ func TestNullableUInt32(t *testing.T) {
 func TestNullableUInt64(t *testing.T) {
 	value := uint64(100)
 	val := &value
-	sut := converters.NullableNumericConverter("UInt64")
+	sut := converters.CreateConverter("UInt8", converters.Types["UInt64"])
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint64)

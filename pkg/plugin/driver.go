@@ -86,8 +86,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		Settings: clickhouse.Settings{
 			"allow_experimental_object_type": 1,
 		},
-		// next driver will support
-		//		ReadTimeout: time.Duration(t) * time.Second,
+		ReadTimeout: time.Duration(t) * time.Second,
 	})
 
 	timeout := time.Duration(t)
