@@ -36,6 +36,8 @@ var complexArrayMatch, _ = regexp.Compile(`^Array\(.*\)`)
 
 var mapMatch, _ = regexp.Compile(`^Map\(.*\)`)
 
+var fixedStringMatch, _ = regexp.Compile(`^Nullable\(FixedString\(.*\)\)`)
+
 var Types = map[string]Converter{
 	"Bool": {
 		scanType:  reflect.PtrTo(reflect.TypeOf(true)),
@@ -166,7 +168,7 @@ var Types = map[string]Converter{
 		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(big.NewInt(0)))),
 		convert:   bigIntNullableConvert,
 	},
-	// covers DateTime with tz, DateTime64 - see regexes
+	// covers DateTime with tz, DateTime64 - see regexes, Date32
 	"Date": {
 		fieldType:  data.FieldTypeTime,
 		scanType:   reflect.PtrTo(reflect.TypeOf(time.Time{})),
@@ -218,6 +220,11 @@ var Types = map[string]Converter{
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 		matchRegex: mapMatch,
 		convert:    jsonConverter,
+	},
+	"FixedString": {
+		fieldType:  data.FieldTypeNullableString,
+		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(""))),
+		matchRegex: fixedStringMatch,
 	},
 }
 
