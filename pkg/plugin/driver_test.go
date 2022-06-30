@@ -526,7 +526,7 @@ func TestNested(t *testing.T) {
 }
 
 func TestArrayTuple(t *testing.T) {
-	conn, close := setupTest(t, "col1 Nested(s String, i Int32)")
+	conn, close := setupTest(t, "col1 Array(Tuple(s String, i Int32))")
 	defer close(t)
 	val := []map[string]interface{}{{"s": "43", "i": int32(43)}}
 	insertData(t, conn, val)
@@ -566,30 +566,77 @@ func TestArrayNullableUInt256(t *testing.T) {
 	checkRows(t, conn, 1, val)
 }
 
-//                        col49 Map(String, UInt8),
-//                        col50 Tuple(String, Int32),
-//                        col51 FixedString(2),
-//                        col52 Nullable(FixedString(2)),
-//                        col53 LowCardinality(String),
-//                        col54 Date32,
-//                        col55 Enum('55' = 55),
-//                        col56 UUID,
-//                        col57 Nullable(UUID),
-//                        col58 JSON
-//                         ) ENGINE = MergeTree ORDER BY tuple();
-//		`
+func TestMap(t *testing.T) {
+	conn, close := setupTest(t, "col1 Map(String, UInt8)")
+	defer close(t)
+	val := map[string]uint8{"49": uint8(49)}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
 
-//			col49Data = map[string]uint8{"49": uint8(49)}
-//			col50Data = []interface{}{"50", int32(50)}
-//			col51Data = "51"
-//			col52Data = "52"
-//			col53Data = "53"
-//			col54Data = date
-//			col55Data = "55"
-//			col56Data = "417ddc5d-e556-4d27-95dd-a34d84e46a50"
-//			col57Data = "417ddc5d-e556-4d27-95dd-a34d84e46a50"
-//			col58Data = map[string]interface{}{
-//				"test": map[string][]string{
-//					"test": {"2", "3"},
-//				},
-//			}
+func TestFixedString(t *testing.T) {
+	conn, close := setupTest(t, "col1 FixedString(2)")
+	defer close(t)
+	val := "51"
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestNullableFixedString(t *testing.T) {
+	conn, close := setupTest(t, "col1 Nullable(FixedString(2))")
+	defer close(t)
+	val := "52"
+	insertData(t, conn, val)
+	insertData(t, conn, nil)
+	checkRows(t, conn, 2, &val, nil)
+}
+
+func TestLowCardinalityString(t *testing.T) {
+	conn, close := setupTest(t, "col1 LowCardinality(String)")
+	defer close(t)
+	val := "53"
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestConvertDate32(t *testing.T) {
+	conn, close := setupTest(t, "col1 Date32")
+	defer close(t)
+	insertData(t, conn, date)
+	checkRows(t, conn, 1, date)
+}
+
+func TestConvertEnum(t *testing.T) {
+	conn, close := setupTest(t, "col1 Enum('55' = 55)")
+	defer close(t)
+	insertData(t, conn, "55")
+	checkRows(t, conn, 1, "55")
+}
+
+func TestConvertUUID(t *testing.T) {
+	conn, close := setupTest(t, "col1 UUID")
+	defer close(t)
+	val := "417ddc5d-e556-4d27-95dd-a34d84e46a50"
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, &val)
+}
+
+func TestConvertNullableUUID(t *testing.T) {
+	conn, close := setupTest(t, "col1 Nullable(UUID)")
+	defer close(t)
+	val := "417ddc5d-e556-4d27-95dd-a34d84e46a50"
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, &val)
+}
+
+func TestConvertJSON(t *testing.T) {
+	conn, close := setupTest(t, "col1 JSON")
+	defer close(t)
+	val := map[string]interface{}{
+		"test": map[string][]string{
+			"test": {"2", "3"},
+		},
+	}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
