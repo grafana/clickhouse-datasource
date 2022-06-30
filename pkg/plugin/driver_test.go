@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -16,6 +17,7 @@ import (
 	"math/big"
 	"os"
 	"path"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -155,6 +157,14 @@ func insertData(t *testing.T, conn *sql.DB, data ...interface{}) {
 	require.NoError(t, scope.Commit())
 }
 
+func toJson(obj interface{}) string {
+	bytes, err := json.Marshal(obj)
+	if err != nil {
+		return "unable to marshal"
+	}
+	return string(bytes)
+}
+
 func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
 	for i, eVal := range expected {
 		val := field.At(i)
@@ -166,6 +176,11 @@ func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
 		case float64:
 			assert.InDelta(t, tVal, val, 0.01)
 		default:
+			switch reflect.ValueOf(eVal).Kind() {
+			case reflect.Map, reflect.Slice:
+				assert.JSONEq(t, toJson(tVal), *val.(*string))
+				return
+			}
 			assert.Equal(t, eVal, val)
 		}
 
@@ -185,7 +200,6 @@ func TestConvertUInt8(t *testing.T) {
 	conn, close := setupTest(t, "col1 UInt8")
 	defer close(t)
 	insertData(t, conn, uint8(1))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, uint8(1))
 }
 
@@ -193,7 +207,6 @@ func TestConvertUInt16(t *testing.T) {
 	conn, close := setupTest(t, "col1 UInt16")
 	defer close(t)
 	insertData(t, conn, uint16(2))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, uint16(2))
 }
 
@@ -201,7 +214,6 @@ func TestConvertUInt32(t *testing.T) {
 	conn, close := setupTest(t, "col1 UInt32")
 	defer close(t)
 	insertData(t, conn, uint32(3))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, uint32(3))
 }
 
@@ -209,7 +221,6 @@ func TestConvertUInt64(t *testing.T) {
 	conn, close := setupTest(t, "col1 UInt64")
 	defer close(t)
 	insertData(t, conn, uint64(4))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, uint64(4))
 }
 
@@ -218,7 +229,6 @@ func TestConvertNullableUInt8(t *testing.T) {
 	defer close(t)
 	val := uint8(5)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -227,7 +237,6 @@ func TestConvertNullableUInt16(t *testing.T) {
 	defer close(t)
 	val := uint16(6)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -236,7 +245,6 @@ func TestConvertNullableUInt32(t *testing.T) {
 	defer close(t)
 	val := uint16(7)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -245,7 +253,6 @@ func TestConvertNullableUInt64(t *testing.T) {
 	defer close(t)
 	val := uint16(8)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -254,7 +261,6 @@ func TestConvertNullableInt8(t *testing.T) {
 	defer close(t)
 	val := int8(9)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -263,7 +269,6 @@ func TestConvertNullableInt16(t *testing.T) {
 	defer close(t)
 	val := int16(10)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -272,7 +277,6 @@ func TestConvertNullableInt32(t *testing.T) {
 	defer close(t)
 	val := int32(11)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -281,7 +285,6 @@ func TestConvertNullableInt64(t *testing.T) {
 	defer close(t)
 	val := int64(12)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -290,7 +293,6 @@ func TestConvertInt8(t *testing.T) {
 	defer close(t)
 	val := int8(13)
 	insertData(t, conn, val)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, val)
 }
 
@@ -298,7 +300,6 @@ func TestConvertInt16(t *testing.T) {
 	conn, close := setupTest(t, "col1 Int16")
 	defer close(t)
 	insertData(t, conn, int16(14))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, int16(14))
 }
 
@@ -306,7 +307,6 @@ func TestConvertInt32(t *testing.T) {
 	conn, close := setupTest(t, "col1 Int32")
 	defer close(t)
 	insertData(t, conn, int32(15))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, int32(15))
 }
 
@@ -314,7 +314,6 @@ func TestConvertInt64(t *testing.T) {
 	conn, close := setupTest(t, "col1 Int64")
 	defer close(t)
 	insertData(t, conn, int64(16))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, int64(16))
 }
 
@@ -322,7 +321,6 @@ func TestConvertFloat32(t *testing.T) {
 	conn, close := setupTest(t, "col1 Float32")
 	defer close(t)
 	insertData(t, conn, float32(17.1))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, float32(17.1))
 }
 
@@ -330,7 +328,6 @@ func TestConvertFloat64(t *testing.T) {
 	conn, close := setupTest(t, "col1 Float64")
 	defer close(t)
 	insertData(t, conn, float64(18.1))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, float64(18.1))
 }
 
@@ -339,7 +336,6 @@ func TestConvertNullableFloat32(t *testing.T) {
 	defer close(t)
 	val := float32(19.1)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -348,7 +344,6 @@ func TestConvertNullableFloat64(t *testing.T) {
 	defer close(t)
 	val := float64(20.1)
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -356,7 +351,6 @@ func TestConvertBool(t *testing.T) {
 	conn, close := setupTest(t, "col1 Bool")
 	defer close(t)
 	insertData(t, conn, true)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, true)
 }
 
@@ -365,7 +359,6 @@ func TestConvertNullableBool(t *testing.T) {
 	defer close(t)
 	val := true
 	insertData(t, conn, val, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -373,7 +366,6 @@ func TestConvertInt128(t *testing.T) {
 	conn, close := setupTest(t, "col1 Int128")
 	defer close(t)
 	insertData(t, conn, big.NewInt(23))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, float64(23))
 }
 
@@ -381,7 +373,6 @@ func TestConvertNullableInt128(t *testing.T) {
 	conn, close := setupTest(t, "col1 Nullable(Int128)")
 	defer close(t)
 	insertData(t, conn, big.NewInt(24), nil)
-	// we test the frame marshalling logic with our converters
 	val := float64(24)
 	checkRows(t, conn, 2, &val, nil)
 }
@@ -390,7 +381,6 @@ func TestConvertInt256(t *testing.T) {
 	conn, close := setupTest(t, "col1 Int256")
 	defer close(t)
 	insertData(t, conn, big.NewInt(25))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, float64(25))
 }
 
@@ -398,7 +388,6 @@ func TestConvertNullableInt256(t *testing.T) {
 	conn, close := setupTest(t, "col1 Nullable(Int256)")
 	defer close(t)
 	insertData(t, conn, big.NewInt(26), nil)
-	// we test the frame marshalling logic with our converters
 	val := float64(26)
 	checkRows(t, conn, 2, &val, nil)
 }
@@ -407,7 +396,6 @@ func TestConvertUInt128(t *testing.T) {
 	conn, close := setupTest(t, "col1 UInt128")
 	defer close(t)
 	insertData(t, conn, big.NewInt(27))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, float64(27))
 }
 
@@ -416,7 +404,6 @@ func TestConvertNullableUInt128(t *testing.T) {
 	defer close(t)
 	insertData(t, conn, big.NewInt(28), nil)
 	val := float64(28)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -424,7 +411,6 @@ func TestConvertUInt256(t *testing.T) {
 	conn, close := setupTest(t, "col1 UInt256")
 	defer close(t)
 	insertData(t, conn, big.NewInt(29))
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, float64(29))
 }
 
@@ -433,7 +419,6 @@ func TestConvertNullableUInt256(t *testing.T) {
 	defer close(t)
 	insertData(t, conn, big.NewInt(30), nil)
 	val := float64(30)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &val, nil)
 }
 
@@ -443,7 +428,6 @@ func TestConvertDate(t *testing.T) {
 	conn, close := setupTest(t, "col1 Date")
 	defer close(t)
 	insertData(t, conn, date)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, date)
 }
 
@@ -451,7 +435,6 @@ func TestConvertNullableDate(t *testing.T) {
 	conn, close := setupTest(t, "col1 Nullable(Date)")
 	defer close(t)
 	insertData(t, conn, date, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &date, nil)
 }
 
@@ -463,7 +446,6 @@ func TestConvertDateTime(t *testing.T) {
 	defer close(t)
 	locTime := datetime.In(loc)
 	insertData(t, conn, locTime)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 1, locTime)
 }
 
@@ -473,26 +455,117 @@ func TestConvertNullableDateTime(t *testing.T) {
 	defer close(t)
 	locTime := datetime.In(loc)
 	insertData(t, conn, locTime, nil)
-	// we test the frame marshalling logic with our converters
 	checkRows(t, conn, 2, &locTime, nil)
 }
 
-//                        col33 DateTime,
-//                        col34 Nullable(DateTime),
-//                        col35 DateTime64(3),
-//                        col36 Nullable(DateTime64(3)),
-//                        col37 String,
-//                        col38 Nullable(String),
-//                        col39 Decimal(15,3),
-//                        col40 Nullable(Decimal(15,3)),
-//                        col41 Tuple(s String, i Int64),
-//                        col42 Nested(s String, i Int64),
-//						col43 Array(Tuple(s String, i Int32)),
-//                        col44 Array(Nested(s String, i Int32)),
-//                        col45 Array(Int64),
-//                        col46 Array(Nullable(Int64)),
-//                        col47 Array(UInt256),
-//                        col48 Array(Nullable(UInt256)),
+func TestConvertDateTime64(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/London")
+	conn, close := setupTest(t, "col1 DateTime64(3, 'Europe/London')")
+	defer close(t)
+	locTime := datetime.In(loc)
+	locTime.Add(123 * time.Millisecond)
+	insertData(t, conn, locTime)
+	checkRows(t, conn, 1, locTime)
+}
+
+func TestConvertNullableDateTime64(t *testing.T) {
+	loc, _ := time.LoadLocation("Europe/London")
+	conn, close := setupTest(t, "col1 Nullable(DateTime64(3, 'Europe/London'))")
+	defer close(t)
+	locTime := datetime.In(loc)
+	locTime.Add(123 * time.Millisecond)
+	insertData(t, conn, locTime, nil)
+	checkRows(t, conn, 2, &locTime, nil)
+}
+
+func TestConvertString(t *testing.T) {
+	conn, close := setupTest(t, "col1 String")
+	defer close(t)
+	insertData(t, conn, "37")
+	checkRows(t, conn, 1, "37")
+}
+
+func TestConvertNullableString(t *testing.T) {
+	conn, close := setupTest(t, "col1 Nullable(String)")
+	defer close(t)
+	insertData(t, conn, "38", nil)
+	val := "38"
+	checkRows(t, conn, 2, &val, nil)
+}
+
+func TestConvertDecimal(t *testing.T) {
+	conn, close := setupTest(t, "col1 Decimal(15,3)")
+	defer close(t)
+	insertData(t, conn, decimal.New(39, 10))
+	val, _ := decimal.New(39, 10).Float64()
+	checkRows(t, conn, 1, val)
+}
+
+func TestConvertNullableDecimal(t *testing.T) {
+	conn, close := setupTest(t, "col1 Nullable(Decimal(15,3))")
+	defer close(t)
+	insertData(t, conn, decimal.New(40, 10), nil)
+	val, _ := decimal.New(40, 10).Float64()
+	checkRows(t, conn, 2, &val, nil)
+}
+
+func TestTuple(t *testing.T) {
+	conn, close := setupTest(t, "col1 Tuple(s String, i Int64)")
+	defer close(t)
+	val := map[string]interface{}{"s": "41", "i": int64(41)}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestNested(t *testing.T) {
+	conn, close := setupTest(t, "col1 Nested(s String, i Int64)")
+	defer close(t)
+	val := []map[string]interface{}{{"s": "42", "i": int64(42)}}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestArrayTuple(t *testing.T) {
+	conn, close := setupTest(t, "col1 Nested(s String, i Int32)")
+	defer close(t)
+	val := []map[string]interface{}{{"s": "43", "i": int32(43)}}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestArrayInt64(t *testing.T) {
+	conn, close := setupTest(t, "col1 Array(Int64)")
+	defer close(t)
+	val := []int64{int64(45), int64(45)}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestArrayNullableInt64(t *testing.T) {
+	conn, close := setupTest(t, "col1 Array(Nullable(Int64))")
+	defer close(t)
+	v := int64(45)
+	val := []*int64{&v, nil}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestArrayUInt256(t *testing.T) {
+	conn, close := setupTest(t, "col1 Array(UInt256)")
+	defer close(t)
+	val := []*big.Int{big.NewInt(47), big.NewInt(47)}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
+func TestArrayNullableUInt256(t *testing.T) {
+	conn, close := setupTest(t, "col1 Array(Nullable(UInt256))")
+	defer close(t)
+	val := []*big.Int{big.NewInt(47), nil}
+	insertData(t, conn, val)
+	checkRows(t, conn, 1, val)
+}
+
 //                        col49 Map(String, UInt8),
 //                        col50 Tuple(String, Int32),
 //                        col51 FixedString(2),
@@ -505,27 +578,7 @@ func TestConvertNullableDateTime(t *testing.T) {
 //                        col58 JSON
 //                         ) ENGINE = MergeTree ORDER BY tuple();
 //		`
-//		date, _ := time.Parse("2006-01-02", "2022-01-12")
-//		datetime, _ := time.Parse("2006-01-02 15:04:05", "2022-01-12 00:00:00")
-//		var (
-//			col31Data = date
-//			col32Data = col31Data.Add(24 * time.Hour)
-//			col33Data = datetime.Truncate(time.Second).Add(24 * time.Hour)
-//			col34Data = col33Data.Add(24 * time.Hour)
-//			col35Data = datetime.Add(123 * time.Millisecond)
-//			col36Data = col35Data.Add(24 * time.Hour)
-//			col37Data = "37"
-//			col38Data = "38"
-//			col39Data = decimal.New(39, 123)
-//			col40Data = decimal.New(40, 123)
-//			col41Data = map[string]interface{}{"s": "41", "i": int64(41)}
-//			col42Data = []map[string]interface{}{{"s": "42", "i": int64(41)}}
-//			col43Data = []map[string]interface{}{{"s": "43", "i": int32(43)}}
-//			col44Data = [][]map[string]interface{}{{{"s": "44", "i": int32(44)}}}
-//			col45Data = []int64{int64(45), int64(45)}
-//			col46Data = []int64{int64(45), int64(45)}
-//			col47Data = []*big.Int{big.NewInt(47), big.NewInt(47)}
-//			col48Data = []*big.Int{big.NewInt(48), big.NewInt(48)}
+
 //			col49Data = map[string]uint8{"49": uint8(49)}
 //			col50Data = []interface{}{"50", int32(50)}
 //			col51Data = "51"
