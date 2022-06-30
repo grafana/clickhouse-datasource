@@ -119,12 +119,6 @@ func TestConnectSecure(t *testing.T) {
 	})
 }
 
-//if err := checkMinServerVersion(conn, 22, 6, 1); err != nil {
-//// n
-//t.Skip(err.Error())
-//return
-//}
-
 func setupConnection(t *testing.T) *sql.DB {
 	clickhouse := Clickhouse{}
 	port := os.Getenv("CLICKHOUSE_DB_PORT")
@@ -630,6 +624,11 @@ func TestConvertNullableUUID(t *testing.T) {
 }
 
 func TestConvertJSON(t *testing.T) {
+	conn := setupConnection(t)
+	if err := checkMinServerVersion(conn, 22, 6, 1); err != nil {
+		t.Skip(err.Error())
+		return
+	}
 	conn, close := setupTest(t, "col1 JSON")
 	defer close(t)
 	val := map[string]interface{}{
