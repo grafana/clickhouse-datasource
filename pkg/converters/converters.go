@@ -321,7 +321,7 @@ func bigIntConvert(in interface{}) (interface{}, error) {
 	}
 	v, ok := in.(**big.Int)
 	if !ok {
-		return nil, fmt.Errorf("invalid int256 - %v", in)
+		return nil, fmt.Errorf("invalid big int - %v", in)
 	}
 	f, _ := new(big.Float).SetInt(*v).Float64()
 	return f, nil
@@ -333,9 +333,9 @@ func bigIntNullableConvert(in interface{}) (interface{}, error) {
 	}
 	v, ok := in.(***big.Int)
 	if !ok {
-		return nil, fmt.Errorf("invalid int128 - %v", in)
+		return nil, fmt.Errorf("invalid big int - %v", in)
 	}
-	if *v == nil {
+	if *v == nil || **v == nil {
 		return (*float64)(nil), nil
 	}
 	f, _ := new(big.Float).SetInt(**v).Float64()
