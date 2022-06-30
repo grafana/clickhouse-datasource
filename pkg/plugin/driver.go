@@ -85,6 +85,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		DialTimeout: time.Duration(t) * time.Second,
 		Settings: clickhouse.Settings{
 			"allow_experimental_object_type": 1,
+			"flatten_nested":                 0,
 		},
 		ReadTimeout: time.Duration(t) * time.Second,
 	})

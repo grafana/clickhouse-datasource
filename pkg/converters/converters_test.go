@@ -505,5 +505,3 @@ func TestArray(t *testing.T) {
 	assert.Nil(t, err)
 	assert.JSONEq(t, toJson(value), *v.(*string))
 }
-
-//IT tests against ClickHouse
