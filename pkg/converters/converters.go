@@ -38,7 +38,7 @@ var mapMatch, _ = regexp.Compile(`^Map\(.*\)`)
 
 var fixedStringMatch, _ = regexp.Compile(`^Nullable\(FixedString\(.*\)\)`)
 
-var Types = map[string]Converter{
+var Converters = map[string]Converter{
 	"Bool": {
 		scanType:  reflect.PtrTo(reflect.TypeOf(true)),
 		fieldType: data.FieldTypeBool,
@@ -221,7 +221,7 @@ var Types = map[string]Converter{
 		matchRegex: mapMatch,
 		convert:    jsonConverter,
 	},
-	"FixedString": {
+	"FixedString()": {
 		fieldType:  data.FieldTypeNullableString,
 		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(""))),
 		matchRegex: fixedStringMatch,
@@ -238,13 +238,29 @@ var ClickhouseConverters = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {
 	var list []sqlutil.Converter
-	for name, converter := range Types {
-		list = append(list, CreateConverter(name, converter))
+	for name, converter := range Converters {
+		list = append(list, createConverter(name, converter))
 	}
 	return list
 }
 
-func CreateConverter(name string, converter Converter) sqlutil.Converter {
+func GetConverter(columnType string) sqlutil.Converter {
+	converter, ok := Converters[columnType]
+	if ok {
+		return createConverter(columnType, converter)
+	}
+	for name, converter := range Converters {
+		if name == columnType {
+			return createConverter(name, converter)
+		}
+		if converter.matchRegex != nil && converter.matchRegex.MatchString(columnType) {
+			return createConverter(name, converter)
+		}
+	}
+	return sqlutil.Converter{}
+}
+
+func createConverter(name string, converter Converter) sqlutil.Converter {
 	convert := defaultConvert
 	if converter.convert != nil {
 		convert = converter.convert
