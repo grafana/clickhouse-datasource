@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	clickhouse_sql "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -19,8 +20,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
@@ -36,32 +35,6 @@ func GetEnv(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func checkMinServerVersion(conn *sql.DB, major, minor, patch uint64) error {
-	var version struct {
-		Major uint64
-		Minor uint64
-		Patch uint64
-	}
-	var res string
-	if err := conn.QueryRow("SELECT version()").Scan(&res); err != nil {
-		panic(err)
-	}
-	for i, v := range strings.Split(res, ".") {
-		switch i {
-		case 0:
-			version.Major, _ = strconv.ParseUint(v, 10, 64)
-		case 1:
-			version.Minor, _ = strconv.ParseUint(v, 10, 64)
-		case 2:
-			version.Patch, _ = strconv.ParseUint(v, 10, 64)
-		}
-	}
-	if version.Major < major || (version.Major == major && version.Minor < minor) || (version.Major == major && version.Minor == minor && version.Patch < patch) {
-		return fmt.Errorf("unsupported server version %d.%d.%d < %d.%d.%d", version.Major, version.Minor, version.Patch, major, minor, patch)
-	}
-	return nil
 }
 
 func TestMain(m *testing.M) {
@@ -139,11 +112,16 @@ func TestConnectSecure(t *testing.T) {
 }
 
 func setupConnection(t *testing.T) *sql.DB {
-	clickhouse := plugin.Clickhouse{}
 	port := os.Getenv("CLICKHOUSE_PORT")
-	settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "localhost", "port": %s }`, port)), DecryptedSecureJSONData: map[string]string{}}
-	conn, err := clickhouse.Connect(settings, json.RawMessage{})
-	require.NoError(t, err)
+	host := os.Getenv("CLICKHOUSE_HOST")
+	// we create a direct connection since we need specific settings for insert
+	conn := clickhouse_sql.OpenDB(&clickhouse_sql.Options{
+		Addr: []string{fmt.Sprintf("%s:%s", host, port)},
+		Settings: clickhouse_sql.Settings{
+			"allow_experimental_object_type": 1,
+			"flatten_nested":                 0,
+		},
+	})
 	return conn
 }
 
@@ -644,8 +622,13 @@ func TestConvertNullableUUID(t *testing.T) {
 
 func TestConvertJSON(t *testing.T) {
 	conn := setupConnection(t)
-	if err := checkMinServerVersion(conn, 22, 6, 1); err != nil {
+	canTest, err := plugin.CheckMinServerVersion(conn, 22, 6, 1)
+	if err != nil {
 		t.Skip(err.Error())
+		return
+	}
+	if !canTest {
+		t.Skipf("Skipping JSON test as version is < 22.6.1")
 		return
 	}
 	conn, close := setupTest(t, "col1 JSON")

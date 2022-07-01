@@ -17,6 +17,7 @@ import (
 	"github.com/grafana/sqlds/v2"
 	"github.com/pkg/errors"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -47,6 +48,32 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 		}
 	}
 	return tlsConfig, nil
+}
+
+func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, error) {
+	var version struct {
+		Major uint64
+		Minor uint64
+		Patch uint64
+	}
+	var res string
+	if err := conn.QueryRow("SELECT version()").Scan(&res); err != nil {
+		return false, err
+	}
+	for i, v := range strings.Split(res, ".") {
+		switch i {
+		case 0:
+			version.Major, _ = strconv.ParseUint(v, 10, 64)
+		case 1:
+			version.Minor, _ = strconv.ParseUint(v, 10, 64)
+		case 2:
+			version.Patch, _ = strconv.ParseUint(v, 10, 64)
+		}
+	}
+	if version.Major < major || (version.Major == major && version.Minor < minor) || (version.Major == major && version.Minor == minor && version.Patch < patch) {
+		return false, nil
+	}
+	return true, nil
 }
 
 // Connect opens a sql.DB connection using datasource settings
@@ -83,10 +110,6 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			Method: clickhouse.CompressionLZ4,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
-		Settings: clickhouse.Settings{
-			"allow_experimental_object_type": 1,
-			"flatten_nested":                 0,
-		},
 		ReadTimeout: time.Duration(t) * time.Second,
 	})
 
