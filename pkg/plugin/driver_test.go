@@ -1,4 +1,4 @@
-package plugin
+package plugin_test
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
+	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
@@ -64,8 +65,25 @@ func checkMinServerVersion(conn *sql.DB, major, minor, patch uint64) error {
 }
 
 func TestMain(m *testing.M) {
+	if os.Getenv("CLICKHOUSE_HOST") != "" && os.Getenv("CLICKHOUSE_PORT") != "" {
+		fmt.Printf("ClickHouse connections details provided, IT tests will use %s:%s\n",
+			os.Getenv("CLICKHOUSE_HOST"), os.Getenv("CLICKHOUSE_PORT"))
+		os.Exit(m.Run())
+	}
 	// create a ClickHouse container
 	ctx := context.Background()
+	// attempt use docker for CI
+	provider, err := testcontainers.ProviderDocker.GetProvider()
+	if err != nil {
+		fmt.Printf("Docker is not running and no clickhouse connections details were provided. Skipping IT tests: %s\n", err)
+		os.Exit(0)
+	}
+	err = provider.Health(ctx)
+	if err != nil {
+		fmt.Printf("Docker is not running and no clickhouse connections details were provided. Skipping IT tests: %s\n", err)
+		os.Exit(0)
+	}
+	fmt.Printf("Using Docker for IT tests\n")
 	cwd, err := os.Getwd()
 	if err != nil {
 		// can't test without container
@@ -90,17 +108,18 @@ func TestMain(m *testing.M) {
 	}
 
 	p, _ := clickhouseContainer.MappedPort(ctx, "9000")
-
-	os.Setenv("CLICKHOUSE_DB_PORT", p.Port())
+	os.Setenv("CLICKHOUSE_PORT", p.Port())
+	os.Setenv("CLICKHOUSE_HOST", "localhost")
 	defer clickhouseContainer.Terminate(ctx) //nolint
 	os.Exit(m.Run())
 }
 
 func TestConnect(t *testing.T) {
-	port := os.Getenv("CLICKHOUSE_DB_PORT")
-	clickhouse := Clickhouse{}
+	port := os.Getenv("CLICKHOUSE_PORT")
+	host := os.Getenv("CLICKHOUSE_HOST")
+	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "localhost", "port": %s }`, port)), DecryptedSecureJSONData: map[string]string{}}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s }`, host, port)), DecryptedSecureJSONData: map[string]string{}}
 		_, err := clickhouse.Connect(settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
@@ -109,7 +128,7 @@ func TestConnect(t *testing.T) {
 func TestConnectSecure(t *testing.T) {
 	// TODO: Configure and test over SSL
 	t.Skip()
-	clickhouse := Clickhouse{}
+	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		params := `{ "server": "server", "port": 9440, "username": "foo", "secure": true }`
 		secure := map[string]string{}
@@ -120,8 +139,8 @@ func TestConnectSecure(t *testing.T) {
 }
 
 func setupConnection(t *testing.T) *sql.DB {
-	clickhouse := Clickhouse{}
-	port := os.Getenv("CLICKHOUSE_DB_PORT")
+	clickhouse := plugin.Clickhouse{}
+	port := os.Getenv("CLICKHOUSE_PORT")
 	settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "localhost", "port": %s }`, port)), DecryptedSecureJSONData: map[string]string{}}
 	conn, err := clickhouse.Connect(settings, json.RawMessage{})
 	require.NoError(t, err)
