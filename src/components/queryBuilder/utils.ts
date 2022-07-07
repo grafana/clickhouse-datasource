@@ -282,7 +282,6 @@ function createAST(sql: string): Statement {
   try {
     ast = parseFirst(sql);
   } catch (err) {
-    //err invalid sql
     return {} as Statement;
   }
 
@@ -305,23 +304,19 @@ function createAST(sql: string): Statement {
   return mapper.statement(ast)!;
 }
 
-export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
+export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions | string {
   const ast = createAST(sql);
   if (!ast) {
-    console.error("Issues with select parsing select statement");
-    return {} as SqlBuilderOptions;
+    return "The query is not valid SQL.";
   }
   if (ast.type !== 'select') {
-    console.error("Not a select statement");
-    return {} as SqlBuilderOptions;
+    return "The query is not a select statement.";
   }
   if (!ast.from || ast.from.length !== 1) {
-    console.error("Too many from clauses");
-    return {} as SqlBuilderOptions;
+    return "The query has too many 'FROM' clauses.";
   }
   if (ast.from[0].type !== 'table') {
-    console.error("From clause is not a table");
-    return {} as SqlBuilderOptions;
+    return "The 'FROM' clause is not a table.";
   }
   const fromTable = ast.from[0] as FromTable;
 
@@ -400,6 +395,19 @@ function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
           map.super().expr(e);
           break;
         case 'ref':
+          if (e.name === '$__fromTime' && filters[i].operator === FilterOperator.LessThanOrEqual) {
+            filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
+            break;
+          }
+          if (e.name === '$__fromTime' && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
+            filters[i].operator = FilterOperator.WithInGrafanaTimeRange;
+            break;
+          }
+          if (e.name === '$__toTime') {
+            filters.splice(i, 1);
+            i--;
+            break;
+          }
           filters[i].key = e.name;
           if (filters[i].operator === FilterOperator.IsNotNull) {
             i++;

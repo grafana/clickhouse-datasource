@@ -85,7 +85,6 @@ export const Components = {
       },
       cannotConvert: {
         title: 'Cannot convert',
-        body: 'The query is too complex to convert to the visual query builder. Do you want to delete your current query and use the query builder?',
         confirmText: 'Yes',
       }
     },

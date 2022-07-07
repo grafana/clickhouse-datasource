@@ -4,6 +4,7 @@ import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
 import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery, Format } from 'types';
+import { isString } from 'lodash';
 
 interface QueryTypeSwitcherProps {
   query: CHQuery;
@@ -24,10 +25,16 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
     { label: queryTypeLabels.SQLEditor, value: QueryType.SQL },
     { label: queryTypeLabels.QueryBuilder, value: QueryType.Builder },
   ];
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const onQueryTypeChange = (queryType: QueryType, confirm = false) => {
     if (query.queryType === QueryType.SQL && queryType === QueryType.Builder && !confirm) {
-      if (getQueryOptionsFromSql(query.rawSql).table) setConfirmModalState(true);
-      else setCannotConvertModalState(true);
+      const queryOptionsFromSql = getQueryOptionsFromSql(query.rawSql);
+      if (isString(queryOptionsFromSql)) {
+        setCannotConvertModalState(true);
+        setErrorMessage(queryOptionsFromSql);
+      } else {
+        setConfirmModalState(true);
+      }
     } else {
       setEditor(queryType);
       let builderOptions: SqlBuilderOptions;
@@ -36,7 +43,8 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
           builderOptions = query.builderOptions;
           break;
         case QueryType.SQL:
-          builderOptions = getQueryOptionsFromSql(query.rawSql) || defaultCHBuilderQuery.builderOptions;
+          builderOptions =
+            (getQueryOptionsFromSql(query.rawSql) as SqlBuilderOptions) || defaultCHBuilderQuery.builderOptions;
           break;
         default:
           builderOptions = defaultCHBuilderQuery.builderOptions;
@@ -78,7 +86,7 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
       />
       <ConfirmModal
         title={cannotConvert.title}
-        body={cannotConvert.body}
+        body={`${errorMessage} \nDo you want to delete your current query and use the query builder?`}
         isOpen={cannotConvertModalState}
         icon="exclamation-triangle"
         onConfirm={onConfirmQueryTypeChange}
