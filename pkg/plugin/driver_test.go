@@ -2,6 +2,7 @@ package plugin_test
 
 import (
 	"context"
+	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -20,6 +21,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -38,9 +40,10 @@ func GetEnv(key, fallback string) string {
 }
 
 func TestMain(m *testing.M) {
-	if os.Getenv("CLICKHOUSE_HOST") != "" && os.Getenv("CLICKHOUSE_PORT") != "" {
-		fmt.Printf("ClickHouse connections details provided, IT tests will use %s:%s\n",
-			os.Getenv("CLICKHOUSE_HOST"), os.Getenv("CLICKHOUSE_PORT"))
+	useDocker := strings.ToLower(getEnv("CLICKHOUSE_USE_DOCKER", "true"))
+	if useDocker == "false" {
+		fmt.Printf("Using external ClickHouse for IT tests -  %s:%s\n",
+			getEnv("CLICKHOUSE_PORT", "9000"), getEnv("CLICKHOUSE_HOST", "localhost"))
 		os.Exit(m.Run())
 	}
 	// create a ClickHouse container
@@ -88,32 +91,40 @@ func TestMain(m *testing.M) {
 }
 
 func TestConnect(t *testing.T) {
-	port := os.Getenv("CLICKHOUSE_PORT")
-	host := os.Getenv("CLICKHOUSE_HOST")
+	port := getEnv("CLICKHOUSE_PORT", "9000")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl := getEnv("CLICKHOUSE_SSL", "false")
 	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s }`, host, port)), DecryptedSecureJSONData: map[string]string{}}
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
 
-func TestConnectSecure(t *testing.T) {
-	// TODO: Configure and test over SSL
-	t.Skip()
-	clickhouse := plugin.Clickhouse{}
-	t.Run("should not error when valid settings passed", func(t *testing.T) {
-		params := `{ "server": "server", "port": 9440, "username": "foo", "secure": true }`
-		secure := map[string]string{}
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(params), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
-		assert.Equal(t, nil, err)
-	})
+func getEnv(key, fallback string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+	return fallback
 }
 
 func setupConnection(t *testing.T) *sql.DB {
-	port := os.Getenv("CLICKHOUSE_PORT")
-	host := os.Getenv("CLICKHOUSE_HOST")
+	port := getEnv("CLICKHOUSE_PORT", "9000")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl, ok := os.LookupEnv("CLICKHOUSE_SSL")
+	var sConfig *tls.Config
+	if ok && strings.ToLower(ssl) == "true" {
+		sConfig = &tls.Config{
+			InsecureSkipVerify: false,
+		}
+	}
 	// we create a direct connection since we need specific settings for insert
 	conn := clickhouse_sql.OpenDB(&clickhouse_sql.Options{
 		Addr: []string{fmt.Sprintf("%s:%s", host, port)},
@@ -121,13 +132,19 @@ func setupConnection(t *testing.T) *sql.DB {
 			"allow_experimental_object_type": 1,
 			"flatten_nested":                 0,
 		},
+		Auth: clickhouse_sql.Auth{
+			Database: "default",
+			Username: username,
+			Password: password,
+		},
+		TLS: sConfig,
 	})
 	return conn
 }
 
 func setupTest(t *testing.T, ddl string) (*sql.DB, func(t *testing.T)) {
 	conn := setupConnection(t)
-	_, err := conn.Exec("DROP TABLE simple_table")
+	_, err := conn.Exec("DROP TABLE IF EXISTS simple_table")
 	require.NoError(t, err)
 	_, err = conn.Exec(fmt.Sprintf("CREATE table simple_table(%s) ENGINE = MergeTree ORDER BY tuple();", ddl))
 	require.NoError(t, err)
