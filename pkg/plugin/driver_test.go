@@ -127,8 +127,9 @@ func setupConnection(t *testing.T) *sql.DB {
 
 func setupTest(t *testing.T, ddl string) (*sql.DB, func(t *testing.T)) {
 	conn := setupConnection(t)
-	conn.Exec("DROP TABLE simple_table")
-	_, err := conn.Exec(fmt.Sprintf("CREATE table simple_table(%s) ENGINE = MergeTree ORDER BY tuple();", ddl))
+	_, err := conn.Exec("DROP TABLE simple_table")
+	require.NoError(t, err)
+	_, err = conn.Exec(fmt.Sprintf("CREATE table simple_table(%s) ENGINE = MergeTree ORDER BY tuple();", ddl))
 	require.NoError(t, err)
 	return conn, func(t *testing.T) {
 		_, err := conn.Exec("DROP TABLE simple_table")

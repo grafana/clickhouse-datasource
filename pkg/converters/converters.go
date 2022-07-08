@@ -228,11 +228,6 @@ var Converters = map[string]Converter{
 	},
 }
 
-type ArrayType struct {
-	name string
-	kind interface{}
-}
-
 var ComplexTypes = []string{"Map"}
 var ClickhouseConverters = ClickHouseConverters()
 
