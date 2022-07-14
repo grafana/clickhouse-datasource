@@ -1,4 +1,4 @@
-import { astVisitor, Expr, FromTable, parseFirst, ExprRef, SelectedColumn, Statement, astMapper } from 'pgsql-ast-parser';
+import { astVisitor, Expr, FromTable, parseFirst, ExprRef, SelectedColumn, Statement, astMapper, ExprString } from 'pgsql-ast-parser';
 import { isString } from 'lodash';
 import {
   BuilderMetricField,
@@ -375,10 +375,14 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions | string 
   }
   return builder;
 }
+//SELECT machine_name FROM mgbench.logs1 WHERE   (  NOT ( id LIKE '%%hello%%' ) ) LIMIT 100
+//SELECT machine_name FROM mgbench.logs1 WHERE   ( id LIKE '%%%hello%%%' ) undefined ( undefined NOT '' ) LIMIT 100
+
 
 function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
   const filters: Filter[] = [];
   let i = 0;
+  let notFlag = false;
   const visitor = astVisitor(map => ({
     expr: e => {
       switch (e?.type) {
@@ -391,21 +395,29 @@ function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
           else if (Object.values(FilterOperator).find(x => e.op === x)) {
             if (i === 0) filters.unshift({} as Filter);
             filters[i].operator = e.op as FilterOperator;
+            if (notFlag && filters[i].operator === FilterOperator.Like) {
+              filters[i].operator = FilterOperator.NotLike;
+              notFlag = false;
+            }
+
           }
           map.super().expr(e);
           break;
         case 'ref':
-          if (e.name === '$__fromTime' && filters[i].operator === FilterOperator.LessThanOrEqual) {
-            filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
-            break;
-          }
           if (e.name === '$__fromTime' && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
-            filters[i].operator = FilterOperator.WithInGrafanaTimeRange;
+            if (notFlag) {
+              filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
+              notFlag = false;
+            }
+            else {
+              filters[i].operator = FilterOperator.WithInGrafanaTimeRange;
+            }
+            filters[i].type = 'datetime';
+            i++;
             break;
           }
           if (e.name === '$__toTime') {
             filters.splice(i, 1);
-            i--;
             break;
           }
           filters[i].key = e.name;
@@ -422,8 +434,13 @@ function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
           i++;
           break;
         case 'unary':
-          if (filters.length === 0) filters.unshift({} as Filter);
-          filters[i].operator = e.op as FilterOperator;
+          if (e.op === 'NOT') {
+            notFlag = true;
+          }
+          else {
+            if (i === 0) filters.unshift({} as Filter);
+            filters[i].operator = e.op as FilterOperator;
+          }
           map.super().expr(e);
           break;
         case 'call':
@@ -435,6 +452,15 @@ function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
           }
           filters[i] = { ...filters[i], value: val, type: 'datetime' } as Filter;
           if (!val) i++;
+          break;
+        case 'list':
+          filters[i] = {
+            ...filters[i], value: e.expressions.map(x => {
+              const k = x as ExprString;
+              return k.value;
+            }), type: 'string'
+          } as Filter;
+          i++;
           break;
         default:
           console.debug(e?.type + ' add this type');
@@ -457,7 +483,7 @@ function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
   if (fields.length > 1) {
     return '';
   }
-  if (Object.values(BuilderMetricFieldAggregation).includes(s.expr.function.name.toLocaleLowerCase() as BuilderMetricFieldAggregation))
+  if (Object.values(BuilderMetricFieldAggregation).includes(s.expr.function.name.toLowerCase() as BuilderMetricFieldAggregation))
     return { aggregation: s.expr.function.name as BuilderMetricFieldAggregation, field: fields[0], alias: s.alias?.name } as BuilderMetricField;
   return fields[0];
 }
