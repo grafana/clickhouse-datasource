@@ -148,4 +148,13 @@ describe('ClickHouseDatasource', () => {
       expect(values).toEqual([{ text: 'foo' }]);
     });
   });
+
+  describe('Conditional All', () => {
+    it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
+
+    });
+    it('should replace $__conditionalAll with arg when anything else is selected', async () => {
+
+    });
+  });
 });

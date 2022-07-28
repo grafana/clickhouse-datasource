@@ -12,7 +12,6 @@ import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
-import { removeConditionalAlls } from './removeConditionalAlls';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -59,11 +58,57 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
-    rawQuery = removeConditionalAlls(rawQuery, templateSrv.getVariables(), scoped);
+    rawQuery = this.applyConditionalAll(rawQuery);
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
     };
+  }
+
+  private applyConditionalAll(rawQuery: string): string {
+    if (!rawQuery) {
+      return rawQuery;
+    }
+    const macro = '$__conditionalAll';
+    let macroIndex = rawQuery.lastIndexOf(macro);
+
+    while (macroIndex !== -1) {
+      const params = this.getMacroArgs(rawQuery, macroIndex + macro.length);
+      if (params.length != 2)
+        return rawQuery;
+      const templateVar = params[1].trim();
+      const key = getTemplateSrv().getVariables().find(x => x.name === templateVar.substring(1, templateVar.length)) as any;
+      let phrase = params[0];
+      if (key?.current.value.toString() === '$__all') {
+        phrase = '1=1';
+      }
+      rawQuery = rawQuery.replace(`${macro}(${params[0]},${params[1]})`, phrase);
+      macroIndex = rawQuery.lastIndexOf(macro);
+    }
+    return rawQuery;
+  }
+
+  private getMacroArgs(query: string, argsIndex: number): Array<string> {
+    let args = Array<string>();
+    const re = /\(|\)|,/g;
+    let bracketCount = 0;
+    let lastArgEndIndex = 1;
+    let regExpArray: RegExpExecArray | null;
+    const argsSubstr = query.substring(argsIndex, query.length);
+    while ((regExpArray = re.exec(argsSubstr)) !== null) {
+      const foundNode = regExpArray[0];
+      if (foundNode === '(') bracketCount++;
+      else if (foundNode === ')') bracketCount--;
+      if (foundNode === ',' && bracketCount === 1) {
+        args.push(argsSubstr.substring(lastArgEndIndex, re.lastIndex - 1));
+        lastArgEndIndex = re.lastIndex;
+      }
+      if (bracketCount === 0) {
+        args.push(argsSubstr.substring(lastArgEndIndex, re.lastIndex - 1));
+        return args;
+      }
+    }
+    return [];
   }
 
   private replace(value?: string, scopedVars?: ScopedVars) {
