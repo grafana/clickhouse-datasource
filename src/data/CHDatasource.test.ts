@@ -1,4 +1,4 @@
-import { ArrayDataFrame, toDataFrame } from '@grafana/data';
+import { ArrayDataFrame, ScopedVar, ScopedVars, toDataFrame } from '@grafana/data';
 import { of } from 'rxjs';
 import { mockDatasource } from '__mocks__/datasource';
 import { CHQuery, QueryType } from 'types';
@@ -55,6 +55,13 @@ describe('ClickHouseDatasource', () => {
       const val = await createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
+    });
+    it('should handle $__conditionalAll and replace values', async () => {
+      const query = { rawSql: 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);', queryType: QueryType.SQL } as CHQuery;
+      const scopedVars = { 'fieldVal': { value: `'val1', 'val2'` } as ScopedVar<string> } as ScopedVars;
+      const val = await createInstance({}).applyTemplateVariables(query, scopedVars);
+      //const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any]);
+      expect(val).toEqual(`select stuff from table where fieldVal in ('val1', 'val2');`);
     });
   });
 
@@ -151,10 +158,19 @@ describe('ClickHouseDatasource', () => {
 
   describe('Conditional All', () => {
     it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
-
+      const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: '$__all' } } as any]);
+      expect(val).toEqual('select stuff from table where 1=1;');
     });
     it('should replace $__conditionalAll with arg when anything else is selected', async () => {
-
+      const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any]);
+      expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal);`);
+    });
+    it('should replace all $__conditionalAll', async () => {
+      const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal) and $__conditionalAll(fieldVal in ($fieldVal2), $fieldVal2);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any, { name: 'fieldVal2', current: { value: '$__all' } } as any]);
+      expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal) and 1=1;`);
     });
   });
 });

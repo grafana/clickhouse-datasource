@@ -1,4 +1,4 @@
-import { parseFirst, Statement, SelectFromStatement, FromTable, astMapper } from 'pgsql-ast-parser';
+import { parseFirst, Statement, SelectFromStatement, FromTable, astMapper, FromStatement, toSql } from 'pgsql-ast-parser';
 
 export function sqlToStatement(sql: string): Statement {
   const replaceFuncs = [] as {
@@ -48,6 +48,19 @@ export function sqlToStatement(sql: string): Statement {
 
 export function getTable(sql: string): string {
   const stm = sqlToStatement(sql) as SelectFromStatement;
-  const table = stm.from![0] as FromTable;
-  return `${table.name.schema}.${table.name.name}`;
+  if (stm.from?.length && stm.from?.length > 0) {
+    switch (stm.from![0].type) {
+      case 'table':
+        {
+          const table = stm.from![0] as FromTable;
+          return `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
+        }
+      case 'statement':
+        {
+          const table = stm.from![0] as FromStatement;
+          return getTable(toSql.statement(table.statement));
+        }
+    }
+  }
+  return '';
 }

@@ -9,6 +9,9 @@ export class AdHocFilter {
 
   setTargetTableFromQuery(query: string) {
     this._targetTable = getTable(query);
+    if (this._targetTable === '') {
+      throw new Error('Stuff broke');
+    }
   }
 
   apply(sql: string, adHocFilters: AdHocVariableFilter[]): string {
@@ -19,25 +22,21 @@ export class AdHocFilter {
     if (filter.key.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
-    if (this._targetTable === '') {
+    if (this._targetTable === '' || !sql.search(this._targetTable)) {
       return sql;
     }
-    let whereClause = '';
+    let filters = '';
     for (let i = 0; i < adHocFilters.length; i++) {
       const filter = adHocFilters[i];
       const v = isNaN(Number(filter.value)) ? `\\'${filter.value}\\'` : Number(filter.value);
-      whereClause += ` ${filter.key} ${filter.operator} ${v} `;
+      filters += ` ${filter.key} ${filter.operator} ${v} `;
       if (i !== adHocFilters.length - 1) {
-        whereClause += filter.condition ? filter.condition : 'AND';
+        filters += filter.condition ? filter.condition : 'AND';
       }
     }
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
-    return `${sql} ${this.applyTableFilter(this._targetTable, whereClause)}`
-  }
-
-  applyTableFilter(table: string, filters: string): string {
-    return `settings additional_table_filters={'${table}' : '${filters}'}`
+    return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`
   }
 }
 

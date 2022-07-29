@@ -6,6 +6,7 @@ import {
   DataSourceInstanceSettings,
   MetricFindValue,
   ScopedVars,
+  VariableModel,
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
@@ -58,31 +59,31 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
-    rawQuery = this.applyConditionalAll(rawQuery);
+    rawQuery = this.applyConditionalAll(rawQuery, getTemplateSrv().getVariables());
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
     };
   }
 
-  private applyConditionalAll(rawQuery: string): string {
+  applyConditionalAll(rawQuery: string, templateVars: VariableModel[]): string {
     if (!rawQuery) {
       return rawQuery;
     }
-    const macro = '$__conditionalAll';
+    const macro = '$__conditionalAll(';
     let macroIndex = rawQuery.lastIndexOf(macro);
 
     while (macroIndex !== -1) {
-      const params = this.getMacroArgs(rawQuery, macroIndex + macro.length);
+      const params = this.getMacroArgs(rawQuery, macroIndex + macro.length - 1);
       if (params.length != 2)
         return rawQuery;
       const templateVar = params[1].trim();
-      const key = getTemplateSrv().getVariables().find(x => x.name === templateVar.substring(1, templateVar.length)) as any;
+      const key = templateVars.find(x => x.name === templateVar.substring(1, templateVar.length)) as any;
       let phrase = params[0];
       if (key?.current.value.toString() === '$__all') {
         phrase = '1=1';
       }
-      rawQuery = rawQuery.replace(`${macro}(${params[0]},${params[1]})`, phrase);
+      rawQuery = rawQuery.replace(`${macro}${params[0]},${params[1]})`, phrase);
       macroIndex = rawQuery.lastIndexOf(macro);
     }
     return rawQuery;
