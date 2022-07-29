@@ -97,7 +97,10 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
-
+	protocol := clickhouse.Native
+	if settings.Protocol == "http" {
+		protocol = clickhouse.HTTP
+	}
 	db := clickhouse.OpenDB(&clickhouse.Options{
 		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
@@ -111,6 +114,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		},
 		DialTimeout: time.Duration(t) * time.Second,
 		ReadTimeout: time.Duration(t) * time.Second,
+		Protocol:    protocol,
 	})
 
 	timeout := time.Duration(t)

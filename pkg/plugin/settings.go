@@ -23,6 +23,7 @@ type Settings struct {
 	TlsClientKey       string
 	Secure             bool   `json:"secure,omitempty"`
 	Timeout            string `json:"timeout,omitempty"`
+	Protocol           string `json:"protocol"`
 }
 
 func (settings *Settings) isValid() (err error) {
@@ -31,6 +32,9 @@ func (settings *Settings) isValid() (err error) {
 	}
 	if settings.Port == 0 {
 		return ErrorMessageInvalidPort
+	}
+	if settings.Protocol != "http" && settings.Protocol != "native" {
+		return ErrorMessageInvalidProtocol
 	}
 	return nil
 }
@@ -59,6 +63,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	tlsClientKey, ok := config.DecryptedSecureJSONData["tlsClientKey"]
 	if ok {
 		settings.TlsClientKey = tlsClientKey
+	}
+	if settings.Protocol == "" {
+		settings.Protocol = "native"
 	}
 	return settings, settings.isValid()
 }

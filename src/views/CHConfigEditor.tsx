@@ -4,10 +4,10 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { LegacyForms, Switch, InlineFormLabel, useTheme } from '@grafana/ui';
-import { CertificationKey } from '../components/ui/CertificationKey';
-import { Components } from './../selectors';
-import { CHConfig, CHSecureConfig } from './../types';
+import {InlineFormLabel, LegacyForms, RadioButtonGroup, Switch, useTheme} from '@grafana/ui';
+import {CertificationKey} from '../components/ui/CertificationKey';
+import {Components} from './../selectors';
+import {CHConfig, CHSecureConfig, Protocol} from './../types';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -20,6 +20,10 @@ export const ConfigEditor: React.FC<Props> = (props) => {
   const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
   const hasTLSClientCert = secureJsonFields && secureJsonFields.tlsClientCert;
   const hasTLSClientKey = secureJsonFields && secureJsonFields.tlsClientKey;
+  const protocolOptions = [
+    { label: 'Native', value: Protocol.NATIVE },
+    { label: 'HTTP', value: Protocol.HTTP },
+  ];
   const switchContainerStyle: React.CSSProperties = {
     padding: `0 ${theme.spacing.sm}`,
     height: `${theme.spacing.formInputHeight}px`,
@@ -56,6 +60,17 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
+
+  const onProtocolToggle = (protocol: Protocol) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        protocol: protocol,
+      },
+    });
+  }
+
   const onCertificateChangeFactory = (key: keyof Omit<CHSecureConfig, 'password'>, value: string) => {
     onOptionsChange({
       ...options,
@@ -121,6 +136,17 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             aria-label={Components.ConfigEditor.ServerPort.label}
             placeholder={Components.ConfigEditor.ServerPort.placeholder(jsonData.secure?.toString() || 'false')}
             tooltip={Components.ConfigEditor.ServerPort.tooltip}
+          />
+        </div>
+        <div className="gf-form">
+          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Protocol.tooltip}>
+            {Components.ConfigEditor.Protocol.label}
+          </InlineFormLabel>
+          <RadioButtonGroup<Protocol>
+              options={protocolOptions}
+              disabledOptions={[]}
+              value={jsonData.protocol || Protocol.NATIVE}
+              onChange={(e) => onProtocolToggle(e!)}
           />
         </div>
         <div className="gf-form">

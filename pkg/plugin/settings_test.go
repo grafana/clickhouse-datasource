@@ -42,6 +42,7 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
 					Timeout:            "10",
+					Protocol:           "native",
 				},
 				wantErr: nil,
 			},
