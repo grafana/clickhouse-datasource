@@ -1,5 +1,5 @@
 import { PluginType } from '@grafana/data';
-import { CHQuery, QueryType } from '../types';
+import { CHQuery, Protocol, QueryType } from '../types';
 import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
@@ -12,6 +12,7 @@ export const mockDatasource = new Datasource({
     port: 443,
     username: 'user',
     defaultDatabase: 'foo',
+    protocol: Protocol.NATIVE,
   },
   meta: {
     id: 'grafana-clickhouse-datasource',

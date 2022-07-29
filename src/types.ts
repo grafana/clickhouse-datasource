@@ -5,7 +5,7 @@ export const defaultQuery: Partial<CHQuery> = {};
 export interface CHConfig extends DataSourceJsonData {
   username: string;
   server: string;
-  protocol: Protocol,
+  protocol: Protocol;
   port: number;
   defaultDatabase?: string;
   tlsSkipVerify?: boolean;
@@ -25,7 +25,7 @@ export interface CHSecureConfig {
 
 export enum Protocol {
   NATIVE = 'native',
-  HTTP = 'http'
+  HTTP = 'http',
 }
 
 export enum Format {

@@ -4,10 +4,10 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import {InlineFormLabel, LegacyForms, RadioButtonGroup, Switch, useTheme} from '@grafana/ui';
-import {CertificationKey} from '../components/ui/CertificationKey';
-import {Components} from './../selectors';
-import {CHConfig, CHSecureConfig, Protocol} from './../types';
+import { InlineFormLabel, LegacyForms, RadioButtonGroup, useTheme, Switch } from '@grafana/ui';
+import { CertificationKey } from '../components/ui/CertificationKey';
+import { Components } from './../selectors';
+import { CHConfig, CHSecureConfig, Protocol } from './../types';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -69,7 +69,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         protocol: protocol,
       },
     });
-  }
+  };
 
   const onCertificateChangeFactory = (key: keyof Omit<CHSecureConfig, 'password'>, value: string) => {
     onOptionsChange({
@@ -143,10 +143,10 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             {Components.ConfigEditor.Protocol.label}
           </InlineFormLabel>
           <RadioButtonGroup<Protocol>
-              options={protocolOptions}
-              disabledOptions={[]}
-              value={jsonData.protocol || Protocol.NATIVE}
-              onChange={(e) => onProtocolToggle(e!)}
+            options={protocolOptions}
+            disabledOptions={[]}
+            value={jsonData.protocol || Protocol.NATIVE}
+            onChange={(e) => onProtocolToggle(e!)}
           />
         </div>
         <div className="gf-form">

@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 	}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf("clickhouse/clickhouse-server:%s", GetClickHouseTestVersion()),
-		ExposedPorts: []string{"9000/tcp"},
+		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
 		WaitingFor:   wait.ForLog("Ready for connections"),
 		Mounts: []testcontainers.ContainerMount{
 			testcontainers.BindMount(path.Join(cwd, "../../config/custom.xml"), "/etc/clickhouse-server/config.d/custom.xml"),
@@ -106,6 +106,22 @@ func TestConnect(t *testing.T) {
 	})
 }
 
+func TestHTTPConnect(t *testing.T) {
+	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl := getEnv("CLICKHOUSE_SSL", "false")
+	clickhouse := plugin.Clickhouse{}
+	t.Run("should not error when valid settings passed", func(t *testing.T) {
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		assert.Equal(t, nil, err)
+	})
+}
+
 func getEnv(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok {
 		return value
@@ -113,7 +129,7 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func setupConnection(t *testing.T) *sql.DB {
+func setupConnection(t *testing.T, protocol clickhouse_sql.Protocol) *sql.DB {
 	port := getEnv("CLICKHOUSE_PORT", "9000")
 	host := getEnv("CLICKHOUSE_HOST", "localhost")
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
@@ -137,13 +153,14 @@ func setupConnection(t *testing.T) *sql.DB {
 			Username: username,
 			Password: password,
 		},
-		TLS: sConfig,
+		TLS:      sConfig,
+		Protocol: protocol,
 	})
 	return conn
 }
 
 func setupTest(t *testing.T, ddl string) (*sql.DB, func(t *testing.T)) {
-	conn := setupConnection(t)
+	conn := setupConnection(t, clickhouse_sql.Native)
 	_, err := conn.Exec("DROP TABLE IF EXISTS simple_table")
 	require.NoError(t, err)
 	_, err = conn.Exec(fmt.Sprintf("CREATE table simple_table(%s) ENGINE = MergeTree ORDER BY tuple();", ddl))
@@ -192,7 +209,6 @@ func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
 			}
 			assert.Equal(t, eVal, val)
 		}
-
 	}
 }
 
@@ -639,7 +655,7 @@ func TestConvertNullableUUID(t *testing.T) {
 }
 
 func TestConvertJSON(t *testing.T) {
-	conn := setupConnection(t)
+	conn := setupConnection(t, clickhouse_sql.Native)
 	canTest, err := plugin.CheckMinServerVersion(conn, 22, 6, 1)
 	if err != nil {
 		t.Skip(err.Error())
