@@ -61,14 +61,15 @@ func TestMain(m *testing.M) {
 		fmt.Printf("Docker is not running and no clickhouse connections details were provided. Skipping IT tests: %s\n", err)
 		os.Exit(0)
 	}
-	fmt.Printf("Using Docker for IT tests\n")
+	chVersion := GetClickHouseTestVersion()
+	fmt.Printf("Using Docker for IT tests with ClickHouse %s\n", chVersion)
 	cwd, err := os.Getwd()
 	if err != nil {
 		// can't test without container
 		panic(err)
 	}
 	req := testcontainers.ContainerRequest{
-		Image:        fmt.Sprintf("clickhouse/clickhouse-server:%s", GetClickHouseTestVersion()),
+		Image:        fmt.Sprintf("clickhouse/clickhouse-server:%s", chVersion),
 		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
 		WaitingFor:   wait.ForLog("Ready for connections"),
 		Mounts: []testcontainers.ContainerMount{
@@ -95,6 +96,8 @@ func TestMain(m *testing.M) {
 	}
 	p, _ := clickhouseContainer.MappedPort(ctx, "9000")
 	os.Setenv("CLICKHOUSE_PORT", p.Port())
+	hp, _ := clickhouseContainer.MappedPort(ctx, "8123")
+	os.Setenv("CLICKHOUSE_HTTP_PORT", hp.Port())
 	os.Setenv("CLICKHOUSE_HOST", "localhost")
 	defer clickhouseContainer.Terminate(ctx) //nolint
 	os.Exit(m.Run())
