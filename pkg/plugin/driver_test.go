@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	clickhouse_sql "github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/go-units"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -73,6 +75,15 @@ func TestMain(m *testing.M) {
 			testcontainers.BindMount(path.Join(cwd, "../../config/custom.xml"), "/etc/clickhouse-server/config.d/custom.xml"),
 			testcontainers.BindMount(path.Join(cwd, "../../config/admin.xml"), "/etc/clickhouse-server/users.d/admin.xml"),
 		},
+		Resources: container.Resources{
+			Ulimits: []*units.Ulimit{
+				{
+					Name: "nofile",
+					Hard: 262144,
+					Soft: 262144,
+				},
+			},
+		},
 	}
 	clickhouseContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -82,7 +93,6 @@ func TestMain(m *testing.M) {
 		// can't test without container
 		panic(err)
 	}
-
 	p, _ := clickhouseContainer.MappedPort(ctx, "9000")
 	os.Setenv("CLICKHOUSE_PORT", p.Port())
 	os.Setenv("CLICKHOUSE_HOST", "localhost")

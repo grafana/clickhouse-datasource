@@ -1,0 +1,44 @@
+name: run-tests
+
+on:
+  push:
+    branches:
+      - v1
+      - main
+  pull_request:
+    branches:
+      - v1
+      - main
+  schedule:
+    - cron: "0 9 1 * *"
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        go:
+          - 1.18.3 #pin to 1.18.3 for now due to https://github.com/ClickHouse/ch-go/issues/160
+        clickhouse:
+          - 21.8
+          - 22.3
+          - 22.4
+          - 22.5
+          - 22.6
+          - latest
+
+    steps:
+      - uses: actions/checkout@main
+
+      - name: Install Go ${{ matrix.go }}
+        uses: actions/setup-go@v2.1.5
+        with:
+          stable: false
+          go-version: ${{ matrix.go }}
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Run backend tests
+        run: CLICKHOUSE_VERSION=${{ matrix.clickhouse }} go test -v ./...
