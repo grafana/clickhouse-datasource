@@ -68,13 +68,20 @@ func TestMain(m *testing.M) {
 		// can't test without container
 		panic(err)
 	}
+
+	customTarget := testcontainers.ContainerMountTarget("/etc/clickhouse-server/config.d/custom.xml")
+	adminTarget := testcontainers.ContainerMountTarget("/etc/clickhouse-server/users.d/admin.xml")
+	if chVersion == "21.8" {
+		customTarget = "/etc/clickhouse-server/config.d/custom.21.8.xml"
+		adminTarget = "/etc/clickhouse-server/users.d/admin.21.8.xml"
+	}
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf("clickhouse/clickhouse-server:%s", chVersion),
 		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
 		WaitingFor:   wait.ForLog("Ready for connections"),
 		Mounts: []testcontainers.ContainerMount{
-			testcontainers.BindMount(path.Join(cwd, "../../config/custom.xml"), "/etc/clickhouse-server/config.d/custom.xml"),
-			testcontainers.BindMount(path.Join(cwd, "../../config/admin.xml"), "/etc/clickhouse-server/users.d/admin.xml"),
+			testcontainers.BindMount(path.Join(cwd, "../../config/custom.xml"), customTarget),
+			testcontainers.BindMount(path.Join(cwd, "../../config/admin.xml"), adminTarget),
 		},
 		Resources: container.Resources{
 			Ulimits: []*units.Ulimit{
