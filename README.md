@@ -109,14 +109,15 @@ FROM test_data
 WHERE $__timeFilter(date_time)
 ```
 
-| Macro                          | Description                                                                                                                      | Output example                                          |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| *$__timeFilter(columnName)*    | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in seconds      | `time >= '1480001790' AND time <= '1482576232' )`       |
-| *$__timeFilter_ms(columnName)* | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds | `time >= '1480001790671' AND time <= '1482576232479' )` |
-| *$__fromTime*                  | Replaced by the starting time of the range of the panel casted to DateTime                                                       | `toDateTime(intDiv(1415792726371,1000))`                |
-| *$__toTime*                    | Replaced by the ending time of the range of the panel casted to DateTime                                                         | `toDateTime(intDiv(1415792726371,1000))`                |
-| *$__interval_s*                | Replaced by the interval in seconds                                                                                              | `20`                                                    |
-| *$__timeInterval(columnName)*  | Replaced by a function calculating the interval based on window size, useful when grouping                                       | `toStartOfInterval(column, INTERVAL 20 second)`         |
+| Macro                                        | Description                                                                                                                                                                         | Output example                                          |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| *$__timeFilter(columnName)*                  | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in seconds                                                         | `time >= '1480001790' AND time <= '1482576232' )`       |
+| *$__timeFilter_ms(columnName)*               | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds                                                    | `time >= '1480001790671' AND time <= '1482576232479' )` |
+| *$__fromTime*                                | Replaced by the starting time of the range of the panel casted to DateTime                                                                                                          | `toDateTime(intDiv(1415792726371,1000))`                |
+| *$__toTime*                                  | Replaced by the ending time of the range of the panel casted to DateTime                                                                                                            | `toDateTime(intDiv(1415792726371,1000))`                |
+| *$__interval_s*                              | Replaced by the interval in seconds                                                                                                                                                 | `20`                                                    |
+| *$__timeInterval(columnName)*                | Replaced by a function calculating the interval based on window size, useful when grouping                                                                                          | `toStartOfInterval(column, INTERVAL 20 second)`         |
+| *$__conditionalAll(condition, $templateVar)* | Replaced by the first parameter when the template variable in the second parameter does not select every value. Replaced by the 1=1 when the template variable selects every value. | `condition` or `1=1`                                    |
 
 The plugin also supports notation using braces {}. Use this notation when queries are needed inside parameters.
 
@@ -148,6 +149,8 @@ We distribute the following dashboards with the plugin. These are aimed at assis
 3. Query Analysis - an analysis of queries by type, performance and resource consumption.
 
 ### Ad Hoc Filters
+
+Ad hoc filters are only supported with version 22.7+ of ChickHouse.
 
 Ad hoc filters allow you to add key/value filters that are automatically added
 to all metric queries that use the specified data source, without being
