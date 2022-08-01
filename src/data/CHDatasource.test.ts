@@ -52,16 +52,19 @@ describe('ClickHouseDatasource', () => {
       const rawSql = 'foo';
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => rawSql);
       const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
-      const val = await createInstance({}).applyTemplateVariables(query, {});
+      const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
     });
     it('should handle $__conditionalAll and replace values', async () => {
-      const query = { rawSql: 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);', queryType: QueryType.SQL } as CHQuery;
+      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
       const scopedVars = { 'fieldVal': { value: `'val1', 'val2'` } as ScopedVar<string> } as ScopedVars;
-      const val = await createInstance({}).applyTemplateVariables(query, scopedVars);
-      //const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any]);
-      expect(val).toEqual(`select stuff from table where fieldVal in ('val1', 'val2');`);
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [scopedVars]);
+      const val = createInstance({}).applyTemplateVariables(query, {});
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL });
     });
   });
 

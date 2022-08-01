@@ -10,7 +10,7 @@ export class AdHocFilter {
   setTargetTableFromQuery(query: string) {
     this._targetTable = getTable(query);
     if (this._targetTable === '') {
-      throw new Error('Stuff broke');
+      throw new Error('Failed to get table from adhoc query.');
     }
   }
 
@@ -22,7 +22,7 @@ export class AdHocFilter {
     if (filter.key.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
-    if (this._targetTable === '' || !sql.search(this._targetTable)) {
+    if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`))) {
       return sql;
     }
     let filters = '';
