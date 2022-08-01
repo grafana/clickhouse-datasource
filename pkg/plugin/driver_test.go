@@ -599,18 +599,25 @@ func TestConvertNullableDate(t *testing.T) {
 
 var datetime, _ = time.Parse("2006-01-02 15:04:05", "2022-01-12 00:00:00")
 
-//func TestConvertDateTime(t *testing.T) {
-//	for name, protocol := range Protocols {
-//		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
-//			loc, _ := time.LoadLocation("Europe/London")
-//			conn, close := setupTest(t, "col1 DateTime('Europe/London')", protocol)
-//			defer close(t)
-//			locTime := datetime.In(loc)
-//			insertData(t, conn, locTime)
-//			checkRows(t, conn, 1, locTime)
-//		})
-//	}
-//}
+func TestConvertDateTime(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var localtime time.Time
+			switch name {
+			// currently native will set a columns tz - http won't as info isn't sent - see https://github.com/ClickHouse/ClickHouse/issues/38209
+			case "native":
+				loc, _ := time.LoadLocation("Europe/London")
+				localtime = datetime.In(loc)
+			case "http":
+				localtime = datetime.Local()
+			}
+			conn, close := setupTest(t, "col1 DateTime('Europe/London')", protocol)
+			defer close(t)
+			insertData(t, conn, localtime)
+			checkRows(t, conn, 1, localtime)
+		})
+	}
+}
 
 func TestConvertNullableDateTime(t *testing.T) {
 	for name, protocol := range Protocols {
