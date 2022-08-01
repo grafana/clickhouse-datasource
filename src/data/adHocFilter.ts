@@ -36,7 +36,7 @@ export class AdHocFilter {
     }
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
-    return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`
+    return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;
   }
 }
 

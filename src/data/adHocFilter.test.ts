@@ -8,7 +8,9 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '=', value: 'val' },
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`);
+    expect(val).toEqual(
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`
+    );
   });
   it('apply ad hoc filter with no inner query and no existing WHERE', () => {
     const ahm = new AdHocFilter();
@@ -17,7 +19,9 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '=', value: 'val' },
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`);
+    expect(val).toEqual(
+      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`
+    );
   });
   it('apply ad hoc filter with an inner query without existing WHERE', () => {
     const ahm = new AdHocFilter();
@@ -93,6 +97,8 @@ describe('AdHocManager', () => {
   });
   it('throws an error when the adhoc filter select cannot be parsed', () => {
     const ahm = new AdHocFilter();
-    expect(function () { ahm.setTargetTableFromQuery('not sql'); }).toThrow(new Error("Failed to get table from adhoc query."));
+    expect(function () {
+      ahm.setTargetTableFromQuery('not sql');
+    }).toThrow(new Error('Failed to get table from adhoc query.'));
   });
 });

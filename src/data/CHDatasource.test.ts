@@ -58,7 +58,7 @@ describe('ClickHouseDatasource', () => {
     });
     it('should handle $__conditionalAll and replace values', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
-      const scopedVars = { 'fieldVal': { value: `'val1', 'val2'` } as ScopedVar<string> } as ScopedVars;
+      const scopedVars = { fieldVal: { value: `'val1', 'val2'` } as ScopedVar<string> } as ScopedVars;
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
       const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [scopedVars]);
       const val = createInstance({}).applyTemplateVariables(query, {});
@@ -162,17 +162,25 @@ describe('ClickHouseDatasource', () => {
   describe('Conditional All', () => {
     it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
       const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
-      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: '$__all' } } as any]);
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'fieldVal', current: { value: '$__all' } } as any,
+      ]);
       expect(val).toEqual('select stuff from table where 1=1;');
     });
     it('should replace $__conditionalAll with arg when anything else is selected', async () => {
       const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
-      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any]);
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any,
+      ]);
       expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal);`);
     });
     it('should replace all $__conditionalAll', async () => {
-      const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal) and $__conditionalAll(fieldVal in ($fieldVal2), $fieldVal2);';
-      const val = createInstance({}).applyConditionalAll(rawSql, [{ name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any, { name: 'fieldVal2', current: { value: '$__all' } } as any]);
+      const rawSql =
+        'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal) and $__conditionalAll(fieldVal in ($fieldVal2), $fieldVal2);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any,
+        { name: 'fieldVal2', current: { value: '$__all' } } as any,
+      ]);
       expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal) and 1=1;`);
     });
   });
