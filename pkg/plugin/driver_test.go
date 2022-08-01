@@ -771,19 +771,11 @@ func TestNested(t *testing.T) {
 }
 
 func TestArrayTuple(t *testing.T) {
-	conn := setupConnection(t, clickhouse_sql.Native, nil)
-	canTest, err := plugin.CheckMinServerVersion(conn, 21, 9, 0)
-	if err != nil {
-		t.Skip(err.Error())
-		return
-	}
-	if !canTest {
-		t.Skipf("Skipping Array Tuple test as version is < 21.9.0")
-		return
-	}
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
-			conn, close := setupTest(t, "col1 Array(Tuple(s String, i Int32))", protocol, nil)
+			conn, close := setupTest(t, "col1 Array(Tuple(s String, i Int32))", protocol, clickhouse_sql.Settings{
+				"flatten_nested": 0,
+			})
 			defer close(t)
 			val := []map[string]interface{}{{"s": "43", "i": int32(43)}}
 			insertData(t, conn, val)
