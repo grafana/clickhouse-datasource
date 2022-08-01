@@ -53,8 +53,8 @@ github.com/ClickHouse/ch-go v0.47.2 h1:94mxqpQc48PLijPp5McmrJ0MnRUV0/w768Q9JgPVb
 github.com/ClickHouse/ch-go v0.47.2/go.mod h1:z97ZbsIa3G2xtr/mENSumixSf2kRCh+gSH3tvtUSRw8=
 github.com/ClickHouse/clickhouse-go v1.5.4 h1:cKjXeYLNWVJIx2J1K6H2CqyRmfwVJVY1OV1coaaFcI0=
 github.com/ClickHouse/clickhouse-go v1.5.4/go.mod h1:EaI/sW7Azgz9UATzd5ZdZHRUhHgv5+JMS9NSr2smCJI=
-github.com/ClickHouse/clickhouse-go/v2 v2.3.0-beta.1.0.20220729163137-34665af8b25b h1:OutoS65kcWW0OCvY/NQNOPP5WTAwOcHa/4SiuH8P/t8=
-github.com/ClickHouse/clickhouse-go/v2 v2.3.0-beta.1.0.20220729163137-34665af8b25b/go.mod h1:JkGzp7rE/A6ETBRYUAaQBdaol13K2DgF5q8JkhM6Rsc=
+github.com/ClickHouse/clickhouse-go/v2 v2.3.0-beta.2 h1:0sACzrR1CeJC2MjaskuN8lzNbSKn3KWizL8K1rJvubg=
+github.com/ClickHouse/clickhouse-go/v2 v2.3.0-beta.2/go.mod h1:JkGzp7rE/A6ETBRYUAaQBdaol13K2DgF5q8JkhM6Rsc=
 github.com/Knetic/govaluate v3.0.1-0.20171022003610-9aa49832a739+incompatible/go.mod h1:r7JcOSlj0wfOMncg0iLm8Leh48TZaKVeNIfJntJ2wa0=
 github.com/Microsoft/go-winio v0.4.11/go.mod h1:VhR8bwka0BXejwEJY73c50VrPtXAaKcyvVC4A4RozmA=
 github.com/Microsoft/go-winio v0.4.14/go.mod h1:qXqCSQ3Xa7+6tgxaGTIe4Kpcdsi+P8jBhyzoq1bpyYA=
