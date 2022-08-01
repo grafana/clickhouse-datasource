@@ -18,7 +18,19 @@ validate that queries are safe. Queries can contain any SQL statement. For
 example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'`
 and `DROP TABLE sadTable;` would be executed.
 
+### ClickHouse protocol support
+
+The plugin supports both `HTTP` and `Native` (default) transport protocols. This can be enabled in the configuration via the `protocol` configuration parameter. Both protocols exchange data with ClickHouse using optimized native format.
+
+Note that the default ports for `HTTP/s` and `Native` differ:
+
+- HTTP - 8123
+- HTTPS - 8443
+- Native - 9000
+- Native with TLS - 9440
+
 ### Manual configuration
+
 Once the plugin is installed on your Grafana instance, follow [these
 instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/)
 to add a new ClickHouse data source, and enter configuration options.
