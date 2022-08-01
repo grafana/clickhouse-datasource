@@ -6,4 +6,6 @@
     <logger>
         <console>1</console>
     </logger>
+    <timezone>Asia/Shanghai</timezone>
+
 </clickhouse>
