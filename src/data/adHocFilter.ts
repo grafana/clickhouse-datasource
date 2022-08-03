@@ -10,6 +10,7 @@ export class AdHocFilter {
   setTargetTableFromQuery(query: string) {
     this._targetTable = getTable(query);
     if (this._targetTable === '') {
+      console.error('Failed to get table from adhoc query.');
       throw new Error('Failed to get table from adhoc query.');
     }
   }
@@ -25,15 +26,12 @@ export class AdHocFilter {
     if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`))) {
       return sql;
     }
-    let filters = '';
-    for (let i = 0; i < adHocFilters.length; i++) {
-      const filter = adHocFilters[i];
-      const v = isNaN(Number(filter.value)) ? `\\'${filter.value}\\'` : Number(filter.value);
-      filters += ` ${filter.key} ${filter.operator} ${v} `;
-      if (i !== adHocFilters.length - 1) {
-        filters += filter.condition ? filter.condition : 'AND';
-      }
-    }
+    let filters = adHocFilters
+      .map(
+        (f, i) =>
+          ` ${f.key} ${f.operator} ${isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value)} ${i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') :
+            ''}`
+      ).join('');
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
     return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;

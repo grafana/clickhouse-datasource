@@ -32,6 +32,7 @@ export function sqlToStatement(sql: string): Statement {
   try {
     ast = parseFirst(sql);
   } catch (err) {
+    console.error(`Failed to parse SQL statement into an AST: ${err}`);
     return {} as Statement;
   }
 

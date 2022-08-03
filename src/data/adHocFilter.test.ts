@@ -98,7 +98,7 @@ describe('AdHocManager', () => {
   it('throws an error when the adhoc filter select cannot be parsed', () => {
     const ahm = new AdHocFilter();
     expect(function () {
-      ahm.setTargetTableFromQuery('not sql');
+      ahm.setTargetTableFromQuery('select not sql');
     }).toThrow(new Error('Failed to get table from adhoc query.'));
   });
 });

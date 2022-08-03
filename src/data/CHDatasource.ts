@@ -20,6 +20,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   settings: DataSourceInstanceSettings<CHConfig>;
   adHocFilter: AdHocFilter;
   skipAdHocFilter = false; // don't apply adhoc filters to the query
+  adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
+  adHocCHVerReq = { major: 22, minor: 7 };
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -28,6 +30,9 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   async metricFindQuery(query: CHQuery | string, options: any) {
+    if (this.adHocFiltersStatus === AdHocFilterStatus.none) {
+      this.adHocFiltersStatus = await this.canUseAdhocFilters();
+    }
     const chQuery = isString(query) ? { rawSql: query, queryType: QueryType.SQL } : query;
 
     if (!(chQuery.queryType === QueryType.SQL || chQuery.queryType === QueryType.Builder || !chQuery.queryType)) {
@@ -56,6 +61,11 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     const templateSrv = getTemplateSrv();
     if (!this.skipAdHocFilter) {
       const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
+      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && adHocFilters?.length > 0) {
+        throw new Error(
+          `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
+        );
+      }
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
@@ -192,6 +202,12 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   async getTagKeys(): Promise<MetricFindValue[]> {
+    if (this.adHocFiltersStatus === AdHocFilterStatus.disabled || this.adHocFiltersStatus === AdHocFilterStatus.none) {
+      this.adHocFiltersStatus = await this.canUseAdhocFilters();
+      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled) {
+        return {} as MetricFindValue[];
+      }
+    }
     const { type, frame } = await this.fetchTags();
     if (type === TagType.query) {
       return frame.fields.map((f) => ({ text: f.name }));
@@ -288,11 +304,34 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     const sql = `SELECT name, type, table FROM system.columns WHERE database IN ('${db}') AND table = '${table}'`;
     return { type: TagType.schema, source: sql, from: source };
   }
+
+  // Returns true if ClickHouse's version is greater than or equal to 22.7
+  // 22.7 added 'settings additional_table_filters' which is used for ad hoc filters
+  private async canUseAdhocFilters(): Promise<AdHocFilterStatus> {
+    this.skipAdHocFilter = true;
+    const data = await this.fetchData(`SELECT version()`);
+    try {
+      const verString = (data[0] as unknown as string).split('.');
+      const ver = { major: Number.parseInt(verString[0], 10), minor: Number.parseInt(verString[1], 10) };
+      return ver.major > this.adHocCHVerReq.major ||
+        (ver.major === this.adHocCHVerReq.major && ver.minor >= this.adHocCHVerReq.minor)
+        ? AdHocFilterStatus.enabled : AdHocFilterStatus.disabled;
+    } catch (err) {
+      console.error(`Unable to parse ClickHouse version: ${err}`);
+      throw err;
+    }
+  }
 }
 
 enum TagType {
   query,
   schema,
+}
+
+enum AdHocFilterStatus {
+  none = 0,
+  enabled,
+  disabled,
 }
 
 interface Tags {

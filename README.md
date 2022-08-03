@@ -3,6 +3,8 @@
 The ClickHouse data source plugin allows you to query and visualize ClickHouse
 data from within Grafana.
 
+**As of 2.0 this plugin will only support ad hoc filters when using ClickHouse 22.7+**
+
 ## Installation
 
 For detailed instructions on how to install the plugin on Grafana Cloud or
@@ -150,7 +152,7 @@ We distribute the following dashboards with the plugin. These are aimed at assis
 
 ### Ad Hoc Filters
 
-Ad hoc filters are only supported with version 22.7+ of ChickHouse.
+Ad hoc filters are only supported with version 22.7+ of ClickHouse.
 
 Ad hoc filters allow you to add key/value filters that are automatically added
 to all metric queries that use the specified data source, without being

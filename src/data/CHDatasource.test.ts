@@ -120,6 +120,38 @@ describe('ClickHouseDatasource', () => {
 
       expect(keys).toEqual([{ text: 'name' }]);
     });
+    it('returns no tags when CH version is less than 22.7 ', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
+      const frame = new ArrayDataFrame([{ version: '21.9.342' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.adHocFiltersStatus = 2;
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      expect(spyOnReplace).toHaveBeenCalled();
+
+      expect(spyOnQuery).toHaveBeenCalled();
+
+      expect(keys).toEqual({});
+    });
+
+    it('returns tags when CH version is greater than 22.7 ', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
+      const frameVer = new ArrayDataFrame([{ version: '23.2.212' }]);
+      const frameData = new ArrayDataFrame([{ name: 'foo' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.adHocFiltersStatus = 2;
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        return request.targets[0].rawSql === 'SELECT version()' ? of({ data: [frameVer] }) : of({ data: [frameData] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(spyOnReplace).toHaveBeenCalled();
+
+      expect(spyOnQuery).toHaveBeenCalled();
+
+      expect(keys).toEqual([{ text: 'name' }]);
+    });
   });
 
   describe('Tag Values', () => {
