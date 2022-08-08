@@ -315,7 +315,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       const ver = { major: Number.parseInt(verString[0], 10), minor: Number.parseInt(verString[1], 10) };
       return ver.major > this.adHocCHVerReq.major ||
         (ver.major === this.adHocCHVerReq.major && ver.minor >= this.adHocCHVerReq.minor)
-        ? AdHocFilterStatus.enabled : AdHocFilterStatus.disabled;
+        ? AdHocFilterStatus.enabled
+        : AdHocFilterStatus.disabled;
     } catch (err) {
       console.error(`Unable to parse ClickHouse version: ${err}`);
       throw err;

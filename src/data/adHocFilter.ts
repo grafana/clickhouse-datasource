@@ -29,9 +29,11 @@ export class AdHocFilter {
     let filters = adHocFilters
       .map(
         (f, i) =>
-          ` ${f.key} ${f.operator} ${isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value)} ${i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') :
-            ''}`
-      ).join('');
+          ` ${f.key} ${f.operator} ${isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value)} ${
+            i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : ''
+          }`
+      )
+      .join('');
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
     return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;
