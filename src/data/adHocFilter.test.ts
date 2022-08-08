@@ -101,4 +101,24 @@ describe('AdHocManager', () => {
       ahm.setTargetTableFromQuery('select not sql');
     }).toThrow(new Error('Failed to get table from adhoc query.'));
   });
+  it('apply ad hoc filter with same table casing', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM fooTable');
+    const val = ahm.apply('SELECT stuff FROM fooTable', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT stuff FROM fooTable settings additional_table_filters={'fooTable' : ' key = \\'val\\' '}`
+    );
+  });
+  it('apply ad hoc filter with default schema', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM default.foo');
+    const val = ahm.apply('SELECT stuff FROM default.foo', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT stuff FROM default.foo settings additional_table_filters={'default.foo' : ' key = \\'val\\' '}`
+    );
+  });
 });

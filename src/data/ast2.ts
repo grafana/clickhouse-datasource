@@ -14,7 +14,8 @@ export function sqlToStatement(sql: string): Statement {
     name: string;
     replacementName: string;
   }>;
-  const re = /(\$__|\$)/gi;
+  //default is a key word in this grammar but it can be used in CH
+  const re = /(\$__|\$|default)/gi;
   let regExpArray: RegExpExecArray | null;
   while ((regExpArray = re.exec(sql)) !== null) {
     replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
@@ -37,6 +38,17 @@ export function sqlToStatement(sql: string): Statement {
   }
 
   const mapper = astMapper((map) => ({
+    tableRef: (t) => {
+      const rfs = replaceFuncs.find((x) => x.replacementName === t.schema);
+      if (rfs) {
+        return { ...t, schema: rfs.name };
+      }
+      const rft = replaceFuncs.find((x) => x.replacementName === t.name);
+      if (rft) {
+        return { ...t, name: rft.name };
+      }
+      return map.super().tableRef(t);
+    },
     ref: (r) => {
       const rf = replaceFuncs.find((x) => x.replacementName === r.name);
       if (rf) {
@@ -61,7 +73,11 @@ export function getTable(sql: string): string {
     switch (stm.from![0].type) {
       case 'table': {
         const table = stm.from![0] as FromTable;
-        return `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
+        const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
+        // clickhouse table names are case sensitive and pgsql parser removes casing,
+        // so we need to get the casing from the raw sql
+        const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
+        return s ? s[0] : tableName;
       }
       case 'statement': {
         const table = stm.from![0] as FromStatement;

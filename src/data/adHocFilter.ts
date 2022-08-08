@@ -23,7 +23,7 @@ export class AdHocFilter {
     if (filter.key.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
-    if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`))) {
+    if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
       return sql;
     }
     let filters = adHocFilters
