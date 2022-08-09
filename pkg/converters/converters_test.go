@@ -1,89 +1,507 @@
 package converters_test
 
 import (
-	"database/sql"
-	"fmt"
-	"strings"
+	"encoding/json"
+	"github.com/grafana/clickhouse-datasource/pkg/converters"
+	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
+	"math/big"
 	"testing"
 	"time"
-
-	"github.com/grafana/clickhouse-datasource/pkg/converters"
-	"github.com/stretchr/testify/assert"
 )
 
-func TestConverters(t *testing.T) {
-	conv := converters.ClickHouseConverters()
-	types := converters.NumericTypes()
-	types = append(types, converters.WILDCARD_TYPES...)
-	types = append(types, converters.STRING_TYPES...)
-	for _, c := range conv {
-		contains := false
-		for _, v := range types {
-			if strings.Contains(c.InputTypeName, v) {
-				contains = true
-				break
-			}
-		}
-		assert.True(t, contains)
-	}
+func TestDate(t *testing.T) {
+	layout := "2006-01-02T15:04:05.000Z"
+	str := "2014-11-12T11:45:26.371Z"
+	d, _ := time.Parse(layout, str)
+	sut := converters.GetConverter("Date")
+	v, err := sut.FrameConverter.ConverterFunc(&d)
+	assert.Nil(t, err)
+	actual := v.(time.Time)
+	assert.Equal(t, d, actual)
 }
 
 func TestNullableDate(t *testing.T) {
 	layout := "2006-01-02T15:04:05.000Z"
 	str := "2014-11-12T11:45:26.371Z"
 	d, _ := time.Parse(layout, str)
-	sut := converters.NullableDate()
-	mock := sql.NullTime{
-		Time:  d,
-		Valid: true,
-	}
-	v, err := sut.FrameConverter.ConverterFunc(&mock)
+	val := &d
+	sut := converters.GetConverter("Nullable(Date)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*time.Time)
-	assert.Equal(t, &d, actual)
+	assert.Equal(t, val, actual)
 }
 
 func TestNullableDateShouldBeNil(t *testing.T) {
-	sut := converters.NullableDate()
-	v, err := sut.FrameConverter.ConverterFunc(nil)
+	sut := converters.GetConverter("Nullable(Date)")
+	var d *time.Time
+	v, err := sut.FrameConverter.ConverterFunc(&d)
 	assert.Nil(t, err)
 	actual := v.(*time.Time)
 	assert.Equal(t, (*time.Time)(nil), actual)
 }
 
 func TestNullableDecimal(t *testing.T) {
-	val := float64(123)
-	value := floatToRawBytes(val)
-	col := sql.ColumnType{}
-	nullableDecimal := converters.NullableDecimal()
-	v, err := nullableDecimal.FrameConverter.ConvertWithColumn(&value, col)
+	val := decimal.New(25, 4)
+	value := &val
+	nullableDecimal := converters.GetConverter("Nullable(Decimal(15,2))")
+	v, err := nullableDecimal.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*float64)
-	assert.Equal(t, val, *actual)
+	f, _ := val.Float64()
+	assert.Equal(t, f, *actual)
+}
+
+func TestNullableDecimalShouldBeNull(t *testing.T) {
+	nullableDecimal := converters.GetConverter("Nullable(Decimal(15,2))")
+	var value *decimal.Decimal
+	v, err := nullableDecimal.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	assert.Equal(t, (*float64)(nil), actual)
+}
+
+func TestDecimal(t *testing.T) {
+	val := decimal.New(25, 4)
+	nullableDecimal := converters.GetConverter("Decimal(15,2)")
+	v, err := nullableDecimal.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	f, _ := val.Float64()
+	assert.Equal(t, f, actual)
 }
 
 func TestNullableString(t *testing.T) {
-	value := sql.NullString{String: "foo", Valid: true}
-	sut := converters.NullableString()
+	var value *string
+	sut := converters.GetConverter("Nullable(String)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*string)
-	assert.Equal(t, value.String, *actual)
+	assert.Equal(t, value, actual)
 }
 
-func TestNullableStringNotValid(t *testing.T) {
-	value := sql.NullString{String: "foo", Valid: false}
-	sut := converters.NullableString()
+func TestBool(t *testing.T) {
+	value := true
+	sut := converters.GetConverter("Bool")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
-	assert.Nil(t, v)
+	actual := v.(bool)
+	assert.True(t, actual)
 }
 
-func floatToRawBytes(val float64) sql.RawBytes {
-	raw := []byte(fmt.Sprintf("%f", val))
-	value := sql.RawBytes{}
-	for _, v := range raw {
-		value = append(value, v)
+func TestNullableBool(t *testing.T) {
+	var value *bool
+	sut := converters.GetConverter("Nullable(Bool)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*bool)
+	assert.Equal(t, value, actual)
+}
+
+func TestFloat64(t *testing.T) {
+	value := 1.1
+	sut := converters.GetConverter("Float64")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableFloat64(t *testing.T) {
+	var value *float64
+	sut := converters.GetConverter("Nullable(Float64)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	assert.Equal(t, value, actual)
+}
+
+func TestFloat32(t *testing.T) {
+	value := 1.1
+	sut := converters.GetConverter("Float32")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	assert.Equal(t, value, actual)
+}
+
+func TestInt64(t *testing.T) {
+	value := int64(1)
+	sut := converters.GetConverter("Int64")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(int64)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableInt64(t *testing.T) {
+	var value *int64
+	sut := converters.GetConverter("Nullable(Int64)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*int64)
+	assert.Equal(t, value, actual)
+}
+
+func TestInt32(t *testing.T) {
+	value := int32(1)
+	sut := converters.GetConverter("Int32")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(int32)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableInt32(t *testing.T) {
+	var value *int32
+	sut := converters.GetConverter("Nullable(Int32)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*int32)
+	assert.Equal(t, value, actual)
+}
+
+func TestInt8(t *testing.T) {
+	value := int8(1)
+	sut := converters.GetConverter("Int8")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(int8)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableInt8(t *testing.T) {
+	var value *int8
+	sut := converters.GetConverter("Nullable(Int8)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*int8)
+	assert.Equal(t, value, actual)
+}
+
+func TestInt16(t *testing.T) {
+	value := int16(1)
+	sut := converters.GetConverter("Int16")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(int16)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableInt16(t *testing.T) {
+	var value *int16
+	sut := converters.GetConverter("Nullable(Int16)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*int16)
+	assert.Equal(t, value, actual)
+}
+
+func TestUInt8(t *testing.T) {
+	value := uint8(1)
+	sut := converters.GetConverter("UInt8")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(uint8)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableUInt8(t *testing.T) {
+	value := uint8(100)
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt8)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint8)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt8ShouldBeNil(t *testing.T) {
+	var value *uint8
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt8)")
+	v, err := sut.FrameConverter.ConverterFunc(val)
+	assert.Nil(t, err)
+	actual := v.(*uint8)
+	assert.Equal(t, value, actual)
+}
+
+func TestUInt16(t *testing.T) {
+	value := uint16(100)
+	val := &value
+	sut := converters.GetConverter("UInt16")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint16)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt16(t *testing.T) {
+	value := uint16(100)
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt16)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint16)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt16ShouldBeNil(t *testing.T) {
+	var value *uint16
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt16)")
+	v, err := sut.FrameConverter.ConverterFunc(val)
+	assert.Nil(t, err)
+	actual := v.(*uint16)
+	assert.Equal(t, value, actual)
+}
+
+func TestUInt32(t *testing.T) {
+	value := uint32(100)
+	val := &value
+	sut := converters.GetConverter("UInt32")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint32)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt32(t *testing.T) {
+	value := uint32(100)
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt32)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint32)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt32ShouldBeNil(t *testing.T) {
+	var value *uint32
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt32)")
+	v, err := sut.FrameConverter.ConverterFunc(val)
+	assert.Nil(t, err)
+	actual := v.(*uint32)
+	assert.Equal(t, value, actual)
+}
+
+func TestUInt64(t *testing.T) {
+	value := uint64(100)
+	val := &value
+	sut := converters.GetConverter("UInt64")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint64)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt64(t *testing.T) {
+	value := uint64(100)
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt64)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*uint64)
+	assert.Equal(t, value, *actual)
+}
+
+func TestNullableUInt64ShouldBeNil(t *testing.T) {
+	var value *uint64
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt64)")
+	v, err := sut.FrameConverter.ConverterFunc(val)
+	assert.Nil(t, err)
+	actual := v.(*uint64)
+	assert.Equal(t, value, actual)
+}
+
+func TestInt128(t *testing.T) {
+	value := big.NewInt(128)
+	sut := converters.GetConverter("Int128")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, expected, actual)
+}
+
+func TestNullableInt128(t *testing.T) {
+	value := big.NewInt(128)
+	val := &value
+	sut := converters.GetConverter("Nullable(Int128)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, &expected, actual)
+}
+
+func TestNullableInt128ShouldBeNil(t *testing.T) {
+	var value *big.Int
+	val := &value
+	sut := converters.GetConverter("Nullable(Int128)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	assert.Equal(t, (*float64)(nil), actual)
+}
+
+func TestInt256(t *testing.T) {
+	value := big.NewInt(128)
+	sut := converters.GetConverter("Int256")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, expected, actual)
+}
+
+func TestNullableInt256(t *testing.T) {
+	value := big.NewInt(128)
+	val := &value
+	sut := converters.GetConverter("Nullable(Int256)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, &expected, actual)
+}
+
+func TestNullableInt256ShouldBeNil(t *testing.T) {
+	var value *big.Int
+	val := &value
+	sut := converters.GetConverter("Nullable(Int256)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	assert.Equal(t, (*float64)(nil), actual)
+}
+
+func TestUInt128(t *testing.T) {
+	value := big.NewInt(128)
+	sut := converters.GetConverter("UInt128")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, expected, actual)
+}
+
+func TestNullableUInt128(t *testing.T) {
+	value := big.NewInt(128)
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt128)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, &expected, actual)
+}
+
+func TestNullableUInt128ShouldBeNil(t *testing.T) {
+	var value *big.Int
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt128)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	assert.Equal(t, (*float64)(nil), actual)
+}
+
+func TestUInt256(t *testing.T) {
+	value := big.NewInt(128)
+	sut := converters.GetConverter("UInt256")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, expected, actual)
+}
+
+func TestNullableUInt256(t *testing.T) {
+	value := big.NewInt(128)
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt256)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	expected, _ := new(big.Float).SetInt(value).Float64()
+	assert.Equal(t, &expected, actual)
+}
+
+func TestNullableUInt256ShouldBeNil(t *testing.T) {
+	var value *big.Int
+	val := &value
+	sut := converters.GetConverter("Nullable(UInt256)")
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*float64)
+	assert.Equal(t, (*float64)(nil), actual)
+}
+
+func toJson(obj interface{}) string {
+	bytes, err := json.Marshal(obj)
+	if err != nil {
+		return "unable to marshal"
 	}
-	return value
+	return string(bytes)
+}
+
+func TestTuple(t *testing.T) {
+	value := map[string]interface{}{
+		"1": uint16(1),
+		"2": uint16(2),
+		"3": uint16(3),
+		"4": uint16(4),
+	}
+	sut := converters.GetConverter("Tuple(name String, id Uint16)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.JSONEq(t, toJson(value), *v.(*string))
+}
+
+func TestNested(t *testing.T) {
+	value := []map[string]interface{}{
+		{
+			"1": uint16(1),
+			"2": uint16(2),
+			"3": uint16(3),
+			"4": uint16(4),
+		},
+	}
+	sut := converters.GetConverter("Nested(name String, id Uint16)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.JSONEq(t, toJson(value), *v.(*string))
+}
+
+func TestMap(t *testing.T) {
+	value := map[string]interface{}{
+		"1": uint16(1),
+		"2": uint16(2),
+		"3": uint16(3),
+		"4": uint16(4),
+	}
+	sut := converters.GetConverter("Map(String, Uint16)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.JSONEq(t, toJson(value), *v.(*string))
+}
+
+func TestNullableFixedString(t *testing.T) {
+	value := "2"
+	sut := converters.GetConverter("Nullable(FixedString(2))")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Equal(t, value, v.(string))
+}
+
+func TestArray(t *testing.T) {
+	value := []string{"1", "2", "3"}
+	sut := converters.GetConverter("Array(String)")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.JSONEq(t, toJson(value), *v.(*string))
 }
