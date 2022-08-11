@@ -1,4 +1,4 @@
-import { ArrayDataFrame, toDataFrame } from '@grafana/data';
+import { ArrayDataFrame, ScopedVar, ScopedVars, toDataFrame } from '@grafana/data';
 import { of } from 'rxjs';
 import { mockDatasource } from '__mocks__/datasource';
 import { CHQuery, QueryType } from 'types';
@@ -52,9 +52,19 @@ describe('ClickHouseDatasource', () => {
       const rawSql = 'foo';
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => rawSql);
       const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
-      const val = await createInstance({}).applyTemplateVariables(query, {});
+      const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
+    });
+    it('should handle $__conditionalAll and replace values', async () => {
+      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
+      const scopedVars = { fieldVal: { value: `'val1', 'val2'` } as ScopedVar<string> } as ScopedVars;
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [scopedVars]);
+      const val = createInstance({}).applyTemplateVariables(query, {});
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL });
     });
   });
 
@@ -110,6 +120,38 @@ describe('ClickHouseDatasource', () => {
 
       expect(keys).toEqual([{ text: 'name' }]);
     });
+    it('returns no tags when CH version is less than 22.7 ', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
+      const frame = new ArrayDataFrame([{ version: '21.9.342' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.adHocFiltersStatus = 2;
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      expect(spyOnReplace).toHaveBeenCalled();
+
+      expect(spyOnQuery).toHaveBeenCalled();
+
+      expect(keys).toEqual({});
+    });
+
+    it('returns tags when CH version is greater than 22.7 ', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
+      const frameVer = new ArrayDataFrame([{ version: '23.2.212' }]);
+      const frameData = new ArrayDataFrame([{ name: 'foo' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.adHocFiltersStatus = 2;
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        return request.targets[0].rawSql === 'SELECT version()' ? of({ data: [frameVer] }) : of({ data: [frameData] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(spyOnReplace).toHaveBeenCalled();
+
+      expect(spyOnQuery).toHaveBeenCalled();
+
+      expect(keys).toEqual([{ text: 'name' }]);
+    });
   });
 
   describe('Tag Values', () => {
@@ -146,6 +188,32 @@ describe('ClickHouseDatasource', () => {
       );
 
       expect(values).toEqual([{ text: 'foo' }]);
+    });
+  });
+
+  describe('Conditional All', () => {
+    it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
+      const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'fieldVal', current: { value: '$__all' } } as any,
+      ]);
+      expect(val).toEqual('select stuff from table where 1=1;');
+    });
+    it('should replace $__conditionalAll with arg when anything else is selected', async () => {
+      const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any,
+      ]);
+      expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal);`);
+    });
+    it('should replace all $__conditionalAll', async () => {
+      const rawSql =
+        'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal) and $__conditionalAll(fieldVal in ($fieldVal2), $fieldVal2);';
+      const val = createInstance({}).applyConditionalAll(rawSql, [
+        { name: 'fieldVal', current: { value: `'val1', 'val2'` } } as any,
+        { name: 'fieldVal2', current: { value: '$__all' } } as any,
+      ]);
+      expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal) and 1=1;`);
     });
   });
 });
