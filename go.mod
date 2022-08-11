@@ -4,6 +4,8 @@ go 1.17
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.3.0-beta.2
+	github.com/docker/docker v20.10.11+incompatible
+	github.com/docker/go-units v0.4.0
 	github.com/grafana/grafana-plugin-sdk-go v0.125.1
 	github.com/grafana/sqlds/v2 v2.3.6
 	github.com/pkg/errors v0.9.1
@@ -27,9 +29,7 @@ require (
 	github.com/containerd/containerd v1.5.9 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/distribution v2.7.1+incompatible // indirect
-	github.com/docker/docker v20.10.11+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/docker/go-units v0.4.0 // indirect
 	github.com/fatih/color v1.10.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.6.1 // indirect
