@@ -127,8 +127,6 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT foo.stuff FROM foo', [
       { key: 'foo.key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(
-      `SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
-    );
+    expect(val).toEqual(`SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
 });
