@@ -1,4 +1,4 @@
-import { getTable } from './ast2';
+import { getTable } from './ast';
 
 export class AdHocFilter {
   private _targetTable = '';
@@ -29,8 +29,7 @@ export class AdHocFilter {
     let filters = adHocFilters
       .map(
         (f, i) =>
-          ` ${f.key} ${f.operator} ${isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value)} ${
-            i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : ''
+          ` ${f.key} ${f.operator} ${isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value)} ${i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : ''
           }`
       )
       .join('');
