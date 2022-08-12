@@ -121,4 +121,14 @@ describe('AdHocManager', () => {
       `SELECT stuff FROM default.foo settings additional_table_filters={'default.foo' : ' key = \\'val\\' '}`
     );
   });
+  it('apply ad hoc filter and does not include the table reference in the selected fields of the function', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT foo.stuff FROM foo', [
+      { key: 'foo.key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
+    );
+  });
 });
