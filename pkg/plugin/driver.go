@@ -162,9 +162,17 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 	}
 }
 
-func (h *Clickhouse) Settings(backend.DataSourceInstanceSettings) sqlds.DriverSettings {
+func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
+	settings, err := LoadSettings(config)
+	timeout := 30
+	if err == nil {
+		t, err := strconv.Atoi(settings.Timeout)
+		if err == nil {
+			timeout = t
+		}
+	}
 	return sqlds.DriverSettings{
-		Timeout: time.Second * 30,
+		Timeout: time.Second * time.Duration(timeout),
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
