@@ -1,5 +1,4 @@
-import { isString } from 'lodash';
-import sqlToAST, { astToSql, AST, applyFiltersToAST } from './ast';
+import { getTable } from './ast2';
 
 export class AdHocFilter {
   private _targetTable = '';
@@ -9,21 +8,10 @@ export class AdHocFilter {
   }
 
   setTargetTableFromQuery(query: string) {
-    const ast = sqlToAST(query);
-    this.setTargetTableFromAST(ast);
-  }
-
-  private setTargetTableFromAST(ast: AST) {
-    if (!ast.get('FROM')) {
-      return;
-    }
-    const from = ast.get('FROM')![0];
-    if (isString(from)) {
-      this._targetTable = from.trim().replace(/(\(|\)|,)/gi, '');
-      return;
-    }
-    if (from) {
-      this.setTargetTableFromAST(from);
+    this._targetTable = getTable(query);
+    if (this._targetTable === '') {
+      console.error('Failed to get table from adhoc query.');
+      throw new Error('Failed to get table from adhoc query.');
     }
   }
 
@@ -35,23 +23,20 @@ export class AdHocFilter {
     if (filter.key.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
-    if (this._targetTable === '') {
+    if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
       return sql;
     }
-    let whereClause = '';
-    for (let i = 0; i < adHocFilters.length; i++) {
-      const filter = adHocFilters[i];
-      const v = isNaN(Number(filter.value)) ? `'${filter.value}'` : Number(filter.value);
-      whereClause += ` ${filter.key} ${filter.operator} ${v} `;
-      if (i !== adHocFilters.length - 1) {
-        whereClause += filter.condition ? filter.condition : 'AND';
-      }
-    }
+    let filters = adHocFilters
+      .map((f, i) => {
+        const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
+        const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
+        const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
+        return ` ${key} ${f.operator} ${value} ${condition}`;
+      })
+      .join('');
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
-    const ast = sqlToAST(sql);
-    applyFiltersToAST(ast, whereClause, this._targetTable);
-    return astToSql(ast);
+    return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;
   }
 }
 
