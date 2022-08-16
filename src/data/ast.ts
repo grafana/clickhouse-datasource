@@ -87,3 +87,11 @@ export function getTable(sql: string): string {
   }
   return '';
 }
+
+export function getFields(sql: string): string[] {
+  const stm = sqlToStatement(sql) as SelectFromStatement;
+  if (stm.columns?.length && stm.columns?.length > 0) {
+    return stm.columns.map(x => `${x.expr} as ${x.alias?.name}`);
+  }
+  return [];
+}
