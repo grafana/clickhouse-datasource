@@ -11,6 +11,10 @@ export const Components = {
       placeholder: (secure: string) => `Typically ${secure === 'true' ? '9440' : '9000'}`,
       tooltip: 'ClickHouse native TCP port. Typically 9000 for unsecure, 9440 for secure',
     },
+    Protocol: {
+      label: 'Protocol',
+      tooltip: 'Native or HTTP for transport',
+    },
     Username: {
       label: 'Username',
       placeholder: 'Username',
