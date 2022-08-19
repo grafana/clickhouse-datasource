@@ -16,12 +16,12 @@
   "author": "Grafana Labs",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@grafana/data": "7.4.1",
-    "@grafana/e2e": "7.4.1",
-    "@grafana/e2e-selectors": "7.4.1",
-    "@grafana/runtime": "7.4.1",
-    "@grafana/toolkit": "7.4.1",
-    "@grafana/ui": "7.4.1",
+    "@grafana/data": "9.1.0",
+    "@grafana/e2e": "9.1.0",
+    "@grafana/e2e-selectors": "9.1.0",
+    "@grafana/runtime": "9.1.0",
+    "@grafana/toolkit": "9.1.0",
+    "@grafana/ui": "9.1.0",
     "@types/dedent": "^0.7.0",
     "@types/lodash": "latest",
     "dedent": "^0.7.0"
@@ -30,6 +30,7 @@
     "rxjs": "6.6.3"
   },
   "dependencies": {
+    "@babel/preset-env": "^7.18.10",
     "@testing-library/dom": "^7.31.0",
     "@testing-library/jest-dom": "^5.15.0",
     "@testing-library/react": "^12.1.2",

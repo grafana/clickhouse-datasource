@@ -13,6 +13,8 @@ import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
+import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -182,6 +184,18 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return this.values(frame);
   }
 
+  query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    return super.query(request).pipe(
+      map((res: DataQueryResponse) => {
+        return {
+          ...res, data: res.data.map(x => {
+            return { ...x, meta: { ...x.meta, preferredVisualisationType: 'logs' } };
+          })
+        };
+      })
+    );
+  }
+
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
     return new Promise((resolve) => {
       const req = {
@@ -189,7 +203,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
         range: options ? options.range : (getTemplateSrv() as any).timeRange,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
-        resolve(res.data[0] || { fields: [] });
+        const frame: DataFrame = res.data[0] || { fields: [] };
+        resolve({ ...frame, meta: { ...frame.meta, preferredVisualisationType: 'logs', } });
       });
     });
   }
