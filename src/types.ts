@@ -49,6 +49,7 @@ export interface CHSQLQuery extends DataQuery {
   };
   format: Format;
   expand?: boolean;
+  isExploreLog?: boolean;
 }
 
 export interface CHBuilderQuery extends DataQuery {
@@ -56,6 +57,7 @@ export interface CHBuilderQuery extends DataQuery {
   rawSql: string;
   builderOptions: SqlBuilderOptions;
   format: Format;
+  isExploreLog?: boolean;
 }
 
 export type CHQuery = CHSQLQuery | CHBuilderQuery;
@@ -189,24 +191,24 @@ export interface StringFilter extends CommonFilterProps {
 
 export interface NumberFilter extends CommonFilterProps {
   operator:
-    | FilterOperator.Equals
-    | FilterOperator.NotEquals
-    | FilterOperator.LessThan
-    | FilterOperator.LessThanOrEqual
-    | FilterOperator.GreaterThan
-    | FilterOperator.GreaterThanOrEqual;
+  | FilterOperator.Equals
+  | FilterOperator.NotEquals
+  | FilterOperator.LessThan
+  | FilterOperator.LessThanOrEqual
+  | FilterOperator.GreaterThan
+  | FilterOperator.GreaterThanOrEqual;
   value: number;
 }
 
 export interface DateFilterWithValue extends CommonFilterProps {
   type: 'datetime' | 'date';
   operator:
-    | FilterOperator.Equals
-    | FilterOperator.NotEquals
-    | FilterOperator.LessThan
-    | FilterOperator.LessThanOrEqual
-    | FilterOperator.GreaterThan
-    | FilterOperator.GreaterThanOrEqual;
+  | FilterOperator.Equals
+  | FilterOperator.NotEquals
+  | FilterOperator.LessThan
+  | FilterOperator.LessThanOrEqual
+  | FilterOperator.GreaterThan
+  | FilterOperator.GreaterThanOrEqual;
   value: string;
 }
 export interface DateFilterWithoutValue extends CommonFilterProps {

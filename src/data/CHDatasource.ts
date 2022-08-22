@@ -185,15 +185,18 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
-    return super.query(request).pipe(
-      map((res: DataQueryResponse) => {
-        return {
-          ...res, data: res.data.map(x => {
-            return { ...x, meta: { ...x.meta, preferredVisualisationType: 'logs' } };
-          })
-        };
-      })
-    );
+    if (request.targets[0].isExploreLog) {
+      return super.query(request).pipe(
+        map((res: DataQueryResponse) => {
+          return {
+            ...res, data: res.data.map(x => {
+              return { ...x, meta: { ...x.meta, preferredVisualisationType: 'logs' } };
+            })
+          };
+        })
+      );
+    }
+    return super.query(request);
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
@@ -203,8 +206,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
         range: options ? options.range : (getTemplateSrv() as any).timeRange,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
-        const frame: DataFrame = res.data[0] || { fields: [] };
-        resolve({ ...frame, meta: { ...frame.meta, preferredVisualisationType: 'logs', } });
+        resolve(res.data[0] || { fields: [] });
       });
     });
   }

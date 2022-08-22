@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QueryEditorProps } from '@grafana/data';
-import { CodeEditor } from '@grafana/ui';
+import { CodeEditor, InlineSwitch } from '@grafana/ui';
 import { Datasource } from '../data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHQuery, CHConfig, QueryType, CHSQLQuery } from '../types';
@@ -31,6 +31,11 @@ export const SQLEditor = (props: SQLEditorProps) => {
   const onSqlChange = (sql: string) => {
     const format = getFormat(sql);
     onChange({ ...query, rawSql: sql, format, queryType: QueryType.SQL });
+    onRunQuery();
+  };
+
+  const onIsExploreChange = (val: boolean) => {
+    onChange({ ...query, isExploreLog: val});
     onRunQuery();
   };
 
@@ -124,6 +129,15 @@ export const SQLEditor = (props: SQLEditorProps) => {
         onBlur={(text) => onChange({ ...query, rawSql: text })}
         onEditorDidMount={(editor: any) => handleMount(editor)}
       />
+      { props.app === 'explore' ? 
+      <InlineSwitch
+        aria-label="formatLogs"
+        label="Format as logs"
+        showLabel={true}
+        value={query.isExploreLog || false}
+        onChange={(e) => onIsExploreChange(e.currentTarget.checked)}
+        transparent={true}
+      /> : ''}
     </div>
   );
 };
