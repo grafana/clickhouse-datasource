@@ -3,9 +3,9 @@
   "type": "datasource",
   "name": "ClickHouse",
   "id": "grafana-clickhouse-datasource",
-  "logs": true,
   "metrics": true,
   "backend": true,
+  "logs": true,
   "alerting": true,
   "executable": "gpx_clickhouse",
   "includes": [
