@@ -3,7 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.19
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.3.0-beta.2
+	github.com/ClickHouse/clickhouse-go/v2 v2.3.0
 	github.com/docker/docker v20.10.11+incompatible
 	github.com/docker/go-units v0.4.0
 	github.com/grafana/grafana-plugin-sdk-go v0.125.1
@@ -16,7 +16,7 @@ require (
 
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/ClickHouse/ch-go v0.47.2 // indirect
+	github.com/ClickHouse/ch-go v0.47.3 // indirect
 	github.com/Microsoft/go-winio v0.4.17 // indirect
 	github.com/Microsoft/hcsshim v0.8.23 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
@@ -75,10 +75,10 @@ require (
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	go.opencensus.io v0.22.4 // indirect
-	go.opentelemetry.io/otel v1.8.0 // indirect
-	go.opentelemetry.io/otel/trace v1.8.0 // indirect
+	go.opentelemetry.io/otel v1.9.0 // indirect
+	go.opentelemetry.io/otel/trace v1.9.0 // indirect
 	golang.org/x/net v0.0.0-20211108170745-6635138e15ea // indirect
-	golang.org/x/sys v0.0.0-20220429233432-b5fbb4746d32 // indirect
+	golang.org/x/sys v0.0.0-20220811171246-fbc7d0a398ab // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20220411194840-2f41105eb62f // indirect
 	google.golang.org/genproto v0.0.0-20210630183607-d20f26d13c79 // indirect
