@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_CLICKHOUSE",
-      "label": "clickHouse",
+      "label": "ClickHouse",
       "description": "",
       "type": "datasource",
       "pluginId": "grafana-clickhouse-datasource",
@@ -21,13 +21,13 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "8.3.4"
+      "version": "9.0.1"
     },
     {
       "type": "datasource",
       "id": "grafana-clickhouse-datasource",
       "name": "ClickHouse",
-      "version": "0.12.2"
+      "version": "2.0.0-beta"
     },
     {
       "type": "panel",
@@ -46,7 +46,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": "-- Grafana --",
+        "datasource": {
+          "type": "datasource",
+          "uid": "grafana"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(0, 211, 255, 1)",
@@ -65,7 +68,7 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1645712030432,
+  "iteration": 1661857966580,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -127,7 +130,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -231,7 +234,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -309,7 +312,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -375,7 +378,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -441,7 +444,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -507,7 +510,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -542,7 +545,8 @@
           },
           "custom": {
             "align": "center",
-            "displayMode": "auto"
+            "displayMode": "auto",
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -671,7 +675,7 @@
         },
         "showHeader": true
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -765,6 +769,8 @@
       "id": 13,
       "options": {
         "displayMode": "lcd",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -775,7 +781,7 @@
         },
         "showUnfilled": true
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -791,7 +797,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT concatAssumeInjective(database, '.', table) as db_table, round(100 * progress, 1) \"progress\" FROM system.merges ORDER BY progress DESC LIMIT 5 WHERE database IN (${database:singlequote});\n",
+          "rawSql": "SELECT concatAssumeInjective(database, '.', table) as db_table, round(100 * progress, 1) \"progress\" FROM system.merges WHERE database IN (${database:singlequote}) ORDER BY progress DESC LIMIT 5;\n",
           "refId": "A"
         }
       ],
@@ -810,7 +816,8 @@
           },
           "custom": {
             "align": "center",
-            "displayMode": "auto"
+            "displayMode": "auto",
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -1030,7 +1037,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -1127,6 +1134,8 @@
       "id": 14,
       "options": {
         "displayMode": "lcd",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -1137,7 +1146,7 @@
         },
         "showUnfilled": true
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -1173,7 +1182,8 @@
           },
           "custom": {
             "align": "center",
-            "displayMode": "auto"
+            "displayMode": "auto",
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -1381,7 +1391,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -1494,6 +1504,8 @@
       "id": 18,
       "options": {
         "displayMode": "lcd",
+        "minVizHeight": 10,
+        "minVizWidth": 0,
         "orientation": "horizontal",
         "reduceOptions": {
           "calcs": [
@@ -1504,7 +1516,7 @@
         },
         "showUnfilled": true
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -1557,7 +1569,8 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto"
+            "displayMode": "auto",
+            "inspect": false
           },
           "mappings": [],
           "thresholds": {
@@ -1655,7 +1668,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "8.3.4",
+      "pluginVersion": "9.0.1",
       "targets": [
         {
           "datasource": {
@@ -1697,7 +1710,7 @@
       "type": "table"
     }
   ],
-  "schemaVersion": 34,
+  "schemaVersion": 36,
   "style": "dark",
   "tags": [],
   "templating": {
@@ -1721,6 +1734,17 @@
         "skipUrlSync": false,
         "sort": 0,
         "type": "query"
+      },
+      {
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "y-Ka8y37k"
+        },
+        "filters": [],
+        "hide": 0,
+        "name": "filters",
+        "skipUrlSync": false,
+        "type": "adhoc"
       }
     ]
   },
@@ -1732,6 +1756,6 @@
   "timezone": "",
   "title": "ClickHouse - Cluster Analysis",
   "uid": "_hAsuzBnz",
-  "version": 2,
+  "version": 6,
   "weekStart": ""
 }
