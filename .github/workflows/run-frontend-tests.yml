@@ -41,20 +41,15 @@ jobs:
           stable: false
           go-version: ${{ matrix.go }}
 
-      - name: Cache node_modules
-        id: cache-node-modules
-        uses: actions/cache@v3
-        with:
-          path: node_modules
-          key: ${{ runner.os }}-${{ matrix.node-version }}-nodemodules-${{ hashFiles('**/package-lock.json') }}
-
       - name: Install yarn dependencies
         run: yarn install
-        if: |
-          steps.cache-node-modules.outputs.cache-hit != 'true'
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"
 
       - name: Build
         run: go build -v ./...
 
       - name: Build Frontend
         run: yarn build
+        env:
+          NODE_OPTIONS: "--max_old_space_size=4096"

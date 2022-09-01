@@ -1,6 +1,6 @@
 import { ParseError, validate } from './validate';
 
-let mockParser: any;
+var mockParser: any;
 
 jest.mock('js-sql-parser', () => {
   const mock = {

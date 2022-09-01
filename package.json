@@ -16,12 +16,12 @@
   "author": "Grafana Labs",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@grafana/data": "7.4.1",
-    "@grafana/e2e": "7.4.1",
-    "@grafana/e2e-selectors": "7.4.1",
-    "@grafana/runtime": "7.4.1",
-    "@grafana/toolkit": "7.4.1",
-    "@grafana/ui": "7.4.1",
+    "@grafana/data": "8.5.11",
+    "@grafana/e2e": "8.5.11",
+    "@grafana/e2e-selectors": "8.5.11",
+    "@grafana/runtime": "8.5.11",
+    "@grafana/toolkit": "8.5.11",
+    "@grafana/ui": "8.5.11",
     "@types/dedent": "^0.7.0",
     "@types/lodash": "latest",
     "dedent": "^0.7.0"
@@ -34,6 +34,7 @@
     "@testing-library/jest-dom": "^5.15.0",
     "@testing-library/react": "^12.1.2",
     "@testing-library/user-event": "^13.5.0",
+    "emotion": "^11.0.0",
     "js-sql-parser": "^1.4.1",
     "pgsql-ast-parser": "^10.3.1",
     "tslib": "^2.3.1"
