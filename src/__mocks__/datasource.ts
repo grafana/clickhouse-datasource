@@ -14,6 +14,7 @@ export const mockDatasource = new Datasource({
     defaultDatabase: 'foo',
     protocol: Protocol.NATIVE,
   },
+  access: 'direct',
   meta: {
     id: 'grafana-clickhouse-datasource',
     name: 'ClickHouse',

@@ -156,7 +156,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           <div style={switchContainerStyle}>
             <Switch
               id="secure"
-              css={{}}
               className="gf-form"
               value={jsonData.secure || false}
               onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
@@ -206,7 +205,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.tlsSkipVerify || false}
               onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
@@ -219,7 +217,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.tlsAuth || false}
               onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
@@ -230,7 +227,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.tlsAuthWithCACert || false}
               onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)}
@@ -299,7 +295,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.validate || false}
               onChange={(e) => onSwitchToggle('validate', e.currentTarget.checked)}
