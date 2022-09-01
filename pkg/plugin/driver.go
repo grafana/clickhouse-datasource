@@ -97,6 +97,10 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
+	qt, err := strconv.Atoi(settings.QueryTimeout)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout))
+	}
 	protocol := clickhouse.Native
 	if settings.Protocol == "http" {
 		protocol = clickhouse.HTTP
@@ -113,7 +117,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			Method: clickhouse.CompressionLZ4,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
-		ReadTimeout: time.Duration(t) * time.Second,
+		ReadTimeout: time.Duration(qt) * time.Second,
 		Protocol:    protocol,
 	})
 
@@ -164,9 +168,9 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 
 func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
 	settings, err := LoadSettings(config)
-	timeout := 30
+	timeout := 60
 	if err == nil {
-		t, err := strconv.Atoi(settings.Timeout)
+		t, err := strconv.Atoi(settings.QueryTimeout)
 		if err == nil {
 			timeout = t
 		}

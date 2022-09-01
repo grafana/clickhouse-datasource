@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"reflect"
 	"regexp"
 	"time"
@@ -20,10 +21,13 @@ type Converter struct {
 	convert    func(in interface{}) (interface{}, error)
 }
 
+var ipMatch, _ = regexp.Compile(`^IPv[4,6]`)
 var dateTimeMatch, _ = regexp.Compile(`^Date\(?`)
 var dateNullableTimeMatch, _ = regexp.Compile(`^Nullable\(Date\(?`)
 
 var stringNullableMatch, _ = regexp.Compile(`Nullable\(String`)
+
+var ipNullableMatch, _ = regexp.Compile(`Nullable\(IP`)
 
 var decimalMatch, _ = regexp.Compile(`^Decimal`)
 var decimalNullableMatch, _ = regexp.Compile(`^Nullable\(Decimal`)
@@ -226,6 +230,18 @@ var Converters = map[string]Converter{
 		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(""))),
 		matchRegex: fixedStringMatch,
 	},
+	"IP": {
+		fieldType:  data.FieldTypeString,
+		scanType:   reflect.PtrTo(reflect.TypeOf(net.IP{})),
+		convert:    ipConverter,
+		matchRegex: ipMatch,
+	},
+	"Nullable(IP)": {
+		fieldType:  data.FieldTypeNullableString,
+		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(net.IP{}))),
+		convert:    ipNullConverter,
+		matchRegex: ipNullableMatch,
+	},
 }
 
 var ComplexTypes = []string{"Map"}
@@ -351,4 +367,34 @@ func bigIntNullableConvert(in interface{}) (interface{}, error) {
 	}
 	f, _ := new(big.Float).SetInt(**v).Float64()
 	return &f, nil
+}
+
+func ipConverter(in interface{}) (interface{}, error) {
+	if in == nil {
+		return nil, nil
+	}
+	v, ok := in.(*net.IP)
+	if !ok {
+		return nil, fmt.Errorf("invalid ip - %v", in)
+	}
+	if v == nil {
+		return nil, nil
+	}
+	sIP := v.String()
+	return sIP, nil
+}
+
+func ipNullConverter(in interface{}) (interface{}, error) {
+	if in == nil {
+		return nil, nil
+	}
+	v, ok := in.(**net.IP)
+	if !ok {
+		return nil, fmt.Errorf("invalid ip - %v", in)
+	}
+	if *v == nil {
+		return nil, nil
+	}
+	sIP := (*v).String()
+	return &sIP, nil
 }
