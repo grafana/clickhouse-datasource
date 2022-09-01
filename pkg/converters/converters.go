@@ -371,14 +371,14 @@ func bigIntNullableConvert(in interface{}) (interface{}, error) {
 
 func ipConverter(in interface{}) (interface{}, error) {
 	if in == nil {
-		return (*string)(nil), nil
+		return nil, nil
 	}
 	v, ok := in.(*net.IP)
 	if !ok {
 		return nil, fmt.Errorf("invalid ip - %v", in)
 	}
 	if v == nil {
-		return (*string)(nil), nil
+		return nil, nil
 	}
 	sIP := v.String()
 	return sIP, nil
@@ -386,14 +386,14 @@ func ipConverter(in interface{}) (interface{}, error) {
 
 func ipNullConverter(in interface{}) (interface{}, error) {
 	if in == nil {
-		return (*string)(nil), nil
+		return nil, nil
 	}
 	v, ok := in.(**net.IP)
 	if !ok {
 		return nil, fmt.Errorf("invalid ip - %v", in)
 	}
 	if *v == nil {
-		return (*string)(nil), nil
+		return nil, nil
 	}
 	sIP := (*v).String()
 	return &sIP, nil
