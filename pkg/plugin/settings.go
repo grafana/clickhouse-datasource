@@ -23,6 +23,7 @@ type Settings struct {
 	TlsClientKey       string
 	Secure             bool   `json:"secure,omitempty"`
 	Timeout            string `json:"timeout,omitempty"`
+	QueryTimeout       string `json:"queryTimeout,omitempty"`
 	Protocol           string `json:"protocol"`
 }
 
@@ -46,6 +47,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	}
 	if strings.TrimSpace(settings.Timeout) == "" {
 		settings.Timeout = "10"
+	}
+	if strings.TrimSpace(settings.QueryTimeout) == "" {
+		settings.QueryTimeout = "60"
 	}
 	val, ok := config.DecryptedSecureJSONData["password"]
 	if !ok {

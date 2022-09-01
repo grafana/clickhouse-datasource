@@ -290,6 +290,19 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
+          <FormField
+            labelWidth={12}
+            inputWidth={20}
+            value={jsonData.queryTimeout || ''}
+            onChange={onUpdateDatasourceJsonDataOption(props, 'queryTimeout')}
+            label={Components.ConfigEditor.QueryTimeout.label}
+            aria-label={Components.ConfigEditor.QueryTimeout.label}
+            placeholder={Components.ConfigEditor.QueryTimeout.placeholder}
+            tooltip={Components.ConfigEditor.QueryTimeout.tooltip}
+            type="number"
+          />
+        </div>
+        <div className="gf-form">
           <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Validate.tooltip}>
             {Components.ConfigEditor.Validate.label}
           </InlineFormLabel>

@@ -20,6 +20,7 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 	"math/big"
+	"net"
 	"os"
 	"path"
 	"reflect"
@@ -962,6 +963,58 @@ func TestConvertJSON(t *testing.T) {
 			}
 			insertData(t, conn, val)
 			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
+func TestConvertIPv4(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 IPv4", protocol, nil)
+			defer close(t)
+			val := net.ParseIP("127.0.0.1")
+			insertData(t, conn, val)
+			sVal := val.String()
+			checkRows(t, conn, 1, sVal)
+		})
+	}
+}
+
+func TestConvertIPv6(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 IPv6", protocol, nil)
+			defer close(t)
+			val := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+			insertData(t, conn, val)
+			sVal := val.String()
+			checkRows(t, conn, 1, sVal)
+		})
+	}
+}
+
+func TestConvertNullableIPv4(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Nullable(IPv4)", protocol, nil)
+			defer close(t)
+			val := net.ParseIP("127.0.0.1")
+			insertData(t, conn, val, nil)
+			sVal := val.String()
+			checkRows(t, conn, 2, &sVal, nil)
+		})
+	}
+}
+
+func TestConvertNullableIPv6(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Nullable(IPv6)", protocol, nil)
+			defer close(t)
+			val := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+			insertData(t, conn, val, nil)
+			sVal := val.String()
+			checkRows(t, conn, 2, &sVal, nil)
 		})
 	}
 }

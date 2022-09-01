@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrorNoArgumentsToMacro           = errors.New("expected minimum of 1 arumgent. But no argument found")
+	ErrorNoArgumentsToMacro           = errors.New("expected minimum of 1 argument. But no argument found")
 	ErrorInsufficientArgumentsToMacro = errors.New("expected number of arguments not matching")
 )
 
@@ -38,7 +38,7 @@ func FromTimeFilter(query *sqlds.Query, args []string) (string, error) {
 	return newTimeFilter(timeQueryTypeFrom, query)
 }
 
-// FromTimeFilter return time filter query based on grafana's timepicker's to time
+// ToTimeFilter return time filter query based on grafana's timepicker's to time
 func ToTimeFilter(query *sqlds.Query, args []string) (string, error) {
 	return newTimeFilter(timeQueryTypeTo, query)
 }

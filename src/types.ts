@@ -14,6 +14,7 @@ export interface CHConfig extends DataSourceJsonData {
   secure?: boolean;
   validate?: boolean;
   timeout?: string;
+  queryTimeout?: string;
 }
 
 export interface CHSecureConfig {
