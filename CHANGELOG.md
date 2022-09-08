@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2.0.1
+
 Bug - now works with Safari. Safari does not support regex look aheads
 
 
