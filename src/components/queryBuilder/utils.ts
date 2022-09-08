@@ -337,7 +337,7 @@ function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
       filters.push({ condition: 'OR' } as Filter);
       continue;
     }
-    const stringPhrases = c.match(/([''])(?:(?=(\\?))\2.)*?\1/g)?.map((x) => (x = x.substring(1, x.length - 1)));
+    const stringPhrases = c.match(/'(.*?)'/g)?.map((x) => (x = x.substring(1, x.length - 1)));
     const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
     if (!phrases) {
       continue;

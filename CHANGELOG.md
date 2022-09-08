@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.1
+
+Bug - now works with Safari. Safari does not support regex look aheads
+
 ## 2.0.0
 
 Feature - upgrade driver to support HTTP

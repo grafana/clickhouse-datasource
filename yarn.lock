@@ -11340,10 +11340,10 @@ performance-now@^2.1.0:
   resolved "https://registry.yarnpkg.com/performance-now/-/performance-now-2.1.0.tgz#6309f4e0e5fa913ec1c69307ae364b4b377c9e7b"
   integrity sha1-Ywn04OX6kT7BxpMHrjZLSzd8nns=
 
-pgsql-ast-parser@^10.3.1:
-  version "10.5.2"
-  resolved "https://registry.yarnpkg.com/pgsql-ast-parser/-/pgsql-ast-parser-10.5.2.tgz#2385e9d7f200aa4a497f2c0e94db06e765b1d985"
-  integrity sha512-GkGhxSPiGlLlT6dRpeTveK8g0meJZuQldhbBmlFWwjoNp4SePoS2n5cCS2bmjVUkI5ugvvSnfl1WMIB36IQzxA==
+pgsql-ast-parser@^11.0.0:
+  version "11.0.0"
+  resolved "https://registry.yarnpkg.com/pgsql-ast-parser/-/pgsql-ast-parser-11.0.0.tgz#1a1d367d269290df0e1b55864d3f4457d777e2e0"
+  integrity sha512-vY5dr03b1ZnobWBPi5dy0fovK/kgXkueTLKWwVaC+Ql6VITZCURAHAnT3yAczZAjsbOyaP5Jr6A+Ol+pru8e9A==
   dependencies:
     moo "^0.5.1"
     nearley "^2.19.5"
@@ -13437,12 +13437,12 @@ rw@1, rw@^1.3.3:
   resolved "https://registry.yarnpkg.com/rw/-/rw-1.3.3.tgz#3f862dfa91ab766b14885ef4d01124bfda074fb4"
   integrity sha1-P4Yt+pGrdmsUiF700BEkv9oHT7Q=
 
-rxjs@6.6.3, rxjs@7.5.5, rxjs@^6.6.3, rxjs@^7.5.1, rxjs@^7.5.5:
-  version "6.6.3"
-  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-6.6.3.tgz#8ca84635c4daa900c0d3967a6ee7ac60271ee552"
-  integrity sha512-trsQc+xYYXZ3urjOiJOuCOa5N3jAZ3eiSpQB5hIT8zGlL2QfnHLJ2r7GMkBGuIausdJN1OneaI6gQlsqNHHmZQ==
+rxjs@7.5.5, rxjs@^6.6.3, rxjs@^7.5.1, rxjs@^7.5.5, rxjs@^7.5.6:
+  version "7.5.6"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.5.6.tgz#0446577557862afd6903517ce7cae79ecb9662bc"
+  integrity sha512-dnyv2/YsXhnm461G+R/Pe5bWP41Nm6LBXEYWI6eiFP4fiwx6WRI/CD0zbdVAudd9xwLEF2IDcKXLHit0FYjUzw==
   dependencies:
-    tslib "^1.9.0"
+    tslib "^2.1.0"
 
 safe-buffer@^5.0.1, safe-buffer@^5.1.0, safe-buffer@^5.1.1, safe-buffer@^5.1.2, safe-buffer@^5.2.0, safe-buffer@~5.2.0:
   version "5.2.1"
