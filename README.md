@@ -37,11 +37,6 @@ Once the plugin is installed on your Grafana instance, follow [these
 instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/)
 to add a new ClickHouse data source, and enter configuration options.
 
-**Note:** this plugin uses the [native ClickHouse TCP
-interface](https://clickhouse.com/docs/en/interfaces/tcp/) to connect and run
-queries. Make sure you configure the server address and port accordingly.
-
-
 ### With a configuration file
 
 It is possible to configure data sources using configuration files with
