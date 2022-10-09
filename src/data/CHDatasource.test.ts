@@ -216,4 +216,32 @@ describe('ClickHouseDatasource', () => {
       expect(val).toEqual(`select stuff from table where fieldVal in ($fieldVal) and 1=1;`);
     });
   });
+
+  describe('fetchFieldsFull', () => {
+    it('sends a correct query when database and table names are provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => of({ data: [frame] }));
+
+      await ds.fetchFieldsFull('db_name', 'table_name');
+      const expected = { rawSql: 'DESC TABLE db_name.table_name' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('sends a correct query when only table name is provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => of({ data: [frame] }));
+
+      await ds.fetchFieldsFull('', 'table_name');
+      const expected = { rawSql: 'DESC TABLE table_name' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+  });
 });

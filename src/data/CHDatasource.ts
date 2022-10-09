@@ -161,9 +161,9 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return this.fetchData(`DESC TABLE ${database}.${table}`);
   }
 
-  async fetchFieldsFull(database: string, table: string): Promise<FullField[]> {
-    const sep = database === '' ? '' : '.';
-    const rawSql = `DESC TABLE ${database}${sep}${table}`;
+  async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
+    const prefix = Boolean(database) ? `${database}.` : '';
+    const rawSql = `DESC TABLE ${prefix}${table}`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
