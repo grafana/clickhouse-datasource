@@ -3,82 +3,82 @@ import { getQueryOptionsFromSql, getSQLFromQueryOptions, isDateType, isNumberTyp
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
-    expect(isDateType('Date')).toBe(true)
-    expect(isDateType('date')).toBe(true)
-  })
+    expect(isDateType('Date')).toBe(true);
+    expect(isDateType('date')).toBe(true);
+  });
   it('returns true for Nullable(Date) type', () => {
-    expect(isDateType('Nullable(Date)')).toBe(true)
-  })
+    expect(isDateType('Nullable(Date)')).toBe(true);
+  });
 
   it('returns true for Date32 type', () => {
-    expect(isDateType('Date32')).toBe(true)
-    expect(isDateType('date32')).toBe(true)
-  })
+    expect(isDateType('Date32')).toBe(true);
+    expect(isDateType('date32')).toBe(true);
+  });
   it('returns true for Nullable(Date) type', () => {
-    expect(isDateType('Nullable(Date32)')).toBe(true)
-  })
+    expect(isDateType('Nullable(Date32)')).toBe(true);
+  });
 
   it('returns true for Datetime type', () => {
-    expect(isDateType('Datetime')).toBe(true)
-    expect(isDateType('datetime')).toBe(true)
-    expect(isDateType("DateTime('Asia/Istanbul')")).toBe(true)
-  })
+    expect(isDateType('Datetime')).toBe(true);
+    expect(isDateType('datetime')).toBe(true);
+    expect(isDateType("DateTime('Asia/Istanbul')")).toBe(true);
+  });
   it('returns true for Nullable(Date) type', () => {
-    expect(isDateType("Nullable(DateTime('Asia/Istanbul'))")).toBe(true)
-  })
+    expect(isDateType("Nullable(DateTime('Asia/Istanbul'))")).toBe(true);
+  });
 
   it('returns true for Datetime64 type', () => {
-    expect(isDateType('Datetime64(3)')).toBe(true)
-    expect(isDateType('datetime64(3)')).toBe(true)
-    expect(isDateType("Datetime64(3, 'Asia/Istanbul')")).toBe(true)
-  })
+    expect(isDateType('Datetime64(3)')).toBe(true);
+    expect(isDateType('datetime64(3)')).toBe(true);
+    expect(isDateType("Datetime64(3, 'Asia/Istanbul')")).toBe(true);
+  });
   it('returns true for Nullable(Date) type', () => {
-    expect(isDateType("Nullable(Datetime64(3, 'Asia/Istanbul'))")).toBe(true)
-  })
+    expect(isDateType("Nullable(Datetime64(3, 'Asia/Istanbul'))")).toBe(true);
+  });
 
   it('returns false for other types', () => {
-    expect(isDateType('boolean')).toBe(false)
-    expect(isDateType('Boolean')).toBe(false)
-  })
+    expect(isDateType('boolean')).toBe(false);
+    expect(isDateType('Boolean')).toBe(false);
+  });
 });
 
 describe('isNumberType', () => {
   it('returns true for UInt* types', () => {
-    expect(isNumberType('UInt8')).toBe(true)
-    expect(isNumberType('UInt16')).toBe(true)
-    expect(isNumberType('UInt32')).toBe(true)
-    expect(isNumberType('UInt64')).toBe(true)
-    expect(isNumberType('UInt128')).toBe(true)
-    expect(isNumberType('UInt256')).toBe(true)
-  })
+    expect(isNumberType('UInt8')).toBe(true);
+    expect(isNumberType('UInt16')).toBe(true);
+    expect(isNumberType('UInt32')).toBe(true);
+    expect(isNumberType('UInt64')).toBe(true);
+    expect(isNumberType('UInt128')).toBe(true);
+    expect(isNumberType('UInt256')).toBe(true);
+  });
 
   it('returns true for Int* types', () => {
-    expect(isNumberType('Int8')).toBe(true)
-    expect(isNumberType('Int16')).toBe(true)
-    expect(isNumberType('Int32')).toBe(true)
-    expect(isNumberType('Int64')).toBe(true)
-    expect(isNumberType('Int128')).toBe(true)
-    expect(isNumberType('Int256')).toBe(true)
-  })
+    expect(isNumberType('Int8')).toBe(true);
+    expect(isNumberType('Int16')).toBe(true);
+    expect(isNumberType('Int32')).toBe(true);
+    expect(isNumberType('Int64')).toBe(true);
+    expect(isNumberType('Int128')).toBe(true);
+    expect(isNumberType('Int256')).toBe(true);
+  });
 
   it('returns true for Float types', () => {
-    expect(isNumberType('Float32')).toBe(true)
-    expect(isNumberType('Float64')).toBe(true)
-  })
+    expect(isNumberType('Float32')).toBe(true);
+    expect(isNumberType('Float64')).toBe(true);
+  });
 
   it('returns true for Decimal types', () => {
-    expect(isNumberType('Decimal(1,2)')).toBe(true)
-    expect(isNumberType('Decimal32(3)')).toBe(true)
-    expect(isNumberType('Decimal64(3)')).toBe(true)
-    expect(isNumberType('Decimal128(3)')).toBe(true)
-    expect(isNumberType('Decimal256(3)')).toBe(true)
-  })
+    expect(isNumberType('Decimal(1,2)')).toBe(true);
+    expect(isNumberType('Decimal32(3)')).toBe(true);
+    expect(isNumberType('Decimal64(3)')).toBe(true);
+    expect(isNumberType('Decimal128(3)')).toBe(true);
+    expect(isNumberType('Decimal256(3)')).toBe(true);
+  });
 
   it('returns false for other types', () => {
-    expect(isNumberType('boolean')).toBe(false)
-    expect(isNumberType('datetime')).toBe(false)
-    expect(isNumberType('Nullable')).toBe(false)
-  })
+    expect(isNumberType('boolean')).toBe(false);
+    expect(isNumberType('datetime')).toBe(false);
+    expect(isNumberType('Nullable')).toBe(false);
+  });
 });
 
 describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
@@ -322,7 +322,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType"',
-    "SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) GROUP BY time ORDER BY time ASC",
+    'SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) GROUP BY time ORDER BY time ASC',
     {
       mode: BuilderMode.Trend,
       database: 'db',
@@ -334,11 +334,11 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       filters: [],
     },
     false
-    );
+  );
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType" with a filter',
-    "SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) AND   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC",
+    'SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) AND   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC',
     {
       mode: BuilderMode.Trend,
       database: 'db',
@@ -354,7 +354,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
           key: 'base',
           operator: 'IS NOT NULL',
           type: 'LowCardinality(String)',
-          value: 'GBP'
+          value: 'GBP',
         },
       ],
     },
@@ -363,7 +363,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles timeseries function with "timeFieldType" not a DateType',
-    "SELECT $__timeInterval(time) as time FROM db.foo WHERE   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC",
+    'SELECT $__timeInterval(time) as time FROM db.foo WHERE   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC',
     {
       mode: BuilderMode.Trend,
       database: 'db',
@@ -379,7 +379,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
           key: 'base',
           operator: 'IS NOT NULL',
           type: 'LowCardinality(String)',
-          value: 'GBP'
+          value: 'GBP',
         },
       ],
     },
