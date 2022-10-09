@@ -21,16 +21,15 @@ import {
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type.toLowerCase());
 };
+
 export const isNumberType = (type: string): boolean => {
-  const numericTypes = ['int', 'float', 'decimal'];
-  const match = numericTypes.find((t) => type.toLowerCase().includes(t));
-  return match !== undefined;
+  return ['int', 'float', 'decimal'].some((t) => type.toLowerCase().includes(t));
 };
+
 export const isDateType = (type: string): boolean => {
-  const name = type.toLowerCase();
-  if(name === 'date' || name === 'date32') return true;
-  return name.startsWith('datetime');
+  return type.toLowerCase().includes('date');
 };
+
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 };
