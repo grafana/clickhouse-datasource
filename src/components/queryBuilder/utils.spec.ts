@@ -1,5 +1,31 @@
 import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDirection } from 'types';
-import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './utils';
+import { getQueryOptionsFromSql, getSQLFromQueryOptions, isDateType } from './utils';
+
+describe.only('isDateType', () => {
+  it('returns true for Date type', () => {
+    expect(isDateType('Date')).toBe(true)
+    expect(isDateType('date')).toBe(true)
+  })
+  it('returns true for Date32 type', () => {
+    expect(isDateType('Date32')).toBe(true)
+    expect(isDateType('date32')).toBe(true)
+  })
+  it('returns true for Datetime type', () => {
+    expect(isDateType('Datetime')).toBe(true)
+    expect(isDateType('datetime')).toBe(true)
+    expect(isDateType("DateTime('Asia/Istanbul')")).toBe(true)
+  })
+  it('returns true for Datetime64 type', () => {
+    expect(isDateType('Datetime64(3)')).toBe(true)
+    expect(isDateType('datetime64(3)')).toBe(true)
+    expect(isDateType("Datetime64(3, 'Asia/Istanbul')")).toBe(true)
+  })
+  it('returns false for other types', () => {
+    expect(isDateType('boolean')).toBe(false)
+    expect(isDateType('Boolean')).toBe(false)
+    expect(isDateType('Datev')).toBe(false)
+  })
+});
 
 describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
   testCondition('handles a table without a database', 'SELECT name FROM table', {
@@ -238,6 +264,72 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
         },
       ],
     }
+  );
+
+  testCondition(
+    'handles timeseries function with "timeFieldType: DateType"',
+    "SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) GROUP BY time ORDER BY time ASC",
+    {
+      mode: BuilderMode.Trend,
+      database: 'db',
+      table: 'foo',
+      fields: [],
+      timeField: 'time',
+      timeFieldType: 'datetime',
+      metrics: [],
+      filters: [],
+    },
+    false
+    );
+
+  testCondition(
+    'handles timeseries function with "timeFieldType: DateType" with a filter',
+    "SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) AND   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC",
+    {
+      mode: BuilderMode.Trend,
+      database: 'db',
+      table: 'foo',
+      fields: [],
+      timeField: 'time',
+      timeFieldType: 'datetime',
+      metrics: [],
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'base',
+          operator: 'IS NOT NULL',
+          type: 'LowCardinality(String)',
+          value: 'GBP'
+        },
+      ],
+    },
+    false
+  );
+
+  testCondition(
+    'handles timeseries function with "timeFieldType" not a DateType',
+    "SELECT $__timeInterval(time) as time FROM db.foo WHERE  ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC",
+    {
+      mode: BuilderMode.Trend,
+      database: 'db',
+      table: 'foo',
+      fields: [],
+      timeField: 'time',
+      timeFieldType: 'boolean',
+      metrics: [],
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'base',
+          operator: 'IS NOT NULL',
+          type: 'LowCardinality(String)',
+          value: 'GBP'
+        },
+      ],
+    },
+    false
   );
 });
 

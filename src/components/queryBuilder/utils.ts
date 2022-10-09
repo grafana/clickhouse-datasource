@@ -27,7 +27,9 @@ export const isNumberType = (type: string): boolean => {
   return match !== undefined;
 };
 export const isDateType = (type: string): boolean => {
-  return ['date', 'datetime'].includes(type.toLowerCase());
+  const name = type.toLowerCase();
+  if(name === 'date' || name === 'date32') return true;
+  return name.startsWith('datetime');
 };
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
@@ -229,11 +231,15 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
         options.timeField,
         options.timeFieldType
       );
+      const trendFilters = getFilters(options.filters || []);
+
       if (isDateType(options.timeFieldType)) {
         query += ` WHERE $__timeFilter(${options.timeField})`;
+        query += trendFilters ? ` AND ${trendFilters}` : '';
+      } else {
+        query += trendFilters ? ` WHERE ${trendFilters}` : '';
       }
-      const trendFilters = getFilters(options.filters || []);
-      query += trendFilters ? ` AND ${trendFilters}` : '';
+
       query += getGroupBy(options.groupBy, options.timeField);
       break;
     case BuilderMode.List:
