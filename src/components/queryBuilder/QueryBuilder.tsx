@@ -21,6 +21,7 @@ import {
   BuilderMetricField,
 } from './../../types';
 import { DatabaseSelect } from './DatabaseSelect';
+import { isDateType } from './utils';
 
 interface QueryBuilderProps {
   builderOptions: SqlBuilderOptions;
@@ -43,9 +44,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           // first value is a datetime or date so we can change the mode to Time Series
           if (builder.fields?.length > 0) {
             const fieldName = builder.fields[0];
-            const timeFields = fields.filter(
-              (f) => f.type.toLowerCase() === 'datetime' || f.type.toLowerCase() === 'date'
-            );
+            const timeFields = fields.filter((f) => isDateType(f.type));
             const timeField = timeFields.find((x) => x.name === fieldName);
             if (timeField) {
               const queryOptions: SqlBuilderOptions = {
