@@ -110,7 +110,7 @@ export interface SqlBuilderOptionsTrend {
   filters?: Filter[];
   groupBy?: string[];
   timeField: string;
-  timeFieldType: 'datetime' | 'date';
+  timeFieldType: string;
   orderBy?: OrderBy[];
   limit?: number;
 }
