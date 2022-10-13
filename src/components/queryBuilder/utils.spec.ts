@@ -362,18 +362,19 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
   );
 
   it('timeseries function throws if "timeFieldType" not a DateType', () => {
-    expect(() => getSQLFromQueryOptions({
-      mode: BuilderMode.Trend,
-      database: 'db',
-      table: 'foo',
-      fields: [],
-      timeField: 'time',
-      timeFieldType: 'boolean',
-      metrics: [],
-      filters: [],
-    })).toThrowErrorMatchingInlineSnapshot('"timeFieldType is expected to be valid Date type."')
-  })
-
+    expect(() =>
+      getSQLFromQueryOptions({
+        mode: BuilderMode.Trend,
+        database: 'db',
+        table: 'foo',
+        fields: [],
+        timeField: 'time',
+        timeFieldType: 'boolean',
+        metrics: [],
+        filters: [],
+      })
+    ).toThrowErrorMatchingInlineSnapshot('"timeFieldType is expected to be valid Date type."');
+  });
 });
 
 function testCondition(name: string, sql: string, builder: any, testQueryOptionsFromSql = true) {

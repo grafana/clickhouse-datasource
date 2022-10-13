@@ -223,8 +223,8 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       query += getGroupBy(options.groupBy);
       break;
     case BuilderMode.Trend:
-      if(!isDateType(options.timeFieldType)){
-        throw new Error('timeFieldType is expected to be valid Date type.')
+      if (!isDateType(options.timeFieldType)) {
+        throw new Error('timeFieldType is expected to be valid Date type.');
       }
       query += getTrendByQuery(
         options.database,
