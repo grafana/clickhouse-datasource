@@ -27,7 +27,8 @@ export const isNumberType = (type: string): boolean => {
 };
 
 export const isDateType = (type: string): boolean => {
-  return type.toLowerCase().includes('date');
+  const normalizedName = type.toLowerCase();
+  return normalizedName.startsWith('date') || normalizedName.startsWith('nullable(date');
 };
 
 export const isStringType = (type: string): boolean => {
@@ -222,6 +223,9 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       query += getGroupBy(options.groupBy);
       break;
     case BuilderMode.Trend:
+      if(!isDateType(options.timeFieldType)){
+        throw new Error('timeFieldType is expected to be valid Date type.')
+      }
       query += getTrendByQuery(
         options.database,
         options.table,
@@ -232,13 +236,8 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       );
       const trendFilters = getFilters(options.filters || []);
 
-      if (isDateType(options.timeFieldType)) {
-        query += ` WHERE $__timeFilter(${options.timeField})`;
-        query += trendFilters ? ` AND ${trendFilters}` : '';
-      } else {
-        query += trendFilters ? ` WHERE ${trendFilters}` : '';
-      }
-
+      query += ` WHERE $__timeFilter(${options.timeField})`;
+      query += trendFilters ? ` AND ${trendFilters}` : '';
       query += getGroupBy(options.groupBy, options.timeField);
       break;
     case BuilderMode.List:

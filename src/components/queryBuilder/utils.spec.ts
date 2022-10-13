@@ -361,10 +361,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     false
   );
 
-  testCondition(
-    'handles timeseries function with "timeFieldType" not a DateType',
-    'SELECT $__timeInterval(time) as time FROM db.foo WHERE   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC',
-    {
+  it('timeseries function throws if "timeFieldType" not a DateType', () => {
+    expect(() => getSQLFromQueryOptions({
       mode: BuilderMode.Trend,
       database: 'db',
       table: 'foo',
@@ -372,19 +370,10 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       timeField: 'time',
       timeFieldType: 'boolean',
       metrics: [],
-      filters: [
-        {
-          condition: 'AND',
-          filterType: 'custom',
-          key: 'base',
-          operator: 'IS NOT NULL',
-          type: 'LowCardinality(String)',
-          value: 'GBP',
-        },
-      ],
-    },
-    false
-  );
+      filters: [],
+    })).toThrowErrorMatchingInlineSnapshot('"timeFieldType is expected to be valid Date type."')
+  })
+
 });
 
 function testCondition(name: string, sql: string, builder: any, testQueryOptionsFromSql = true) {
