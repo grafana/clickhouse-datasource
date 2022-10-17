@@ -6,7 +6,7 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.3.0
 	github.com/docker/docker v20.10.19+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/grafana-plugin-sdk-go v0.140.0
+	github.com/grafana/grafana-plugin-sdk-go v0.141.0
 	github.com/grafana/sqlds/v2 v2.3.11
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
