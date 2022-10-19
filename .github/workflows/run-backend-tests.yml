@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@main
 
       - name: Install Go ${{ matrix.go }}
-        uses: actions/setup-go@v3.3.0
+        uses: actions/setup-go@v3.3.1
         with:
           stable: false
           go-version: ${{ matrix.go }}
