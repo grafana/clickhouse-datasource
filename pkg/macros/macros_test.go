@@ -1,6 +1,7 @@
 package macros_test
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -8,7 +9,27 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/sqlds/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+type ClickhouseDriver struct {
+	sqlds.Driver
+}
+
+type MockDB struct {
+	ClickhouseDriver
+}
+
+func (h *ClickhouseDriver) Macros() sqlds.Macros {
+	return map[string]sqlds.MacroFunc{
+		"fromTime":      macros.FromTimeFilter,
+		"toTime":        macros.ToTimeFilter,
+		"timeFilter_ms": macros.TimeFilterMs,
+		"timeFilter":    macros.TimeFilter,
+		"timeInterval":  macros.TimeInterval,
+		"interval_s":    macros.IntervalSeconds,
+	}
+}
 
 func TestMacroFromTimeFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
@@ -92,4 +113,32 @@ func TestMacroIntervalSeconds(t *testing.T) {
 	got, err := macros.IntervalSeconds(&query, []string{})
 	assert.Nil(t, err)
 	assert.Equal(t, "20", got)
+}
+
+// test sqlds query interpolation with clickhouse filters used
+func TestInterpolate(t *testing.T) {
+	tableName := "my_table"
+	tableColumn := "my_col"
+	type test struct {
+		name   string
+		input  string
+		output string
+	}
+	tests := []test{
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= '-62135596800' AND cast(sth as timestamp) <= '-62135596800'", name: "clickhouse timeFilter"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= '-62135596800' AND cast(sth as timestamp) <= '-62135596800'", name: "clickhouse timeFilter with empty spaces"},
+	}
+	for i, tc := range tests {
+		driver := MockDB{}
+		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
+			query := &sqlds.Query{
+				RawSQL: tc.input,
+				Table:  tableName,
+				Column: tableColumn,
+			}
+			interpolatedQuery, err := sqlds.Interpolate(&driver, query)
+			require.Nil(t, err)
+			assert.Equal(t, tc.output, interpolatedQuery)
+		})
+	}
 }

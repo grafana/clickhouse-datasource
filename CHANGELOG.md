@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2
+
+Feature - update sqlds to 2.3.13 which fixes some macro queries
+
 ## 2.0.1
 
 Bug - now works with Safari. Safari does not support regex look aheads
