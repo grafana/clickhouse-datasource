@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
+	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/sqlds/v2"
 	"github.com/stretchr/testify/assert"
@@ -21,14 +22,9 @@ type MockDB struct {
 }
 
 func (h *ClickhouseDriver) Macros() sqlds.Macros {
-	return map[string]sqlds.MacroFunc{
-		"fromTime":      macros.FromTimeFilter,
-		"toTime":        macros.ToTimeFilter,
-		"timeFilter_ms": macros.TimeFilterMs,
-		"timeFilter":    macros.TimeFilter,
-		"timeInterval":  macros.TimeInterval,
-		"interval_s":    macros.IntervalSeconds,
-	}
+	var C = plugin.Clickhouse{}
+
+	return C.Macros()
 }
 
 func TestMacroFromTimeFilter(t *testing.T) {
