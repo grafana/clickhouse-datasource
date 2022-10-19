@@ -555,8 +555,8 @@ github.com/gorilla/websocket v1.4.0/go.mod h1:E7qHFY5m1UJ88s3WnNqhKjPHQ0heANvMoA
 github.com/gorilla/websocket v1.4.2/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/grafana-plugin-sdk-go v0.141.0 h1:BvoeJCjBxijGzujamVvmMTdb+Ex+vIxa4YGcf3GGsjo=
 github.com/grafana/grafana-plugin-sdk-go v0.141.0/go.mod h1:srvRQ+de4C5h7FqA5lSFUkFCs5pJolWT+PGV2AyBOFk=
-github.com/grafana/sqlds/v2 v2.3.11 h1:ev3O9gVBdHVo1UH2IGcuqoETgPXUrHLWiWA+bVAXccs=
-github.com/grafana/sqlds/v2 v2.3.11/go.mod h1:hRW+23vXTYN31SgWTFK09N+nwe2Umt1ST1GlNUjqv8Q=
+github.com/grafana/sqlds/v2 v2.3.12 h1:WiLJzy/FX0pNWYK2H/1jNv+KBOsTgrHXkMgI3l/KP+U=
+github.com/grafana/sqlds/v2 v2.3.12/go.mod h1:hRW+23vXTYN31SgWTFK09N+nwe2Umt1ST1GlNUjqv8Q=
 github.com/gregjones/httpcache v0.0.0-20180305231024-9cad4c3443a7/go.mod h1:FecbI9+v66THATjSRHfNgh1IVFe/9kFxbXtjV0ctIMA=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.0/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
