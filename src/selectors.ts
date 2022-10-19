@@ -101,6 +101,7 @@ export const Components = {
           LIST: 'Table',
           AGGREGATE: 'Aggregate',
           TREND: 'Time Series',
+          LOG: 'Log',
         },
       },
       DATABASE: {

@@ -17,7 +17,16 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange } = props;
   const onBuilderOptionsChange = (builderOptions: SqlBuilderOptions) => {
     const sql = getSQLFromQueryOptions(builderOptions);
-    const format = builderOptions.mode === BuilderMode.Trend ? Format.TIMESERIES : Format.TABLE;
+    let format = Format.TABLE;
+    if (builderOptions.mode === BuilderMode.List) {
+      format = Format.TABLE;
+    } else if (builderOptions.mode === BuilderMode.Aggregate) {
+      format = Format.TABLE;
+    } else if (builderOptions.mode === BuilderMode.Trend) {
+      format = Format.TIMESERIES;
+    } else if (builderOptions.mode === BuilderMode.Log) {
+      format = Format.LOGS;
+    }
     onChange({ ...query, queryType: QueryType.Builder, rawSql: sql, builderOptions, format });
   };
 

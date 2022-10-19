@@ -117,6 +117,9 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         metrics: builder.metrics || [],
       };
       props.onBuilderOptionsChange(queryOptions);
+    } else if (mode === BuilderMode.Log) {
+      const queryOptions: SqlBuilderOptions = { ...builder, mode, fields: builder.fields || [], orderBy: [] };
+      props.onBuilderOptionsChange(queryOptions);
     }
   };
 
@@ -185,7 +188,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           fieldsList={fieldsList}
         />
       )}
-      {builder.mode !== BuilderMode.Trend && (
+      {builder.mode !== BuilderMode.Trend && builder.mode !== BuilderMode.Log && (
         <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
       )}
 
