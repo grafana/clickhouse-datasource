@@ -105,6 +105,10 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if settings.Protocol == "http" {
 		protocol = clickhouse.HTTP
 	}
+	compression := clickhouse.CompressionLZ4
+	if protocol == clickhouse.HTTP {
+		compression = clickhouse.CompressionGZIP
+	}
 	db := clickhouse.OpenDB(&clickhouse.Options{
 		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
@@ -114,7 +118,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			Database: settings.DefaultDatabase,
 		},
 		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
+			Method: compression,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
 		ReadTimeout: time.Duration(qt) * time.Second,
