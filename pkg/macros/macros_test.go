@@ -91,6 +91,20 @@ func TestMacroToTimeFilter(t *testing.T) {
 	}
 }
 
+func TestMacroDateFilter(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	query := sqlds.Query{
+		TimeRange: backend.TimeRange{
+			From: from,
+			To:   to,
+		},
+	}
+	got, err := macros.DateFilter(&query, []string{"dateCol"})
+	assert.Nil(t, err)
+	assert.Equal(t, "dateCol >= '2014-11-12' AND dateCol <= '2015-11-12'", got)
+}
+
 func TestMacroTimeInterval(t *testing.T) {
 	query := sqlds.Query{
 		RawSQL:   "select $__timeInterval(col) from foo",
