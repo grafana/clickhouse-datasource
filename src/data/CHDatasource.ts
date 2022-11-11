@@ -10,6 +10,7 @@ import {
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { Observable } from 'rxjs';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
@@ -180,6 +181,14 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
+  }
+
+  query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    return super.query({
+      ...request,
+      // filters out queries disabled in UI
+      targets: request.targets.filter((t) => t.hide !== true),
+    });
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
