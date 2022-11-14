@@ -1,5 +1,6 @@
-import { ArrayDataFrame, ScopedVar, ScopedVars, toDataFrame } from '@grafana/data';
+import { ArrayDataFrame, ScopedVar, ScopedVars, toDataFrame, DataQuery } from '@grafana/data';
 import { of } from 'rxjs';
+import { DataSourceWithBackend } from '@grafana/runtime';
 import { mockDatasource } from '__mocks__/datasource';
 import { CHQuery, QueryType } from 'types';
 import { cloneDeep } from 'lodash';
@@ -242,6 +243,24 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
       );
+    });
+  });
+
+  describe('query', () => {
+    it('filters out hidden queries', async () => {
+      const instance = cloneDeep(mockDatasource);
+      // Datasource inherits from DataSourceWithBackend
+      const spy = jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((request) => of({ data: [toDataFrame([])] }));
+
+      instance.query({
+        targets: [{ refId: '1' }, { refId: '2', hide: false }, { refId: '3', hide: true }] as DataQuery[],
+      } as any);
+
+      expect(spy).toHaveBeenCalledWith({
+        targets: [{ refId: '1' }, { refId: '2', hide: false }],
+      });
     });
   });
 });
