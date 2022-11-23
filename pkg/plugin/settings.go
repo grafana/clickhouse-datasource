@@ -3,15 +3,40 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
+type sInt64 int64
+
+func (st *sInt64) UnmarshalJSON(b []byte) error {
+	var item interface{}
+	if err := json.Unmarshal(b, &item); err != nil {
+		return err
+	}
+	switch v := item.(type) {
+	case int:
+		*st = sInt64(v)
+	case float64:
+		*st = sInt64(int(v))
+	case string:
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			return err
+
+		}
+		*st = sInt64(i)
+
+	}
+	return nil
+}
+
 // Settings - data loaded from grafana settings database
 type Settings struct {
 	Server             string `json:"server,omitempty"`
-	Port               int64  `json:"port,omitempty"`
+	Port               sInt64 `json:"port,omitempty"`
 	Username           string `json:"username,omitempty"`
 	DefaultDatabase    string `json:"defaultDatabase,omitempty"`
 	InsecureSkipVerify bool   `json:"tlsSkipVerify,omitempty"`
