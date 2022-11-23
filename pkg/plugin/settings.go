@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -11,24 +12,47 @@ import (
 
 type sInt64 int64
 
-func (st *sInt64) UnmarshalJSON(b []byte) error {
+func (si *sInt64) UnmarshalJSON(b []byte) error {
 	var item interface{}
 	if err := json.Unmarshal(b, &item); err != nil {
 		return err
 	}
 	switch v := item.(type) {
 	case int:
-		*st = sInt64(v)
+		*si = sInt64(v)
 	case float64:
-		*st = sInt64(int(v))
+		*si = sInt64(int(v))
 	case string:
 		i, err := strconv.Atoi(v)
 		if err != nil {
 			return err
-
 		}
-		*st = sInt64(i)
+		*si = sInt64(i)
 
+	}
+	return nil
+}
+
+type sBool bool
+
+func (sb *sBool) UnmarshalJSON(b []byte) error {
+	var item interface{}
+	if err := json.Unmarshal(b, &item); err != nil {
+		return err
+	}
+	switch v := item.(type) {
+	case bool:
+		*sb = sBool(v)
+	case string:
+		var i bool
+		if v == "true" {
+			i = true
+		} else if v == "false" {
+			i = false
+		} else {
+			return errors.New("unexpected bool value: " + v)
+		}
+		*sb = sBool(i)
 	}
 	return nil
 }
@@ -39,14 +63,14 @@ type Settings struct {
 	Port               sInt64 `json:"port,omitempty"`
 	Username           string `json:"username,omitempty"`
 	DefaultDatabase    string `json:"defaultDatabase,omitempty"`
-	InsecureSkipVerify bool   `json:"tlsSkipVerify,omitempty"`
-	TlsClientAuth      bool   `json:"tlsAuth,omitempty"`
-	TlsAuthWithCACert  bool   `json:"tlsAuthWithCACert,omitempty"`
+	InsecureSkipVerify sBool  `json:"tlsSkipVerify,omitempty"`
+	TlsClientAuth      sBool  `json:"tlsAuth,omitempty"`
+	TlsAuthWithCACert  sBool  `json:"tlsAuthWithCACert,omitempty"`
 	Password           string `json:"-,omitempty"`
 	TlsCACert          string
 	TlsClientCert      string
 	TlsClientKey       string
-	Secure             bool   `json:"secure,omitempty"`
+	Secure             sBool  `json:"secure,omitempty"`
 	Timeout            string `json:"timeout,omitempty"`
 	QueryTimeout       string `json:"queryTimeout,omitempty"`
 	Protocol           string `json:"protocol"`

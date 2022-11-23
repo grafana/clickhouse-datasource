@@ -73,6 +73,32 @@ func TestLoadSettings(t *testing.T) {
 				},
 				wantErr: nil,
 			},
+			{
+				name: "should parse and set string tlsSkipVerify and tlsAuth flags correctly",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{ "server": "foo", "port": 443, "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": "false", "tlsAuth" : "true", "tlsAuthWithCACert": true, "timeout": "10"}`),
+						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey"},
+					},
+				},
+				wantSettings: Settings{
+					Server:             "foo",
+					Port:               443,
+					Username:           "baz",
+					DefaultDatabase:    "example",
+					InsecureSkipVerify: false,
+					TlsClientAuth:      true,
+					TlsAuthWithCACert:  true,
+					Password:           "bar",
+					TlsCACert:          "caCert",
+					TlsClientCert:      "clientCert",
+					TlsClientKey:       "clientKey",
+					Timeout:            "10",
+					QueryTimeout:       "60",
+					Protocol:           "native",
+				},
+				wantErr: nil,
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
