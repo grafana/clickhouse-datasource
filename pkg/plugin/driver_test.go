@@ -6,6 +6,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"net"
+	"os"
+	"path"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
 	clickhouse_sql "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
@@ -19,14 +28,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
-	"math/big"
-	"net"
-	"os"
-	"path"
-	"reflect"
-	"strings"
-	"testing"
-	"time"
 )
 
 const defaultClickHouseVersion = "latest"
@@ -640,19 +641,19 @@ var datetime, _ = time.Parse("2006-01-02 15:04:05", "2022-01-12 00:00:00")
 func TestConvertDateTime(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
-			var localtime time.Time
+			var localTime time.Time
 			switch name {
 			// currently native will set a columns tz - http won't as info isn't sent - see https://github.com/ClickHouse/ClickHouse/issues/38209
 			case "native":
 				loc, _ := time.LoadLocation("Europe/London")
-				localtime = datetime.In(loc)
+				localTime = datetime.In(loc)
 			case "http":
-				localtime = datetime.Local()
+				localTime = datetime.Local()
 			}
 			conn, close := setupTest(t, "col1 DateTime('Europe/London')", protocol, nil)
 			defer close(t)
-			insertData(t, conn, localtime)
-			checkRows(t, conn, 1, localtime)
+			insertData(t, conn, localTime)
+			checkRows(t, conn, 1, localTime)
 		})
 	}
 }

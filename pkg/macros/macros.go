@@ -111,7 +111,7 @@ func RemoveQuotesInArgs(args []string) []string {
 	return updatedArgs
 }
 
-// IsValidComparisonPredicates checks for a string and return true if it is a valid SQL comparision predicate
+// IsValidComparisonPredicates checks for a string and return true if it is a valid SQL comparison predicate
 func IsValidComparisonPredicates(comparison_predicates string) bool {
 	switch comparison_predicates {
 	case "=", "!=", "<>", "<", "<=", ">", ">=":
