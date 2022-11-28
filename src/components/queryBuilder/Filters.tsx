@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { Button, InlineFormLabel, RadioButtonGroup, Select, Input, MultiSelect } from '@grafana/ui';
-import { Filter, FullField, FilterOperator, NullFilter, BooleanFilter, DateFilter } from './../../types';
+import { Filter, FullField, FilterOperator, NullFilter } from './../../types';
 import * as utils from './utils';
 import { selectors } from './../../selectors';
 import { styles } from '../../styles';
@@ -227,41 +227,72 @@ export const FilterEditor = (props: {
   };
   const onFilterNameChange = (fieldName: string) => {
     setIsOpen(false);
-    const matchingFiled = fieldsList.find((f) => f.name === fieldName);
-    if (matchingFiled) {
-      var newFilter: Filter;
-      if (utils.isBooleanType(matchingFiled.type)) {
-        let boolFilter: BooleanFilter = {
-          filterType: 'custom',
-          key: matchingFiled.name,
-          type: 'boolean',
-          condition: filter.condition || 'AND',
-          operator: FilterOperator.Equals,
-          value: false,
-        };
-        newFilter = boolFilter;
-      } else if (utils.isDateType(matchingFiled.type)) {
-        let timeFilter: DateFilter = {
-          filterType: 'custom',
-          key: matchingFiled.name,
-          type: matchingFiled.type as 'date',
-          condition: filter.condition || 'AND',
-          operator: FilterOperator.Equals,
-          value: 'TODAY',
-        };
-        newFilter = timeFilter;
-      } else {
-        let nullFilter: NullFilter = {
-          filterType: 'custom',
-          key: matchingFiled.name,
-          type: matchingFiled.type,
-          condition: filter.condition || 'AND',
-          operator: FilterOperator.IsNotNull,
-        };
-        newFilter = nullFilter;
+    const matchingField = fieldsList.find((f) => f.name === fieldName);
+    let filterData: { key: string; type: string } | null = null;
+
+    if (matchingField) {
+      filterData = {
+        key: matchingField.name,
+        type: matchingField.type,
+      };
+    } else {
+      // In case user wants to add a custom filter for the
+      // field with `Map` type (e.g. colName['keyName'])
+      // More info: https://clickhouse.com/docs/en/sql-reference/data-types/map/
+      const matchingMapField = fieldsList.find((f) => {
+        return (
+          f.type.startsWith('Map') &&
+          fieldName.startsWith(f.name) &&
+          new RegExp(`^${f.name}\\[['"].+['"]\\]$`).test(fieldName)
+        );
+      });
+
+      if (matchingMapField) {
+        // Getting the field type. Example: getting `UInt64` from `Map(String, UInt64)`.
+        const mapFieldType = /^Map\(\w+, (\w+)\)$/.exec(matchingMapField.type)?.[1];
+
+        if (mapFieldType) {
+          filterData = {
+            key: fieldName,
+            type: mapFieldType,
+          };
+        }
       }
-      onFilterChange(index, newFilter);
     }
+
+    if (!filterData) {
+      return;
+    }
+
+    let newFilter: Filter;
+    if (utils.isBooleanType(filterData.type)) {
+      newFilter = {
+        filterType: 'custom',
+        key: filterData.key,
+        type: 'boolean',
+        condition: filter.condition || 'AND',
+        operator: FilterOperator.Equals,
+        value: false,
+      };
+    } else if (utils.isDateType(filterData.type)) {
+      newFilter = {
+        filterType: 'custom',
+        key: filterData.key,
+        type: filterData.type as 'date',
+        condition: filter.condition || 'AND',
+        operator: FilterOperator.Equals,
+        value: 'TODAY',
+      };
+    } else {
+      newFilter = {
+        filterType: 'custom',
+        key: filterData.key,
+        type: filterData.type,
+        condition: filter.condition || 'AND',
+        operator: FilterOperator.IsNotNull,
+      };
+    }
+    onFilterChange(index, newFilter);
   };
   const onFilterOperatorChange = (operator: FilterOperator) => {
     let newFilter: Filter = filter;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.4
+
+**Fix** - Query builder: allow custom filter values for fields with [`Map`](https://clickhouse.com/docs/en/sql-reference/data-types/map/) type
+
 ## 2.0.3
 
 **Chore** - Backend binaries compiled with latest go version 1.19.3
