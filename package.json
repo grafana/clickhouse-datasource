@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "Clickhouse Datasource",
   "scripts": {
     "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",

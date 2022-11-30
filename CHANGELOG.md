@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.5
+
+**Chore** - update sqlds to 2.3.17 which fixes complex macro queries
+**Chore** - backend grafana dependency updated
+
 ## 2.0.4
 
 **Fix** - Query builder: allow custom filter values for fields with [`Map`](https://clickhouse.com/docs/en/sql-reference/data-types/map/) type
