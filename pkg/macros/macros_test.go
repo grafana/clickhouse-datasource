@@ -138,7 +138,7 @@ func TestInterpolate(t *testing.T) {
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= '-62135596800' AND cast(sth as timestamp) <= '-62135596800'", name: "clickhouse timeFilter"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= '-62135596800' AND cast(sth as timestamp) <= '-62135596800'", name: "clickhouse timeFilter with empty spaces"},
 		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(-6795364578871,1000)) and date <= toDateTime(intDiv(-6795364578871,1000)) ) limit 100", name: "clickhouse fromTime and toTime"},
-		{input: "select * from foo default where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo default where ( date >= toDateTime(intDiv(-6795364578871,1000)) ) and ( date <= toDateTime(intDiv(-6795364578871,1000)) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
+		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(-6795364578871,1000)) ) and ( date <= toDateTime(intDiv(-6795364578871,1000)) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
 	}
 	for i, tc := range tests {
 		driver := MockDB{}
