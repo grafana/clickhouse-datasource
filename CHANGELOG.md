@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.5
+
+**Fix** - fix: Allow default protocol toggle value when saving in settings
+
 ## 2.0.4
 
 **Fix** - Query builder: allow custom filter values for fields with [`Map`](https://clickhouse.com/docs/en/sql-reference/data-types/map/) type
