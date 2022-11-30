@@ -51,6 +51,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	if strings.TrimSpace(settings.QueryTimeout) == "" {
 		settings.QueryTimeout = "60"
 	}
+	if settings.Protocol == "" {
+		settings.Protocol = "native"
+	}
 	val, ok := config.DecryptedSecureJSONData["password"]
 	if !ok {
 		return settings, settings.isValid()
@@ -67,9 +70,6 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	tlsClientKey, ok := config.DecryptedSecureJSONData["tlsClientKey"]
 	if ok {
 		settings.TlsClientKey = tlsClientKey
-	}
-	if settings.Protocol == "" {
-		settings.Protocol = "native"
 	}
 	return settings, settings.isValid()
 }
