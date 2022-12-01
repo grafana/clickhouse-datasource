@@ -4,6 +4,7 @@
 
 **Chore** - update sqlds to 2.3.17 which fixes complex macro queries
 **Chore** - backend grafana dependency updated
+**Fix** - Allow default protocol toggle value when saving in settings
 
 ## 2.0.4
 
