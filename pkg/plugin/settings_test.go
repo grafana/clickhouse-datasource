@@ -43,7 +43,6 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientKey:       "clientKey",
 					Timeout:            "10",
 					QueryTimeout:       "60",
-					Protocol:           "native",
 				},
 				wantErr: nil,
 			},
