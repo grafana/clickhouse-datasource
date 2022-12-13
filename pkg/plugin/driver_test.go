@@ -94,6 +94,9 @@ func TestMain(m *testing.M) {
 				},
 			},
 		},
+		Env: map[string]string{
+			"TZ": time.Local.String(),
+		},
 	}
 	clickhouseContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -641,15 +644,15 @@ var datetime, _ = time.Parse("2006-01-02 15:04:05", "2022-01-12 00:00:00")
 func TestConvertDateTime(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
-			var localTime time.Time
+			var loc *time.Location
 			switch name {
-			// currently native will set a columns tz - http won't as info isn't sent - see https://github.com/ClickHouse/ClickHouse/issues/38209
 			case "native":
-				loc, _ := time.LoadLocation("Europe/London")
-				localTime = datetime.In(loc)
+				loc, _ = time.LoadLocation("Europe/London")
 			case "http":
-				localTime = datetime.Local()
+				// http sends back ClickHouse configured timezone which is Asia/Shanghai
+				loc, _ = time.LoadLocation("Asia/Shanghai")
 			}
+			localTime := datetime.In(loc)
 			conn, close := setupTest(t, "col1 DateTime('Europe/London')", protocol, nil)
 			defer close(t)
 			insertData(t, conn, localTime)
