@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.6
+
+**Chore** - Backend binaries compiled with latest go version 1.19.4
+**Chore** - Backend grafana dependencies updated
+
 ## 2.0.5
 
 **Chore** - update sqlds to 2.3.17 which fixes complex macro queries
