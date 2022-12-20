@@ -4,6 +4,7 @@
 
 **Chore** - Backend binaries compiled with latest go version 1.19.4
 **Chore** - Backend grafana dependencies updated to latest version
+**Chore** - Clickhouse dependency updated to latest version
 
 ## 2.0.5
 
