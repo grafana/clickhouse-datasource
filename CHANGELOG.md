@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.6
+
+**Chore** - Backend binaries compiled with latest go version 1.19.4
+**Chore** - Backend grafana dependencies updated to latest version
+**Chore** - Clickhouse-go client updated to [v2.4.3](https://github.com/ClickHouse/clickhouse-go/blob/main/CHANGELOG.md#243-2022-11-30)
+
 ## 2.0.5
 
 **Chore** - update sqlds to 2.3.17 which fixes complex macro queries
