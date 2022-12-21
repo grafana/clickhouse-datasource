@@ -7,7 +7,7 @@ require (
 	github.com/docker/docker v20.10.21+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.147.0
-	github.com/grafana/sqlds/v2 v2.3.18
+	github.com/grafana/sqlds/v2 v2.3.19
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.1
