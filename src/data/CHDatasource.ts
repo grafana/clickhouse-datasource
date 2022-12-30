@@ -92,7 +92,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       const templateVar = params[1].trim();
       const key = templateVars.find((x) => x.name === templateVar.substring(1, templateVar.length)) as any;
       let phrase = params[0];
-      if (key?.current.value.toString() === '$__all') {
+      let value = key?.current.value.toString();
+      if (value === '' || value === '$__all') {
         phrase = '1=1';
       }
       rawQuery = rawQuery.replace(`${macro}${params[0]},${params[1]})`, phrase);
