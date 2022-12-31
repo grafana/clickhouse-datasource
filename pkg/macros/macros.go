@@ -94,7 +94,7 @@ func TimeInterval(query *sqlds.Query, args []string) (string, error) {
 }
 
 func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
-	seconds := query.Interval.Seconds()
+	seconds := math.Max(query.Interval.Seconds(), 1)
 	return fmt.Sprintf("%d", int(seconds)), nil
 }
 
