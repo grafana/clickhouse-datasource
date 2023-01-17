@@ -83,9 +83,6 @@ func (settings *Settings) isValid() (err error) {
 	if settings.Port == 0 {
 		return ErrorMessageInvalidPort
 	}
-	if settings.Protocol != "http" && settings.Protocol != "native" {
-		return ErrorMessageInvalidProtocol
-	}
 	return nil
 }
 
@@ -100,11 +97,10 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	if strings.TrimSpace(settings.QueryTimeout) == "" {
 		settings.QueryTimeout = "60"
 	}
-	val, ok := config.DecryptedSecureJSONData["password"]
-	if !ok {
-		return settings, settings.isValid()
+	password, ok := config.DecryptedSecureJSONData["password"]
+	if ok {
+		settings.Password = password
 	}
-	settings.Password = val
 	tlsCACert, ok := config.DecryptedSecureJSONData["tlsCACert"]
 	if ok {
 		settings.TlsCACert = tlsCACert
@@ -116,9 +112,6 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	tlsClientKey, ok := config.DecryptedSecureJSONData["tlsClientKey"]
 	if ok {
 		settings.TlsClientKey = tlsClientKey
-	}
-	if settings.Protocol == "" {
-		settings.Protocol = "native"
 	}
 	return settings, settings.isValid()
 }

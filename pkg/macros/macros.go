@@ -94,7 +94,7 @@ func TimeInterval(query *sqlds.Query, args []string) (string, error) {
 }
 
 func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
-	seconds := query.Interval.Seconds()
+	seconds := math.Max(query.Interval.Seconds(), 1)
 	return fmt.Sprintf("%d", int(seconds)), nil
 }
 
@@ -111,7 +111,7 @@ func RemoveQuotesInArgs(args []string) []string {
 	return updatedArgs
 }
 
-// IsValidComparisonPredicates checks for a string and return true if it is a valid SQL comparision predicate
+// IsValidComparisonPredicates checks for a string and return true if it is a valid SQL comparison predicate
 func IsValidComparisonPredicates(comparison_predicates string) bool {
 	switch comparison_predicates {
 	case "=", "!=", "<>", "<", "<=", ">", ">=":

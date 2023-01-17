@@ -19,13 +19,13 @@ jobs:
       fail-fast: true
       matrix:
         go:
-          - 1.18.3 #pin to 1.18.3 for now due to https://github.com/ClickHouse/ch-go/issues/160
+          - 1.19
         clickhouse:
-          - 21.8
           - 22.3
-          - 22.4
-          - 22.5
-          - 22.6
+          - 22.8
+          - 22.9
+          - '22.10'
+          - 22.11
           - latest
 
     steps:
