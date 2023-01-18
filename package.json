@@ -4,7 +4,7 @@
   "description": "Clickhouse Datasource",
   "scripts": {
     "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",
-    "build": "grafana-toolkit plugin:build",
+    "build": "NODE_OPTIONS='--max-old-space-size=8192' grafana-toolkit plugin:build",
     "test": "grafana-toolkit plugin:test",
     "dev": "grafana-toolkit plugin:dev",
     "watch": "grafana-toolkit plugin:dev --watch",
