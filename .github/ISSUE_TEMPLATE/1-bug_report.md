@@ -1,7 +1,7 @@
 ---
 name: Bug report
 about: Report a bug you found when using this plugin
-labels: ['datasource/Clickhouse', 'type/bug']
+labels: ['datasource/ClickHouse', 'type/bug']
 ---
 
 <!--
