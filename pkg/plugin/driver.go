@@ -110,6 +110,15 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		compression = clickhouse.CompressionGZIP
 	}
 	db := clickhouse.OpenDB(&clickhouse.Options{
+		ClientInfo: clickhouse.ClientInfo{
+			Products: []struct {
+				Name    string
+				Version string
+			}{
+				{Name: "Grafana", Version: ""},
+				{Name: "clickhouse-datasource", Version: ""},
+			},
+		},
 		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
 		Auth: clickhouse.Auth{
