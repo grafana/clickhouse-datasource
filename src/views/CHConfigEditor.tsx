@@ -4,10 +4,10 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { LegacyForms, Switch, InlineFormLabel, useTheme } from '@grafana/ui';
+import { InlineFormLabel, LegacyForms, RadioButtonGroup, useTheme, Switch } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
-import { CHConfig, CHSecureConfig } from './../types';
+import { CHConfig, CHSecureConfig, Protocol } from './../types';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -20,6 +20,10 @@ export const ConfigEditor: React.FC<Props> = (props) => {
   const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
   const hasTLSClientCert = secureJsonFields && secureJsonFields.tlsClientCert;
   const hasTLSClientKey = secureJsonFields && secureJsonFields.tlsClientKey;
+  const protocolOptions = [
+    { label: 'Native', value: Protocol.NATIVE },
+    { label: 'HTTP', value: Protocol.HTTP },
+  ];
   const switchContainerStyle: React.CSSProperties = {
     padding: `0 ${theme.spacing.sm}`,
     height: `${theme.spacing.formInputHeight}px`,
@@ -56,6 +60,17 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
+
+  const onProtocolToggle = (protocol: Protocol) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        protocol: protocol,
+      },
+    });
+  };
+
   const onCertificateChangeFactory = (key: keyof Omit<CHSecureConfig, 'password'>, value: string) => {
     onOptionsChange({
       ...options,
@@ -124,13 +139,23 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
+          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Protocol.tooltip}>
+            {Components.ConfigEditor.Protocol.label}
+          </InlineFormLabel>
+          <RadioButtonGroup<Protocol>
+            options={protocolOptions}
+            disabledOptions={[]}
+            value={jsonData.protocol || Protocol.NATIVE}
+            onChange={(e) => onProtocolToggle(e!)}
+          />
+        </div>
+        <div className="gf-form">
           <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
             {Components.ConfigEditor.Secure.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
               id="secure"
-              css={{}}
               className="gf-form"
               value={jsonData.secure || false}
               onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
@@ -180,7 +205,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.tlsSkipVerify || false}
               onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
@@ -193,7 +217,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.tlsAuth || false}
               onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
@@ -204,7 +227,6 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.tlsAuthWithCACert || false}
               onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)}
@@ -268,12 +290,24 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
+          <FormField
+            labelWidth={12}
+            inputWidth={20}
+            value={jsonData.queryTimeout || ''}
+            onChange={onUpdateDatasourceJsonDataOption(props, 'queryTimeout')}
+            label={Components.ConfigEditor.QueryTimeout.label}
+            aria-label={Components.ConfigEditor.QueryTimeout.label}
+            placeholder={Components.ConfigEditor.QueryTimeout.placeholder}
+            tooltip={Components.ConfigEditor.QueryTimeout.tooltip}
+            type="number"
+          />
+        </div>
+        <div className="gf-form">
           <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Validate.tooltip}>
             {Components.ConfigEditor.Validate.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
             <Switch
-              css={{}}
               className="gf-form"
               value={jsonData.validate || false}
               onChange={(e) => onSwitchToggle('validate', e.currentTarget.checked)}

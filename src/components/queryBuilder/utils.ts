@@ -23,14 +23,16 @@ import { sqlToStatement } from 'data/ast';
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type?.toLowerCase());
 };
+
 export const isNumberType = (type: string): boolean => {
-  const numericTypes = ['int', 'float', 'decimal'];
-  const match = numericTypes.find((t) => type?.toLowerCase().includes(t));
-  return match !== undefined;
+  return ['int', 'float', 'decimal'].some((t) => type.toLowerCase().includes(t));
 };
+
 export const isDateType = (type: string): boolean => {
-  return ['date', 'datetime'].includes(type?.toLowerCase());
+  const normalizedName = type.toLowerCase();
+  return normalizedName.startsWith('date') || normalizedName.startsWith('nullable(date');
 };
+
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 };
@@ -222,6 +224,9 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       query += getGroupBy(options.groupBy);
       break;
     case BuilderMode.Trend:
+      if (!isDateType(options.timeFieldType)) {
+        throw new Error('timeFieldType is expected to be valid Date type.');
+      }
       query += getTrendByQuery(
         options.database,
         options.table,
@@ -230,10 +235,9 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
         options.timeField,
         options.timeFieldType
       );
-      if (isDateType(options.timeFieldType)) {
-        query += ` WHERE $__timeFilter(${options.timeField})`;
-      }
       const trendFilters = getFilters(options.filters || []);
+
+      query += ` WHERE $__timeFilter(${options.timeField})`;
       query += trendFilters ? ` AND ${trendFilters}` : '';
       query += getGroupBy(options.groupBy, options.timeField);
       break;
@@ -330,9 +334,6 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions | string 
   }
   return builder;
 }
-//SELECT machine_name FROM mgbench.logs1 WHERE   (  NOT ( id LIKE '%%hello%%' ) ) LIMIT 100
-//SELECT machine_name FROM mgbench.logs1 WHERE   ( id LIKE '%%%hello%%%' ) undefined ( undefined NOT '' ) LIMIT 100
-
 
 function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
   const filters: Filter[] = [];

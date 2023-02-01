@@ -10,6 +10,7 @@ import {
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { Observable } from 'rxjs';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
@@ -91,7 +92,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       const templateVar = params[1].trim();
       const key = templateVars.find((x) => x.name === templateVar.substring(1, templateVar.length)) as any;
       let phrase = params[0];
-      if (key?.current.value.toString() === '$__all') {
+      let value = key?.current.value.toString();
+      if (value === '' || value === '$__all') {
         phrase = '1=1';
       }
       rawQuery = rawQuery.replace(`${macro}${params[0]},${params[1]})`, phrase);
@@ -161,9 +163,9 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return this.fetchData(`DESC TABLE ${database}.${table}`);
   }
 
-  async fetchFieldsFull(database: string, table: string): Promise<FullField[]> {
-    const sep = database === '' ? '' : '.';
-    const rawSql = `DESC TABLE ${database}${sep}${table}`;
+  async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
+    const prefix = Boolean(database) ? `${database}.` : '';
+    const rawSql = `DESC TABLE ${prefix}${table}`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
@@ -180,6 +182,14 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
+  }
+
+  query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    return super.query({
+      ...request,
+      // filters out queries disabled in UI
+      targets: request.targets.filter((t) => t.hide !== true),
+    });
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

@@ -5,7 +5,9 @@ import (
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"math/big"
+	"net"
 	"testing"
 	"time"
 )
@@ -500,8 +502,60 @@ func TestNullableFixedString(t *testing.T) {
 
 func TestArray(t *testing.T) {
 	value := []string{"1", "2", "3"}
-	sut := converters.GetConverter("Array(String)")
-	v, err := sut.FrameConverter.ConverterFunc(&value)
+	ipConverter := converters.GetConverter("Array(String)")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	assert.JSONEq(t, toJson(value), *v.(*string))
+}
+
+func TestIPv4(t *testing.T) {
+	value := net.ParseIP("127.0.0.1")
+	ipConverter := converters.GetConverter("IPv4")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Equal(t, value.String(), v)
+}
+
+func TestIPv6(t *testing.T) {
+	value := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+	ipConverter := converters.GetConverter("IPv6")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Equal(t, value.String(), v)
+}
+
+func TestNullableIPv4(t *testing.T) {
+	value := net.ParseIP("127.0.0.1")
+	val := &value
+	ipConverter := converters.GetConverter("Nullable(IPv4)")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, value.String(), *actual)
+}
+
+func TestNullableIPv4ShouldBeNull(t *testing.T) {
+	var value *net.IP
+	ipConverter := converters.GetConverter("Nullable(IPv4)")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	require.Nil(t, v)
+}
+
+func TestNullableIPv6(t *testing.T) {
+	value := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+	val := &value
+	ipConverter := converters.GetConverter("Nullable(IPv6)")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, value.String(), *actual)
+}
+
+func TestNullableIPv6ShouldBeNull(t *testing.T) {
+	var value *net.IP
+	ipConverter := converters.GetConverter("Nullable(IPv6)")
+	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	require.Nil(t, v)
 }

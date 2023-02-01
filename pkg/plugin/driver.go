@@ -97,7 +97,18 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if err != nil {
 		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
-
+	qt, err := strconv.Atoi(settings.QueryTimeout)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout))
+	}
+	protocol := clickhouse.Native
+	if settings.Protocol == "http" {
+		protocol = clickhouse.HTTP
+	}
+	compression := clickhouse.CompressionLZ4
+	if protocol == clickhouse.HTTP {
+		compression = clickhouse.CompressionGZIP
+	}
 	db := clickhouse.OpenDB(&clickhouse.Options{
 		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
@@ -107,10 +118,11 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			Database: settings.DefaultDatabase,
 		},
 		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
+			Method: compression,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
-		ReadTimeout: time.Duration(t) * time.Second,
+		ReadTimeout: time.Duration(qt) * time.Second,
+		Protocol:    protocol,
 	})
 
 	timeout := time.Duration(t)
@@ -153,14 +165,23 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 		"toTime":        macros.ToTimeFilter,
 		"timeFilter_ms": macros.TimeFilterMs,
 		"timeFilter":    macros.TimeFilter,
+		"dateFilter":    macros.DateFilter,
 		"timeInterval":  macros.TimeInterval,
 		"interval_s":    macros.IntervalSeconds,
 	}
 }
 
-func (h *Clickhouse) Settings(backend.DataSourceInstanceSettings) sqlds.DriverSettings {
+func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
+	settings, err := LoadSettings(config)
+	timeout := 60
+	if err == nil {
+		t, err := strconv.Atoi(settings.QueryTimeout)
+		if err == nil {
+			timeout = t
+		}
+	}
 	return sqlds.DriverSettings{
-		Timeout: time.Second * 30,
+		Timeout: time.Second * time.Duration(timeout),
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},

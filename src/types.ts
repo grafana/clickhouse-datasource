@@ -5,6 +5,7 @@ export const defaultQuery: Partial<CHQuery> = {};
 export interface CHConfig extends DataSourceJsonData {
   username: string;
   server: string;
+  protocol: Protocol;
   port: number;
   defaultDatabase?: string;
   tlsSkipVerify?: boolean;
@@ -13,6 +14,7 @@ export interface CHConfig extends DataSourceJsonData {
   secure?: boolean;
   validate?: boolean;
   timeout?: string;
+  queryTimeout?: string;
 }
 
 export interface CHSecureConfig {
@@ -20,6 +22,11 @@ export interface CHSecureConfig {
   tlsCACert?: string;
   tlsClientCert?: string;
   tlsClientKey?: string;
+}
+
+export enum Protocol {
+  NATIVE = 'native',
+  HTTP = 'http',
 }
 
 export enum Format {
@@ -103,7 +110,7 @@ export interface SqlBuilderOptionsTrend {
   filters?: Filter[];
   groupBy?: string[];
   timeField: string;
-  timeFieldType: 'datetime' | 'date';
+  timeFieldType: string;
   orderBy?: OrderBy[];
   limit?: number;
 }

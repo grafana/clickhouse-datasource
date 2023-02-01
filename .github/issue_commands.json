@@ -1,0 +1,34 @@
+[   
+    {
+      "type": "label",
+      "name": "datasource/ClickHouse",
+      "action": "addToProject",
+      "addToProject": {
+        "url": "https://github.com/orgs/grafana/projects/190"
+      }
+    },
+    {
+      "type": "label",
+      "name": "datasource/ClickHouse",
+      "action": "removeFromProject",
+      "addToProject": {
+        "url": "https://github.com/orgs/grafana/projects/190"
+      }
+    },
+    {
+      "type": "label",
+      "name": "type/docs",
+      "action": "addToProject",
+      "addToProject": {
+        "url": "https://github.com/orgs/grafana/projects/69"
+      }
+    },
+    {
+      "type": "label",
+      "name": "type/docs",
+      "action": "removeFromProject",
+      "addToProject": {
+        "url": "https://github.com/orgs/grafana/projects/69"
+      }
+    }
+]

@@ -20,15 +20,22 @@ validate that queries are safe. Queries can contain any SQL statement. For
 example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'`
 and `DROP TABLE sadTable;` would be executed.
 
+### ClickHouse protocol support
+
+The plugin supports both `HTTP` and `Native` (default) transport protocols. This can be enabled in the configuration via the `protocol` configuration parameter. Both protocols exchange data with ClickHouse using optimized native format.
+
+Note that the default ports for `HTTP/s` and `Native` differ:
+
+- HTTP - 8123
+- HTTPS - 8443
+- Native - 9000
+- Native with TLS - 9440
+
 ### Manual configuration
+
 Once the plugin is installed on your Grafana instance, follow [these
 instructions](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/)
 to add a new ClickHouse data source, and enter configuration options.
-
-**Note:** this plugin uses the [native ClickHouse TCP
-interface](https://clickhouse.com/docs/en/interfaces/tcp/) to connect and run
-queries. Make sure you configure the server address and port accordingly.
-
 
 ### With a configuration file
 
@@ -112,8 +119,9 @@ WHERE $__timeFilter(date_time)
 ```
 
 | Macro                                        | Description                                                                                                                                                                         | Output example                                          |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+|----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------|
 | *$__timeFilter(columnName)*                  | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in seconds                                                         | `time >= '1480001790' AND time <= '1482576232' )`       |
+| *$__dateFilter(columnName)*                  | Replaced by a conditional that filters the data (using the provided column) based on the date range of the panel                                                                    | `date >= '2022-10-21' AND date <= '2022-10-23' )`       |
 | *$__timeFilter_ms(columnName)*               | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds                                                    | `time >= '1480001790671' AND time <= '1482576232479' )` |
 | *$__fromTime*                                | Replaced by the starting time of the range of the panel casted to DateTime                                                                                                          | `toDateTime(intDiv(1415792726371,1000))`                |
 | *$__toTime*                                  | Replaced by the ending time of the range of the panel casted to DateTime                                                                                                            | `toDateTime(intDiv(1415792726371,1000))`                |

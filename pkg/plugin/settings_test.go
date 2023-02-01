@@ -42,6 +42,7 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
 					Timeout:            "10",
+					QueryTimeout:       "60",
 				},
 				wantErr: nil,
 			},
@@ -58,19 +59,19 @@ func TestLoadSettings(t *testing.T) {
 	})
 	t.Run("should capture invalid settings", func(t *testing.T) {
 		tests := []struct {
-			jsondata    string
+			jsonData    string
 			password    string
 			wantErr     error
 			description string
 		}{
-			{jsondata: `{ "server": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidServerName, description: "should capture empty server name"},
-			{jsondata: `{ "server": "foo" }`, password: "", wantErr: ErrorMessageInvalidPort, description: "should capture nil port"},
-			{jsondata: `  "server": "foo", "port": 443, "username" : "foo" }`, password: "", wantErr: ErrorMessageInvalidJSON, description: "should capture invalid json"},
+			{jsonData: `{ "server": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidServerName, description: "should capture empty server name"},
+			{jsonData: `{ "server": "foo" }`, password: "", wantErr: ErrorMessageInvalidPort, description: "should capture nil port"},
+			{jsonData: `  "server": "foo", "port": 443, "username" : "foo" }`, password: "", wantErr: ErrorMessageInvalidJSON, description: "should capture invalid json"},
 		}
 		for i, tc := range tests {
 			t.Run(fmt.Sprintf("[%v/%v] %s", i+1, len(tests), tc.description), func(t *testing.T) {
 				_, err := LoadSettings(backend.DataSourceInstanceSettings{
-					JSONData:                []byte(tc.jsondata),
+					JSONData:                []byte(tc.jsonData),
 					DecryptedSecureJSONData: map[string]string{"password": tc.password},
 				})
 				if !errors.Is(err, tc.wantErr) {

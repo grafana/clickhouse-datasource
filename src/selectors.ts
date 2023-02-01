@@ -11,6 +11,10 @@ export const Components = {
       placeholder: (secure: string) => `Typically ${secure === 'true' ? '9440' : '9000'}`,
       tooltip: 'ClickHouse native TCP port. Typically 9000 for unsecure, 9440 for secure',
     },
+    Protocol: {
+      label: 'Protocol',
+      tooltip: 'Native or HTTP for transport',
+    },
     Username: {
       label: 'Username',
       placeholder: 'Username',
@@ -51,9 +55,14 @@ export const Components = {
       tooltip: 'Default database to be used. Can be empty.',
     },
     Timeout: {
-      label: 'Timeout (seconds)',
+      label: 'Dial Timeout (seconds)',
       placeholder: '10',
-      tooltip: 'Timeout in seconds for connection and read queries',
+      tooltip: 'Timeout in seconds for connection',
+    },
+    QueryTimeout: {
+      label: 'Query Timeout (seconds)',
+      placeholder: '60',
+      tooltip: 'Timeout in seconds for read queries',
     },
     Secure: {
       label: 'Secure Connection',

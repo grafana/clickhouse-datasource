@@ -1,0 +1,9 @@
+changelog:
+  categories:
+    - title: Copy the following lines for the CHANGELOG
+      labels:
+        - changelog
+    - title: Hidden
+      exclude:
+        labels:
+          - '*'

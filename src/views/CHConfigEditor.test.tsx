@@ -4,6 +4,7 @@ import { ConfigEditor } from './CHConfigEditor';
 import { mockConfigEditorProps } from '../__mocks__/ConfigEditor';
 import { Components } from './../selectors';
 import '@testing-library/jest-dom';
+import { Protocol } from '../types';
 
 describe('ConfigEditor', () => {
   it('new editor', () => {
@@ -14,6 +15,7 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
   });
   it('with password', async () => {
     render(
@@ -34,6 +36,7 @@ describe('ConfigEditor', () => {
     expect(a.textContent).toBe('Reset');
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
   });
   it('with secure connection', async () => {
     render(
@@ -46,6 +49,19 @@ describe('ConfigEditor', () => {
       />
     );
     expect(screen.queryByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('true'))).toBeInTheDocument();
+  });
+  it('with protocol', async () => {
+    render(
+      <ConfigEditor
+        {...mockConfigEditorProps()}
+        options={{
+          ...mockConfigEditorProps().options,
+          jsonData: { ...mockConfigEditorProps().options.jsonData, protocol: Protocol.HTTP },
+        }}
+      />
+    );
+    expect(screen.getAllByLabelText('HTTP').pop()).toBeInTheDocument();
+    expect(screen.getAllByLabelText('HTTP').pop()).toBeChecked();
   });
   it('without tlsCACert', async () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);

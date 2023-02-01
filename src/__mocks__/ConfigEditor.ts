@@ -10,6 +10,7 @@ export const mockConfigEditorProps = (): Props => ({
       server: 'foo.com',
       port: 443,
       username: 'user',
+      protocol: 'native',
     },
   },
   onOptionsChange: jest.fn(),

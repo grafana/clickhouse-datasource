@@ -27,11 +27,12 @@ export class AdHocFilter {
       return sql;
     }
     let filters = adHocFilters
-      .map(
-        (f, i) =>
-          ` ${f.key} ${f.operator} ${isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value)} ${i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : ''
-          }`
-      )
+      .map((f, i) => {
+        const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
+        const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
+        const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
+        return ` ${key} ${f.operator} ${value} ${condition}`;
+      })
       .join('');
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
