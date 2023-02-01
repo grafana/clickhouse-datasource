@@ -3,7 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.19
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.5.1
+	github.com/ClickHouse/clickhouse-go/v2 v2.6.0
 	github.com/docker/docker v20.10.23+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.147.0
@@ -17,7 +17,7 @@ require (
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/BurntSushi/toml v0.3.1 // indirect
-	github.com/ClickHouse/ch-go v0.51.0 // indirect
+	github.com/ClickHouse/ch-go v0.51.2 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/Microsoft/hcsshim v0.9.4 // indirect
 	github.com/andybalholm/brotli v1.0.4 // indirect
@@ -55,7 +55,7 @@ require (
 	github.com/hashicorp/yamux v0.0.0-20181012175058-2f1d1f20f75d // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.15.13 // indirect
+	github.com/klauspost/compress v1.15.14 // indirect
 	github.com/magefile/mage v1.14.0 // indirect
 	github.com/magiconair/properties v1.8.6 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
