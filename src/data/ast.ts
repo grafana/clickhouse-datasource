@@ -41,25 +41,26 @@ export function sqlToStatement(sql: string): Statement {
     tableRef: (t) => {
       const rfs = replaceFuncs.find((x) => x.replacementName === t.schema);
       if (rfs) {
-        return { ...t, schema: rfs.name };
+        return { ...t, schema: t.schema?.replace(rfs.replacementName, rfs.name) };
       }
       const rft = replaceFuncs.find((x) => x.replacementName === t.name);
       if (rft) {
-        return { ...t, name: rft.name };
+        return { ...t, name: t.name.replace(rft.replacementName, rft.name) };
       }
       return map.super().tableRef(t);
     },
     ref: (r) => {
-      const rf = replaceFuncs.find((x) => x.replacementName === r.name);
+      const rf = replaceFuncs.find((x) => r.name.startsWith(x.replacementName));
       if (rf) {
-        return { ...r, name: rf.name };
+        const d = r.name.replace(rf.replacementName, rf.name);
+        return { ...r, name: d };
       }
       return map.super().ref(r);
     },
     call: (c) => {
-      const rf = replaceFuncs.find((x) => x.replacementName === c.function.name);
+      const rf = replaceFuncs.find((x) => c.function.name.startsWith(x.replacementName));
       if (rf) {
-        return { ...c, function: { ...c.function, name: rf.name } };
+        return { ...c, function: { ...c.function, name: c.function.name.replace(rf.replacementName, rf.name) } };
       }
       return map.super().call(c);
     },
@@ -91,7 +92,7 @@ export function getTable(sql: string): string {
 export function getFields(sql: string): string[] {
   const stm = sqlToStatement(sql) as SelectFromStatement;
   if (stm.columns?.length && stm.columns?.length > 0) {
-    return stm.columns.map(x => `${x.expr} as ${x.alias?.name}`);
+    return stm.columns.map((x) => `${x.expr} as ${x.alias?.name}`);
   }
   return [];
 }

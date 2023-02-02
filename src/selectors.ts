@@ -95,7 +95,7 @@ export const Components = {
       cannotConvert: {
         title: 'Cannot convert',
         confirmText: 'Yes',
-      }
+      },
     },
     QueryBuilder: {
       TYPES: {

@@ -190,24 +190,24 @@ export interface StringFilter extends CommonFilterProps {
 
 export interface NumberFilter extends CommonFilterProps {
   operator:
-  | FilterOperator.Equals
-  | FilterOperator.NotEquals
-  | FilterOperator.LessThan
-  | FilterOperator.LessThanOrEqual
-  | FilterOperator.GreaterThan
-  | FilterOperator.GreaterThanOrEqual;
+    | FilterOperator.Equals
+    | FilterOperator.NotEquals
+    | FilterOperator.LessThan
+    | FilterOperator.LessThanOrEqual
+    | FilterOperator.GreaterThan
+    | FilterOperator.GreaterThanOrEqual;
   value: number;
 }
 
 export interface DateFilterWithValue extends CommonFilterProps {
   type: 'datetime' | 'date';
   operator:
-  | FilterOperator.Equals
-  | FilterOperator.NotEquals
-  | FilterOperator.LessThan
-  | FilterOperator.LessThanOrEqual
-  | FilterOperator.GreaterThan
-  | FilterOperator.GreaterThanOrEqual;
+    | FilterOperator.Equals
+    | FilterOperator.NotEquals
+    | FilterOperator.LessThan
+    | FilterOperator.LessThanOrEqual
+    | FilterOperator.GreaterThan
+    | FilterOperator.GreaterThanOrEqual;
   value: string;
 }
 export interface DateFilterWithoutValue extends CommonFilterProps {

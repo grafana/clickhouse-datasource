@@ -273,7 +273,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with datetime filter',
-    `SELECT count(id) FROM db.foo WHERE   ( createddate  >= \$__fromTime AND createddate <= \$__toTime )`,
+    `SELECT count(id) FROM db.foo WHERE   ( createddate  >= $__fromTime AND createddate <= $__toTime )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -292,7 +292,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with date filter',
-    `SELECT count(id) FROM db.foo WHERE   (  NOT ( closedate  >= \$__fromTime AND closedate <= \$__toTime ) )`,
+    `SELECT count(id) FROM db.foo WHERE   (  NOT ( closedate  >= $__fromTime AND closedate <= $__toTime ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
