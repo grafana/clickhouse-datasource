@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.7
+
+- **Fix** - Empty template variables used with the conditionalAll macro work the same as selecting All. [Allow empty Inputs for $__conditionalAll](https://github.com/grafana/clickhouse-datasource/issues/262)
+- **Fix** - Intervals are limited to 1 second. [limit $__interval_s to at least 1 second](https://github.com/grafana/clickhouse-datasource/pull/270)
+- **Chore** - Bump ClickHouse go API to v2.5.1 [Bump github.com/ClickHouse/clickhouse-go/v2 from 2.4.3 to 2.5.1](https://github.com/grafana/clickhouse-datasource/pull/283)
+
 ## 2.0.6
 
 - **Chore** - Backend binaries compiled with latest go version 1.19.4
