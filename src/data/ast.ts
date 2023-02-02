@@ -1,19 +1,11 @@
-import {
-  parseFirst,
-  Statement,
-  SelectFromStatement,
-  FromTable,
-  astMapper,
-  FromStatement,
-  toSql,
-} from 'pgsql-ast-parser';
+import { parseFirst, Statement, SelectFromStatement, astMapper, toSql } from 'pgsql-ast-parser';
 
 export function sqlToStatement(sql: string): Statement {
-  const replaceFuncs = [] as Array<{
+  const replaceFuncs: Array<{
     startIndex: number;
     name: string;
     replacementName: string;
-  }>;
+  }> = [];
   //default is a key word in this grammar but it can be used in CH
   const re = /(\$__|\$|default)/gi;
   let regExpArray: RegExpExecArray | null;
@@ -69,21 +61,22 @@ export function sqlToStatement(sql: string): Statement {
 }
 
 export function getTable(sql: string): string {
-  const stm = sqlToStatement(sql) as SelectFromStatement;
-  if (stm.from?.length && stm.from?.length > 0) {
-    switch (stm.from![0].type) {
-      case 'table': {
-        const table = stm.from![0] as FromTable;
-        const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
-        // clickhouse table names are case sensitive and pgsql parser removes casing,
-        // so we need to get the casing from the raw sql
-        const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
-        return s ? s[0] : tableName;
-      }
-      case 'statement': {
-        const table = stm.from![0] as FromStatement;
-        return getTable(toSql.statement(table.statement));
-      }
+  const stm = sqlToStatement(sql);
+  if (stm.type !== 'select' || !stm.from?.length || stm.from?.length <= 0) {
+    return '';
+  }
+  switch (stm.from![0].type) {
+    case 'table': {
+      const table = stm.from![0];
+      const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
+      // clickhouse table names are case sensitive and pgsql parser removes casing,
+      // so we need to get the casing from the raw sql
+      const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
+      return s ? s[0] : tableName;
+    }
+    case 'statement': {
+      const table = stm.from![0];
+      return getTable(toSql.statement(table.statement));
     }
   }
   return '';
@@ -91,8 +84,8 @@ export function getTable(sql: string): string {
 
 export function getFields(sql: string): string[] {
   const stm = sqlToStatement(sql) as SelectFromStatement;
-  if (stm.columns?.length && stm.columns?.length > 0) {
-    return stm.columns.map((x) => `${x.expr} as ${x.alias?.name}`);
+  if (stm.type !== 'select' || !stm.columns?.length || stm.columns?.length <= 0) {
+    return [];
   }
-  return [];
+  return stm.columns.map((x) => `${x.expr} as ${x.alias?.name}`);
 }
