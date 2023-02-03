@@ -389,7 +389,7 @@ function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
 }
 
 function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean): { i: number; notFlag: boolean } {
-  if (e.name === '$__fromtime' && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
+  if (e.name?.toLowerCase() === '$__fromtime' && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
     if (notFlag) {
       filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
       notFlag = false;
@@ -400,7 +400,7 @@ function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean
     i++;
     return { i, notFlag };
   }
-  if (e.name === '$__totime') {
+  if (e.name?.toLowerCase() === '$__totime') {
     filters.splice(i, 1);
     return { i, notFlag };
   }
