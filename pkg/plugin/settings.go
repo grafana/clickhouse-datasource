@@ -49,10 +49,13 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.Server = jsonData["server"].(string)
 	}
 	if jsonData["port"] != nil {
-		if port, err := strconv.ParseInt(jsonData["port"].(string), 0, 64); err == nil {
-			settings.Port = port
+		if port, ok := jsonData["port"].(string); ok {
+			settings.Port, err = strconv.ParseInt(port, 0, 64)
+			if err != nil {
+				return settings, fmt.Errorf("could not parse port value: %w", err)
+			}
 		} else {
-			return settings, fmt.Errorf("could not parse Port value: %w", err)
+			settings.Port = int64(jsonData["port"].(float64))
 		}
 	}
 	if jsonData["username"] != nil {
