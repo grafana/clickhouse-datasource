@@ -82,10 +82,9 @@ describe('isNumberType', () => {
 });
 
 describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
-  testCondition('handles a table without a database', 'SELECT name FROM table', {
+  testCondition('handles a table without a database', 'SELECT name FROM foo', {
     mode: BuilderMode.List,
-    database: '',
-    table: 'table',
+    table: 'foo',
     fields: ['name'],
   });
 
@@ -234,21 +233,19 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with a IN filter',
-    `SELECT count(Id) FROM db.foo WHERE   ( StageName IN ('Deal Won', 'Deal Lost' ) )`,
+    `SELECT count(id) FROM db.foo WHERE   ( stagename IN ('Deal Won', 'Deal Lost' ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
       filters: [
         {
-          filterType: 'custom',
-          key: 'StageName',
+          key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
-          condition: 'AND',
         },
       ],
     }
@@ -256,21 +253,19 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with a NOT IN filter',
-    `SELECT count(Id) FROM db.foo WHERE   ( StageName NOT IN ('Deal Won', 'Deal Lost' ) )`,
+    `SELECT count(id) FROM db.foo WHERE   ( stagename NOT IN ('Deal Won', 'Deal Lost' ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
       filters: [
         {
-          filterType: 'custom',
-          key: 'StageName',
+          key: 'stagename',
           operator: FilterOperator.NotIn,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
-          condition: 'AND',
         },
       ],
     }
@@ -278,21 +273,18 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with datetime filter',
-    `SELECT count(Id) FROM db.foo WHERE   ( CreatedDate  >= \$__fromTime AND CreatedDate <= \$__toTime )`,
+    `SELECT count(id) FROM db.foo WHERE   ( createddate  >= $__fromTime AND createddate <= $__toTime )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
       filters: [
         {
-          filterType: 'custom',
-          key: 'CreatedDate',
+          key: 'createddate',
           operator: FilterOperator.WithInGrafanaTimeRange,
           type: 'datetime',
-          value: '',
-          condition: 'AND',
         },
       ],
     }
@@ -300,21 +292,18 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with date filter',
-    `SELECT count(Id) FROM db.foo WHERE   (  NOT ( CloseDate  >= \$__fromTime AND CloseDate <= \$__toTime ) )`,
+    `SELECT count(id) FROM db.foo WHERE   (  NOT ( closedate  >= $__fromTime AND closedate <= $__toTime ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'Id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
       filters: [
         {
-          filterType: 'custom',
-          key: 'CloseDate',
+          key: 'closedate',
           operator: FilterOperator.OutsideGrafanaTimeRange,
           type: 'datetime',
-          value: '',
-          condition: 'AND',
         },
       ],
     }

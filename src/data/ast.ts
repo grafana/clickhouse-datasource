@@ -1,267 +1,91 @@
-import { isString } from 'lodash';
+import { parseFirst, Statement, SelectFromStatement, astMapper, toSql } from 'pgsql-ast-parser';
 
-export type Clause = string | AST | null;
-export type AST = Map<string, Clause[]>;
-
-export default function sqlToAST(sql: string): AST {
-  const ast = createStatement();
-  const re =
-    /\b(WITH|SELECT|DISTINCT|FROM|SAMPLE|JOIN|PREWHERE|WHERE|GROUP BY|LIMIT BY|HAVING|ORDER BY|LIMIT|OFFSET|UNION|INTERSECT|EXCEPT|INTO OUTFILE|FORMAT)\b/gi;
-  const bracket = { count: 0, lastCount: 0, phrase: '' };
-  let lastNode = '';
+export function sqlToStatement(sql: string): Statement {
+  const replaceFuncs: Array<{
+    startIndex: number;
+    name: string;
+    replacementName: string;
+  }> = [];
+  //default is a key word in this grammar but it can be used in CH
+  const re = /(\$__|\$|default)/gi;
   let regExpArray: RegExpExecArray | null;
-  ast.set('', [sql.split(re, 2)[0]]);
-
   while ((regExpArray = re.exec(sql)) !== null) {
-    // Sets foundNode to a SQL keyword from the regular expression
-    const foundNode = regExpArray[0].toUpperCase();
-    const phrase = sql.substring(re.lastIndex, sql.length).split(re, 2)[0];
-    // If there is a greater number of open brackets than closed,
-    // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
-    if (bracket.count > 0) {
-      bracket.phrase += foundNode + phrase;
-    } else {
-      addToPhrase(foundNode, phrase);
-      lastNode = foundNode;
-      bracket.phrase = phrase;
-    }
-    bracket.count += (phrase.match(/\(/g) || []).length;
-    bracket.count -= (phrase.match(/\)/g) || []).length;
-    if (bracket.count <= 0 && bracket.lastCount > 0) {
-      // The phrase is complete
-      // If it contains the keyword SELECT, make new branches
-      // If it does not, make a leaf node
-      ast.set(lastNode, getASTBranches(bracket.phrase));
-    }
-    bracket.lastCount = bracket.count;
+    replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
   }
-  return ast;
 
-  function addToPhrase(foundNode: string, phrase: string) {
-    const nodePhrase = ast.get(foundNode);
-    if (nodePhrase && nodePhrase.length !== 0) {
-      ast.set(foundNode, nodePhrase.concat(foundNode, getASTBranches(phrase)));
-    } else {
-      ast.set(foundNode, getASTBranches(phrase));
-    }
+  //need to process in reverse so starting positions aren't effected by replacing other things
+  for (let i = replaceFuncs.length - 1; i >= 0; i--) {
+    const si = replaceFuncs[i].startIndex;
+    const replacementName = 'f' + (Math.random() + 1).toString(36).substring(7);
+    replaceFuncs[i].replacementName = replacementName;
+    sql = sql.substring(0, si) + replacementName + sql.substring(si + replaceFuncs[i].name.length);
   }
-}
 
-export function astToSql(ast: AST): string {
-  let r = '';
-  ast.forEach((clauses: Clause[], key: string) => {
-    let keyAndClauses = `${key} `;
-    for (const c of clauses) {
-      if (isString(c)) {
-        keyAndClauses += `${c.trim()} `;
-      } else if (c !== null) {
-        keyAndClauses += `${astToSql(c)} `;
+  let ast: Statement;
+  try {
+    ast = parseFirst(sql);
+  } catch (err) {
+    console.error(`Failed to parse SQL statement into an AST: ${err}`);
+    return {} as Statement;
+  }
+
+  const mapper = astMapper((map) => ({
+    tableRef: (t) => {
+      const rfs = replaceFuncs.find((x) => x.replacementName === t.schema);
+      if (rfs) {
+        return { ...t, schema: t.schema?.replace(rfs.replacementName, rfs.name) };
       }
-    }
-    // do not add the keys that do not have nodes
-    if (keyAndClauses !== `${key} `) {
-      r += keyAndClauses;
-    }
-  });
-  // Remove all of the consecutive spaces to make things more readable when debugging
-  return r.trim().replace(/\s+/g, ' ');
-}
-
-export function applyFiltersToAST(ast: AST, whereClause: string, targetTable: string): AST {
-  if (!ast || !ast.get('FROM')) {
-    return ast;
-  }
-
-  if (!targetTable) {
-    return ast;
-  }
-
-  for (const clause of ast.get('FROM')!) {
-    if (isString(clause)) {
-      const tableRE = RegExp(`\\b${targetTable}\\b`, 'g');
-      if (!clause.match(tableRE)) {
-        continue;
+      const rft = replaceFuncs.find((x) => x.replacementName === t.name);
+      if (rft) {
+        return { ...t, name: t.name.replace(rft.replacementName, rft.name) };
       }
-      const where = ast.get('WHERE');
-      // If there is no defined WHERE clause create one
-      // Else add an ad hoc filter to the existing WHERE clause
-      if (where?.length === 0) {
-        // set WHERE clause to ad hoc filter and add the remaining part of the FROM clause to the new WHERE clause
-        // example: "(SELECT * FROM table) as r" will have a FROM clause of "table) as r". We need ") as r" to be after the new WHERE clause
-
-        // first we get the remaining part of the FROM phrase. ") as r"
-        const fromPhrase = ast.get('FROM');
-        const fromPhraseAfterTableName = fromPhrase!
-          [fromPhrase!.length - 1]!.toString()
-          .trim()
-          .substring(targetTable.length);
-
-        // if the fromPhraseAfterTheTableName is not the ending of a bracket statement, then don't add it
-        if (!fromPhraseAfterTableName.includes(')')) {
-          ast.set('WHERE', [whereClause]);
-          continue;
-        }
-        // apply the remaining part of the FROM phrase to the end of the new WHERE clause
-        ast.set('WHERE', [`${whereClause} ${fromPhraseAfterTableName}`]);
-        // set the FROM clause to only have the table name
-        const index = ast.get('FROM')!.indexOf(clause);
-        ast.get('FROM')![index] = ` ${targetTable} `;
-        continue;
+      return map.super().tableRef(t);
+    },
+    ref: (r) => {
+      const rf = replaceFuncs.find((x) => r.name.startsWith(x.replacementName));
+      if (rf) {
+        const d = r.name.replace(rf.replacementName, rf.name);
+        return { ...r, name: d };
       }
-      where!.unshift(`${whereClause} AND `);
-    }
-  }
-
-  // Each node in the AST needs to be checked to see if ad hoc filters should be applied
-  ast.forEach((clauses: Clause[]) => {
-    for (const c of clauses) {
-      if (c !== null && !isString(c)) {
-        applyFiltersToAST(c, whereClause, targetTable);
+      return map.super().ref(r);
+    },
+    call: (c) => {
+      const rf = replaceFuncs.find((x) => c.function.name.startsWith(x.replacementName));
+      if (rf) {
+        return { ...c, function: { ...c.function, name: c.function.name.replace(rf.replacementName, rf.name) } };
       }
-    }
-  });
-
-  return ast;
+      return map.super().call(c);
+    },
+  }));
+  return mapper.statement(ast)!;
 }
 
-export function removeConditionalAllsFromAST(ast: AST, queryVarNames: string[]): AST {
-  if (!ast || !ast.get('FROM')) {
-    return ast;
+export function getTable(sql: string): string {
+  const stm = sqlToStatement(sql);
+  if (stm.type !== 'select' || !stm.from?.length || stm.from?.length <= 0) {
+    return '';
   }
-
-  const where = ast.get('WHERE');
-  if (where) {
-    for (let i = 0; i < where.length; i++) {
-      const c = where[i];
-      if (isString(c) && queryVarNames.some((v) => c.includes(v)) && c.includes('$')) {
-        // remove AND/OR before this condition if this is the last condition
-        if (i === where.length - 1) {
-          where.splice(i - 1, 2);
-        }
-        // remove AND/OR after this condition
-        if (where.length > 1) {
-          where.splice(i, 2);
-          i--;
-        }
-        // moves the ending of the phrase, like ')', to the next logical place
-        movePhraseEnding(c, ast);
-      }
+  switch (stm.from![0].type) {
+    case 'table': {
+      const table = stm.from![0];
+      const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
+      // clickhouse table names are case sensitive and pgsql parser removes casing,
+      // so we need to get the casing from the raw sql
+      const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
+      return s ? s[0] : tableName;
+    }
+    case 'statement': {
+      const table = stm.from![0];
+      return getTable(toSql.statement(table.statement));
     }
   }
-
-  // Each node in the AST needs to be checked to see if it contains a conditional all template variable
-  ast.forEach((clauses: Clause[]) => {
-    for (const c of clauses) {
-      if (c !== null && !isString(c)) {
-        removeConditionalAllsFromAST(c, queryVarNames);
-      }
-    }
-  });
-
-  return ast;
+  return '';
 }
 
-function movePhraseEnding(c: string, ast: AST) {
-  let count = (c.match(/\)/g) || []).length - (c.match(/\(/g) || []).length;
-  if (count <= 0) {
-    return;
+export function getFields(sql: string): string[] {
+  const stm = sqlToStatement(sql) as SelectFromStatement;
+  if (stm.type !== 'select' || !stm.columns?.length || stm.columns?.length <= 0) {
+    return [];
   }
-  const re = /\)/g;
-  const indices: number[] = [];
-  // get all indices of ')'
-  while (re.exec(c) !== null) {
-    indices.push(re.lastIndex);
-  }
-  // get the first ')' that does not have a beginning bracket in this phrase
-  const firstUnmatchedBracketIndex = indices[indices.length - count] - 1;
-  const phraseEnding = c.substring(firstUnmatchedBracketIndex, c.length);
-  // these are the logical places in priority to move the phrase ending
-  if (ast.get('PREWHERE')?.length !== 0) {
-    ast.get('PREWHERE')?.push(phraseEnding);
-  } else if (ast.get('JOIN')?.length !== 0) {
-    ast.get('JOIN')?.push(phraseEnding);
-  } else if (ast.get('SAMPLE')?.length !== 0) {
-    ast.get('SAMPLE')?.push(phraseEnding);
-  } else if (ast.get('FROM')?.length !== 0) {
-    ast.get('FROM')?.push(phraseEnding);
-  }
-}
-
-function getASTBranches(sql: string): Clause[] {
-  const clauses: Clause[] = [];
-  const re = /(\bAND\b|\bOR\b|,)/gi;
-  const bracket = { count: 0, lastCount: 0, phrase: '' };
-  let regExpArray: RegExpExecArray | null;
-  let lastPhraseIndex = 0;
-
-  while ((regExpArray = re.exec(sql)) !== null) {
-    const foundSplitter = regExpArray[0].toUpperCase();
-    const phrase = sql.substring(lastPhraseIndex, regExpArray.index);
-    lastPhraseIndex = re.lastIndex;
-
-    bracket.count += (phrase.match(/\(/g) || []).length;
-    bracket.count -= (phrase.match(/\)/g) || []).length;
-    // If there is a greater number of open brackets than closed,
-    // add the phrase to the bracket phrase. The complete bracket phrase will be used to create a new AST branch
-    if (bracket.count > 0) {
-      bracket.phrase += phrase + foundSplitter;
-    } else if (bracket.lastCount <= 0) {
-      completePhrase(clauses, phrase);
-      clauses.push(foundSplitter);
-    }
-    if (bracket.count <= 0 && bracket.lastCount > 0) {
-      bracket.phrase += phrase;
-      completePhrase(clauses, bracket.phrase);
-      clauses.push(foundSplitter);
-      bracket.phrase = '';
-    }
-    bracket.lastCount = bracket.count;
-  }
-
-  // add the phrase after the last splitter
-  const phrase = sql.substring(lastPhraseIndex, sql.length);
-  if (bracket.count > 0) {
-    bracket.phrase += phrase;
-  } else {
-    bracket.phrase = phrase;
-  }
-  completePhrase(clauses, bracket.phrase);
-  return clauses;
-}
-
-function completePhrase(clauses: Clause[], bracketPhrase: string) {
-  // The phrase is complete
-  // If it contains the keyword SELECT, build the AST for the phrase
-  // If it does not, make a leaf node
-  if (bracketPhrase.match(/\bSELECT\b/gi)) {
-    clauses.push(sqlToAST(bracketPhrase));
-  } else {
-    clauses.push(bracketPhrase);
-  }
-}
-
-// Creates a statement with all the keywords to preserve the keyword order
-function createStatement(): AST {
-  const clauses = new Map<string, Clause[]>();
-  clauses.set('', []);
-  clauses.set('WITH', []);
-  clauses.set('SELECT', []);
-  clauses.set('DISTINCT', []);
-  clauses.set('FROM', []);
-  clauses.set('SAMPLE', []);
-  clauses.set('JOIN', []);
-  clauses.set('PREWHERE', []);
-  clauses.set('WHERE', []);
-  clauses.set('GROUP BY', []);
-  clauses.set('LIMIT BY', []);
-  clauses.set('HAVING', []);
-  clauses.set('ORDER BY', []);
-  clauses.set('LIMIT', []);
-  clauses.set('OFFSET', []);
-  clauses.set('UNION', []);
-  clauses.set('INTERSECT', []);
-  clauses.set('EXCEPT', []);
-  clauses.set('INTO OUTFILE', []);
-  clauses.set('FORMAT', []);
-  return clauses as AST;
+  return stm.columns.map((x) => `${x.expr} as ${x.alias?.name}`);
 }
