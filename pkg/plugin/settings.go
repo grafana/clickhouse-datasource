@@ -11,7 +11,7 @@ import (
 // Settings - data loaded from grafana settings database
 type Settings struct {
 	Server             string `json:"server,omitempty"`
-	Port               int64  `json:"port,omitempty"`
+	Port               int64  `json:"port,string,omitempty"`
 	Username           string `json:"username,omitempty"`
 	DefaultDatabase    string `json:"defaultDatabase,omitempty"`
 	InsecureSkipVerify bool   `json:"tlsSkipVerify,omitempty"`
