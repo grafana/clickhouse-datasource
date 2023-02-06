@@ -49,6 +49,8 @@
     "TLSCA",
     "totime",
     "Ulimits",
-    "vectorator"
+    "vectorator",
+    "createddate",
+    "closedate"
   ]
 }
