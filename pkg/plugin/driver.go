@@ -12,10 +12,12 @@ import (
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	"github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v2"
 	"github.com/pkg/errors"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -48,6 +50,24 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 		}
 	}
 	return tlsConfig, nil
+}
+
+func getClientInfoProducts() (products []struct{ Name, Version string }) {
+	if version := os.Getenv("GF_VERSION"); version != "" {
+		products = append(products, struct{ Name, Version string }{
+			Name:    "grafana",
+			Version: version,
+		})
+	}
+
+	if info, err := build.GetBuildInfo(); err == nil {
+		products = append(products, struct{ Name, Version string }{
+			Name:    "clickhouse-datasource",
+			Version: info.Version,
+		})
+	}
+
+	return products
 }
 
 func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, error) {
@@ -110,6 +130,9 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		compression = clickhouse.CompressionGZIP
 	}
 	db := clickhouse.OpenDB(&clickhouse.Options{
+		ClientInfo: clickhouse.ClientInfo{
+			Products: getClientInfoProducts(),
+		},
 		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
 		Auth: clickhouse.Auth{
