@@ -19,6 +19,7 @@
     "DataSources",
     "DateTime",
     "endregion",
+    "fromtime",
     "Grafana",
     "groupable",
     "instancemgmt",
@@ -35,6 +36,7 @@
     "shopspring",
     "sqlds",
     "sqlutil",
+    "stagename",
     "stretchr",
     "sugg",
     "supress",
@@ -45,7 +47,10 @@
     "timerange",
     "timeseries",
     "TLSCA",
+    "totime",
     "Ulimits",
-    "vectorator"
+    "vectorator",
+    "createddate",
+    "closedate"
   ]
 }

@@ -1,4 +1,4 @@
-import { getTable } from './ast2';
+import { getTable } from './ast';
 
 export class AdHocFilter {
   private _targetTable = '';
