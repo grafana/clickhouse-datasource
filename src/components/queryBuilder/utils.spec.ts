@@ -82,27 +82,34 @@ describe('isNumberType', () => {
 });
 
 describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
-  testCondition('handles a table without a database', 'SELECT name FROM foo', {
+  testCondition('handles a table without a database', 'SELECT name FROM "foo"', {
     mode: BuilderMode.List,
     table: 'foo',
     fields: ['name'],
   });
 
-  testCondition('handles a database and a table', 'SELECT name FROM db.foo', {
+  testCondition('handles a database and a table', 'SELECT name FROM db."foo"', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
     fields: ['name'],
   });
 
-  testCondition('handles 2 fields', 'SELECT field1, field2 FROM db.foo', {
+  testCondition('handles a database and a table with a dot', 'SELECT name FROM db."foo.bar"', {
+    mode: BuilderMode.List,
+    database: 'db',
+    table: 'foo.bar',
+    fields: ['name'],
+  });
+
+  testCondition('handles 2 fields', 'SELECT field1, field2 FROM db."foo"', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
     fields: ['field1', 'field2'],
   });
 
-  testCondition('handles a limit', 'SELECT field1, field2 FROM db.foo LIMIT 20', {
+  testCondition('handles a limit', 'SELECT field1, field2 FROM db."foo" LIMIT 20', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
@@ -112,7 +119,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles empty orderBy array',
-    'SELECT field1, field2 FROM db.foo LIMIT 20',
+    'SELECT field1, field2 FROM db."foo" LIMIT 20',
     {
       mode: BuilderMode.List,
       database: 'db',
@@ -124,7 +131,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     false
   );
 
-  testCondition('handles order by', 'SELECT field1, field2 FROM db.foo ORDER BY field1 ASC LIMIT 20', {
+  testCondition('handles order by', 'SELECT field1, field2 FROM db."foo" ORDER BY field1 ASC LIMIT 20', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
@@ -146,7 +153,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     false
   );
 
-  testCondition('handles aggregation function', 'SELECT sum(field1) FROM db.foo', {
+  testCondition('handles aggregation function', 'SELECT sum(field1) FROM db."foo"', {
     mode: BuilderMode.Aggregate,
     database: 'db',
     table: 'foo',
@@ -154,7 +161,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     metrics: [{ field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum }],
   });
 
-  testCondition('handles aggregation with alias', 'SELECT sum(field1) total_records FROM db.foo', {
+  testCondition('handles aggregation with alias', 'SELECT sum(field1) total_records FROM db."foo"', {
     mode: BuilderMode.Aggregate,
     database: 'db',
     table: 'foo',
@@ -164,7 +171,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles 2 aggregations',
-    'SELECT sum(field1) total_records, count(field2) total_records2 FROM db.foo',
+    'SELECT sum(field1) total_records, count(field2) total_records2 FROM db."foo"',
     {
       mode: BuilderMode.Aggregate,
       table: 'foo',
@@ -179,7 +186,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with groupBy',
-    'SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM db.foo GROUP BY field3',
+    'SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM db."foo" GROUP BY field3',
     {
       mode: BuilderMode.Aggregate,
       table: 'foo',
@@ -196,7 +203,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with groupBy with fields having group by value',
-    'SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM db.foo GROUP BY field3',
+    'SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM db."foo" GROUP BY field3',
     {
       mode: BuilderMode.Aggregate,
       table: 'foo',
@@ -212,7 +219,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with group by and order by',
-    'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db.foo GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC',
+    'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM db."foo" GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC',
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -233,7 +240,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with a IN filter',
-    `SELECT count(id) FROM db.foo WHERE   ( stagename IN ('Deal Won', 'Deal Lost' ) )`,
+    `SELECT count(id) FROM db."foo" WHERE   ( stagename IN ('Deal Won', 'Deal Lost' ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -253,7 +260,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with a NOT IN filter',
-    `SELECT count(id) FROM db.foo WHERE   ( stagename NOT IN ('Deal Won', 'Deal Lost' ) )`,
+    `SELECT count(id) FROM db."foo" WHERE   ( stagename NOT IN ('Deal Won', 'Deal Lost' ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -273,7 +280,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with datetime filter',
-    `SELECT count(id) FROM db.foo WHERE   ( createddate  >= $__fromTime AND createddate <= $__toTime )`,
+    `SELECT count(id) FROM db."foo" WHERE   ( createddate  >= $__fromTime AND createddate <= $__toTime )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -292,7 +299,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles aggregation with date filter',
-    `SELECT count(id) FROM db.foo WHERE   (  NOT ( closedate  >= $__fromTime AND closedate <= $__toTime ) )`,
+    `SELECT count(id) FROM db."foo" WHERE   (  NOT ( closedate  >= $__fromTime AND closedate <= $__toTime ) )`,
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
@@ -311,7 +318,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType"',
-    'SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) GROUP BY time ORDER BY time ASC',
+    'SELECT $__timeInterval(time) as time FROM db."foo" WHERE $__timeFilter(time) GROUP BY time ORDER BY time ASC',
     {
       mode: BuilderMode.Trend,
       database: 'db',
@@ -327,7 +334,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType" with a filter',
-    'SELECT $__timeInterval(time) as time FROM db.foo WHERE $__timeFilter(time) AND   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC',
+    'SELECT $__timeInterval(time) as time FROM db."foo" WHERE $__timeFilter(time) AND   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC',
     {
       mode: BuilderMode.Trend,
       database: 'db',
