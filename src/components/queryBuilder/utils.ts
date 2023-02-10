@@ -74,7 +74,7 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
 };
 
 const getListQuery = (database = '', table = '', fields: string[] = []): string => {
-  const sep = database === ''  || table === '' ? '' : '.';
+  const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
   return `SELECT ${fields.join(', ')} FROM ${database}${sep}${escapedTableName(table)}`;
 };
