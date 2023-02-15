@@ -4,7 +4,7 @@ import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
   id: 1,
-  uid: 'sap_hana_ds',
+  uid: 'clickhouse_ds',
   type: 'grafana-clickhouse-datasource',
   name: 'ClickHouse',
   jsonData: {

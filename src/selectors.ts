@@ -92,6 +92,10 @@ export const Components = {
         confirmText: 'Continue',
         dismissText: 'Cancel',
       },
+      cannotConvert: {
+        title: 'Cannot convert',
+        confirmText: 'Yes',
+      },
     },
     QueryBuilder: {
       TYPES: {

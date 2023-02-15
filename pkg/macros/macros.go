@@ -57,6 +57,19 @@ func TimeFilter(query *sqlds.Query, args []string) (string, error) {
 	return fmt.Sprintf("%s >= '%d' AND %s <= '%d'", column, from, column, to), nil
 }
 
+func DateFilter(query *sqlds.Query, args []string) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+	}
+	var (
+		column = args[0]
+		from   = query.TimeRange.From.Format("2006-01-02")
+		to     = query.TimeRange.To.Format("2006-01-02")
+	)
+
+	return fmt.Sprintf("%s >= '%s' AND %s <= '%s'", column, from, column, to), nil
+}
+
 func TimeFilterMs(query *sqlds.Query, args []string) (string, error) {
 	if len(args) != 1 {
 		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
@@ -81,7 +94,7 @@ func TimeInterval(query *sqlds.Query, args []string) (string, error) {
 }
 
 func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
-	seconds := query.Interval.Seconds()
+	seconds := math.Max(query.Interval.Seconds(), 1)
 	return fmt.Sprintf("%d", int(seconds)), nil
 }
 
@@ -98,7 +111,7 @@ func RemoveQuotesInArgs(args []string) []string {
 	return updatedArgs
 }
 
-// IsValidComparisonPredicates checks for a string and return true if it is a valid SQL comparision predicate
+// IsValidComparisonPredicates checks for a string and return true if it is a valid SQL comparison predicate
 func IsValidComparisonPredicates(comparison_predicates string) bool {
 	switch comparison_predicates {
 	case "=", "!=", "<>", "<", "<=", ">", ">=":
