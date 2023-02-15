@@ -46,6 +46,25 @@ func TestLoadSettings(t *testing.T) {
 				},
 				wantErr: nil,
 			},
+			{
+				name: "should converting string values to the correct type)",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"server": "test", "port": "443", "tlsSkipVerify": "true", "tlsAuth" : "true", "tlsAuthWithCACert": "true"}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Server:             "test",
+					Port:               443,
+					InsecureSkipVerify: true,
+					TlsClientAuth:      true,
+					TlsAuthWithCACert:  true,
+					Timeout:            "10",
+					QueryTimeout:       "60",
+				},
+				wantErr: nil,
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
