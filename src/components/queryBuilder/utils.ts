@@ -256,7 +256,7 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
       break;
     case BuilderMode.List:
     case BuilderMode.Log:
-      options.fields = ['*']
+      options.fields = ['*'];
     default:
       query += getListQuery(options.database, options.table, options.fields);
       const filters = getFilters(options.filters || []);
