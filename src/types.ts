@@ -127,9 +127,9 @@ export interface SqlBuilderOptionsLog {
 
 export type SqlBuilderOptions =
     SqlBuilderOptionsList
-    | SqlBuilderOptionsAggregate
-    | SqlBuilderOptionsTrend
-    | SqlBuilderOptionsLog;
+      | SqlBuilderOptionsAggregate
+      | SqlBuilderOptionsTrend
+      | SqlBuilderOptionsLog;
 
 export interface Field {
   name: string;
