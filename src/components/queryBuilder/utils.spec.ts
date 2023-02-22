@@ -1,5 +1,5 @@
 import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDirection } from 'types';
-import { getQueryOptionsFromSql, getSQLFromQueryOptions, isDateType, isNumberType } from './utils';
+import { getQueryOptionsFromSql, getSQLFromQueryOptions, isDateTimeType, isDateType, isNumberType } from './utils';
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
@@ -39,6 +39,41 @@ describe('isDateType', () => {
   it('returns false for other types', () => {
     expect(isDateType('boolean')).toBe(false);
     expect(isDateType('Boolean')).toBe(false);
+  });
+});
+
+describe('isDateTimeType', () => {
+  it('returns true for DateTime type', () => {
+    expect(isDateTimeType('DateTime')).toBe(true);
+    expect(isDateTimeType('datetime')).toBe(true);
+  });
+  it('returns true for Nullable(DateTime) type', () => {
+    expect(isDateTimeType('Nullable(DateTime)')).toBe(true);
+  });
+  it('returns true for DateTime64 type', () => {
+    expect(isDateTimeType('DateTime64(3)')).toBe(true);
+    expect(isDateTimeType('datetime64(3)')).toBe(true);
+    expect(isDateTimeType("Datetime64(3, 'Asia/Istanbul')")).toBe(true);
+  });
+  it('returns true for Nullable(DateTime64(3)) type', () => {
+    expect(isDateTimeType('Nullable(DateTime64(3))')).toBe(true);
+    expect(isDateTimeType("Nullable(DateTime64(3, 'Asia/Istanbul'))")).toBe(true);
+  });
+  it('returns false for Date type', () => {
+    expect(isDateTimeType('Date')).toBe(false);
+    expect(isDateTimeType('date')).toBe(false);
+    expect(isDateTimeType('Date32')).toBe(false);
+    expect(isDateTimeType('date32')).toBe(false);
+  });
+  it('returns false for Nullable(Date) type', () => {
+    expect(isDateTimeType('Nullable(Date)')).toBe(false);
+    expect(isDateTimeType('Nullable(Date32)')).toBe(false);
+    expect(isDateTimeType('nullable(date)')).toBe(false);
+    expect(isDateTimeType('nullable(date32)')).toBe(false);
+  });
+  it('returns false for other types', () => {
+    expect(isDateTimeType('boolean')).toBe(false);
+    expect(isDateTimeType('String')).toBe(false);
   });
 });
 
