@@ -233,7 +233,6 @@ export const FilterEditor = (props: {
     }
   };
   const onFilterNameChange = (fieldName: string) => {
-    console.log(fieldName);
     setIsOpen(false);
     const matchingField = fieldsList.find((f) => f.name === fieldName);
     let filterData: { key: string; type: string } | null = null;
@@ -273,7 +272,6 @@ export const FilterEditor = (props: {
     }
 
     let newFilter: Filter & RestrictedFilter;
-    console.log('Composing new filter');
     // this is an auto-generated TimeRange filter
     if (filter.restrictToFields && filter.restrictToOperators) {
       newFilter = {
