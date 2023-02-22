@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, RadioButtonGroup, Select, Input, MultiSelect } from '@grafana/ui';
-import { Filter, FullField, FilterOperator, NullFilter } from './../../types';
+import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
+import { Filter, FilterOperator, FullField, NullFilter } from '../../types';
 import * as utils from './utils';
-import { selectors } from './../../selectors';
+import { isDateTimeType } from './utils';
+import { selectors } from '../../selectors';
 import { styles } from '../../styles';
 
 const boolValues: Array<SelectableValue<boolean>> = [
@@ -44,6 +45,10 @@ export const defaultNewFilter: NullFilter = {
   type: 'id',
   operator: FilterOperator.IsNotNull,
 };
+export interface RestrictedFilter {
+  restrictToFields?: FullField[];
+  restrictToOperators?: FilterOperator[];
+}
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
   const [value, setValue] = useState(props.value || 0);
@@ -164,13 +169,13 @@ export const FilterValueEditor = (props: {
 export const FilterEditor = (props: {
   fieldsList: FullField[];
   index: number;
-  filter: Filter;
+  filter: Filter & RestrictedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
 }) => {
   const { index, filter, fieldsList, onFilterChange } = props;
   const [isOpen, setIsOpen] = useState(false);
   const getFields = () => {
-    const values = fieldsList.map((f) => {
+    const values = (filter.restrictToFields || fieldsList).map((f) => {
       return { label: f.label, value: f.name };
     });
     // Add selected value to the list if it does not exist.
@@ -180,7 +185,9 @@ export const FilterEditor = (props: {
     return values;
   };
   const getFilterOperatorsByType = (type = 'string'): Array<SelectableValue<FilterOperator>> => {
-    if (utils.isBooleanType(type)) {
+    if (filter.restrictToOperators !== undefined) {
+      return filterOperators.filter((f) => filter.restrictToOperators!.includes(f.value!));
+    } else if (utils.isBooleanType(type)) {
       return filterOperators.filter((f) => [FilterOperator.Equals, FilterOperator.NotEquals].includes(f.value!));
     } else if (utils.isNumberType(type)) {
       return filterOperators.filter((f) =>
@@ -226,6 +233,7 @@ export const FilterEditor = (props: {
     }
   };
   const onFilterNameChange = (fieldName: string) => {
+    console.log(fieldName);
     setIsOpen(false);
     const matchingField = fieldsList.find((f) => f.name === fieldName);
     let filterData: { key: string; type: string } | null = null;
@@ -264,8 +272,20 @@ export const FilterEditor = (props: {
       return;
     }
 
-    let newFilter: Filter;
-    if (utils.isBooleanType(filterData.type)) {
+    let newFilter: Filter & RestrictedFilter;
+    console.log('Composing new filter');
+    // this is an auto-generated TimeRange filter
+    if (filter.restrictToFields && filter.restrictToOperators) {
+      newFilter = {
+        filterType: 'custom',
+        key: filterData.key,
+        type: 'datetime',
+        condition: filter.condition || 'AND',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        restrictToOperators: filter.restrictToOperators,
+        restrictToFields: filter.restrictToFields,
+      };
+    } else if (utils.isBooleanType(filterData.type)) {
       newFilter = {
         filterType: 'custom',
         key: filterData.key,
@@ -346,8 +366,9 @@ export const FiltersEditor = (props: {
   fieldsList: FullField[];
   filters: Filter[];
   onFiltersChange: (filters: Filter[]) => void;
+  tableName: string;
 }) => {
-  const { filters = [], onFiltersChange, fieldsList = [] } = props;
+  const { filters = [], onFiltersChange, fieldsList = [], tableName } = props;
   const { label, tooltip, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.WHERE;
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
@@ -362,6 +383,45 @@ export const FiltersEditor = (props: {
     newFilters[index] = filter;
     onFiltersChange(newFilters);
   };
+  // we need to prevent the default time range filter from added again if we remove it
+  // keep this state for a particular table selected, and reset it when we change the table
+  const [timeRangeFilterState, updateTimeRangeFilterState] = useState({
+    tableName,
+    wasSetOnce: false,
+  });
+  // if we changed a table via "Table" input
+  if (timeRangeFilterState.tableName !== tableName) {
+    // reset existing filters and all the fields, as they tend to linger between table switches
+    filters.length = 0;
+    fieldsList.length = 0;
+    updateTimeRangeFilterState({
+      tableName,
+      wasSetOnce: false,
+    });
+  }
+  if (!timeRangeFilterState.wasSetOnce && filters.length === 0 && fieldsList.length > 0) {
+    const dateTimeFields = fieldsList.filter((f) => isDateTimeType(f.type));
+    if (dateTimeFields.length > 0) {
+      const filter: Filter & RestrictedFilter = {
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: dateTimeFields[0].name,
+        type: 'datetime',
+        condition: 'AND',
+        restrictToFields: dateTimeFields,
+        restrictToOperators: [FilterOperator.WithInGrafanaTimeRange],
+      };
+      filters.push(filter);
+      updateTimeRangeFilterState({
+        ...timeRangeFilterState,
+        wasSetOnce: true,
+      });
+      // avoid "cannot update during an existing state transition" error
+      // trigger the parent re-render immediately after we quit this function;
+      // this way we will see the change to the SQL preview
+      setTimeout(() => onFiltersChange([...filters]), 0);
+    }
+  }
   return (
     <>
       {filters.length === 0 && (

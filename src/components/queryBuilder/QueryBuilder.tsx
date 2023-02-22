@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import defaultsDeep from 'lodash/defaultsDeep';
 import { Datasource } from '../../data/CHDatasource';
 import { TableSelect } from './TableSelect';
@@ -8,18 +8,18 @@ import { MetricsEditor } from './Metrics';
 import { TimeFieldEditor } from './TimeField';
 import { FiltersEditor } from './Filters';
 import { GroupByEditor } from './GroupBy';
-import { OrderByEditor, getOrderByFields } from './OrderBy';
+import { getOrderByFields, OrderByEditor } from './OrderBy';
 import { LimitEditor } from './Limit';
 import {
-  SqlBuilderOptions,
-  defaultCHBuilderQuery,
-  OrderBy,
-  BuilderMode,
-  FullField,
-  Filter,
-  SqlBuilderOptionsTrend,
   BuilderMetricField,
-} from './../../types';
+  BuilderMode,
+  defaultCHBuilderQuery,
+  Filter,
+  FullField,
+  OrderBy,
+  SqlBuilderOptions,
+  SqlBuilderOptionsTrend,
+} from '../../types';
 import { DatabaseSelect } from './DatabaseSelect';
 import { isDateType } from './utils';
 
@@ -192,7 +192,12 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
       )}
-      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
+      <FiltersEditor
+        filters={builder.filters || []}
+        onFiltersChange={onFiltersChange}
+        fieldsList={fieldsList}
+        tableName={builder.table}
+      />
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
       )}
