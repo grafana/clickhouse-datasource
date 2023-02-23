@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor, RestrictedFilter } from './Filters';
+import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor, PredefinedFilter } from './Filters';
 import { selectors } from '../../selectors';
 import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
 
@@ -92,7 +92,7 @@ describe('FiltersEditor', () => {
           tableName={tableName}
         />
       );
-      const filters: Array<Filter & RestrictedFilter> = [
+      const filters: Array<Filter & PredefinedFilter> = [
         {
           filterType: 'custom',
           condition: 'AND',
@@ -100,7 +100,6 @@ describe('FiltersEditor', () => {
           type: 'datetime',
           operator: FilterOperator.WithInGrafanaTimeRange,
           restrictToFields: [dateTimeField],
-          restrictToOperators: [FilterOperator.WithInGrafanaTimeRange],
         },
       ];
       jest.runAllTimers();

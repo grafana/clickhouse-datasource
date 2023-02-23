@@ -45,9 +45,8 @@ export const defaultNewFilter: NullFilter = {
   type: 'id',
   operator: FilterOperator.IsNotNull,
 };
-export interface RestrictedFilter {
+export interface PredefinedFilter {
   restrictToFields?: FullField[];
-  restrictToOperators?: FilterOperator[];
 }
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
@@ -169,7 +168,7 @@ export const FilterValueEditor = (props: {
 export const FilterEditor = (props: {
   fieldsList: FullField[];
   index: number;
-  filter: Filter & RestrictedFilter;
+  filter: Filter & PredefinedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
 }) => {
   const { index, filter, fieldsList, onFilterChange } = props;
@@ -185,9 +184,7 @@ export const FilterEditor = (props: {
     return values;
   };
   const getFilterOperatorsByType = (type = 'string'): Array<SelectableValue<FilterOperator>> => {
-    if (filter.restrictToOperators !== undefined) {
-      return filterOperators.filter((f) => filter.restrictToOperators!.includes(f.value!));
-    } else if (utils.isBooleanType(type)) {
+    if (utils.isBooleanType(type)) {
       return filterOperators.filter((f) => [FilterOperator.Equals, FilterOperator.NotEquals].includes(f.value!));
     } else if (utils.isNumberType(type)) {
       return filterOperators.filter((f) =>
@@ -272,17 +269,16 @@ export const FilterEditor = (props: {
       return;
     }
 
-    let newFilter: Filter & RestrictedFilter;
+    let newFilter: Filter & PredefinedFilter;
     console.log('Composing new filter');
     // this is an auto-generated TimeRange filter
-    if (filter.restrictToFields && filter.restrictToOperators) {
+    if (filter.restrictToFields) {
       newFilter = {
         filterType: 'custom',
         key: filterData.key,
         type: 'datetime',
         condition: filter.condition || 'AND',
         operator: FilterOperator.WithInGrafanaTimeRange,
-        restrictToOperators: filter.restrictToOperators,
         restrictToFields: filter.restrictToFields,
       };
     } else if (utils.isBooleanType(filterData.type)) {
@@ -402,14 +398,13 @@ export const FiltersEditor = (props: {
   if (!timeRangeFilterState.wasSetOnce && filters.length === 0 && fieldsList.length > 0) {
     const dateTimeFields = fieldsList.filter((f) => isDateTimeType(f.type));
     if (dateTimeFields.length > 0) {
-      const filter: Filter & RestrictedFilter = {
+      const filter: Filter & PredefinedFilter = {
         operator: FilterOperator.WithInGrafanaTimeRange,
         filterType: 'custom',
         key: dateTimeFields[0].name,
         type: 'datetime',
         condition: 'AND',
         restrictToFields: dateTimeFields,
-        restrictToOperators: [FilterOperator.WithInGrafanaTimeRange],
       };
       filters.push(filter);
       updateTimeRangeFilterState({
