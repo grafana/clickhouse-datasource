@@ -3,7 +3,6 @@ import { SelectableValue } from '@grafana/data';
 import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
 import { Filter, FilterOperator, FullField, NullFilter } from '../../types';
 import * as utils from './utils';
-import { isDateTimeType } from './utils';
 import { selectors } from '../../selectors';
 import { styles } from '../../styles';
 
@@ -360,9 +359,8 @@ export const FiltersEditor = (props: {
   fieldsList: FullField[];
   filters: Filter[];
   onFiltersChange: (filters: Filter[]) => void;
-  tableName: string;
 }) => {
-  const { filters = [], onFiltersChange, fieldsList = [], tableName } = props;
+  const { filters = [], onFiltersChange, fieldsList = [] } = props;
   const { label, tooltip, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.WHERE;
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
@@ -377,44 +375,6 @@ export const FiltersEditor = (props: {
     newFilters[index] = filter;
     onFiltersChange(newFilters);
   };
-  // we need to prevent the default time range filter from added again if we remove it
-  // keep this state for a particular table selected, and reset it when we change the table
-  const [timeRangeFilterState, updateTimeRangeFilterState] = useState({
-    tableName,
-    wasSetOnce: false,
-  });
-  // if we changed a table via "Table" input
-  if (timeRangeFilterState.tableName !== tableName) {
-    // reset existing filters and all the fields, as they tend to linger between table switches
-    filters.length = 0;
-    fieldsList.length = 0;
-    updateTimeRangeFilterState({
-      tableName,
-      wasSetOnce: false,
-    });
-  }
-  if (!timeRangeFilterState.wasSetOnce && filters.length === 0 && fieldsList.length > 0) {
-    const dateTimeFields = fieldsList.filter((f) => isDateTimeType(f.type));
-    if (dateTimeFields.length > 0) {
-      const filter: Filter & PredefinedFilter = {
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: dateTimeFields[0].name,
-        type: 'datetime',
-        condition: 'AND',
-        restrictToFields: dateTimeFields,
-      };
-      filters.push(filter);
-      updateTimeRangeFilterState({
-        ...timeRangeFilterState,
-        wasSetOnce: true,
-      });
-      // avoid "cannot update during an existing state transition" error
-      // trigger the parent re-render immediately after we quit this function;
-      // this way we will see the change to the SQL preview
-      setTimeout(() => onFiltersChange([...filters]), 0);
-    }
-  }
   return (
     <>
       {filters.length === 0 && (

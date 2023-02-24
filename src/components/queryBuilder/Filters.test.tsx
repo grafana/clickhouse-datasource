@@ -1,21 +1,18 @@
 import React from 'react';
 import { fireEvent, render, RenderResult } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor, PredefinedFilter } from './Filters';
+import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './Filters';
 import { selectors } from '../../selectors';
 import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
 
 describe('FiltersEditor', () => {
   describe('FiltersEditor', () => {
-    const tableName = 'my_table';
     beforeAll(() => {
       jest.resetAllMocks();
     });
     it('renders correctly', () => {
       const onFiltersChange = jest.fn();
-      const result = render(
-        <FiltersEditor fieldsList={[]} filters={[]} onFiltersChange={onFiltersChange} tableName={tableName} />
-      );
+      const result = render(<FiltersEditor fieldsList={[]} filters={[]} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
@@ -41,9 +38,7 @@ describe('FiltersEditor', () => {
           operator: FilterOperator.IsNotNull,
         },
       ];
-      const result = render(
-        <FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={() => {}} tableName={tableName} />
-      );
+      const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={() => {}} />);
       assertRenderResultWithFilters(result, filters);
     });
     it('should call the onFiltersChange with correct args', () => {
@@ -64,9 +59,7 @@ describe('FiltersEditor', () => {
         },
       ];
       const onFiltersChange = jest.fn();
-      const result = render(
-        <FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={onFiltersChange} tableName={tableName} />
-      );
+      const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={onFiltersChange} />);
       assertRenderResultWithFilters(result, filters);
       userEvent.click(result.getByTestId('query-builder-filters-inline-add-button'));
       expect(onFiltersChange).toBeCalledTimes(1);
@@ -74,38 +67,6 @@ describe('FiltersEditor', () => {
       userEvent.click(result.getAllByTestId('query-builder-filters-remove-button')[0]);
       expect(onFiltersChange).toBeCalledTimes(2);
       expect(onFiltersChange).toHaveBeenNthCalledWith(2, [filters[1]]);
-    });
-    it('should add a predefined TimeRange filter if we have at least one datetime column', async () => {
-      const onFiltersChange = jest.fn();
-      jest.useFakeTimers();
-      jest.spyOn(global, 'setTimeout');
-      const dateTimeField = { label: 'Created', name: 'created', type: 'datetime', picklistValues: [] };
-      const result = render(
-        <FiltersEditor
-          fieldsList={[
-            { label: 'col1', name: 'col1', type: 'string', picklistValues: [] },
-            { label: 'col2', name: 'col2', type: 'string', picklistValues: [] },
-            dateTimeField,
-          ]}
-          filters={[]}
-          onFiltersChange={onFiltersChange}
-          tableName={tableName}
-        />
-      );
-      const filters: Array<Filter & PredefinedFilter> = [
-        {
-          filterType: 'custom',
-          condition: 'AND',
-          key: 'created',
-          type: 'datetime',
-          operator: FilterOperator.WithInGrafanaTimeRange,
-          restrictToFields: [dateTimeField],
-        },
-      ];
-      jest.runAllTimers();
-      assertRenderResultWithFilters(result, filters);
-      expect(onFiltersChange).toBeCalledTimes(1);
-      expect(onFiltersChange).toHaveBeenNthCalledWith(1, [...filters]);
     });
 
     function assertRenderResultWithFilters(result: RenderResult, filters: Filter[]) {

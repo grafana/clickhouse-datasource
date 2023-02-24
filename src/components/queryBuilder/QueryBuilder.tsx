@@ -6,7 +6,7 @@ import { ModeEditor } from './ModeEditor';
 import { FieldsEditor } from './Fields';
 import { MetricsEditor } from './Metrics';
 import { TimeFieldEditor } from './TimeField';
-import { FiltersEditor } from './Filters';
+import { FiltersEditor, PredefinedFilter } from './Filters';
 import { GroupByEditor } from './GroupBy';
 import { getOrderByFields, OrderByEditor } from './OrderBy';
 import { LimitEditor } from './Limit';
@@ -15,13 +15,14 @@ import {
   BuilderMode,
   defaultCHBuilderQuery,
   Filter,
+  FilterOperator,
   FullField,
   OrderBy,
   SqlBuilderOptions,
   SqlBuilderOptionsTrend,
 } from '../../types';
 import { DatabaseSelect } from './DatabaseSelect';
-import { isDateType } from './utils';
+import { isDateTimeType, isDateType } from './utils';
 
 interface QueryBuilderProps {
   builderOptions: SqlBuilderOptions;
@@ -40,8 +41,21 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           fields.push({ name: '*', label: 'ALL', type: 'string', picklistValues: [] });
           setBaseFieldsList(fields);
 
+          const dateTimeFields = fields.filter((f) => isDateTimeType(f.type));
+          if (dateTimeFields.length > 0) {
+            const filter: Filter & PredefinedFilter = {
+              operator: FilterOperator.WithInGrafanaTimeRange,
+              filterType: 'custom',
+              key: dateTimeFields[0].name,
+              type: 'datetime',
+              condition: 'AND',
+              restrictToFields: dateTimeFields,
+            };
+            onFiltersChange([filter]);
+          }
+
           // When changing from SQL Editor to Query Builder, we need to find out if the
-          // first value is a datetime or date so we can change the mode to Time Series
+          // first value is a datetime or date, so we can change the mode to Time Series
           if (builder.fields?.length > 0) {
             const fieldName = builder.fields[0];
             const timeFields = fields.filter((f) => isDateType(f.type));
@@ -192,12 +206,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
       )}
-      <FiltersEditor
-        filters={builder.filters || []}
-        onFiltersChange={onFiltersChange}
-        fieldsList={fieldsList}
-        tableName={builder.table}
-      />
+      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
         <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
       )}
