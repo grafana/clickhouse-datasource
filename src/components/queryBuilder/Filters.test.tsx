@@ -1,15 +1,12 @@
 import React from 'react';
-import { fireEvent, render, RenderResult } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './Filters';
-import { selectors } from '../../selectors';
+import { selectors } from './../../selectors';
 import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
 
 describe('FiltersEditor', () => {
   describe('FiltersEditor', () => {
-    beforeAll(() => {
-      jest.resetAllMocks();
-    });
     it('renders correctly', () => {
       const onFiltersChange = jest.fn();
       const result = render(<FiltersEditor fieldsList={[]} filters={[]} onFiltersChange={onFiltersChange} />);
@@ -39,7 +36,12 @@ describe('FiltersEditor', () => {
         },
       ];
       const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={() => {}} />);
-      assertRenderResultWithFilters(result, filters);
+      expect(result.container.firstChild).not.toBeNull();
+      expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
+      expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
+      expect(result.getByTestId('query-builder-filters-inline-add-button')).toBeInTheDocument();
+      expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
+      expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
     });
     it('should call the onFiltersChange with correct args', () => {
       const filters: Filter[] = [
@@ -60,7 +62,12 @@ describe('FiltersEditor', () => {
       ];
       const onFiltersChange = jest.fn();
       const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={onFiltersChange} />);
-      assertRenderResultWithFilters(result, filters);
+      expect(result.container.firstChild).not.toBeNull();
+      expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
+      expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
+      expect(result.getByTestId('query-builder-filters-inline-add-button')).toBeInTheDocument();
+      expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
+      expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
       userEvent.click(result.getByTestId('query-builder-filters-inline-add-button'));
       expect(onFiltersChange).toBeCalledTimes(1);
       expect(onFiltersChange).toHaveBeenNthCalledWith(1, [...filters, defaultNewFilter]);
@@ -68,15 +75,6 @@ describe('FiltersEditor', () => {
       expect(onFiltersChange).toBeCalledTimes(2);
       expect(onFiltersChange).toHaveBeenNthCalledWith(2, [filters[1]]);
     });
-
-    function assertRenderResultWithFilters(result: RenderResult, filters: Filter[]) {
-      expect(result.container.firstChild).not.toBeNull();
-      expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
-      expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
-      expect(result.getByTestId('query-builder-filters-inline-add-button')).toBeInTheDocument();
-      expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
-      expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
-    }
   });
   describe('FilterEditor', () => {
     it('renders correctly', () => {
