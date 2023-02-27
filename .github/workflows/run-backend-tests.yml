@@ -29,7 +29,7 @@ jobs:
           - latest
 
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v3
 
       - name: Install Go ${{ matrix.go }}
         uses: actions/setup-go@v3.5.0
