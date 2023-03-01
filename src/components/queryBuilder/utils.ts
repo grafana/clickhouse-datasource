@@ -1,34 +1,34 @@
 import {
   astVisitor,
   Expr,
-  FromTable,
-  ExprRef,
-  SelectedColumn,
-  ExprString,
   ExprBinary,
-  ExprInteger,
-  ExprUnary,
   ExprCall,
+  ExprInteger,
   ExprList,
+  ExprRef,
+  ExprString,
+  ExprUnary,
+  FromTable,
+  SelectedColumn,
 } from 'pgsql-ast-parser';
 import { isString } from 'lodash';
 import {
+  BooleanFilter,
   BuilderMetricField,
+  BuilderMetricFieldAggregation,
   BuilderMode,
+  DateFilter,
+  DateFilterWithoutValue,
+  Filter,
+  FilterOperator,
+  MultiFilter,
+  NullFilter,
+  NumberFilter,
   OrderBy,
   SqlBuilderOptions,
-  Filter,
-  NullFilter,
-  BooleanFilter,
-  NumberFilter,
-  DateFilter,
-  StringFilter,
-  MultiFilter,
-  FilterOperator,
-  DateFilterWithoutValue,
-  BuilderMetricFieldAggregation,
   SqlBuilderOptionsAggregate,
   SqlBuilderOptionsTrend,
+  StringFilter,
 } from 'types';
 import { sqlToStatement } from 'data/ast';
 
@@ -44,7 +44,10 @@ export const isDateType = (type: string): boolean => {
   const normalizedName = type?.toLowerCase();
   return normalizedName?.startsWith('date') || normalizedName?.startsWith('nullable(date');
 };
-
+export const isDateTimeType = (type: string): boolean => {
+  const normalizedName = type?.toLowerCase();
+  return normalizedName?.startsWith('datetime') || normalizedName?.startsWith('nullable(datetime');
+};
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 };
