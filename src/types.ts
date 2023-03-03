@@ -60,7 +60,7 @@ export interface CHBuilderQuery extends DataQuery {
   format: Format;
   meta?: {
     timezone?: string;
-  }
+  };
 }
 
 export type CHQuery = CHSQLQuery | CHBuilderQuery;

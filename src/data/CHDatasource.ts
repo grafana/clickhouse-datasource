@@ -188,7 +188,9 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
 
   private getTimezone(request: DataQueryRequest<CHQuery>): string | undefined {
     // timezone specified in the time picker
-    if(request.timezone) return request.timezone;
+    if (request.timezone) {
+      return request.timezone;
+    }
     // fall back to the local timezone
     const localTimezoneInfo = getTimeZoneInfo(getTimeZone(), Date.now());
     return localTimezoneInfo?.ianaName;
@@ -199,19 +201,19 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       // filters out queries disabled in UI
       .filter((t) => t.hide !== true)
       // attach timezone information
-      .map(t => {
+      .map((t) => {
         return {
           ...t,
           meta: {
             ...t.meta,
-            timezone: this.getTimezone(request)
-          }
-        }
+            timezone: this.getTimezone(request),
+          },
+        };
       });
 
     return super.query({
       ...request,
-      targets
+      targets,
     });
   }
 
