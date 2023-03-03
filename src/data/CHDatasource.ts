@@ -188,7 +188,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
 
   private getTimezone(request: DataQueryRequest<CHQuery>): string | undefined {
     // timezone specified in the time picker
-    if (request.timezone) {
+    if (request.timezone && request.timezone !== 'browser') {
       return request.timezone;
     }
     // fall back to the local timezone
