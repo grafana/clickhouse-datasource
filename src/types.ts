@@ -45,6 +45,7 @@ export interface CHSQLQuery extends DataQuery {
   queryType: QueryType.SQL;
   rawSql: string;
   meta?: {
+    timezone?: string;
     // meta fields to be used just for building builder options when migrating  back to QueryType.Builder
     builderOptions?: SqlBuilderOptions;
   };
@@ -57,6 +58,9 @@ export interface CHBuilderQuery extends DataQuery {
   rawSql: string;
   builderOptions: SqlBuilderOptions;
   format: Format;
+  meta?: {
+    timezone?: string;
+  }
 }
 
 export type CHQuery = CHSQLQuery | CHBuilderQuery;
