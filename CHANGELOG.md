@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.1.0
+
+* **Fix** - Quote table names with dots by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/298
+* Add a predefined TimeRange filter if there is at least one DateTime* column by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/304
+
 ## 2.0.7
 
 - **Fix** - Empty template variables used with the conditionalAll macro work the same as selecting All. [Allow empty Inputs for $__conditionalAll](https://github.com/grafana/clickhouse-datasource/issues/262)
