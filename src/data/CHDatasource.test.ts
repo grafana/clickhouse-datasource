@@ -269,10 +269,15 @@ describe('ClickHouseDatasource', () => {
 
       instance.query({
         targets: [{ refId: '1' }, { refId: '2', hide: false }, { refId: '3', hide: true }] as DataQuery[],
+        timezone: 'UTC',
       } as any);
 
       expect(spy).toHaveBeenCalledWith({
-        targets: [{ refId: '1' }, { refId: '2', hide: false }],
+        targets: [
+          { refId: '1', meta: {timezone: 'UTC'} },
+          { refId: '2', hide: false, meta: {timezone: 'UTC'}},
+        ],
+        timezone: 'UTC',
       });
     });
   });
