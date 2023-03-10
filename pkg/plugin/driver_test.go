@@ -615,7 +615,7 @@ func TestConvertNullableUInt256(t *testing.T) {
 	}
 }
 
-var date, _ = time.Parse("2006-01-02", "2022-01-12")
+var date, _ = time.ParseInLocation("2006-01-02", "2022-01-12", time.UTC)
 
 func TestConvertDate(t *testing.T) {
 	for name, protocol := range Protocols {
@@ -650,7 +650,7 @@ func TestConvertDateTime(t *testing.T) {
 				loc, _ = time.LoadLocation("Europe/London")
 			case "http":
 				// http sends back ClickHouse configured timezone which is Asia/Shanghai
-				loc, _ = time.LoadLocation("Asia/Shanghai")
+				loc = time.UTC
 			}
 			localTime := datetime.In(loc)
 			conn, close := setupTest(t, "col1 DateTime('Europe/London')", protocol, nil)
