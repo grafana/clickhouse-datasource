@@ -649,7 +649,7 @@ func TestConvertDateTime(t *testing.T) {
 			case "native":
 				loc, _ = time.LoadLocation("Europe/London")
 			case "http":
-				// http sends back ClickHouse configured timezone which is Asia/Shanghai
+				// http sends back ClickHouse configured timezone which is UTC
 				loc = time.UTC
 			}
 			localTime := datetime.In(loc)
