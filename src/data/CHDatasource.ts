@@ -8,6 +8,8 @@ import {
   ScopedVars,
   VariableModel,
   vectorator,
+  getTimeZone,
+  getTimeZoneInfo,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
@@ -184,11 +186,34 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return this.values(frame);
   }
 
+  private getTimezone(request: DataQueryRequest<CHQuery>): string | undefined {
+    // timezone specified in the time picker
+    if (request.timezone && request.timezone !== 'browser') {
+      return request.timezone;
+    }
+    // fall back to the local timezone
+    const localTimezoneInfo = getTimeZoneInfo(getTimeZone(), Date.now());
+    return localTimezoneInfo?.ianaName;
+  }
+
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    const targets = request.targets
+      // filters out queries disabled in UI
+      .filter((t) => t.hide !== true)
+      // attach timezone information
+      .map((t) => {
+        return {
+          ...t,
+          meta: {
+            ...t.meta,
+            timezone: this.getTimezone(request),
+          },
+        };
+      });
+
     return super.query({
       ...request,
-      // filters out queries disabled in UI
-      targets: request.targets.filter((t) => t.hide !== true),
+      targets,
     });
   }
 
