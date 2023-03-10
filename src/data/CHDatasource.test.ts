@@ -274,8 +274,8 @@ describe('ClickHouseDatasource', () => {
 
       expect(spy).toHaveBeenCalledWith({
         targets: [
-          { refId: '1', meta: {timezone: 'UTC'} },
-          { refId: '2', hide: false, meta: {timezone: 'UTC'}},
+          { refId: '1', meta: { timezone: 'UTC' } },
+          { refId: '2', hide: false, meta: { timezone: 'UTC' } },
         ],
         timezone: 'UTC',
       });
