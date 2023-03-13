@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1
+
+* **Fix** - [Date and Date32 type normalization with user's timezone](https://github.com/grafana/clickhouse-datasource/pull/314)
+
 ## 2.1.0
 
 * **Fix** - Quote table names with dots by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/298
