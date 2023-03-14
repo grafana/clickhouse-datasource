@@ -69,6 +69,7 @@ export enum BuilderMode {
   List = 'list',
   Aggregate = 'aggregate',
   Trend = 'trend',
+  Log = 'log',
 }
 
 export interface SqlBuilderOptionsList {
@@ -118,8 +119,22 @@ export interface SqlBuilderOptionsTrend {
   orderBy?: OrderBy[];
   limit?: number;
 }
+export interface SqlBuilderOptionsLog {
+  mode: BuilderMode.Log;
+  database?: string;
+  table?: string;
+  fields?: string[];
+  filters?: Filter[];
+  orderBy?: OrderBy[];
+  limit?: number;
+}
 
-export type SqlBuilderOptions = SqlBuilderOptionsList | SqlBuilderOptionsAggregate | SqlBuilderOptionsTrend;
+export type SqlBuilderOptions =
+  | SqlBuilderOptionsList
+  | SqlBuilderOptionsAggregate
+  | SqlBuilderOptionsTrend
+  | SqlBuilderOptionsLog;
+
 export interface Field {
   name: string;
   type: string;

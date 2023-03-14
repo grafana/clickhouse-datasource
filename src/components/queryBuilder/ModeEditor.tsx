@@ -13,6 +13,7 @@ export const ModeEditor = (props: ModeEditorProps) => {
     { value: BuilderMode.List, label: options.LIST },
     { value: BuilderMode.Aggregate, label: options.AGGREGATE },
     { value: BuilderMode.Trend, label: options.TREND },
+    { value: BuilderMode.Log, label: options.LOG },
   ];
   return (
     <>

@@ -176,6 +176,7 @@ export const getOrderByFields = (
       ];
       break;
     case BuilderMode.List:
+    case BuilderMode.Log:
     default:
       values = fieldsList.map((m) => {
         return { value: m.name, label: m.label };
