@@ -51,6 +51,8 @@
     "Ulimits",
     "vectorator",
     "createddate",
-    "closedate"
+    "closedate",
+    "commitish",
+    "slvrtrn"
   ]
 }

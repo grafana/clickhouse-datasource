@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "2.0.7",
+  "version": "2.1.1",
   "description": "Clickhouse Datasource",
   "scripts": {
     "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",
@@ -12,7 +12,8 @@
     "start": "yarn watch",
     "e2e": "grafana-e2e run",
     "e2e:open": "grafana-e2e open",
-    "e2e:update": "grafana-e2e run --update-screenshots"
+    "e2e:update": "grafana-e2e run --update-screenshots",
+    "generate-release-notes": "PREV_TAG=$(git tag | tail -n 1) && gh api --method POST /repos/grafana/clickhouse-datasource/releases/generate-notes -f tag_name=v${npm_package_version} -f target_commitish=main -f previous_tag_name=${PREV_TAG} | jq -r .body"
   },
   "author": "Grafana Labs",
   "license": "Apache-2.0",
