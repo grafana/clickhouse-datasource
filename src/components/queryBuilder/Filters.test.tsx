@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { FiltersEditor, FilterEditor, FilterValueEditor, defaultNewFilter } from './Filters';
+import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './Filters';
 import { selectors } from './../../selectors';
-import { Filter, BooleanFilter, DateFilter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
+import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
 
 describe('FiltersEditor', () => {
   describe('FiltersEditor', () => {
@@ -93,6 +93,87 @@ describe('FiltersEditor', () => {
         />
       );
       expect(result.container.firstChild).not.toBeNull();
+    });
+    it('should have all provided fields in the select', () => {
+      const result = render(
+        <FilterEditor
+          fieldsList={[
+            { label: 'col1', name: 'col1', type: 'string', picklistValues: [] },
+            { label: 'col2', name: 'col2', type: 'string', picklistValues: [] },
+            { label: 'col3', name: 'col3', type: 'string', picklistValues: [] },
+          ]}
+          filter={{
+            key: 'foo',
+            operator: FilterOperator.IsNotNull,
+            type: 'boolean',
+            condition: 'AND',
+            filterType: 'custom',
+          }}
+          index={0}
+          onFilterChange={() => {}}
+        />
+      );
+
+      // expand the `fieldName` select box
+      userEvent.type(result.getAllByRole('combobox')[0], '{ArrowDown}');
+
+      expect(result.getByText('col1')).toBeInTheDocument();
+      expect(result.getByText('col2')).toBeInTheDocument();
+      expect(result.getByText('col3')).toBeInTheDocument();
+    });
+    it('should call onFilterChange when user adds correct custom filter for the field with Map type', () => {
+      const onFilterChange = jest.fn();
+      const result = render(
+        <FilterEditor
+          fieldsList={[{ label: 'colName', name: 'colName', type: 'Map(String, UInt64)', picklistValues: [] }]}
+          filter={{
+            key: 'foo',
+            type: 'boolean',
+            operator: FilterOperator.IsNotNull,
+            condition: 'AND',
+            filterType: 'custom',
+          }}
+          index={0}
+          onFilterChange={onFilterChange}
+        />
+      );
+
+      // type into the `fieldName` select box
+      userEvent.type(result.getAllByRole('combobox')[0], `colName[['keyName']`);
+      userEvent.keyboard('{Enter}');
+
+      const expectedFilter: Filter = {
+        key: `colName['keyName']`,
+        type: 'UInt64',
+        operator: FilterOperator.IsNotNull,
+        condition: 'AND',
+        filterType: 'custom',
+      };
+
+      expect(onFilterChange).toHaveBeenCalledWith(0, expectedFilter);
+    });
+    it('should not call onFilterChange when user adds incorrect custom filter', async () => {
+      const onFilterChange = jest.fn();
+      const result = render(
+        <FilterEditor
+          fieldsList={[{ label: 'mapField', name: 'mapField', type: 'Map(String, UInt64)', picklistValues: [] }]}
+          filter={{
+            key: 'foo',
+            type: 'boolean',
+            operator: FilterOperator.IsNotNull,
+            condition: 'AND',
+            filterType: 'custom',
+          }}
+          index={0}
+          onFilterChange={onFilterChange}
+        />
+      );
+
+      // type into the `fieldName` select box
+      userEvent.type(result.getAllByRole('combobox')[0], `mapField__key`);
+      userEvent.keyboard('{Enter}');
+
+      expect(onFilterChange).not.toHaveBeenCalled();
     });
   });
   describe('FilterValueEditor', () => {

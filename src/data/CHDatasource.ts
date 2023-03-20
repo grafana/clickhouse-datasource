@@ -8,8 +8,11 @@ import {
   ScopedVars,
   VariableModel,
   vectorator,
+  getTimeZone,
+  getTimeZoneInfo,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { Observable } from 'rxjs';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
@@ -91,7 +94,8 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       const templateVar = params[1].trim();
       const key = templateVars.find((x) => x.name === templateVar.substring(1, templateVar.length)) as any;
       let phrase = params[0];
-      if (key?.current.value.toString() === '$__all') {
+      let value = key?.current.value.toString();
+      if (value === '' || value === '$__all') {
         phrase = '1=1';
       }
       rawQuery = rawQuery.replace(`${macro}${params[0]},${params[1]})`, phrase);
@@ -158,12 +162,12 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   async fetchFields(database: string, table: string): Promise<string[]> {
-    return this.fetchData(`DESC TABLE ${database}.${table}`);
+    return this.fetchData(`DESC TABLE ${database}."${table}"`);
   }
 
   async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
     const prefix = Boolean(database) ? `${database}.` : '';
-    const rawSql = `DESC TABLE ${prefix}${table}`;
+    const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
@@ -180,6 +184,37 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
+  }
+
+  private getTimezone(request: DataQueryRequest<CHQuery>): string | undefined {
+    // timezone specified in the time picker
+    if (request.timezone && request.timezone !== 'browser') {
+      return request.timezone;
+    }
+    // fall back to the local timezone
+    const localTimezoneInfo = getTimeZoneInfo(getTimeZone(), Date.now());
+    return localTimezoneInfo?.ianaName;
+  }
+
+  query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    const targets = request.targets
+      // filters out queries disabled in UI
+      .filter((t) => t.hide !== true)
+      // attach timezone information
+      .map((t) => {
+        return {
+          ...t,
+          meta: {
+            ...t.meta,
+            timezone: this.getTimezone(request),
+          },
+        };
+      });
+
+    return super.query({
+      ...request,
+      targets,
+    });
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

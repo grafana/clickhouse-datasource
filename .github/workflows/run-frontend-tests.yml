@@ -36,7 +36,7 @@ jobs:
           node-version: '16.x'
 
       - name: Install Go ${{ matrix.go }}
-        uses: actions/setup-go@v3.3.0
+        uses: actions/setup-go@v3.5.0
         with:
           stable: false
           go-version: ${{ matrix.go }}

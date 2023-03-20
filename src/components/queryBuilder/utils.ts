@@ -1,36 +1,53 @@
-import sqlToAST, { Clause } from 'data/ast';
+import {
+  astVisitor,
+  Expr,
+  ExprBinary,
+  ExprCall,
+  ExprInteger,
+  ExprList,
+  ExprRef,
+  ExprString,
+  ExprUnary,
+  FromTable,
+  SelectedColumn,
+} from 'pgsql-ast-parser';
 import { isString } from 'lodash';
 import {
+  BooleanFilter,
   BuilderMetricField,
+  BuilderMetricFieldAggregation,
   BuilderMode,
+  DateFilter,
+  DateFilterWithoutValue,
+  Filter,
+  FilterOperator,
+  MultiFilter,
+  NullFilter,
+  NumberFilter,
   OrderBy,
   SqlBuilderOptions,
-  Filter,
-  NullFilter,
-  BooleanFilter,
-  NumberFilter,
-  DateFilter,
-  StringFilter,
-  MultiFilter,
-  FilterOperator,
-  DateFilterWithoutValue,
-  BuilderMetricFieldAggregation,
   SqlBuilderOptionsAggregate,
+  SqlBuilderOptionsTrend,
+  StringFilter,
 } from 'types';
+import { sqlToStatement } from 'data/ast';
 
 export const isBooleanType = (type: string): boolean => {
-  return ['boolean'].includes(type.toLowerCase());
+  return ['boolean'].includes(type?.toLowerCase());
 };
 
 export const isNumberType = (type: string): boolean => {
-  return ['int', 'float', 'decimal'].some((t) => type.toLowerCase().includes(t));
+  return ['int', 'float', 'decimal'].some((t) => type?.toLowerCase().includes(t));
 };
 
 export const isDateType = (type: string): boolean => {
-  const normalizedName = type.toLowerCase();
-  return normalizedName.startsWith('date') || normalizedName.startsWith('nullable(date');
+  const normalizedName = type?.toLowerCase();
+  return normalizedName?.startsWith('date') || normalizedName?.startsWith('nullable(date');
 };
-
+export const isDateTimeType = (type: string): boolean => {
+  const normalizedName = type?.toLowerCase();
+  return normalizedName?.startsWith('datetime') || normalizedName?.startsWith('nullable(datetime');
+};
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 };
@@ -62,7 +79,7 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
 const getListQuery = (database = '', table = '', fields: string[] = []): string => {
   const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
-  return `SELECT ${fields.join(', ')} FROM ${database}${sep}${table}`;
+  return `SELECT ${fields.join(', ')} FROM ${database}${sep}${escapedTableName(table)}`;
 };
 
 const getAggregationQuery = (
@@ -85,7 +102,7 @@ const getAggregationQuery = (
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
     metricsQuery && groupByQuery ? ', ' : ''
-  }${metricsQuery} FROM ${database}${sep}${table}`;
+  }${metricsQuery} FROM ${database}${sep}${escapedTableName(table)}`;
 };
 
 const getTrendByQuery = (
@@ -115,7 +132,7 @@ const getTrendByQuery = (
   }
 
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${metricsQuery} FROM ${database}${sep}${table}`;
+  return `SELECT ${metricsQuery} FROM ${database}${sep}${escapedTableName(table)}`;
 };
 
 const getFilters = (filters: Filter[]): string => {
@@ -169,11 +186,11 @@ const getFilters = (filters: Filter[]): string => {
       if (currentFilter.operator === FilterOperator.Like || currentFilter.operator === FilterOperator.NotLike) {
         filter += ` '%${currentFilter.value || ''}%'`;
       } else {
-        filter += ` '${currentFilter.value || ''}'`;
+        filter += formatStringValue(currentFilter.value || '');
       }
     } else if (isMultiFilter(currentFilter)) {
       let values = currentFilter.value;
-      filter += ` (${values.map((v) => `'${v.trim()}'`).join(', ')} )`;
+      filter += ` (${values?.map((v) => formatStringValue(v).trim()).join(', ')} )`;
     }
     if (notOperator) {
       filter = ` NOT ( ${filter} )`;
@@ -262,63 +279,70 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   return query;
 };
 
-export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
-  const ast = sqlToAST(sql);
-  const fromPhrase = ast.get('FROM');
-  if (!fromPhrase || fromPhrase.length > 1 || !isString(fromPhrase[0])) {
-    return {} as SqlBuilderOptions;
+export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions | string {
+  const ast = sqlToStatement(sql);
+  if (!ast) {
+    return 'The query is not valid SQL.';
   }
+  if (ast.type !== 'select') {
+    return 'The query is not a select statement.';
+  }
+  if (!ast.from || ast.from.length !== 1) {
+    return `The query has too many 'FROM' clauses.`;
+  }
+  if (ast.from[0].type !== 'table') {
+    return `The 'FROM' clause is not a table.`;
+  }
+  const fromTable = ast.from[0] as FromTable;
 
-  const databaseAndTable = fromPhrase[0].trim().split('.');
-  const where = ast.get('WHERE');
-  const limit = ast.get('LIMIT');
-
-  const fieldsAndMetrics = getMetricsFromAst(ast.get('SELECT')!);
+  const fieldsAndMetrics = getMetricsFromAst(ast.columns ? ast.columns : null);
 
   let builder = {
-    mode: fieldsAndMetrics.metrics.length > 0 ? BuilderMode.Aggregate : BuilderMode.List,
-    database: databaseAndTable[1] ? databaseAndTable[0].trim() : '',
-    table: databaseAndTable[1] ? databaseAndTable[1].trim() : databaseAndTable[0].trim(),
+    mode: BuilderMode.List,
+    database: fromTable.name.schema,
+    table: fromTable.name.name,
   } as SqlBuilderOptions;
 
   if (fieldsAndMetrics.fields) {
     builder.fields = fieldsAndMetrics.fields;
   }
 
-  if (where && where.length > 0) {
-    builder.filters = getFiltersFromAst(where);
+  if (fieldsAndMetrics.metrics.length > 0) {
+    builder.mode = BuilderMode.Aggregate;
+    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
   }
 
-  const orderBy = ast
-    .get('ORDER BY')
-    ?.map<OrderBy>((phrase) => {
-      if (!isString(phrase) || phrase.trim() === ',') {
+  if (fieldsAndMetrics.timeField) {
+    builder.mode = BuilderMode.Trend;
+    (builder as SqlBuilderOptionsTrend).timeFieldType = 'datetime';
+    (builder as SqlBuilderOptionsTrend).timeField = fieldsAndMetrics.timeField;
+  }
+
+  if (ast.where) {
+    builder.filters = getFiltersFromAst(ast.where, fieldsAndMetrics.timeField);
+  }
+
+  const orderBy = ast.orderBy
+    ?.map<OrderBy>((ob) => {
+      if (ob.by.type !== 'ref' || ob.by.name === 'time') {
         return {} as OrderBy;
       }
-      const orderBySplit = phrase.trim().split(' ');
-      return { name: orderBySplit[0], dir: orderBySplit[1]?.toUpperCase() } as OrderBy;
+      return { name: ob.by.name, dir: ob.order } as OrderBy;
     })
-    .filter((x) => x);
+    .filter((x) => x.name);
 
   if (orderBy && orderBy.length > 0) {
     (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
   }
 
-  if (limit && limit.length > 0) {
-    builder.limit = Number.parseInt(limit[0]!.toString(), 10);
-  }
+  builder.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
 
-  if (fieldsAndMetrics.metrics.length > 0) {
-    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
-  }
-
-  const groupBy = ast
-    .get('GROUP BY')
-    ?.map((field) => {
-      if (!isString(field) || field.trim() === ',') {
+  const groupBy = ast.groupBy
+    ?.map((gb) => {
+      if (gb.type !== 'ref' || gb.name === 'time') {
         return '';
       }
-      return field.trim();
+      return gb.name;
     })
     .filter((x) => x !== '');
   if (groupBy && groupBy.length > 0) {
@@ -327,132 +351,233 @@ export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions {
   return builder;
 }
 
-function getFiltersFromAst(whereClauses: Clause[]): Filter[] {
-  // first condition is always AND but is not used
-  const filters: Filter[] = [{ condition: 'AND' } as Filter];
-  for (const c of whereClauses) {
-    if (!isString(c)) {
-      continue;
-    }
-    if (c.trim().toUpperCase() === 'AND') {
-      filters.push({ condition: 'AND' } as Filter);
-      continue;
-    } else if (c.trim().toUpperCase() === 'OR') {
-      filters.push({ condition: 'OR' } as Filter);
-      continue;
-    }
-    const stringPhrases = c.match(/'(.*?)'/g)?.map((x) => (x = x.substring(1, x.length - 1)));
-    const phrases = c.match(/(\w+|\$(\w+)|!=|<=|>=|=)/g);
-    if (!phrases) {
-      continue;
-    }
-    const isNotClause = phrases[0] === 'NOT';
-    const opAndVal = getOperatorAndValues(phrases, stringPhrases ? stringPhrases : []);
-    filters[filters.length - 1] = {
-      ...filters[filters.length - 1],
-      filterType: 'custom',
-      key: isNotClause ? phrases[1] : phrases[0],
-      operator: opAndVal.f ? opAndVal.f : '',
-      value: opAndVal.v ? opAndVal.v : '',
-      type: getFilterType(c, stringPhrases),
-    } as Filter;
-  }
+function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
+  const filters: Filter[] = [];
+  let i = 0;
+  let notFlag = false;
+  const visitor = astVisitor((map) => ({
+    expr: (e) => {
+      switch (e?.type) {
+        case 'binary':
+          notFlag = getBinaryFilter(e, filters, i, notFlag);
+          map.super().expr(e);
+          break;
+        case 'ref':
+          ({ i, notFlag } = getRefFilter(e, filters, i, notFlag));
+          break;
+        case 'string':
+          i = getStringFilter(filters, i, e);
+          break;
+        case 'integer':
+          i = getIntFilter(filters, i, e);
+          break;
+        case 'unary':
+          notFlag = getUnaryFilter(e, notFlag, i, filters);
+          map.super().expr(e);
+          break;
+        case 'call':
+          i = getCallFilter(e, timeField, filters, i);
+          break;
+        case 'list':
+          i = getListFilter(filters, i, e);
+          break;
+        default:
+          console.error(`${e?.type} is not supported. This is likely a bug.`);
+          break;
+      }
+    },
+  }));
+  visitor.expr(expr);
   return filters;
 }
 
-function getOperatorAndValues(phrases: string[], stringPhrases: string[]): { f: FilterOperator; v: any } {
-  if (isWithInTimeRangeFilter(phrases)) {
-    return {
-      f: phrases[0] === 'NOT' ? FilterOperator.OutsideGrafanaTimeRange : FilterOperator.WithInGrafanaTimeRange,
-      v: '',
-    };
+function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean): { i: number; notFlag: boolean } {
+  if (e.name?.toLowerCase() === '$__fromtime' && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
+    if (notFlag) {
+      filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
+      notFlag = false;
+    } else {
+      filters[i].operator = FilterOperator.WithInGrafanaTimeRange;
+    }
+    filters[i].type = 'datetime';
+    i++;
+    return { i, notFlag };
   }
+  if (e.name?.toLowerCase() === '$__totime') {
+    filters.splice(i, 1);
+    return { i, notFlag };
+  }
+  if (!filters[i].key) {
+    filters[i].key = e.name;
+    if (filters[i].operator === FilterOperator.IsNotNull) {
+      i++;
+    }
+    return { i, notFlag };
+  }
+  filters[i] = { ...filters[i], value: [e.name], type: 'string' } as Filter;
+  i++;
+  return { i, notFlag };
+}
 
-  let op = phrases[1];
-  if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
-    return {
-      f: op.toUpperCase() as FilterOperator,
-      v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(2, phrases.length),
-    };
+function getListFilter(filters: Filter[], i: number, e: ExprList): number {
+  filters[i] = {
+    ...filters[i],
+    value: e.expressions.map((x) => {
+      const k = x as ExprString;
+      return k.value;
+    }),
+    type: 'string',
+  } as Filter;
+  i++;
+  return i;
+}
+
+function getCallFilter(e: ExprCall, timeField: string, filters: Filter[], i: number): number {
+  const val = `${e.function.name}(${e.args.map<string>((x) => (x as ExprRef).name).join(',')})`;
+  //do not add the timeFilter that is used when using time series and remove the condition
+  if (val === `$__timefilter(${timeField})`) {
+    filters.splice(i, 1);
+    return i;
   }
-  for (let i = 2; i < phrases.length; i++) {
-    op += ` ${phrases[i]}`;
-    if (Object.values(FilterOperator).includes(op.toUpperCase() as FilterOperator)) {
-      return {
-        f: op.toUpperCase() as FilterOperator,
-        v: stringPhrases.length > 0 ? stringPhrases : phrases.slice(i + 1, phrases.length),
-      };
+  if (val.startsWith('$__timefilter(')) {
+    filters[i] = {
+      ...filters[i],
+      key: (e.args[0] as ExprRef).name,
+      operator: FilterOperator.WithInGrafanaTimeRange,
+      type: 'datetime',
+    } as Filter;
+    i++;
+    return i;
+  }
+  filters[i] = { ...filters[i], value: val, type: 'datetime' } as Filter;
+  if (!val) {
+    i++;
+  }
+  return i;
+}
+
+function getUnaryFilter(e: ExprUnary, notFlag: boolean, i: number, filters: Filter[]): boolean {
+  if (e.op === 'NOT') {
+    return true;
+  }
+  if (i === 0) {
+    filters.unshift({} as Filter);
+  }
+  filters[i].operator = e.op as FilterOperator;
+  return notFlag;
+}
+
+function getStringFilter(filters: Filter[], i: number, e: ExprString): number {
+  if (!filters[i].key) {
+    filters[i] = { ...filters[i], key: e.value } as Filter;
+    return i;
+  }
+  filters[i] = { ...filters[i], value: e.value, type: 'string' } as Filter;
+  i++;
+  return i;
+}
+
+function getIntFilter(filters: Filter[], i: number, e: ExprInteger): number {
+  if (!filters[i].key) {
+    filters[i] = { ...filters[i], key: e.value.toString() } as Filter;
+    return i;
+  }
+  filters[i] = { ...filters[i], value: e.value, type: 'int' } as Filter;
+  i++;
+  return i;
+}
+
+function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: boolean): boolean {
+  if (e.op === 'AND' || e.op === 'OR') {
+    filters.unshift({
+      condition: e.op,
+    } as Filter);
+  } else if (Object.values(FilterOperator).find((x) => e.op === x)) {
+    if (i === 0) {
+      filters.unshift({} as Filter);
+    }
+    filters[i].operator = e.op as FilterOperator;
+    if (notFlag && filters[i].operator === FilterOperator.Like) {
+      filters[i].operator = FilterOperator.NotLike;
+      notFlag = false;
     }
   }
-  return { f: '' as FilterOperator, v: null };
+  return notFlag;
 }
 
-function getFilterType(whereClause: string, stringPhrases?: string[]): '' | 'datetime' | 'date' | 'string' {
-  if (stringPhrases && stringPhrases.length > 0) {
-    return 'string';
+function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
+  if (s.expr.type !== 'call') {
+    return {} as BuilderMetricField;
   }
-  if (whereClause.includes('__time') || whereClause.includes('__from') || whereClause.includes('__to')) {
-    return 'datetime';
-  }
-  return '';
-}
-
-function isWithInTimeRangeFilter(phrases: string[]): boolean {
-  if (!phrases || phrases.length === 0) {
-    return false;
-  }
-  const has = { from: false, to: false };
-  for (const p of phrases) {
-    if (p.includes('__from')) {
-      has.from = true;
-    } else if (p.includes('__to')) {
-      has.to = true;
+  let fields = s.expr.args.map((x) => {
+    if (x.type !== 'ref') {
+      return '';
     }
+    return x.name;
+  });
+  if (fields.length > 1) {
+    return '';
   }
-  return has.from && has.to;
+  if (
+    Object.values(BuilderMetricFieldAggregation).includes(
+      s.expr.function.name.toLowerCase() as BuilderMetricFieldAggregation
+    )
+  ) {
+    return {
+      aggregation: s.expr.function.name as BuilderMetricFieldAggregation,
+      field: fields[0],
+      alias: s.alias?.name,
+    } as BuilderMetricField;
+  }
+  return fields[0];
 }
 
-function getMetricsFromAst(selectClauses: Clause[]): { metrics: BuilderMetricField[]; fields: string[] } {
-  let metrics: BuilderMetricField[] = [];
+function getMetricsFromAst(selectClauses: SelectedColumn[] | null): {
+  timeField: string;
+  metrics: BuilderMetricField[];
+  fields: string[];
+} {
+  if (!selectClauses) {
+    return { timeField: '', metrics: [], fields: [] };
+  }
+  const metrics: BuilderMetricField[] = [];
   const fields: string[] = [];
-  for (const c of selectClauses) {
-    if (!isString(c) || !c.trim() || c.trim() === ',') {
-      continue;
-    }
-    let isMetric = false;
-    metrics = metrics.concat(
-      Object.values(BuilderMetricFieldAggregation)
-        .filter((x) => c.trim().toLowerCase().startsWith(`${x}`))
-        .map((x) => {
-          const phrases = c.match(/\w+|\$(\w+)/g);
-          if (!phrases) {
-            return null;
-          }
-          const metric = {
-            field: phrases[1] ? phrases[1] : '',
-            aggregation: x,
-          } as BuilderMetricField;
+  let timeField = '';
 
-          // Alias does use 'as' like sum(field) total_Fields
-          if (phrases[2]) {
-            metric.alias = phrases[2];
-          }
-          // Alias does use 'as' like field as aliasField
-          if (phrases[3]) {
-            metric.alias = phrases[3];
-          }
-          isMetric = true;
-          return metric;
-        })
-        .filter((x) => x) as BuilderMetricField[]
-    );
-
-    if (!isMetric) {
-      fields.push(c.trim());
+  for (let s of selectClauses) {
+    switch (s.expr.type) {
+      case 'ref':
+        fields.push(s.expr.name);
+        break;
+      case 'call':
+        const f = selectCallFunc(s);
+        if (!f) {
+          return { timeField: '', metrics: [], fields: [] };
+        }
+        if (isString(f)) {
+          timeField = f;
+        } else {
+          metrics.push(f);
+        }
+        break;
+      default:
+        return { timeField: '', metrics: [], fields: [] };
     }
   }
-  return { metrics, fields };
+  return { timeField, metrics, fields };
 }
+
+function formatStringValue(currentFilter: string): string {
+  if (currentFilter.startsWith('$')) {
+    return ` ${currentFilter || ''}`;
+  }
+  return ` '${currentFilter || ''}'`;
+}
+
+function escapedTableName(table: string) {
+  return table === '' ? '' : `"${table}"`;
+}
+
 export const operMap = new Map<string, FilterOperator>([
   ['equals', FilterOperator.Equals],
   ['contains', FilterOperator.Like],
