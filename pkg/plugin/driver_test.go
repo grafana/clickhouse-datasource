@@ -216,7 +216,7 @@ func toJson(obj interface{}) (json.RawMessage, error) {
 		return nil, errors.New("unable to marshal")
 	}
 	var rawJSON json.RawMessage
-	json.Unmarshal(bytes, &rawJSON)
+	err = json.Unmarshal(bytes, &rawJSON)
 	if err != nil {
 		return nil, errors.New("unable to unmarshal")
 	}
