@@ -7,18 +7,18 @@ import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberF
 
 describe('FiltersEditor', () => {
   describe('FiltersEditor', () => {
-    it('renders correctly', () => {
+    it('renders correctly', async () => {
       const onFiltersChange = jest.fn();
       const result = render(<FiltersEditor fieldsList={[]} filters={[]} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
       expect(onFiltersChange).toBeCalledTimes(0);
-      userEvent.click(result.getByTestId('query-builder-filters-add-button'));
+      await userEvent.click(result.getByTestId('query-builder-filters-add-button'));
       expect(onFiltersChange).toBeCalledTimes(1);
       expect(onFiltersChange).toHaveBeenCalledWith([defaultNewFilter]);
     });
-    it('should render buttons and labels correctly', () => {
+    it('should render buttons and labels correctly', async () => {
       const filters: Filter[] = [
         {
           filterType: 'custom',
@@ -43,7 +43,7 @@ describe('FiltersEditor', () => {
       expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
       expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
     });
-    it('should call the onFiltersChange with correct args', () => {
+    it('should call the onFiltersChange with correct args', async () => {
       const filters: Filter[] = [
         {
           filterType: 'custom',
@@ -68,16 +68,16 @@ describe('FiltersEditor', () => {
       expect(result.getByTestId('query-builder-filters-inline-add-button')).toBeInTheDocument();
       expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
       expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
-      userEvent.click(result.getByTestId('query-builder-filters-inline-add-button'));
+      await userEvent.click(result.getByTestId('query-builder-filters-inline-add-button'));
       expect(onFiltersChange).toBeCalledTimes(1);
       expect(onFiltersChange).toHaveBeenNthCalledWith(1, [...filters, defaultNewFilter]);
-      userEvent.click(result.getAllByTestId('query-builder-filters-remove-button')[0]);
+      await userEvent.click(result.getAllByTestId('query-builder-filters-remove-button')[0]);
       expect(onFiltersChange).toBeCalledTimes(2);
       expect(onFiltersChange).toHaveBeenNthCalledWith(2, [filters[1]]);
     });
   });
   describe('FilterEditor', () => {
-    it('renders correctly', () => {
+    it('renders correctly', async () => {
       const result = render(
         <FilterEditor
           fieldsList={[]}
@@ -94,7 +94,7 @@ describe('FiltersEditor', () => {
       );
       expect(result.container.firstChild).not.toBeNull();
     });
-    it('should have all provided fields in the select', () => {
+    it('should have all provided fields in the select', async () => {
       const result = render(
         <FilterEditor
           fieldsList={[
@@ -115,13 +115,13 @@ describe('FiltersEditor', () => {
       );
 
       // expand the `fieldName` select box
-      userEvent.type(result.getAllByRole('combobox')[0], '{ArrowDown}');
+      await userEvent.type(result.getAllByRole('combobox')[0], '{ArrowDown}');
 
       expect(result.getByText('col1')).toBeInTheDocument();
       expect(result.getByText('col2')).toBeInTheDocument();
       expect(result.getByText('col3')).toBeInTheDocument();
     });
-    it('should call onFilterChange when user adds correct custom filter for the field with Map type', () => {
+    it('should call onFilterChange when user adds correct custom filter for the field with Map type', async () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterEditor
@@ -139,8 +139,8 @@ describe('FiltersEditor', () => {
       );
 
       // type into the `fieldName` select box
-      userEvent.type(result.getAllByRole('combobox')[0], `colName[['keyName']`);
-      userEvent.keyboard('{Enter}');
+      await userEvent.type(result!.getAllByRole('combobox')[0], `colName[['keyName']`);
+      await userEvent.keyboard('{Enter}');
 
       const expectedFilter: Filter = {
         key: `colName['keyName']`,
@@ -170,14 +170,14 @@ describe('FiltersEditor', () => {
       );
 
       // type into the `fieldName` select box
-      userEvent.type(result.getAllByRole('combobox')[0], `mapField__key`);
-      userEvent.keyboard('{Enter}');
+      await userEvent.type(result!.getAllByRole('combobox')[0], `mapField__key`);
+      await userEvent.keyboard('{Enter}');
 
       expect(onFilterChange).not.toHaveBeenCalled();
     });
   });
   describe('FilterValueEditor', () => {
-    it('should render nothing for null operator', () => {
+    it('should render nothing for null operator', async () => {
       const result = render(
         <FilterValueEditor
           fieldsList={[]}
@@ -191,9 +191,9 @@ describe('FiltersEditor', () => {
           onFilterChange={() => {}}
         />
       );
-      expect(result.container.firstChild).toBeNull();
+      expect(result!.container.firstChild).toBeNull();
     });
-    it('should render radio button with value for boolean operator', () => {
+    it('should render radio button with value for boolean operator', async () => {
       const filter: BooleanFilter = {
         key: 'IsDeleted',
         operator: FilterOperator.Equals,
@@ -204,14 +204,14 @@ describe('FiltersEditor', () => {
       };
       const onFilterChange = jest.fn();
       const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
-      expect(result.container.firstChild).not.toBeNull();
-      expect(result.getByTestId('query-builder-filters-boolean-value-container')).toBeInTheDocument();
-      expect(result.getByLabelText('True')).toBeChecked();
-      userEvent.click(result.getByLabelText('False'));
+      expect(result!.container.firstChild).not.toBeNull();
+      expect(result!.getByTestId('query-builder-filters-boolean-value-container')).toBeInTheDocument();
+      expect(result!.getByLabelText('True')).toBeChecked();
+      await userEvent.click(result!.getByLabelText('False'));
       expect(onFilterChange).toHaveBeenCalledTimes(1);
       expect(onFilterChange).toHaveBeenNthCalledWith(1, { ...filter, value: false });
     });
-    it('should render number filter with value for number operator', () => {
+    it('should render number filter with value for number operator', async () => {
       const filter: NumberFilter = {
         filterType: 'custom',
         key: 'Amount',
@@ -225,12 +225,12 @@ describe('FiltersEditor', () => {
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-number-value-container')).toBeInTheDocument();
       expect(result.getByTestId('query-builder-filters-number-value-input')).toBeInTheDocument();
-      userEvent.clear(result.getByTestId('query-builder-filters-number-value-input'));
-      userEvent.type(result.getByTestId('query-builder-filters-number-value-input'), '300');
+      await userEvent.clear(result.getByTestId('query-builder-filters-number-value-input'));
+      await userEvent.type(result.getByTestId('query-builder-filters-number-value-input'), '300');
       fireEvent.blur(result.getByTestId('query-builder-filters-number-value-input'));
       expect(onFilterChange).toHaveBeenCalledTimes(1);
     });
-    it('should render nothing for date operator with grafana time range', () => {
+    it('should render nothing for date operator with grafana time range', async () => {
       const filter: DateFilter = {
         filterType: 'custom',
         key: 'CreatedDate',
@@ -242,7 +242,7 @@ describe('FiltersEditor', () => {
       const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).toBeNull();
     });
-    it('should render date filter with value for date operator with time range', () => {
+    it('should render date filter with value for date operator with time range', async () => {
       const filter: DateFilter = {
         filterType: 'custom',
         key: 'CreatedDate',
@@ -324,7 +324,7 @@ describe('FiltersEditor', () => {
       expect(result.getByText('Deal Lost')).toBeInTheDocument();
       expect(result.queryByText('Discovery')).not.toBeInTheDocument();
     });
-    it('should render input filter for single value string', () => {
+    it('should render input filter for single value string', async () => {
       const filter: StringFilter = {
         filterType: 'custom',
         key: 'Name',
@@ -338,7 +338,7 @@ describe('FiltersEditor', () => {
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-single-string-value-container')).toBeInTheDocument();
     });
-    it('should render input filter for multi value string', () => {
+    it('should render input filter for multi value string', async () => {
       const filter: MultiFilter = {
         filterType: 'custom',
         key: 'Name',
