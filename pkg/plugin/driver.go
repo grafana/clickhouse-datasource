@@ -210,3 +210,23 @@ func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.D
 		},
 	}
 }
+
+func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	var dataQuery struct {
+		Meta struct {
+			TimeZone string `json:"timezone"`
+		} `json:"meta"`
+	}
+
+	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
+		return ctx, req
+	}
+
+	if dataQuery.Meta.TimeZone == "" {
+		return ctx, req
+	}
+
+	loc, _ := time.LoadLocation(dataQuery.Meta.TimeZone)
+
+	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
+}

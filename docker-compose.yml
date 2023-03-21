@@ -14,3 +14,14 @@ services:
       - TERM=linux
       - GF_DEFAULT_APP_MODE=development
       - GF_ENTERPRISE_LICENSE_TEXT=$GF_ENTERPRISE_LICENSE_TEXT
+
+  clickhouse:
+    image: 'clickhouse/clickhouse-server:${CLICKHOUSE_VERSION-23.1-alpine}'
+    container_name: 'grafana-clickhouse-server'
+    ports:
+      - '8123:8123'
+      - '9000:9000'
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144

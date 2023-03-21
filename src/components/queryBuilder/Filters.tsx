@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, RadioButtonGroup, Select, Input, MultiSelect } from '@grafana/ui';
-import { Filter, FullField, FilterOperator, NullFilter } from './../../types';
+import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
+import { Filter, FilterOperator, FullField, NullFilter } from '../../types';
 import * as utils from './utils';
-import { selectors } from './../../selectors';
+import { selectors } from '../../selectors';
 import { styles } from '../../styles';
 
 const boolValues: Array<SelectableValue<boolean>> = [
@@ -44,6 +44,9 @@ export const defaultNewFilter: NullFilter = {
   type: 'id',
   operator: FilterOperator.IsNotNull,
 };
+export interface PredefinedFilter {
+  restrictToFields?: FullField[];
+}
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
   const [value, setValue] = useState(props.value || 0);
@@ -164,13 +167,13 @@ export const FilterValueEditor = (props: {
 export const FilterEditor = (props: {
   fieldsList: FullField[];
   index: number;
-  filter: Filter;
+  filter: Filter & PredefinedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
 }) => {
   const { index, filter, fieldsList, onFilterChange } = props;
   const [isOpen, setIsOpen] = useState(false);
   const getFields = () => {
-    const values = fieldsList.map((f) => {
+    const values = (filter.restrictToFields || fieldsList).map((f) => {
       return { label: f.label, value: f.name };
     });
     // Add selected value to the list if it does not exist.
@@ -264,8 +267,18 @@ export const FilterEditor = (props: {
       return;
     }
 
-    let newFilter: Filter;
-    if (utils.isBooleanType(filterData.type)) {
+    let newFilter: Filter & PredefinedFilter;
+    // this is an auto-generated TimeRange filter
+    if (filter.restrictToFields) {
+      newFilter = {
+        filterType: 'custom',
+        key: filterData.key,
+        type: 'datetime',
+        condition: filter.condition || 'AND',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        restrictToFields: filter.restrictToFields,
+      };
+    } else if (utils.isBooleanType(filterData.type)) {
       newFilter = {
         filterType: 'custom',
         key: filterData.key,
