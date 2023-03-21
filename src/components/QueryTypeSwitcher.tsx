@@ -3,7 +3,7 @@ import { SelectableValue } from '@grafana/data';
 import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
-import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery, Format } from 'types';
+import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery } from 'types';
 import { isString } from 'lodash';
 
 interface QueryTypeSwitcherProps {
@@ -56,7 +56,8 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
           queryType,
           rawSql: getSQLFromQueryOptions(builderOptions),
           meta: { builderOptions },
-          format: Format.TABLE,
+          format: query.format,
+          selectedFormat: query.selectedFormat,
         });
       } else if (queryType === QueryType.Builder) {
         onChange({ ...query, queryType, rawSql: getSQLFromQueryOptions(builderOptions), builderOptions });

@@ -216,6 +216,7 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		Meta struct {
 			TimeZone string `json:"timezone"`
 		} `json:"meta"`
+		Format int `json:"format"`
 	}
 
 	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
@@ -227,6 +228,5 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 	}
 
 	loc, _ := time.LoadLocation(dataQuery.Meta.TimeZone)
-
 	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
 }
