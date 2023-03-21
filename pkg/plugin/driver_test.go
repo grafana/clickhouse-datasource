@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -209,12 +210,17 @@ func insertData(t *testing.T, conn *sql.DB, data ...interface{}) {
 	require.NoError(t, scope.Commit())
 }
 
-func toJson(obj interface{}) string {
+func toJson(obj interface{}) (json.RawMessage, error) {
 	bytes, err := json.Marshal(obj)
 	if err != nil {
-		return "unable to marshal"
+		return nil, errors.New("unable to marshal")
 	}
-	return string(bytes)
+	var rawJSON json.RawMessage
+	json.Unmarshal(bytes, &rawJSON)
+	if err != nil {
+		return nil, errors.New("unable to unmarshal")
+	}
+	return rawJSON, nil
 }
 
 func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
@@ -230,7 +236,9 @@ func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
 		default:
 			switch reflect.ValueOf(eVal).Kind() {
 			case reflect.Map, reflect.Slice:
-				assert.JSONEq(t, toJson(tVal), *val.(*string))
+				jsonRaw, err := toJson(tVal)
+				assert.Nil(t, err)
+				assert.Equal(t, jsonRaw, *val.(*json.RawMessage))
 				return
 			}
 			assert.Equal(t, eVal, val)

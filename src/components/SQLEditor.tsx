@@ -29,7 +29,7 @@ export const SQLEditor = (props: SQLEditorProps) => {
   });
 
   const onSqlChange = (sql: string) => {
-    const format = getFormat(sql);
+    const format = getFormat(sql, query.selectedFormat);
     onChange({ ...query, rawSql: sql, format, queryType: QueryType.SQL });
     onRunQuery();
   };
