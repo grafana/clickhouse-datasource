@@ -16,6 +16,7 @@
     "e2e": "yarn cypress install && yarn grafana-e2e run",
     "e2e:update": "yarn cypress install && yarn grafana-e2e run --update-screenshots",
     "server": "docker-compose up --build",
+    "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",
     "sign": "npx --yes @grafana/sign-plugin@latest"
   },
   "author": "Grafana Labs",
@@ -39,6 +40,7 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/webpack-livereload-plugin": "^2.3.3",
     "copy-webpack-plugin": "^11.0.0",
+    "cspell": "^6.30.2",
     "css-loader": "^6.7.1",
     "eslint-webpack-plugin": "^3.1.1",
     "fork-ts-checker-webpack-plugin": "^7.2.0",
