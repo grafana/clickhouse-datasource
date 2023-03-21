@@ -22,7 +22,7 @@ jobs:
           - 1.18.3 #pin to 1.18.3 for now due to https://github.com/ClickHouse/ch-go/issues/160
 
     steps:
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v3
 
       - name: Setup packages
         id: setup-packages
