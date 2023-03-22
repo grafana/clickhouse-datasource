@@ -10,12 +10,15 @@ import {
   vectorator,
   getTimeZone,
   getTimeZoneInfo,
+  DataQueryResponseData,
+  Field,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
-import { CHConfig, CHQuery, FullField, QueryType } from '../types';
+import { CHConfig, CHQuery, Format, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
+import { map } from 'rxjs/operators';
 
 export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   // This enables default annotation support for 7.2+
@@ -197,6 +200,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    const formats = new Map(request.targets.map(query => [query.refId, query.format]));
     const targets = request.targets
       // filters out queries disabled in UI
       .filter((t) => t.hide !== true)
@@ -214,7 +218,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     return super.query({
       ...request,
       targets,
-    });
+    }).pipe(map(res => this.processQueryResponse(res, formats)));
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
@@ -224,9 +228,37 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
         range: options ? options.range : (getTemplateSrv() as any).timeRange,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
-        resolve(res.data[0] || { fields: [] });
+        resolve(this.stringifyObjects(res.data[0], request.format));
       });
     });
+  }
+ 
+  private processQueryResponse(response: DataQueryResponse, formats: Map<String | undefined, Format>): DataQueryResponse {
+    //why is this any?
+    response.data = response.data.map(data => this.stringifyObjects(data, formats.get(data.refId)))
+    return response
+  }
+
+  private stringifyObjects(data: DataQueryResponseData | undefined, format: Format | undefined): DataQueryResponseData {
+      if (data !== undefined) {
+        (data as DataFrame).fields.forEach((field: Field & { typeInfo?: { frame: string} } ) => {
+          if (field.typeInfo?.frame === 'json.RawMessage' && format !== Format.TRACE){
+            const asArray = [...Array(field.values.length).keys()].map(i => JSON.stringify(field.values.get(i)))
+            const values = {
+              length: asArray.length,
+              get: (index: number) => {
+                return asArray[index]
+              },
+              toArray: () => {
+                return asArray
+              }
+            }
+            field.values = values
+          }
+        });
+        return data
+      }
+      return { fields: [] }
   }
 
   private values(frame: DataFrame) {
