@@ -79,6 +79,17 @@ export const Components = {
       container: 'data-testid-code-editor-container',
       Expand: 'data-testid-code-editor-expand-button',
     },
+    Format: {
+      label: 'Format',
+      tooltip: 'Query Type',
+      options: {
+        AUTO: 'Auto',
+        TABLE: 'Table',
+        TIME_SERIES: 'Time Series',
+        LOGS: 'Logs',
+        TRACE: 'Trace',
+      },
+    },
     Types: {
       label: 'Query Type',
       tooltip: 'Query Type',

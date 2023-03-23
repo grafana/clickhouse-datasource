@@ -201,26 +201,26 @@ var Converters = map[string]Converter{
 		convert:    decimalNullConvert,
 	},
 	"Tuple()": {
-		fieldType:  data.FieldTypeNullableString,
+		fieldType:  data.FieldTypeNullableJSON,
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 		matchRegex: tupleMatch,
 		convert:    jsonConverter,
 	},
 	// NestedConverter currently only supports flatten_nested=0 only which can be marshalled into []map[string]interface{}
 	"Nested()": {
-		fieldType:  data.FieldTypeNullableString,
+		fieldType:  data.FieldTypeNullableJSON,
 		scanType:   reflect.TypeOf([]map[string]interface{}{}),
 		matchRegex: nestedMatch,
 		convert:    jsonConverter,
 	},
 	"Array()": {
-		fieldType:  data.FieldTypeNullableString,
+		fieldType:  data.FieldTypeNullableJSON,
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 		matchRegex: complexArrayMatch,
 		convert:    jsonConverter,
 	},
 	"Map()": {
-		fieldType:  data.FieldTypeNullableString,
+		fieldType:  data.FieldTypeNullableJSON,
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 		matchRegex: mapMatch,
 		convert:    jsonConverter,
@@ -288,24 +288,20 @@ func createConverter(name string, converter Converter) sqlutil.Converter {
 	}
 }
 
-// MarshalJSON marshals the enum as a quoted json string
-func marshalJSON(in interface{}) (string, error) {
-	jBytes, err := json.Marshal(in)
-	if err != nil {
-		return "", err
-	}
-	return string(jBytes), nil
-}
-
 func jsonConverter(in interface{}) (interface{}, error) {
 	if in == nil {
 		return (*string)(nil), nil
 	}
-	json, err := marshalJSON(in)
+	jBytes, err := json.Marshal(in)
 	if err != nil {
 		return nil, err
 	}
-	return &json, nil
+	var rawJSON json.RawMessage
+	err = json.Unmarshal(jBytes, &rawJSON)
+	if err != nil {
+		return nil, err
+	}
+	return &rawJSON, nil
 }
 
 func defaultConvert(in interface{}) (interface{}, error) {

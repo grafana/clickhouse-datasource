@@ -56,5 +56,10 @@ export const styles = {
       }
     `,
   },
+  FormatSelector: {
+    formatSelector: css`
+      display: flex;
+    `,
+  },
   VariablesEditor: {},
 };
