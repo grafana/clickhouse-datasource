@@ -10,7 +10,7 @@ require (
 	github.com/grafana/sqlds/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.8.2
 	github.com/testcontainers/testcontainers-go v0.14.0
 )
 
