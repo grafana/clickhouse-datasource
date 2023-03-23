@@ -2,6 +2,8 @@ module github.com/grafana/clickhouse-datasource
 
 go 1.19
 
+replace github.com/grafana/sqlds/v2 => /opt/sqlds
+
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.7.0
 	github.com/docker/docker v20.10.23+incompatible
@@ -100,6 +102,7 @@ require (
 	go.opentelemetry.io/otel v1.13.0 // indirect
 	go.opentelemetry.io/otel/trace v1.13.0 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
+	golang.org/x/exp v0.0.0-20230307190834-24139beb5833 // indirect
 	golang.org/x/net v0.7.0 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/term v0.5.0 // indirect
