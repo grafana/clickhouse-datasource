@@ -2,14 +2,12 @@ module github.com/grafana/clickhouse-datasource
 
 go 1.19
 
-replace github.com/grafana/sqlds/v2 => /opt/sqlds
-
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.7.0
 	github.com/docker/docker v20.10.23+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.149.1
-	github.com/grafana/sqlds/v2 v2.4.0
+	github.com/grafana/sqlds/v2 v2.4.2
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.1
