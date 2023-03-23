@@ -8,9 +8,7 @@
       "mode": "auto",
       "program": "${workspaceFolder}/pkg/",
       "env": {},
-      "args": [
-        "--standalone=true"
-      ]
+      "args": ["--standalone=true"]
     },
     {
       "name": "Debug in Container",
@@ -23,5 +21,15 @@
       "apiVersion": 1,
       "trace": "verbose"
     },
-  ],
-} 
+    {
+      "name": "Debug Jest test",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["run", "jest", "--runInBand", "${file}"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "port": 9229
+    }
+  ]
+}

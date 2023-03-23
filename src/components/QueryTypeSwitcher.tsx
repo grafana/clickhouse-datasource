@@ -3,7 +3,8 @@ import { SelectableValue } from '@grafana/data';
 import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
-import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery, Format } from 'types';
+import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery } from 'types';
+import { isString } from 'lodash';
 
 interface QueryTypeSwitcherProps {
   query: CHQuery;
@@ -13,19 +14,27 @@ interface QueryTypeSwitcherProps {
 
 export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   const { query, onChange } = props;
-  const { label, tooltip, options: queryTypeLabels, switcher } = selectors.components.QueryEditor.Types;
+  const { label, tooltip, options: queryTypeLabels, switcher, cannotConvert } = selectors.components.QueryEditor.Types;
   let queryType: QueryType =
     query.queryType ||
     ((query as CHSQLQuery).rawSql && !(query as CHQuery).queryType ? QueryType.SQL : QueryType.Builder);
   const [editor, setEditor] = useState<QueryType>(queryType);
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
+  const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
   const options: Array<SelectableValue<QueryType>> = [
     { label: queryTypeLabels.SQLEditor, value: QueryType.SQL },
     { label: queryTypeLabels.QueryBuilder, value: QueryType.Builder },
   ];
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const onQueryTypeChange = (queryType: QueryType, confirm = false) => {
     if (query.queryType === QueryType.SQL && queryType === QueryType.Builder && !confirm) {
-      setConfirmModalState(true);
+      const queryOptionsFromSql = getQueryOptionsFromSql(query.rawSql);
+      if (isString(queryOptionsFromSql)) {
+        setCannotConvertModalState(true);
+        setErrorMessage(queryOptionsFromSql);
+      } else {
+        setConfirmModalState(true);
+      }
     } else {
       setEditor(queryType);
       let builderOptions: SqlBuilderOptions;
@@ -34,7 +43,8 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
           builderOptions = query.builderOptions;
           break;
         case QueryType.SQL:
-          builderOptions = getQueryOptionsFromSql(query.rawSql) || defaultCHBuilderQuery.builderOptions;
+          builderOptions =
+            (getQueryOptionsFromSql(query.rawSql) as SqlBuilderOptions) || defaultCHBuilderQuery.builderOptions;
           break;
         default:
           builderOptions = defaultCHBuilderQuery.builderOptions;
@@ -46,7 +56,8 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
           queryType,
           rawSql: getSQLFromQueryOptions(builderOptions),
           meta: { builderOptions },
-          format: Format.TABLE,
+          format: query.format,
+          selectedFormat: query.selectedFormat,
         });
       } else if (queryType === QueryType.Builder) {
         onChange({ ...query, queryType, rawSql: getSQLFromQueryOptions(builderOptions), builderOptions });
@@ -56,6 +67,7 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   const onConfirmQueryTypeChange = () => {
     onQueryTypeChange(QueryType.Builder, true);
     setConfirmModalState(false);
+    setCannotConvertModalState(false);
   };
   return (
     <>
@@ -72,6 +84,15 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
         icon="exclamation-triangle"
         onConfirm={onConfirmQueryTypeChange}
         onDismiss={() => setConfirmModalState(false)}
+      />
+      <ConfirmModal
+        title={cannotConvert.title}
+        body={`${errorMessage} \nDo you want to delete your current query and use the query builder?`}
+        isOpen={cannotConvertModalState}
+        icon="exclamation-triangle"
+        onConfirm={onConfirmQueryTypeChange}
+        confirmText={switcher.confirmText}
+        onDismiss={() => setCannotConvertModalState(false)}
       />
     </>
   );
