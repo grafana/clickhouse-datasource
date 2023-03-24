@@ -2,6 +2,7 @@ package converters_test
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -443,12 +444,17 @@ func TestNullableUInt256ShouldBeNil(t *testing.T) {
 	assert.Equal(t, (*float64)(nil), actual)
 }
 
-func toJson(obj interface{}) string {
+func toJson(obj interface{}) (json.RawMessage, error) {
 	bytes, err := json.Marshal(obj)
 	if err != nil {
-		return "unable to marshal"
+		return nil, errors.New("unable to marshal")
 	}
-	return string(bytes)
+	var rawJSON json.RawMessage
+	err = json.Unmarshal(bytes, &rawJSON)
+	if err != nil {
+		return nil, errors.New("unable to unmarshal")
+	}
+	return rawJSON, nil
 }
 
 func TestTuple(t *testing.T) {
@@ -461,7 +467,9 @@ func TestTuple(t *testing.T) {
 	sut := converters.GetConverter("Tuple(name String, id Uint16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
-	assert.JSONEq(t, toJson(value), *v.(*string))
+	msg, err := toJson(value)
+	assert.Nil(t, err)
+	assert.Equal(t, msg, *v.(*json.RawMessage))
 }
 
 func TestNested(t *testing.T) {
@@ -476,7 +484,9 @@ func TestNested(t *testing.T) {
 	sut := converters.GetConverter("Nested(name String, id Uint16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
-	assert.JSONEq(t, toJson(value), *v.(*string))
+	msg, err := toJson(value)
+	assert.Nil(t, err)
+	assert.Equal(t, msg, *v.(*json.RawMessage))
 }
 
 func TestMap(t *testing.T) {
@@ -489,7 +499,9 @@ func TestMap(t *testing.T) {
 	sut := converters.GetConverter("Map(String, Uint16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
-	assert.JSONEq(t, toJson(value), *v.(*string))
+	msg, err := toJson(value)
+	assert.Nil(t, err)
+	assert.Equal(t, msg, *v.(*json.RawMessage))
 }
 
 func TestNullableFixedString(t *testing.T) {
@@ -505,7 +517,9 @@ func TestArray(t *testing.T) {
 	ipConverter := converters.GetConverter("Array(String)")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
-	assert.JSONEq(t, toJson(value), *v.(*string))
+	msg, err := toJson(value)
+	assert.Nil(t, err)
+	assert.Equal(t, msg, *v.(*json.RawMessage))
 }
 
 func TestIPv4(t *testing.T) {
