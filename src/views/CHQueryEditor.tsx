@@ -1,12 +1,22 @@
 import React from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from '../data/CHDatasource';
-import { CHConfig, CHQuery, SqlBuilderOptions, QueryType, defaultCHBuilderQuery, BuilderMode, Format } from '../types';
+import {
+  BuilderMode,
+  CHConfig,
+  CHQuery,
+  defaultCHBuilderQuery,
+  Format,
+  QueryType,
+  SqlBuilderOptions,
+  CHBuilderQuery,
+} from '../types';
 import { SQLEditor } from 'components/SQLEditor';
 import { getSQLFromQueryOptions } from 'components/queryBuilder/utils';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { Preview } from 'components/queryBuilder/Preview';
 import { QueryTypeSwitcher } from 'components/QueryTypeSwitcher';
+import { FormatSelect } from '../components/FormatSelect';
 import { Button } from '@grafana/ui';
 import { styles } from 'styles';
 import { getFormat } from 'components/editor';
@@ -17,7 +27,12 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange } = props;
   const onBuilderOptionsChange = (builderOptions: SqlBuilderOptions) => {
     const sql = getSQLFromQueryOptions(builderOptions);
-    const format = builderOptions.mode === BuilderMode.Trend ? Format.TIMESERIES : Format.TABLE;
+    const format =
+      query.selectedFormat === Format.AUTO
+        ? builderOptions.mode === BuilderMode.Trend
+          ? Format.TIMESERIES
+          : Format.TABLE
+        : query.selectedFormat;
     onChange({ ...query, queryType: QueryType.Builder, rawSql: sql, builderOptions, format });
   };
 
@@ -60,12 +75,28 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
   const runQuery = () => {
     if (query.queryType === QueryType.SQL) {
-      const format = getFormat(query.rawSql);
+      const format = getFormat(query.rawSql, query.selectedFormat);
       if (format !== query.format) {
         onChange({ ...query, format });
       }
     }
     onRunQuery();
+  };
+
+  const onFormatChange = (selectedFormat: Format) => {
+    switch (query.queryType) {
+      case QueryType.SQL:
+        onChange({ ...query, format: getFormat(query.rawSql, selectedFormat), selectedFormat });
+      case QueryType.Builder:
+      default:
+        if (selectedFormat === Format.AUTO) {
+          let builderOptions = (query as CHBuilderQuery).builderOptions;
+          const format = builderOptions && builderOptions.mode === BuilderMode.Trend ? Format.TIMESERIES : Format.TABLE;
+          onChange({ ...query, format, selectedFormat });
+        } else {
+          onChange({ ...query, format: selectedFormat, selectedFormat });
+        }
+    }
   };
 
   return (
@@ -76,6 +107,7 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
         </span>
         <Button onClick={() => runQuery()}>Run Query</Button>
       </div>
+      <FormatSelect format={query.selectedFormat ?? Format.AUTO} onChange={onFormatChange} />
       <CHEditorByType {...props} />
     </>
   );

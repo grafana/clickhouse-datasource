@@ -25,7 +25,7 @@ describe('Query Editor', () => {
     const rawSql = 'foo';
     render(
       <CHQueryEditor
-        query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL }}
+        query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL, selectedFormat: 4 }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}

@@ -33,6 +33,8 @@ export enum Format {
   TIMESERIES = 0,
   TABLE = 1,
   LOGS = 2,
+  TRACE = 3,
+  AUTO = 4,
 }
 
 //#region Query
@@ -50,6 +52,7 @@ export interface CHSQLQuery extends DataQuery {
     builderOptions?: SqlBuilderOptions;
   };
   format: Format;
+  selectedFormat: Format;
   expand?: boolean;
 }
 
@@ -58,6 +61,7 @@ export interface CHBuilderQuery extends DataQuery {
   rawSql: string;
   builderOptions: SqlBuilderOptions;
   format: Format;
+  selectedFormat: Format;
   meta?: {
     timezone?: string;
   };
@@ -240,11 +244,13 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
     limit: 100,
   },
   format: Format.TABLE,
+  selectedFormat: Format.AUTO,
 };
 export const defaultCHSQLQuery: Omit<CHSQLQuery, 'refId'> = {
   queryType: QueryType.SQL,
   rawSql: '',
   format: Format.TABLE,
+  selectedFormat: Format.AUTO,
   expand: false,
 };
 //#endregion

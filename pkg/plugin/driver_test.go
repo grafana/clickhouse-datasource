@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"net"
@@ -209,12 +210,17 @@ func insertData(t *testing.T, conn *sql.DB, data ...interface{}) {
 	require.NoError(t, scope.Commit())
 }
 
-func toJson(obj interface{}) string {
+func toJson(obj interface{}) (json.RawMessage, error) {
 	bytes, err := json.Marshal(obj)
 	if err != nil {
-		return "unable to marshal"
+		return nil, errors.New("unable to marshal")
 	}
-	return string(bytes)
+	var rawJSON json.RawMessage
+	err = json.Unmarshal(bytes, &rawJSON)
+	if err != nil {
+		return nil, errors.New("unable to unmarshal")
+	}
+	return rawJSON, nil
 }
 
 func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
@@ -230,7 +236,9 @@ func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
 		default:
 			switch reflect.ValueOf(eVal).Kind() {
 			case reflect.Map, reflect.Slice:
-				assert.JSONEq(t, toJson(tVal), *val.(*string))
+				jsonRaw, err := toJson(tVal)
+				assert.Nil(t, err)
+				assert.Equal(t, jsonRaw, *val.(*json.RawMessage))
 				return
 			}
 			assert.Equal(t, eVal, val)
@@ -1021,4 +1029,54 @@ func TestConvertNullableIPv6(t *testing.T) {
 			checkRows(t, conn, 2, &sVal, nil)
 		})
 	}
+}
+
+func TestMutateResponse(t *testing.T) {
+	conn := setupConnection(t, clickhouse_sql.Native, nil)
+	canTest, err := plugin.CheckMinServerVersion(conn, 22, 6, 1)
+	if err != nil {
+		t.Skip(err.Error())
+		return
+	}
+	if !canTest {
+		t.Skipf("Skipping Mutate Response as version is < 22.6.1")
+		return
+	}
+
+	clickhouse := plugin.Clickhouse{}
+	assert.Equal(t, nil, err)
+	conn, close := setupTest(t, "col1 JSON", clickhouse_sql.Native, clickhouse_sql.Settings{
+		"allow_experimental_object_type": 1,
+	})
+	defer close(t)
+	val := map[string]interface{}{
+		"test": map[string][]string{
+			"test": {"2", "3"},
+		},
+	}
+	insertData(t, conn, val)
+	t.Run("doesn't mutate traces", func(t *testing.T) {
+		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
+		require.NoError(t, err)
+		frame, err := sqlutil.FrameFromRows(rows, 1, converters.ClickhouseConverters...)
+		require.NoError(t, err)
+		frame.Meta = &data.FrameMeta{PreferredVisualization: data.VisType(data.VisTypeTrace)}
+		frames, err := clickhouse.MutateResponse(context.Background(), []*data.Frame{frame})
+		require.NoError(t, err)
+		require.NotNil(t, frames)
+		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableJSON)
+	})
+	t.Run("mutates other types", func(t *testing.T) {
+		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
+		require.NoError(t, err)
+		frame, err := sqlutil.FrameFromRows(rows, 1, converters.ClickhouseConverters...)
+		require.NoError(t, err)
+		frame.Meta = &data.FrameMeta{PreferredVisualization: data.VisType(data.VisTypeLogs)}
+		frames, err := clickhouse.MutateResponse(context.Background(), []*data.Frame{frame})
+		require.NoError(t, err)
+		require.NotNil(t, frames)
+		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableString)
+		assert.NoError(t, err)
+		assert.Equal(t, "{\"test\":{\"test\":[\"2\",\"3\"]}}", *frames[0].Fields[0].At(0).(*string))
+	})
 }

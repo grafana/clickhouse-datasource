@@ -54,6 +54,7 @@
     "createddate",
     "closedate",
     "commitish",
-    "slvrtrn"
+    "slvrtrn",
+    "otel"
   ]
 }

@@ -216,6 +216,7 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		Meta struct {
 			TimeZone string `json:"timezone"`
 		} `json:"meta"`
+		Format int `json:"format"`
 	}
 
 	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
@@ -227,6 +228,39 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 	}
 
 	loc, _ := time.LoadLocation(dataQuery.Meta.TimeZone)
-
 	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
+}
+
+// MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
+func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
+	for _, frame := range res {
+		if frame.Meta.PreferredVisualization != data.VisType(data.VisTypeTrace) {
+			var fields []*data.Field
+			for _, field := range frame.Fields {
+				values := make([]*string, field.Len())
+				if field.Type() == data.FieldTypeNullableJSON {
+					newField := data.NewField(field.Name, field.Labels, values)
+					newField.SetConfig(field.Config)
+					for i := 0; i < field.Len(); i++ {
+						val := field.At(i).(*json.RawMessage)
+						if val == nil {
+							newField.Set(i, nil)
+						} else {
+							bytes, err := val.MarshalJSON()
+							if err != nil {
+								return res, err
+							}
+							sVal := string(bytes)
+							newField.Set(i, &sVal)
+						}
+					}
+					fields = append(fields, newField)
+				} else {
+					fields = append(fields, field)
+				}
+			}
+			frame.Fields = fields
+		}
+	}
+	return res, nil
 }
