@@ -6,18 +6,23 @@ import {
   DataSourceInstanceSettings,
   MetricFindValue,
   ScopedVars,
-  VariableModel,
   vectorator,
   getTimeZone,
   getTimeZoneInfo,
-} from '@grafana/data';
+  DataSourceWithSupplementaryQueriesSupport,
+  SupplementaryQueryType, TypedVariableModel,
+} from '@grafana/data'
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
 import { CHConfig, CHQuery, FullField, QueryType } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { isString, isEmpty } from 'lodash';
-
-export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
+import { getLogLevelFromKey } from '@grafana/data'
+import { queryLogsVolume } from './logs'
+export class Datasource
+  extends DataSourceWithBackend<CHQuery, CHConfig>
+  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>
+{
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
@@ -30,6 +35,33 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+  }
+
+  getDataProvider(
+    type: SupplementaryQueryType,
+    request: DataQueryRequest<CHQuery>
+  ): Observable<DataQueryResponse> | undefined {
+    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+      return undefined;
+    }
+    switch (type) {
+      case SupplementaryQueryType.LogsVolume:
+        return this.getLogsVolumeDataProvider(request);
+      default:
+        return undefined;
+    }
+  }
+
+  getSupportedSupplementaryQueryTypes(): SupplementaryQueryType[] {
+    return [SupplementaryQueryType.LogsVolume];
+  }
+
+  getSupplementaryQuery(type: SupplementaryQueryType, query: CHQuery): CHQuery | undefined {
+    console.log('getSupplementaryQuery', type, query);
+    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+      return undefined;
+    }
+    return undefined // TODO
   }
 
   async metricFindQuery(query: CHQuery | string, options: any) {
@@ -79,7 +111,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     };
   }
 
-  applyConditionalAll(rawQuery: string, templateVars: VariableModel[]): string {
+  applyConditionalAll(rawQuery: string, templateVars: TypedVariableModel[]): string {
     if (!rawQuery) {
       return rawQuery;
     }
@@ -102,6 +134,30 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
       macroIndex = rawQuery.lastIndexOf(macro);
     }
     return rawQuery;
+  }
+
+  private getLogsVolumeDataProvider(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> | undefined {
+    const targets: CHQuery[]= []
+    request.targets.forEach(target => {
+      const supplementaryQuery = this.getSupplementaryQuery(SupplementaryQueryType.LogsVolume, target)
+      if (supplementaryQuery !== undefined) {
+        targets.push(supplementaryQuery)
+      }
+    })
+
+    if (!targets.length) {
+      return undefined;
+    }
+
+    return queryLogsVolume(
+      this,
+      { ...request, targets },
+      {
+        range: request.range,
+        targets: request.targets,
+        extractLevel: (dataFrame) => getLogLevelFromKey(dataFrame.name || ''),
+      }
+    );
   }
 
   private getMacroArgs(query: string, argsIndex: number): string[] {

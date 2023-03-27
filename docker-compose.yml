@@ -15,6 +15,24 @@ services:
       - GF_DEFAULT_APP_MODE=development
       - GF_ENTERPRISE_LICENSE_TEXT=$GF_ENTERPRISE_LICENSE_TEXT
 
+  elasticsearch:
+    image: elasticsearch:8.2.2
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+    ports:
+      - target: 9200
+        published: 9200
+
+  kibana:
+    image: kibana:8.2.2
+    ports:
+      - target: 5601
+        published: 5601
+    depends_on:
+      - elasticsearch
+
   clickhouse:
     image: 'clickhouse/clickhouse-server:${CLICKHOUSE_VERSION-23.2-alpine}'
     container_name: 'grafana-clickhouse-server'
