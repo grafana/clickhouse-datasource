@@ -107,6 +107,32 @@ GROUP BY machine_group, log_time
 ORDER BY log_time
 ```
 
+To force rendering as logs, in absence of a `log_time` column, set the Format to `Logs` (available from 2.2.0).
+
+### Visualizing traces with the Traces Panel
+
+Ensure your data meets the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). This applies if using the visualization or Explore view.
+
+Set the Format to `Trace` when constructing the query (available from 2.2.0).
+
+If using the [Open Telemetry Collector and ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter), the following query produces the required column names (these are case sensitive):
+
+```sql
+SELECT
+    TraceId AS traceID,
+    SpanId AS spanID,
+    SpanName AS operationName,
+    ParentSpanId AS parentSpanID,
+    ServiceName AS serviceName,
+    Duration / 1000000 AS duration,
+    Timestamp AS startTime,
+    arrayMap(key -> map('key', key, 'value', SpanAttributes[key]), mapKeys(SpanAttributes)) AS tags,
+    arrayMap(key -> map('key', key, 'value', ResourceAttributes[key]), mapKeys(ResourceAttributes)) AS serviceTags
+FROM otel.otel_traces
+WHERE TraceId = '61d489320c01243966700e172ab37081'
+ORDER BY startTime ASC
+```
+
 ### Macros
 
 To simplify syntax and to allow for dynamic parts, like date range filters, the query can contain macros.

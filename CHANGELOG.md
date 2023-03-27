@@ -1,13 +1,17 @@
 # Changelog
 
+## 2.2.0
+
+- Feature - [Support format dropdown and support for rendering traces](https://github.com/grafana/clickhouse-datasource/pull/329)
+
 ## 2.1.1
 
-* **Fix** - [Date and Date32 type normalization with user's timezone](https://github.com/grafana/clickhouse-datasource/pull/314)
+- **Fix** - [Date and Date32 type normalization with user's timezone](https://github.com/grafana/clickhouse-datasource/pull/314)
 
 ## 2.1.0
 
-* **Fix** - Quote table names with dots by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/298
-* Add a predefined TimeRange filter if there is at least one DateTime* column by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/304
+- **Fix** - Quote table names with dots by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/298
+- Add a predefined TimeRange filter if there is at least one DateTime* column by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/304
 
 ## 2.0.7
 
