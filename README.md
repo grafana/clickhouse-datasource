@@ -20,6 +20,19 @@ validate that queries are safe. Queries can contain any SQL statement. For
 example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'`
 and `DROP TABLE sadTable;` would be executed.
 
+#### Configure a readonly user
+
+A readonly user needs to have enough permission to change the
+`max_execution_time` setting as required by the
+[clickhouse-go](https://github.com/ClickHouse/clickhouse-go/) client used by the
+plugin to connect to the Clickhouse server. Either set
+[`readonly=2`](https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#settings_readonly)
+in the `readonly` profile (which is not recommended on a public Clickhouse
+instance). Or leave `readonly=1` and allow the `max_execution_time` setting to
+be changed by setting its
+[constraint](https://clickhouse.com/docs/en/operations/settings/constraints-on-settings)
+type to `changeable_in_readonly`.
+
 ### ClickHouse protocol support
 
 The plugin supports both `HTTP` and `Native` (default) transport protocols. This can be enabled in the configuration via the `protocol` configuration parameter. Both protocols exchange data with ClickHouse using optimized native format.
