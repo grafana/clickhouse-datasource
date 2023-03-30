@@ -4,21 +4,35 @@ import {
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
+  DataSourceWithSupplementaryQueriesSupport,
+  getLogLevelFromKey,
+  getTimeZone,
+  getTimeZoneInfo, LogLevel,
   MetricFindValue,
   ScopedVars,
+  SupplementaryQueryType,
+  TypedVariableModel,
   vectorator,
-  getTimeZone,
-  getTimeZoneInfo,
-  DataSourceWithSupplementaryQueriesSupport,
-  SupplementaryQueryType, TypedVariableModel,
 } from '@grafana/data'
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
-import { CHConfig, CHQuery, FullField, QueryType } from '../types';
+import {
+  BuilderMetricFieldAggregation,
+  BuilderMode,
+  CHConfig,
+  CHQuery,
+  CHSQLQuery,
+  Format,
+  FullField,
+  OrderByDirection,
+  QueryType,
+  SqlBuilderOptions,
+} from '../types';
 import { AdHocFilter } from './adHocFilter';
-import { isString, isEmpty } from 'lodash';
-import { getLogLevelFromKey } from '@grafana/data'
-import { queryLogsVolume } from './logs'
+import { cloneDeep, isEmpty, isString } from 'lodash';
+import { getIntervalInfo, getTimeFieldRoundingClause, queryLogsVolume } from './logs';
+import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
+
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
   implements DataSourceWithSupplementaryQueriesSupport<CHQuery>
@@ -46,7 +60,58 @@ export class Datasource
     }
     switch (type) {
       case SupplementaryQueryType.LogsVolume:
-        return this.getLogsVolumeDataProvider(request);
+        const logsVolumeRequest = cloneDeep(request);
+
+        const timespanMs = logsVolumeRequest.range.to.valueOf() - logsVolumeRequest.range.from.valueOf();
+        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars, timespanMs);
+
+        logsVolumeRequest.interval = intervalInfo.interval;
+        logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
+
+        if (intervalInfo.intervalMs !== undefined) {
+          logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
+          logsVolumeRequest.scopedVars.__interval_ms = {
+            value: intervalInfo.intervalMs,
+            text: intervalInfo.intervalMs,
+          };
+        }
+
+        logsVolumeRequest.hideFromInspector = true;
+
+        const targets: CHQuery[] = [];
+        logsVolumeRequest.targets.forEach((target) => {
+          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(
+            logsVolumeRequest,
+            target,
+            timespanMs,
+            'created_at'
+          );
+          if (supplementaryQuery !== undefined) {
+            targets.push(supplementaryQuery);
+          }
+        });
+
+        if (!targets.length) {
+          return undefined;
+        }
+
+        return queryLogsVolume(
+          this,
+          { ...request, targets },
+          {
+            range: request.range,
+            targets: request.targets,
+            extractLevel: (dataFrame) => {
+              // console.log('dataFrame.name', dataFrame.name)
+              const levelField = dataFrame.fields.find(f => f.name === 'level')
+              if (levelField) {
+
+                return getLogLevelFromKey(levelField.values.get(0) || '')
+              }
+              return LogLevel.unknown
+            },
+          }
+        );
       default:
         return undefined;
     }
@@ -56,12 +121,55 @@ export class Datasource
     return [SupplementaryQueryType.LogsVolume];
   }
 
-  getSupplementaryQuery(type: SupplementaryQueryType, query: CHQuery): CHQuery | undefined {
-    console.log('getSupplementaryQuery', type, query);
-    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+  private getSupplementaryLogsVolumeQuery<Q extends CHQuery>(
+    logsVolumeRequest: DataQueryRequest<Q>,
+    query: Q,
+    timespanMs: number,
+    timeField: string
+  ): CHQuery | undefined {
+    if (query.format !== Format.LOGS || query.queryType !== QueryType.Builder) {
       return undefined;
     }
-    return undefined // TODO
+
+    const timeFieldRoundingClause = getTimeFieldRoundingClause(logsVolumeRequest.scopedVars, timespanMs, timeField);
+    const builderOptions: SqlBuilderOptions = {
+      mode: BuilderMode.Aggregate,
+      database: query.builderOptions.database!,
+      table: query.builderOptions.table!,
+      filters: query.builderOptions.filters,
+      fields: [],
+      metrics: [
+        {
+          aggregation: BuilderMetricFieldAggregation.Count,
+          alias: 'count',
+          field: '*',
+        },
+      ],
+      groupBy: [`${timeFieldRoundingClause} AS when`, 'level'],
+      orderBy: [
+        {
+          name: 'when',
+          dir: OrderByDirection.ASC,
+        },
+      ],
+    };
+    const rawSupplementarySQL = getSQLFromQueryOptions(builderOptions);
+    console.log('rawSupplementarySQL', rawSupplementarySQL)
+    const supplementaryQuery: CHSQLQuery = {
+      format: Format.AUTO,
+      queryType: QueryType.SQL,
+      rawSql: rawSupplementarySQL,
+      refId: '',
+      selectedFormat: Format.AUTO,
+    };
+
+    console.log(supplementaryQuery);
+    return supplementaryQuery;
+  }
+
+  getSupplementaryQuery(type: SupplementaryQueryType, query: CHQuery): CHQuery | undefined {
+    console.error('getSupplementaryQuery is not supposed to be called');
+    return undefined;
   }
 
   async metricFindQuery(query: CHQuery | string, options: any) {
@@ -134,30 +242,6 @@ export class Datasource
       macroIndex = rawQuery.lastIndexOf(macro);
     }
     return rawQuery;
-  }
-
-  private getLogsVolumeDataProvider(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> | undefined {
-    const targets: CHQuery[]= []
-    request.targets.forEach(target => {
-      const supplementaryQuery = this.getSupplementaryQuery(SupplementaryQueryType.LogsVolume, target)
-      if (supplementaryQuery !== undefined) {
-        targets.push(supplementaryQuery)
-      }
-    })
-
-    if (!targets.length) {
-      return undefined;
-    }
-
-    return queryLogsVolume(
-      this,
-      { ...request, targets },
-      {
-        range: request.range,
-        targets: request.targets,
-        extractLevel: (dataFrame) => getLogLevelFromKey(dataFrame.name || ''),
-      }
-    );
   }
 
   private getMacroArgs(query: string, argsIndex: number): string[] {

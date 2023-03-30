@@ -55,18 +55,18 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
   logsVolumeRequest: DataQueryRequest<TQuery>,
   options: LogsVolumeQueryOptions<TQuery>
 ): Observable<DataQueryResponse> {
-  const timespan = options.range.to.valueOf() - options.range.from.valueOf();
-  const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars, timespan);
-
-  logsVolumeRequest.interval = intervalInfo.interval;
-  logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
-
-  if (intervalInfo.intervalMs !== undefined) {
-    logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
-    logsVolumeRequest.scopedVars.__interval_ms = { value: intervalInfo.intervalMs, text: intervalInfo.intervalMs };
-  }
-
-  logsVolumeRequest.hideFromInspector = true;
+  // const timespan = options.range.to.valueOf() - options.range.from.valueOf();
+  // const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars, timespan);
+  //
+  // logsVolumeRequest.interval = intervalInfo.interval;
+  // logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
+  //
+  // if (intervalInfo.intervalMs !== undefined) {
+  //   logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
+  //   logsVolumeRequest.scopedVars.__interval_ms = { value: intervalInfo.intervalMs, text: intervalInfo.intervalMs };
+  // }
+  //
+  // logsVolumeRequest.hideFromInspector = true;
 
   return new Observable((observer) => {
     let rawLogsVolume: DataFrame[] = [];
@@ -186,11 +186,17 @@ function getLogVolumeFieldConfig(level: LogLevel, oneLevelDetected: boolean) {
  */
 function aggregateFields(dataFrames: DataFrame[], config: FieldConfig): DataFrame {
   const aggregatedDataFrame = new MutableDataFrame();
-  if (!dataFrames.length) {
-    return aggregatedDataFrame;
+  // if (!dataFrames.length) {
+  //   return aggregatedDataFrame;
+  // }
+  if (!dataFrames.length || (dataFrames.length === 1 && !dataFrames[0].length)) {
+    return aggregatedDataFrame
   }
 
   const totalLength = dataFrames[0].length;
+  console.log('dataFrames', dataFrames)
+  console.log('dataFrames[0]', dataFrames[0])
+  console.log('totalLength', totalLength)
   const timeField = new FieldCache(dataFrames[0]).getFirstFieldOfType(FieldType.time);
 
   if (!timeField) {
@@ -217,7 +223,7 @@ function aggregateFields(dataFrames: DataFrame[], config: FieldConfig): DataFram
   return aggregatedDataFrame;
 }
 
-function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { interval: string; intervalMs?: number } {
+export function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { interval: string; intervalMs?: number } {
   if (scopedVars.__interval) {
     let intervalMs: number = scopedVars.__interval_ms.value;
     let interval;
@@ -243,4 +249,25 @@ function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { interval
   } else {
     return { interval: '$__interval' };
   }
+}
+
+export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timespanMs: number, timeField = 'created_at'): string {
+  let interval = 'DAY';
+  if (scopedVars.__interval) {
+    let intervalMs: number = scopedVars.__interval_ms.value;
+    // TODO: some unix timestamp shenanigans for DateTime64
+    // below 5 seconds we force the resolution to be per 1ms as interval in scopedVars is not less than 10ms
+    if (timespanMs < SECOND * 5) {
+      console.error('MILLIS precision is not supported')
+    } else if (intervalMs > HOUR) {
+      interval = 'DAY';
+    } else if (intervalMs > MINUTE) {
+      interval = 'HOUR';
+    } else if (intervalMs > SECOND) {
+      interval = 'MINUTE';
+    } else {
+      interval = 'SECOND';
+    }
+  }
+  return `toStartOfInterval("${timeField}", INTERVAL 1 ${interval})`
 }
