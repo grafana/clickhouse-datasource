@@ -7,7 +7,6 @@ import {
   DataSourceApi,
   FieldColorModeId,
   FieldType,
-  getLogLevelFromKey,
   LoadingState,
   LogLevel,
   MutableDataFrame,
@@ -132,51 +131,23 @@ function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] {
   }
 
   const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS;
+  if (oneLevelDetected) {
+    levelFields[0].name = 'logs';
+  }
+
   const totalLength = timeField.values.length;
-  const logLevelToDataFrame = new Map<
-    LogLevel,
-    {
-      frame: MutableDataFrame;
-      hasNonZeroValues: boolean;
-    }
-  >();
-
-  /** sum up all `info`, `information` and `informational` counts into a single `info` DataFrame
-   *  same for other levels; `hasNonZeroValues` used to quickly filter empty log levels in the end
-   *  @see LogLevel */
-  levelFields.forEach((field) => {
-    const logLevel = getLogLevelFromKey(field.name);
-    let df = logLevelToDataFrame.get(logLevel);
-    if (df === undefined) {
-      df = {
-        frame: new MutableDataFrame(),
-        hasNonZeroValues: false,
-      };
-      df.frame.addField({ name: 'Time', type: FieldType.time }, totalLength);
-      df.frame.addField(
-        { name: 'Value', type: FieldType.number, config: getLogVolumeFieldConfig(logLevel, oneLevelDetected) },
-        totalLength
-      );
-    }
-    for (let pointIndex = 0; pointIndex < totalLength; pointIndex++) {
-      const currentValue = df.frame.get(pointIndex).Value;
-      const valueToAdd = field.values.get(pointIndex);
-      const totalValue = currentValue === null && valueToAdd === null ? null : (currentValue || 0) + (valueToAdd || 0);
-      if (totalValue > 0 && !df.hasNonZeroValues) {
-        df.hasNonZeroValues = true;
-      }
-      df.frame.set(pointIndex, { Value: totalValue, Time: timeField.values.get(pointIndex) });
-    }
-    logLevelToDataFrame.set(logLevel, df);
+  return levelFields.map((field) => {
+    const logLevel = LogLevel[field.name as keyof typeof LogLevel] || LogLevel.unknown;
+    const df = new MutableDataFrame();
+    df.addField({ name: 'Time', type: FieldType.time, values: timeField.values }, totalLength);
+    df.addField({
+      name: 'Value',
+      type: FieldType.number,
+      config: getLogVolumeFieldConfig(logLevel, oneLevelDetected),
+      values: field.values,
+    });
+    return df;
   });
-
-  // if we have all zeroes for a particular level, we want to exclude it from the logs volume histogram
-  return [...logLevelToDataFrame.values()].reduce((acc: MutableDataFrame[], { frame, hasNonZeroValues }) => {
-    if (hasNonZeroValues) {
-      acc.push(frame);
-    }
-    return acc;
-  }, []);
 }
 
 /**
@@ -262,3 +233,16 @@ export function getTimeFieldRoundingClause(
 
 export const TIME_FIELD_ALIAS = 'time';
 export const DEFAULT_LOGS_ALIAS = 'logs';
+
+/**
+ * @see {LogLevel}
+ */
+export const LOG_LEVELS = {
+  critical: ['emerg', 'fatal', 'critical', 'crit', 'alert'],
+  error: ['error', 'eror', 'err'],
+  warn: ['warn', 'warning'],
+  info: ['info', 'information', 'informational'],
+  debug: ['dbug', 'debug'],
+  trace: ['trace'],
+  unknown: ['unknown'],
+};

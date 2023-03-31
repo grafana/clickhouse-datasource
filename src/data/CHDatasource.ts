@@ -7,7 +7,6 @@ import {
   DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
-  LogLevel,
   MetricFindValue,
   ScopedVars,
   SupplementaryQueryType,
@@ -34,6 +33,7 @@ import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
   getTimeFieldRoundingClause,
+  LOG_LEVELS,
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
@@ -132,16 +132,22 @@ export class Datasource
     const timeFieldRoundingClause = getTimeFieldRoundingClause(
       logsVolumeRequest.scopedVars,
       timespanMs,
-      query.builderOptions.timeField.name
+      query.builderOptions.timeField
     );
-
     const metrics: BuilderMetricField[] = [];
-    if (query.builderOptions.logLevelField) { // could be undefined or an empty string
-      for (const logLevel in LogLevel) {
+    // could be undefined or an empty string (if user deselects the field)
+    if (query.builderOptions.logLevelField) {
+      const llf = query.builderOptions.logLevelField;
+      let level: keyof typeof LOG_LEVELS;
+      for (level in LOG_LEVELS) {
+        /** generating something like multiIf(__level = 'err', 1, __level = 'error', 1, 0)
+         @see https://clickhouse.com/docs/en/sql-reference/functions/conditional-functions#multiif */
+        const allLevels = LOG_LEVELS[level];
+        const field = `multiIf(${allLevels.map((l) => `lower(toString("${llf}")) = '${l}', 1`).join(',')}, 0)`;
         metrics.push({
           aggregation: BuilderMetricFieldAggregation.Sum,
-          alias: logLevel,
-          field: `if(lower(toString("${query.builderOptions.logLevelField}")) = '${logLevel}', 1, 0)`,
+          alias: level,
+          field,
         });
       }
     } else {
@@ -151,6 +157,7 @@ export class Datasource
         field: '*',
       });
     }
+
     const builderOptions: SqlBuilderOptionsAggregate = {
       mode: BuilderMode.Aggregate,
       database: query.builderOptions.database,
@@ -166,6 +173,7 @@ export class Datasource
         },
       ],
     };
+
     const rawSupplementarySQL = getSQLFromQueryOptions(builderOptions);
     return {
       format: Format.AUTO,
