@@ -238,11 +238,11 @@ export const DEFAULT_LOGS_ALIAS = 'logs';
  * @see {LogLevel}
  */
 export const LOG_LEVELS = {
-  critical: ['emerg', 'fatal', 'critical', 'crit', 'alert'],
-  error: ['error', 'eror', 'err'],
+  critical: ['critical', 'fatal', 'crit', 'alert', 'emerg'],
+  error: ['error', 'err', 'eror'],
   warn: ['warn', 'warning'],
   info: ['info', 'information', 'informational'],
-  debug: ['dbug', 'debug'],
+  debug: ['debug', 'dbug'],
   trace: ['trace'],
   unknown: ['unknown'],
 };
