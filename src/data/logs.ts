@@ -1,28 +1,33 @@
-import { BarAlignment, DataQuery, DataSourceJsonData, GraphDrawStyle, StackingMode } from '@grafana/schema'
+import { BarAlignment, DataQuery, DataSourceJsonData, GraphDrawStyle, StackingMode } from '@grafana/schema';
 import {
   DataFrame,
   DataQueryError,
   DataQueryRequest,
   DataQueryResponse,
-  DataSourceApi, FieldCache,
-  FieldColorModeId, FieldConfig, FieldType,
+  DataSourceApi,
+  FieldColorModeId,
+  FieldType,
+  getLogLevelFromKey,
   LoadingState,
-  LogLevel, MutableDataFrame,
+  LogLevel,
+  MutableDataFrame,
   ScopedVars,
   TimeRange,
   toDataFrame,
-} from '@grafana/data'
-import { Observable, isObservable, from } from 'rxjs'
-import { config } from '@grafana/runtime'
-import { colors } from '@grafana/ui'
+} from '@grafana/data';
+import { from, isObservable, Observable } from 'rxjs';
+import { config } from '@grafana/runtime';
+import { colors } from '@grafana/ui';
+import { partition } from 'lodash';
 
 /**
- * Copy-paste from `public/app/core/logsModel.ts` (release-9.4.3 branch)
+ * Partially copy-pasted and adjusted to ClickHouse server-side aggregations
+ * from `public/app/core/logsModel.ts` (release-9.4.3 branch)
+ *
  * See https://github.com/grafana/grafana/blob/release-9.4.3/public/app/core/logsModel.ts
  */
 
 type LogsVolumeQueryOptions<T extends DataQuery> = {
-  extractLevel: (dataFrame: DataFrame) => LogLevel;
   targets: T[];
   range: TimeRange;
 };
@@ -55,19 +60,6 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
   logsVolumeRequest: DataQueryRequest<TQuery>,
   options: LogsVolumeQueryOptions<TQuery>
 ): Observable<DataQueryResponse> {
-  // const timespan = options.range.to.valueOf() - options.range.from.valueOf();
-  // const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars, timespan);
-  //
-  // logsVolumeRequest.interval = intervalInfo.interval;
-  // logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
-  //
-  // if (intervalInfo.intervalMs !== undefined) {
-  //   logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
-  //   logsVolumeRequest.scopedVars.__interval_ms = { value: intervalInfo.intervalMs, text: intervalInfo.intervalMs };
-  // }
-  //
-  // logsVolumeRequest.hideFromInspector = true;
-
   return new Observable((observer) => {
     let rawLogsVolume: DataFrame[] = [];
     observer.next({
@@ -81,7 +73,7 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
 
     const subscription = queryObservable.subscribe({
       complete: () => {
-        const aggregatedLogsVolume = aggregateRawLogsVolume(rawLogsVolume, options.extractLevel);
+        const aggregatedLogsVolume = aggregateRawLogsVolume(rawLogsVolume);
         if (aggregatedLogsVolume[0]) {
           aggregatedLogsVolume[0].meta = {
             custom: {
@@ -129,26 +121,62 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
  * Take multiple data frames, sum up values and group by level.
  * Return a list of data frames, each representing single level.
  */
-function aggregateRawLogsVolume(
-  rawLogsVolume: DataFrame[],
-  extractLevel: (dataFrame: DataFrame) => LogLevel
-): DataFrame[] {
-  const logsVolumeByLevelMap: Partial<Record<LogLevel, DataFrame[]>> = {};
+function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] {
+  if (rawLogsVolume.length !== 1) {
+    return []; // we always expect a single DataFrame with all the aggregations from ClickHouse
+  }
 
-  rawLogsVolume.forEach((dataFrame) => {
-    const level = extractLevel(dataFrame);
-    if (!logsVolumeByLevelMap[level]) {
-      logsVolumeByLevelMap[level] = [];
+  const [[timeField], levelFields] = partition(rawLogsVolume[0].fields, (f) => f.name === TIME_FIELD_ALIAS);
+  if (timeField === undefined) {
+    return []; // should never happen if we have a DataFrame available
+  }
+
+  const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS;
+  const totalLength = timeField.values.length;
+  const logLevelToDataFrame = new Map<
+    LogLevel,
+    {
+      frame: MutableDataFrame;
+      hasNonZeroValues: boolean;
     }
-    logsVolumeByLevelMap[level]!.push(dataFrame);
+  >();
+
+  /** sum up all `info`, `information` and `informational` counts into a single `info` DataFrame
+   *  same for other levels; `hasNonZeroValues` used to quickly filter empty log levels in the end
+   *  @see LogLevel */
+  levelFields.forEach((field) => {
+    const logLevel = getLogLevelFromKey(field.name);
+    let df = logLevelToDataFrame.get(logLevel);
+    if (df === undefined) {
+      df = {
+        frame: new MutableDataFrame(),
+        hasNonZeroValues: false,
+      };
+      df.frame.addField({ name: 'Time', type: FieldType.time }, totalLength);
+      df.frame.addField(
+        { name: 'Value', type: FieldType.number, config: getLogVolumeFieldConfig(logLevel, oneLevelDetected) },
+        totalLength
+      );
+    }
+    for (let pointIndex = 0; pointIndex < totalLength; pointIndex++) {
+      const currentValue = df.frame.get(pointIndex).Value;
+      const valueToAdd = field.values.get(pointIndex);
+      const totalValue = currentValue === null && valueToAdd === null ? null : (currentValue || 0) + (valueToAdd || 0);
+      if (totalValue > 0 && !df.hasNonZeroValues) {
+        df.hasNonZeroValues = true;
+      }
+      df.frame.set(pointIndex, { Value: totalValue, Time: timeField.values.get(pointIndex) });
+    }
+    logLevelToDataFrame.set(logLevel, df);
   });
 
-  return Object.keys(logsVolumeByLevelMap).map((level: string) => {
-    return aggregateFields(
-      logsVolumeByLevelMap[level as LogLevel]!,
-      getLogVolumeFieldConfig(level as LogLevel, Object.keys(logsVolumeByLevelMap).length === 1)
-    );
-  });
+  // if we have all zeroes for a particular level, we want to exclude it from the logs volume histogram
+  return [...logLevelToDataFrame.values()].reduce((acc: MutableDataFrame[], { frame, hasNonZeroValues }) => {
+    if (hasNonZeroValues) {
+      acc.push(frame);
+    }
+    return acc;
+  }, []);
 }
 
 /**
@@ -179,50 +207,6 @@ function getLogVolumeFieldConfig(level: LogLevel, oneLevelDetected: boolean) {
   };
 }
 
-/**
- * Aggregate multiple data frames into a single data frame by adding values.
- * Multiple data frames for the same level are passed here to get a single
- * data frame for a given level. Aggregation by level happens in aggregateRawLogsVolume()
- */
-function aggregateFields(dataFrames: DataFrame[], config: FieldConfig): DataFrame {
-  const aggregatedDataFrame = new MutableDataFrame();
-  // if (!dataFrames.length) {
-  //   return aggregatedDataFrame;
-  // }
-  if (!dataFrames.length || (dataFrames.length === 1 && !dataFrames[0].length)) {
-    return aggregatedDataFrame
-  }
-
-  const totalLength = dataFrames[0].length;
-  console.log('dataFrames', dataFrames)
-  console.log('dataFrames[0]', dataFrames[0])
-  console.log('totalLength', totalLength)
-  const timeField = new FieldCache(dataFrames[0]).getFirstFieldOfType(FieldType.time);
-
-  if (!timeField) {
-    return aggregatedDataFrame;
-  }
-
-  aggregatedDataFrame.addField({ name: 'Time', type: FieldType.time }, totalLength);
-  aggregatedDataFrame.addField({ name: 'Value', type: FieldType.number, config }, totalLength);
-
-  dataFrames.forEach((dataFrame) => {
-    dataFrame.fields.forEach((field) => {
-      if (field.type === FieldType.number) {
-        for (let pointIndex = 0; pointIndex < totalLength; pointIndex++) {
-          const currentValue = aggregatedDataFrame.get(pointIndex).Value;
-          const valueToAdd = field.values.get(pointIndex);
-          const totalValue =
-            currentValue === null && valueToAdd === null ? null : (currentValue || 0) + (valueToAdd || 0);
-          aggregatedDataFrame.set(pointIndex, { Value: totalValue, Time: timeField.values.get(pointIndex) });
-        }
-      }
-    });
-  });
-
-  return aggregatedDataFrame;
-}
-
 export function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { interval: string; intervalMs?: number } {
   if (scopedVars.__interval) {
     let intervalMs: number = scopedVars.__interval_ms.value;
@@ -251,14 +235,18 @@ export function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { i
   }
 }
 
-export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timespanMs: number, timeField = 'created_at'): string {
+export function getTimeFieldRoundingClause(
+  scopedVars: ScopedVars,
+  timespanMs: number,
+  timeField = 'created_at'
+): string {
   let interval = 'DAY';
   if (scopedVars.__interval) {
     let intervalMs: number = scopedVars.__interval_ms.value;
-    // TODO: some unix timestamp shenanigans for DateTime64
     // below 5 seconds we force the resolution to be per 1ms as interval in scopedVars is not less than 10ms
     if (timespanMs < SECOND * 5) {
-      console.error('MILLIS precision is not supported')
+      // TODO: workaround
+      console.error('MILLIS precision is not supported');
     } else if (intervalMs > HOUR) {
       interval = 'DAY';
     } else if (intervalMs > MINUTE) {
@@ -269,5 +257,8 @@ export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timespanMs: n
       interval = 'SECOND';
     }
   }
-  return `toStartOfInterval("${timeField}", INTERVAL 1 ${interval})`
+  return `toStartOfInterval("${timeField}", INTERVAL 1 ${interval})`;
 }
+
+export const TIME_FIELD_ALIAS = 'time';
+export const DEFAULT_LOGS_ALIAS = 'logs';

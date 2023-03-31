@@ -4,20 +4,23 @@ import { InlineFormLabel, Select } from '@grafana/ui';
 import { selectors } from './../../selectors';
 import { FullField } from 'types';
 
-interface TimeFieldEditorProps {
+interface LogLevelEditorProps {
   fieldsList: FullField[];
-  timeField: string;
-  timeFieldType: string;
-  onTimeFieldChange: (timeField: string, timeFieldType: string) => void;
-  timeFieldTypeCheckFn: (type: string) => boolean;
-  labelAndTooltip: typeof selectors.components.QueryEditor.QueryBuilder.TIME_FIELD;
+  onLogLevelFieldChange: (logLevelField: string, logLevelFieldType: string) => void;
 }
 
-export const TimeFieldEditor = (props: TimeFieldEditorProps) => {
-  const { label, tooltip } = props.labelAndTooltip;
+export const LogLevelFieldEditor = (props: LogLevelEditorProps) => {
+  const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.LOG_LEVEL_FIELD;
+  // TODO: filter by strings, enums?
   const columns: SelectableValue[] = (props.fieldsList || [])
-    .filter((f) => props.timeFieldTypeCheckFn(f.type))
+    .filter(f => f.name !== '*')
     .map((f) => ({ label: f.label, value: f.name }));
+  if (columns.length) {
+    columns.push({
+      label: '-',
+      value: undefined, // allow to de-select the field
+    });
+  }
   const getColumnType = (columnName: string): string => {
     const matchedColumn = props.fieldsList.find((f) => f.name === columnName);
     return matchedColumn ? matchedColumn.type : '';
@@ -30,8 +33,7 @@ export const TimeFieldEditor = (props: TimeFieldEditorProps) => {
       <Select
         options={columns}
         width={20}
-        onChange={(e) => props.onTimeFieldChange(e.value, getColumnType(e.value))}
-        value={props.timeField}
+        onChange={(e) => props.onLogLevelFieldChange(e.value, getColumnType(e.value))}
         menuPlacement={'bottom'}
       />
     </div>

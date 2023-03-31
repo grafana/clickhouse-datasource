@@ -63,6 +63,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
             datasource={props.datasource}
             builderOptions={newQuery.builderOptions}
             onBuilderOptionsChange={onBuilderOptionsChange}
+            format={newQuery.format}
           />
           <Preview sql={newQuery.rawSql} />
         </div>

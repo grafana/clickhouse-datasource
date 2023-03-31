@@ -16,6 +16,7 @@ import {
   defaultCHBuilderQuery,
   Filter,
   FilterOperator,
+  Format,
   FullField,
   OrderBy,
   SqlBuilderOptions,
@@ -23,11 +24,14 @@ import {
 } from '../../types';
 import { DatabaseSelect } from './DatabaseSelect';
 import { isDateTimeType, isDateType } from './utils';
+import { selectors } from '../../selectors';
+import { LogLevelFieldEditor } from './LogLevelField';
 
 interface QueryBuilderProps {
   builderOptions: SqlBuilderOptions;
   onBuilderOptionsChange: (builderOptions: SqlBuilderOptions) => void;
   datasource: Datasource;
+  format: Format;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
@@ -159,6 +163,11 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     props.onBuilderOptionsChange(queryOptions);
   };
 
+  const onLogLevelFieldChange = (logLevelField = '') => {
+    const queryOptions: SqlBuilderOptions = { ...builder, logLevelField };
+    props.onBuilderOptionsChange(queryOptions);
+  };
+
   const onOrderByChange = (orderBy: OrderBy[] = []) => {
     const queryOptions: SqlBuilderOptions = { ...builder, orderBy };
     props.onBuilderOptionsChange(queryOptions);
@@ -197,8 +206,27 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           timeFieldType={builder.timeFieldType}
           onTimeFieldChange={onTimeFieldChange}
           fieldsList={fieldsList}
+          timeFieldTypeCheckFn={isDateType}
+          labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.TIME_FIELD}
         />
       )}
+      {
+        // Time and LogLevel fields selection for Logs Volume histogram in the Explore mode
+        // TODO: show only in the Explore mode
+        builder.mode === BuilderMode.List && props.format === Format.LOGS && (
+          <>
+            <TimeFieldEditor
+              timeField={builder.timeField}
+              timeFieldType={builder.timeFieldType}
+              onTimeFieldChange={onTimeFieldChange}
+              fieldsList={fieldsList}
+              timeFieldTypeCheckFn={isDateTimeType}
+              labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.LOGS_VOLUME_TIME_FIELD}
+            />
+            <LogLevelFieldEditor fieldsList={fieldsList} onLogLevelFieldChange={onLogLevelFieldChange} />
+          </>
+        )
+      }
       {builder.mode !== BuilderMode.Trend && (
         <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
       )}

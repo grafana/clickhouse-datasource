@@ -172,6 +172,14 @@ export const Components = {
         label: 'Time field',
         tooltip: 'Select the time field for trending over time',
       },
+      LOGS_VOLUME_TIME_FIELD: {
+        label: 'Time field',
+        tooltip: 'Select the time field for logs volume histogram. If not selected, the histogram will not be shown',
+      },
+      LOG_LEVEL_FIELD: {
+        label: 'Log level field',
+        tooltip: 'Select the field to extract log level information from'
+      },
       PREVIEW: {
         label: 'SQL Preview',
         tooltip: 'SQL Preview. You can safely switch to SQL Editor to customize the generated query',

@@ -5,32 +5,38 @@ import {
   DataQueryResponse,
   DataSourceInstanceSettings,
   DataSourceWithSupplementaryQueriesSupport,
-  getLogLevelFromKey,
   getTimeZone,
-  getTimeZoneInfo, LogLevel,
+  getTimeZoneInfo,
+  LogLevel,
   MetricFindValue,
   ScopedVars,
   SupplementaryQueryType,
   TypedVariableModel,
   vectorator,
-} from '@grafana/data'
+} from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
 import {
+  BuilderMetricField,
   BuilderMetricFieldAggregation,
   BuilderMode,
   CHConfig,
   CHQuery,
-  CHSQLQuery,
   Format,
   FullField,
   OrderByDirection,
   QueryType,
-  SqlBuilderOptions,
+  SqlBuilderOptionsAggregate,
 } from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
-import { getIntervalInfo, getTimeFieldRoundingClause, queryLogsVolume } from './logs';
+import {
+  DEFAULT_LOGS_ALIAS,
+  getIntervalInfo,
+  getTimeFieldRoundingClause,
+  queryLogsVolume,
+  TIME_FIELD_ALIAS,
+} from './logs';
 import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
 
 export class Datasource
@@ -80,12 +86,7 @@ export class Datasource
 
         const targets: CHQuery[] = [];
         logsVolumeRequest.targets.forEach((target) => {
-          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(
-            logsVolumeRequest,
-            target,
-            timespanMs,
-            'created_at'
-          );
+          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target, timespanMs);
           if (supplementaryQuery !== undefined) {
             targets.push(supplementaryQuery);
           }
@@ -101,15 +102,6 @@ export class Datasource
           {
             range: request.range,
             targets: request.targets,
-            extractLevel: (dataFrame) => {
-              // console.log('dataFrame.name', dataFrame.name)
-              const levelField = dataFrame.fields.find(f => f.name === 'level')
-              if (levelField) {
-
-                return getLogLevelFromKey(levelField.values.get(0) || '')
-              }
-              return LogLevel.unknown
-            },
           }
         );
       default:
@@ -121,54 +113,70 @@ export class Datasource
     return [SupplementaryQueryType.LogsVolume];
   }
 
-  private getSupplementaryLogsVolumeQuery<Q extends CHQuery>(
-    logsVolumeRequest: DataQueryRequest<Q>,
-    query: Q,
-    timespanMs: number,
-    timeField: string
+  private getSupplementaryLogsVolumeQuery(
+    logsVolumeRequest: DataQueryRequest<CHQuery>,
+    query: CHQuery,
+    timespanMs: number
   ): CHQuery | undefined {
-    if (query.format !== Format.LOGS || query.queryType !== QueryType.Builder) {
+    if (
+      query.format !== Format.LOGS ||
+      query.queryType !== QueryType.Builder ||
+      query.builderOptions.mode !== BuilderMode.List ||
+      query.builderOptions.timeField === undefined ||
+      query.builderOptions.database === undefined ||
+      query.builderOptions.table === undefined
+    ) {
       return undefined;
     }
 
-    const timeFieldRoundingClause = getTimeFieldRoundingClause(logsVolumeRequest.scopedVars, timespanMs, timeField);
-    const builderOptions: SqlBuilderOptions = {
+    const timeFieldRoundingClause = getTimeFieldRoundingClause(
+      logsVolumeRequest.scopedVars,
+      timespanMs,
+      query.builderOptions.timeField.name
+    );
+
+    const metrics: BuilderMetricField[] = [];
+    if (query.builderOptions.logLevelField) { // could be undefined or an empty string
+      for (const logLevel in LogLevel) {
+        metrics.push({
+          aggregation: BuilderMetricFieldAggregation.Sum,
+          alias: logLevel,
+          field: `if(lower(toString("${query.builderOptions.logLevelField}")) = '${logLevel}', 1, 0)`,
+        });
+      }
+    } else {
+      metrics.push({
+        aggregation: BuilderMetricFieldAggregation.Count,
+        alias: DEFAULT_LOGS_ALIAS,
+        field: '*',
+      });
+    }
+    const builderOptions: SqlBuilderOptionsAggregate = {
       mode: BuilderMode.Aggregate,
-      database: query.builderOptions.database!,
-      table: query.builderOptions.table!,
+      database: query.builderOptions.database,
+      table: query.builderOptions.table,
       filters: query.builderOptions.filters,
       fields: [],
-      metrics: [
-        {
-          aggregation: BuilderMetricFieldAggregation.Count,
-          alias: 'count',
-          field: '*',
-        },
-      ],
-      groupBy: [`${timeFieldRoundingClause} AS when`, 'level'],
+      metrics,
+      groupBy: [`${timeFieldRoundingClause} AS ${TIME_FIELD_ALIAS}`],
       orderBy: [
         {
-          name: 'when',
+          name: TIME_FIELD_ALIAS,
           dir: OrderByDirection.ASC,
         },
       ],
     };
     const rawSupplementarySQL = getSQLFromQueryOptions(builderOptions);
-    console.log('rawSupplementarySQL', rawSupplementarySQL)
-    const supplementaryQuery: CHSQLQuery = {
+    return {
       format: Format.AUTO,
       queryType: QueryType.SQL,
       rawSql: rawSupplementarySQL,
       refId: '',
       selectedFormat: Format.AUTO,
     };
-
-    console.log(supplementaryQuery);
-    return supplementaryQuery;
   }
 
   getSupplementaryQuery(type: SupplementaryQueryType, query: CHQuery): CHQuery | undefined {
-    console.error('getSupplementaryQuery is not supposed to be called');
     return undefined;
   }
 
