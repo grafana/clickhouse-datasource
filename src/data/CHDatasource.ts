@@ -32,11 +32,10 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
-  getTimeFieldRoundingClause,
-  LOG_LEVELS,
+  getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE,
   queryLogsVolume,
   TIME_FIELD_ALIAS,
-} from './logs';
+} from './logs'
 import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
 
 export class Datasource
@@ -50,29 +49,11 @@ export class Datasource
   skipAdHocFilter = false; // don't apply adhoc filters to the query
   adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
   adHocCHVerReq = { major: 22, minor: 7 };
-  logVolumesOuterQuery: string
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
-    /**
-     * Outer query for Logs Volume is always the same, we can generate it in advance
-     *
-     * SELECT time,
-     *        (unknown + unknown_c + unknown_u) AS unknown,
-     *        (trace + trace_c + trace_u) AS trace,
-     *        ...
-     * FROM sub ORDER BY time ASC;
-     *
-     * @see {getSupplementaryLogsVolumeQuery} for inner query examples
-     */
-    const values = (Object.keys(LOG_LEVELS) as Array<keyof typeof LOG_LEVELS>).map( level => {
-      const lls = LOG_LEVELS[level]
-      const sum = [...lls.lower, ...lls.capitalized.map(c => c.alias), ...lls.upper.map(u => u.alias)].join(' + ')
-      return `(${sum}) AS ${level}`
-    }).join(',')
-    this.logVolumesOuterQuery = `SELECT ${values}, time FROM sub ORDER BY time ASC`
   }
 
   getDataProvider(
@@ -156,34 +137,12 @@ export class Datasource
     const metrics: BuilderMetricField[] = [];
     // could be undefined or an empty string (if user deselects the field)
     if (query.builderOptions.logLevelField) {
-      /**
-       * Our goal here is to generate inner query like following:
-       *
-       * SELECT sum(toString("log_level_field") = 'critical') AS critical,
-       *        sum(toString("log_level_field") = 'CRITICAL') AS critical_u,
-       *        sum(toString("log_level_field") = 'Critical') AS critical_c,
-       *        ...
-       * FROM "some_table"
-       * GROUP BY toStartOfInterval("time_field", ...) AS time
-       * ORDER BY time ASC;
-       *
-       * i.e. we will sum every possible log level value (lower, upper or capital case),
-       * which will be post-processed in the outer query;
-       * additionally, we leverage SqlBuilder capabilities to render user-defined filters
-       */
+      // Generate "fields" like
+      // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
       const llf = `toString("${query.builderOptions.logLevelField}")`;
-      let level: keyof typeof LOG_LEVELS;
-      for (level in LOG_LEVELS) {
-        const { lower, upper, capitalized } = LOG_LEVELS[level];
-        lower.forEach((l) => {
-          fields.push(`sum(${llf} = '${l}') AS ${l}`);
-        });
-        upper.forEach(({ value, alias }) => {
-          fields.push(`sum(${llf} = '${value}') AS ${alias}`);
-        });
-        capitalized.forEach(({ value, alias }) => {
-          fields.push(`sum(${llf} = '${value}') AS ${alias}`);
-        });
+      let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
+      for (level in LOG_LEVEL_TO_IN_CLAUSE) {
+        fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`)
       }
     } else {
       metrics.push({
@@ -193,7 +152,7 @@ export class Datasource
       });
     }
 
-    const innerQueryBuilderOptions: SqlBuilderOptionsAggregate = {
+    const logVolumeSqlBuilderOptions: SqlBuilderOptionsAggregate = {
       mode: BuilderMode.Aggregate,
       database: query.builderOptions.database,
       table: query.builderOptions.table,
@@ -209,12 +168,11 @@ export class Datasource
       ],
     };
 
-    const logVolumeInnerQuery = getSQLFromQueryOptions(innerQueryBuilderOptions);
-    const completeSupplementaryQuery = `WITH sub AS (${logVolumeInnerQuery}) ${this.logVolumesOuterQuery}`
+    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(logVolumeSqlBuilderOptions);
     return {
       format: Format.AUTO,
       queryType: QueryType.SQL,
-      rawSql: completeSupplementaryQuery,
+      rawSql: logVolumeSupplementaryQuery,
       refId: '',
       selectedFormat: Format.AUTO,
     };
