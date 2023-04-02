@@ -1,4 +1,4 @@
-import { BarAlignment, DataQuery, DataSourceJsonData, GraphDrawStyle, StackingMode } from '@grafana/schema';
+import { BarAlignment, DataQuery, DataSourceJsonData, GraphDrawStyle, StackingMode } from '@grafana/schema'
 import {
   DataFrame,
   DataQueryError,
@@ -13,11 +13,11 @@ import {
   ScopedVars,
   TimeRange,
   toDataFrame,
-} from '@grafana/data';
-import { from, isObservable, Observable } from 'rxjs';
-import { config } from '@grafana/runtime';
-import { colors } from '@grafana/ui';
-import { partition } from 'lodash';
+} from '@grafana/data'
+import { from, isObservable, Observable } from 'rxjs'
+import { config } from '@grafana/runtime'
+import { colors } from '@grafana/ui'
+import { partition } from 'lodash'
 
 /**
  * Partially copy-pasted and adjusted to ClickHouse server-side aggregations
@@ -31,11 +31,11 @@ type LogsVolumeQueryOptions<T extends DataQuery> = {
   range: TimeRange;
 };
 
-const MILLISECOND = 1;
-const SECOND = 1000 * MILLISECOND;
-const MINUTE = 60 * SECOND;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
+const MILLISECOND = 1
+const SECOND = 1000 * MILLISECOND
+const MINUTE = 60 * SECOND
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
 
 const LogLevelColor = {
   [LogLevel.critical]: colors[7],
@@ -45,10 +45,10 @@ const LogLevelColor = {
   [LogLevel.debug]: colors[5],
   [LogLevel.trace]: colors[2],
   [LogLevel.unknown]: getThemeColor('#8e8e8e', '#bdc4cd'),
-};
+}
 
 function getThemeColor(dark: string, light: string): string {
-  return config.bootData.user.lightTheme ? light : dark;
+  return config.bootData.user.lightTheme ? light : dark
 }
 
 /**
@@ -60,45 +60,45 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
   options: LogsVolumeQueryOptions<TQuery>
 ): Observable<DataQueryResponse> {
   return new Observable((observer) => {
-    let rawLogsVolume: DataFrame[] = [];
+    let rawLogsVolume: DataFrame[] = []
     observer.next({
       state: LoadingState.Loading,
       error: undefined,
       data: [],
-    });
+    })
 
-    const queryResponse = datasource.query(logsVolumeRequest);
-    const queryObservable = isObservable(queryResponse) ? queryResponse : from(queryResponse);
+    const queryResponse = datasource.query(logsVolumeRequest)
+    const queryObservable = isObservable(queryResponse) ? queryResponse : from(queryResponse)
 
     const subscription = queryObservable.subscribe({
       complete: () => {
-        const aggregatedLogsVolume = aggregateRawLogsVolume(rawLogsVolume);
+        const aggregatedLogsVolume = aggregateRawLogsVolume(rawLogsVolume)
         if (aggregatedLogsVolume[0]) {
           aggregatedLogsVolume[0].meta = {
             custom: {
               targets: options.targets,
               absoluteRange: { from: options.range.from.valueOf(), to: options.range.to.valueOf() },
             },
-          };
+          }
         }
         observer.next({
           state: LoadingState.Done,
           error: undefined,
           data: aggregatedLogsVolume,
-        });
-        observer.complete();
+        })
+        observer.complete()
       },
       next: (dataQueryResponse: DataQueryResponse) => {
-        const { error } = dataQueryResponse;
+        const { error } = dataQueryResponse
         if (error !== undefined) {
           observer.next({
             state: LoadingState.Error,
             error,
             data: [],
-          });
-          observer.error(error);
+          })
+          observer.error(error)
         } else {
-          rawLogsVolume = rawLogsVolume.concat(dataQueryResponse.data.map(toDataFrame));
+          rawLogsVolume = rawLogsVolume.concat(dataQueryResponse.data.map(toDataFrame))
         }
       },
       error: (error: DataQueryError) => {
@@ -106,14 +106,14 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
           state: LoadingState.Error,
           error: error,
           data: [],
-        });
-        observer.error(error);
+        })
+        observer.error(error)
       },
-    });
+    })
     return () => {
-      subscription?.unsubscribe();
-    };
-  });
+      subscription?.unsubscribe()
+    }
+  })
 }
 
 /**
@@ -122,40 +122,40 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
  */
 function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] {
   if (rawLogsVolume.length !== 1) {
-    return []; // we always expect a single DataFrame with all the aggregations from ClickHouse
+    return [] // we always expect a single DataFrame with all the aggregations from ClickHouse
   }
 
-  const [[timeField], levelFields] = partition(rawLogsVolume[0].fields, (f) => f.name === TIME_FIELD_ALIAS);
+  const [ [ timeField ], levelFields ] = partition(rawLogsVolume[0].fields, (f) => f.name === TIME_FIELD_ALIAS)
   if (timeField === undefined) {
-    return []; // should never happen if we have a DataFrame available
+    return [] // should never happen if we have a DataFrame available
   }
 
-  const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS;
+  const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS
   if (oneLevelDetected) {
-    levelFields[0].name = 'logs';
+    levelFields[0].name = 'logs'
   }
 
-  const totalLength = timeField.values.length;
+  const totalLength = timeField.values.length
   return levelFields.map((field) => {
-    const logLevel = LogLevel[field.name as keyof typeof LogLevel] || LogLevel.unknown;
-    const df = new MutableDataFrame();
-    df.addField({ name: 'Time', type: FieldType.time, values: timeField.values }, totalLength);
+    const logLevel = LogLevel[field.name as keyof typeof LogLevel] || LogLevel.unknown
+    const df = new MutableDataFrame()
+    df.addField({ name: 'Time', type: FieldType.time, values: timeField.values }, totalLength)
     df.addField({
       name: 'Value',
       type: FieldType.number,
       config: getLogVolumeFieldConfig(logLevel, oneLevelDetected),
       values: field.values,
-    });
-    return df;
-  });
+    })
+    return df
+  })
 }
 
 /**
  * Returns field configuration used to render logs volume bars
  */
 function getLogVolumeFieldConfig(level: LogLevel, oneLevelDetected: boolean) {
-  const name = oneLevelDetected && level === LogLevel.unknown ? 'logs' : level;
-  const color = LogLevelColor[level];
+  const name = oneLevelDetected && level === LogLevel.unknown ? 'logs' : level
+  const color = LogLevelColor[level]
   return {
     displayNameFromDS: name,
     color: {
@@ -175,34 +175,34 @@ function getLogVolumeFieldConfig(level: LogLevel, oneLevelDetected: boolean) {
         group: 'A',
       },
     },
-  };
+  }
 }
 
 export function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { interval: string; intervalMs?: number } {
   if (scopedVars.__interval) {
-    let intervalMs: number = scopedVars.__interval_ms.value;
-    let interval;
+    let intervalMs: number = scopedVars.__interval_ms.value
+    let interval
     // below 5 seconds we force the resolution to be per 1ms as interval in scopedVars is not less than 10ms
     if (timespanMs < SECOND * 5) {
-      intervalMs = MILLISECOND;
-      interval = '1ms';
+      intervalMs = MILLISECOND
+      interval = '1ms'
     } else if (intervalMs > HOUR) {
-      intervalMs = DAY;
-      interval = '1d';
+      intervalMs = DAY
+      interval = '1d'
     } else if (intervalMs > MINUTE) {
-      intervalMs = HOUR;
-      interval = '1h';
+      intervalMs = HOUR
+      interval = '1h'
     } else if (intervalMs > SECOND) {
-      intervalMs = MINUTE;
-      interval = '1m';
+      intervalMs = MINUTE
+      interval = '1m'
     } else {
-      intervalMs = SECOND;
-      interval = '1s';
+      intervalMs = SECOND
+      interval = '1s'
     }
 
-    return { interval, intervalMs };
+    return { interval, intervalMs }
   } else {
-    return { interval: '$__interval' };
+    return { interval: '$__interval' }
   }
 }
 
@@ -211,38 +211,67 @@ export function getTimeFieldRoundingClause(
   timespanMs: number,
   timeField = 'created_at'
 ): string {
-  let interval = 'DAY';
+  let interval = 'DAY'
   if (scopedVars.__interval) {
-    let intervalMs: number = scopedVars.__interval_ms.value;
+    let intervalMs: number = scopedVars.__interval_ms.value
     // below 5 seconds we force the resolution to be per 1ms as interval in scopedVars is not less than 10ms
     if (timespanMs < SECOND * 5) {
       // TODO: workaround
-      console.error('MILLIS precision is not supported');
+      console.error('MILLIS precision is not supported')
     } else if (intervalMs > HOUR) {
-      interval = 'DAY';
+      interval = 'DAY'
     } else if (intervalMs > MINUTE) {
-      interval = 'HOUR';
+      interval = 'HOUR'
     } else if (intervalMs > SECOND) {
-      interval = 'MINUTE';
+      interval = 'MINUTE'
     } else {
-      interval = 'SECOND';
+      interval = 'SECOND'
     }
   }
-  return `toStartOfInterval("${timeField}", INTERVAL 1 ${interval})`;
+  return `toStartOfInterval("${timeField}", INTERVAL 1 ${interval})`
 }
 
-export const TIME_FIELD_ALIAS = 'time';
-export const DEFAULT_LOGS_ALIAS = 'logs';
+export const TIME_FIELD_ALIAS = 'time'
+export const DEFAULT_LOGS_ALIAS = 'logs'
 
 /**
  * @see {LogLevel}
  */
-export const LOG_LEVELS = {
-  critical: ['critical', 'fatal', 'crit', 'alert', 'emerg'],
-  error: ['error', 'err', 'eror'],
-  warn: ['warn', 'warning'],
-  info: ['info', 'information', 'informational'],
-  debug: ['debug', 'dbug'],
-  trace: ['trace'],
-  unknown: ['unknown'],
-};
+type LevelValueWithAlias = {
+  value: string;
+  alias: string;
+}
+type LogLevelsWithAliases = Record<
+  'critical' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'unknown',
+  {
+    lower: string[];
+    upper: LevelValueWithAlias[];
+    capitalized: LevelValueWithAlias[];
+  }
+>;
+export const LOG_LEVELS: LogLevelsWithAliases = (() => {
+  const levels = {
+    critical: [ 'critical', 'fatal', 'crit', 'alert', 'emerg' ],
+    error: [ 'error', 'err', 'eror' ],
+    warn: [ 'warn', 'warning' ],
+    info: [ 'info', 'information', 'informational' ],
+    debug: [ 'debug', 'dbug' ],
+    trace: [ 'trace' ],
+    unknown: [ 'unknown' ],
+  }
+  return (Object.keys(levels) as Array<keyof typeof levels>).reduce((allLevels, level) => {
+    const lls = levels[level]
+    allLevels[level] = {
+      lower: lls,
+      upper: lls.map((l) => ({
+        value: l.toUpperCase(),
+        alias: `${l}_u`,
+      })),
+      capitalized: lls.map((l) => ({
+        value: l.charAt(0).toUpperCase() + l.slice(1),
+        alias: `${l}_c`
+      })),
+    }
+    return allLevels
+  }, {} as LogLevelsWithAliases)
+})()
