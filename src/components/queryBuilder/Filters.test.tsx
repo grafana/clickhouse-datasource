@@ -1,9 +1,9 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { FiltersEditor, FilterEditor, FilterValueEditor, defaultNewFilter } from './Filters';
+import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './Filters';
 import { selectors } from './../../selectors';
-import { Filter, BooleanFilter, DateFilter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
+import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
 
 describe('FiltersEditor', () => {
   describe('FiltersEditor', () => {

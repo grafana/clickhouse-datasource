@@ -6,7 +6,7 @@ export function sqlToStatement(sql: string): Statement {
     name: string;
     replacementName: string;
   }> = [];
-  //default is a key word in this grammar but it can be used in CH
+  //default is a key word in this grammar, but it can be used in CH
   const re = /(\$__|\$|default)/gi;
   let regExpArray: RegExpExecArray | null;
   while ((regExpArray = re.exec(sql)) !== null) {
@@ -69,7 +69,7 @@ export function getTable(sql: string): string {
     case 'table': {
       const table = stm.from![0];
       const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
-      // clickhouse table names are case sensitive and pgsql parser removes casing,
+      // clickhouse table names are case-sensitive and pgsql parser removes casing,
       // so we need to get the casing from the raw sql
       const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
       return s ? s[0] : tableName;

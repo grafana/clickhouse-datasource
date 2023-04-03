@@ -1,34 +1,34 @@
 import {
   astVisitor,
   Expr,
-  FromTable,
-  ExprRef,
-  SelectedColumn,
-  ExprString,
   ExprBinary,
-  ExprInteger,
-  ExprUnary,
   ExprCall,
+  ExprInteger,
   ExprList,
+  ExprRef,
+  ExprString,
+  ExprUnary,
+  FromTable,
+  SelectedColumn,
 } from 'pgsql-ast-parser';
 import { isString } from 'lodash';
 import {
+  BooleanFilter,
   BuilderMetricField,
+  BuilderMetricFieldAggregation,
   BuilderMode,
+  DateFilter,
+  DateFilterWithoutValue,
+  Filter,
+  FilterOperator,
+  MultiFilter,
+  NullFilter,
+  NumberFilter,
   OrderBy,
   SqlBuilderOptions,
-  Filter,
-  NullFilter,
-  BooleanFilter,
-  NumberFilter,
-  DateFilter,
-  StringFilter,
-  MultiFilter,
-  FilterOperator,
-  DateFilterWithoutValue,
-  BuilderMetricFieldAggregation,
   SqlBuilderOptionsAggregate,
   SqlBuilderOptionsTrend,
+  StringFilter,
 } from 'types';
 import { sqlToStatement } from 'data/ast';
 
@@ -44,7 +44,10 @@ export const isDateType = (type: string): boolean => {
   const normalizedName = type?.toLowerCase();
   return normalizedName?.startsWith('date') || normalizedName?.startsWith('nullable(date');
 };
-
+export const isDateTimeType = (type: string): boolean => {
+  const normalizedName = type?.toLowerCase();
+  return normalizedName?.startsWith('datetime') || normalizedName?.startsWith('nullable(datetime');
+};
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 };
@@ -76,7 +79,7 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
 const getListQuery = (database = '', table = '', fields: string[] = []): string => {
   const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
-  return `SELECT ${fields.join(', ')} FROM ${database}${sep}${table}`;
+  return `SELECT ${fields.join(', ')} FROM ${database}${sep}${escapedTableName(table)}`;
 };
 
 const getAggregationQuery = (
@@ -99,7 +102,7 @@ const getAggregationQuery = (
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
     metricsQuery && groupByQuery ? ', ' : ''
-  }${metricsQuery} FROM ${database}${sep}${table}`;
+  }${metricsQuery} FROM ${database}${sep}${escapedTableName(table)}`;
 };
 
 const getTrendByQuery = (
@@ -129,7 +132,7 @@ const getTrendByQuery = (
   }
 
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${metricsQuery} FROM ${database}${sep}${table}`;
+  return `SELECT ${metricsQuery} FROM ${database}${sep}${escapedTableName(table)}`;
 };
 
 const getFilters = (filters: Filter[]): string => {
@@ -569,6 +572,10 @@ function formatStringValue(currentFilter: string): string {
     return ` ${currentFilter || ''}`;
   }
   return ` '${currentFilter || ''}'`;
+}
+
+function escapedTableName(table: string) {
+  return table === '' ? '' : `"${table}"`;
 }
 
 export const operMap = new Map<string, FilterOperator>([

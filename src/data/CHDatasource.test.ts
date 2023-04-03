@@ -225,7 +225,7 @@ describe('ClickHouseDatasource', () => {
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => of({ data: [frame] }));
 
       await ds.fetchFieldsFull('db_name', 'table_name');
-      const expected = { rawSql: 'DESC TABLE db_name.table_name' };
+      const expected = { rawSql: 'DESC TABLE db_name."table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
@@ -238,7 +238,20 @@ describe('ClickHouseDatasource', () => {
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => of({ data: [frame] }));
 
       await ds.fetchFieldsFull('', 'table_name');
-      const expected = { rawSql: 'DESC TABLE table_name' };
+      const expected = { rawSql: 'DESC TABLE "table_name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('sends a correct query when table name contains a dot', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_) => of({ data: [frame] }));
+
+      await ds.fetchFieldsFull('', 'table.name');
+      const expected = { rawSql: 'DESC TABLE "table.name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
@@ -256,10 +269,15 @@ describe('ClickHouseDatasource', () => {
 
       instance.query({
         targets: [{ refId: '1' }, { refId: '2', hide: false }, { refId: '3', hide: true }] as DataQuery[],
+        timezone: 'UTC',
       } as any);
 
       expect(spy).toHaveBeenCalledWith({
-        targets: [{ refId: '1' }, { refId: '2', hide: false }],
+        targets: [
+          { refId: '1', meta: { timezone: 'UTC' } },
+          { refId: '2', hide: false, meta: { timezone: 'UTC' } },
+        ],
+        timezone: 'UTC',
       });
     });
   });
