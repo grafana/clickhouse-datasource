@@ -2,7 +2,7 @@ import { DataSourcePlugin, DashboardLoadedEvent } from '@grafana/data';
 import { Datasource } from './data/CHDatasource';
 import { ConfigEditor } from './views/CHConfigEditor';
 import { CHQueryEditor } from './views/CHQueryEditor';
-import { CHQuery, CHConfig } from './types';
+import { CHQuery, CHConfig, BuilderMode } from './types';
 import { getAppEvents } from '@grafana/runtime';
 import { trackClickhouseMonitorDashboardLoaded } from 'tracking';
 import pluginJson from './plugin.json';
@@ -20,10 +20,15 @@ getAppEvents().subscribe<DashboardLoadedEvent<CHQuery>>(
     if (!clickhouseQueries?.length) {
       return;
     }
+
     const counters = {
       sql_queries: 0,
       builder_queries: 0,
+      builder_table_queries: 0,
+      builder_aggregate_queries: 0,
+      builder_time_series_queries: 0
     };
+
     clickhouseQueries.forEach((query) => {
       switch (query.queryType) {
         case 'sql':
@@ -31,9 +36,15 @@ getAppEvents().subscribe<DashboardLoadedEvent<CHQuery>>(
           break;
         case 'builder':
           counters.builder_queries++;
+          if (query.builderOptions.mode === BuilderMode.Aggregate) {
+            counters.builder_aggregate_queries++;
+          } else if (query.builderOptions.mode === BuilderMode.List) {
+            counters.builder_table_queries++;
+          } else if (query.builderOptions.mode === BuilderMode.Trend) {
+            counters.builder_time_series_queries++;
+          }
           break;
       }
-      // query.rawSql ? counters.raw_queries++ : counters.query_builder_queries++;
     });
 
     trackClickhouseMonitorDashboardLoaded({

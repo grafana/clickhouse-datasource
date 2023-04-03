@@ -12,12 +12,12 @@ export type ClickhouseMonitorDashboardLoadedProps = {
   org_id?: number;
   /** number of queries using the SQL query editor  */
   sql_queries: number;
-  /** number of queries using the "Table" format  */
+  /** number of queries using the Query Builder  */
   builder_queries: number;
-  // /** number of queries using the "Aggregate" format  */
-  // aggregate_queries: number;
-  // /** number of queries using the "Time Series" format  */
-  // time_series_queries: number;
-  // /** number of queries using the query builder  */
-  // query_builder_queries: number;
+  /** number of queries using the "Table" format in the Query Builder  */
+  builder_table_queries: number;
+  /** number of queries using the "Aggregate" format in the Query Builder */
+  builder_aggregate_queries: number;
+  /** number of queries using the "Time Series" format in the Query Builder */
+  builder_time_series_queries: number;
 };
