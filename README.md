@@ -154,22 +154,9 @@ on the Dashboards tab.
 
 We distribute the following dashboards with the plugin. These are aimed at assisting with support analysis of a ClickHouse cluster and do not rely on external datasets. The querying user requires access to the `system` database.
 
-1. [Cluster Analysis](src/dashboards/cluster-analysis.json) - an overview of configured clusters, merges, mutations and data replication.
-2. [Data Analysis](src/dashboards/data-analysis.json) - an overview of current databases and tables, including their respective sizes, partitions and parts.
-3. [Query Analysis](src/dashboards/query-analysis.json) - an analysis of queries by type, performance and resource consumption.
-
-#### Load dashboards in Grafana config
-
-```yaml
-        dashboards:
-          default:
-            clickhouse-cluster-analysis:
-              url: https://raw.githubusercontent.com/grafana/clickhouse-datasource/main/src/dashboards/cluster-analysis.json
-            clickhouse-data-analysis:
-              url: https://raw.githubusercontent.com/grafana/clickhouse-datasource/main/src/dashboards/data-analysis.json
-            clickhouse-query-analysis:
-              url: https://raw.githubusercontent.com/grafana/clickhouse-datasource/main/src/dashboards/query-analysis.json
-```
+1. Cluster Analysis - an overview of configured clusters, merges, mutations and data replication.
+2. Data Analysis - an overview of current databases and tables, including their respective sizes, partitions and parts.
+3. Query Analysis - an analysis of queries by type, performance and resource consumption.
 
 ### Ad Hoc Filters
 
