@@ -38,3 +38,5 @@ cypress-e2e/report.json
 cypress-e2e/videos
 
 **/.DS_Store
+.eslintcache
+.nvmrc

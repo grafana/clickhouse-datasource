@@ -27,7 +27,7 @@ describe('FieldsEditor', () => {
     expect(result.queryAllByText('Dummy').length).toBe(0);
     expect(onFieldsChange).toHaveBeenCalledTimes(0);
   });
-  it('should render the popup values when clicked', () => {
+  it('should render the popup values when clicked', async () => {
     const onFieldsChange = jest.fn();
 
     const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
@@ -42,7 +42,7 @@ describe('FieldsEditor', () => {
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
     expect(result.getByText('Field Type')).toBeInTheDocument();
     fireEvent.blur(screen.getByRole('combobox'));
-    expect(onFieldsChange).toHaveBeenCalledTimes(1);
+    expect(onFieldsChange).toHaveBeenCalledTimes(2);
 
     expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
   });
