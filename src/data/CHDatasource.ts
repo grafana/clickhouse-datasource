@@ -36,7 +36,7 @@ import {
   LOG_LEVEL_TO_IN_CLAUSE,
   queryLogsVolume,
   TIME_FIELD_ALIAS,
-} from './logs'
+} from './logs';
 import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
 
 export class Datasource
