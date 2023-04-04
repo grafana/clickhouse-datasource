@@ -32,7 +32,8 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
-  getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE,
+  getTimeFieldRoundingClause,
+  LOG_LEVEL_TO_IN_CLAUSE,
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs'
