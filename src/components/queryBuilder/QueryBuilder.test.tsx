@@ -1,8 +1,9 @@
-import React from 'react'
-import { render, waitFor } from '@testing-library/react'
-import { QueryBuilder } from './QueryBuilder'
-import { Datasource } from '../../data/CHDatasource'
-import { BuilderMode, Format } from 'types'
+import React from 'react';
+import { render, waitFor } from '@testing-library/react';
+import { QueryBuilder } from './QueryBuilder';
+import { Datasource } from '../../data/CHDatasource';
+import { BuilderMode, Format } from 'types';
+import { CoreApp } from '@grafana/data';
 
 describe('QueryBuilder', () => {
   it('renders correctly', async () => {
@@ -28,6 +29,7 @@ describe('QueryBuilder', () => {
           onBuilderOptionsChange={() => {}}
           datasource={mockDs}
           format={Format.AUTO}
+          app={CoreApp.PanelEditor}
         />
       )
     );

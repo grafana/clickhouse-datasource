@@ -26,12 +26,14 @@ import { DatabaseSelect } from './DatabaseSelect';
 import { isDateTimeType, isDateType } from './utils';
 import { selectors } from '../../selectors';
 import { LogLevelFieldEditor } from './LogLevelField';
+import { CoreApp } from '@grafana/data';
 
 interface QueryBuilderProps {
   builderOptions: SqlBuilderOptions;
   onBuilderOptionsChange: (builderOptions: SqlBuilderOptions) => void;
   datasource: Datasource;
   format: Format;
+  app: CoreApp | undefined;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
@@ -99,6 +101,8 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       fields: [],
       filters: [],
       orderBy: [],
+      timeField: undefined,
+      logLevelField: undefined,
     };
     props.onBuilderOptionsChange(queryOptions);
   };
@@ -110,6 +114,8 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       fields: [],
       filters: [],
       orderBy: [],
+      timeField: undefined,
+      logLevelField: undefined,
     };
     props.onBuilderOptionsChange(queryOptions);
   };
@@ -212,8 +218,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       )}
       {
         // Time and LogLevel fields selection for Logs Volume histogram in the Explore mode
-        // TODO: show only in the Explore mode
-        builder.mode === BuilderMode.List && props.format === Format.LOGS && (
+        builder.mode === BuilderMode.List && props.format === Format.LOGS && props.app === CoreApp.Explore && (
           <>
             <TimeFieldEditor
               timeField={builder.timeField}

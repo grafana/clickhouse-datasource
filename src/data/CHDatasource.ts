@@ -32,10 +32,11 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
-  getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE,
+  getTimeFieldRoundingClause,
+  LOG_LEVEL_TO_IN_CLAUSE,
   queryLogsVolume,
   TIME_FIELD_ALIAS,
-} from './logs'
+} from './logs';
 import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
 
 export class Datasource
@@ -67,12 +68,10 @@ export class Datasource
       case SupplementaryQueryType.LogsVolume:
         const logsVolumeRequest = cloneDeep(request);
 
-        const timespanMs = logsVolumeRequest.range.to.valueOf() - logsVolumeRequest.range.from.valueOf();
-        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars, timespanMs);
-
+        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
         logsVolumeRequest.interval = intervalInfo.interval;
         logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
-
+        logsVolumeRequest.hideFromInspector = true;
         if (intervalInfo.intervalMs !== undefined) {
           logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
           logsVolumeRequest.scopedVars.__interval_ms = {
@@ -81,11 +80,9 @@ export class Datasource
           };
         }
 
-        logsVolumeRequest.hideFromInspector = true;
-
         const targets: CHQuery[] = [];
         logsVolumeRequest.targets.forEach((target) => {
-          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target, timespanMs);
+          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
           if (supplementaryQuery !== undefined) {
             targets.push(supplementaryQuery);
           }
@@ -97,10 +94,10 @@ export class Datasource
 
         return queryLogsVolume(
           this,
-          { ...request, targets },
+          { ...logsVolumeRequest, targets },
           {
-            range: request.range,
-            targets: request.targets,
+            range: logsVolumeRequest.range,
+            targets: logsVolumeRequest.targets,
           }
         );
       default:
@@ -112,11 +109,7 @@ export class Datasource
     return [SupplementaryQueryType.LogsVolume];
   }
 
-  private getSupplementaryLogsVolumeQuery(
-    logsVolumeRequest: DataQueryRequest<CHQuery>,
-    query: CHQuery,
-    timespanMs: number
-  ): CHQuery | undefined {
+  getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
       query.format !== Format.LOGS ||
       query.queryType !== QueryType.Builder ||
@@ -130,7 +123,6 @@ export class Datasource
 
     const timeFieldRoundingClause = getTimeFieldRoundingClause(
       logsVolumeRequest.scopedVars,
-      timespanMs,
       query.builderOptions.timeField
     );
     const fields: string[] = [];
@@ -142,7 +134,7 @@ export class Datasource
       const llf = `toString("${query.builderOptions.logLevelField}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
-        fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`)
+        fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`);
       }
     } else {
       metrics.push({

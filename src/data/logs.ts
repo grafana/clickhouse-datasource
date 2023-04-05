@@ -120,12 +120,12 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
  * Take multiple data frames, sum up values and group by level.
  * Return a list of data frames, each representing single level.
  */
-function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] {
+export function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] {
   if (rawLogsVolume.length !== 1) {
     return []; // we always expect a single DataFrame with all the aggregations from ClickHouse
   }
 
-  const [ [ timeField ], levelFields ] = partition(rawLogsVolume[0].fields, (f) => f.name === TIME_FIELD_ALIAS);
+  const [[timeField], levelFields] = partition(rawLogsVolume[0].fields, (f) => f.name === TIME_FIELD_ALIAS);
   if (timeField === undefined) {
     return []; // should never happen if we have a DataFrame available
   }
@@ -178,15 +178,11 @@ function getLogVolumeFieldConfig(level: LogLevel, oneLevelDetected: boolean) {
   };
 }
 
-export function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { interval: string; intervalMs?: number } {
-  if (scopedVars.__interval) {
+export function getIntervalInfo(scopedVars: ScopedVars): { interval: string; intervalMs?: number } {
+  if (scopedVars.__interval_ms) {
     let intervalMs: number = scopedVars.__interval_ms.value;
     let interval;
-    // below 5 seconds we force the resolution to be per 1ms as interval in scopedVars is not less than 10ms
-    if (timespanMs < SECOND * 5) {
-      intervalMs = MILLISECOND;
-      interval = '1ms';
-    } else if (intervalMs > HOUR) {
+    if (intervalMs > HOUR) {
       intervalMs = DAY;
       interval = '1d';
     } else if (intervalMs > MINUTE) {
@@ -206,19 +202,14 @@ export function getIntervalInfo(scopedVars: ScopedVars, timespanMs: number): { i
   }
 }
 
-export function getTimeFieldRoundingClause(
-  scopedVars: ScopedVars,
-  timespanMs: number,
-  timeField = 'created_at'
-): string {
+export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timeField: string): string {
+  // NB: slight discrepancy with getIntervalInfo here
+  // it returns { interval: '$__interval' } when the interval from the ScopedVars is undefined,
+  // but we fall back to DAY here
   let interval = 'DAY';
-  if (scopedVars.__interval) {
+  if (scopedVars.__interval_ms) {
     let intervalMs: number = scopedVars.__interval_ms.value;
-    // below 5 seconds we force the resolution to be per 1ms as interval in scopedVars is not less than 10ms
-    if (timespanMs < SECOND * 5) {
-      // TODO: workaround
-      console.error('MILLIS precision is not supported');
-    } else if (intervalMs > HOUR) {
+    if (intervalMs > HOUR) {
       interval = 'DAY';
     } else if (intervalMs > MINUTE) {
       interval = 'HOUR';
@@ -245,13 +236,13 @@ export const DEFAULT_LOGS_ALIAS = 'logs';
 type LogLevelToInClause = Record<'critical' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'unknown', string>;
 export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
   const levels = {
-    critical: [ 'critical', 'fatal', 'crit', 'alert', 'emerg' ],
-    error: [ 'error', 'err', 'eror' ],
-    warn: [ 'warn', 'warning' ],
-    info: [ 'info', 'information', 'informational' ],
-    debug: [ 'debug', 'dbug' ],
-    trace: [ 'trace' ],
-    unknown: [ 'unknown' ],
+    critical: ['critical', 'fatal', 'crit', 'alert', 'emerg'],
+    error: ['error', 'err', 'eror'],
+    warn: ['warn', 'warning'],
+    info: ['info', 'information', 'informational'],
+    debug: ['debug', 'dbug'],
+    trace: ['trace'],
+    unknown: ['unknown'],
   };
   return (Object.keys(levels) as Array<keyof typeof levels>).reduce((allLevels, level) => {
     allLevels[level] = `IN (${[

@@ -178,7 +178,7 @@ export const Components = {
       },
       LOG_LEVEL_FIELD: {
         label: 'Log level field',
-        tooltip: 'Select the field to extract log level information from'
+        tooltip: 'Select the field to extract log level information from',
       },
       PREVIEW: {
         label: 'SQL Preview',
