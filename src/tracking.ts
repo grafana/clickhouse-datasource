@@ -1,7 +1,7 @@
 import { reportInteraction } from '@grafana/runtime';
 import { BuilderMode, CHQuery, QueryType } from 'types';
 
-export const trackClickhouseMonitorDashboardLoaded = (props: ClickhouseDashboardLoadedProps) => {
+export const trackClickhouseDashboardLoaded = (props: ClickhouseDashboardLoadedProps) => {
   reportInteraction('grafana_ds_clickhouse_dashboard_loaded', props);
 };
 
