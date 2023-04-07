@@ -14,6 +14,7 @@ export const mockDatasource = new Datasource({
     defaultDatabase: 'foo',
     protocol: Protocol.NATIVE,
   },
+  readOnly: true,
   access: 'direct',
   meta: {
     id: 'grafana-clickhouse-datasource',
@@ -38,4 +39,10 @@ export const mockDatasource = new Datasource({
   },
 });
 mockDatasource.adHocFiltersStatus = 1; // most tests should skip checking the CH version. We will set ad hoc filters to enabled to avoid running the CH version check
-export const mockQuery: CHQuery = { rawSql: 'select * from foo', refId: '', format: 1, queryType: QueryType.SQL };
+export const mockQuery: CHQuery = {
+  rawSql: 'select * from foo',
+  refId: '',
+  format: 1,
+  queryType: QueryType.SQL,
+  selectedFormat: 4,
+};

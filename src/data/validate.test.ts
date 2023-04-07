@@ -1,13 +1,9 @@
-import { ParseError, validate } from './validate';
-
-var mockParser: any;
+import { validate } from './validate';
 
 jest.mock('js-sql-parser', () => {
-  const mock = {
+  return {
     parse: jest.fn(),
   };
-  mockParser = mock;
-  return mock;
 });
 
 describe('Validate', () => {
@@ -17,21 +13,20 @@ describe('Validate', () => {
     expect(v.valid).toBe(true);
   });
 
-  it('should not be valid', () => {
-    const validationError: ParseError = {
-      message: 'foo\nbar\njunk\nexpected',
-      hash: {
-        text: 'foo',
-        loc: {
-          first_line: 1,
-          last_line: 1,
-          first_column: 1,
-          last_column: 3,
+  it('should not be valid', async () => {
+    (await import('js-sql-parser')).parse.mockImplementationOnce(() => {
+      throw {
+        message: 'foo\nbar\njunk\nexpected',
+        hash: {
+          text: 'foo',
+          loc: {
+            first_line: 1,
+            last_line: 1,
+            first_column: 1,
+            last_column: 3,
+          },
         },
-      },
-    };
-    spyOn(mockParser, 'parse').and.callFake(() => {
-      throw validationError;
+      };
     });
 
     const sql = 'invalid sql';

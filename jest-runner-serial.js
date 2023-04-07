@@ -8,4 +8,4 @@ class SerialJestRunner extends JestRunner {
   }
 }
 
-module.exports = SerialJestRunner; 
+module.exports = SerialJestRunner;

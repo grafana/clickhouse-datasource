@@ -27,7 +27,7 @@ describe('SQL Editor', () => {
     const rawSql = 'foo';
     render(
       <SQLEditor
-        query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL }}
+        query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL, selectedFormat: 4 }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}
@@ -41,14 +41,14 @@ describe('SQL Editor', () => {
     await act(async () => {
       render(
         <SQLEditor
-          query={{ rawSql: 'test', refId: 'A', format: 1, queryType: QueryType.SQL }}
+          query={{ rawSql: 'test', refId: 'A', format: 1, queryType: QueryType.SQL, selectedFormat: 4 }}
           onChange={onChangeValue}
           onRunQuery={onRunQuery}
           datasource={mockDatasource}
         />
       );
       expect(screen.queryByText('test')).toBeInTheDocument();
-      userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
+      await userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
       expect(onChangeValue).toHaveBeenCalledTimes(1);
     });
   });

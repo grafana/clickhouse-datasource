@@ -1,20 +1,8 @@
-const standard = require('@grafana/toolkit/src/config/jest.plugin.config');
-const globals = standard.jestConfig().globals;
-const tsJest = globals['ts-jest'];
-const JestRunner = require('jest-runner');
+// force timezone to UTC to allow tests to work regardless of local timezone
+// generally used by snapshots, but can affect specific tests
+process.env.TZ = 'UTC';
 
 module.exports = {
-  ...{
-    ...standard.jestConfig(),
-    setupFilesAfterEnv: ['<rootDir>/src/test/setupTests.ts'],
-    modulePathIgnorePatterns: ['<rootDir>/src/types.ts', '<rootDir>/src/module.ts'],
-    globals: {
-      ...globals,
-      'ts-jest': {
-        isolatedModules: tsJest.isolatedModules,
-        tsconfig: tsJest.tsConfig,
-      },
-    },
-    ...{runner: './jest-runner-serial.js'}
-  },
+  // Jest configuration provided by Grafana scaffolding
+  ...require('./.config/jest.config'),
 };

@@ -30,7 +30,7 @@ describe('QueryTypeSwitcher', () => {
   it('renders correctly SQL editor', () => {
     const result = render(
       <QueryTypeSwitcher
-        query={{ refId: 'A', queryType: QueryType.SQL, rawSql: '', format: Format.TABLE }}
+        query={{ refId: 'A', queryType: QueryType.SQL, rawSql: '', format: Format.TABLE, selectedFormat: Format.AUTO }}
         onChange={() => {}}
         onRunQuery={() => {}}
       />

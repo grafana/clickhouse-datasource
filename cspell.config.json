@@ -48,11 +48,13 @@
     "timeseries",
     "TLSCA",
     "totime",
+    "typecheck",
     "Ulimits",
     "vectorator",
     "createddate",
     "closedate",
     "commitish",
-    "slvrtrn"
+    "slvrtrn",
+    "otel"
   ]
 }
