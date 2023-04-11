@@ -24,7 +24,7 @@ import { getFormat } from 'components/editor';
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
-  const { query, onChange } = props;
+  const { query, onChange, app } = props;
   const onBuilderOptionsChange = (builderOptions: SqlBuilderOptions) => {
     const sql = getSQLFromQueryOptions(builderOptions);
     const format =
@@ -63,6 +63,8 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
             datasource={props.datasource}
             builderOptions={newQuery.builderOptions}
             onBuilderOptionsChange={onBuilderOptionsChange}
+            format={newQuery.format}
+            app={app}
           />
           <Preview sql={newQuery.rawSql} />
         </div>

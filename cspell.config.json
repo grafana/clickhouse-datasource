@@ -55,6 +55,10 @@
     "closedate",
     "commitish",
     "slvrtrn",
-    "otel"
+    "otel",
+    "eror",
+    "timespan",
+    "dbug",
+    "emerg"
   ]
 }
