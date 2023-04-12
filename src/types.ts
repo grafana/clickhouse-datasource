@@ -75,6 +75,10 @@ export enum BuilderMode {
   Trend = 'trend',
 }
 
+/**
+ * @property {string} timeField Explore only: used for Logs Volume histogram
+ * @property {string} logLevelField Explore only: used for Logs Volume histogram
+ */
 export interface SqlBuilderOptionsList {
   mode: BuilderMode.List;
   database?: string;
@@ -83,6 +87,8 @@ export interface SqlBuilderOptionsList {
   filters?: Filter[];
   orderBy?: OrderBy[];
   limit?: number;
+  timeField?: string;
+  logLevelField?: string;
 }
 export enum BuilderMetricFieldAggregation {
   Sum = 'sum',

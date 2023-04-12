@@ -3,19 +3,20 @@ import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Select } from '@grafana/ui';
 import { selectors } from './../../selectors';
 import { FullField } from 'types';
-import { isDateType } from './utils';
 
 interface TimeFieldEditorProps {
   fieldsList: FullField[];
   timeField: string;
   timeFieldType: string;
   onTimeFieldChange: (timeField: string, timeFieldType: string) => void;
+  timeFieldTypeCheckFn: (type: string) => boolean;
+  labelAndTooltip: typeof selectors.components.QueryEditor.QueryBuilder.TIME_FIELD;
 }
 
 export const TimeFieldEditor = (props: TimeFieldEditorProps) => {
-  const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.TIME_FIELD;
+  const { label, tooltip } = props.labelAndTooltip;
   const columns: SelectableValue[] = (props.fieldsList || [])
-    .filter((f) => isDateType(f.type))
+    .filter((f) => props.timeFieldTypeCheckFn(f.type))
     .map((f) => ({ label: f.label, value: f.name }));
   const getColumnType = (columnName: string): string => {
     const matchedColumn = props.fieldsList.find((f) => f.name === columnName);
