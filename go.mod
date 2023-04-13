@@ -3,7 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.19
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.8.1
+	github.com/ClickHouse/clickhouse-go/v2 v2.3.0
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.156.0
