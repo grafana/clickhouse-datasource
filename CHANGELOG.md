@@ -1,5 +1,8 @@
 # Changelog
 
+## 3.0.1-beta
+- **Chore** - Update Grafana dependency to 9.x for compatibility with v3+
+
 ## 3.0.0
 - **Feature** - [Logs volume histogram support](https://github.com/grafana/clickhouse-datasource/pull/352)
 - **Chore** - Update clickhouse-go to v2.8.1
