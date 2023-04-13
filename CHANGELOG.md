@@ -1,5 +1,10 @@
 # Changelog
 
+## 3.0.1-beta
+
+Users on v8.x of Grafana are encouraged to continue to use v2.2.0 of the plugin. 
+Users of Grafana v9.x can use v3 however it is beta and may contain bugs.
+
 ## 3.0.0
 - **Feature** - [Logs volume histogram support](https://github.com/grafana/clickhouse-datasource/pull/352)
 - **Chore** - Update clickhouse-go to v2.8.1
