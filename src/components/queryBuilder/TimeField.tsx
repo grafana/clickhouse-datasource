@@ -6,7 +6,7 @@ import { FullField } from 'types';
 
 interface TimeFieldEditorProps {
   fieldsList: FullField[];
-  timeField: string;
+  timeField: string | null;
   timeFieldType: string;
   onTimeFieldChange: (timeField: string, timeFieldType: string) => void;
   timeFieldTypeCheckFn: (type: string) => boolean;

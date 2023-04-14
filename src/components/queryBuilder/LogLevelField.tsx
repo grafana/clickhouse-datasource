@@ -7,6 +7,7 @@ import { FullField } from 'types';
 interface LogLevelEditorProps {
   fieldsList: FullField[];
   onLogLevelFieldChange: (logLevelField: string) => void;
+  logLevelField: string | null;
 }
 
 export const LogLevelFieldEditor = (props: LogLevelEditorProps) => {
@@ -14,12 +15,6 @@ export const LogLevelFieldEditor = (props: LogLevelEditorProps) => {
   const columns: SelectableValue[] = (props.fieldsList || [])
     .filter((f) => f.name !== '*')
     .map((f) => ({ label: f.label, value: f.name }));
-  if (columns.length) {
-    columns.push({
-      label: '-',
-      value: undefined, // allow to de-select the field
-    });
-  }
   return (
     <div className="gf-form">
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
@@ -28,8 +23,10 @@ export const LogLevelFieldEditor = (props: LogLevelEditorProps) => {
       <Select
         options={columns}
         width={20}
-        onChange={(e) => props.onLogLevelFieldChange(e.value)}
+        onChange={(e) => props.onLogLevelFieldChange(e?.value ?? e)}
         menuPlacement={'bottom'}
+        value={props.logLevelField}
+        isClearable={true}
       />
     </div>
   );

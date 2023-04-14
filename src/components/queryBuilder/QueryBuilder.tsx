@@ -38,6 +38,8 @@ interface QueryBuilderProps {
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
   const [baseFieldsList, setBaseFieldsList] = useState<FullField[]>([]);
+  const [timeField, setTimeField] = useState<string | null>(null);
+  const [logLevelField, setLogLevelField] = useState<string | null>(null);
   const builder = defaultsDeep(props.builderOptions, defaultCHBuilderQuery.builderOptions);
   useEffect(() => {
     const fetchBaseFields = async (database: string, table: string) => {
@@ -94,6 +96,8 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   const onDatabaseChange = (database = '') => {
     setBaseFieldsList([]);
+    setTimeField(null);
+    setLogLevelField(null);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       database,
@@ -102,12 +106,14 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       filters: [],
       orderBy: [],
       timeField: undefined,
-      logLevelField: undefined,
+      logLevelField: undefined
     };
     props.onBuilderOptionsChange(queryOptions);
   };
 
   const onTableChange = (table = '') => {
+    setTimeField(null);
+    setLogLevelField(null);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       table,
@@ -115,7 +121,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       filters: [],
       orderBy: [],
       timeField: undefined,
-      logLevelField: undefined,
+      logLevelField: undefined
     };
     props.onBuilderOptionsChange(queryOptions);
   };
@@ -165,11 +171,13 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
 
   const onTimeFieldChange = (timeField = '', timeFieldType = '') => {
+    setTimeField(timeField);
     const queryOptions: SqlBuilderOptions = { ...builder, timeField, timeFieldType };
     props.onBuilderOptionsChange(queryOptions);
   };
 
   const onLogLevelFieldChange = (logLevelField = '') => {
+    setLogLevelField(logLevelField);
     const queryOptions: SqlBuilderOptions = { ...builder, logLevelField };
     props.onBuilderOptionsChange(queryOptions);
   };
@@ -221,14 +229,18 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         builder.mode === BuilderMode.List && props.format === Format.LOGS && props.app === CoreApp.Explore && (
           <>
             <TimeFieldEditor
-              timeField={builder.timeField}
+              timeField={timeField}
               timeFieldType={builder.timeFieldType}
               onTimeFieldChange={onTimeFieldChange}
               fieldsList={fieldsList}
               timeFieldTypeCheckFn={isDateTimeType}
               labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.LOGS_VOLUME_TIME_FIELD}
             />
-            <LogLevelFieldEditor fieldsList={fieldsList} onLogLevelFieldChange={onLogLevelFieldChange} />
+            <LogLevelFieldEditor
+              logLevelField={logLevelField}
+              fieldsList={fieldsList}
+              onLogLevelFieldChange={onLogLevelFieldChange}
+            />
           </>
         )
       }
