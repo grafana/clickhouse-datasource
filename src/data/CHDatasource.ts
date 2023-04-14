@@ -301,7 +301,13 @@ export class Datasource
           value: action.options.value,
         });
       }
-      return { ...query, builderOptions: { ...query.builderOptions, filters } };
+      const updatedBuilder = { ...query.builderOptions, filters }
+      return {
+        ...query,
+        // the query is updated to trigger the URL update and propagation to the panels
+        rawSql: getSQLFromQueryOptions(updatedBuilder),
+        builderOptions: updatedBuilder
+      };
     }
     return query;
   }

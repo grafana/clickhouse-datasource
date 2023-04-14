@@ -49,17 +49,20 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           fields.push({ name: '*', label: 'ALL', type: 'string', picklistValues: [] });
           setBaseFieldsList(fields);
 
-          const dateTimeFields = fields.filter((f) => isDateTimeType(f.type));
-          if (dateTimeFields.length > 0) {
-            const filter: Filter & PredefinedFilter = {
-              operator: FilterOperator.WithInGrafanaTimeRange,
-              filterType: 'custom',
-              key: dateTimeFields[0].name,
-              type: 'datetime',
-              condition: 'AND',
-              restrictToFields: dateTimeFields,
-            };
-            onFiltersChange([filter]);
+          // if no filters are set, we add a default one for the timerange
+          if(builder.filters.length === 0) {
+            const dateTimeFields = fields.filter((f) => isDateTimeType(f.type));
+            if (dateTimeFields.length > 0) {
+              const filter: Filter & PredefinedFilter = {
+                operator: FilterOperator.WithInGrafanaTimeRange,
+                filterType: 'custom',
+                key: dateTimeFields[0].name,
+                type: 'datetime',
+                condition: 'AND',
+                restrictToFields: dateTimeFields,
+              };
+              onFiltersChange([filter]);
+            }
           }
 
           // When changing from SQL Editor to Query Builder, we need to find out if the
