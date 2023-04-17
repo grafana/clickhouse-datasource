@@ -6,11 +6,11 @@ export const trackClickhouseDashboardLoaded = (props: ClickhouseDashboardLoadedP
 };
 
 export type ClickhouseCounters = {
-  sql_queries: number,
-  builder_queries: number,
-  builder_table_queries: number,
-  builder_aggregate_queries: number,
-  builder_time_series_queries: number
+  sql_queries: number;
+  builder_queries: number;
+  builder_table_queries: number;
+  builder_aggregate_queries: number;
+  builder_time_series_queries: number;
 };
 
 export interface ClickhouseDashboardLoadedProps extends ClickhouseCounters {
@@ -19,7 +19,7 @@ export interface ClickhouseDashboardLoadedProps extends ClickhouseCounters {
   dashboard_id: string;
   org_id?: number;
   [key: string]: any;
-};
+}
 
 export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
   const counters = {
@@ -27,15 +27,15 @@ export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
     builder_queries: 0,
     builder_table_queries: 0,
     builder_aggregate_queries: 0,
-    builder_time_series_queries: 0
+    builder_time_series_queries: 0,
   };
-  
+
   queries.forEach((query) => {
     switch (query.queryType) {
-      case (QueryType.SQL):
+      case QueryType.SQL:
         counters.sql_queries++;
         break;
-      case (QueryType.Builder):
+      case QueryType.Builder:
         counters.builder_queries++;
         if (query.builderOptions.mode === BuilderMode.Aggregate) {
           counters.builder_aggregate_queries++;
@@ -50,4 +50,3 @@ export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
 
   return counters;
 };
-

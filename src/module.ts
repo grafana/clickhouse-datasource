@@ -15,7 +15,6 @@ export const plugin = new DataSourcePlugin<Datasource, CHQuery, CHConfig>(Dataso
 getAppEvents().subscribe<DashboardLoadedEvent<CHQuery>>(
   DashboardLoadedEvent,
   ({ payload: { dashboardId, orgId, grafanaVersion, queries } }) => {
-    
     const clickhouseQueries = queries[pluginJson.id]?.filter((q) => !q.hide);
     if (!clickhouseQueries?.length) {
       return;
