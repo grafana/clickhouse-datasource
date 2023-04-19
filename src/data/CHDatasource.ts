@@ -289,9 +289,7 @@ export class Datasource
                 'value' in f &&
                 f.value === action.options?.value &&
                 f.operator === FilterOperator.NotEquals) ||
-              (f.type === 'string' &&
-                f.key === action.options?.key &&
-                f.operator === FilterOperator.Equals)
+              (f.type === 'string' && f.key === action.options?.key && f.operator === FilterOperator.Equals)
             )
         );
         filters.push({
@@ -303,12 +301,12 @@ export class Datasource
           value: action.options.value,
         });
       }
-      const updatedBuilder = { ...query.builderOptions, filters }
+      const updatedBuilder = { ...query.builderOptions, filters };
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
         rawSql: getSQLFromQueryOptions(updatedBuilder),
-        builderOptions: updatedBuilder
+        builderOptions: updatedBuilder,
       };
     }
     return query;
