@@ -164,7 +164,6 @@ export class Datasource
     };
 
     const logVolumeSupplementaryQuery = getSQLFromQueryOptions(logVolumeSqlBuilderOptions);
-    console.log(logVolumeSupplementaryQuery);
     return {
       format: Format.AUTO,
       queryType: QueryType.SQL,
@@ -281,15 +280,18 @@ export class Datasource
       } else if (action.type === 'ADD_FILTER_OUT') {
         // with this we might want to add multiple values as NE filters
         // for example, `level != info` AND `level != debug`
-        // thus, here we remove only exactly matching NE or EQ filter by exact field name and value
-        const filters = (query.builderOptions.filters ?? []).filter(
+        // thus, here we remove only exactly matching NE filters or an existing EQ filter for this field
+        filters = (query.builderOptions.filters ?? []).filter(
           (f) =>
             !(
-              f.type === 'string' &&
-              f.key === action.options?.key &&
-              'value' in f &&
-              f.value === action.options?.value &&
-              (f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
+              (f.type === 'string' &&
+                f.key === action.options?.key &&
+                'value' in f &&
+                f.value === action.options?.value &&
+                f.operator === FilterOperator.NotEquals) ||
+              (f.type === 'string' &&
+                f.key === action.options?.key &&
+                f.operator === FilterOperator.Equals)
             )
         );
         filters.push({
@@ -301,12 +303,12 @@ export class Datasource
           value: action.options.value,
         });
       }
-      const updatedBuilder = { ...query.builderOptions, filters };
+      const updatedBuilder = { ...query.builderOptions, filters }
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
         rawSql: getSQLFromQueryOptions(updatedBuilder),
-        builderOptions: updatedBuilder,
+        builderOptions: updatedBuilder
       };
     }
     return query;
