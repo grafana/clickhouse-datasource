@@ -218,6 +218,11 @@ export class Datasource
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
+      customSettings: this.settings.jsonData.customSettings?.map(({ setting, value }) => {
+        return {
+          setting, value: this.replace(this.applyConditionalAll(value, getTemplateSrv().getVariables()), scoped) || ''
+        }
+      }) ?? []
     };
   }
 
@@ -339,6 +344,7 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    console.trace('query', request, this.settings);
     const targets = request.targets
       // filters out queries disabled in UI
       .filter((t) => t.hide !== true)

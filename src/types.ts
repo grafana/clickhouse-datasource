@@ -49,7 +49,11 @@ export enum QueryType {
   Builder = 'builder',
 }
 
-export interface CHSQLQuery extends DataQuery {
+export interface CHQueryBase extends DataQuery {
+  customSettings?: CHCustomSetting[]
+}
+
+export interface CHSQLQuery extends CHQueryBase {
   queryType: QueryType.SQL;
   rawSql: string;
   meta?: {
@@ -62,7 +66,7 @@ export interface CHSQLQuery extends DataQuery {
   expand?: boolean;
 }
 
-export interface CHBuilderQuery extends DataQuery {
+export interface CHBuilderQuery extends CHQueryBase {
   queryType: QueryType.Builder;
   rawSql: string;
   builderOptions: SqlBuilderOptions;
