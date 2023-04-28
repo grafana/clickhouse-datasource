@@ -78,7 +78,7 @@ describe('ClickHouseDatasource', () => {
       const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
+      expect(val).toEqual({ rawSql, queryType: QueryType.SQL, customSettings: [] });
     });
     it('should handle $__conditionalAll and replace values', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
@@ -88,7 +88,7 @@ describe('ClickHouseDatasource', () => {
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(spyOnGetVars).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL });
+      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL, customSettings: [] });
     });
   });
 
