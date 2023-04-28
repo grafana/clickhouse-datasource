@@ -25,6 +25,7 @@ describe('QueryBuilder', () => {
             database: 'db',
             table: 'foo',
             fields: [],
+            filters: [],
           }}
           onBuilderOptionsChange={() => {}}
           datasource={mockDs}
