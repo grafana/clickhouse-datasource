@@ -344,7 +344,6 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
-    console.trace('query', request, this.settings);
     const targets = request.targets
       // filters out queries disabled in UI
       .filter((t) => t.hide !== true)
