@@ -50,7 +50,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           setBaseFieldsList(fields);
 
           // if no filters are set, we add a default one for the time range
-          if (builder.filters.length === 0) {
+          if (builder.filters?.length === 0) {
             const dateTimeFields = fields.filter((f) => isDateTimeType(f.type));
             if (dateTimeFields.length > 0) {
               const filter: Filter & PredefinedFilter = {
