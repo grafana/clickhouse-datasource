@@ -334,12 +334,12 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           customSettings.map(({ setting, value }, i) => {
             return <InlineFieldRow key={i}>
               <InlineField
-                label={`Custom Setting (${i})`}
-                aria-label={`Custom Setting (${i})`}
+                label={`Setting`}
+                aria-label={`Setting`}
               >
                 <Input
                   value={setting}
-                  placeholder={'my_setting'}
+                  placeholder={'Setting'}
                   onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
                     let newSettings = customSettings.concat();
                     newSettings[i] = { setting: changeEvent.target.value, value };
@@ -351,10 +351,13 @@ export const ConfigEditor: React.FC<Props> = (props) => {
                 >
                 </Input>
               </InlineField>
-              <InlineField>
+              <InlineField
+                label={'Value'}
+                aria-label={`Value`}
+              >
                 <Input
                   value={value}
-                  placeholder={'value'}
+                  placeholder={'Value'}
                   onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
                     let newSettings = customSettings.concat();
                     newSettings[i] = { setting, value: changeEvent.target.value };
