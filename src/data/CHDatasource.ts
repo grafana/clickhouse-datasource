@@ -218,11 +218,6 @@ export class Datasource
     return {
       ...query,
       rawSql: this.replace(rawQuery, scoped) || '',
-      customSettings: this.settings.jsonData.customSettings?.map(({ setting, value }) => {
-        return {
-          setting, value: this.replace(this.applyConditionalAll(value, getTemplateSrv().getVariables()), scoped) || ''
-        }
-      }) ?? []
     };
   }
 

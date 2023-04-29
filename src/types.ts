@@ -50,7 +50,6 @@ export enum QueryType {
 }
 
 export interface CHQueryBase extends DataQuery {
-  customSettings?: CHCustomSetting[]
 }
 
 export interface CHSQLQuery extends CHQueryBase {

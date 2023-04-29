@@ -78,7 +78,7 @@ describe('ClickHouseDatasource', () => {
       const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql, queryType: QueryType.SQL, customSettings: [] });
+      expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
     });
     it('should handle $__conditionalAll and replace values', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
@@ -88,7 +88,7 @@ describe('ClickHouseDatasource', () => {
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(spyOnGetVars).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL, customSettings: [] });
+      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL });
     });
   });
 
@@ -485,42 +485,6 @@ describe('ClickHouseDatasource', () => {
           { range, targets: ['initialTarget'] }
         );
       });
-    });
-  });
-
-  describe('Custom Settings', () => {
-    it('should pass no custom settings when jsonData.customSettings is null', async () => {
-      const ds = cloneDeep(mockDatasource);
-      ds.settings.jsonData.customSettings = undefined;
-
-      const rawSql = 'foo';
-      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(s => s == '${var}' ? rawSql : s);
-      const query = { rawSql: '${var}', queryType: QueryType.SQL } as CHQuery;
-      const val = ds.applyTemplateVariables(query, {});
-      expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql, queryType: QueryType.SQL, customSettings: [] });
-    });
-    it('should pass constant custom settings', async () => {
-      const ds = cloneDeep(mockDatasource);
-      ds.settings.jsonData.customSettings = [{ setting: 'hello', value: 'world' }];
-
-      const rawSql = 'foo';
-      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(s => s == '${var}' ? rawSql : s);
-      const query = { rawSql: '${var}', queryType: QueryType.SQL } as CHQuery;
-      const val = ds.applyTemplateVariables(query, {});
-      expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql, queryType: QueryType.SQL, customSettings: [{ setting: 'hello', value: 'world' }] });
-    });
-    it('should pass templated custom settings', async () => {
-      const ds = cloneDeep(mockDatasource);
-      ds.settings.jsonData.customSettings = [{ setting: 'hello', value: '${var}' }];
-
-      const templatedValue = 'foo';
-      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(s => s == '${var}' ? templatedValue : s);
-      const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
-      const val = ds.applyTemplateVariables(query, {});
-      expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql: 'select', queryType: QueryType.SQL, customSettings: [{ setting: 'hello', value: templatedValue }] });
     });
   });
 });

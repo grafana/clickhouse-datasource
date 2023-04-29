@@ -130,6 +130,12 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if protocol == clickhouse.HTTP {
 		compression = clickhouse.CompressionGZIP
 	}
+	customSettings := make(clickhouse.Settings)
+	if settings.CustomSettings != nil {
+		for _, setting := range settings.CustomSettings {
+			customSettings[setting.Setting] = setting.Value
+		}
+	}
 
 	db := clickhouse.OpenDB(&clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
@@ -148,6 +154,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		DialTimeout: time.Duration(t) * time.Second,
 		ReadTimeout: time.Duration(qt) * time.Second,
 		Protocol:    protocol,
+		Settings:    customSettings,
 	})
 
 	timeout := time.Duration(t)
@@ -218,8 +225,7 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		Meta struct {
 			TimeZone string `json:"timezone"`
 		} `json:"meta"`
-		Format         int             `json:"format"`
-		CustomSettings []CustomSetting `json:"customSettings"`
+		Format int `json:"format"`
 	}
 
 	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
@@ -230,15 +236,8 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		return ctx, req
 	}
 
-	customSettings := make(clickhouse.Settings)
-	if dataQuery.CustomSettings != nil {
-		for _, setting := range dataQuery.CustomSettings {
-			customSettings[setting.Setting] = setting.Value
-		}
-	}
-
 	loc, _ := time.LoadLocation(dataQuery.Meta.TimeZone)
-	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc), clickhouse.WithSettings(customSettings)), req
+	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
 }
 
 // MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
