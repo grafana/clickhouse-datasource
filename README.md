@@ -1,5 +1,10 @@
 # ClickHouse data source for Grafana
 
+## Version compatibility
+
+Users on `v8.x` of Grafana are encouraged to continue to use `v2.2.0` of the plugin. 
+Users on `v9.x` and higher of Grafana can use `v3` however it is `beta` and may contain bugs.
+
 The ClickHouse data source plugin allows you to query and visualize ClickHouse
 data from within Grafana.
 
