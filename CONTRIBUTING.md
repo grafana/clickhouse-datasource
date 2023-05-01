@@ -45,6 +45,8 @@ Once you are ready to make a pull request, please read and follow [Create a pull
 You need to have commit rights to the GitHub repository to publish a release.
 
 1. Update the version number in the `package.json` file.
-2. Update the `CHANGELOG.md` by copy and pasting the relevant PRs from [Github's Release drafter interface](https://github.com/grafana/clickhouse-datasource/releases/new) or by running `npm run generate-release-notes`.
+2. Update the `CHANGELOG.md` by copy and pasting the relevant PRs
+   from [GitHub's Release drafter interface](https://github.com/grafana/clickhouse-datasource/releases/new) or by
+   running `npm run generate-release-notes`.
 3. PR the changes.
 4. Once merged, follow the Drone release process that you can find [here](https://github.com/grafana/integrations-team/wiki/Plugin-Release-Process#drone-release-proces

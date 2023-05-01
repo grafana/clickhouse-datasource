@@ -48,12 +48,17 @@
     "timeseries",
     "TLSCA",
     "totime",
+    "typecheck",
     "Ulimits",
     "vectorator",
     "createddate",
     "closedate",
     "commitish",
     "slvrtrn",
-    "otel"
+    "otel",
+    "eror",
+    "timespan",
+    "dbug",
+    "emerg"
   ]
 }

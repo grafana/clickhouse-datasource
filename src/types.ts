@@ -15,6 +15,12 @@ export interface CHConfig extends DataSourceJsonData {
   validate?: boolean;
   timeout?: string;
   queryTimeout?: string;
+  customSettings?: CHCustomSetting[];
+}
+
+export interface CHCustomSetting {
+  setting: string;
+  value: string;
 }
 
 export interface CHSecureConfig {
@@ -43,7 +49,10 @@ export enum QueryType {
   Builder = 'builder',
 }
 
-export interface CHSQLQuery extends DataQuery {
+export interface CHQueryBase extends DataQuery {
+}
+
+export interface CHSQLQuery extends CHQueryBase {
   queryType: QueryType.SQL;
   rawSql: string;
   meta?: {
@@ -56,7 +65,7 @@ export interface CHSQLQuery extends DataQuery {
   expand?: boolean;
 }
 
-export interface CHBuilderQuery extends DataQuery {
+export interface CHBuilderQuery extends CHQueryBase {
   queryType: QueryType.Builder;
   rawSql: string;
   builderOptions: SqlBuilderOptions;
@@ -75,6 +84,10 @@ export enum BuilderMode {
   Trend = 'trend',
 }
 
+/**
+ * @property {string} timeField Explore only: used for Logs Volume histogram
+ * @property {string} logLevelField Explore only: used for Logs Volume histogram
+ */
 export interface SqlBuilderOptionsList {
   mode: BuilderMode.List;
   database?: string;
@@ -83,6 +96,8 @@ export interface SqlBuilderOptionsList {
   filters?: Filter[];
   orderBy?: OrderBy[];
   limit?: number;
+  timeField?: string;
+  logLevelField?: string;
 }
 export enum BuilderMetricFieldAggregation {
   Sum = 'sum',

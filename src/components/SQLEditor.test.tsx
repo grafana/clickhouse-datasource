@@ -48,7 +48,7 @@ describe('SQL Editor', () => {
         />
       );
       expect(screen.queryByText('test')).toBeInTheDocument();
-      userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
+      await userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
       expect(onChangeValue).toHaveBeenCalledTimes(1);
     });
   });

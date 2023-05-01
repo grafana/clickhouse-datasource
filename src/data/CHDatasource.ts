@@ -4,20 +4,45 @@ import {
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
-  MetricFindValue,
-  ScopedVars,
-  VariableModel,
-  vectorator,
+  DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
+  MetricFindValue,
+  ScopedVars,
+  SupplementaryQueryType,
+  TypedVariableModel,
+  vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
-import { CHConfig, CHQuery, FullField, QueryType } from '../types';
+import {
+  BuilderMetricField,
+  BuilderMetricFieldAggregation,
+  BuilderMode,
+  CHConfig,
+  CHQuery,
+  Format,
+  FullField,
+  OrderByDirection,
+  QueryType,
+  SqlBuilderOptionsAggregate,
+} from '../types';
 import { AdHocFilter } from './adHocFilter';
-import { isString, isEmpty } from 'lodash';
+import { cloneDeep, isEmpty, isString } from 'lodash';
+import {
+  DEFAULT_LOGS_ALIAS,
+  getIntervalInfo,
+  getTimeFieldRoundingClause,
+  LOG_LEVEL_TO_IN_CLAUSE,
+  queryLogsVolume,
+  TIME_FIELD_ALIAS,
+} from './logs';
+import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
 
-export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
+export class Datasource
+  extends DataSourceWithBackend<CHQuery, CHConfig>
+  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>
+{
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
@@ -30,6 +55,123 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+  }
+
+  getDataProvider(
+    type: SupplementaryQueryType,
+    request: DataQueryRequest<CHQuery>
+  ): Observable<DataQueryResponse> | undefined {
+    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+      return undefined;
+    }
+    switch (type) {
+      case SupplementaryQueryType.LogsVolume:
+        const logsVolumeRequest = cloneDeep(request);
+
+        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
+        logsVolumeRequest.interval = intervalInfo.interval;
+        logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
+        logsVolumeRequest.hideFromInspector = true;
+        if (intervalInfo.intervalMs !== undefined) {
+          logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
+          logsVolumeRequest.scopedVars.__interval_ms = {
+            value: intervalInfo.intervalMs,
+            text: intervalInfo.intervalMs,
+          };
+        }
+
+        const targets: CHQuery[] = [];
+        logsVolumeRequest.targets.forEach((target) => {
+          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
+          if (supplementaryQuery !== undefined) {
+            targets.push(supplementaryQuery);
+          }
+        });
+
+        if (!targets.length) {
+          return undefined;
+        }
+
+        return queryLogsVolume(
+          this,
+          { ...logsVolumeRequest, targets },
+          {
+            range: logsVolumeRequest.range,
+            targets: logsVolumeRequest.targets,
+          }
+        );
+      default:
+        return undefined;
+    }
+  }
+
+  getSupportedSupplementaryQueryTypes(): SupplementaryQueryType[] {
+    return [SupplementaryQueryType.LogsVolume];
+  }
+
+  getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
+    if (
+      query.format !== Format.LOGS ||
+      query.queryType !== QueryType.Builder ||
+      query.builderOptions.mode !== BuilderMode.List ||
+      query.builderOptions.timeField === undefined ||
+      query.builderOptions.database === undefined ||
+      query.builderOptions.table === undefined
+    ) {
+      return undefined;
+    }
+
+    const timeFieldRoundingClause = getTimeFieldRoundingClause(
+      logsVolumeRequest.scopedVars,
+      query.builderOptions.timeField
+    );
+    const fields: string[] = [];
+    const metrics: BuilderMetricField[] = [];
+    // could be undefined or an empty string (if user deselects the field)
+    if (query.builderOptions.logLevelField) {
+      // Generate "fields" like
+      // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
+      const llf = `toString("${query.builderOptions.logLevelField}")`;
+      let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
+      for (level in LOG_LEVEL_TO_IN_CLAUSE) {
+        fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`);
+      }
+    } else {
+      metrics.push({
+        aggregation: BuilderMetricFieldAggregation.Count,
+        alias: DEFAULT_LOGS_ALIAS,
+        field: '*',
+      });
+    }
+
+    const logVolumeSqlBuilderOptions: SqlBuilderOptionsAggregate = {
+      mode: BuilderMode.Aggregate,
+      database: query.builderOptions.database,
+      table: query.builderOptions.table,
+      filters: query.builderOptions.filters,
+      fields,
+      metrics,
+      groupBy: [`${timeFieldRoundingClause} AS ${TIME_FIELD_ALIAS}`],
+      orderBy: [
+        {
+          name: TIME_FIELD_ALIAS,
+          dir: OrderByDirection.ASC,
+        },
+      ],
+    };
+
+    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(logVolumeSqlBuilderOptions);
+    return {
+      format: Format.AUTO,
+      queryType: QueryType.SQL,
+      rawSql: logVolumeSupplementaryQuery,
+      refId: '',
+      selectedFormat: Format.AUTO,
+    };
+  }
+
+  getSupplementaryQuery(type: SupplementaryQueryType, query: CHQuery): CHQuery | undefined {
+    return undefined;
   }
 
   async metricFindQuery(query: CHQuery | string, options: any) {
@@ -79,7 +221,7 @@ export class Datasource extends DataSourceWithBackend<CHQuery, CHConfig> {
     };
   }
 
-  applyConditionalAll(rawQuery: string, templateVars: VariableModel[]): string {
+  applyConditionalAll(rawQuery: string, templateVars: TypedVariableModel[]): string {
     if (!rawQuery) {
       return rawQuery;
     }

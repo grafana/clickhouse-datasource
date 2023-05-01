@@ -1,7 +1,7 @@
 version: '3.7'
 services:
   grafana:
-    image: grafana/grafana-enterprise:${GR_VERSION:-8.4.7}
+    image: grafana/grafana-enterprise:${GR_VERSION:-9.4.3}
     # image: grafana/grafana-enterprise:9.2.1
     # image: grafana/grafana-enterprise:latest
     # image: grafana/grafana-enterprise:main
@@ -16,7 +16,7 @@ services:
       - GF_ENTERPRISE_LICENSE_TEXT=$GF_ENTERPRISE_LICENSE_TEXT
 
   clickhouse:
-    image: 'clickhouse/clickhouse-server:${CLICKHOUSE_VERSION-23.1-alpine}'
+    image: 'clickhouse/clickhouse-server:${CLICKHOUSE_VERSION-23.2-alpine}'
     container_name: 'grafana-clickhouse-server'
     ports:
       - '8123:8123'
