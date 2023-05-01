@@ -22,10 +22,16 @@ type Settings struct {
 	TlsCACert          string
 	TlsClientCert      string
 	TlsClientKey       string
-	Secure             bool   `json:"secure,omitempty"`
-	Timeout            string `json:"timeout,omitempty"`
-	QueryTimeout       string `json:"queryTimeout,omitempty"`
-	Protocol           string `json:"protocol"`
+	Secure             bool            `json:"secure,omitempty"`
+	Timeout            string          `json:"timeout,omitempty"`
+	QueryTimeout       string          `json:"queryTimeout,omitempty"`
+	Protocol           string          `json:"protocol"`
+	CustomSettings     []CustomSetting `json:"customSettings"`
+}
+
+type CustomSetting struct {
+	Setting string `json:"setting"`
+	Value   string `json:"value"`
 }
 
 func (settings *Settings) isValid() (err error) {
@@ -114,6 +120,20 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	}
 	if jsonData["protocol"] != nil {
 		settings.Protocol = jsonData["protocol"].(string)
+	}
+	if jsonData["customSettings"] != nil {
+		customSettingsRaw := jsonData["customSettings"].([]interface{})
+		customSettings := make([]CustomSetting, len(customSettingsRaw))
+
+		for i, raw := range customSettingsRaw {
+			rawMap := raw.(map[string]interface{})
+			customSettings[i] = CustomSetting{
+				Setting: rawMap["setting"].(string),
+				Value:   rawMap["value"].(string),
+			}
+		}
+
+		settings.CustomSettings = customSettings
 	}
 
 	if strings.TrimSpace(settings.Timeout) == "" {
