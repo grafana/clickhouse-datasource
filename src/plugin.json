@@ -24,6 +24,11 @@
       "type": "dashboard",
       "name": "Cluster Analysis",
       "path": "dashboards/cluster-analysis.json"
+    },
+    {
+      "type": "dashboard",
+      "name": "Open Telemetry Traces",
+      "path": "dashboards/open-telemetry-traces.json"
     }
   ],
   "category": "sql",
