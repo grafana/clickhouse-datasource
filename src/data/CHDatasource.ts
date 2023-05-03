@@ -8,6 +8,7 @@ import {
   getTimeZone,
   getTimeZoneInfo,
   MetricFindValue,
+  QueryFixAction,
   ScopedVars,
   SupplementaryQueryType,
   TypedVariableModel,
@@ -21,6 +22,8 @@ import {
   BuilderMode,
   CHConfig,
   CHQuery,
+  Filter,
+  FilterOperator,
   Format,
   FullField,
   OrderByDirection,
@@ -244,6 +247,69 @@ export class Datasource
       macroIndex = rawQuery.lastIndexOf(macro);
     }
     return rawQuery;
+  }
+
+  modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
+    // support filtering by field value in Explore
+    if (
+      query.queryType === QueryType.Builder &&
+      action.options !== undefined &&
+      'key' in action.options &&
+      'value' in action.options
+    ) {
+      let filters: Filter[] = query.builderOptions.filters || [];
+      if (action.type === 'ADD_FILTER') {
+        // we need to remove *any other EQ or NE* for the same field,
+        // because we don't want to end up with two filters like `level=info` AND `level=error`
+        filters = (query.builderOptions.filters ?? []).filter(
+          (f) =>
+            !(
+              f.type === 'string' &&
+              f.key === action.options?.key &&
+              (f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
+            )
+        );
+        filters.push({
+          condition: 'AND',
+          key: action.options.key,
+          type: 'string',
+          filterType: 'custom',
+          operator: FilterOperator.Equals,
+          value: action.options.value,
+        });
+      } else if (action.type === 'ADD_FILTER_OUT') {
+        // with this we might want to add multiple values as NE filters
+        // for example, `level != info` AND `level != debug`
+        // thus, here we remove only exactly matching NE filters or an existing EQ filter for this field
+        filters = (query.builderOptions.filters ?? []).filter(
+          (f) =>
+            !(
+              (f.type === 'string' &&
+                f.key === action.options?.key &&
+                'value' in f &&
+                f.value === action.options?.value &&
+                f.operator === FilterOperator.NotEquals) ||
+              (f.type === 'string' && f.key === action.options?.key && f.operator === FilterOperator.Equals)
+            )
+        );
+        filters.push({
+          condition: 'AND',
+          key: action.options.key,
+          type: 'string',
+          filterType: 'custom',
+          operator: FilterOperator.NotEquals,
+          value: action.options.value,
+        });
+      }
+      const updatedBuilder = { ...query.builderOptions, filters };
+      return {
+        ...query,
+        // the query is updated to trigger the URL update and propagation to the panels
+        rawSql: getSQLFromQueryOptions(updatedBuilder),
+        builderOptions: updatedBuilder,
+      };
+    }
+    return query;
   }
 
   private getMacroArgs(query: string, argsIndex: number): string[] {

@@ -38,6 +38,8 @@ interface QueryBuilderProps {
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
   const [baseFieldsList, setBaseFieldsList] = useState<FullField[]>([]);
+  const [timeField, setTimeField] = useState<string | null>(null);
+  const [logLevelField, setLogLevelField] = useState<string | null>(null);
   const builder = defaultsDeep(props.builderOptions, defaultCHBuilderQuery.builderOptions);
   useEffect(() => {
     const fetchBaseFields = async (database: string, table: string) => {
@@ -47,17 +49,20 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           fields.push({ name: '*', label: 'ALL', type: 'string', picklistValues: [] });
           setBaseFieldsList(fields);
 
-          const dateTimeFields = fields.filter((f) => isDateTimeType(f.type));
-          if (dateTimeFields.length > 0) {
-            const filter: Filter & PredefinedFilter = {
-              operator: FilterOperator.WithInGrafanaTimeRange,
-              filterType: 'custom',
-              key: dateTimeFields[0].name,
-              type: 'datetime',
-              condition: 'AND',
-              restrictToFields: dateTimeFields,
-            };
-            onFiltersChange([filter]);
+          // if no filters are set, we add a default one for the time range
+          if (builder.filters?.length === 0) {
+            const dateTimeFields = fields.filter((f) => isDateTimeType(f.type));
+            if (dateTimeFields.length > 0) {
+              const filter: Filter & PredefinedFilter = {
+                operator: FilterOperator.WithInGrafanaTimeRange,
+                filterType: 'custom',
+                key: dateTimeFields[0].name,
+                type: 'datetime',
+                condition: 'AND',
+                restrictToFields: dateTimeFields,
+              };
+              onFiltersChange([filter]);
+            }
           }
 
           // When changing from SQL Editor to Query Builder, we need to find out if the
@@ -94,6 +99,8 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   const onDatabaseChange = (database = '') => {
     setBaseFieldsList([]);
+    setTimeField(null);
+    setLogLevelField(null);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       database,
@@ -108,6 +115,8 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
 
   const onTableChange = (table = '') => {
+    setTimeField(null);
+    setLogLevelField(null);
     const queryOptions: SqlBuilderOptions = {
       ...builder,
       table,
@@ -165,11 +174,13 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
 
   const onTimeFieldChange = (timeField = '', timeFieldType = '') => {
+    setTimeField(timeField);
     const queryOptions: SqlBuilderOptions = { ...builder, timeField, timeFieldType };
     props.onBuilderOptionsChange(queryOptions);
   };
 
   const onLogLevelFieldChange = (logLevelField = '') => {
+    setLogLevelField(logLevelField);
     const queryOptions: SqlBuilderOptions = { ...builder, logLevelField };
     props.onBuilderOptionsChange(queryOptions);
   };
@@ -221,14 +232,18 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         builder.mode === BuilderMode.List && props.format === Format.LOGS && props.app === CoreApp.Explore && (
           <>
             <TimeFieldEditor
-              timeField={builder.timeField}
+              timeField={timeField}
               timeFieldType={builder.timeFieldType}
               onTimeFieldChange={onTimeFieldChange}
               fieldsList={fieldsList}
               timeFieldTypeCheckFn={isDateTimeType}
               labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.LOGS_VOLUME_TIME_FIELD}
             />
-            <LogLevelFieldEditor fieldsList={fieldsList} onLogLevelFieldChange={onLogLevelFieldChange} />
+            <LogLevelFieldEditor
+              logLevelField={logLevelField}
+              fieldsList={fieldsList}
+              onLogLevelFieldChange={onLogLevelFieldChange}
+            />
           </>
         )
       }

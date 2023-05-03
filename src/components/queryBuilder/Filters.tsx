@@ -64,14 +64,12 @@ const FilterValueNumberItem = (props: { value: number; onChange: (value: number)
 };
 
 const FilterValueSingleStringItem = (props: { value: string; onChange: (value: string) => void }) => {
-  const [value, setValue] = useState(props.value || '');
   return (
     <div data-testid="query-builder-filters-single-string-value-container">
       <Input
         type="text"
-        value={value}
-        onChange={(e) => setValue(e.currentTarget.value)}
-        onBlur={() => props.onChange(value)}
+        defaultValue={props.value}
+        onBlur={(e) => props.onChange(e.currentTarget.value)}
       />
     </div>
   );
@@ -142,7 +140,15 @@ export const FilterValueEditor = (props: {
         </div>
       );
     }
-    return <FilterValueSingleStringItem value={filter.value} onChange={onStringFilterValueChange} />;
+
+    return (
+      <FilterValueSingleStringItem
+        value={filter.value}
+        onChange={onStringFilterValueChange}
+        // enforce input re-render when filter changes to avoid stale input value
+        key={filter.value}
+      />
+    );
   } else if (utils.isMultiFilter(filter)) {
     const onMultiFilterValueChange = (value: string[]) => {
       onFilterChange({ ...filter, value });

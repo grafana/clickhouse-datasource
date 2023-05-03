@@ -45,7 +45,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       );
     case QueryType.Builder:
     default:
-      let newQuery = { ...query };
+      let newQuery: CHBuilderQuery = { ...query };
       if (query.rawSql && !query.builderOptions) {
         return (
           <div data-testid="query-editor-section-sql">
@@ -54,8 +54,14 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
         );
       }
       if (!query.rawSql || !query.builderOptions) {
-        let { rawSql, builderOptions } = defaultCHBuilderQuery;
-        newQuery = { ...newQuery, rawSql, builderOptions };
+        newQuery = {
+          ...newQuery,
+          rawSql: defaultCHBuilderQuery.rawSql,
+          builderOptions: {
+            ...defaultCHBuilderQuery.builderOptions,
+            database: props.datasource.getDefaultDatabase() || 'default',
+          },
+        };
       }
       return (
         <div data-testid="query-editor-section-builder">
