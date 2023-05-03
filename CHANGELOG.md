@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.1
+
+- **Chore** - Backend binaries compiled with latest go version 1.20.4
+
 ## 2.2.0
 
 - Feature - [Support format dropdown and support for rendering traces](https://github.com/grafana/clickhouse-datasource/pull/329)
