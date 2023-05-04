@@ -1,9 +1,21 @@
 # Changelog
 
+## 3.0.2-beta
+
+- Custom ClickHouse settings can be set in data source settings. [Allow passing custom ClickHouse settings in datasource](https://github.com/grafana/clickhouse-datasource/pull/366)
+- Histogram UI fixes [Histogram UI fixes](https://github.com/grafana/clickhouse-datasource/pull/363)
+  -  Support filter/filter out logs view actions
+  -  Fix undefined database name by default
+  -  Reset level and time field properly on table/database change
+  -  Make it possible to clear the level field (so the histogram will render without grouping by level)
+  -  Propagate UI changes from modifyQuery to QueryBuilder component
+  -  Fix filter value that gets stuck in the UI
+- Tracing dashboard added to default dashboards. [Tracing dashboard ](https://github.com/grafana/clickhouse-datasource/pull/336)
+
 ## 3.0.1-beta
 
-Users on v8.x of Grafana are encouraged to continue to use v2.2.0 of the plugin. 
-Users of Grafana v9.x can use v3 however it is beta and may contain bugs.
+- Users on v8.x of Grafana are encouraged to continue to use v2.2.0 of the plugin. 
+- Users of Grafana v9.x can use v3 however it is beta and may contain bugs.
 
 ## 3.0.0
 - **Feature** - [Logs volume histogram support](https://github.com/grafana/clickhouse-datasource/pull/352)
