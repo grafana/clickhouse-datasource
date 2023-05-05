@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { ChangeEvent, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { InlineFormLabel, LegacyForms, RadioButtonGroup, useTheme, Switch } from '@grafana/ui';
+import {
+  Button,
+  InlineFormLabel,
+  LegacyForms,
+  RadioButtonGroup,
+  useTheme,
+  Switch,
+  InlineFieldRow,
+  InlineField,
+  Input,
+} from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
-import { CHConfig, CHSecureConfig, Protocol } from './../types';
+import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -106,6 +116,18 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
+  const onCustomSettingsChange = (customSettings: CHCustomSetting[]) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        customSettings: customSettings.filter((s) => !!s.setting && !!s.value),
+      },
+    });
+  };
+
+  const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
+
   return (
     <>
       <div className="gf-form-group">
@@ -314,6 +336,55 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             />
           </div>
         </div>
+      </div>
+      <div className="gf-form-group">
+        <h3>Custom Settings</h3>
+        <br />
+        {customSettings.map(({ setting, value }, i) => {
+          return (
+            <InlineFieldRow key={i}>
+              <InlineField label={`Setting`} aria-label={`Setting`}>
+                <Input
+                  value={setting}
+                  placeholder={'Setting'}
+                  onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
+                    let newSettings = customSettings.concat();
+                    newSettings[i] = { setting: changeEvent.target.value, value };
+                    setCustomSettings(newSettings);
+                  }}
+                  onBlur={() => {
+                    onCustomSettingsChange(customSettings);
+                  }}
+                ></Input>
+              </InlineField>
+              <InlineField label={'Value'} aria-label={`Value`}>
+                <Input
+                  value={value}
+                  placeholder={'Value'}
+                  onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
+                    let newSettings = customSettings.concat();
+                    newSettings[i] = { setting, value: changeEvent.target.value };
+                    setCustomSettings(newSettings);
+                  }}
+                  onBlur={() => {
+                    onCustomSettingsChange(customSettings);
+                  }}
+                ></Input>
+              </InlineField>
+            </InlineFieldRow>
+          );
+        })}
+        <br />
+        <Button
+          variant="secondary"
+          icon="plus"
+          type="button"
+          onClick={() => {
+            setCustomSettings([...customSettings, { setting: '', value: '' }]);
+          }}
+        >
+          Add custom setting
+        </Button>
       </div>
     </>
   );

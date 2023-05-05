@@ -7,6 +7,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
@@ -17,10 +22,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v2"
 	"github.com/pkg/errors"
-	"os"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
@@ -129,6 +130,13 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	if protocol == clickhouse.HTTP {
 		compression = clickhouse.CompressionGZIP
 	}
+	customSettings := make(clickhouse.Settings)
+	if settings.CustomSettings != nil {
+		for _, setting := range settings.CustomSettings {
+			customSettings[setting.Setting] = setting.Value
+		}
+	}
+
 	db := clickhouse.OpenDB(&clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(),
@@ -146,6 +154,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		DialTimeout: time.Duration(t) * time.Second,
 		ReadTimeout: time.Duration(qt) * time.Second,
 		Protocol:    protocol,
+		Settings:    customSettings,
 	})
 
 	timeout := time.Duration(t)
