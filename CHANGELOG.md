@@ -8,7 +8,6 @@
   -  Fix undefined database name by default
   -  Reset level and time field properly on table/database change
   -  Make it possible to clear the level field (so the histogram will render without grouping by level)
-  -  Propagate UI changes from modifyQuery to QueryBuilder component
   -  Fix filter value that gets stuck in the UI
 - Tracing dashboard added to default dashboards. [Tracing dashboard ](https://github.com/grafana/clickhouse-datasource/pull/336)
 
