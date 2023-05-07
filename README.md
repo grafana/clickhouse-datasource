@@ -19,12 +19,16 @@ locally, please checkout the [Plugin installation docs](https://grafana.com/docs
 
 ### ClickHouse user for the data source
 
-Set up an ClickHouse user account with `readonly` permission and access to
+Set up an ClickHouse user account with [readonly](https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#settings_readonly) permission and access to
 databases and tables you want to query. Please note that Grafana does not
 validate that queries are safe. Queries can contain any SQL statement. For
 example, statements like `ALTER TABLE system.users DELETE WHERE name='sadUser'`
 and `DROP TABLE sadTable;` would be executed.
 
+To configure a readonly user, follow these steps:
+
+1. Ensure the readonly user has enough permission to modify the `max_execution_time` setting required by the underlying [clickhouse-go client](https://github.com/ClickHouse/clickhouse-go/).
+2. If you're using a public Clickhouse instance, it's not recommended to set `readonly=2` in the `readonly` profile. Instead, leave `readonly=1` and set the constraint type of `max_execution_time` to [changeable_in_readonly](https://clickhouse.com/docs/en/operations/settings/constraints-on-settings) to allow modification of this setting.
 ### ClickHouse protocol support
 
 The plugin supports both `HTTP` and `Native` (default) transport protocols. This can be enabled in the configuration via the `protocol` configuration parameter. Both protocols exchange data with ClickHouse using optimized native format.
