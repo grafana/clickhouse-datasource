@@ -31,7 +31,7 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerAddress.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('false'))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
-    const a = screen.getByRole('button');
+    const a = screen.getByText('Reset');
     expect(a).toBeInTheDocument();
     expect(a.textContent).toBe('Reset');
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
