@@ -4,12 +4,22 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { Button, InlineFormLabel, LegacyForms, RadioButtonGroup, useTheme, Switch, InlineFieldRow, InlineField, Input } from '@grafana/ui';
+import {
+  Button,
+  InlineFormLabel,
+  LegacyForms,
+  RadioButtonGroup,
+  useTheme,
+  Switch,
+  InlineFieldRow,
+  InlineField,
+  Input,
+} from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
 
-export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> { }
+export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
 export const ConfigEditor: React.FC<Props> = (props) => {
   const theme = useTheme();
@@ -111,10 +121,10 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       ...options,
       jsonData: {
         ...options.jsonData,
-        customSettings: customSettings.filter(s => !!s.setting && !!s.value)
+        customSettings: customSettings.filter((s) => !!s.setting && !!s.value),
       },
-    })
-  }
+    });
+  };
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
 
@@ -330,13 +340,10 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       <div className="gf-form-group">
         <h3>Custom Settings</h3>
         <br />
-        {
-          customSettings.map(({ setting, value }, i) => {
-            return <InlineFieldRow key={i}>
-              <InlineField
-                label={`Setting`}
-                aria-label={`Setting`}
-              >
+        {customSettings.map(({ setting, value }, i) => {
+          return (
+            <InlineFieldRow key={i}>
+              <InlineField label={`Setting`} aria-label={`Setting`}>
                 <Input
                   value={setting}
                   placeholder={'Setting'}
@@ -348,13 +355,9 @@ export const ConfigEditor: React.FC<Props> = (props) => {
                   onBlur={() => {
                     onCustomSettingsChange(customSettings);
                   }}
-                >
-                </Input>
+                ></Input>
               </InlineField>
-              <InlineField
-                label={'Value'}
-                aria-label={`Value`}
-              >
+              <InlineField label={'Value'} aria-label={`Value`}>
                 <Input
                   value={value}
                   placeholder={'Value'}
@@ -366,12 +369,11 @@ export const ConfigEditor: React.FC<Props> = (props) => {
                   onBlur={() => {
                     onCustomSettingsChange(customSettings);
                   }}
-                >
-                </Input>
+                ></Input>
               </InlineField>
             </InlineFieldRow>
-          })
-        }
+          );
+        })}
         <br />
         <Button
           variant="secondary"
