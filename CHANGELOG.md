@@ -4,6 +4,7 @@
 
 - **Chore** - Backend binaries compiled with latest go version 1.20.4
 - Custom ClickHouse settings can be set in data source settings. Allow passing custom [ClickHouse settings in datasource](https://github.com/grafana/clickhouse-datasource/pull/371)
+- HTTP(S)_PROXY env variables support 
 
 ## 2.2.0
 
