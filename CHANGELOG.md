@@ -20,6 +20,11 @@
 - **Feature** - [Logs volume histogram support](https://github.com/grafana/clickhouse-datasource/pull/352)
 - **Chore** - Update clickhouse-go to v2.8.1
 
+## 2.2.1
+
+- **Chore** - Backend binaries compiled with latest go version 1.20.4
+- Custom ClickHouse settings can be set in data source settings. Allow passing custom [ClickHouse settings in datasource](https://github.com/grafana/clickhouse-datasource/pull/371)
+
 ## 2.2.0
 
 - **Feature** - [Support format dropdown and support for rendering traces](https://github.com/grafana/clickhouse-datasource/pull/329)
