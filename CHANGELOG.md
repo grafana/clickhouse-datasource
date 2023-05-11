@@ -4,6 +4,7 @@
 
 - **Chore** - Backend binaries compiled with latest go version 1.20.4
 - Custom ClickHouse settings can be set in data source settings. Allow passing custom [ClickHouse settings in datasource](https://github.com/grafana/clickhouse-datasource/pull/371)
+- Standard Golang HTTP proxy environment variables support (`HTTP_PROXY`/`HTTPS_PROXY`/`NO_PROXY`). See [FromEnvironment](https://pkg.go.dev/golang.org/x/net/http/httpproxy#FromEnvironment) for more information. If the Grafana instance is started with one of these env variables, the driver will automatically load them now. 
 
 ## 2.2.0
 
