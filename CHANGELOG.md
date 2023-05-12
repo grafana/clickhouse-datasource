@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.3-beta
+
+- Update ClickHouse driver to v2.9.2
+
 ## 3.0.2-beta
 
 - Custom ClickHouse settings can be set in data source settings. [Allow passing custom ClickHouse settings in datasource](https://github.com/grafana/clickhouse-datasource/pull/366)
