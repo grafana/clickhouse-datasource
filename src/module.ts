@@ -6,6 +6,7 @@ import { CHQuery, CHConfig } from './types';
 import { getAppEvents } from '@grafana/runtime';
 import { analyzeQueries, trackClickhouseDashboardLoaded } from 'tracking';
 import pluginJson from './plugin.json';
+import clickhouseVersion from '../package.json';
 
 export const plugin = new DataSourcePlugin<Datasource, CHQuery, CHConfig>(Datasource)
   .setConfigEditor(ConfigEditor)
@@ -21,7 +22,7 @@ getAppEvents().subscribe<DashboardLoadedEvent<CHQuery>>(
     }
 
     trackClickhouseDashboardLoaded({
-      clickhouse_plugin_version: pluginJson.info.version,
+      clickhouse_plugin_version: clickhouseVersion.version,
       grafana_version: grafanaVersion,
       dashboard_id: dashboardId,
       org_id: orgId,
