@@ -72,6 +72,10 @@ export const Components = {
       label: 'Validate SQL',
       tooltip: 'Validate Sql in the editor.',
     },
+    SecureSocksProxy: {
+      label: 'Enable Secure Socks Proxy',
+      tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',
+    },
   },
   QueryEditor: {
     CodeEditor: {

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 )
 
 // Settings - data loaded from grafana settings database
@@ -27,6 +28,7 @@ type Settings struct {
 	QueryTimeout       string          `json:"queryTimeout,omitempty"`
 	Protocol           string          `json:"protocol"`
 	CustomSettings     []CustomSetting `json:"customSettings"`
+	ProxyOptions       *proxy.Options
 }
 
 type CustomSetting struct {
@@ -158,5 +160,12 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	if ok {
 		settings.TlsClientKey = tlsClientKey
 	}
+
+	opts, err := config.HTTPClientOptions()
+	if err != nil {
+		return settings, err
+	}
+	settings.ProxyOptions = opts.ProxyOptions
+
 	return settings, settings.isValid()
 }
