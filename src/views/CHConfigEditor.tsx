@@ -17,7 +17,9 @@ import {
 } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
+import { config } from '@grafana/runtime';
 import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
+import { gte } from 'semver';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -61,7 +63,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       },
     });
   };
-  const onSwitchToggle = (key: keyof Pick<CHConfig, 'secure' | 'validate'>, value: boolean) => {
+  const onSwitchToggle = (key: keyof Pick<CHConfig, 'secure' | 'validate' | 'enableSecureSocksProxy'>, value: boolean) => {
     onOptionsChange({
       ...options,
       jsonData: {
@@ -136,7 +138,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <div className="gf-form">
           <FormField
             name="server"
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             value={jsonData.server || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'server')}
@@ -149,7 +151,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <div className="gf-form">
           <FormField
             name="port"
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             type="number"
             value={jsonData.port || ''}
@@ -161,7 +163,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Protocol.tooltip}>
+          <InlineFormLabel width={13} tooltip={Components.ConfigEditor.Protocol.tooltip}>
             {Components.ConfigEditor.Protocol.label}
           </InlineFormLabel>
           <RadioButtonGroup<Protocol>
@@ -172,7 +174,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Secure.tooltip}>
+          <InlineFormLabel width={13} tooltip={Components.ConfigEditor.Secure.tooltip}>
             {Components.ConfigEditor.Secure.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
@@ -191,7 +193,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <div className="gf-form">
           <FormField
             name="user"
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             value={jsonData.username || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'username')}
@@ -204,7 +206,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <div className="gf-form">
           <SecretFormField
             name="pwd"
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             required
             value={secureJsonData.password || ''}
@@ -222,7 +224,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <h3>TLS / SSL Settings</h3>
         <br />
         <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.TLSSkipVerify.tooltip}>
+          <InlineFormLabel width={13} tooltip={Components.ConfigEditor.TLSSkipVerify.tooltip}>
             {Components.ConfigEditor.TLSSkipVerify.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
@@ -234,7 +236,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           </div>
         </div>
         <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.TLSClientAuth.tooltip}>
+          <InlineFormLabel width={13} tooltip={Components.ConfigEditor.TLSClientAuth.tooltip}>
             {Components.ConfigEditor.TLSClientAuth.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
@@ -244,7 +246,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
               onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
             />
           </div>
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.TLSAuthWithCACert.tooltip}>
+          <InlineFormLabel width={13} tooltip={Components.ConfigEditor.TLSAuthWithCACert.tooltip}>
             {Components.ConfigEditor.TLSAuthWithCACert.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
@@ -288,7 +290,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <br />
         <div className="gf-form">
           <FormField
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             value={jsonData.defaultDatabase || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'defaultDatabase')}
@@ -300,7 +302,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         </div>
         <div className="gf-form">
           <FormField
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             value={jsonData.timeout || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'timeout')}
@@ -313,7 +315,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         </div>
         <div className="gf-form">
           <FormField
-            labelWidth={12}
+            labelWidth={13}
             inputWidth={20}
             value={jsonData.queryTimeout || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'queryTimeout')}
@@ -325,7 +327,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
-          <InlineFormLabel width={12} tooltip={Components.ConfigEditor.Validate.tooltip}>
+          <InlineFormLabel width={13} tooltip={Components.ConfigEditor.Validate.tooltip}>
             {Components.ConfigEditor.Validate.label}
           </InlineFormLabel>
           <div style={switchContainerStyle}>
@@ -336,6 +338,20 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             />
           </div>
         </div>
+        {config.featureToggles['secureSocksDSProxyEnabled'] && gte(config.buildInfo.version, '10.0.0') && (
+          <div className="gf-form">
+            <InlineFormLabel width={13} tooltip={Components.ConfigEditor.SecureSocksProxy.tooltip}>
+              {Components.ConfigEditor.SecureSocksProxy.label}
+            </InlineFormLabel>
+            <div style={switchContainerStyle}>
+              <Switch
+                className="gf-form"
+                value={jsonData.enableSecureSocksProxy || false}
+                onChange={(e) => onSwitchToggle('enableSecureSocksProxy', e.currentTarget.checked)}
+              />
+            </div>
+          </div>
+        )}
       </div>
       <div className="gf-form-group">
         <h3>Custom Settings</h3>
