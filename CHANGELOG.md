@@ -3,6 +3,7 @@
 ## 3.0.4-beta
 
 - Update Grafana dependencies to >=v9.0.0
+- **Feature** - [Add support for the secure socks proxy](https://github.com/grafana/clickhouse-datasource/pull/389)
 
 ## 3.0.3-beta
 
