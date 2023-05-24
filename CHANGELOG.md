@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.0.4-beta
+
+- Update Grafana dependencies to >=v9.0.0
+
 ## 3.0.3-beta
 
 - Update ClickHouse driver to v2.9.2

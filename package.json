@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "3.0.3-beta",
+  "version": "3.0.4-beta",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=16"
