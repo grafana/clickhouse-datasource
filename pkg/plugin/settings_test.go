@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -25,8 +26,9 @@ func TestLoadSettings(t *testing.T) {
 				name: "should parse and set all the json fields correctly",
 				args: args{
 					config: backend.DataSourceInstanceSettings{
-						JSONData:                []byte(`{ "server": "foo", "port": 443, "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10"}`),
-						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey"},
+						UID:                     "ds-uid",
+						JSONData:                []byte(`{ "server": "foo", "port": 443, "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10", "enableSecureSocksProxy": true}`),
+						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey", "secureSocksProxyPassword": "test"},
 					},
 				},
 				wantSettings: Settings{
@@ -43,6 +45,14 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientKey:       "clientKey",
 					Timeout:            "10",
 					QueryTimeout:       "60",
+					ProxyOptions: &proxy.Options{
+						Enabled: true,
+						Auth: &proxy.AuthOptions{
+							Username: "ds-uid",
+							Password: "test",
+						},
+						Timeouts: nil,
+					},
 				},
 				wantErr: nil,
 			},
@@ -62,6 +72,7 @@ func TestLoadSettings(t *testing.T) {
 					TlsAuthWithCACert:  true,
 					Timeout:            "10",
 					QueryTimeout:       "60",
+					ProxyOptions:       nil,
 				},
 				wantErr: nil,
 			},

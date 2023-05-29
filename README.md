@@ -1,5 +1,11 @@
 # ClickHouse data source for Grafana
 
+
+<img alt="Grafana Dashboard Screenshot - Query Analysis" src="https://github.com/grafana/clickhouse-datasource/assets/5509570/d129936e-afac-4002-8963-61c15825c154" width="400" >
+
+<img alt="Grafana Dashboard Screenshot - Data Analysis" src="https://github.com/grafana/clickhouse-datasource/assets/5509570/5911f72b-0a52-4e1e-9cd4-3905ac0623cd" width="400" >
+
+
 ## Version compatibility
 
 Users on `v8.x` of Grafana are encouraged to continue to use `v2.2.0` of the plugin. 

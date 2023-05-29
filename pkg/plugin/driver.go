@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -17,11 +18,13 @@ import (
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
+	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	"github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v2"
 	"github.com/pkg/errors"
+	"golang.org/x/net/proxy"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
@@ -137,7 +140,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		}
 	}
 
-	db := clickhouse.OpenDB(&clickhouse.Options{
+	opts := &clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(),
 		},
@@ -155,7 +158,23 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		ReadTimeout: time.Duration(qt) * time.Second,
 		Protocol:    protocol,
 		Settings:    customSettings,
-	})
+	}
+
+	if sdkproxy.SecureSocksProxyEnabled(settings.ProxyOptions) {
+		dialer, err := sdkproxy.NewSecureSocksProxyContextDialer(settings.ProxyOptions)
+		if err != nil {
+			return nil, err
+		}
+		contextDialer, ok := dialer.(proxy.ContextDialer)
+		if !ok {
+			return nil, errors.New("unable to cast socks proxy dialer to context proxy dialer")
+		}
+		opts.DialContext = func(ctx context.Context, addr string) (net.Conn, error) {
+			return contextDialer.DialContext(ctx, "tcp", addr)
+		}
+	}
+
+	db := clickhouse.OpenDB(opts)
 
 	timeout := time.Duration(t)
 	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)

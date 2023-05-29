@@ -16,6 +16,7 @@ export interface CHConfig extends DataSourceJsonData {
   timeout?: string;
   queryTimeout?: string;
   customSettings?: CHCustomSetting[];
+  enableSecureSocksProxy?: boolean;
 }
 
 export interface CHCustomSetting {
