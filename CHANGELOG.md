@@ -1,5 +1,9 @@
 # Changelog
 
+## 3.1.0
+
+- Stable release of v3.0.4-beta
+
 ## 3.0.4-beta
 
 - Update Grafana dependencies to >=v9.0.0
