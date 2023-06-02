@@ -2,7 +2,7 @@ import { chromium } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 
-export async function login(browser, page) {
+export async function login(page) {
   try {
     await page.goto('http://localhost:3000/login', { waitUntil: 'networkidle' });
 
@@ -10,41 +10,72 @@ export async function login(browser, page) {
     page.locator('input[name="password"]').type('admin');
     page.locator('button[type="submit"]').click();
 
+    // checks page for skip change password screen
     check(page, {
       'change password is presented':
         page.locator('button[aria-label="Skip change password button"]').textContent() === 'Skip',
     });
   } catch (e) {
     fail(`login failed: ${e}`);
-  }
+  } 
 }
 
-//TODO: select datasource as default to ensure it is selected for query
-export async function addDatasource(browser, page) {
+export async function addDatasourceSuccess(page) {
   try {
-    await page.goto('http://localhost:3000/connections/add-new-connection', { waitUntil: 'networkidle' });
-    page.locator('input[aria-label="Search all"]').type('click')
-    await page.locator('a[href="/connections/datasources/grafana-clickhouse-datasource"]').click();
-    await page.locator('button[data-testid="create-data-source-button"]').click();
-    page.locator('input[aria-label="Server address"]').type('play.clickhouse.com');
-    page.locator('input[aria-label="Server port"]').type('9440');
-    page.locator('label[for="secure"]').check();
-    page.locator('input[aria-label="Username"]').type('play');
-    page.locator('input[aria-label="Default database"]').type('default');
-    await page.locator('button[data-testid="data-testid Data source settings page Save and Test button"]').click();
+    await page.goto('http://localhost:3000/connections/datasources/new', { waitUntil: 'networkidle' });
+    const findDatasource = page.locator('input[placeholder="Filter by name or type"]');
+    await findDatasource.type('click');
+    const clickHouseDataSource = page.locator('button[aria-label="Add new data source ClickHouse"]');
+    await clickHouseDataSource.click();
+    page.locator(`input[aria-label="Server address"]`).type('localhost');
+    page.locator('input[aria-label="Server port"]').type('9000');
+    const saveAndTestButton = page.locator('button[data-testid="data-testid Data source settings page Save and Test button"]');
+    await saveAndTestButton.click();
 
+    // checks the page for the data source is working message
     check(page, {
-      'add datasource successful':
+      'add datasource successful with correct auth':
       await page.locator('[aria-label="Create a dashboard').textContent() === "building a dashboard",
     })
     
-    // add checkHealth response status?; need to find a way to grab UIDxs
-    // const res = http.get('');
-    // check(res, {
-    //   'checkHealth returns a status of 200':
-    //   (r) => r.status === 200,
-    // })
+    // checks the status code of the checkHealth function
+    const pageURL = page.url();
+    const res = http.get(`${pageURL}\health`);
 
+    check(res, {
+      'checkHealth returns a status of 200 with correct auth':
+      (r) => r.status === 200,
+    })
+
+  } catch (e) {
+    fail(`add datasource failed: ${e}`);
+  }
+}
+
+export async function addDatasourceFailure(page) {
+  try {
+    await page.goto('http://localhost:3000/connections/datasources/new', { waitUntil: 'networkidle' });
+    const findDatasource = page.locator('input[placeholder="Filter by name or type"]');
+    await findDatasource.type('click');
+    const clickHouseDataSource = page.locator('button[aria-label="Add new data source ClickHouse"]');
+    await clickHouseDataSource.click();
+    const saveAndTestButton = page.locator('button[data-testid="data-testid Data source settings page Save and Test button"]');
+    await saveAndTestButton.click();
+
+    // checks the page for the data source error message
+    check(page, {
+      'add datasource fails with incorrect auth':
+      await page.locator('[data-testid="data-testid Alert error').textContent() === "invalid server name. Either empty or not set",
+    })
+    
+    // checks the status code of the checkHealth function
+    const pageURL = page.url();
+    const res = http.get(`${pageURL}\health`);
+
+    check(res, {
+      'checkHealth returns a status of 400 with incorrect auth':
+      (r) => r.status === 400,
+    })
   } catch (e) {
     fail(`add datasource failed: ${e}`);
   }
@@ -53,21 +84,29 @@ export async function addDatasource(browser, page) {
 export async function addDashboardWithQueryBuilder(browser, page) {
   try {
     await page.goto('http://localhost:3000/dashboard/new?orgId=1', { waitUntil: 'networkidle' });
-    await page.locator('input[aria-label="Add new panel"]').click();
-    await page.locator('input[aria-label="Close dialog"]').click();
+    const addNewPanel = page.locator('button[aria-label="Add new panel"]');
+    await addNewPanel.click();
+    const closeDialog = page.locator('button[aria-label="Close dialog"]');
+    await closeDialog.click();
 
+    // checks that a dashboard can be added successfully using the query builder
     check(page, {
-      'add dashboard successful':
+      'add dashboard successful with query builder':
       await page.locator(),
     })
   } catch(e) {
     fail(`add dashboard failed: ${e}`);
+  } finally {
+    page.close();
+    browser.close();
   }
 }
 
 export default async function () {
   const browser = chromium.launch({ headless: false });
   const page = browser.newPage();
-  await login(browser, page);
-  await addDatasource(browser, page);
+  await login(page);
+  await addDatasourceSuccess(page);
+  await addDatasourceFailure(page);
+  await addDashboardWithQueryBuilder(browser, page);
 }
