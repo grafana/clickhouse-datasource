@@ -61,6 +61,7 @@
     "eror",
     "timespan",
     "dbug",
-    "emerg"
+    "emerg",
+    "networkidle"
   ]
 }
