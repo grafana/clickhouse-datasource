@@ -31,7 +31,8 @@ export class AdHocFilter {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
         const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
         const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
-        return ` ${key} ${f.operator} ${value} ${condition}`;
+        const operator = convertOperatorToClickHouseOperator(f.operator);
+        return ` ${key} ${operator} ${value} ${condition}`;
       })
       .join('');
     // Semicolons are not required and cause problems when building the SQL
@@ -40,9 +41,17 @@ export class AdHocFilter {
   }
 }
 
+function convertOperatorToClickHouseOperator(operator: AdHocVariableFilterOperator): string {
+  if (operator === '=~') {return 'ILIKE';}
+  if (operator === '!~') {return 'NOT ILIKE';}
+  return operator;
+}
+
+type AdHocVariableFilterOperator = '>' | '<' | '=' | '!=' | '=~' | '!~';
+
 export type AdHocVariableFilter = {
   key: string;
-  operator: string;
+  operator: AdHocVariableFilterOperator;
   value: string;
   condition: string;
 };
