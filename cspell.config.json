@@ -62,6 +62,7 @@
     "timespan",
     "dbug",
     "emerg",
-    "networkidle"
+    "networkidle",
+    "uuidv"
   ]
 }
