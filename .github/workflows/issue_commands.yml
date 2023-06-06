@@ -9,7 +9,7 @@ jobs:
       - name: Checkout Actions
         uses: actions/checkout@v3
         with:
-          repository: "grafana/grafana-github-actions"
+          repository: 'grafana/grafana-github-actions'
           path: ./actions
           ref: main
       - name: Install Actions
@@ -17,5 +17,5 @@ jobs:
       - name: Run Commands
         uses: ./actions/commands
         with:
-          token: ${{secrets.GH_BOT_ACCESS_TOKEN}}
+          token: ${{secrets.ISSUE_COMMANDS_TOKEN}}
           configPath: issue_commands
