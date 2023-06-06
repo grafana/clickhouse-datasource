@@ -2,9 +2,12 @@ import { chromium } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-// import { e2e } from '@grafana/e2e';
+import { selectors } from 'unpkg.com/@grafana/e2e-selectors/dist/index.js';
+
+console.log('selectors', selectors);
 
 http.setResponseCallback(http.expectedStatuses({ min: 200, max: 400 }));
+const dashboardTitle = `e2e-test-dashboard-${uuidv4()}`;
 
 export async function login(page) {
   try {
@@ -60,7 +63,6 @@ export async function addDatasource(page) {
 
 export async function addDashboard(page) {
   try {
-    const dashboardTitle = `e2e-test-dashboard-${uuidv4()}`;
     await page.goto('http://localhost:3000/dashboard/new', { waitUntil: 'networkidle' });
     const dashboardSettings = page.locator('button[aria-label="Dashboard settings"]');
     await dashboardSettings.click();
@@ -71,9 +73,6 @@ export async function addDashboard(page) {
     saveDashboardButton.click();
     const saveDashboardSidebarButton = page.locator('button[aria-label="Save dashboard button"]');
     saveDashboardSidebarButton.click();
-    // TODO: check query network request
-    // const res = http.get('http://localhost:3000/api/ds/query?ds_type=grafana-clickhouse-datasource');
-    // console.log('res body', res.json())
 
     // checks that query is run successfully
     check(page, {
@@ -85,9 +84,122 @@ export async function addDashboard(page) {
   } 
 }
 
-export async function runQuery(browser, page) {
+export async function configurePanel(browser, page) {
   try {
+    const latestDashboardURL = page.url();
+    await page.goto(`${latestDashboardURL}`, { waitUntil: 'networkidle' });
+    const addPanelButton = page.locator('button[aria-label="Add new panel"]');
+    await addPanelButton.click();
+    const addDatasourceInput = page.locator('input[placeholder="Search data source"]');
+    addDatasourceInput.type('ClickHouse');
+    page.keyboard.down('Tab');
+    page.keyboard.down('Enter');
+    const databaseDropdown = page.locator('#react-select-8-input');
+    databaseDropdown.type('system');
+    page.keyboard.down('Enter');
+    const tableDropdown = page.locator('#react-select-7-input');
+    tableDropdown.type('query_log');
+    page.keyboard.down('Enter');
+    const fieldsDropdown = page.locator('#react-select-10-input');
+    fieldsDropdown.type('event_time');
+    page.keyboard.down('Enter');
+    fieldsDropdown.type('memory_usage');
+    page.keyboard.down('Enter');
+    const runQueryButton = page.locator('button[data-testid="data-testid RefreshPicker run button"]');
+    await runQueryButton.click();
 
+    // TODO: export to util file
+    let data = {
+      "queries": [
+          {
+              "datasource": {
+                  "type": "grafana-clickhouse-datasource",
+                  "uid": `${latestDashboardUID}`
+              },
+              "refId": "A",
+              "queryType": "builder",
+              "rawSql": "SELECT memory_usage, event_time FROM system.\"query_log\" WHERE   ( event_time  >= $__fromTime AND event_time <= $__toTime ) LIMIT 100",
+              "builderOptions": {
+                  "mode": "list",
+                  "fields": [
+                      "memory_usage",
+                      "event_time"
+                  ],
+                  "limit": 100,
+                  "database": "system",
+                  "table": "query_log",
+                  "filters": [
+                      {
+                          "operator": "WITH IN DASHBOARD TIME RANGE",
+                          "filterType": "custom",
+                          "key": "event_time",
+                          "type": "datetime",
+                          "condition": "AND",
+                          "restrictToFields": [
+                              {
+                                  "name": "event_time",
+                                  "type": "DateTime",
+                                  "label": "event_time",
+                                  "picklistValues": []
+                              },
+                              {
+                                  "name": "event_time_microseconds",
+                                  "type": "DateTime64(6)",
+                                  "label": "event_time_microseconds",
+                                  "picklistValues": []
+                              },
+                              {
+                                  "name": "query_start_time",
+                                  "type": "DateTime",
+                                  "label": "query_start_time",
+                                  "picklistValues": []
+                              },
+                              {
+                                  "name": "query_start_time_microseconds",
+                                  "type": "DateTime64(6)",
+                                  "label": "query_start_time_microseconds",
+                                  "picklistValues": []
+                              },
+                              {
+                                  "name": "initial_query_start_time",
+                                  "type": "DateTime",
+                                  "label": "initial_query_start_time",
+                                  "picklistValues": []
+                              },
+                              {
+                                  "name": "initial_query_start_time_microseconds",
+                                  "type": "DateTime64(6)",
+                                  "label": "initial_query_start_time_microseconds",
+                                  "picklistValues": []
+                              }
+                          ]
+                      }
+                  ],
+                  "orderBy": []
+              },
+              "meta": {
+                  "timezone": "America/Denver"
+              },
+              "datasourceId": 2922,
+              "intervalMs": 43200000,
+              "maxDataPoints": 531
+          }
+      ],
+      "from": "1654534659803",
+      "to": "1686070659803"
+  }
+
+  // Using a JSON string as body
+  let res = http.post(url, JSON.stringify(data), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+  http.post('http://localhost:3000/api/ds/query?ds_type=grafana-clickhouse-datasource');
+
+    check(res, {
+      'configure panel query returns a status of 200':
+      (r) => r.status === 200,
+    })
   } catch(e) {
     fail(`run query failed: ${e}`);
   } finally {
@@ -101,7 +213,7 @@ export default async function () {
   await login(page);
   await addDatasource(page);
   await addDashboard(page);
-  await runQuery(browser, page);
+  await configurePanel(browser, page);
   // await removeDatasource(browser, page);
 }
 
