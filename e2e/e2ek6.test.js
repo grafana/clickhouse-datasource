@@ -1,11 +1,18 @@
 import { chromium } from 'k6/experimental/browser';
-import { check, fail, sleep } from 'k6';
+import { check, fail } from 'k6';
 import http from 'k6/http';
 
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-import { selectors } from 'unpkg.com/@grafana/e2e-selectors/dist/index.js';
+import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.js';
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
+const getDashboardUid = (url) => {
+  const matches = new URL(url).pathname.match(/\/d\/([^/]+)/);
+  if (!matches) {
+    throw new Error(`Couldn't parse uid from ${url}`);
+  } else {
+  }
+};
 
 export async function login(page) {
   try {
@@ -82,9 +89,7 @@ export async function addDashboard(page) {
     // checks that query is run successfully
     check(page, {
       'dashboard created successfully':
-      page.locator(`span[data-testid="data-testid ${DASHBOARD_TITLE} breadcrumb"]`).textContent() === `${DASHBOARD_TITLE}`,
-      // TODO: replace above test with below test
-      // page.locator(`div[data-testid="data-testid ${selectors.components.Alert.alertV2('success')}`).textContent() === 'Dashboard saved',
+      await page.locator('div[data-testid="data-testid Alert success"]').isVisible(),
     })
   } catch(e) {
     fail(`add dashboard failed: ${e}`);
@@ -116,8 +121,7 @@ export async function configurePanel(page) {
     const runQueryButton = page.locator('button[data-testid="data-testid RefreshPicker run button"]');
     await runQueryButton.click();
 
-    // TODO:get dashboardUID via scenariocontext
-    const dashboardUID = dashboardURL.split('/')[4];
+    const dashboardUID = getDashboardUid(dashboardURL);
 
     let saveDashboardData = {
       "annotations": {
@@ -331,7 +335,7 @@ export async function removeDatasource(browser, page) {
   try {
     const dashboardURL = page.url();
     // TODO: replace with scenarioContext
-    const dashboardUID = dashboardURL.split('/')[4];
+    const dashboardUID = getDashboardUid(dashboardURL);
     await page.goto(`http://localhost:3000/d/${dashboardUID}`, { waitUntil: 'networkidle' });
     
     const dashboardSettings = page.locator(`button[aria-label="${selectors.components.PageToolbar.item('Dashboard settings')}"]`);
@@ -340,7 +344,6 @@ export async function removeDatasource(browser, page) {
     await deleteDashboardButton.click();
     const deleteDashboardModalButton = page.locator(`button[data-testid="data-testid ${selectors.pages.ConfirmModal.delete}"]`);
     await deleteDashboardModalButton.click();
-    await page.screenshot({ path: 'e2e/screenshots/test.png' });
 
     check(page, {
       'dashboard deleted successfully':

@@ -63,6 +63,7 @@
     "dbug",
     "emerg",
     "networkidle",
-    "uuidv"
+    "uuidv",
+    "templating"
   ]
 }
