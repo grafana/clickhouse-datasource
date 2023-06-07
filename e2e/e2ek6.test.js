@@ -5,7 +5,7 @@ import http from 'k6/http';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { selectors } from 'unpkg.com/@grafana/e2e-selectors/dist/index.js';
 
-const dashboardTitle = `e2e-test-dashboard-${uuidv4()}`;
+const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 
 export async function login(page) {
   try {
@@ -75,14 +75,14 @@ export async function addDashboard(page) {
     await saveDashboardToolbarButton.click();
     const dashboardTitleInput = page.locator(`input[aria-label="${selectors.pages.SaveDashboardAsModal.newName}"]`);
     dashboardTitleInput.fill('');
-    await dashboardTitleInput.type(dashboardTitle);
+    await dashboardTitleInput.type(DASHBOARD_TITLE);
     const saveDashboardModalButton = page.locator(`button[aria-label="${selectors.pages.SaveDashboardAsModal.save}"]`);
     saveDashboardModalButton.click();
 
     // checks that query is run successfully
     check(page, {
       'dashboard created successfully':
-      page.locator(`span[data-testid="data-testid ${dashboardTitle} breadcrumb"]`).textContent() === `${dashboardTitle}`,
+      page.locator(`span[data-testid="data-testid ${DASHBOARD_TITLE} breadcrumb"]`).textContent() === `${DASHBOARD_TITLE}`,
       // TODO: replace above test with below test that aligns with core Grafana flows
       // page.locator(`div[data-testid="data-testid ${selectors.components.Alert.alertV2('success')}`).textContent() === 'Dashboard saved',
     })
