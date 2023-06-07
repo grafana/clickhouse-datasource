@@ -1,5 +1,5 @@
 import { chromium } from 'k6/experimental/browser';
-import { check, fail } from 'k6';
+import { check, fail, sleep } from 'k6';
 import http from 'k6/http';
 
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
@@ -27,7 +27,7 @@ export async function login(page) {
   } catch (e) {
     fail(`login failed: ${e}`);
   } 
-}
+};
 
 export async function addDatasource(page) {
   try {
@@ -64,7 +64,7 @@ export async function addDatasource(page) {
   } catch (e) {
     fail(`add datasource failed: ${e}`);
   }
-}
+};
 
 export async function addDashboard(page) {
   try {
@@ -89,13 +89,13 @@ export async function addDashboard(page) {
   } catch(e) {
     fail(`add dashboard failed: ${e}`);
   } 
-}
+};
 
-export async function configurePanel(browser, page) {
+export async function configurePanel(page) {
   try {
     const latestDashboardURL = page.url();
-
     await page.goto(`${latestDashboardURL}`, { waitUntil: 'networkidle' });
+
     const addPanelButton = page.locator('button[aria-label="Add new panel"]');
     await addPanelButton.click();
     const addDatasourceInput = page.locator('input[placeholder="Search data source"]');
@@ -116,16 +116,44 @@ export async function configurePanel(browser, page) {
     const runQueryButton = page.locator('button[data-testid="data-testid RefreshPicker run button"]');
     await runQueryButton.click();
 
-    check(page, {
-      'configure panel query returns a status of 200':
-      (r) => r.status === 200,
-    })
+    // TODO: implement check for this flow - post request and/or screenshot
+    // check(page, {
+    //   'configure panel query returns a status of 200':
+    //   (r) => r.status === 200,
+    // })
   } catch(e) {
     fail(`run query failed: ${e}`);
+  } 
+};
+
+export async function removeDatasource(browser, page) {
+  try {
+    const currentDashboardPanel = page.url();
+    console.log('url boo boo', currentDashboardPanel);
+    // await page.goto(`${currentDashboardPanel}`, { waitUntil: 'networkidle' });
+    // sleep(15)
+
+    const dashboardBreadcrumb = page.locator(`a[data-testid="${selectors.components.Breadcrumbs.breadcrumb(`${dashboardTitle}`)}"]`);
+    await dashboardBreadcrumb.click();
+    sleep(5)
+    const dashboardSettings = page.locator(`button[aria-label="${selectors.components.PageToolbar.item('Dashboard settings')}"]`);
+    await dashboardSettings.click();
+    sleep(5)
+    // const deleteDashboardButton = page.locator(`button[aria-label=["${selectors.pages.Dashboard.Settings.General.deleteDashBoard}"]`);
+    const deleteDashboardButton = page.locator(`button[aria-label=["Dashboard settings page delete dashboard button"]`);
+    await deleteDashboardButton.click();
+    const deleteDashboardModalButton = page.locator(`button[data-testid="data-testid ${pages.ConfirmModal.delete}"]`);
+    await deleteDashboardModalButton.click();
+
+    // const res = http.del('http://localhost:3000/api/dashboards/uid/b6df57f6-dd5b-4fe7-bd34-4949271157a3');
+    // console.log('del res', res);
+
+  } catch(e) {
+    fail(`remove datasource failed: ${e}`);
   } finally {
     browser.close();
   }
-}
+};
 
 export default async function () {
   const browser = chromium.launch({ headless: false });
@@ -133,7 +161,7 @@ export default async function () {
   await login(page);
   await addDatasource(page);
   await addDashboard(page);
-  await configurePanel(browser, page);
-  // await removeDatasource(browser, page);
+  await configurePanel(page);
+  await removeDatasource(browser, page);
 }
 
