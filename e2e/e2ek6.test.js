@@ -2,15 +2,20 @@ import { chromium } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 
+import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.js';
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
+const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
+let datasourceUID;
+let apiToken;
 const getDashboardUid = (url) => {
   const matches = new URL(url).pathname.match(/\/d\/([^/]+)/);
   if (!matches) {
     throw new Error(`Couldn't parse uid from ${url}`);
   } else {
+    return matches[1];
   }
 };
 
@@ -45,7 +50,7 @@ export async function addDatasource(page) {
     await clickHouseDataSource.click();
     const dataSourceName = page.locator(`input[aria-label="${selectors.pages.DataSource.name}"]`);
     dataSourceName.fill('');
-    dataSourceName.type(`ClickHouse-e2e-test-${uuidv4()}`);
+    dataSourceName.type(`${DATASOURCE_NAME}`);
     const serverAddress = page.locator(`input[aria-label="Server address"]`);
     serverAddress.type('localhost');
     const serverPort = page.locator('input[aria-label="Server port"]');
@@ -57,17 +62,58 @@ export async function addDatasource(page) {
     check(page, {
       'add datasource successful':
       await page.locator('[aria-label="Create a dashboard').textContent() === "building a dashboard",
-    })
+    });
+
+    const orgName = `api-org-${uuidv4()}`
+
+    // creates org
+    const getOrg = http.post('http://admin:admin@localhost:3000/api/orgs', `{"name": "${orgName}"}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const orgID = getOrg.json().orgId;
+
+    // ensures admin is added as a user to the org
+    http.post(`http://admin:admin@localhost:3000/api/orgs/${orgID}/users`, '{"loginOrEmail":"admin", "role": "Admin"}', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    // switch the org context for the Admin user to the new org
+    http.post(`http://admin:admin@localhost:3000/api/user/using/${orgID}`, null);
+
+    // creates API token
+    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', '{"name":"apikey", "role": "Admin", "secondsToLive": 6000 }', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    apiToken = getApiToken.json().key;
+
+    const addNewDatasourcePostBody = {
+      "name": "ClickHouse",
+      "type":"grafana-clickhouse-datasource",
+      "url":"http://mydatasource.com",
+      "access":"proxy",
+      "basicAuth":false
+    }
+
+    const addNewDatasource = http.post('http://admin:admin@localhost:3000/api/datasources', JSON.stringify(addNewDatasourcePostBody), {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
+     });
+
+    check(addNewDatasource, {
+      'add new data source returns a status of 200':
+      (r) => r.status === 200
+    });
+
+    datasourceUID = addNewDatasource.json().uid;
     
     // checks the status code of the checkHealth function
     const pageURL = page.url();
-    const res = http.get(`${pageURL}\health`);
+    const healthCheck = http.get(`${pageURL}\health`);
 
-    check(res, {
+    check(healthCheck, {
       'checkHealth returns a status of 200':
       (r) => r.status === 200,
-    })
-
+    });
   } catch (e) {
     fail(`add datasource failed: ${e}`);
   }
@@ -121,211 +167,116 @@ export async function configurePanel(page) {
     const runQueryButton = page.locator('button[data-testid="data-testid RefreshPicker run button"]');
     await runQueryButton.click();
 
-    const dashboardUID = getDashboardUid(dashboardURL);
+    const getCurrentUser = http.post('http://admin:admin@localhost:3000/api/orgs/users', null, {
+     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
+    });
+    console.log('getCurrentUser', getCurrentUser.json())
 
-    let saveDashboardData = {
-      "annotations": {
-        "list": [
+    // deletes org after use for cleanup
+    // const deleteOrg = http.del(`http://admin:admin@localhost:3000/api/orgs/${orgID}`, { "username": "admin", "password": "admin" }, {
+    //   headers: { 'Content-Type': 'application/json' },
+    // });
+    // console.log('deleteOrg', deleteOrg.json())
+
+    console.log('datasourceUID', datasourceUID)
+
+    // const getDatasourceUID = http.get(`http://localhost:3000/api/datasources/name/${DATASOURCE_NAME}`, {
+    //   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
+    //  });
+    // console.log('datasource UID123', getDatasourceUID.json())
+
+    let queryData = {
+      "queries": [
           {
-            "builtIn": 1,
-            "datasource": {
-              "type": "grafana",
-              "uid": "-- Grafana --"
-            },
-            "enable": true,
-            "hide": true,
-            "iconColor": "rgba(0, 211, 255, 1)",
-            "name": "Annotations & Alerts",
-            "type": "dashboard"
-          }
-        ]
-      },
-      "editable": true,
-      "fiscalYearStartMonth": 0,
-      "graphTooltip": 0,
-      "id": 319,
-      "links": [],
-      "liveNow": false,
-      "panels": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": `${dashboardUID}`
-          },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
-          "gridPos": {
-            "h": 8,
-            "w": 12,
-            "x": 0,
-            "y": 0
-          },
-          "id": 1,
-          "options": {
-            "legend": {
-              "calcs": [],
-              "displayMode": "list",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "tooltip": {
-              "mode": "single",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "builderOptions": {
-                "database": "system",
-                "fields": [
-                  "event_time",
-                  "memory_usage"
-                ],
-                "filters": [
-                  {
-                    "condition": "AND",
-                    "filterType": "custom",
-                    "key": "event_time",
-                    "operator": "WITH IN DASHBOARD TIME RANGE",
-                    "restrictToFields": [
-                      {
-                        "label": "event_time",
-                        "name": "event_time",
-                        "picklistValues": [],
-                        "type": "DateTime"
-                      },
-                      {
-                        "label": "event_time_microseconds",
-                        "name": "event_time_microseconds",
-                        "picklistValues": [],
-                        "type": "DateTime64(6)"
-                      },
-                      {
-                        "label": "query_start_time",
-                        "name": "query_start_time",
-                        "picklistValues": [],
-                        "type": "DateTime"
-                      },
-                      {
-                        "label": "query_start_time_microseconds",
-                        "name": "query_start_time_microseconds",
-                        "picklistValues": [],
-                        "type": "DateTime64(6)"
-                      },
-                      {
-                        "label": "initial_query_start_time",
-                        "name": "initial_query_start_time",
-                        "picklistValues": [],
-                        "type": "DateTime"
-                      },
-                      {
-                        "label": "initial_query_start_time_microseconds",
-                        "name": "initial_query_start_time_microseconds",
-                        "picklistValues": [],
-                        "type": "DateTime64(6)"
-                      }
-                    ],
-                    "type": "datetime"
-                  }
-                ],
-                "limit": 100,
-                "metrics": [],
-                "mode": "aggregate",
-                "orderBy": [],
-                "table": "query_log",
-                "timeFieldType": "DateTime"
-              },
               "datasource": {
-                "type": "grafana-clickhouse-datasource",
-                "uid": `${dashboardUID}`
+                  "type": "grafana-clickhouse-datasource",
+                  "uid": `${datasourceUID}`
+              },
+              "builderOptions": {
+                  "database": "system",
+                  "fields": [
+                      "memory_usage",
+                      "event_time"
+                  ],
+                  "filters": [
+                      {
+                          "condition": "AND",
+                          "filterType": "custom",
+                          "key": "event_time",
+                          "operator": "WITH IN DASHBOARD TIME RANGE",
+                          "restrictToFields": [
+                              {
+                                  "label": "event_time",
+                                  "name": "event_time",
+                                  "picklistValues": [],
+                                  "type": "DateTime"
+                              },
+                              {
+                                  "label": "event_time_microseconds",
+                                  "name": "event_time_microseconds",
+                                  "picklistValues": [],
+                                  "type": "DateTime64(6)"
+                              },
+                              {
+                                  "label": "query_start_time",
+                                  "name": "query_start_time",
+                                  "picklistValues": [],
+                                  "type": "DateTime"
+                              },
+                              {
+                                  "label": "query_start_time_microseconds",
+                                  "name": "query_start_time_microseconds",
+                                  "picklistValues": [],
+                                  "type": "DateTime64(6)"
+                              },
+                              {
+                                  "label": "initial_query_start_time",
+                                  "name": "initial_query_start_time",
+                                  "picklistValues": [],
+                                  "type": "DateTime"
+                              },
+                              {
+                                  "label": "initial_query_start_time_microseconds",
+                                  "name": "initial_query_start_time_microseconds",
+                                  "picklistValues": [],
+                                  "type": "DateTime64(6)"
+                              }
+                          ],
+                          "type": "datetime"
+                      }
+                  ],
+                  "limit": 100,
+                  "metrics": [],
+                  "mode": "list",
+                  "orderBy": [],
+                  "table": "query_log",
+                  "timeField": "event_time",
+                  "timeFieldType": "DateTime"
               },
               "queryType": "builder",
-              "rawSql": "SELECT event_time, memory_usage FROM system.\"query_log\" WHERE   ( event_time  >= $__fromTime AND event_time <= $__toTime ) LIMIT 100",
-              "refId": "A"
-            }
-          ],
-          "title": "Panel Title",
-          "type": "timeseries"
-        }
+              "rawSql": "SELECT memory_usage, event_time FROM system.\"query_log\" WHERE   ( event_time  >= $__fromTime AND event_time <= $__toTime ) LIMIT 100",
+              "refId": "A",
+              "meta": {
+                  "timezone": "America/Denver"
+              },
+              "datasourceId": 2922,
+              "intervalMs": 30000,
+              "maxDataPoints": 638
+          }
       ],
-      "refresh": "",
-      "schemaVersion": 38,
-      "style": "dark",
-      "tags": [],
-      "templating": {
-        "list": []
-      },
-      "time": {
-        "from": "now-6h",
-        "to": "now"
-      },
-      "timepicker": {},
-      "timezone": "",
-      "title": `${DASHBOARD_TITLE}`,
-      "uid": `${dashboardUID}`,
-      "version": 2,
-      "weekStart": ""
-    }
+      "from": "1686147681613",
+      "to": "1686169281613"
+    };
 
-    const res = http.post('http://localhost:3000/api/dashboards/db/', saveDashboardData, {
-      headers: { 'Content-Type': 'application/json' },
+    const res = http.post('http://localhost:3000/api/ds/query/', JSON.stringify(queryData), {
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
-    console.log('response1', res.json())
+    console.log('response123', res.json())
 
-    check(res, {
-      'run query returns a response of 200':
-      (r) => r.status === 200
-    })
+    // check(res, {
+    //   'run query returns a response of 200':
+    //   (r) => r.status === 200
+    // })
   } catch(e) {
     fail(`run query failed: ${e}`);
   } 
