@@ -8,6 +8,7 @@ import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.j
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
+let orgID;
 let datasourceUID;
 let apiToken;
 const getDashboardUid = (url) => {
@@ -71,7 +72,7 @@ export async function addDatasource(page) {
       headers: { 'Content-Type': 'application/json' },
     });
 
-    const orgID = getOrg.json().orgId;
+    orgID = getOrg.json().orgId;
 
     // ensures admin is added as a user to the org
     http.post(`http://admin:admin@localhost:3000/api/orgs/${orgID}/users`, '{"loginOrEmail":"admin", "role": "Admin"}', {
@@ -79,32 +80,37 @@ export async function addDatasource(page) {
     });
 
     // switch the org context for the Admin user to the new org
-    http.post(`http://admin:admin@localhost:3000/api/user/using/${orgID}`, null);
+    const orgContext = http.post(`http://admin:admin@localhost:3000/api/user/using/${orgID}`, null);
+    console.log('org cont', orgContext)
 
     // creates API token
-    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', '{"name":"apikey", "role": "Admin", "secondsToLive": 6000 }', {
+    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', '{"name":"apikey", "role": "Admin", "secondsToLive": 60000 }', {
       headers: { 'Content-Type': 'application/json' },
     });
     apiToken = getApiToken.json().key;
 
     const addNewDatasourcePostBody = {
       "name": "ClickHouse",
-      "type":"grafana-clickhouse-datasource",
-      "url":"http://mydatasource.com",
-      "access":"proxy",
-      "basicAuth":false
+      "type": "grafana-clickhouse-datasource",
+      "url": "http://mydatasource.com",
+      "access": "proxy",
+      "basicAuth": true,
+      "basicAuthUser": "admin",
+      "basicAuthPassword": "admin",
+      "password": "admin",
+      "user": "admin",
     }
 
     const addNewDatasource = http.post('http://admin:admin@localhost:3000/api/datasources', JSON.stringify(addNewDatasourcePostBody), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
-     });
+    });
 
     check(addNewDatasource, {
       'add new data source returns a status of 200':
       (r) => r.status === 200
     });
 
-    datasourceUID = addNewDatasource.json().uid;
+    datasourceUID = addNewDatasource.json().datasource.uid;
     
     // checks the status code of the checkHealth function
     const pageURL = page.url();
@@ -166,24 +172,6 @@ export async function configurePanel(page) {
     page.keyboard.down('Enter');
     const runQueryButton = page.locator('button[data-testid="data-testid RefreshPicker run button"]');
     await runQueryButton.click();
-
-    const getCurrentUser = http.post('http://admin:admin@localhost:3000/api/orgs/users', null, {
-     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
-    });
-    console.log('getCurrentUser', getCurrentUser.json())
-
-    // deletes org after use for cleanup
-    // const deleteOrg = http.del(`http://admin:admin@localhost:3000/api/orgs/${orgID}`, { "username": "admin", "password": "admin" }, {
-    //   headers: { 'Content-Type': 'application/json' },
-    // });
-    // console.log('deleteOrg', deleteOrg.json())
-
-    console.log('datasourceUID', datasourceUID)
-
-    // const getDatasourceUID = http.get(`http://localhost:3000/api/datasources/name/${DATASOURCE_NAME}`, {
-    //   headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
-    //  });
-    // console.log('datasource UID123', getDatasourceUID.json())
 
     let queryData = {
       "queries": [
@@ -271,12 +259,12 @@ export async function configurePanel(page) {
     const res = http.post('http://localhost:3000/api/ds/query/', JSON.stringify(queryData), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
-    console.log('response123', res.json())
 
-    // check(res, {
-    //   'run query returns a response of 200':
-    //   (r) => r.status === 200
-    // })
+    // checks for 200 response of query request
+    check(res, {
+      'run query returns a response of 200':
+      (r) => r.status === 200
+    })
   } catch(e) {
     fail(`run query failed: ${e}`);
   } 
@@ -285,7 +273,6 @@ export async function configurePanel(page) {
 export async function removeDatasource(browser, page) {
   try {
     const dashboardURL = page.url();
-    // TODO: replace with scenarioContext
     const dashboardUID = getDashboardUid(dashboardURL);
     await page.goto(`http://localhost:3000/d/${dashboardUID}`, { waitUntil: 'networkidle' });
     
@@ -296,10 +283,11 @@ export async function removeDatasource(browser, page) {
     const deleteDashboardModalButton = page.locator(`button[data-testid="data-testid ${selectors.pages.ConfirmModal.delete}"]`);
     await deleteDashboardModalButton.click();
 
+    // checks for success alert message
     check(page, {
       'dashboard deleted successfully':
       await page.locator('div[data-testid="data-testid Alert success"]').isVisible(),
-    })
+    });
   } catch(e) {
     fail(`remove datasource failed: ${e}`);
   } finally {
@@ -315,5 +303,5 @@ export default async function () {
   await addDashboard(page);
   await configurePanel(page);
   await removeDatasource(browser, page);
-}
+};
 
