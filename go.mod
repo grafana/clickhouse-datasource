@@ -3,10 +3,10 @@ module github.com/grafana/clickhouse-datasource
 go 1.20
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.10.0
+	github.com/ClickHouse/clickhouse-go/v2 v2.3.0
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/grafana-plugin-sdk-go v0.161.0
+	github.com/grafana/grafana-plugin-sdk-go v0.165.0
 	github.com/grafana/sqlds/v2 v2.5.0
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
