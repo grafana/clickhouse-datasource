@@ -138,7 +138,7 @@ export async function addDashboard(page) {
     const saveDashboardModalButton = page.locator(`button[aria-label="${selectors.pages.SaveDashboardAsModal.save}"]`);
     saveDashboardModalButton.click();
 
-    // checks that query is run successfully
+    // checks that the dashboard is created successfully
     check(page, {
       'dashboard created successfully':
       await page.locator('div[data-testid="data-testid Alert success"]').isVisible(),
@@ -270,7 +270,7 @@ export async function configurePanel(page) {
   } 
 };
 
-export async function removeDatasource(browser, page) {
+export async function removeDashboard(browser, page) {
   try {
     const dashboardURL = page.url();
     const dashboardUID = getDashboardUid(dashboardURL);
@@ -302,6 +302,6 @@ export default async function () {
   await addDatasource(page);
   await addDashboard(page);
   await configurePanel(page);
-  await removeDatasource(browser, page);
+  await removeDashboard(browser, page);
 };
 
