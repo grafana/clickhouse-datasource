@@ -2,9 +2,7 @@ package e2e_test
 
 import (
 	"context"
-	"embed"
 	"fmt"
-	"io/fs"
 	"log"
 	"os"
 	"testing"
@@ -22,15 +20,23 @@ var command = &cobra.Command{
 func e2etests(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 
-	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr))
+	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr), dagger.WithWorkdir(".."))
 	if err != nil {
 		panic(err)
 	}
+	defer client.Close()
 
 	//set up clickhouse docker image
 	startClickHouse(client)
 
+	entries, err := client.Host().Directory(".").Entries(ctx)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	fmt.Println(entries)
 	//build CH plugin to get dist file
+	buildPlugin(ctx, client)
 
 	//run grafana with CH plugin installed
 
@@ -47,89 +53,56 @@ func startClickHouse(client *dagger.Client) {
 	fmt.Println("ClickHouse started")
 }
 
-var e embed.FS
+func buildPlugin(ctx context.Context, client *dagger.Client) {
+	fmt.Println("Building plugin")
+	backend := buildBackend(ctx, client, client.Host().Directory("."))
+	_ = WithYarnDependencies(client, backend)
+	fmt.Println("Plugin built")
 
-// func buildPlugin(client *dagger.Client) {
-// 	fmt.Println("Building plugin")
-
-// 	var (
-// 		grabplVersion = "2.9.51"
-// 		//dockerizeVersion = "0.6.1"
-// 	)
-
-// 	log.Println("build plugin")
-
-// 	source := client.Directory()
-// 	var err error
-// 	source, err = copyEmbedDir(e, source)
-// 	if err != nil {
-// 		panic(err)
-// 	}
-
-// 	grabpl := DownloadGrabpl(client, grabplVersion)
-// 	container := client.Container().From("grafana/grafana-plugin-ci:1.7.4-alpine")
-
-// 	container = container.
-// 		WithDirectory("/src", &dagger.Directory).
-// 		WithFile("/bin/grabpl", grabpl).
-// 		WithWorkdir("/src")
-
-// 	fmt.Println("Plugin built")
-// 	return WithYarnDependencies(client, container).Directory("/src")
-// }
-
-func embedStuff() {
-	ctx := context.Background()
-
-	// Init Dagger client
-	client, err := dagger.Connect(ctx)
-	if err != nil {
-		panic(err)
-	}
-	defer client.Close()
-
-	// Copy embed files to dir, a newly created directory.
-	dir := client.Directory()
-	dir, err = copyEmbedDir(e, dir)
-	if err != nil {
-		panic(err)
-	}
-
-	// Mount above directory ID and
-	container := client.Container().From("alpine:3.16.2").WithDirectory("/embed", dir)
-
-	// List files
-	out, err := container.WithExec([]string{"ls", "-lR", "/embed/"}).Stdout(ctx)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Printf("%s", out)
 }
 
-// create a copy of an embed directory
-func copyEmbedDir(e fs.FS, dir *dagger.Directory) (*dagger.Directory, error) {
-	err := fs.WalkDir(e, ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
+func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.Directory) *dagger.Container {
+	container := client.
+		Container().
+		From("golang:1.20").
+		WithWorkdir("./clickhouse-datasource").
+		WithDirectory(".", directory).
+		//WithExec([]string{"apt", "update"}).
+		// WithExec([]string{"apt", "install", "-y", "upx"}).
+		WithExec([]string{"go", "install", "github.com/magefile/mage@latest"}).
+		WithExec([]string{"mage", "build:backend"})
 
-		content, err := fs.ReadFile(e, path)
-		if err != nil {
-			return err
-		}
-
-		dir = dir.WithNewFile(path, string(content))
-
-		return nil
-	})
+	//print stuff
+	entries, err := container.Directory(".").Entries(ctx)
 	if err != nil {
-		return nil, err
+		log.Println(err)
 	}
-	return dir, nil
+	fmt.Println(entries)
+	// Mockgen
+	// do same stuff for mockgen
+	// gen k8s controllers
+	// same
+	// Build
+	// gobuildfiles := client.Host().Directory(".")
+	// gobuild := mageBase.WithMountedDirectory(workdir, protogen.Directory(workdir)).
+	// WithMountedDirectory(workdir, mockgen.Directory(workdir)).
+	// WithMountedDirectory(workdir, k8s.Directory(workdir)).
+	// WithExec([]string{"go", "build", "./..."})
+
+	//_, err := gobuild.Directory("bin/").Export(ctx, "bin/")
+	return container
+}
+
+func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *dagger.Directory {
+
+	nodeModules := client.Container().From("node:16.13.2").
+		WithDirectory(".", client.Directory()).
+		WithExec([]string{"yarn", "install", "--frozen-lockfile", "--no-progress"}).
+		WithExec([]string{"yarn", "build"}).
+		//WithExec([]string{"rm", "-rf", "/src/node_modules/@grafana/data/node_modules"}).
+		Directory(".")
+
+	return nodeModules
 }
 
 func startGrafana(client *dagger.Client) {
@@ -141,7 +114,6 @@ func startGrafana(client *dagger.Client) {
 
 func TestConnect(t *testing.T) {
 	fmt.Println("dasfdsafdsafd built")
-	embedStuff()
 	if err := command.Execute(); err != nil {
 		log.Fatalln(err)
 	}
