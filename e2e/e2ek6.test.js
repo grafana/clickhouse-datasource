@@ -8,7 +8,6 @@ import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.j
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
-let orgID;
 let datasourceUID;
 let apiToken;
 const getDashboardUid = (url) => {
@@ -56,7 +55,8 @@ export async function addDatasource(page) {
     serverAddress.type('localhost');
     const serverPort = page.locator('input[aria-label="Server port"]');
     serverPort.type('9000');
-    const saveAndTestButton = page.locator(`button[data-testid="data-testid ${selectors.pages.DataSource.saveAndTest}"]`);
+    // const saveAndTestButton = page.locator(`button[data-testid="data-testid ${selectors.pages.DataSource.saveAndTest}"]`);
+    const saveAndTestButton = page.locator('button[data-testid="data-testid Data source settings page Save and Test button"]');
     await saveAndTestButton.click();
 
     // checks the page for the data source is working message
@@ -65,61 +65,9 @@ export async function addDatasource(page) {
       await page.locator('[aria-label="Create a dashboard').textContent() === "building a dashboard",
     });
 
-    const orgName = `api-org-${uuidv4()}`
+    const pageURL = page.url().split('/');
+    datasourceUID = pageURL[pageURL.length - 1];
 
-    // creates org
-    const getOrg = http.post('http://admin:admin@localhost:3000/api/orgs', `{"name": "${orgName}"}`, {
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    orgID = getOrg.json().orgId;
-
-    // ensures admin is added as a user to the org
-    http.post(`http://admin:admin@localhost:3000/api/orgs/${orgID}/users`, '{"loginOrEmail":"admin", "role": "Admin"}', {
-      headers: { 'Content-Type': 'application/json' },
-    });
-
-    // switch the org context for the Admin user to the new org
-    const orgContext = http.post(`http://admin:admin@localhost:3000/api/user/using/${orgID}`, null);
-    console.log('org cont', orgContext)
-
-    // creates API token
-    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', '{"name":"apikey", "role": "Admin", "secondsToLive": 60000 }', {
-      headers: { 'Content-Type': 'application/json' },
-    });
-    apiToken = getApiToken.json().key;
-
-    const addNewDatasourcePostBody = {
-      "name": "ClickHouse",
-      "type": "grafana-clickhouse-datasource",
-      "url": "http://mydatasource.com",
-      "access": "proxy",
-      "basicAuth": true,
-      "basicAuthUser": "admin",
-      "basicAuthPassword": "admin",
-      "password": "admin",
-      "user": "admin",
-    }
-
-    const addNewDatasource = http.post('http://admin:admin@localhost:3000/api/datasources', JSON.stringify(addNewDatasourcePostBody), {
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` } 
-    });
-
-    check(addNewDatasource, {
-      'add new data source returns a status of 200':
-      (r) => r.status === 200
-    });
-
-    datasourceUID = addNewDatasource.json().datasource.uid;
-    
-    // checks the status code of the checkHealth function
-    const pageURL = page.url();
-    const healthCheck = http.get(`${pageURL}\health`);
-
-    check(healthCheck, {
-      'checkHealth returns a status of 200':
-      (r) => r.status === 200,
-    });
   } catch (e) {
     fail(`add datasource failed: ${e}`);
   }
@@ -153,25 +101,12 @@ export async function configurePanel(page) {
     const dashboardURL = page.url();
     await page.goto(`${dashboardURL}`, { waitUntil: 'networkidle' });
 
-    const addPanelButton = page.locator('button[aria-label="Add new panel"]');
+    const addPanelButton = page.locator('button[data-testid="data-testid Create new panel button"]');
     await addPanelButton.click();
     const addDatasourceInput = page.locator('input[placeholder="Search data source"]');
-    addDatasourceInput.type('ClickHouse');
+    addDatasourceInput.type(`${DATASOURCE_NAME}`);
     page.keyboard.down('Tab');
     page.keyboard.down('Enter');
-    const databaseDropdown = page.locator('#react-select-8-input');
-    databaseDropdown.type('system');
-    page.keyboard.down('Enter');
-    const tableDropdown = page.locator('#react-select-9-input');
-    tableDropdown.type('query_log');
-    page.keyboard.down('Enter');
-    const fieldsDropdown = page.locator('#react-select-10-input');
-    fieldsDropdown.type('event_time');
-    page.keyboard.down('Enter');
-    fieldsDropdown.type('memory_usage');
-    page.keyboard.down('Enter');
-    const runQueryButton = page.locator('button[data-testid="data-testid RefreshPicker run button"]');
-    await runQueryButton.click();
 
     let queryData = {
       "queries": [
@@ -256,7 +191,17 @@ export async function configurePanel(page) {
       "to": "1686169281613"
     };
 
-    const res = http.post('http://localhost:3000/api/ds/query/', JSON.stringify(queryData), {
+    // ensures user is an admin to the org
+    http.post('http://admin:admin@localhost:3000/api/user/using/1', null);
+
+    // creates API token 
+    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', '{"name":"apikey-test1", "role": "Admin", "secondsToLive": 6000 }', {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    apiToken = getApiToken.json().key;
+
+    // sends POST request for query
+    const res = http.post('http://admin:admin@localhost:3000/api/ds/query/', JSON.stringify(queryData), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
 
@@ -280,7 +225,7 @@ export async function removeDashboard(browser, page) {
     await dashboardSettings.click();
     const deleteDashboardButton = page.locator(`button[aria-label="${selectors.pages.Dashboard.Settings.General.deleteDashBoard}"]`);
     await deleteDashboardButton.click();
-    const deleteDashboardModalButton = page.locator(`button[data-testid="data-testid ${selectors.pages.ConfirmModal.delete}"]`);
+    const deleteDashboardModalButton = page.locator(`button[data-testid="${selectors.pages.ConfirmModal.delete}"]`);
     await deleteDashboardModalButton.click();
 
     // checks for success alert message
