@@ -55,8 +55,7 @@ export async function addDatasource(page) {
     serverAddress.type('localhost');
     const serverPort = page.locator('input[aria-label="Server port"]');
     serverPort.type('9000');
-    // const saveAndTestButton = page.locator(`button[data-testid="data-testid ${selectors.pages.DataSource.saveAndTest}"]`);
-    const saveAndTestButton = page.locator('button[data-testid="data-testid Data source settings page Save and Test button"]');
+    const saveAndTestButton = page.locator(`button[data-testid="${selectors.pages.DataSource.saveAndTest}"]`);
     await saveAndTestButton.click();
 
     // checks the page for the data source is working message
@@ -194,16 +193,20 @@ export async function configurePanel(page) {
     // ensures user is an admin to the org
     http.post('http://admin:admin@localhost:3000/api/user/using/1', null);
 
+    const apiKeyName = `apikey-${uuidv4()}`
+
     // creates API token 
-    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', '{"name":"apikey-test1", "role": "Admin", "secondsToLive": 6000 }', {
+    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', `{"name":"${apiKeyName}", "role": "Admin", "secondsToLive": 600 }`, {
       headers: { 'Content-Type': 'application/json' },
     });
     apiToken = getApiToken.json().key;
+    console.log('apiToken', getApiToken.json())
 
     // sends POST request for query
     const res = http.post('http://admin:admin@localhost:3000/api/ds/query/', JSON.stringify(queryData), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
+    console.log('res', res)
 
     // checks for 200 response of query request
     check(res, {
@@ -219,6 +222,7 @@ export async function removeDashboard(browser, page) {
   try {
     const dashboardURL = page.url();
     const dashboardUID = getDashboardUid(dashboardURL);
+    console.log('dashboardUID', dashboardUID)
     await page.goto(`http://localhost:3000/d/${dashboardUID}`, { waitUntil: 'networkidle' });
     
     const dashboardSettings = page.locator(`button[aria-label="${selectors.components.PageToolbar.item('Dashboard settings')}"]`);
