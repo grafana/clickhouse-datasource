@@ -9,3 +9,5 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    ignore:
+      - dependency-name: "github.com/ClickHouse/clickhouse-go/v2"
