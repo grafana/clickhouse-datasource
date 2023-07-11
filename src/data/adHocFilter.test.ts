@@ -129,4 +129,24 @@ describe('AdHocManager', () => {
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(`SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
+
+  it('does not apply an adhoc filter without "operator"', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT foo.stuff FROM foo', [
+      // @ts-expect-error
+      { key: 'foo.key', operator: undefined, value: 'val' },
+    ]);
+    expect(val).toEqual(`SELECT foo.stuff FROM foo`);
+  });
+
+  it('does not apply an adhoc filter without "value"', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT foo.stuff FROM foo', [
+      // @ts-expect-error
+      { key: 'foo.key', operator: '=', value: undefined },
+    ]);
+    expect(val).toEqual(`SELECT foo.stuff FROM foo`);
+  });
 });

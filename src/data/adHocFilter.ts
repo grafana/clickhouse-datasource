@@ -26,7 +26,9 @@ export class AdHocFilter {
     if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
       return sql;
     }
+
     let filters = adHocFilters
+      .filter(validate)
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
         const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
@@ -34,15 +36,23 @@ export class AdHocFilter {
         return ` ${key} ${f.operator} ${value} ${condition}`;
       })
       .join('');
+
+    if(filters === '') {
+      return sql;
+    }
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
     return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;
   }
 }
 
+function validate(filter: AdHocVariableFilter): boolean {
+  return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
+}
+
 export type AdHocVariableFilter = {
   key: string;
   operator: string;
   value: string;
-  condition: string;
+  condition?: string;
 };
