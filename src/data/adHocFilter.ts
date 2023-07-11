@@ -26,7 +26,7 @@ export class AdHocFilter {
     if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
       return sql;
     }
-    let filters = adHocFilters
+    const filters = adHocFilters
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
         const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
