@@ -200,13 +200,11 @@ export async function configurePanel(page) {
       headers: { 'Content-Type': 'application/json' },
     });
     apiToken = getApiToken.json().key;
-    console.log('apiToken', getApiToken.json())
 
     // sends POST request for query
     const res = http.post('http://admin:admin@localhost:3000/api/ds/query/', JSON.stringify(queryData), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
-    console.log('res', res)
 
     // checks for 200 response of query request
     check(res, {
@@ -222,7 +220,6 @@ export async function removeDashboard(browser, page) {
   try {
     const dashboardURL = page.url();
     const dashboardUID = getDashboardUid(dashboardURL);
-    console.log('dashboardUID', dashboardUID)
     await page.goto(`http://localhost:3000/d/${dashboardUID}`, { waitUntil: 'networkidle' });
     
     const dashboardSettings = page.locator(`button[aria-label="${selectors.components.PageToolbar.item('Dashboard settings')}"]`);
