@@ -28,7 +28,13 @@ export class AdHocFilter {
     }
 
     const filters = adHocFilters
-      .filter(validate)
+      .filter((filter: AdHocVariableFilter) => {
+        const valid = isValid(filter);
+        if(!valid) {
+          console.error('Invalid adhoc filter will be ignored:', filter);
+        }
+        return valid;
+      })
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
         const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
@@ -47,7 +53,7 @@ export class AdHocFilter {
   }
 }
 
-function validate(filter: AdHocVariableFilter): boolean {
+function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
 }
 

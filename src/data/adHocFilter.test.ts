@@ -172,4 +172,17 @@ describe('AdHocManager', () => {
     ]);
     expect(val).toEqual(`SELECT foo.stuff FROM foo`);
   });
+
+  it('log a malformed filter', () => {
+    const warn = jest.spyOn(console, "error");
+    const value = { key: 'foo.key', operator: '=', value: undefined }
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    ahm.apply('SELECT foo.stuff FROM foo', [
+      // @ts-expect-error
+      value,
+    ]);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith("Invalid adhoc filter will be ignored:", value)
+  });
 });
