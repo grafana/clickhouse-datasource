@@ -130,6 +130,29 @@ describe('AdHocManager', () => {
     expect(val).toEqual(`SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
 
+  it('apply ad hoc filter converts "=~" to "ILIKE"', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
+      { key: 'key', operator: '=~', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key ILIKE \\'val\\' '}`
+    );
+  });
+
+
+  it('apply ad hoc filter converts "!~" to "NOT ILIKE"', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
+      { key: 'key', operator: '!~', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key NOT ILIKE \\'val\\' '}`
+    );
+  });
+
   it('does not apply an adhoc filter without "operator"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');
