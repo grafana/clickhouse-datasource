@@ -20,7 +20,8 @@ export class AdHocFilter {
       return sql;
     }
     const filter = adHocFilters[0];
-    if (filter.key.includes('.')) {
+
+    if (filter.key?.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
     if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
