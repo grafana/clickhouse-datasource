@@ -245,7 +245,7 @@ describe('ClickHouseDatasource', () => {
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchFieldsFull('db_name', 'table_name');
-      const expected = { rawSql: 'DESC TABLE db_name."table_name"' };
+      const expected = { rawSql: 'DESC TABLE "db_name"."table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
@@ -403,7 +403,7 @@ describe('ClickHouseDatasource', () => {
         });
         expect(result?.rawSql).toEqual(
           'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) AS time, count(*) logs ' +
-            'FROM default."logs" ' +
+            'FROM "default"."logs" ' +
             'GROUP BY toStartOfInterval("created_at", INTERVAL 1 DAY) AS time ' +
             'ORDER BY time ASC'
         );
@@ -423,7 +423,7 @@ describe('ClickHouseDatasource', () => {
             `sum(toString("level") IN ('trace','TRACE','Trace')) AS trace, ` +
             `sum(toString("level") IN ('unknown','UNKNOWN','Unknown')) AS unknown, ` +
             `toStartOfInterval("created_at", INTERVAL 1 DAY) AS time ` +
-            `FROM default."logs" ` +
+            `FROM "default"."logs" ` +
             `GROUP BY toStartOfInterval("created_at", INTERVAL 1 DAY) AS time ` +
             `ORDER BY time ASC`
         );
