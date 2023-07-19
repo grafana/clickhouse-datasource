@@ -10,7 +10,7 @@ on:
       - v1
       - main
   schedule:
-    - cron: "0 9 1 * *"
+    - cron: '0 9 1 * *'
 
 jobs:
   run:
@@ -19,7 +19,7 @@ jobs:
       fail-fast: true
       matrix:
         go:
-          - 1.18.3 #pin to 1.18.3 for now due to https://github.com/ClickHouse/ch-go/issues/160
+          - '1.20.x'
 
     steps:
       - uses: actions/checkout@v3
@@ -38,13 +38,12 @@ jobs:
       - name: Install Go ${{ matrix.go }}
         uses: actions/setup-go@v4.0.0
         with:
-          stable: false
           go-version: ${{ matrix.go }}
 
       - name: Install yarn dependencies
         run: yarn install
         env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
+          NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Build
         run: go build -v ./...
@@ -52,4 +51,4 @@ jobs:
       - name: Build Frontend
         run: yarn build
         env:
-          NODE_OPTIONS: "--max_old_space_size=4096"
+          NODE_OPTIONS: '--max_old_space_size=4096'
