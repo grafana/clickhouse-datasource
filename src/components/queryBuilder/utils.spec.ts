@@ -117,41 +117,41 @@ describe('isNumberType', () => {
 });
 
 describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
-  testCondition('handles a table without a database', 'SELECT name FROM "foo"', {
+  testCondition('handles a table without a database', 'SELECT "name" FROM "foo"', {
     mode: BuilderMode.List,
     table: 'foo',
     fields: ['name'],
   });
 
-  testCondition('handles a database with a special character', 'SELECT name FROM "foo-bar"."buzz"', {
+  testCondition('handles a database with a special character', 'SELECT "name" FROM "foo-bar"."buzz"', {
     mode: BuilderMode.List,
     database: 'foo-bar',
     table: 'buzz',
     fields: ['name'],
   });
 
-  testCondition('handles a database and a table', 'SELECT name FROM "db"."foo"', {
+  testCondition('handles a database and a table', 'SELECT "name" FROM "db"."foo"', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
     fields: ['name'],
   });
 
-  testCondition('handles a database and a table with a dot', 'SELECT name FROM "db"."foo.bar"', {
+  testCondition('handles a database and a table with a dot', 'SELECT "name" FROM "db"."foo.bar"', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo.bar',
     fields: ['name'],
   });
 
-  testCondition('handles 2 fields', 'SELECT field1, field2 FROM "db"."foo"', {
+  testCondition('handles 2 fields', 'SELECT "field1", "field2" FROM "db"."foo"', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
     fields: ['field1', 'field2'],
   });
 
-  testCondition('handles a limit', 'SELECT field1, field2 FROM "db"."foo" LIMIT 20', {
+  testCondition('handles a limit', 'SELECT "field1", "field2" FROM "db"."foo" LIMIT 20', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
@@ -161,7 +161,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles empty orderBy array',
-    'SELECT field1, field2 FROM "db"."foo" LIMIT 20',
+    'SELECT "field1", "field2" FROM "db"."foo" LIMIT 20',
     {
       mode: BuilderMode.List,
       database: 'db',
@@ -173,7 +173,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     false
   );
 
-  testCondition('handles order by', 'SELECT field1, field2 FROM "db"."foo" ORDER BY field1 ASC LIMIT 20', {
+  testCondition('handles order by', 'SELECT "field1", "field2" FROM "db"."foo" ORDER BY field1 ASC LIMIT 20', {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
@@ -190,6 +190,19 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       table: '',
       fields: [],
+      metrics: [],
+    },
+    false
+  );
+
+  testCondition(
+    'does not escape * field',
+    'SELECT * FROM "db"',
+    {
+      mode: BuilderMode.Aggregate,
+      database: 'db',
+      table: '',
+      fields: ['*'],
       metrics: [],
     },
     false

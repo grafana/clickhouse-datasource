@@ -79,7 +79,7 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
 const getListQuery = (database = '', table = '', fields: string[] = []): string => {
   const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
-  return `SELECT ${fields.join(', ')} FROM ${escaped(database)}${sep}${escaped(table)}`;
+  return `SELECT ${escapedFields(fields).join(', ')} FROM ${escaped(database)}${sep}${escaped(table)}`;
 };
 
 const getAggregationQuery = (
@@ -576,6 +576,10 @@ function formatStringValue(currentFilter: string): string {
 
 function escaped(object: string) {
   return object === '' ? '' : `"${object}"`;
+}
+
+function escapedFields(fields: string[]) {
+  return fields.map((field) => (field === '*' ? field : escaped(field)));
 }
 
 export const operMap = new Map<string, FilterOperator>([
