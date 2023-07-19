@@ -136,7 +136,6 @@ func TestConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
-		fmt.Println(settings)
 		_, err := clickhouse.Connect(settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
