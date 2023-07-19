@@ -3,8 +3,6 @@ import {
   CoreApp,
   DataQueryRequest,
   DataQueryResponse,
-  ScopedVar,
-  ScopedVars,
   SupplementaryQueryType,
   TimeRange,
   TypedVariableModel,
