@@ -118,7 +118,12 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.Timeout = jsonData["timeout"].(string)
 	}
 	if jsonData["queryTimeout"] != nil {
-		settings.QueryTimeout = jsonData["queryTimeout"].(string)
+		if val, ok := jsonData["queryTimeout"].(string); ok {
+			settings.QueryTimeout = val
+		}
+		if val, ok := jsonData["queryTimeout"].(float64); ok {
+			settings.QueryTimeout = fmt.Sprintf("%d", int64(val))
+		}
 	}
 	if jsonData["protocol"] != nil {
 		settings.Protocol = jsonData["protocol"].(string)

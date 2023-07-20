@@ -122,11 +122,20 @@ func TestConnect(t *testing.T) {
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
 	ssl := getEnv("CLICKHOUSE_SSL", "false")
+	queryTimeoutNumber := 3600
+	queryTimeoutString := "3600"
 	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
+		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		assert.Equal(t, nil, err)
+	})
+	t.Run("should not error when valid settings passed - with query timeout as number", func(t *testing.T) {
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
