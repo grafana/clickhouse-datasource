@@ -19,7 +19,9 @@ jobs:
       fail-fast: true
       matrix:
         go:
-          - '1.20.x'
+          # version pinned until https://github.com/testcontainers/testcontainers-go/issues/1359
+          # is resolved
+          - '1.20.5'
         clickhouse:
           - 22.3
           - 22.8
