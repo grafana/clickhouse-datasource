@@ -3,10 +3,9 @@ import {
   CoreApp,
   DataQueryRequest,
   DataQueryResponse,
-  ScopedVar,
-  ScopedVars,
   SupplementaryQueryType,
   TimeRange,
+  TypedVariableModel,
   toDataFrame,
 } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
@@ -80,15 +79,25 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
     });
-    it('should handle $__conditionalAll and replace values', async () => {
+    it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
-      const scopedVars = { fieldVal: { value: `'val1', 'val2'` } as ScopedVar<string> } as ScopedVars;
+      const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
-      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [scopedVars]);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => vars);
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(spyOnGetVars).toHaveBeenCalled();
       expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL });
+    });
+    it('should handle $__conditionalAll and replace', async () => {
+      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
+      const vars = [{ current: { value: '$__all' }, name: 'fieldVal' }] as TypedVariableModel[];
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => vars);
+      const val = createInstance({}).applyTemplateVariables(query, {});
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(val).toEqual({ rawSql: `1=1`, queryType: QueryType.SQL });
     });
   });
 
