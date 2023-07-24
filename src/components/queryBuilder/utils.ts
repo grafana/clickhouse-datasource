@@ -79,7 +79,7 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
 const getListQuery = (database = '', table = '', fields: string[] = []): string => {
   const sep = database === '' || table === '' ? '' : '.';
   fields = fields && fields.length > 0 ? fields : [''];
-  return `SELECT ${fields.join(', ')} FROM ${database}${sep}${escapedTableName(table)}`;
+  return `SELECT ${escapedFields(fields).join(', ')} FROM ${escaped(database)}${sep}${escaped(table)}`;
 };
 
 const getAggregationQuery = (
@@ -102,7 +102,7 @@ const getAggregationQuery = (
   const sep = database === '' || table === '' ? '' : '.';
   return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
     metricsQuery && groupByQuery ? ', ' : ''
-  }${metricsQuery} FROM ${database}${sep}${escapedTableName(table)}`;
+  }${metricsQuery} FROM ${escaped(database)}${sep}${escaped(table)}`;
 };
 
 const getTrendByQuery = (
@@ -132,7 +132,7 @@ const getTrendByQuery = (
   }
 
   const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${metricsQuery} FROM ${database}${sep}${escapedTableName(table)}`;
+  return `SELECT ${metricsQuery} FROM ${escaped(database)}${sep}${escaped(table)}`;
 };
 
 const getFilters = (filters: Filter[]): string => {
@@ -574,8 +574,12 @@ function formatStringValue(currentFilter: string): string {
   return ` '${currentFilter || ''}'`;
 }
 
-function escapedTableName(table: string) {
-  return table === '' ? '' : `"${table}"`;
+function escaped(object: string) {
+  return object === '' ? '' : `"${object}"`;
+}
+
+function escapedFields(fields: string[]) {
+  return fields.map((field) => (field === '*' ? field : escaped(field)));
 }
 
 export const operMap = new Map<string, FilterOperator>([
