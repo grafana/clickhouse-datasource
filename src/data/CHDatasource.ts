@@ -365,7 +365,7 @@ export class Datasource
   }
 
   async fetchTables(db?: string): Promise<string[]> {
-    const rawSql = db ? `SHOW TABLES FROM ${db}` : 'SHOW TABLES';
+    const rawSql = db ? `SHOW TABLES FROM "${db}"` : 'SHOW TABLES';
     return this.fetchData(rawSql);
   }
 
@@ -374,11 +374,11 @@ export class Datasource
   }
 
   async fetchFields(database: string, table: string): Promise<string[]> {
-    return this.fetchData(`DESC TABLE ${database}."${table}"`);
+    return this.fetchData(`DESC TABLE "${database}"."${table}"`);
   }
 
   async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
-    const prefix = Boolean(database) ? `${database}.` : '';
+    const prefix = Boolean(database) ? `"${database}".` : '';
     const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
