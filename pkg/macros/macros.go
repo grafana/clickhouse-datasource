@@ -93,6 +93,15 @@ func TimeInterval(query *sqlds.Query, args []string) (string, error) {
 	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", args[0], int(seconds)), nil
 }
 
+func TimeIntervalMs(query *sqlds.Query, args []string) (string, error) {
+	if len(args) != 1 {
+		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+	}
+
+	milliseconds := math.Max(float64(query.Interval.Milliseconds()), 1)
+	return fmt.Sprintf("toStartOfInterval(toDateTime64(3, %s), INTERVAL %d millisecond)", args[0], int(milliseconds)), nil
+}
+
 func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
 	seconds := math.Max(query.Interval.Seconds(), 1)
 	return fmt.Sprintf("%d", int(seconds)), nil

@@ -115,6 +115,16 @@ func TestMacroTimeInterval(t *testing.T) {
 	assert.Equal(t, "toStartOfInterval(toDateTime(col), INTERVAL 20 second)", got)
 }
 
+func TestMacroTimeIntervalMs(t *testing.T) {
+	query := sqlds.Query{
+		RawSQL:   "select $__timeInterval_ms(col) from foo",
+		Interval: time.Duration(20000000000),
+	}
+	got, err := macros.TimeIntervalMs(&query, []string{"col"})
+	assert.Nil(t, err)
+	assert.Equal(t, "toStartOfInterval(toDateTime64(3, col), INTERVAL 20000 millisecond)", got)
+}
+
 func TestMacroIntervalSeconds(t *testing.T) {
 	query := sqlds.Query{
 		RawSQL:   "select toStartOfInterval(col, INTERVAL $__interval_s second) AS time from foo",
