@@ -20,13 +20,22 @@ export class AdHocFilter {
       return sql;
     }
     const filter = adHocFilters[0];
-    if (filter.key.includes('.')) {
+
+    if (filter.key?.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
     if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
       return sql;
     }
+
     const filters = adHocFilters
+      .filter((filter: AdHocVariableFilter) => {
+        const valid = isValid(filter);
+        if(!valid) {
+          console.error('Invalid adhoc filter will be ignored:', filter);
+        }
+        return valid;
+      })
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
         const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
@@ -35,10 +44,18 @@ export class AdHocFilter {
         return ` ${key} ${operator} ${value} ${condition}`;
       })
       .join('');
+
+    if(filters === '') {
+      return sql;
+    }
     // Semicolons are not required and cause problems when building the SQL
     sql = sql.replace(';', '');
     return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;
   }
+}
+
+function isValid(filter: AdHocVariableFilter): boolean {
+  return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
 }
 
 function convertOperatorToClickHouseOperator(operator: AdHocVariableFilterOperator): string {
@@ -53,5 +70,5 @@ export type AdHocVariableFilter = {
   key: string;
   operator: AdHocVariableFilterOperator;
   value: string;
-  condition: string;
+  condition?: string;
 };
