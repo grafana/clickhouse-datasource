@@ -81,6 +81,14 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
   const { query, onChange, onRunQuery } = props;
 
+  React.useEffect(() => {
+    if (typeof query.selectedFormat === 'undefined' && query.queryType === QueryType.SQL) {
+      const selectedFormat = Format.AUTO;
+      const format = getFormat(query.rawSql, selectedFormat);
+      onChange({ ...query, selectedFormat, format });
+    }
+  }, [query, onChange]);
+
   const runQuery = () => {
     if (query.queryType === QueryType.SQL) {
       const format = getFormat(query.rawSql, query.selectedFormat);

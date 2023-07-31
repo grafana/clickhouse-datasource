@@ -1,4 +1,4 @@
-import { parseFirst, Statement, SelectFromStatement, astMapper, toSql } from 'pgsql-ast-parser';
+import { parseFirst, Statement, SelectFromStatement, astMapper, toSql, ExprRef } from 'pgsql-ast-parser';
 
 export function sqlToStatement(sql: string): Statement {
   const replaceFuncs: Array<{
@@ -87,5 +87,14 @@ export function getFields(sql: string): string[] {
   if (stm.type !== 'select' || !stm.columns?.length || stm.columns?.length <= 0) {
     return [];
   }
-  return stm.columns.map((x) => `${x.expr} as ${x.alias?.name}`);
+  
+  return stm.columns.map((x) => {
+    const exprName = (x.expr as ExprRef).name
+
+    if (x.alias !== undefined) {
+      return `${exprName} as ${x.alias?.name}`;
+    } else {
+      return `${exprName}`;
+    }
+  });
 }
