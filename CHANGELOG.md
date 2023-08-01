@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.2.0
+
+### Features
+- Add a predefined TimeRange filter if there is at least one DateTime* column
+- Date and Date32 type normalization with user's timezone
+- Multi-datasource dashboards & instructions to load dashboards in Grafana config
+
+### Fixes
+- Quote table names with dots
+- Fix auto formatting by reverting to table correctly
+
 ## 3.1.0
 
 - Stable release of v3.0.4-beta
