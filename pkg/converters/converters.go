@@ -42,6 +42,8 @@ var mapMatch, _ = regexp.Compile(`^Map\(.*\)`)
 
 var fixedStringMatch, _ = regexp.Compile(`^Nullable\(FixedString\(.*\)\)`)
 
+var simpleAggMatch, _ = regexp.Compile(`^SimpleAggregateFunction\(.*\)`)
+
 var Converters = map[string]Converter{
 	"Bool": {
 		scanType:  reflect.PtrTo(reflect.TypeOf(true)),
@@ -241,6 +243,12 @@ var Converters = map[string]Converter{
 		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(net.IP{}))),
 		convert:    ipNullConverter,
 		matchRegex: ipNullableMatch,
+	},
+	"SimpleAggregateFunction()": {
+		fieldType:  data.FieldTypeNullableJSON,
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+		matchRegex: simpleAggMatch,
+		convert:    jsonConverter,
 	},
 }
 
