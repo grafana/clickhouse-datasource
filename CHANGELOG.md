@@ -3,13 +3,15 @@
 ## 3.2.0
 
 ### Features
-- Add a predefined TimeRange filter if there is at least one DateTime* column
-- Date and Date32 type normalization with user's timezone
-- Multi-datasource dashboards & instructions to load dashboards in Grafana config
+- Add `timeInterval_ms` macro to allow higher precision queries on DateTime64 columns. [#462](https://github.com/grafana/clickhouse-datasource/pull/462).
 
 ### Fixes
-- Quote table names with dots
-- Fix auto formatting by reverting to table correctly
+- Ensure databases, tables, and columns are escaped correctly. [#460](https://github.com/grafana/clickhouse-datasource/pull/460).
+- Fix conditionAll handling. [#459](https://github.com/grafana/clickhouse-datasource/pull/459).
+- Fix support for ad-hoc regexp filters: `=~`, `!~` [#414](https://github.com/grafana/clickhouse-datasource/pull/414).
+- Do not create malformed adhoc filters [#451](https://github.com/grafana/clickhouse-datasource/pull/451). invalid values will be ignored.
+- Fix auto formatting by reverting to table correctly. [#469](https://github.com/grafana/clickhouse-datasource/pull/469).
+- Fix parsing of numeric configuration values in `yaml` file. [#456](https://github.com/grafana/clickhouse-datasource/pull/456).
 
 ## 3.1.0
 
