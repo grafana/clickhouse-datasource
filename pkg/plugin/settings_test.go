@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -51,7 +52,10 @@ func TestLoadSettings(t *testing.T) {
 							Username: "ds-uid",
 							Password: "test",
 						},
-						Timeouts: nil,
+						Timeouts: &proxy.TimeoutOptions{
+							Timeout:   10 * time.Second,
+							KeepAlive: proxy.DefaultTimeoutOptions.KeepAlive,
+						},
 					},
 				},
 				wantErr: nil,

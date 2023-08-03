@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -167,7 +168,13 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	}
 
 	proxyOpts, err := config.ProxyOptions()
-	if err == nil {
+	if err == nil && proxyOpts != nil {
+		// the sdk expects the timeout to not be a string
+		timeout, err := strconv.ParseFloat(settings.Timeout, 64)
+		if err == nil {
+			proxyOpts.Timeouts.Timeout = (time.Duration(timeout) * time.Second)
+		}
+
 		settings.ProxyOptions = proxyOpts
 	}
 
