@@ -1064,6 +1064,7 @@ func TestMutateResponse(t *testing.T) {
 		},
 	}
 	insertData(t, conn, val)
+
 	t.Run("doesn't mutate traces", func(t *testing.T) {
 		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
 		require.NoError(t, err)
@@ -1075,6 +1076,19 @@ func TestMutateResponse(t *testing.T) {
 		require.NotNil(t, frames)
 		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableJSON)
 	})
+
+	t.Run("doesn't mutate tables", func(t *testing.T) {
+		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
+		require.NoError(t, err)
+		frame, err := sqlutil.FrameFromRows(rows, 1, converters.ClickhouseConverters...)
+		require.NoError(t, err)
+		frame.Meta = &data.FrameMeta{PreferredVisualization: data.VisType(data.VisTypeTable)}
+		frames, err := clickhouse.MutateResponse(context.Background(), []*data.Frame{frame})
+		require.NoError(t, err)
+		require.NotNil(t, frames)
+		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableJSON)
+	})
+
 	t.Run("mutates other types", func(t *testing.T) {
 		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
 		require.NoError(t, err)
