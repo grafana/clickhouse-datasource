@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -166,24 +167,15 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.TlsClientKey = tlsClientKey
 	}
 
-	// secure socks proxy setup
-	// username defaults to the datasource UID
-	if proxy.SecureSocksProxyEnabledOnDS(jsonData) {
-		proxyUser := config.UID
-		if v, exists := jsonData["secureSocksProxyUsername"]; exists {
-			proxyUser = v.(string)
+	proxyOpts, err := config.ProxyOptions()
+	if err == nil && proxyOpts != nil {
+		// the sdk expects the timeout to not be a string
+		timeout, err := strconv.ParseFloat(settings.Timeout, 64)
+		if err == nil {
+			proxyOpts.Timeouts.Timeout = (time.Duration(timeout) * time.Second)
 		}
-		proxyPass := ""
-		if v, exists := config.DecryptedSecureJSONData["secureSocksProxyPassword"]; exists {
-			proxyPass = v
-		}
-		settings.ProxyOptions = &proxy.Options{
-			Enabled: true,
-			Auth: &proxy.AuthOptions{
-				Username: proxyUser,
-				Password: proxyPass,
-			},
-		}
+
+		settings.ProxyOptions = proxyOpts
 	}
 
 	return settings, settings.isValid()

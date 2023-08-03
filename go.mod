@@ -6,8 +6,13 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.10.1
 	github.com/docker/docker v23.0.1+incompatible
 	github.com/docker/go-units v0.5.0
+<<<<<<< HEAD
 	github.com/grafana/grafana-plugin-sdk-go v0.161.0
 	github.com/grafana/sqlds/v2 v2.4.0
+=======
+	github.com/grafana/grafana-plugin-sdk-go v0.171.0
+	github.com/grafana/sqlds/v2 v2.5.0
+>>>>>>> dbb958f (Upgrade grafana-plugin-sdk-go (#475))
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.8.2
@@ -104,7 +109,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.40.0 // indirect
+	github.com/prometheus/common v0.42.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
