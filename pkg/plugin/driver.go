@@ -160,8 +160,8 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		Settings:    customSettings,
 	}
 
-	if sdkproxy.SecureSocksProxyEnabled(settings.ProxyOptions) {
-		dialer, err := sdkproxy.NewSecureSocksProxyContextDialer(settings.ProxyOptions)
+	if sdkproxy.Cli.SecureSocksProxyEnabled(settings.ProxyOptions) {
+		dialer, err := sdkproxy.Cli.NewSecureSocksProxyContextDialer(settings.ProxyOptions)
 		if err != nil {
 			return nil, err
 		}

@@ -166,24 +166,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.TlsClientKey = tlsClientKey
 	}
 
-	// secure socks proxy setup
-	// username defaults to the datasource UID
-	if proxy.SecureSocksProxyEnabledOnDS(jsonData) {
-		proxyUser := config.UID
-		if v, exists := jsonData["secureSocksProxyUsername"]; exists {
-			proxyUser = v.(string)
-		}
-		proxyPass := ""
-		if v, exists := config.DecryptedSecureJSONData["secureSocksProxyPassword"]; exists {
-			proxyPass = v
-		}
-		settings.ProxyOptions = &proxy.Options{
-			Enabled: true,
-			Auth: &proxy.AuthOptions{
-				Username: proxyUser,
-				Password: proxyPass,
-			},
-		}
+	proxyOpts, err := config.ProxyOptions()
+	if err == nil {
+		settings.ProxyOptions = proxyOpts
 	}
 
 	return settings, settings.isValid()
