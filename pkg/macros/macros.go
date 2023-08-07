@@ -99,7 +99,7 @@ func TimeIntervalMs(query *sqlds.Query, args []string) (string, error) {
 	}
 
 	milliseconds := math.Max(float64(query.Interval.Milliseconds()), 1)
-	return fmt.Sprintf("toStartOfInterval(toDateTime64(3, %s), INTERVAL %d millisecond)", args[0], int(milliseconds)), nil
+	return fmt.Sprintf("toStartOfInterval(toDateTime64(%s, 3), INTERVAL %d millisecond)", args[0], int(milliseconds)), nil
 }
 
 func IntervalSeconds(query *sqlds.Query, args []string) (string, error) {
