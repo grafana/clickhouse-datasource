@@ -1817,7 +1817,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT modification_time as timestamp, concatAssumeInjective(database, '.', table) as table, rows FROM system.parts WHERE database IN ($database) AND table IN (${table})  AND $__timeFilter(modification_time) ORDER BY modification_time DESC",
+          "rawSql": "SELECT modification_time as timestamp, concatAssumeInjective(database, '.', table) as table, rows FROM system.parts parts WHERE parts.database IN ($database) AND parts.table IN (${table})  AND $__timeFilter(modification_time) ORDER BY modification_time ASC",
           "refId": "A"
         }
       ],
