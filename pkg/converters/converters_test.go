@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
+	"github.com/paulmach/orb"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -579,6 +580,16 @@ func TestSimpleAggregateFunction(t *testing.T) {
 	value := [][]int{{1, 2, 3}, {1, 2, 3}}
 	aggConverter := converters.GetConverter("SimpleAggregateFunction()")
 	v, err := aggConverter.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	msg, err := toJson(value)
+	assert.Nil(t, err)
+	assert.Equal(t, msg, *v.(*json.RawMessage))
+}
+
+func TestPoint(t *testing.T) {
+	value := interface{}(interface{}(orb.Point{10, 10}))
+	sut := converters.GetConverter("Point")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
