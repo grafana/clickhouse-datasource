@@ -11,244 +11,246 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/paulmach/orb"
 	"github.com/shopspring/decimal"
 )
 
 type Converter struct {
-	scanType   reflect.Type
+	convert    func(in interface{}) (interface{}, error)
 	fieldType  data.FieldType
 	matchRegex *regexp.Regexp
-	convert    func(in interface{}) (interface{}, error)
+	scanType   reflect.Type
 }
 
-var ipMatch, _ = regexp.Compile(`^IPv[4,6]`)
-var dateTimeMatch, _ = regexp.Compile(`^Date\(?`)
-var dateNullableTimeMatch, _ = regexp.Compile(`^Nullable\(Date\(?`)
-
-var stringNullableMatch, _ = regexp.Compile(`Nullable\(String`)
-
-var ipNullableMatch, _ = regexp.Compile(`Nullable\(IP`)
-
-var decimalMatch, _ = regexp.Compile(`^Decimal`)
-var decimalNullableMatch, _ = regexp.Compile(`^Nullable\(Decimal`)
-
-var tupleMatch, _ = regexp.Compile(`^Tuple\(.*\)`)
-var nestedMatch, _ = regexp.Compile(`^Nested\(.*\)`)
-
-// for complex Arrays e.g. Array(Tuple)
-var complexArrayMatch, _ = regexp.Compile(`^Array\(.*\)`)
-
-var mapMatch, _ = regexp.Compile(`^Map\(.*\)`)
-
-var fixedStringMatch, _ = regexp.Compile(`^Nullable\(FixedString\(.*\)\)`)
-
-var simpleAggMatch, _ = regexp.Compile(`^SimpleAggregateFunction\(.*\)`)
+var matchRegexes = map[string]*regexp.Regexp{
+	// for complex Arrays e.g. Array(Tuple)
+	"Array()":                   regexp.MustCompile(`^Array\(.*\)`),
+	"Date":                      regexp.MustCompile(`^Date\(?`),
+	"Decimal":                   regexp.MustCompile(`^Decimal`),
+	"FixedString()":             regexp.MustCompile(`^Nullable\(FixedString\(.*\)\)`),
+	"IP":                        regexp.MustCompile(`^IPv[4,6]`),
+	"Map()":                     regexp.MustCompile(`^Map\(.*\)`),
+	"Nested()":                  regexp.MustCompile(`^Nested\(.*\)`),
+	"Nullable(Date)":            regexp.MustCompile(`^Nullable\(Date\(?`),
+	"Nullable(Decimal)":         regexp.MustCompile(`^Nullable\(Decimal`),
+	"Nullable(IP)":              regexp.MustCompile(`Nullable\(IP`),
+	"Nullable(String)":          regexp.MustCompile(`Nullable\(String`),
+	"Point":                     regexp.MustCompile(`^Point`),
+	"SimpleAggregateFunction()": regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
+	"Tuple()":                   regexp.MustCompile(`^Tuple\(.*\)`),
+}
 
 var Converters = map[string]Converter{
 	"Bool": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(true)),
 		fieldType: data.FieldTypeBool,
+		scanType:  reflect.PtrTo(reflect.TypeOf(true)),
 	},
 	"Nullable(Bool)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(true))),
 		fieldType: data.FieldTypeNullableBool,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(true))),
 	},
 	"Float64": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(float64(0))),
 		fieldType: data.FieldTypeFloat64,
+		scanType:  reflect.PtrTo(reflect.TypeOf(float64(0))),
 	},
 	"Float32": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(float32(0))),
 		fieldType: data.FieldTypeFloat32,
+		scanType:  reflect.PtrTo(reflect.TypeOf(float32(0))),
 	},
 	"Nullable(Float32)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(float32(0)))),
 		fieldType: data.FieldTypeNullableFloat32,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(float32(0)))),
 	},
 	"Nullable(Float64)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(float64(0)))),
 		fieldType: data.FieldTypeNullableFloat64,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(float64(0)))),
 	},
 	"Int64": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(int64(0))),
 		fieldType: data.FieldTypeInt64,
+		scanType:  reflect.PtrTo(reflect.TypeOf(int64(0))),
 	},
 	"Int32": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(int32(0))),
 		fieldType: data.FieldTypeInt32,
+		scanType:  reflect.PtrTo(reflect.TypeOf(int32(0))),
 	},
 	"Int16": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(int16(0))),
 		fieldType: data.FieldTypeInt16,
+		scanType:  reflect.PtrTo(reflect.TypeOf(int16(0))),
 	},
 	"Int8": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(int8(0))),
 		fieldType: data.FieldTypeInt8,
+		scanType:  reflect.PtrTo(reflect.TypeOf(int8(0))),
 	},
 	"UInt64": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(uint64(0))),
 		fieldType: data.FieldTypeUint64,
+		scanType:  reflect.PtrTo(reflect.TypeOf(uint64(0))),
 	},
 	"UInt32": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(uint32(0))),
 		fieldType: data.FieldTypeUint32,
+		scanType:  reflect.PtrTo(reflect.TypeOf(uint32(0))),
 	},
 	"UInt16": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(uint16(0))),
 		fieldType: data.FieldTypeUint16,
+		scanType:  reflect.PtrTo(reflect.TypeOf(uint16(0))),
 	},
 	"UInt8": {
-		scanType:  reflect.PtrTo(reflect.TypeOf(uint8(0))),
 		fieldType: data.FieldTypeUint8,
+		scanType:  reflect.PtrTo(reflect.TypeOf(uint8(0))),
 	},
 	"Nullable(UInt64)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint64(0)))),
 		fieldType: data.FieldTypeNullableUint64,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint64(0)))),
 	},
 	"Nullable(UInt32)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint32(0)))),
 		fieldType: data.FieldTypeNullableUint32,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint32(0)))),
 	},
 	"Nullable(UInt16)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint16(0)))),
 		fieldType: data.FieldTypeNullableUint16,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint16(0)))),
 	},
 	"Nullable(UInt8)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint8(0)))),
 		fieldType: data.FieldTypeNullableUint8,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(uint8(0)))),
 	},
 	"Nullable(Int64)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int64(0)))),
 		fieldType: data.FieldTypeNullableInt64,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int64(0)))),
 	},
 	"Nullable(Int32)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int32(0)))),
 		fieldType: data.FieldTypeNullableInt32,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int32(0)))),
 	},
 	"Nullable(Int16)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int16(0)))),
 		fieldType: data.FieldTypeNullableInt16,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int16(0)))),
 	},
 	"Nullable(Int8)": {
-		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int8(0)))),
 		fieldType: data.FieldTypeNullableInt8,
+		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(int8(0)))),
 	},
 	// this is in precise and in appropriate for any math, but everything goes to floats in JS anyway
 	"Int128": {
+		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PtrTo(reflect.TypeOf(big.NewInt(0))),
-		convert:   bigIntConvert,
 	},
 	"Nullable(Int128)": {
+		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(big.NewInt(0)))),
-		convert:   bigIntNullableConvert,
 	},
 	"Int256": {
+		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PtrTo(reflect.TypeOf(big.NewInt(0))),
-		convert:   bigIntConvert,
 	},
 	"Nullable(Int256)": {
+		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(big.NewInt(0)))),
-		convert:   bigIntNullableConvert,
 	},
 	"UInt128": {
+		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PtrTo(reflect.TypeOf(big.NewInt(0))),
-		convert:   bigIntConvert,
 	},
 	"Nullable(UInt128)": {
+		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(big.NewInt(0)))),
-		convert:   bigIntNullableConvert,
 	},
 	"UInt256": {
+		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PtrTo(reflect.TypeOf(big.NewInt(0))),
-		convert:   bigIntConvert,
 	},
 	"Nullable(UInt256)": {
+		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(big.NewInt(0)))),
-		convert:   bigIntNullableConvert,
 	},
 	// covers DateTime with tz, DateTime64 - see regexes, Date32
 	"Date": {
 		fieldType:  data.FieldTypeTime,
+		matchRegex: matchRegexes["Date"],
 		scanType:   reflect.PtrTo(reflect.TypeOf(time.Time{})),
-		matchRegex: dateTimeMatch,
 	},
 	"Nullable(Date)": {
 		fieldType:  data.FieldTypeNullableTime,
+		matchRegex: matchRegexes["Nullable(Date)"],
 		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(time.Time{}))),
-		matchRegex: dateNullableTimeMatch,
 	},
 	"Nullable(String)": {
 		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["Nullable(String)"],
 		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(""))),
-		matchRegex: stringNullableMatch,
 	},
 	"Decimal": {
-		fieldType:  data.FieldTypeFloat64,
-		scanType:   reflect.PtrTo(reflect.TypeOf(decimal.Decimal{})),
-		matchRegex: decimalMatch,
 		convert:    decimalConvert,
+		fieldType:  data.FieldTypeFloat64,
+		matchRegex: matchRegexes["Decimal"],
+		scanType:   reflect.PtrTo(reflect.TypeOf(decimal.Decimal{})),
 	},
 	"Nullable(Decimal)": {
-		fieldType:  data.FieldTypeNullableFloat64,
-		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(decimal.Decimal{}))),
-		matchRegex: decimalNullableMatch,
 		convert:    decimalNullConvert,
+		fieldType:  data.FieldTypeNullableFloat64,
+		matchRegex: matchRegexes["Nullable(Decimal)"],
+		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(decimal.Decimal{}))),
 	},
 	"Tuple()": {
-		fieldType:  data.FieldTypeNullableJSON,
-		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
-		matchRegex: tupleMatch,
 		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Tuple()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
 	// NestedConverter currently only supports flatten_nested=0 only which can be marshalled into []map[string]interface{}
 	"Nested()": {
-		fieldType:  data.FieldTypeNullableJSON,
-		scanType:   reflect.TypeOf([]map[string]interface{}{}),
-		matchRegex: nestedMatch,
 		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Nested()"],
+		scanType:   reflect.TypeOf([]map[string]interface{}{}),
 	},
 	"Array()": {
-		fieldType:  data.FieldTypeNullableJSON,
-		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
-		matchRegex: complexArrayMatch,
 		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Array()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
 	"Map()": {
-		fieldType:  data.FieldTypeNullableJSON,
-		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
-		matchRegex: mapMatch,
 		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Map()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
 	"FixedString()": {
 		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["FixedString()"],
 		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(""))),
-		matchRegex: fixedStringMatch,
 	},
 	"IP": {
-		fieldType:  data.FieldTypeString,
-		scanType:   reflect.PtrTo(reflect.TypeOf(net.IP{})),
 		convert:    ipConverter,
-		matchRegex: ipMatch,
+		fieldType:  data.FieldTypeString,
+		matchRegex: matchRegexes["IP"],
+		scanType:   reflect.PtrTo(reflect.TypeOf(net.IP{})),
 	},
 	"Nullable(IP)": {
-		fieldType:  data.FieldTypeNullableString,
-		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(net.IP{}))),
 		convert:    ipNullConverter,
-		matchRegex: ipNullableMatch,
+		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["Nullable(IP)"],
+		scanType:   reflect.PtrTo(reflect.PtrTo(reflect.TypeOf(net.IP{}))),
 	},
 	"SimpleAggregateFunction()": {
-		fieldType:  data.FieldTypeNullableJSON,
-		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
-		matchRegex: simpleAggMatch,
 		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["SimpleAggregateFunction()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"Point": {
+		convert:    pointConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Point"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
 }
 
@@ -401,4 +403,15 @@ func ipNullConverter(in interface{}) (interface{}, error) {
 	}
 	sIP := (*v).String()
 	return &sIP, nil
+}
+
+func pointConverter(in interface{}) (interface{}, error) {
+	if in == nil {
+		return nil, nil
+	}
+	v, ok := (*(in.(*interface{}))).(orb.Point)
+	if !ok {
+		return nil, fmt.Errorf("invalid point - %v", in)
+	}
+	return jsonConverter(v)
 }
