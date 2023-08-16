@@ -39,8 +39,20 @@ func e2etests(cmd *cobra.Command, args []string) {
 	buildPlugin(ctx, client)
 
 	//run grafana with CH plugin installed
+	startGrafana(client)
 
 	//run e2e tests
+	source := client.Container().
+		From("node:16-slim").
+		WithDirectory("/src", client.Host().Directory("."), dagger.ContainerWithDirectoryOpts{
+			Exclude: []string{"node_modules/", "ci/"},
+		})
+	runner := source.WithWorkdir("/src").WithExec([]string{"yarn", "install"})
+	out, err := runner.WithExec([]string{"k6", "run", "k6 run e2e/e2ek6.test.js"}).Stderr(ctx)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(out)
 
 	//check if e2e tests pass
 
@@ -105,11 +117,13 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *d
 	return nodeModules
 }
 
-func startGrafana(client *dagger.Client) {
+func startGrafana(client *dagger.Client) *dagger.Container {
 	fmt.Println("Building Grafana")
 	container := client.Container().From("grafana/grafana:latest")
-	container = container.Exec()
+	container = container.WithExec([]string{"yarn", "start"})
 	fmt.Println("Grafana built")
+
+	return container
 }
 
 func TestConnect(t *testing.T) {
