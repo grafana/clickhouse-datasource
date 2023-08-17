@@ -137,19 +137,25 @@ func TestMacroIntervalSeconds(t *testing.T) {
 
 // test sqlds query interpolation with clickhouse filters used
 func TestInterpolate(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+
 	tableName := "my_table"
 	tableColumn := "my_col"
+
 	type test struct {
 		name   string
 		input  string
 		output string
 	}
+
 	tests := []test{
-		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= '-62135596800' AND cast(sth as timestamp) <= '-62135596800'", name: "clickhouse timeFilter"},
-		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= '-62135596800' AND cast(sth as timestamp) <= '-62135596800'", name: "clickhouse timeFilter with empty spaces"},
-		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(-6795364578871,1000)) and date <= toDateTime(intDiv(-6795364578871,1000)) ) limit 100", name: "clickhouse fromTime and toTime"},
-		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(-6795364578871,1000)) ) and ( date <= toDateTime(intDiv(-6795364578871,1000)) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= '1415792726' AND cast(sth as timestamp) <= '1447328726'", name: "clickhouse timeFilter"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= '1415792726' AND cast(sth as timestamp) <= '1447328726'", name: "clickhouse timeFilter with empty spaces"},
+		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(1415792726371,1000)) and date <= toDateTime(intDiv(1447328726371,1000)) ) limit 100", name: "clickhouse fromTime and toTime"},
+		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(1415792726371,1000)) ) and ( date <= toDateTime(intDiv(1447328726371,1000)) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
 	}
+
 	for i, tc := range tests {
 		driver := MockDB{}
 		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
@@ -157,6 +163,10 @@ func TestInterpolate(t *testing.T) {
 				RawSQL: tc.input,
 				Table:  tableName,
 				Column: tableColumn,
+				TimeRange: backend.TimeRange{
+					From: from,
+					To:   to,
+				},
 			}
 			interpolatedQuery, err := sqlds.Interpolate(&driver, query)
 			require.Nil(t, err)
