@@ -34,7 +34,7 @@ export async function login(page) {
     // checks page for skip change password screen
     check(page, {
       'change password is presented':
-        page.locator(`button[aria-label="${selectors.pages.Login.skip}"]`).textContent() === 'Skip',
+        page.locator(`button[aria-label="${selectors.pages.Login.skip}"]`).textContent() === 'Skipp',
     });
   } catch (e) {
     fail(`login failed: ${e}`);

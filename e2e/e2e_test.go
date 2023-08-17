@@ -47,15 +47,14 @@ func e2etests(cmd *cobra.Command, args []string) {
 		WithDirectory("/src", client.Host().Directory("."), dagger.ContainerWithDirectoryOpts{
 			Exclude: []string{"node_modules/", "ci/"},
 		})
-	runner := source.WithWorkdir("/src").WithExec([]string{"yarn", "install"})
-	out, err := runner.WithExec([]string{"k6", "run", "k6 run e2e/e2ek6.test.js"}).Stderr(ctx)
+	runner := source.WithWorkdir(".")
+	out, err := runner.WithExec([]string{"", "k6 run e2ek6.test.js"}).Stderr(ctx)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(out)
 
 	//check if e2e tests pass
-
+	fmt.Println("resultzz", out)
 }
 
 func startClickHouse(client *dagger.Client) {
@@ -79,8 +78,6 @@ func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.
 		From("golang:1.20").
 		WithWorkdir("./clickhouse-datasource").
 		WithDirectory(".", directory).
-		//WithExec([]string{"apt", "update"}).
-		// WithExec([]string{"apt", "install", "-y", "upx"}).
 		WithExec([]string{"go", "install", "github.com/magefile/mage@latest"}).
 		WithExec([]string{"mage", "build:backend"})
 
@@ -90,18 +87,7 @@ func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.
 		log.Println(err)
 	}
 	fmt.Println(entries)
-	// Mockgen
-	// do same stuff for mockgen
-	// gen k8s controllers
-	// same
-	// Build
-	// gobuildfiles := client.Host().Directory(".")
-	// gobuild := mageBase.WithMountedDirectory(workdir, protogen.Directory(workdir)).
-	// WithMountedDirectory(workdir, mockgen.Directory(workdir)).
-	// WithMountedDirectory(workdir, k8s.Directory(workdir)).
-	// WithExec([]string{"go", "build", "./..."})
 
-	//_, err := gobuild.Directory("bin/").Export(ctx, "bin/")
 	return container
 }
 
@@ -111,7 +97,6 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *d
 		WithDirectory(".", client.Directory()).
 		WithExec([]string{"yarn", "install", "--frozen-lockfile", "--no-progress"}).
 		WithExec([]string{"yarn", "build"}).
-		//WithExec([]string{"rm", "-rf", "/src/node_modules/@grafana/data/node_modules"}).
 		Directory(".")
 
 	return nodeModules
