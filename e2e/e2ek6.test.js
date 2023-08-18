@@ -252,7 +252,7 @@ export default async function () {
   await removeDashboard(browser, page);
 };
 
-export function handleSummary(data) {
+export async function handleSummary(data) {
   console.log('Preparing the end-of-test summary...');
 
   return {

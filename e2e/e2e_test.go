@@ -74,8 +74,8 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	//check if e2e tests pass
 	fmt.Println("Checking test summary")
 	j, _ := os.ReadFile("test_summary.json")
-	fmt.Println("j: ", j)
-	type TestSummary struct {
+
+	data := struct {
 		RootGroup struct {
 			Checks []struct {
 				Name   string `json:"name"`
@@ -83,8 +83,7 @@ func e2eTests(cmd *cobra.Command, args []string) {
 				Fails  int    `json:"fails"`
 			}
 		} `json:"root_group"`
-	}
-	var data TestSummary
+	}{}
 	err = json.Unmarshal(j, &data)
 	if err != nil {
 		fmt.Println("Cannot unmarshal the json", err)
