@@ -5,6 +5,7 @@ import http from 'k6/http';
 import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.js';
+import {textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
@@ -250,4 +251,13 @@ export default async function () {
   await configurePanel(page);
   await removeDashboard(browser, page);
 };
+
+export function handleSummary(data) {
+  console.log('Preparing the end-of-test summary...');
+
+  return {
+    'stdout': textSummary(data, { indent: ' ', enableColors: true}),
+    'e2e/test_summary.json': JSON.stringify(data), 
+  };
+}
 

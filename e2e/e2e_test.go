@@ -2,8 +2,9 @@ package e2e_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"log"
+	"io/ioutil"
 	"os"
 	"testing"
 
@@ -11,13 +12,26 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var command = &cobra.Command{
-	Use:   "build",
-	Short: "Build a backend plugin",
-	Run:   e2etests,
+var runTests = &cobra.Command{
+	Use:   "test",
+	Short: "run k6 tests",
+	Run:   e2eTests,
 }
 
-func e2etests(cmd *cobra.Command, args []string) {
+var errorHandling = &cobra.Command{
+	Use:   "error handling",
+	Short: "check if k6 tests have failing tests",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if testFailures > 0 {
+			return fmt.Errorf("Failing tests")
+		}
+		return nil
+	},
+}
+
+var testFailures = 0
+
+func e2eTests(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr), dagger.WithWorkdir(".."))
@@ -26,22 +40,18 @@ func e2etests(cmd *cobra.Command, args []string) {
 	}
 	defer client.Close()
 
-	//set up clickhouse docker image
+	clearCache(client)
+
+	// set up clickhouse docker image
 	startClickHouse(client)
 
-	entries, err := client.Host().Directory(".").Entries(ctx)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	fmt.Println(entries)
-	//build CH plugin to get dist file
+	// build CH plugin to get dist file
 	buildPlugin(ctx, client)
 
-	//run grafana with CH plugin installed
+	// run grafana with CH plugin installed
 	startGrafana(client)
 
-	//run e2e tests
+	// run e2e tests
 	source := client.Container().
 		From("node:16-slim").
 		WithDirectory("/src", client.Host().Directory("."), dagger.ContainerWithDirectoryOpts{
@@ -52,9 +62,41 @@ func e2etests(cmd *cobra.Command, args []string) {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("out", out)
 
 	//check if e2e tests pass
-	fmt.Println("resultzz", out)
+	j, _ := ioutil.ReadFile("./test_summary.json")
+	type TestSummary struct {
+		RootGroup struct {
+			Checks []struct {
+				Name   string `json:"name"`
+				Passes int    `json:"passes"`
+				Fails  int    `json:"fails"`
+			}
+		} `json:"root_group"`
+	}
+	var data TestSummary
+	err = json.Unmarshal(j, &data)
+	if err != nil {
+		fmt.Println("Cannot unmarshal the json", err)
+		return
+	}
+	for _, check := range data.RootGroup.Checks {
+		if check.Fails > 0 {
+			testFailures++
+			fmt.Println("Test failed:", check.Name)
+		} else {
+			fmt.Println("Test passed:", check.Name)
+		}
+	}
+}
+
+func clearCache(client *dagger.Client) {
+	fmt.Println("Clearing cache")
+	client.Container().From("node:16.13.2").
+		WithDirectory(".", client.Directory()).
+		WithExec([]string{"go", "clear", "-cache"})
+	fmt.Println("Cache cleared")
 }
 
 func startClickHouse(client *dagger.Client) {
@@ -81,13 +123,6 @@ func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.
 		WithExec([]string{"go", "install", "github.com/magefile/mage@latest"}).
 		WithExec([]string{"mage", "build:backend"})
 
-	//print stuff
-	entries, err := container.Directory(".").Entries(ctx)
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Println(entries)
-
 	return container
 }
 
@@ -111,9 +146,8 @@ func startGrafana(client *dagger.Client) *dagger.Container {
 	return container
 }
 
-func TestConnect(t *testing.T) {
-	fmt.Println("dasfdsafdsafd built")
-	if err := command.Execute(); err != nil {
-		log.Fatalln(err)
-	}
+func TestK6(t *testing.T) {
+	fmt.Println("Test starting")
+	runTests.Execute()
+	errorHandling.Execute()
 }
