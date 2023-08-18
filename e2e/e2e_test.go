@@ -15,12 +15,7 @@ var runTests = &cobra.Command{
 	Use:   "test",
 	Short: "run k6 tests",
 	Run:   e2eTests,
-}
-
-var errorHandling = &cobra.Command{
-	Use:   "error handling",
-	Short: "check if k6 tests have failing tests",
-	RunE: func(cmd *cobra.Command, args []string) error {
+	PostRunE: func(cmd *cobra.Command, args []string) error {
 		if testFailures > 0 {
 			return fmt.Errorf("Failing tests")
 		}
@@ -35,21 +30,10 @@ func e2eTests(cmd *cobra.Command, args []string) {
 
 	client, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr), dagger.WithWorkdir(".."))
 	if err != nil {
-		panic(err)
+		fmt.Println("Error connecting to dagger", err)
+		return
 	}
 	defer client.Close()
-
-	if _, err := os.Stat("test_summary.json"); err == nil {
-		os.Remove("test_summary.json")
-		fmt.Println("Stale test_summary.json removed")
-	} else {
-		fmt.Println("No test_summary.json file exists")
-	}
-
-	clearCache(client)
-
-	// set up clickhouse docker image
-	startClickHouse(client)
 
 	// build CH plugin to get dist file
 	buildPlugin(ctx, client)
@@ -67,7 +51,8 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	runner := source.WithWorkdir(".")
 	_, err = runner.WithExec([]string{"", "k6 run e2e/e2ek6.test.js"}).Stderr(ctx)
 	if err != nil {
-		panic(err)
+		fmt.Println("Error running k6 tests", err)
+		return
 	}
 	fmt.Println("k6 tests ran")
 
@@ -98,21 +83,6 @@ func e2eTests(cmd *cobra.Command, args []string) {
 		fmt.Println("Test passed:", check.Name)
 	}
 	fmt.Println("Test summary check complete")
-}
-
-func clearCache(client *dagger.Client) {
-	fmt.Println("Clearing cache")
-	client.Container().From("node:16.13.2").
-		WithDirectory(".", client.Directory()).
-		WithExec([]string{"go", "clean", "-cache"})
-	fmt.Println("Cache cleared")
-}
-
-func startClickHouse(client *dagger.Client) {
-	fmt.Println("Starting ClickHouse")
-	container := client.Container().From("clickhouse/clickhouse-server:${CLICKHOUSE_VERSION-23.2-alpine}")
-	_ = container.WithExec([]string{})
-	fmt.Println("ClickHouse started")
 }
 
 func buildPlugin(ctx context.Context, client *dagger.Client) {
@@ -159,8 +129,5 @@ func TestK6(t *testing.T) {
 	fmt.Println("Test starting")
 	if err := runTests.Execute(); err != nil {
 		fmt.Println("Error running runTests: ", err)
-	}
-	if err := errorHandling.Execute(); err != nil {
-		fmt.Println("Error running errorHandling: ", err)
 	}
 }
