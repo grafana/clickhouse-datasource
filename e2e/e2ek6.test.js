@@ -4,7 +4,7 @@ import http from 'k6/http';
 
 import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
-import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.js';
+import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors@9.4.3/dist/index.js';
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
