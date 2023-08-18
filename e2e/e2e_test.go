@@ -93,9 +93,9 @@ func e2eTests(cmd *cobra.Command, args []string) {
 		if check.Fails > 0 {
 			testFailures++
 			fmt.Println("Test failed:", check.Name)
-		} else {
-			fmt.Println("Test passed:", check.Name)
+			continue
 		}
+		fmt.Println("Test passed:", check.Name)
 	}
 	fmt.Println("Test summary check complete")
 }
