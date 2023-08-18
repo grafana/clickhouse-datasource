@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -40,6 +39,13 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	}
 	defer client.Close()
 
+	if _, err := os.Stat("test_summary.json"); err == nil {
+		os.Remove("test_summary.json")
+		fmt.Println("Stale test_summary.json removed")
+	} else {
+		fmt.Println("No test_summary.json file exists")
+	}
+
 	clearCache(client)
 
 	// set up clickhouse docker image
@@ -52,20 +58,23 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	startGrafana(client)
 
 	// run e2e tests
+	fmt.Println("Starting k6 tests")
 	source := client.Container().
 		From("node:16-slim").
 		WithDirectory("/src", client.Host().Directory("."), dagger.ContainerWithDirectoryOpts{
 			Exclude: []string{"node_modules/", "ci/"},
 		})
 	runner := source.WithWorkdir(".")
-	out, err := runner.WithExec([]string{"", "k6 run e2ek6.test.js"}).Stderr(ctx)
+	_, err = runner.WithExec([]string{"", "k6 run e2e/e2ek6.test.js"}).Stderr(ctx)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("out", out)
+	fmt.Println("k6 tests ran")
 
 	//check if e2e tests pass
-	j, _ := ioutil.ReadFile("./test_summary.json")
+	fmt.Println("Checking test summary")
+	j, _ := os.ReadFile("test_summary.json")
+	fmt.Println("j: ", j)
 	type TestSummary struct {
 		RootGroup struct {
 			Checks []struct {
@@ -89,13 +98,14 @@ func e2eTests(cmd *cobra.Command, args []string) {
 			fmt.Println("Test passed:", check.Name)
 		}
 	}
+	fmt.Println("Test summary check complete")
 }
 
 func clearCache(client *dagger.Client) {
 	fmt.Println("Clearing cache")
 	client.Container().From("node:16.13.2").
 		WithDirectory(".", client.Directory()).
-		WithExec([]string{"go", "clear", "-cache"})
+		WithExec([]string{"go", "clean", "-cache"})
 	fmt.Println("Cache cleared")
 }
 
@@ -148,6 +158,10 @@ func startGrafana(client *dagger.Client) *dagger.Container {
 
 func TestK6(t *testing.T) {
 	fmt.Println("Test starting")
-	runTests.Execute()
-	errorHandling.Execute()
+	if err := runTests.Execute(); err != nil {
+		fmt.Println("Error running runTests: ", err)
+	}
+	if err := errorHandling.Execute(); err != nil {
+		fmt.Println("Error running errorHandling: ", err)
+	}
 }

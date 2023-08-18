@@ -67,6 +67,8 @@
     "typecheck",
     "Ulimits",
     "uuidv",
-    "vectorator"
+    "vectorator",
+    "WorkDir",
+    "magefile"
   ]
 }
