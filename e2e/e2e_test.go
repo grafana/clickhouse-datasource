@@ -38,9 +38,6 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	// build CH plugin to get dist file
 	buildPlugin(ctx, client)
 
-	// run grafana with CH plugin installed
-	startGrafana(client)
-
 	// run e2e tests
 	fmt.Println("Starting k6 tests")
 	source := client.Container().
@@ -114,15 +111,6 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *d
 		Directory(".")
 
 	return nodeModules
-}
-
-func startGrafana(client *dagger.Client) *dagger.Container {
-	fmt.Println("Building Grafana")
-	container := client.Container().From("grafana/grafana:latest")
-	container = container.WithExec([]string{"yarn", "start"})
-	fmt.Println("Grafana built")
-
-	return container
 }
 
 func TestK6(t *testing.T) {
