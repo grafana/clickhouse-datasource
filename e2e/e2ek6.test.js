@@ -1,5 +1,5 @@
-// import { chromium } from 'k6/experimental/browser';
-import { browser } from 'k6/experimental/browser';
+import { chromium } from 'k6/experimental/browser';
+// import { browser } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 
@@ -234,7 +234,7 @@ export async function configurePanel(page) {
   } 
 };
 
-export async function removeDashboard(browser, page) {
+export async function removeDashboard(page) {
   try {
     const dashboardURL = page.url();
     const dashboardUID = getDashboardUid(dashboardURL);
@@ -254,20 +254,18 @@ export async function removeDashboard(browser, page) {
     });
   } catch(e) {
     fail(`remove datasource failed: ${e}`);
-  } finally {
-    browser.close();
   }
 };
 
 export default async function () {
-  // const browser = chromium.launch({ headless: false });
+  const browser = chromium.launch({ headless: false });
   const page = browser.newPage();
-  console.log("page", page);
+
   await login(page);
   await addDatasource(page);
   await addDashboard(page);
   await configurePanel(page);
-  await removeDashboard(browser, page);
+  await removeDashboard(page);
 };
 
 export function handleSummary(data) {
