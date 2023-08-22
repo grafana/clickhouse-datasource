@@ -1,11 +1,28 @@
-import { chromium } from 'k6/experimental/browser';
+// import { chromium } from 'k6/experimental/browser';
+import { browser } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 
 import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.js';
-import {textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+
+export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+          type: 'chromium',
+        },
+      },
+    },
+  },
+  thresholds: {
+    checks: ["rate==1.0"]
+  }
+}
 
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
@@ -243,8 +260,9 @@ export async function removeDashboard(browser, page) {
 };
 
 export default async function () {
-  const browser = chromium.launch({ headless: false });
+  // const browser = chromium.launch({ headless: false });
   const page = browser.newPage();
+  console.log("page", page);
   await login(page);
   await addDatasource(page);
   await addDashboard(page);
@@ -252,7 +270,7 @@ export default async function () {
   await removeDashboard(browser, page);
 };
 
-export async function handleSummary(data) {
+export function handleSummary(data) {
   console.log('Preparing the end-of-test summary...');
 
   return {

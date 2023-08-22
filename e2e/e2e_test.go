@@ -38,16 +38,17 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	// build CH plugin to get dist file
 	gibberish := buildPlugin(ctx, client)
 
+	entries, err := gibberish.Directory(".").Entries(ctx)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(entries)
+
 	// run e2e tests
 	fmt.Println("Starting k6 tests")
-	runk6(ctx, client, gibberish)
-	// source := client.Container()
-	// runner := source.WithWorkdir("/src")
-	// _, err = runner.WithExec([]string{"k6", "run", "e2e/e2ek6.test.js"}).Stderr(ctx)
-	// if err != nil {
-	// 	fmt.Println("Error running k6 tests", err)
-	// 	return
-	// }
+	runk6(ctx, gibberish)
 	fmt.Println("k6 tests ran")
 
 	//check if e2e tests pass
@@ -79,13 +80,12 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	fmt.Println("Test summary check complete")
 }
 
-func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Directory {
+func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Container {
 	fmt.Println("Building plugin")
 	backend := buildBackend(ctx, client, client.Host().Directory("."))
-	nodeModules := WithYarnDependencies(client, backend)
-	//_ = Withk6(client, backend)
+
 	fmt.Println("Plugin built")
-	return nodeModules
+	return WithYarnDependencies(client, backend)
 }
 
 func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.Directory) *dagger.Container {
@@ -100,32 +100,30 @@ func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.
 	return container
 }
 
-func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *dagger.Directory {
+func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *dagger.Container {
 
-	nodeModules := client.Container().
-		WithDirectory(".", client.Directory()).
+	var (
+		packageJSON = container.File("package.json")
+		yarnLock    = container.File("yarn.lock")
+	)
+
+	nodeModules := client.Container().From("node:16.13.2").
+		WithWorkdir("/src").
+		WithFile("/src/package.json", packageJSON).
+		WithFile("/src/yarn.lock", yarnLock).
 		WithExec([]string{"yarn", "install", "--frozen-lockfile", "--no-progress"}).
-		WithExec([]string{"yarn", "build"}).
-		Directory(".")
+		WithExec([]string{"rm", "-rf", "/src/node_modules/@grafana/data/node_modules"}).
+		Directory("/src/node_modules")
 
-	return nodeModules
+	return container.WithDirectory("node_modules", nodeModules)
 }
 
-// func Withk6(client *dagger.Client, container *dagger.Container) *dagger.Directory {
-
-// 	k6Browser := client.Container().
-// 		WithDirectory(".", client.Directory()).
-// 		WithExec([]string{"go", "install", "github.com/grafana/k6:master-with-browser"}).
-// 		Directory(".")
-
-// 	return k6Browser
-// }
-
-func runk6(ctx context.Context, client *dagger.Client, directory *dagger.Directory) {
-	value, err := client.Container().
-		From("grafana/k6:master-with-browser").
-		WithDirectory(".", directory).
-		WithExec([]string{"k6", "run", "e2e/e2ek6.test.js"}).Stderr(ctx)
+func runk6(ctx context.Context, container *dagger.Container) {
+	value, err := container.
+		From("grafana/k6:latest-with-browser").
+		WithWorkdir("./clickhouse-datasource").
+		WithDirectory(".", container.Directory(".")).
+		WithExec([]string{"run", "e2e/e2ek6.test.js"}).Stderr(ctx)
 	if err != nil {
 		fmt.Println(err)
 		return
