@@ -36,19 +36,11 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	defer client.Close()
 
 	// build CH plugin to get dist file
-	gibberish := buildPlugin(ctx, client)
-
-	entries, err := gibberish.Directory(".").Entries(ctx)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	fmt.Println(entries)
+	pluginContainer := buildPlugin(ctx, client)
 
 	// run e2e tests
 	fmt.Println("Starting k6 tests")
-	runk6(ctx, gibberish)
+	runk6(ctx, pluginContainer)
 	fmt.Println("k6 tests ran")
 
 	//check if e2e tests pass
