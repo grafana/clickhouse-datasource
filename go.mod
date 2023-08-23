@@ -3,7 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.20
 
 require (
-	github.com/ClickHouse/clickhouse-go/v2 v2.13.2
+	github.com/ClickHouse/clickhouse-go/v2 v2.13.3
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.173.0
@@ -49,7 +49,7 @@ require (
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/flatbuffers v2.0.0+incompatible // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.1 // indirect
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
