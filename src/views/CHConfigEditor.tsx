@@ -144,6 +144,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           required
           label={Components.ConfigEditor.ServerAddress.label}
           description={Components.ConfigEditor.ServerAddress.tooltip}
+          invalid={!jsonData.server}
+          error={'Server URL is required'}
         >
           <Input
             name="server"
@@ -159,6 +161,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           required
           label={Components.ConfigEditor.ServerPort.label}
           description={Components.ConfigEditor.ServerPort.tooltip}
+          invalid={!jsonData.port}
+          error={'Port is required'}
         >
           <Input
             name="port"
@@ -197,6 +201,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           required
           label={Components.ConfigEditor.Username.label}
           description={Components.ConfigEditor.Username.tooltip}
+          invalid={!jsonData.username}
+          error={'Username is required'}
         >
           <Input
             name="user"
@@ -208,18 +214,13 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             placeholder={Components.ConfigEditor.Username.placeholder}
           />
         </Field>
-        <Field
-          required
-          label={Components.ConfigEditor.Password.label}
-          description={Components.ConfigEditor.Password.tooltip}
-        >
+        <Field label={Components.ConfigEditor.Password.label} description={Components.ConfigEditor.Password.tooltip}>
           <SecretInput
             name="pwd"
             width={40}
             label={Components.ConfigEditor.Password.label}
             aria-label={Components.ConfigEditor.Password.label}
             placeholder={Components.ConfigEditor.Password.placeholder}
-            required
             value={secureJsonData.password || ''}
             isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
             onReset={onResetPassword}
