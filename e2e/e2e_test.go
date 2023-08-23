@@ -35,12 +35,14 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	}
 	defer client.Close()
 
-	// build CH plugin to get dist file
-	pluginContainer := buildPlugin(ctx, client)
+	clickHouseAssets := buildPlugin(ctx, client)
+	grafanaContainer := startGrafana(client, clickHouseAssets)
+	clickHouseContainer := startClickHouse(client, ctx)
+	fmt.Println("Plugin built")
 
 	// run e2e tests
 	fmt.Println("Starting k6 tests")
-	runk6(ctx, pluginContainer)
+	runk6(client, ctx, grafanaContainer, clickHouseContainer, clickHouseAssets)
 	fmt.Println("k6 tests ran")
 
 	//check if e2e tests pass
@@ -76,7 +78,6 @@ func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Container {
 	fmt.Println("Building plugin")
 	backend := buildBackend(ctx, client, client.Host().Directory("."))
 
-	fmt.Println("Plugin built")
 	return WithYarnDependencies(client, backend)
 }
 
@@ -99,7 +100,8 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *d
 		yarnLock    = container.File("yarn.lock")
 	)
 
-	nodeModules := client.Container().From("node:16.13.2").
+	nodeModules := client.Container().
+		From("node:16.13.2").
 		WithWorkdir("/src").
 		WithFile("/src/package.json", packageJSON).
 		WithFile("/src/yarn.lock", yarnLock).
@@ -110,12 +112,41 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *d
 	return container.WithDirectory("node_modules", nodeModules)
 }
 
-func runk6(ctx context.Context, container *dagger.Container) {
-	value, err := container.
+func startGrafana(client *dagger.Client, clickHouseAssets *dagger.Container) *dagger.Container {
+	fmt.Println("Building Grafana")
+	container := client.
+		Container().
+		From("grafana/grafana:latest").
+		WithDirectory(".", clickHouseAssets.Directory(".")).
+		WithExec(nil).
+		//WithEnvVariable() //point to clickhouseassets directory
+		WithExposedPort(3000)
+
+	fmt.Println("Grafana built")
+
+	return container
+}
+
+func startClickHouse(client *dagger.Client, ctx context.Context) *dagger.Container {
+	fmt.Println("Starting ClickHouse")
+	container := client.Container().
+		From("clickhouse/clickhouse-server:latest-alpine").
+		WithExec(nil).
+		WithExposedPort(9000)
+
+	fmt.Println("ClickHouse started")
+
+	return container
+}
+
+func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.Container, clickhouseContainer *dagger.Container, clickHouseAssets *dagger.Container) {
+	value, err := client.
+		Container().
 		From("grafana/k6:latest-with-browser").
-		WithWorkdir("./clickhouse-datasource").
-		WithDirectory(".", container.Directory(".")).
-		WithExec([]string{"run", "e2e/e2ek6.test.js"}).Stderr(ctx)
+		WithServiceBinding("clickhouse", clickhouseContainer). //dns for this? e.g. does grafana connect to localhost:9000 or "clickhouse:9000"
+		WithServiceBinding("grafana", grafanaContainer).       //we'll need to somehow tell Grafana where to find the plugin
+		WithDirectory(".", clickHouseAssets.Directory(".")).
+		WithExec([]string{"run", "e2e/e2ek6.test.js"}, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}).Stderr(ctx)
 	if err != nil {
 		fmt.Println(err)
 		return

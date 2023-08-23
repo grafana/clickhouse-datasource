@@ -1,5 +1,4 @@
-import { chromium } from 'k6/experimental/browser';
-// import { browser } from 'k6/experimental/browser';
+import { browser } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 
@@ -7,6 +6,19 @@ import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors/dist/index.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
+
+const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
+const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
+let datasourceUID;
+let apiToken;
+const getDashboardUid = (url) => {
+  const matches = new URL(url).pathname.match(/\/d\/([^/]+)/);
+  if (!matches) {
+    throw new Error(`Couldn't parse uid from ${url}`);
+  } else {
+    return matches[1];
+  }
+};
 
 export const options = {
   scenarios: {
@@ -24,23 +36,10 @@ export const options = {
   }
 }
 
-const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
-const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
-let datasourceUID;
-let apiToken;
-const getDashboardUid = (url) => {
-  const matches = new URL(url).pathname.match(/\/d\/([^/]+)/);
-  if (!matches) {
-    throw new Error(`Couldn't parse uid from ${url}`);
-  } else {
-    return matches[1];
-  }
-};
-
 export async function login(page) {
   try {
     const loginURL = selectors.pages.Login.url;
-    await page.goto(`http://localhost:3000${loginURL}`, { waitUntil: 'networkidle' });
+    await page.goto(`https://localhost:3000${loginURL}`, { waitUntil: 'networkidle' });
 
     const usernameInput = page.locator(`input[aria-label="${selectors.pages.Login.username}"]`)
     await usernameInput.type('admin');
@@ -258,7 +257,6 @@ export async function removeDashboard(page) {
 };
 
 export default async function () {
-  const browser = chromium.launch({ headless: false });
   const page = browser.newPage();
 
   await login(page);
