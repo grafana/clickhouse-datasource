@@ -18,25 +18,21 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        go:
-          # version pinned until https://github.com/testcontainers/testcontainers-go/issues/1359
-          # is resolved
-          - '1.20.5'
         clickhouse:
-          - 22.3
-          - 22.8
-          - 22.9
+          - '22.3'
+          - '22.8'
+          - '22.9'
           - '22.10'
-          - 22.11
-          - latest
+          - '22.11'
+          - 'latest'
 
     steps:
       - uses: actions/checkout@v3
 
-      - name: Install Go ${{ matrix.go }}
+      - name: Install Go
         uses: actions/setup-go@v4.1.0
         with:
-          go-version: ${{ matrix.go }}
+          go-version-file: 'go.mod'
 
       - name: Build
         run: go build -v ./...
