@@ -4,7 +4,17 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, Field, SecretInput, Button, InlineField, InlineFieldRow } from '@grafana/ui';
+import {
+  RadioButtonGroup,
+  Switch,
+  Input,
+  Field,
+  SecretInput,
+  Button,
+  InlineField,
+  InlineFieldRow,
+  Divider,
+} from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
@@ -135,10 +145,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         docsLink="https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/"
         hasRequiredFields
       />
-
-      {/* TODO add dividers */
-      /* <Divider/>*/}
-
+      <Divider />
       <ConfigSection title="Server">
         <Field
           required
@@ -193,9 +200,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         </Field>
       </ConfigSection>
 
-      {/* TODO add dividers */
-      /* <Divider/>*/}
-
+      <Divider />
       <ConfigSection title="Credentials">
         <Field
           required
@@ -229,9 +234,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         </Field>
       </ConfigSection>
 
-      {/* TODO add dividers */
-      /* <Divider/>*/}
-
+      <Divider />
       <ConfigSection title="TLS / SSL Settings">
         <Field
           label={Components.ConfigEditor.TLSSkipVerify.label}
@@ -292,9 +295,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         )}
       </ConfigSection>
 
-      {/* TODO add dividers */
-      /* <Divider/>*/}
-
+      <Divider />
       <ConfigSection
         title="Additional settings"
         description="Additional settings are optional settings that can be configured for more control over your data source. This includes the default database, dial and query timeouts, SQL validation, and custom Clickhouse settings."
