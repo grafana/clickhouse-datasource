@@ -13,8 +13,6 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint --cache --ignore-path ./.gitignore --ext .js,.jsx,.ts,.tsx .",
     "lint:fix": "yarn lint --fix",
-    "e2e": "yarn cypress install && yarn grafana-e2e run",
-    "e2e:update": "yarn cypress install && yarn grafana-e2e run --update-screenshots",
     "server": "docker-compose up --build",
     "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",
     "sign": "npx --yes @grafana/sign-plugin@latest"
