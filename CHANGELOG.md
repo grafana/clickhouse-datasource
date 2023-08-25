@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.3.0
+
+### Features
+- Support Point geo data type.
+
+### Fixes
+- Fix timeInterval_ms macro.
+- Fix Table summary and Parts over time panels in Data Analysis dashboard.
+
+### Upgrades
+- Upgrade [grafana-plugin-sdk-go](https://github.com/grafana/grafana-plugin-sdk-go).
+
 ## 3.2.0
 
 ### Features
