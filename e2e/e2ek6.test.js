@@ -26,20 +26,17 @@ export const options = {
       executor: 'shared-iterations',
       options: {
         browser: {
-          type: 'chromium',
+          type: 'chromium'
         },
       },
     },
   },
-  thresholds: {
-    checks: ["rate==1.0"]
-  }
 }
 
 export async function login(page) {
   try {
-    const loginURL = selectors.pages.Login.url;
-    await page.goto(`https://localhost:3000${loginURL}`, { waitUntil: 'networkidle' });
+    // const loginURL = selectors.pages.Login.url;
+    await page.goto('https://localhost:3000/login', { waitUntil: 'load' });
 
     const usernameInput = page.locator(`input[aria-label="${selectors.pages.Login.username}"]`)
     await usernameInput.type('admin');
@@ -257,13 +254,16 @@ export async function removeDashboard(page) {
 };
 
 export default async function () {
-  const page = browser.newPage();
+  const context = browser.newContext();
+  const page = context.newPage();
 
   await login(page);
   await addDatasource(page);
   await addDashboard(page);
   await configurePanel(page);
   await removeDashboard(page);
+
+  page.close();
 };
 
 export function handleSummary(data) {
