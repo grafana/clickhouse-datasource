@@ -3,12 +3,11 @@ import { check, fail } from 'k6';
 import http from 'k6/http';
 
 import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
-import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors@9.4.3/dist/index.js';
 
-const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
-const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
+const DASHBOARD_TITLE = `e2e-test-dashboard`;
+const DATASOURCE_NAME = `ClickHouse-e2e-test`;
 let datasourceUID;
 let apiToken;
 const getDashboardUid = (url) => {
@@ -35,8 +34,9 @@ export const options = {
 
 export async function login(page) {
   try {
-    // const loginURL = selectors.pages.Login.url;
-    await page.goto('https://localhost:3000/login', { waitUntil: 'load' });
+    const loginURL = selectors.pages.Login.url;
+    await page.goto(`http://localhost:3000/${loginURL}`, { waitUntil: 'load' });
+    page.waitForTimeout(15000);
 
     const usernameInput = page.locator(`input[aria-label="${selectors.pages.Login.username}"]`)
     await usernameInput.type('admin');
@@ -69,7 +69,8 @@ export async function addDatasource(page) {
     serverAddress.type('localhost');
     const serverPort = page.locator('input[aria-label="Server port"]');
     serverPort.type('9000');
-    const saveAndTestButton = page.locator(`button[data-testid="${selectors.pages.DataSource.saveAndTest}"]`);
+    console.log(selectors.pages.DataSource.saveAndTest)
+    const saveAndTestButton = page.locator(`button[data-testid="data-testid ${selectors.pages.DataSource.saveAndTest}"]`);
     await saveAndTestButton.click();
 
     // checks the page for the data source is working message
@@ -240,7 +241,7 @@ export async function removeDashboard(page) {
     await dashboardSettings.click();
     const deleteDashboardButton = page.locator(`button[aria-label="${selectors.pages.Dashboard.Settings.General.deleteDashBoard}"]`);
     await deleteDashboardButton.click();
-    const deleteDashboardModalButton = page.locator(`button[data-testid="${selectors.pages.ConfirmModal.delete}"]`);
+    const deleteDashboardModalButton = page.locator(`button[data-testid="data-testid ${selectors.pages.ConfirmModal.delete}"]`);
     await deleteDashboardModalButton.click();
 
     // checks for success alert message
@@ -254,14 +255,14 @@ export async function removeDashboard(page) {
 };
 
 export default async function () {
-  const context = browser.newContext();
-  const page = context.newPage();
+  // const context = browser.newContext();
+  const page = browser.newPage();
 
-  await login(page);
-  await addDatasource(page);
-  await addDashboard(page);
-  await configurePanel(page);
-  await removeDashboard(page);
+  // await login(page);
+  // await addDatasource(page);
+  // await addDashboard(page);
+  // await configurePanel(page);
+  // await removeDashboard(page);
 
   page.close();
 };

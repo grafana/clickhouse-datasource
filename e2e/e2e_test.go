@@ -76,7 +76,7 @@ func e2eTests(cmd *cobra.Command, args []string) {
 
 func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Container {
 	fmt.Println("Building plugin")
-	backend := buildBackend(ctx, client, client.Host().Directory("."))
+	backend := buildBackend(ctx, client, client.Host().Directory(".", dagger.HostDirectoryOpts{Exclude: []string{"node_modules/**", "dist/**"}}))
 
 	return WithYarnDependencies(client, backend)
 }
@@ -84,7 +84,7 @@ func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Container {
 func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.Directory) *dagger.Container {
 	container := client.
 		Container().
-		From("golang:1.20").
+		From("golang:1.21.0").
 		WithWorkdir("./clickhouse-datasource").
 		WithDirectory(".", directory).
 		WithExec([]string{"go", "install", "github.com/magefile/mage@latest"}).
@@ -144,8 +144,9 @@ func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.
 		Container().
 		From("grafana/k6:latest-with-browser").
 		WithServiceBinding("clickhouse", clickhouseContainer). //dns for this? e.g. does grafana connect to localhost:9000 or "clickhouse:9000"
-		WithServiceBinding("grafana", grafanaContainer).       //we'll need to somehow tell Grafana where to find the plugin
+		WithServiceBinding("grafana", grafanaContainer).
 		WithDirectory(".", clickHouseAssets.Directory(".")).
+		WithEnvVariable("K6_BROWSER_HEADLESS", "0").
 		WithExec([]string{"run", "e2e/e2ek6.test.js"}, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}).Stderr(ctx)
 	if err != nil {
 		fmt.Println(err)
