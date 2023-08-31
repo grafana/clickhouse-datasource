@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   build:
     name: Build and archive plugin build artifacts
