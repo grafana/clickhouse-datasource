@@ -4,7 +4,7 @@ import { ConfigEditor } from './CHConfigEditor';
 import { mockConfigEditorProps } from '../__mocks__/ConfigEditor';
 import { Components } from './../selectors';
 import '@testing-library/jest-dom';
-import { Protocol } from '../types';
+import { Protocol } from 'types/config';
 
 describe('ConfigEditor', () => {
   it('new editor', () => {

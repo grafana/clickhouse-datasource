@@ -1,8 +1,9 @@
 import { DataSourcePlugin, DashboardLoadedEvent } from '@grafana/data';
 import { Datasource } from './data/CHDatasource';
 import { ConfigEditor } from './views/CHConfigEditor';
-import { CHQueryEditor } from './views/CHQueryEditor';
-import { CHQuery, CHConfig } from './types';
+import { CHQueryEditor } from './views/v4/CHQueryEditor';
+import { CHConfig } from './types/config';
+import { CHQuery } from './types/sql';
 import { getAppEvents } from '@grafana/runtime';
 import { analyzeQueries, trackClickhouseDashboardLoaded } from 'tracking';
 import pluginJson from './plugin.json';

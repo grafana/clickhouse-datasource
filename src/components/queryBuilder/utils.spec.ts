@@ -414,10 +414,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
   it('timeseries function throws if "timeFieldType" not a DateType', () => {
     expect(() =>
-      getSQLFromQueryOptions({
+      getSQLFromQueryOptions('db', 'foo', {
         mode: BuilderMode.Trend,
-        database: 'db',
-        table: 'foo',
         fields: [],
         timeField: 'time',
         timeFieldType: 'boolean',
@@ -430,7 +428,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
 
 function testCondition(name: string, sql: string, builder: any, testQueryOptionsFromSql = true) {
   it(name, () => {
-    expect(getSQLFromQueryOptions(builder)).toBe(sql);
+    expect(getSQLFromQueryOptions('db', 'foo', builder)).toBe(sql);
     if (testQueryOptionsFromSql) {
       expect(getQueryOptionsFromSql(sql)).toEqual(builder);
     }

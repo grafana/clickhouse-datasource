@@ -1,27 +1,28 @@
 import { analyzeQueries } from 'tracking';
-import { BuilderMode, QueryType, CHQuery, Format } from 'types';
+import { CHQuery, EditorType, QueryType } from 'types/sql';
+import { BuilderMode } from 'types/queryBuilder';
 
 describe('analyzeQueries', () => {
   [
-    {
-      description: 'should count 1 sql query (with a default mode of auto)',
-      queries: [{ queryType: QueryType.SQL, selectedFormat: Format.AUTO }],
-      expectedCounters: {
-        sql_queries: 1,
-        sql_query_format_auto: 1,
-        sql_query_format_table: 0,
-        sql_query_format_logs: 0,
-        sql_query_format_time_series: 0,
-        sql_query_format_trace: 0,
-        builder_queries: 0,
-        builder_table_queries: 0,
-        builder_aggregate_queries: 0,
-        builder_time_series_queries: 0,
-      },
-    },
+    // {
+    //   description: 'should count 1 sql query (with a default mode of auto)',
+    //   queries: [{ editorType: EditorType.SQL, QueryType: QueryType.Table }],
+    //   expectedCounters: {
+    //     sql_queries: 1,
+    //     sql_query_format_auto: 1,
+    //     sql_query_format_table: 0,
+    //     sql_query_format_logs: 0,
+    //     sql_query_format_time_series: 0,
+    //     sql_query_format_trace: 0,
+    //     builder_queries: 0,
+    //     builder_table_queries: 0,
+    //     builder_aggregate_queries: 0,
+    //     builder_time_series_queries: 0,
+    //   },
+    // },
     {
       description: 'should count 1 sql query with a mode of Table',
-      queries: [{ queryType: QueryType.SQL, selectedFormat: Format.TABLE }],
+      queries: [{ editorType: EditorType.SQL, queryType: QueryType.Table }],
       expectedCounters: {
         sql_queries: 1,
         sql_query_format_auto: 0,
@@ -37,7 +38,7 @@ describe('analyzeQueries', () => {
     },
     {
       description: 'should count 1 sql query with a mode of Logs',
-      queries: [{ queryType: QueryType.SQL, selectedFormat: Format.LOGS }],
+      queries: [{ editorType: EditorType.SQL, queryType: QueryType.Logs }],
       expectedCounters: {
         sql_queries: 1,
         sql_query_format_auto: 0,
@@ -53,7 +54,7 @@ describe('analyzeQueries', () => {
     },
     {
       description: 'should count 1 sql query with a mode of Time Series',
-      queries: [{ queryType: QueryType.SQL, selectedFormat: Format.TIMESERIES }],
+      queries: [{ editorType: EditorType.SQL, queryType: QueryType.TimeSeries }],
       expectedCounters: {
         sql_queries: 1,
         sql_query_format_auto: 0,
@@ -68,8 +69,8 @@ describe('analyzeQueries', () => {
       },
     },
     {
-      description: 'should count 1 sql query with a mode of Trace',
-      queries: [{ queryType: QueryType.SQL, selectedFormat: Format.TRACE }],
+      description: 'should count 1 sql query with a mode of Traces',
+      queries: [{ editorType: EditorType.SQL, queryType: QueryType.Traces }],
       expectedCounters: {
         sql_queries: 1,
         sql_query_format_auto: 0,
@@ -85,7 +86,7 @@ describe('analyzeQueries', () => {
     },
     {
       description: 'should count 1 builder query (with a default mode of Table)',
-      queries: [{ queryType: QueryType.Builder, builderOptions: { mode: BuilderMode.List } }],
+      queries: [{ editorType: EditorType.Builder, builderOptions: { mode: BuilderMode.List } }],
       expectedCounters: {
         sql_queries: 0,
         sql_query_format_auto: 0,
@@ -101,7 +102,7 @@ describe('analyzeQueries', () => {
     },
     {
       description: 'should count 1 builder query with a mode of Aggregate',
-      queries: [{ queryType: QueryType.Builder, builderOptions: { mode: BuilderMode.Aggregate } }],
+      queries: [{ editorType: EditorType.Builder, builderOptions: { mode: BuilderMode.Aggregate } }],
       expectedCounters: {
         sql_queries: 0,
         sql_query_format_auto: 0,
@@ -117,7 +118,7 @@ describe('analyzeQueries', () => {
     },
     {
       description: 'should count 1 builder query with a mode of Time Series',
-      queries: [{ queryType: QueryType.Builder, builderOptions: { mode: BuilderMode.Trend } }],
+      queries: [{ editorType: EditorType.Builder, builderOptions: { mode: BuilderMode.Trend } }],
       expectedCounters: {
         sql_queries: 0,
         sql_query_format_auto: 0,

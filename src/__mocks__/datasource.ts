@@ -1,5 +1,6 @@
 import { PluginType } from '@grafana/data';
-import { CHQuery, Protocol, QueryType } from '../types';
+import { Protocol } from 'types/config';
+import { CHQuery, EditorType, QueryType } from 'types/sql';
 import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
@@ -12,7 +13,7 @@ export const mockDatasource = new Datasource({
     port: 443,
     username: 'user',
     defaultDatabase: 'foo',
-    protocol: Protocol.NATIVE,
+    protocol: Protocol.Native,
   },
   readOnly: true,
   access: 'direct',
@@ -42,7 +43,8 @@ mockDatasource.adHocFiltersStatus = 1; // most tests should skip checking the CH
 export const mockQuery: CHQuery = {
   rawSql: 'select * from foo',
   refId: '',
-  format: 1,
-  queryType: QueryType.SQL,
-  selectedFormat: 4,
+  database: '',
+  table: 'foo',
+  editorType: EditorType.SQL,
+  queryType: QueryType.Table
 };

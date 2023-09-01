@@ -18,7 +18,7 @@ import {
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
 import { config } from '@grafana/runtime';
-import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
+import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from 'types/config';
 import { gte } from 'semver';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
@@ -33,7 +33,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
   const hasTLSClientCert = secureJsonFields && secureJsonFields.tlsClientCert;
   const hasTLSClientKey = secureJsonFields && secureJsonFields.tlsClientKey;
   const protocolOptions = [
-    { label: 'Native', value: Protocol.NATIVE },
+    { label: 'Native', value: Protocol.Native },
     { label: 'HTTP', value: Protocol.HTTP },
   ];
   const switchContainerStyle: React.CSSProperties = {
@@ -169,7 +169,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           <RadioButtonGroup<Protocol>
             options={protocolOptions}
             disabledOptions={[]}
-            value={jsonData.protocol || Protocol.NATIVE}
+            value={jsonData.protocol || Protocol.Native}
             onChange={(e) => onProtocolToggle(e!)}
           />
         </div>

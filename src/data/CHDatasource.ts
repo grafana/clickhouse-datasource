@@ -16,20 +16,18 @@ import {
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
+import { CHConfig } from 'types/config';
+import { EditorType, QueryType, CHQuery } from 'types/sql';
 import {
   BuilderMetricField,
   BuilderMetricFieldAggregation,
   BuilderMode,
-  CHConfig,
-  CHQuery,
   Filter,
   FilterOperator,
-  Format,
   FullField,
   OrderByDirection,
-  QueryType,
   SqlBuilderOptionsAggregate,
-} from '../types';
+} from 'types/queryBuilder';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
@@ -114,8 +112,8 @@ export class Datasource
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
-      query.format !== Format.LOGS ||
-      query.queryType !== QueryType.Builder ||
+      query.editorType !== EditorType.Builder ||
+      query.queryType !== QueryType.Logs ||
       query.builderOptions.mode !== BuilderMode.List ||
       query.builderOptions.timeField === undefined ||
       query.builderOptions.database === undefined ||
@@ -149,8 +147,6 @@ export class Datasource
 
     const logVolumeSqlBuilderOptions: SqlBuilderOptionsAggregate = {
       mode: BuilderMode.Aggregate,
-      database: query.builderOptions.database,
-      table: query.builderOptions.table,
       filters: query.builderOptions.filters,
       fields,
       metrics,
@@ -163,13 +159,16 @@ export class Datasource
       ],
     };
 
-    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(logVolumeSqlBuilderOptions);
+    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(query.database, query.table, logVolumeSqlBuilderOptions);
     return {
-      format: Format.AUTO,
-      queryType: QueryType.SQL,
+      // format: Format.AUTO,
+      // selectedFormat: Format.AUTO,
+      editorType: EditorType.SQL,
+      queryType: QueryType.Table,
+      database: query.database,
+      table: query.table,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
-      selectedFormat: Format.AUTO,
     };
   }
 
@@ -181,16 +180,16 @@ export class Datasource
     if (this.adHocFiltersStatus === AdHocFilterStatus.none) {
       this.adHocFiltersStatus = await this.canUseAdhocFilters();
     }
-    const chQuery = isString(query) ? { rawSql: query, queryType: QueryType.SQL } : query;
+    const chQuery = isString(query) ? { rawSql: query, editorType: EditorType.SQL } : query;
 
-    if (!(chQuery.queryType === QueryType.SQL || chQuery.queryType === QueryType.Builder || !chQuery.queryType)) {
+    if (!(chQuery.editorType === EditorType.SQL || chQuery.editorType === EditorType.Builder || !chQuery.editorType)) {
       return [];
     }
 
     if (!chQuery.rawSql) {
       return [];
     }
-    const q = { ...chQuery, queryType: chQuery.queryType || QueryType.SQL };
+    const q = { ...chQuery, editorType: chQuery.editorType || EditorType.SQL };
     const frame = await this.runQuery(q, options);
     if (frame.fields?.length === 0) {
       return [];
@@ -256,7 +255,7 @@ export class Datasource
   modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
     // support filtering by field value in Explore
     if (
-      query.queryType === QueryType.Builder &&
+      query.editorType === EditorType.Builder &&
       action.options !== undefined &&
       'key' in action.options &&
       'value' in action.options
@@ -309,7 +308,7 @@ export class Datasource
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: getSQLFromQueryOptions(updatedBuilder),
+        rawSql: getSQLFromQueryOptions(query.database, query.table, updatedBuilder),
         builderOptions: updatedBuilder,
       };
     }

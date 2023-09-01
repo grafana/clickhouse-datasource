@@ -29,7 +29,7 @@ import {
   SqlBuilderOptionsAggregate,
   SqlBuilderOptionsTrend,
   StringFilter,
-} from 'types';
+} from 'types/queryBuilder';
 import { sqlToStatement } from 'data/ast';
 
 export const isBooleanType = (type: string): boolean => {
@@ -227,12 +227,12 @@ const getLimit = (limit?: number): string => {
   return ` LIMIT ` + (limit || 100);
 };
 
-export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
+export const getSQLFromQueryOptions = (database: string, table: string, options: SqlBuilderOptions): string => {
   const limit = options.limit ? getLimit(options.limit) : '';
   let query = ``;
   switch (options.mode) {
     case BuilderMode.Aggregate:
-      query += getAggregationQuery(options.database, options.table, options.fields, options.metrics, options.groupBy);
+      query += getAggregationQuery(database, table, options.fields, options.metrics, options.groupBy);
       let aggregateFilters = getFilters(options.filters || []);
       if (aggregateFilters) {
         query += ` WHERE ${aggregateFilters}`;
@@ -244,8 +244,8 @@ export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
         throw new Error('timeFieldType is expected to be valid Date type.');
       }
       query += getTrendByQuery(
-        options.database,
-        options.table,
+        database,
+        table,
         options.metrics,
         options.groupBy,
         options.timeField,
