@@ -6,9 +6,8 @@ import { EditorTypeSwitcher } from 'components/v4/EditorTypeSwitcher';
 import { QueryTypeSwitcher } from 'components/v4/QueryTypeSwitcher';
 import { styles } from 'styles';
 import { Button } from '@grafana/ui';
-import { EditorType, QueryType, CHBuilderQuery, defaultCHBuilderQuery } from 'types/sql';
+import { CHQuery, EditorType, QueryType, CHBuilderQuery, defaultCHBuilderQuery } from 'types/sql';
 import { CHConfig } from 'types/config';
-import { CHQuery } from 'types/sql';
 import { SqlBuilderOptions } from 'types/queryBuilder';
 import { SqlEditor } from 'components/v4/SqlEditor';
 import { QueryBuilder } from 'components/v4/queryBuilder/QueryBuilder';
@@ -21,23 +20,23 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { query, onChange, onRunQuery } = props;
+  const { datasource, query, onChange, onRunQuery } = props;
 
   React.useEffect(() => {
     if (!query.queryType) {
       onChange({ ...query, queryType: QueryType.Table });
     }
     if (!query.database) {
-      onChange({ ...query, database: props.datasource.getDefaultDatabase() || 'default' });
+      onChange({ ...query, database: datasource.getDefaultDatabase() || 'default' });
     }
-  }, [query, onChange]);
+  }, [query, onChange, datasource]);
 
   const runQuery = () => {
     if (query.editorType === EditorType.SQL) {
       // const format = getFormat(query.rawSql, query.selectedFormat);
       // if (format !== query.format) {
         // onChange({ ...query, format });
-        onChange({ ...query });
+        // onChange({ ...query });
       // }
     }
     onRunQuery();

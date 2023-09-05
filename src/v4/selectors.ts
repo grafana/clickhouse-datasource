@@ -25,6 +25,42 @@ export default {
     TableSelect: {
       label: 'Table',
       tooltip: 'ClickHouse table to query from',
+    },
+    ColumnsEditor: {
+      label: 'Columns',
+      tooltip: 'A list of columns to include in the query'
+    },
+    OtelVersionSelect: {
+      label: 'OTEL Logs',
+      tooltip: 'Enables Open Telemetry schema versioning'
+    },
+    LimitEditor: {
+      label: 'Limit',
+      tooltip: 'Limits the number of rows returned by the query'
+    },
+    LogsQueryBuilder: {
+      logTimeColumn: {
+        label: 'Time',
+        tooltip: 'Column that contains the log timestamp'
+      },
+      logLevelColumn: {
+        label: 'Log Level',
+        tooltip: 'Column that contains the log level'
+      },
+      logMessageColumn: {
+        label: 'Message',
+        tooltip: 'Column that contains the log message'
+      },
+      liveView: {
+        label: 'Live View',
+        tooltip: 'Enable to update logs in real time'
+      },
+    },
+    TimeSeriesQueryBuilder: {
+      simpleQueryModeLabel: 'Simple',
+      aggregateQueryModeLabel: 'Aggregate',
+      builderModeLabel: 'Builder Mode',
+      builderModeTooltip: 'Switches the query builder between the simple and aggregate modes'
     }
   },
   types: {

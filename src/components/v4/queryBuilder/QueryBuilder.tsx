@@ -22,6 +22,9 @@ import { isDateTimeType, isDateType } from '../../queryBuilder/utils';
 import { selectors } from 'selectors';
 import { LogLevelFieldEditor } from '../../queryBuilder/LogLevelField';
 import { CoreApp } from '@grafana/data';
+import useTableColumns from 'hooks/useTableColumns';
+import { LogsQueryBuilder } from './views/LogsQueryBuilder';
+import { TimeSeriesQueryBuilder } from './views/TimeSeriesQueryBuilder';
 
 interface QueryBuilderProps {
   builderOptions: SqlBuilderOptions;
@@ -34,6 +37,53 @@ interface QueryBuilderProps {
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
+  const { datasource, database, table, builderOptions, onBuilderOptionsChange } = props;
+  const allColumns = useTableColumns(datasource, database, table);
+  const builder = defaultsDeep(builderOptions, defaultCHBuilderQuery.builderOptions);
+
+  useEffect(() => {
+    if (builder.database === database) {
+      return;
+    }
+    const queryOptions: SqlBuilderOptions = {
+      ...builder,
+      database,
+      table: '',
+      fields: [],
+      filters: [],
+      orderBy: [],
+      timeField: undefined,
+      logLevelField: undefined,
+    };
+    onBuilderOptionsChange(queryOptions);
+  }, [builder, database, onBuilderOptionsChange]);
+  useEffect(() => {
+    if (builder.table === table) {
+      return;
+    }
+    const queryOptions: SqlBuilderOptions = {
+      ...builder,
+      table: table,
+      fields: [],
+      filters: [],
+      orderBy: [],
+      timeField: undefined,
+      logLevelField: undefined,
+    };
+    onBuilderOptionsChange(queryOptions);
+  }, [builder, table, onBuilderOptionsChange]);
+
+  return (
+    <div>
+      { props.queryType === QueryType.Table && <TimeSeriesQueryBuilder allColumns={allColumns} builderOptions={builder} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { props.queryType === QueryType.Logs && <LogsQueryBuilder allColumns={allColumns} builderOptions={builder} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { props.queryType === QueryType.TimeSeries && <TimeSeriesQueryBuilder allColumns={allColumns} builderOptions={builder} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+    </div>
+  );
+}
+
+export const OldQueryBuilder = (props: QueryBuilderProps) => {
+  const { onBuilderOptionsChange, database, table } = props;
   const [baseFieldsList, setBaseFieldsList] = useState<FullField[]>([]);
   const [timeField, setTimeField] = useState<string | null>(null);
   const [logLevelField, setLogLevelField] = useState<string | null>(null);
@@ -86,15 +136,18 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         });
     };
 
-    if (props.table) {
+    if (props.database && props.table) {
       fetchBaseFields(props.database, props.table);
     }
     // We want to run this only when the table changes or first time load.
     // If we add 'builder.fields' / 'builder.groupBy' / 'builder.metrics' / 'builder.filters' to the deps array, this will be called every time query editor changes
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.datasource, props.table]);
+  }, [props.datasource, props.database, props.table]);
 
-  const onDatabaseChange = (database = '') => {
+  useEffect(() => {
+    if (builder.database === database) {
+      return;
+    }
     setBaseFieldsList([]);
     setTimeField(null);
     setLogLevelField(null);
@@ -108,10 +161,12 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       timeField: undefined,
       logLevelField: undefined,
     };
-    props.onBuilderOptionsChange(queryOptions);
-  };
-
-  const onTableChange = (table = '') => {
+    onBuilderOptionsChange(queryOptions);
+  }, [builder, database, onBuilderOptionsChange]);
+  useEffect(() => {
+    if (builder.table === table) {
+      return;
+    }
     setTimeField(null);
     setLogLevelField(null);
     const queryOptions: SqlBuilderOptions = {
@@ -123,15 +178,8 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       timeField: undefined,
       logLevelField: undefined,
     };
-    props.onBuilderOptionsChange(queryOptions);
-  };
-
-  useEffect(() => {
-    onDatabaseChange(props.database);
-  }, [props.database]);
-  useEffect(() => {
-    onTableChange(props.table);
-  }, [props.table]);
+    onBuilderOptionsChange(queryOptions);
+  }, [builder, table, onBuilderOptionsChange]);
 
   // const onModeChange = (mode: BuilderMode) => {
   //   if (mode === BuilderMode.List) {

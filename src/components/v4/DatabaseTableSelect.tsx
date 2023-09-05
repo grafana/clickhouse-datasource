@@ -4,32 +4,31 @@ import { SelectableValue } from '@grafana/data';
 import { Datasource } from '../../data/CHDatasource';
 import selectors from 'v4/selectors';
 import { styles } from '../../styles';
+import useDatabaseTables from 'hooks/useDatabaseTables';
+import useDatabases from 'hooks/useDatabases';
 
 export type DatabaseSelectProps = {
   datasource: Datasource;
-  database?: string;
+  database: string;
   onDatabaseChange: (value: string) => void
 };
 
 export const DatabaseSelect = (props: DatabaseSelectProps) => {
   const { datasource, onDatabaseChange, database } = props;
+  const databases = useDatabases(datasource);
   const [list, setList] = useState<Array<SelectableValue<string>>>([]);
   const { label, tooltip } = selectors.components.DatabaseSelect;
 
   useEffect(() => {
-    async function fetchList() {
-      const list = await datasource.fetchDatabases();
-      const values = list.map(t => ({ label: t, value: t }));
+    const values = databases.map(d => ({ label: d, value: d }));
 
-      // Add selected value to the list if it does not exist.
-      if (database && !list.includes(database)) {
-        values.push({ label: database, value: database });
-      }
-
-      setList(values);
+    // Add selected value to the list if it does not exist.
+    if (database && !databases.includes(database)) {
+      values.push({ label: database, value: database });
     }
-    fetchList();
-  }, [datasource, database]);
+
+    setList(values);
+  }, [datasource, database, databases]);
 
   const defaultDatabase = datasource.settings.jsonData.defaultDatabase;
   const db = database ?? defaultDatabase;
@@ -53,33 +52,29 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
 
 export type TableSelectProps = {
   datasource: Datasource;
-  database?: string;
-  table?: string;
+  database: string;
+  table: string;
   onTableChange: (value: string) => void;
 };
 
 
 export const TableSelect = (props: TableSelectProps) => {
   const { datasource, onTableChange, database, table } = props;
+  const tables = useDatabaseTables(datasource, database);
   const [list, setList] = useState<Array<SelectableValue<string>>>([]);
   const { label, tooltip } = selectors.components.TableSelect;
 
   useEffect(() => {
-    async function fetchTables() {
-      const tables = await datasource.fetchTables(database);
-      const values = tables.map(t => ({ label: t, value: t }));
-
-      // Add selected value to the list if it does not exist.
-      if (table && !tables.includes(table)) {
-        values.push({ label: table, value: table });
-      }
-
-      // TODO: Can't seem to reset the select to unselected
-      values.push({ label: '-- Choose --', value: '' });
-      setList(values);
+    const values = tables.map(t => ({ label: t, value: t }));
+    // Add selected value to the list if it does not exist.
+    if (table && !tables.includes(table)) {
+      values.push({ label: table, value: table });
     }
-    fetchTables();
-  }, [datasource, database, table]);
+
+    // TODO: Can't seem to reset the select to unselected
+    values.push({ label: '-- Choose --', value: '' });
+    setList(values);
+  }, [tables, table]);
 
   return (
     <>
@@ -100,9 +95,9 @@ export const TableSelect = (props: TableSelectProps) => {
 
 export type DatabaseTableSelectProps = {
   datasource: Datasource;
-  database?: string;
+  database: string;
   onDatabaseChange: (value: string) => void
-  table?: string;
+  table: string;
   onTableChange: (value: string) => void;
 };
 

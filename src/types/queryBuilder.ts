@@ -1,3 +1,8 @@
+export interface FieldLabel {
+  label: string;
+  tooltip: string;
+}
+
 export enum BuilderMode {
   List = 'list',
   Aggregate = 'aggregate',
