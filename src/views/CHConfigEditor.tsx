@@ -4,23 +4,14 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import {
-  RadioButtonGroup,
-  Switch,
-  Input,
-  Field,
-  SecretInput,
-  Button,
-  InlineField,
-  InlineFieldRow,
-  Divider,
-} from '@grafana/ui';
+import { RadioButtonGroup, Switch, Input, Field, SecretInput, Button, InlineField, InlineFieldRow } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
 import { gte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana/experimental';
 import { config } from '@grafana/runtime';
+import { Divider } from 'components/Divider';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
