@@ -1,23 +1,34 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add a new optional `path` setting to specify an additional URL path. [#512](https://github.com/grafana/clickhouse-datasource/pull/512)
+
 ## 3.3.0
 
 ### Features
+
 - Support Point geo data type.
 
 ### Fixes
+
 - Fix timeInterval_ms macro.
 - Fix Table summary and Parts over time panels in Data Analysis dashboard.
 
 ### Upgrades
+
 - Upgrade [grafana-plugin-sdk-go](https://github.com/grafana/grafana-plugin-sdk-go).
 
 ## 3.2.0
 
 ### Features
+
 - Add `timeInterval_ms` macro to allow higher precision queries on DateTime64 columns. [#462](https://github.com/grafana/clickhouse-datasource/pull/462).
 
 ### Fixes
+
 - Ensure databases, tables, and columns are escaped correctly. [#460](https://github.com/grafana/clickhouse-datasource/pull/460).
 - Fix conditionAll handling. [#459](https://github.com/grafana/clickhouse-datasource/pull/459).
 - Fix support for ad-hoc regexp filters: `=~`, `!~` [#414](https://github.com/grafana/clickhouse-datasource/pull/414).
@@ -42,19 +53,20 @@
 
 - Custom ClickHouse settings can be set in data source settings. [Allow passing custom ClickHouse settings in datasource](https://github.com/grafana/clickhouse-datasource/pull/366)
 - Histogram UI fixes [Histogram UI fixes](https://github.com/grafana/clickhouse-datasource/pull/363)
-  -  Support filter/filter out logs view actions
-  -  Fix undefined database name by default
-  -  Reset level and time field properly on table/database change
-  -  Make it possible to clear the level field (so the histogram will render without grouping by level)
-  -  Fix filter value that gets stuck in the UI
+  - Support filter/filter out logs view actions
+  - Fix undefined database name by default
+  - Reset level and time field properly on table/database change
+  - Make it possible to clear the level field (so the histogram will render without grouping by level)
+  - Fix filter value that gets stuck in the UI
 - Tracing dashboard added to default dashboards. [Tracing dashboard ](https://github.com/grafana/clickhouse-datasource/pull/336)
 
 ## 3.0.1-beta
 
-- Users on v8.x of Grafana are encouraged to continue to use v2.2.0 of the plugin. 
+- Users on v8.x of Grafana are encouraged to continue to use v2.2.0 of the plugin.
 - Users of Grafana v9.x can use v3 however it is beta and may contain bugs.
 
 ## 3.0.0
+
 - **Feature** - [Logs volume histogram support](https://github.com/grafana/clickhouse-datasource/pull/352)
 - **Chore** - Update clickhouse-go to v2.8.1
 
@@ -75,12 +87,12 @@
 ## 2.1.0
 
 - **Fix** - Quote table names with dots by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/298
-- Add a predefined TimeRange filter if there is at least one DateTime* column by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/304
+- Add a predefined TimeRange filter if there is at least one DateTime\* column by @slvrtrn in https://github.com/grafana/clickhouse-datasource/pull/304
 
 ## 2.0.7
 
-- **Fix** - Empty template variables used with the conditionalAll macro work the same as selecting All. [Allow empty Inputs for $__conditionalAll](https://github.com/grafana/clickhouse-datasource/issues/262)
-- **Fix** - Intervals are limited to 1 second. [limit $__interval_s to at least 1 second](https://github.com/grafana/clickhouse-datasource/pull/270)
+- **Fix** - Empty template variables used with the conditionalAll macro work the same as selecting All. [Allow empty Inputs for $\_\_conditionalAll](https://github.com/grafana/clickhouse-datasource/issues/262)
+- **Fix** - Intervals are limited to 1 second. [limit $\_\_interval_s to at least 1 second](https://github.com/grafana/clickhouse-datasource/pull/270)
 - **Chore** - Bump ClickHouse go API to v2.5.1 [Bump github.com/ClickHouse/clickhouse-go/v2 from 2.4.3 to 2.5.1](https://github.com/grafana/clickhouse-datasource/pull/283)
 
 ## 2.0.6
@@ -171,7 +183,7 @@
 
 ## 0.12.0
 
-- **Feature** - Time series builder: use $__timeInterval macro on time field so buckets can be adjusted from query options.
+- **Feature** - Time series builder: use $\_\_timeInterval macro on time field so buckets can be adjusted from query options.
 
 ## 0.11.0
 
@@ -191,7 +203,7 @@
 
 ## 0.9.11
 
-- **Feature** - $__timeInterval(column) and $__interval_s macros
+- **Feature** - $**timeInterval(column) and $**interval_s macros
 
 ## 0.9.10
 
