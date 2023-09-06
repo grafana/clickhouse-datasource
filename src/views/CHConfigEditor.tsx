@@ -163,6 +163,19 @@ export const ConfigEditor: React.FC<Props> = (props) => {
           />
         </div>
         <div className="gf-form">
+          <FormField
+            name="path"
+            labelWidth={13}
+            inputWidth={20}
+            value={jsonData.path || ''}
+            onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
+            label={Components.ConfigEditor.Path.label}
+            aria-label={Components.ConfigEditor.Path.label}
+            placeholder={Components.ConfigEditor.Path.placeholder}
+            tooltip={Components.ConfigEditor.Path.tooltip}
+          />
+        </div>
+        <div className="gf-form">
           <InlineFormLabel width={13} tooltip={Components.ConfigEditor.Protocol.tooltip}>
             {Components.ConfigEditor.Protocol.label}
           </InlineFormLabel>

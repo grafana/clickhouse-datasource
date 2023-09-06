@@ -15,6 +15,7 @@ import (
 type Settings struct {
 	Server             string `json:"server,omitempty"`
 	Port               int64  `json:"port,omitempty"`
+	Path               string `json:"path,omitempty"`
 	Username           string `json:"username,omitempty"`
 	DefaultDatabase    string `json:"defaultDatabase,omitempty"`
 	InsecureSkipVerify bool   `json:"tlsSkipVerify,omitempty"`
@@ -69,6 +70,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	}
 	if jsonData["username"] != nil {
 		settings.Username = jsonData["username"].(string)
+	}
+	if jsonData["path"] != nil {
+		settings.Path = jsonData["path"].(string)
 	}
 	if jsonData["defaultDatabase"] != nil {
 		settings.DefaultDatabase = jsonData["defaultDatabase"].(string)

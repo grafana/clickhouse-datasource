@@ -7,6 +7,7 @@ export interface CHConfig extends DataSourceJsonData {
   server: string;
   protocol: Protocol;
   port: number;
+  path: string;
   defaultDatabase?: string;
   tlsSkipVerify?: boolean;
   tlsAuth?: boolean;
