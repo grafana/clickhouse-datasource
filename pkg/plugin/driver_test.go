@@ -124,11 +124,12 @@ func TestConnect(t *testing.T) {
 	ssl := getEnv("CLICKHOUSE_SSL", "false")
 	queryTimeoutNumber := 3600
 	queryTimeoutString := "3600"
+	path := "custom-path"
 	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, path, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
@@ -147,11 +148,12 @@ func TestHTTPConnect(t *testing.T) {
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
 	ssl := getEnv("CLICKHOUSE_SSL", "false")
+	path := "custom-path"
 	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "protocol": "http" }`, host, port, path, username, ssl)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
