@@ -36,6 +36,13 @@ You can also have `yarn` watch for changes and automatically recompile them:
 yarn watch
 ```
 
+#### Running E2E tests
+
+1. Install [K6](https://k6.io/docs/get-started/installation/)
+1. Ensure Grafana is running on port `:3000`
+1. Ensure clickhouse server is running on port `:9000`, hint you can use the `docker-compose.yml` file to get the needed services running.
+1. Run `k6 run e2e/e2ek6.test.js`
+
 ## Create a pull request
 
 Once you are ready to make a pull request, please read and follow [Create a pull request](https://github.com/grafana/grafana/blob/master/contribute/create-pull-request.md).
