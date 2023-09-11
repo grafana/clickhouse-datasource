@@ -1,26 +1,27 @@
 import React, { useState } from 'react';
 import { InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
-import { FullField } from 'types/queryBuilder';
-import { selectors } from 'selectors';
+import { TableColumn } from 'types/queryBuilder';
+import selectors from 'v4/selectors';
 import { styles } from 'styles';
 
 interface GroupByEditorProps {
-  allColumns: FullField[];
+  allColumns: TableColumn[];
   groupBy: string[];
   onGroupByChange: (groupBy: string[]) => void;
 }
+
 export const GroupByEditor = (props: GroupByEditorProps) => {
-  const columns: SelectableValue[] = (props.allColumns || []).map((f) => ({ label: f.label, value: f.name }));
+  const { allColumns, groupBy, onGroupByChange } = props;
   const [isOpen, setIsOpen] = useState(false);
-  const [groupBy, setGroupBy] = useState<string[]>(props.groupBy || []);
-  const { label, tooltip } = selectors.components.QueryEditor.QueryBuilder.GROUP_BY;
-  const onChange = (e: Array<SelectableValue<string>>) => {
+  const { label, tooltip } = selectors.components.GroupByEditor;
+  const options: Array<SelectableValue<string>> = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+
+  const onChange = (selection: Array<SelectableValue<string>>) => {
     setIsOpen(false);
-    setGroupBy(e.map((item) => item.value!));
+    onGroupByChange(selection.map(s => s.value!));
   };
-  // Add selected value to the list if it does not exist.
-  groupBy.filter((x) => !columns.some((y) => y.value === x)).forEach((x) => columns.push({ value: x, label: x }));
+
   return (
     <div className="gf-form">
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
@@ -28,14 +29,12 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
       </InlineFormLabel>
       <div data-testid="query-builder-group-by-multi-select-container" className={styles.Common.selectWrapper}>
         <MultiSelect
-          options={columns}
-          placeholder="(Optional) Click here to choose"
+          options={options}
           isOpen={isOpen}
           onOpenMenu={() => setIsOpen(true)}
           onCloseMenu={() => setIsOpen(false)}
-          onChange={onChange}
-          onBlur={() => props.onGroupByChange(groupBy)}
           value={groupBy}
+          onChange={onChange}
           allowCustomValue={true}
           menuPlacement={'bottom'}
         />

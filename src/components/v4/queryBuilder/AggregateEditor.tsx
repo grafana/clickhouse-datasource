@@ -1,145 +1,142 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Select, Button, Input } from '@grafana/ui';
-import { BuilderMetricField, BuilderMetricFieldAggregation, FullField } from 'types/queryBuilder';
-import { selectors } from 'selectors';
+import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
+import selectors from 'v4/selectors';
 import { styles } from 'styles';
 
-const AggregateEditor = (props: {
-  allColumns: FullField[];
-  index: number;
-  metric: BuilderMetricField;
-  metrics: BuilderMetricField[];
-  onMetricsChange: (metrics: BuilderMetricField[]) => void;
-}) => {
-  const columns: SelectableValue[] = (props.allColumns || []).map((f) => ({ label: f.label, value: f.name }));
+interface AggregateProps {
+  columnOptions: Array<SelectableValue<string>>;
+  index: number,
+  aggregate: AggregateColumn;
+  updateAggregate: (index: number, aggregate: AggregateColumn) => void;
+}
+
+const aggregateOptions: Array<SelectableValue<AggregateType>> = [
+  { label: 'Count', value: AggregateType.Count },
+  { label: 'Sum', value: AggregateType.Sum },
+  { label: 'Min', value: AggregateType.Min },
+  { label: 'Max', value: AggregateType.Max },
+  { label: 'Average', value: AggregateType.Average },
+  { label: 'Any', value: AggregateType.Any },
+  // { label: 'Distinct Count', value: AggregateType.Count_Distinct },
+];
+
+const Aggregate = (props: AggregateProps) => {
+  const { columnOptions, index, aggregate, updateAggregate } = props;
   const [isOpen, setIsOpen] = useState(false);
-  const { metric, index, metrics, onMetricsChange } = props;
-  const [alias, setAlias] = useState(metric.alias || '');
-  const { ALIAS } = selectors.components.QueryEditor.QueryBuilder.AGGREGATES;
-  const aggregationTypes: Array<SelectableValue<BuilderMetricFieldAggregation>> = [
-    { value: BuilderMetricFieldAggregation.Count, label: 'Count' },
-    { value: BuilderMetricFieldAggregation.Sum, label: 'Sum' },
-    { value: BuilderMetricFieldAggregation.Min, label: 'Min' },
-    { value: BuilderMetricFieldAggregation.Max, label: 'Max' },
-    { value: BuilderMetricFieldAggregation.Average, label: 'Average' },
-    { value: BuilderMetricFieldAggregation.Any, label: 'Any' },
-    // { value: BuilderMetricFieldAggregation.Count_Distinct, label: 'Distinct Count' },
-  ];
-  const onMetricFieldChange = (e: SelectableValue<string>) => {
-    setIsOpen(false);
-    const newMetrics: BuilderMetricField[] = [...metrics].map((o, i) => {
-      return { ...o, field: i === index ? e.value! : o.field };
-    });
-    onMetricsChange(newMetrics);
-  };
-  const onMetricAggregationChange = (aggregation: BuilderMetricFieldAggregation) => {
-    const newMetrics: BuilderMetricField[] = [...metrics].map((o, i) => {
-      return { ...o, aggregation: i === index ? aggregation : o.aggregation };
-    });
-    onMetricsChange(newMetrics);
-  };
-  const onMetricAliasChange = () => {
-    const newMetrics: BuilderMetricField[] = [...metrics].map((o, i) => {
-      return { ...o, alias: i === index ? alias : o.alias };
-    });
-    onMetricsChange(newMetrics);
-  };
+  const [alias, setAlias] = useState(aggregate.alias || '');
+  const { aliasLabel } = selectors.components.AggregatesEditor;
+
   return (
     <>
       <Select
         width={20}
         className={styles.Common.inlineSelect}
-        options={aggregationTypes}
-        onChange={(e) => onMetricAggregationChange(e.value!)}
-        value={metric.aggregation}
+        options={aggregateOptions}
+        value={aggregate.aggregateType}
+        onChange={e => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
         menuPlacement={'bottom'}
       />
       <Select<string>
         width={28}
         className={styles.Common.inlineSelect}
-        options={columns}
+        options={columnOptions}
         isOpen={isOpen}
         onOpenMenu={() => setIsOpen(true)}
         onCloseMenu={() => setIsOpen(false)}
-        onChange={onMetricFieldChange}
-        value={metric.field}
+        onChange={e => updateAggregate(index, { ...aggregate, column: e.value! })}
+        value={aggregate.column}
         menuPlacement={'bottom'}
       />
       <InlineFormLabel width={2} className="query-keyword">
-        {ALIAS.label}
+        {aliasLabel}
       </InlineFormLabel>
       <Input
         width={20}
         value={alias}
-        onChange={(e) => setAlias(e.currentTarget.value)}
-        onBlur={onMetricAliasChange}
+        onChange={e => setAlias(e.currentTarget.value)}
+        onBlur={e => updateAggregate(index, { ...aggregate, alias: e.currentTarget.value })}
         placeholder="alias"
       />
     </>
   );
 };
 
-interface AggregatesEditorProps {
-  allColumns: FullField[];
-  aggregates: BuilderMetricField[];
-  onAggregatesChange: (metrics: BuilderMetricField[]) => void;
+interface AggregateEditorProps {
+  allColumns: TableColumn[];
+  aggregates: AggregateColumn[];
+  onAggregatesChange: (aggregates: AggregateColumn[]) => void;
 }
-export const AggregatesEditor = (props: AggregatesEditorProps) => {
-  const { aggregates, onAggregatesChange, allColumns = [] } = props;
-  const { label, tooltipAggregate, AddLabel, RemoveLabel } = selectors.components.QueryEditor.QueryBuilder.AGGREGATES;
-  const onMetricAdd = () => {
-    const newMetric: BuilderMetricField = { field: '', aggregation: BuilderMetricFieldAggregation.Count };
-    onAggregatesChange([...aggregates, newMetric]);
+export const AggregateEditor = (props: AggregateEditorProps) => {
+  const { allColumns, aggregates, onAggregatesChange } = props;
+  const columnOptions: Array<SelectableValue<string>> = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const { label, tooltip, addLabel } = selectors.components.AggregatesEditor;
+
+  const addAggregate = () => {
+    const nextAggregates: AggregateColumn[] = aggregates.slice();
+    nextAggregates.push({ column: '', aggregateType: AggregateType.Count });
+    onAggregatesChange(nextAggregates);
   };
-  const onMetricRemove = (index: number) => {
-    const newMetrics: BuilderMetricField[] = [...aggregates];
-    newMetrics.splice(index, 1);
-    onAggregatesChange(newMetrics);
+  const removeAggregate = (index: number) => {
+    const nextAggregates: AggregateColumn[] = aggregates.slice();
+    nextAggregates.splice(index, 1);
+    onAggregatesChange(nextAggregates);
   };
+  const updateAggregate = (index: number, aggregatesItem: AggregateColumn) => {
+    const nextAggregates: AggregateColumn[] = aggregates.slice();
+    nextAggregates[index] = aggregatesItem;
+    onAggregatesChange(nextAggregates);
+  };
+
+  const fieldLabel = (
+    <InlineFormLabel
+      width={8}
+      className="query-keyword"
+      data-testid="query-builder-orderby-item-label"
+      tooltip={tooltip}
+    >
+      {label}
+    </InlineFormLabel>
+  );
+  const fieldSpacer = <div className={`width-8 ${styles.Common.firstLabel}`}></div>;
+
   return (
     <>
-      {aggregates.map((metric, index) => {
+      {aggregates.map((aggregate, index) => {
+        const key = `${index}-${aggregate.column}-${aggregate.aggregateType}-${aggregate.alias}`;
         return (
-          <div className="gf-form" key={index}>
-            {index === 0 ? (
-              <InlineFormLabel width={8} className="query-keyword" tooltip={tooltipAggregate}>
-                {label}
-              </InlineFormLabel>
-            ) : (
-              <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-            )}
-            <AggregateEditor
-              allColumns={allColumns}
+          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
+            { index === 0 ? fieldLabel : fieldSpacer }
+            <Aggregate
+              columnOptions={columnOptions}
               index={index}
-              metric={metric}
-              metrics={aggregates}
-              onMetricsChange={onAggregatesChange}
+              aggregate={aggregate}
+              updateAggregate={updateAggregate}
             />
-            {aggregates.length > 1 && (
-              <Button
-                icon="trash-alt"
-                size="sm"
-                variant="destructive"
-                className={styles.Common.smallBtn}
-                onClick={() => onMetricRemove(index)}
-              >
-                {RemoveLabel}
-              </Button>
-            )}
+            <Button
+              data-testid="query-builder-orderby-remove-button"
+              className={styles.Common.smallBtn}
+              variant="destructive"
+              size="sm"
+              icon="trash-alt"
+              onClick={() => removeAggregate(index)}
+            />
           </div>
         );
       })}
+
       <div className="gf-form">
-        <div className={`width-8 ${styles.Common.firstLabel}`}></div>
+        {aggregates.length === 0 ? fieldLabel : fieldSpacer}
         <Button
+          data-testid="query-builder-orderby-add-button"
           icon="plus-circle"
-          size="sm"
           variant="secondary"
+          size="sm"
+          onClick={addAggregate}
           className={styles.Common.smallBtn}
-          onClick={onMetricAdd}
         >
-          {AddLabel}
+          {addLabel}
         </Button>
       </div>
     </>

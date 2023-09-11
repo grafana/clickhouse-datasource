@@ -1,63 +1,61 @@
 import React, { useState, useEffect } from 'react';
 import { InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
-import { FullField } from 'types/queryBuilder';
+import { TableColumn, SelectedColumn } from 'types/queryBuilder';
 import selectors from 'v4/selectors';
 import { styles } from 'styles';
 
 interface ColumnsEditorProps {
-  allColumns: FullField[];
-  columns: string[];
-  onColumnsChange: (columns: string[]) => void;
+  allColumns: TableColumn[];
+  selectedColumns: SelectedColumn[];
+  onSelectedColumnsChange: (selectedColumns: SelectedColumn[]) => void;
 }
 
-function getCustomColumns(columnNames: string[], allColumns: FullField[]) {
+function getCustomColumns(columnNames: string[], allColumns: TableColumn[]): Array<SelectableValue<string>> {
   const columnNamesSet = new Set(columnNames);
   return allColumns.
     filter(c => columnNamesSet.has(c.name)).
     map(c => ({ label: c.name, value: c.name }));
 }
 
-function cleanupColumns(columns: string[], defaultColumns: Array<SelectableValue<string>>): string[] {
-  const columnNames = new Set(defaultColumns.map(d => d.value));
-  const firstColumnName = columns[0];
-  const lastColumnName = columns[columns.length - 1];
-  if (columnNames.has(firstColumnName) || columnNames.has(lastColumnName)) {
-    return [lastColumnName];
-  }
-  return columns;
-};
-
 export const ColumnsEditor = (props: ColumnsEditorProps) => {
-  const [columns, setColumns] = useState<string[]>(props.columns || []);
-  const [custom, setCustom] = useState<Array<SelectableValue<string>>>([]);
+  const { allColumns, selectedColumns, onSelectedColumnsChange } = props;
+  const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const defaultColumns: Array<SelectableValue<string>> = [];
-  const allColumns = (props.allColumns || []).map(f => ({ label: f.label, value: f.name }));
+  const allColumnNames = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const selectedColumnNames = (selectedColumns || []).map(c => ({ label: c.name, value: c.name }));
   const { label, tooltip } = selectors.components.ColumnsEditor;
 
+  const options = [...allColumnNames, ...customColumns];
+
   useEffect(() => {
-    if (props.allColumns.length === 0) {
+    if (allColumns.length === 0) {
       return;
     }
 
-    setColumns(props.columns);
-    const customColumns = getCustomColumns(props.columns, props.allColumns);
-    setCustom(customColumns);
-  }, [props.columns, props.allColumns]);
-
-  const onColumnsChange = (columns: string[]) => {
-    const cleanColumns = cleanupColumns(columns, defaultColumns);
-    setColumns(cleanColumns);
-    const customColumns = getCustomColumns(columns, props.allColumns);
-    setCustom(customColumns);
-  };
-
-  const onUpdateColumns = () => props.onColumnsChange(columns);
+    const columnNames = selectedColumns.map(c => c.name);
+    const customColumns = getCustomColumns(columnNames, allColumns);
+    setCustomColumns(customColumns);
+  }, [allColumns, selectedColumns]);
 
   const onChange = (selected: Array<SelectableValue<string>>): void => {
     setIsOpen(false);
-    onColumnsChange(selected.map(v => v.value!));
+    const selectedColumnNames = new Set<string>(selected.map(s => s.value!));
+    const customColumnNames = new Set<string>(customColumns.map(c => c.value!))
+    const columnMap = new Map<string, TableColumn>();
+    allColumns.forEach(c => columnMap.set(c.name, c));
+
+    const nextSelectedColumns: SelectedColumn[] = [];
+    for (let columnName of selectedColumnNames) {
+      const tableColumn = columnMap.get(columnName);
+      nextSelectedColumns.push({
+        name: columnName,
+        type: tableColumn?.type || 'String',
+        custom: customColumnNames.has(columnName)
+      });
+    }
+
+    onSelectedColumnsChange(nextSelectedColumns);
   };
 
   return (
@@ -67,13 +65,12 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
       </InlineFormLabel>
       <div data-testid="query-builder-fields-multi-select-container" className={styles.Common.selectWrapper}>
         <MultiSelect<string>
-          options={[...allColumns, ...defaultColumns, ...custom]}
-          value={columns && columns.length > 0 ? columns : []}
+          options={options}
+          value={selectedColumnNames}
           isOpen={isOpen}
           onOpenMenu={() => setIsOpen(true)}
           onCloseMenu={() => setIsOpen(false)}
           onChange={onChange}
-          onBlur={onUpdateColumns}
           allowCustomValue={true}
           menuPlacement={'bottom'}
         />

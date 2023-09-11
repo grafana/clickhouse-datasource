@@ -17,16 +17,18 @@ import {
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
-import { EditorType, QueryType, CHQuery } from 'types/sql';
+import { EditorType, CHQuery } from 'types/sql';
 import {
-  BuilderMetricField,
-  BuilderMetricFieldAggregation,
+  QueryType,
+  AggregateColumn,
+  AggregateType,
   BuilderMode,
   Filter,
   FilterOperator,
-  FullField,
+  TableColumn,
   OrderByDirection,
-  SqlBuilderOptionsAggregate,
+  QueryBuilderOptions,
+  ColumnHint,
 } from 'types/queryBuilder';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
@@ -38,7 +40,7 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
+import { getSQLFromQueryOptions, getColumnByHint } from '../components/queryBuilder/utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -115,41 +117,47 @@ export class Datasource
       query.editorType !== EditorType.Builder ||
       query.queryType !== QueryType.Logs ||
       query.builderOptions.mode !== BuilderMode.List ||
-      query.builderOptions.timeField === undefined ||
+      getColumnByHint(query.builderOptions, ColumnHint.Time) === undefined ||
       query.builderOptions.database === undefined ||
       query.builderOptions.table === undefined
     ) {
       return undefined;
     }
 
+    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time)!;
+
     const timeFieldRoundingClause = getTimeFieldRoundingClause(
       logsVolumeRequest.scopedVars,
-      query.builderOptions.timeField
+      timeColumn.name
     );
     const fields: string[] = [];
-    const metrics: BuilderMetricField[] = [];
+    const aggregates: AggregateColumn[] = [];
     // could be undefined or an empty string (if user deselects the field)
-    if (query.builderOptions.logLevelField) {
+    const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
+    if (logLevelColumn) {
       // Generate "fields" like
       // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
-      const llf = `toString("${query.builderOptions.logLevelField}")`;
+      const llf = `toString("${logLevelColumn.name}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
         fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`);
       }
     } else {
-      metrics.push({
-        aggregation: BuilderMetricFieldAggregation.Count,
+      aggregates.push({
+        aggregateType: AggregateType.Count,
+        column: '*',
         alias: DEFAULT_LOGS_ALIAS,
-        field: '*',
       });
     }
 
-    const logVolumeSqlBuilderOptions: SqlBuilderOptionsAggregate = {
+    const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
+      database: query.builderOptions.database,
+      table: query.builderOptions.table,
+      queryType: QueryType.TimeSeries,
       mode: BuilderMode.Aggregate,
       filters: query.builderOptions.filters,
-      fields,
-      metrics,
+      columns: fields.map(f => ({ name: f })),
+      aggregates,
       groupBy: [`${timeFieldRoundingClause} AS ${TIME_FIELD_ALIAS}`],
       orderBy: [
         {
@@ -159,14 +167,11 @@ export class Datasource
       ],
     };
 
-    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(query.database, query.table, logVolumeSqlBuilderOptions);
+    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(query.builderOptions.database, query.builderOptions.table, logVolumeSqlBuilderOptions);
     return {
       // format: Format.AUTO,
       // selectedFormat: Format.AUTO,
       editorType: EditorType.SQL,
-      queryType: QueryType.Table,
-      database: query.database,
-      table: query.table,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
     };
@@ -308,7 +313,7 @@ export class Datasource
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: getSQLFromQueryOptions(query.database, query.table, updatedBuilder),
+        rawSql: getSQLFromQueryOptions(query.builderOptions.database, query.builderOptions.table, updatedBuilder),
         builderOptions: updatedBuilder,
       };
     }
@@ -376,7 +381,7 @@ export class Datasource
     return this.fetchData(`DESC TABLE "${database}"."${table}"`);
   }
 
-  async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
+  async fetchColumnsFull(database: string | undefined, table: string): Promise<TableColumn[]> {
     const prefix = Boolean(database) ? `"${database}".` : '';
     const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
@@ -384,7 +389,7 @@ export class Datasource
       return [];
     }
     const view = new DataFrameView(frame);
-    return view.map((item) => ({
+    return view.map(item => ({
       name: item[0],
       type: item[1],
       label: item[0],

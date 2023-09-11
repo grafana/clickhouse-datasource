@@ -4,7 +4,7 @@ import { CodeEditor } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { registerSQL, Range, Fetcher } from '../sqlProvider';
 import { CHConfig } from 'types/config';
-import { CHQuery, EditorType, QueryType, CHSqlQuery } from 'types/sql';
+import { CHQuery, EditorType, CHSqlQuery } from 'types/sql';
 import { styles } from 'styles';
 import { fetchSuggestions as sugg, Schema } from '../suggestions';
 import { selectors } from 'selectors';
@@ -31,7 +31,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   const onSqlChange = (sql: string) => {
     // const format = getFormat(sql, query.selectedFormat);
-    onChange({ ...query, rawSql: sql, editorType: EditorType.SQL, queryType: QueryType.Table });
+    onChange({ ...query, rawSql: sql, editorType: EditorType.SQL });
     onRunQuery();
   };
 

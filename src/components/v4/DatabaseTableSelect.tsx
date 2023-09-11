@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { InlineFormLabel, Select } from '@grafana/ui';
-import { SelectableValue } from '@grafana/data';
 import { Datasource } from '../../data/CHDatasource';
 import selectors from 'v4/selectors';
 import { styles } from '../../styles';
-import useDatabaseTables from 'hooks/useDatabaseTables';
+import useTables from 'hooks/useTables';
 import useDatabases from 'hooks/useDatabases';
 
 export type DatabaseSelectProps = {
@@ -16,22 +15,22 @@ export type DatabaseSelectProps = {
 export const DatabaseSelect = (props: DatabaseSelectProps) => {
   const { datasource, onDatabaseChange, database } = props;
   const databases = useDatabases(datasource);
-  const [list, setList] = useState<Array<SelectableValue<string>>>([]);
-  const { label, tooltip } = selectors.components.DatabaseSelect;
+  const { label, tooltip, empty } = selectors.components.DatabaseSelect;
+
+  const options = databases.map(d => ({ label: d, value: d }));
+  options.push({ label: empty, value: '' }); // Allow a blank value
+
+  // Add selected value to the list if it does not exist.
+  if (database && !databases.includes(database)) {
+    options.push({ label: database, value: database });
+  }
 
   useEffect(() => {
-    const values = databases.map(d => ({ label: d, value: d }));
-
-    // Add selected value to the list if it does not exist.
-    if (database && !databases.includes(database)) {
-      values.push({ label: database, value: database });
+    // Auto select default db
+    if (!database) {
+      onDatabaseChange(datasource.getDefaultDatabase() || 'default');
     }
-
-    setList(values);
-  }, [datasource, database, databases]);
-
-  const defaultDatabase = datasource.settings.jsonData.defaultDatabase;
-  const db = database ?? defaultDatabase;
+  }, [datasource, database, onDatabaseChange]);
 
   return (
     <>
@@ -40,11 +39,11 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
       </InlineFormLabel>
       <Select
         className={`width-15 ${styles.Common.inlineSelect}`}
+        options={options}
+        value={database}
         onChange={e => onDatabaseChange(e.value!)}
-        options={list}
-        value={db}
         menuPlacement={'bottom'}
-        allowCustomValue={true}
+        allowCustomValue
       ></Select>
     </>
   );
@@ -60,21 +59,23 @@ export type TableSelectProps = {
 
 export const TableSelect = (props: TableSelectProps) => {
   const { datasource, onTableChange, database, table } = props;
-  const tables = useDatabaseTables(datasource, database);
-  const [list, setList] = useState<Array<SelectableValue<string>>>([]);
-  const { label, tooltip } = selectors.components.TableSelect;
+  const tables = useTables(datasource, database);
+  const { label, tooltip, empty } = selectors.components.TableSelect;
 
-  useEffect(() => {
-    const values = tables.map(t => ({ label: t, value: t }));
-    // Add selected value to the list if it does not exist.
-    if (table && !tables.includes(table)) {
-      values.push({ label: table, value: table });
-    }
+  const options = tables.map(t => ({ label: t, value: t }));
+  options.push({ label: empty, value: '' }); // Allow a blank value
 
-    // TODO: Can't seem to reset the select to unselected
-    values.push({ label: '-- Choose --', value: '' });
-    setList(values);
-  }, [tables, table]);
+  if (table && !tables.includes(table)) {
+    options.push({ label: table, value: table });
+  }
+
+  // useEffect(() => {
+  //   // TODO: broken. tables are loaded async when the db is changed, so it picks the first table from the previous db
+  //   // Auto select first table
+  //   if (database && !table && tables.length > 0) {
+  //       onTableChange(tables[0]);
+  //   }
+  // }, [database, table, tables, onTableChange]);
 
   return (
     <>
@@ -83,11 +84,11 @@ export const TableSelect = (props: TableSelectProps) => {
       </InlineFormLabel>
       <Select
         className={`width-15 ${styles.Common.inlineSelect}`}
-        onChange={e => onTableChange(e.value ?? '')}
-        options={list}
+        options={options}
         value={table}
+        onChange={e => onTableChange(e.value!)}
         menuPlacement={'bottom'}
-        allowCustomValue={true}
+        allowCustomValue
       ></Select>
     </>
   );

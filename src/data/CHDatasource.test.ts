@@ -12,8 +12,9 @@ import { DataQuery } from '@grafana/schema';
 import { Observable, of } from 'rxjs';
 import { DataSourceWithBackend } from '@grafana/runtime';
 import { mockDatasource } from '__mocks__/datasource';
-import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType, QueryType } from 'types/sql';
-import { BuilderMode, SqlBuilderOptionsList } from 'types/queryBuilder';
+import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
+import { ColumnHint, QueryType } from 'types/queryBuilder';
+import { BuilderMode, QueryBuilderOptions } from 'types/queryBuilder';
 import { cloneDeep } from 'lodash';
 import { Datasource } from './CHDatasource';
 import * as logs from './logs';
@@ -249,12 +250,12 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe('fetchFieldsFull', () => {
+  describe('fetchColumnsFull', () => {
     it('sends a correct query when database and table names are provided', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchFieldsFull('db_name', 'table_name');
+      await ds.fetchColumnsFull('db_name', 'table_name');
       const expected = { rawSql: 'DESC TABLE "db_name"."table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -266,7 +267,7 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchFieldsFull('', 'table_name');
+      await ds.fetchColumnsFull('', 'table_name');
       const expected = { rawSql: 'DESC TABLE "table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -279,7 +280,7 @@ describe('ClickHouseDatasource', () => {
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_) => of({ data: [frame] }));
 
-      await ds.fetchFieldsFull('', 'table.name');
+      await ds.fetchColumnsFull('', 'table.name');
       const expected = { rawSql: 'DESC TABLE "table.name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -314,16 +315,16 @@ describe('ClickHouseDatasource', () => {
     const query: CHBuilderQuery = {
       refId: '42',
       editorType: EditorType.Builder,
-      queryType: QueryType.Logs,
-      database: 'system',
-      table: 'numbers',
       rawSql: 'SELECT * FROM system.numbers LIMIT 1',
       builderOptions: {
+        database: 'system',
+        table: 'numbers',
+        queryType: QueryType.Logs,
         mode: BuilderMode.List,
-        database: 'default',
-        table: 'logs',
-        timeField: 'created_at',
-        logLevelField: 'level',
+        columns: [
+          { name: 'created_at', hint: ColumnHint.Time },
+          { name: 'level', hint: ColumnHint.LogLevel },
+        ]
       },
     };
     const request: DataQueryRequest<CHQuery> = {
@@ -377,8 +378,8 @@ describe('ClickHouseDatasource', () => {
             ...query,
             builderOptions: {
               ...query.builderOptions,
-              database: undefined,
-            } as SqlBuilderOptionsList,
+              database: '',
+            } as QueryBuilderOptions,
           })
         ).toBeUndefined();
         expect(
@@ -386,8 +387,8 @@ describe('ClickHouseDatasource', () => {
             ...query,
             builderOptions: {
               ...query.builderOptions,
-              table: undefined,
-            } as SqlBuilderOptionsList,
+              table: '',
+            } as QueryBuilderOptions,
           })
         ).toBeUndefined();
         expect(
@@ -396,7 +397,7 @@ describe('ClickHouseDatasource', () => {
             builderOptions: {
               ...query.builderOptions,
               timeField: undefined,
-            } as SqlBuilderOptionsList,
+            } as QueryBuilderOptions,
           })
         ).toBeUndefined();
       });
@@ -410,7 +411,7 @@ describe('ClickHouseDatasource', () => {
           builderOptions: {
             ...query.builderOptions,
             logLevelField: undefined,
-          } as SqlBuilderOptionsList,
+          } as QueryBuilderOptions,
         });
         expect(result?.rawSql).toEqual(
           'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) AS time, count(*) logs ' +

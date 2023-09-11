@@ -1,6 +1,6 @@
 import { reportInteraction } from '@grafana/runtime';
-import { CHQuery, EditorType, QueryType } from 'types/sql';
-import { BuilderMode } from 'types/queryBuilder';
+import { CHQuery, EditorType } from 'types/sql';
+import { QueryType, BuilderMode } from 'types/queryBuilder';
 
 // TODO: v4, determine new/updated fields to track
 

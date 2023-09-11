@@ -1,16 +1,16 @@
 import { useState, useEffect } from 'react';
-import { FullField } from 'types/queryBuilder';
+import { TableColumn } from 'types/queryBuilder';
 import { Datasource } from 'data/CHDatasource';
 
 const allColumn = { name: '*', label: 'ALL', type: 'string', picklistValues: [] };
 
-export default (datasource: Datasource, database: string, table: string): FullField[] => {
-  const [columns, setColumns] = useState<FullField[]>([allColumn]); 
+export default (datasource: Datasource, database: string, table: string): TableColumn[] => {
+  const [columns, setColumns] = useState<TableColumn[]>([allColumn]); 
   
   useEffect(() => {
     const fetchTableColumns = async () => {
       datasource
-        .fetchFieldsFull(database, table)
+        .fetchColumnsFull(database, table)
         .then(columns => {
           columns.push(allColumn);
           setColumns(columns);

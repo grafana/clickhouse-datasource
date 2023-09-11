@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
-import { Filter, FilterOperator, FullField, NullFilter } from 'types/queryBuilder';
+import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from '../../queryBuilder/utils';
 import { selectors } from 'selectors';
 import { styles } from 'styles';
@@ -45,7 +45,7 @@ export const defaultNewFilter: NullFilter = {
   operator: FilterOperator.IsNotNull,
 };
 export interface PredefinedFilter {
-  restrictToFields?: FullField[];
+  restrictToFields?: TableColumn[];
 }
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
@@ -91,7 +91,7 @@ const FilterValueMultiStringItem = (props: { value: string[]; onChange: (value: 
 };
 
 export const FilterValueEditor = (props: {
-  fieldsList: FullField[];
+  fieldsList: TableColumn[];
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
 }) => {
@@ -171,7 +171,7 @@ export const FilterValueEditor = (props: {
 };
 
 export const FilterEditor = (props: {
-  fieldsList: FullField[];
+  fieldsList: TableColumn[];
   index: number;
   filter: Filter & PredefinedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
@@ -362,7 +362,7 @@ export const FilterEditor = (props: {
 };
 
 export const FiltersEditor = (props: {
-  allColumns: FullField[];
+  allColumns: TableColumn[];
   filters: Filter[];
   onFiltersChange: (filters: Filter[]) => void;
 }) => {

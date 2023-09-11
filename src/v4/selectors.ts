@@ -21,10 +21,12 @@ export default {
     DatabaseSelect: {
       label: 'Database',
       tooltip: 'ClickHouse database to query from',
+      empty: '<select database>',
     },
     TableSelect: {
       label: 'Table',
       tooltip: 'ClickHouse table to query from',
+      empty: '<select table>',
     },
     ColumnsEditor: {
       label: 'Columns',
@@ -37,6 +39,26 @@ export default {
     LimitEditor: {
       label: 'Limit',
       tooltip: 'Limits the number of rows returned by the query'
+    },
+    SqlPreview: {
+      label: 'SQL Preview',
+      tooltip: 'Preview of the generated SQL. You can safely switch to SQL Editor to customize the generated query',
+    },
+    AggregatesEditor: {
+      label: 'Aggregates',
+      tooltip: 'Aggregate functions to use',
+      aliasLabel: 'as',
+      aliasTooltip: 'alias for this aggregate function',
+      addLabel: 'Aggregate',
+    },
+    OrderByEditor: {
+      label: 'Order By',
+      tooltip: 'Order by column',
+      addLabel: 'Order By',
+    },
+    GroupByEditor: {
+      label: 'Group By',
+      tooltip: 'Group the results by specific column',
     },
     LogsQueryBuilder: {
       logTimeColumn: {
@@ -60,7 +82,66 @@ export default {
       simpleQueryModeLabel: 'Simple',
       aggregateQueryModeLabel: 'Aggregate',
       builderModeLabel: 'Builder Mode',
-      builderModeTooltip: 'Switches the query builder between the simple and aggregate modes'
+      builderModeTooltip: 'Switches the query builder between the simple and aggregate modes',
+      timeColumn: {
+        label: 'Time',
+        tooltip: 'Column to use for the time series'
+      },
+    },
+    TableQueryBuilder: {
+      simpleQueryModeLabel: 'Simple',
+      aggregateQueryModeLabel: 'Aggregate',
+      builderModeLabel: 'Builder Mode',
+      builderModeTooltip: 'Switches the query builder between the simple and aggregate modes',
+    },
+    TraceQueryBuilder: {
+      traceIdModeLabel: 'Trace ID',
+      traceSearchModeLabel: 'Trace Search',
+      traceModeLabel: 'Trace Mode',
+      traceModeTooltip: 'Switches between trace ID and trace search mode',
+
+      fields: {
+        traceId: {
+          label: 'Trace ID Column',
+          tooltip: 'Column that contains the trace ID'
+        },
+        spanId: {
+          label: 'Span ID Column',
+          tooltip: 'Column that contains the span ID'
+        },
+        parentSpanId: {
+          label: 'Parent Span ID Column',
+          tooltip: 'Column that contains the parent span ID'
+        },
+        serviceName: {
+          label: 'Service Name Column',
+          tooltip: 'Column that contains the service name'
+        },
+        operationName: {
+          label: 'Operation Name Column',
+          tooltip: 'Column that contains the operation name'
+        },
+        startTime: {
+          label: 'Start Time Column',
+          tooltip: 'Column that contains the start time'
+        },
+        durationTime: {
+          label: 'Duration Time Column',
+          tooltip: 'Column that contains the duration time'
+        },
+        durationUnit: {
+          label: 'Duration Unit',
+          tooltip: 'The unit of time used for the duration time'
+        },
+        tags: {
+          label: 'Tags Column',
+          tooltip: 'Column that contains the trace tags'
+        },
+        serviceTags: {
+          label: 'Service Tags Column',
+          tooltip: 'Column that contains the service tags'
+        }
+      },
     }
   },
   types: {

@@ -290,7 +290,7 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 				}
 			}
 			frame.Fields = fields
-			frame.Meta.PreferredVisualization = data.VisTypeTable // TODO: Temporary fix for Explorer view.
+			//frame.Meta.PreferredVisualization = data.VisTypeTable // TODO: Temporary fix for Explorer view.
 		}
 	}
 	return res, nil

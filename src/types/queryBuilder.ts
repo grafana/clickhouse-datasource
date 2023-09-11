@@ -10,22 +10,46 @@ export enum BuilderMode {
 }
 
 /**
- * @property {string} timeField Explore only: used for Logs Volume histogram
- * @property {string} logLevelField Explore only: used for Logs Volume histogram
+ * QueryType determines the display/query format.
  */
-export interface SqlBuilderOptionsList {
-  mode: BuilderMode.List;
-  database?: string;
-  table?: string;
-  fields?: string[];
-  filters?: Filter[];
-  orderBy?: OrderBy[];
-  limit?: number;
-  timeField?: string;
-  logLevelField?: string;
+export enum QueryType {
+  Table = 'table',
+  Logs = 'logs',
+  TimeSeries = 'timeseries',
+  Traces = 'traces',
 }
 
-export enum BuilderMetricFieldAggregation {
+export interface QueryBuilderOptions {
+  database: string;
+  table: string;
+  queryType: QueryType;
+  
+  mode?: BuilderMode; // TODO: no longer required?
+
+  columns?: SelectedColumn[];
+  aggregates?: AggregateColumn[];
+  filters?: Filter[];
+  groupBy?: string[];
+  orderBy?: OrderBy[];
+  limit?: number;
+
+  /**
+   * Contains metadata for editor-specific use cases.
+   */
+  meta?: {
+    // Logs
+    otelEnabled?: boolean;
+    otelVersion?: string;
+    liveView?: boolean;
+
+    // Trace
+    isTraceSearchMode?: boolean;
+    traceDurationUnit?: string;
+    traceId?: string; // TODO: this doesn't need to be persisted?
+  }
+}
+
+export enum AggregateType {
   Sum = 'sum',
   Average = 'avg',
   Min = 'min',
@@ -35,35 +59,11 @@ export enum BuilderMetricFieldAggregation {
   // Count_Distinct = 'count_distinct',
 }
 
-export type BuilderMetricField = {
-  field: string;
-  aggregation: BuilderMetricFieldAggregation;
+export type AggregateColumn = {
+  aggregateType: AggregateType;
+  column: string;
   alias?: string;
 }
-
-export interface SqlBuilderOptionsAggregate {
-  mode: BuilderMode.Aggregate;
-  fields: string[];
-  metrics: BuilderMetricField[];
-  groupBy?: string[];
-  filters?: Filter[];
-  orderBy?: OrderBy[];
-  limit?: number;
-}
-
-export interface SqlBuilderOptionsTrend {
-  mode: BuilderMode.Trend;
-  fields: string[];
-  metrics: BuilderMetricField[];
-  filters?: Filter[];
-  groupBy?: string[];
-  timeField: string;
-  timeFieldType: string;
-  orderBy?: OrderBy[];
-  limit?: number;
-}
-
-export type SqlBuilderOptions = SqlBuilderOptionsList | SqlBuilderOptionsAggregate | SqlBuilderOptionsTrend;
 
 export interface Field {
   name: string;
@@ -80,20 +80,56 @@ export interface FullEntity {
   queryable: boolean;
 }
 
-interface FullFieldPickListItem {
-  value: string;
+interface TableColumnPickListItem {
   label: string;
+  value: string;
 }
 
-export interface FullField {
+/**
+ * Represents a column retrieved from ClickHouse
+ */
+export interface TableColumn {
   name: string;
   label: string;
   type: string;
-  picklistValues: FullFieldPickListItem[];
+  picklistValues: TableColumnPickListItem[];
   filterable?: boolean;
   sortable?: boolean;
   groupable?: boolean;
   aggregatable?: boolean;
+}
+
+/**
+ * Some columns are used to enable certain features.
+ * This enum defines the different use cases that a column may be used for in the query generator.
+ * For example, "Time" would be used to identify the primary time column for a time series.
+ */
+export enum ColumnHint {
+  Time = 'time',
+
+  LogLevel = 'log_level',
+  LogMessage = 'log_message',
+
+  TraceId = 'trace_id',
+  TraceSpanId = 'trace_span_id',
+  TraceParentSpanId = 'trace_parent_span_id',
+  TraceServiceName = 'trace_service_name',
+  TraceOperationName = 'trace_operation_name',
+  TraceStartTime = 'trace_start_time',
+  TraceDurationTime = 'trace_duration_time',
+  TraceTags = 'trace_tags',
+  TraceServiceTags = 'trace_service_tags',
+}
+
+/**
+ * Represents a column selection, including metadata for the query generator to use.
+ */
+export interface SelectedColumn {
+  name: string;
+  type?: string;
+  alias?: string;
+  custom?: boolean;
+  hint?: ColumnHint;
 }
 
 export enum OrderByDirection {

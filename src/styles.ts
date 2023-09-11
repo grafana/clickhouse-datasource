@@ -55,6 +55,9 @@ export const styles = {
         display: flex;
       }
     `,
+    inlineField: css`
+      margin-left: 7px;
+    `
   },
   FormatSelector: {
     formatSelector: css`

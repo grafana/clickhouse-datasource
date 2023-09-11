@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { AggregateColumn, BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn, AggregateType } from 'types/queryBuilder';
+import { AggregateColumn, BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, AggregateType } from 'types/queryBuilder';
 import { OrderByEditor } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
@@ -8,10 +8,8 @@ import allSelectors from 'v4/selectors';
 import { ModeSwitch } from '../ModeSwitch';
 import { AggregateEditor } from '../AggregateEditor';
 import { GroupByEditor } from '../GroupByEditor';
-import { ColumnSelect } from '../ColumnSelect';
-import { getColumnByHint } from 'components/queryBuilder/utils';
 
-interface TimeSeriesQueryBuilderProps {
+interface TableQueryBuilderProps {
   allColumns: TableColumn[];
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
@@ -19,17 +17,16 @@ interface TimeSeriesQueryBuilderProps {
 
 const emptyAggregate: AggregateColumn = { column: '', aggregateType: AggregateType.Count };
 
-export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
+export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const { allColumns, builderOptions, onBuilderOptionsChange } = props;
   const [isAggregateMode, setAggregateMode] = useState<boolean>(false);
-  const [timeColumn, setTimeColumn] = useState<SelectedColumn>();
   const [selectedColumns, setSelectedColumns] = useState<SelectedColumn[]>([]);
   const [aggregates, setAggregates] = useState<AggregateColumn[]>([emptyAggregate]);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [orderBy, setOrderBy] = useState<OrderBy[]>([]);
   const [limit, setLimit] = useState<number>(100);
   const [filters, setFilters] = useState<Filter[]>([]);
-  const selectors = allSelectors.components.TimeSeriesQueryBuilder;
+  const selectors = allSelectors.components.TableQueryBuilder;
 
   useEffect(() => {
     if (!builderOptions) {
@@ -37,8 +34,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     }
 
     builderOptions.aggregates && setAggregateMode(builderOptions.aggregates.length > 0);
-    setTimeColumn(getColumnByHint(builderOptions, ColumnHint.Time));
-    builderOptions.columns && setSelectedColumns(builderOptions.columns.filter(c => c.hint === undefined));
+    builderOptions.columns && setSelectedColumns(builderOptions.columns);
     builderOptions.aggregates && setAggregates(builderOptions.aggregates);
     builderOptions.groupBy && setGroupBy(builderOptions.groupBy);
     builderOptions.orderBy && setOrderBy(builderOptions.orderBy);
@@ -50,15 +46,10 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   }, []);
 
   useEffect(() => {
-    const nextColumns = selectedColumns.slice();
-    if (timeColumn) {
-      nextColumns.push(timeColumn);
-    }
-
     const nextOptions: QueryBuilderOptions = {
       ...builderOptions,
       mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
-      columns: nextColumns,
+      columns: selectedColumns,
       filters,
       orderBy,
       limit
@@ -70,9 +61,10 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     }
 
     onBuilderOptionsChange(nextOptions);
+
     // TODO: ignore when builderOptions changes?
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAggregateMode, timeColumn, selectedColumns, filters, aggregates, groupBy, orderBy, limit]);
+  }, [isAggregateMode, selectedColumns, filters, aggregates, groupBy, orderBy, limit]);
 
   const aggregateFields = (
     <>
@@ -92,14 +84,6 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
         tooltip={selectors.builderModeTooltip}
       />
 
-      <ColumnSelect
-        allColumns={allColumns}
-        selectedColumn={timeColumn}
-        onColumnChange={setTimeColumn}
-        columnHint={ColumnHint.Time}
-        label={selectors.timeColumn.label}
-        tooltip={selectors.timeColumn.tooltip}
-      />
       <ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={setSelectedColumns} />
 
       {isAggregateMode && aggregateFields}

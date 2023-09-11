@@ -1,35 +1,54 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Select } from '@grafana/ui';
-import { FullField } from 'types/queryBuilder';
+import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { styles } from 'styles';
 
 interface ColumnSelectProps {
-  allColumns: FullField[];
-  selectedColumn: string;
-  onColumnChange: (c: string) => void,
-  columnFilterFn?: (c: FullField) => boolean,
+  allColumns: TableColumn[];
+  selectedColumn: SelectedColumn | undefined;
+  onColumnChange: (c: SelectedColumn) => void;
+  columnFilterFn?: (c: TableColumn) => boolean;
+  columnHint?: ColumnHint;
   label: string;
   tooltip: string;
+  wide?: boolean;
+  inline?: boolean;
 }
 
 const defaultFilterFn = () => true;
 
 export const ColumnSelect = (props: ColumnSelectProps) => {
-  const { allColumns, selectedColumn, onColumnChange, columnFilterFn, label, tooltip } = props;
-  const columns: SelectableValue[] = (allColumns || []).
+  const { allColumns, selectedColumn, onColumnChange, columnFilterFn, columnHint, label, tooltip, wide, inline } = props;
+  const selectedColumnName = selectedColumn?.name;
+  const columns: Array<SelectableValue<string>> = (allColumns || []).
     filter(columnFilterFn || defaultFilterFn).
-    map(f => ({ label: f.label, value: f.name }));
+    map(c => ({ label: c.name, value: c.name }));
+
+  const onChange = (selected: SelectableValue<string>) => {
+    const column = allColumns.find(c => c.name === selected.value);
+    if (column) {
+      onColumnChange({
+        name: column.name,
+        type: column.type,
+        custom: false,
+        hint: columnHint
+      })
+    }
+  }
+
+  const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
     <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+      <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <Select
+      <Select<string>
         options={columns}
-        width={20}
-        onChange={e => onColumnChange(e.value)}
-        value={selectedColumn}
+        value={selectedColumnName}
+        onChange={onChange}
+        width={wide ? 25 : 20}
         menuPlacement={'bottom'}
       />
     </div>

@@ -5,7 +5,7 @@ export default (datasource: Datasource): string[] => {
   const [databases, setDatabases] = useState<string[]>([]); 
   
   useEffect(() => {
-    const fetchDatabaseDatabases = async () => {
+    const fetchDatabases = async () => {
       datasource.
         fetchDatabases().
         then(databases => setDatabases(databases)).
@@ -16,7 +16,7 @@ export default (datasource: Datasource): string[] => {
       };
 
       if (datasource) {
-        fetchDatabaseDatabases();
+        fetchDatabases();
       }
     }, [datasource]);
     

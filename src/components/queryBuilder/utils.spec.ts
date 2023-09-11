@@ -1,5 +1,6 @@
 import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDirection } from 'types';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions, isDateTimeType, isDateType, isNumberType } from './utils';
+import { ColumnHint, QueryType } from 'types/queryBuilder';
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
@@ -415,11 +416,12 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
   it('timeseries function throws if "timeFieldType" not a DateType', () => {
     expect(() =>
       getSQLFromQueryOptions('db', 'foo', {
+        database: 'db',
+        table: 'foo',
+        queryType: QueryType.TimeSeries,
         mode: BuilderMode.Trend,
-        fields: [],
-        timeField: 'time',
-        timeFieldType: 'boolean',
-        metrics: [],
+        columns: [{ name: 'time', type: 'boolean', hint: ColumnHint.Time }],
+        aggregates: [],
         filters: [],
       })
     ).toThrowErrorMatchingInlineSnapshot('"timeFieldType is expected to be valid Date type."');

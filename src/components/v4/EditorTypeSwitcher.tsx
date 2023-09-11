@@ -4,7 +4,7 @@ import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from '../queryBuilder/utils';
 import selectors from '../../v4/selectors';
 import { EditorType, CHQuery, defaultCHBuilderQuery, CHSqlQuery } from 'types/sql';
-import { SqlBuilderOptions } from 'types/queryBuilder';
+import { QueryBuilderOptions } from 'types/queryBuilder';
 import isString from 'lodash/isString';
 
 interface CHEditorTypeSwitcherProps {
@@ -41,14 +41,14 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
       }
     } else {
       setEditor(editorType);
-      let builderOptions: SqlBuilderOptions;
+      let builderOptions: QueryBuilderOptions;
       switch (query.editorType) {
         case EditorType.Builder:
           builderOptions = query.builderOptions;
           break;
         case EditorType.SQL:
           builderOptions =
-            (getQueryOptionsFromSql(query.rawSql) as SqlBuilderOptions) || defaultCHBuilderQuery.builderOptions;
+            (getQueryOptionsFromSql(query.rawSql) as QueryBuilderOptions) || defaultCHBuilderQuery.builderOptions;
           break;
         default:
           builderOptions = defaultCHBuilderQuery.builderOptions;
@@ -58,8 +58,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         onChange({
           ...query,
           editorType: EditorType.SQL,
-          // queryType: QueryType.SQL,
-          rawSql: getSQLFromQueryOptions(query.database, query.table, builderOptions),
+          rawSql: getSQLFromQueryOptions(builderOptions.database, builderOptions.table, builderOptions),
           meta: { builderOptions },
           // format: query.format,
           // selectedFormat: query.selectedFormat,
@@ -68,8 +67,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         onChange({
           ...query,
           editorType: EditorType.Builder,
-          // queryType: QueryType.Builder,
-          rawSql: getSQLFromQueryOptions(query.database, query.table, builderOptions),
+          rawSql: getSQLFromQueryOptions(builderOptions.database, builderOptions.table, builderOptions),
           builderOptions
         });
       }

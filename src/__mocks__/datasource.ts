@@ -1,6 +1,7 @@
 import { PluginType } from '@grafana/data';
 import { Protocol } from 'types/config';
-import { CHQuery, EditorType, QueryType } from 'types/sql';
+import { CHQuery, EditorType } from 'types/sql';
+import { QueryType } from 'types/queryBuilder';
 import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
@@ -43,8 +44,6 @@ mockDatasource.adHocFiltersStatus = 1; // most tests should skip checking the CH
 export const mockQuery: CHQuery = {
   rawSql: 'select * from foo',
   refId: '',
-  database: '',
-  table: 'foo',
   editorType: EditorType.SQL,
   queryType: QueryType.Table
 };

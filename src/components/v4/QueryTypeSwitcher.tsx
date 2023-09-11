@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { RadioButtonGroup, InlineFormLabel } from '@grafana/ui';
 import selectors from '../../v4/selectors';
-import { QueryType } from 'types/sql';
+import { QueryType } from 'types/queryBuilder';
 
 export interface QueryTypeSwitcherProps {
   queryType: QueryType;
@@ -33,6 +33,12 @@ const options = [
 export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   const { queryType, onChange } = props;
   const { label, tooltip } = selectors.components.QueryTypeSwitcher;
+
+  useEffect(() => {
+    if (!queryType) {
+      onChange(QueryType.Table);
+    }
+  }, [queryType, onChange]);
 
   return (
     <span>

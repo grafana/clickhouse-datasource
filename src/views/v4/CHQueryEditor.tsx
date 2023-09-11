@@ -1,18 +1,15 @@
 import React from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from '../../data/CHDatasource';
-import { Preview } from 'components/queryBuilder/Preview';
 import { EditorTypeSwitcher } from 'components/v4/EditorTypeSwitcher';
-import { QueryTypeSwitcher } from 'components/v4/QueryTypeSwitcher';
 import { styles } from 'styles';
 import { Button } from '@grafana/ui';
-import { CHQuery, EditorType, QueryType, CHBuilderQuery, defaultCHBuilderQuery } from 'types/sql';
+import { CHQuery, EditorType, CHBuilderQuery, defaultCHBuilderQuery } from 'types/sql';
 import { CHConfig } from 'types/config';
-import { SqlBuilderOptions } from 'types/queryBuilder';
+import { QueryBuilderOptions } from 'types/queryBuilder';
 import { SqlEditor } from 'components/v4/SqlEditor';
 import { QueryBuilder } from 'components/v4/queryBuilder/QueryBuilder';
 import { getSQLFromQueryOptions } from 'components/queryBuilder/utils';
-import { DatabaseTableSelect } from 'components/v4/DatabaseTableSelect';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -20,16 +17,7 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { datasource, query, onChange, onRunQuery } = props;
-
-  React.useEffect(() => {
-    if (!query.queryType) {
-      onChange({ ...query, queryType: QueryType.Table });
-    }
-    if (!query.database) {
-      onChange({ ...query, database: datasource.getDefaultDatabase() || 'default' });
-    }
-  }, [query, onChange, datasource]);
+  const { query, onRunQuery } = props;
 
   const runQuery = () => {
     if (query.editorType === EditorType.SQL) {
@@ -41,9 +29,6 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
     }
     onRunQuery();
   };
-
-  const onDatabaseChange = (db: string) => onChange({ ...query, database: db });
-  const onTableChange = (t: string) => onChange({ ...query, table: t });
 
   // const onFormatChange = (selectedFormat: Format) => {
   //   switch (query.queryType) {
@@ -67,16 +52,6 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
           <EditorTypeSwitcher {...props} />
         <Button onClick={() => runQuery()}>Run Query</Button>
       </div>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
-        <DatabaseTableSelect
-          datasource={props.datasource}
-          database={props.query.database} onDatabaseChange={onDatabaseChange}
-          table={props.query.table} onTableChange={onTableChange}
-        />
-      </div>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
-        <QueryTypeSwitcher queryType={query.queryType} onChange={t => onChange({ ...query, queryType: t })} />
-      </div>
       <CHEditorByType {...props} />
     </>
   );
@@ -84,8 +59,8 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange, app } = props;
-  const onBuilderOptionsChange = (builderOptions: SqlBuilderOptions) => {
-    const sql = getSQLFromQueryOptions(query.database, query.table, builderOptions);
+  const onBuilderOptionsChange = (builderOptions: QueryBuilderOptions) => {
+    const sql = getSQLFromQueryOptions(builderOptions.database, builderOptions.table, builderOptions);
     onChange({ ...query, editorType: EditorType.Builder, rawSql: sql, builderOptions });
   };
 
@@ -106,6 +81,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
           </div>
         );
       }
+
       if (!query.rawSql || !query.builderOptions) {
         newQuery = {
           ...newQuery,
@@ -115,19 +91,15 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
           },
         };
       }
+
       return (
-        <div data-testid="query-editor-section-builder">
-          <QueryBuilder
-            datasource={props.datasource}
-            builderOptions={newQuery.builderOptions}
-            onBuilderOptionsChange={onBuilderOptionsChange}
-            queryType={newQuery.queryType}
-            database={props.query.database}
-            table={props.query.table}
-            app={app}
-          />
-          <Preview sql={newQuery.rawSql} />
-        </div>
+        <QueryBuilder
+          datasource={props.datasource}
+          builderOptions={newQuery.builderOptions}
+          onBuilderOptionsChange={onBuilderOptionsChange}
+          generatedSql={newQuery.rawSql}
+          app={app}
+        />
       );
   }
 };

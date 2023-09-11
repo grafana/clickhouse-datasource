@@ -5,19 +5,17 @@ export default (datasource: Datasource, database: string): string[] => {
   const [tables, setTables] = useState<string[]>([]); 
   
   useEffect(() => {
-    const fetchDatabaseTables = async () => {
-      datasource.
-        fetchTables(database).
-        then(tables => setTables(tables)).
-        catch((ex: any) => {
-          console.error(ex);
-          throw ex;
-        });
-      };
+    if (!database) {
+      return;
+    }
 
-      if (database) {
-        fetchDatabaseTables();
-      }
+    datasource.
+      fetchTables(database).
+      then(tables => setTables(tables)).
+      catch((ex: any) => {
+        console.error(ex);
+        throw ex;
+      });
     }, [datasource, database]);
     
     return tables;

@@ -1,5 +1,5 @@
 import { DataQuery } from '@grafana/schema';
-import { BuilderMode, SqlBuilderOptions } from './queryBuilder';
+import { BuilderMode, QueryType, QueryBuilderOptions } from './queryBuilder';
 
 /**
  * EditorType determines the query editor type.
@@ -9,23 +9,8 @@ export enum EditorType {
   Builder = 'builder',
 }
 
-/**
- * QueryType determines the display/query format.
- */
-export enum QueryType {
-  Table = 'table',
-  Logs = 'logs',
-  TimeSeries = 'timeSeries',
-  Traces = 'traces',
-}
-
 export interface CHQueryBase extends DataQuery {
   editorType: EditorType;
-  queryType: QueryType;
-  database: string;
-  table: string;
-  selectedQueryType?: QueryType;
-
   rawSql: string;
 }
 
@@ -34,14 +19,14 @@ export interface CHSqlQuery extends CHQueryBase {
   meta?: {
     timezone?: string;
     // meta fields to be used just for building builder options when migrating back to EditorType.Builder
-    builderOptions?: SqlBuilderOptions;
+    builderOptions?: QueryBuilderOptions;
   };
   expand?: boolean;
 }
 
 export interface CHBuilderQuery extends CHQueryBase {
   editorType: EditorType.Builder;
-  builderOptions: SqlBuilderOptions;
+  builderOptions: QueryBuilderOptions;
   meta?: {
     timezone?: string;
   };
@@ -53,13 +38,13 @@ export type CHQuery = CHSqlQuery | CHBuilderQuery;
 export const defaultEditorType: EditorType = EditorType.Builder;
 export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
   editorType: EditorType.Builder,
-  queryType: QueryType.Table,
-  database: '',
-  table: '',
   rawSql: '',
   builderOptions: {
+    database: '',
+    table: '',
+    queryType: QueryType.Table,
     mode: BuilderMode.List,
-    fields: [],
+    columns: [],
     limit: 100,
   },
   // format: Format.TABLE,
@@ -67,11 +52,6 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
 };
 export const defaultCHSqlQuery: Omit<CHSqlQuery, 'refId'> = {
   editorType: EditorType.SQL,
-  queryType: QueryType.Table,
-  database: '',
-  table: '',
   rawSql: '',
-  // format: Format.TABLE,
-  // selectedFormat: Format.AUTO,
   expand: false,
 };

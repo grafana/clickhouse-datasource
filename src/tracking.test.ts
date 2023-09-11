@@ -1,5 +1,6 @@
 import { analyzeQueries } from 'tracking';
-import { CHQuery, EditorType, QueryType } from 'types/sql';
+import { CHQuery, EditorType } from 'types/sql';
+import { QueryType } from 'types/queryBuilder';
 import { BuilderMode } from 'types/queryBuilder';
 
 describe('analyzeQueries', () => {
