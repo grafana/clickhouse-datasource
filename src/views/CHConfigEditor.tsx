@@ -15,8 +15,8 @@ import {
   InlineField,
   Input,
 } from '@grafana/ui';
-import { CertificationKey } from '../components/ui/CertificationKey';
-import { Components } from './../selectors';
+import { CertificationKey } from 'components/ui/CertificationKey';
+import { Components } from 'selectors';
 import { config } from '@grafana/runtime';
 import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from 'types/config';
 import { gte } from 'semver';

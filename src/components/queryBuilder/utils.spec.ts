@@ -1,4 +1,4 @@
-import { BuilderMetricFieldAggregation, BuilderMode, FilterOperator, OrderByDirection } from 'types';
+import { AggregateType, BuilderMode, FilterOperator, OrderByDirection } from 'types/queryBuilder';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions, isDateTimeType, isDateType, isNumberType } from './utils';
 import { ColumnHint, QueryType } from 'types/queryBuilder';
 
@@ -214,7 +214,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     database: 'db',
     table: 'foo',
     fields: [],
-    metrics: [{ field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum }],
+    metrics: [{ field: 'field1', aggregation: AggregateType.Sum }],
   });
 
   testCondition('handles aggregation with alias', 'SELECT sum(field1) total_records FROM "db"."foo"', {
@@ -222,7 +222,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
     database: 'db',
     table: 'foo',
     fields: [],
-    metrics: [{ field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' }],
+    metrics: [{ field: 'field1', aggregation: AggregateType.Sum, alias: 'total_records' }],
   });
 
   testCondition(
@@ -234,8 +234,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       fields: [],
       metrics: [
-        { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
-        { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
+        { field: 'field1', aggregation: AggregateType.Sum, alias: 'total_records' },
+        { field: 'field2', aggregation: AggregateType.Count, alias: 'total_records2' },
       ],
     }
   );
@@ -249,8 +249,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       fields: [],
       metrics: [
-        { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
-        { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
+        { field: 'field1', aggregation: AggregateType.Sum, alias: 'total_records' },
+        { field: 'field2', aggregation: AggregateType.Count, alias: 'total_records2' },
       ],
       groupBy: ['field3'],
     },
@@ -266,8 +266,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       fields: ['field3'],
       metrics: [
-        { field: 'field1', aggregation: BuilderMetricFieldAggregation.Sum, alias: 'total_records' },
-        { field: 'field2', aggregation: BuilderMetricFieldAggregation.Count, alias: 'total_records2' },
+        { field: 'field1', aggregation: AggregateType.Sum, alias: 'total_records' },
+        { field: 'field2', aggregation: AggregateType.Count, alias: 'total_records2' },
       ],
       groupBy: ['field3'],
     }
@@ -282,8 +282,8 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       table: 'foo',
       fields: [],
       metrics: [
-        { field: 'Id', aggregation: BuilderMetricFieldAggregation.Count, alias: 'count_of' },
-        { field: 'Amount', aggregation: BuilderMetricFieldAggregation.Sum },
+        { field: 'Id', aggregation: AggregateType.Count, alias: 'count_of' },
+        { field: 'Amount', aggregation: AggregateType.Sum },
       ],
       groupBy: ['StageName', 'Type'],
       orderBy: [
@@ -302,7 +302,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: AggregateType.Count }],
       filters: [
         {
           key: 'stagename',
@@ -322,7 +322,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: AggregateType.Count }],
       filters: [
         {
           key: 'stagename',
@@ -342,7 +342,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: AggregateType.Count }],
       filters: [
         {
           key: 'createddate',
@@ -361,7 +361,7 @@ describe('Utils: getSQLFromQueryOptions and getQueryOptionsFromSql', () => {
       database: 'db',
       table: 'foo',
       fields: [],
-      metrics: [{ field: 'id', aggregation: BuilderMetricFieldAggregation.Count }],
+      metrics: [{ field: 'id', aggregation: AggregateType.Count }],
       filters: [
         {
           key: 'closedate',

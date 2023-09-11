@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { ConfigEditor } from './CHConfigEditor';
-import { mockConfigEditorProps } from '../__mocks__/ConfigEditor';
-import { Components } from './../selectors';
+import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
+import { Components } from 'selectors';
 import '@testing-library/jest-dom';
 import { Protocol } from 'types/config';
 

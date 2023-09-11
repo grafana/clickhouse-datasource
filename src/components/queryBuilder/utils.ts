@@ -32,6 +32,7 @@ import {
 } from 'types/queryBuilder';
 import { sqlToStatement } from 'data/ast';
 
+
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type?.toLowerCase());
 };
