@@ -25,6 +25,10 @@ var runTests = &cobra.Command{
 
 var testFailures = 0
 
+var platforms = []dagger.Platform{
+	"linux/amd64",
+}
+
 func e2eTests(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
 
@@ -35,55 +39,57 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	}
 	defer client.Close()
 
-	clickHouseAssets := buildPlugin(ctx, client)
-	grafanaContainer := startGrafana(client, clickHouseAssets)
-	clickHouseContainer := startClickHouse(client, ctx)
-	fmt.Println("Plugin built")
+	for _, platform := range platforms {
+		clickHouseAssets := buildPlugin(ctx, client, platform)
+		grafanaContainer := startGrafana(client, clickHouseAssets, platform)
+		clickHouseContainer := startClickHouse(client, ctx)
+		fmt.Println("Plugin built")
 
-	// run e2e tests
-	fmt.Println("Starting k6 tests")
-	runk6(client, ctx, grafanaContainer, clickHouseContainer, clickHouseAssets)
-	fmt.Println("k6 tests ran")
+		// run e2e tests
+		fmt.Println("Starting k6 tests")
+		runk6(client, ctx, grafanaContainer, clickHouseContainer, clickHouseAssets)
+		fmt.Println("k6 tests ran")
 
-	//check if e2e tests pass
-	fmt.Println("Checking test summary")
-	j, _ := os.ReadFile("test_summary.json")
+		//check if e2e tests pass
+		fmt.Println("Checking test summary")
+		j, _ := os.ReadFile("test_summary.json")
 
-	data := struct {
-		RootGroup struct {
-			Checks []struct {
-				Name   string `json:"name"`
-				Passes int    `json:"passes"`
-				Fails  int    `json:"fails"`
-			}
-		} `json:"root_group"`
-	}{}
-	err = json.Unmarshal(j, &data)
-	if err != nil {
-		fmt.Println("Cannot unmarshal the json", err)
-		return
-	}
-	for _, check := range data.RootGroup.Checks {
-		if check.Fails > 0 {
-			testFailures++
-			fmt.Println("Test failed:", check.Name)
-			continue
+		data := struct {
+			RootGroup struct {
+				Checks []struct {
+					Name   string `json:"name"`
+					Passes int    `json:"passes"`
+					Fails  int    `json:"fails"`
+				}
+			} `json:"root_group"`
+		}{}
+		err = json.Unmarshal(j, &data)
+		if err != nil {
+			fmt.Println("Cannot unmarshal the json", err)
+			return
 		}
-		fmt.Println("Test passed:", check.Name)
+		for _, check := range data.RootGroup.Checks {
+			if check.Fails > 0 {
+				testFailures++
+				fmt.Println("Test failed:", check.Name)
+				continue
+			}
+			fmt.Println("Test passed:", check.Name)
+		}
+		fmt.Println("Test summary check complete")
 	}
-	fmt.Println("Test summary check complete")
 }
 
-func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Container {
+func buildPlugin(ctx context.Context, client *dagger.Client, platform dagger.Platform) *dagger.Container {
 	fmt.Println("Building plugin")
-	backend := buildBackend(ctx, client, client.Host().Directory(".", dagger.HostDirectoryOpts{Exclude: []string{"node_modules/**", "dist/**"}}))
+	backend := buildBackend(ctx, client, client.Host().Directory(".", dagger.HostDirectoryOpts{Exclude: []string{"node_modules/**", "dist/**", "provisioning/**"}}), platform)
 
-	return WithYarnDependencies(client, backend)
+	return WithYarnDependencies(client, backend, platform)
 }
 
-func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.Directory) *dagger.Container {
+func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.Directory, platform dagger.Platform) *dagger.Container {
 	container := client.
-		Container().
+		Container(dagger.ContainerOpts{Platform: platform}).
 		From("golang:1.21.0").
 		WithWorkdir("./clickhouse-datasource").
 		WithDirectory(".", directory).
@@ -93,14 +99,14 @@ func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.
 	return container
 }
 
-func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *dagger.Container {
+func WithYarnDependencies(client *dagger.Client, container *dagger.Container, platform dagger.Platform) *dagger.Container {
 
 	var (
 		packageJSON = container.File("package.json")
 		yarnLock    = container.File("yarn.lock")
 	)
 
-	nodeModules := client.Container().
+	nodeModules := client.Container(dagger.ContainerOpts{Platform: platform}).
 		From("node:16.13.2").
 		WithWorkdir("/src").
 		WithFile("/src/package.json", packageJSON).
@@ -112,10 +118,10 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *d
 	return container.WithDirectory("node_modules", nodeModules)
 }
 
-func startGrafana(client *dagger.Client, clickHouseAssets *dagger.Container) *dagger.Container {
+func startGrafana(client *dagger.Client, clickHouseAssets *dagger.Container, platform dagger.Platform) *dagger.Container {
 	fmt.Println("Building Grafana")
 	container := client.
-		Container().
+		Container(dagger.ContainerOpts{Platform: platform}).
 		From("grafana/grafana:latest").
 		WithDirectory(".", clickHouseAssets.Directory(".")).
 		WithExec(nil).
@@ -146,7 +152,7 @@ func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.
 		WithServiceBinding("clickhouse", clickhouseContainer). //dns for this? e.g. does grafana connect to localhost:9000 or "clickhouse:9000"
 		WithServiceBinding("grafana", grafanaContainer).
 		WithDirectory(".", clickHouseAssets.Directory(".")).
-		WithEnvVariable("K6_BROWSER_HEADLESS", "0").
+		WithEnvVariable("K6_BROWSER_ARGS", "no-sandbox").
 		WithExec([]string{"run", "e2e/e2ek6.test.js"}, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}).Stderr(ctx)
 	if err != nil {
 		fmt.Println(err)
