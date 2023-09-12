@@ -82,7 +82,7 @@ jobs:
           COPY . /var/lib/grafana/plugins/${{ github.event.repository.name }}/" > Dockerfile
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
