@@ -1,37 +1,37 @@
-import { SemVersion, isVersionGtOrEq } from './version'
+import { SemVersion, isVersionGtOrEq } from './version';
 
 describe('SemVersion', () => {
-  let version = '1.0.0-alpha.1'
+  let version = '1.0.0-alpha.1';
 
   describe('parsing', () => {
     it('should parse version properly', () => {
-      const semver = new SemVersion(version)
-      expect(semver.major).toBe(1)
-      expect(semver.minor).toBe(0)
-      expect(semver.patch).toBe(0)
-      expect(semver.meta).toBe('alpha.1')
-    })
-  })
+      const semver = new SemVersion(version);
+      expect(semver.major).toBe(1);
+      expect(semver.minor).toBe(0);
+      expect(semver.patch).toBe(0);
+      expect(semver.meta).toBe('alpha.1');
+    });
+  });
 
   describe('comparing', () => {
     beforeEach(() => {
-      version = '3.4.5'
-    })
+      version = '3.4.5';
+    });
 
     it('should detect greater version properly', () => {
-      const semver = new SemVersion(version)
+      const semver = new SemVersion(version);
       const cases = [
         { value: '3.4.5', expected: true },
         { value: '3.4.4', expected: true },
         { value: '3.4.6', expected: false },
         { value: '4', expected: false },
         { value: '3.5', expected: false },
-      ]
+      ];
       cases.forEach((testCase) => {
-        expect(semver.isGtOrEq(testCase.value)).toBe(testCase.expected)
-      })
-    })
-  })
+        expect(semver.isGtOrEq(testCase.value)).toBe(testCase.expected);
+      });
+    });
+  });
 
   describe('isVersionGtOrEq', () => {
     it('should compare versions properly (a >= b)', () => {
@@ -45,10 +45,10 @@ describe('SemVersion', () => {
         { values: ['3.4.5', '4'], expected: false },
         { values: ['3.4.5', '3.5'], expected: false },
         { values: ['6.0.0', '5.2.0'], expected: true },
-      ]
+      ];
       cases.forEach((testCase) => {
-        expect(isVersionGtOrEq(testCase.values[0], testCase.values[1])).toBe(testCase.expected)
-      })
-    })
-  })
-})
+        expect(isVersionGtOrEq(testCase.values[0], testCase.values[1])).toBe(testCase.expected);
+      });
+    });
+  });
+});
