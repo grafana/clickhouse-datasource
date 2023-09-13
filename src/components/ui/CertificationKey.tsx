@@ -1,5 +1,5 @@
 import React, { ChangeEvent, MouseEvent, FC } from 'react';
-import { Input, Button, TextArea, InlineFormLabel } from '@grafana/ui';
+import { Input, Button, TextArea, Field } from '@grafana/ui';
 
 interface Props {
   label: string;
@@ -11,8 +11,7 @@ interface Props {
 
 export const CertificationKey: FC<Props> = ({ hasCert, label, onChange, onClick, placeholder }) => {
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={12}>{label}</InlineFormLabel>
+    <Field label={label}>
       {hasCert ? (
         <>
           <Input type="text" disabled value="configured" width={24} />
@@ -23,6 +22,6 @@ export const CertificationKey: FC<Props> = ({ hasCert, label, onChange, onClick,
       ) : (
         <TextArea rows={7} onChange={onChange} placeholder={placeholder} required />
       )}
-    </div>
+    </Field>
   );
 };

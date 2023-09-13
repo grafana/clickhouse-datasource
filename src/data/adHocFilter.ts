@@ -31,7 +31,7 @@ export class AdHocFilter {
     const filters = adHocFilters
       .filter((filter: AdHocVariableFilter) => {
         const valid = isValid(filter);
-        if(!valid) {
+        if (!valid) {
           console.error('Invalid adhoc filter will be ignored:', filter);
         }
         return valid;
@@ -45,7 +45,7 @@ export class AdHocFilter {
       })
       .join('');
 
-    if(filters === '') {
+    if (filters === '') {
       return sql;
     }
     // Semicolons are not required and cause problems when building the SQL
@@ -59,8 +59,12 @@ function isValid(filter: AdHocVariableFilter): boolean {
 }
 
 function convertOperatorToClickHouseOperator(operator: AdHocVariableFilterOperator): string {
-  if (operator === '=~') {return 'ILIKE';}
-  if (operator === '!~') {return 'NOT ILIKE';}
+  if (operator === '=~') {
+    return 'ILIKE';
+  }
+  if (operator === '!~') {
+    return 'NOT ILIKE';
+  }
   return operator;
 }
 

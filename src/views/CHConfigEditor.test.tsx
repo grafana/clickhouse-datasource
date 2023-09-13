@@ -6,6 +6,14 @@ import { Components } from './../selectors';
 import '@testing-library/jest-dom';
 import { Protocol } from '../types';
 
+jest.mock('@grafana/runtime', () => {
+  const original = jest.requireActual('@grafana/runtime');
+  return {
+    ...original,
+    config: { buildInfo: { version: '10.0.0' }, featureToggles: { secureSocksDSProxyEnabled: true } },
+  };
+});
+
 describe('ConfigEditor', () => {
   it('new editor', () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
@@ -13,9 +21,6 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('false'))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
   });
   it('with password', async () => {
     render(
@@ -33,9 +38,6 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     const a = screen.getByText('Reset');
     expect(a).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
   });
   it('with secure connection', async () => {
     render(
@@ -95,5 +97,23 @@ describe('ConfigEditor', () => {
     );
     expect(screen.getByPlaceholderText(Components.ConfigEditor.TLSClientCert.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.TLSClientKey.placeholder)).toBeInTheDocument();
+  });
+  it('with additional properties', async () => {
+    const jsonDataOverrides = {
+      defaultDatabase: 'default',
+      queryTimeout: '100',
+      timeout: '100',
+      validate: true,
+      enableSecureSocksProxy: true,
+      customSettings: [{ setting: 'test-setting', value: 'test-value' }],
+    };
+    render(<ConfigEditor {...mockConfigEditorProps(jsonDataOverrides)} />);
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
+    expect(screen.getByText(Components.ConfigEditor.Validate.label)).toBeInTheDocument();
+    expect(screen.getByText(Components.ConfigEditor.SecureSocksProxy.label)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].setting)).toBeInTheDocument();
+    expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();
   });
 });
