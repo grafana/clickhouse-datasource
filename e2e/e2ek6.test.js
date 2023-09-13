@@ -7,6 +7,8 @@ import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors@9.4.3/dist/index.js';
 
+const GRAFANA_HOST = `grafana`;
+const CLICKHOUSE_HOST = `clickhouse`;
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
 let datasourceUID;
@@ -36,7 +38,7 @@ export const options = {
 export async function login(page) {
   try {
     const loginURL = selectors.pages.Login.url;
-    await page.goto(`http://localhost:3000${loginURL}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://${GRAFANA_HOST}:3000${loginURL}`, { waitUntil: 'networkidle' });
     page.waitForTimeout(15000);
 
     const usernameInput = page.locator(`input[aria-label="${selectors.pages.Login.username}"]`)
@@ -45,7 +47,7 @@ export async function login(page) {
     await passwordInput.type('admin');
     const submitButton = page.locator(`button[aria-label="${selectors.pages.Login.submit}"]`)
     await submitButton.click();
-
+ 
     // checks page for skip change password screen
     check(page, {
       'change password is presented':
@@ -59,7 +61,7 @@ export async function login(page) {
 export async function addDatasource(page) {
   try {
     const addDataSourceURL = selectors.pages.AddDataSource.url;
-    await page.goto(`http://localhost:3000${addDataSourceURL}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://${GRAFANA_HOST}:3000${addDataSourceURL}`, { waitUntil: 'networkidle' });
     
     const clickHouseDataSource = page.locator(`button[aria-label="${selectors.pages.AddDataSource.dataSourcePluginsV2('ClickHouse')}"]`);
     await clickHouseDataSource.click();
@@ -67,7 +69,7 @@ export async function addDatasource(page) {
     dataSourceName.fill('');
     dataSourceName.type(`${DATASOURCE_NAME}`);
     const serverAddress = page.locator(`input[aria-label="Server address"]`);
-    serverAddress.type('localhost');
+    serverAddress.type(`http://${CLICKHOUSE_HOST}`);
     const serverPort = page.locator('input[aria-label="Server port"]');
     serverPort.type('9000');
     console.log(selectors.pages.DataSource.saveAndTest)
@@ -91,7 +93,7 @@ export async function addDatasource(page) {
 export async function addDashboard(page) {
   try {
     const addDashboardURL = selectors.pages.AddDashboard.url;
-    await page.goto(`http://localhost:3000${addDashboardURL}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://${GRAFANA_HOST}:3000${addDashboardURL}`, { waitUntil: 'networkidle' });
     
     const saveDashboardToolbarButton = page.locator(`button[aria-label="${selectors.components.PageToolbar.item('Save dashboard')}"]`);
     await saveDashboardToolbarButton.click();
@@ -207,18 +209,18 @@ export async function configurePanel(page) {
     };
 
     // ensures user is an admin to the org
-    http.post('http://admin:admin@localhost:3000/api/user/using/1', null);
+    http.post('http://admin:admin@${GRAFANA_HOST}:3000/api/user/using/1', null);
 
     const apiKeyName = `apikey-${uuidv4()}`
 
     // creates API token 
-    const getApiToken = http.post('http://admin:admin@localhost:3000/api/auth/keys', `{"name":"${apiKeyName}", "role": "Admin", "secondsToLive": 600 }`, {
+    const getApiToken = http.post('http://admin:admin@${GRAFANA_HOST}:3000/api/auth/keys', `{"name":"${apiKeyName}", "role": "Admin", "secondsToLive": 600 }`, {
       headers: { 'Content-Type': 'application/json' },
     });
     apiToken = getApiToken.json().key;
 
     // sends POST request for query
-    const res = http.post('http://admin:admin@localhost:3000/api/ds/query/', JSON.stringify(queryData), {
+    const res = http.post('http://admin:admin@${GRAFANA_HOST}3000/api/ds/query/', JSON.stringify(queryData), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
 
@@ -236,7 +238,7 @@ export async function removeDashboard(page) {
   try {
     const dashboardURL = page.url();
     const dashboardUID = getDashboardUid(dashboardURL);
-    await page.goto(`http://localhost:3000/d/${dashboardUID}`, { waitUntil: 'networkidle' });
+    await page.goto(`http://${GRAFANA_HOST}:3000/d/${dashboardUID}`, { waitUntil: 'networkidle' });
     
     const dashboardSettings = page.locator(`button[aria-label="${selectors.components.PageToolbar.item('Dashboard settings')}"]`);
     await dashboardSettings.click();

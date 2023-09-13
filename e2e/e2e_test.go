@@ -41,7 +41,7 @@ func e2eTests(cmd *cobra.Command, args []string) {
 
 	for _, platform := range platforms {
 		clickHouseAssets := buildPlugin(ctx, client, platform)
-		grafanaContainer := startGrafana(client, clickHouseAssets, platform)
+		grafanaContainer := startGrafana(client, clickHouseAssets, platform, ctx)
 		clickHouseContainer := startClickHouse(client, ctx)
 		fmt.Println("Plugin built")
 
@@ -118,15 +118,23 @@ func WithYarnDependencies(client *dagger.Client, container *dagger.Container, pl
 	return container.WithDirectory("node_modules", nodeModules)
 }
 
-func startGrafana(client *dagger.Client, clickHouseAssets *dagger.Container, platform dagger.Platform) *dagger.Container {
+func startGrafana(client *dagger.Client, clickHouseAssets *dagger.Container, platform dagger.Platform, ctx context.Context) *dagger.Container {
 	fmt.Println("Building Grafana")
 	container := client.
 		Container(dagger.ContainerOpts{Platform: platform}).
 		From("grafana/grafana:latest").
-		WithDirectory(".", clickHouseAssets.Directory(".")).
+		WithFile("grafana/conf/custom.ini", client.Host().File("e2e/custom.ini")).
+		WithDirectory("/data/plugins", clickHouseAssets.Directory(".")).
 		WithExec(nil).
-		//WithEnvVariable() //point to clickhouseassets directory
+		//WithEnvVariable("P", "./plugins"). //point to clickhouseassets directory
 		WithExposedPort(3000)
+
+	// entries, err := container.Directory(".").Entries(ctx)
+	// if err != nil {
+	// 	log.Println(err)
+	// }
+
+	// fmt.Println(entries)
 
 	fmt.Println("Grafana built")
 
@@ -148,7 +156,7 @@ func startClickHouse(client *dagger.Client, ctx context.Context) *dagger.Contain
 func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.Container, clickhouseContainer *dagger.Container, clickHouseAssets *dagger.Container) {
 	value, err := client.
 		Container().
-		From("grafana/k6:latest-with-browser").
+		From("grafana/k6:master-with-browser").
 		WithServiceBinding("clickhouse", clickhouseContainer). //dns for this? e.g. does grafana connect to localhost:9000 or "clickhouse:9000"
 		WithServiceBinding("grafana", grafanaContainer).
 		WithDirectory(".", clickHouseAssets.Directory(".")).
