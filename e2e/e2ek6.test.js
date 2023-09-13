@@ -2,12 +2,13 @@ import { browser } from 'k6/experimental/browser';
 import { check, fail } from 'k6';
 import http from 'k6/http';
 
+import { uuidv4 } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors@9.4.3/dist/index.js';
 
-const DASHBOARD_TITLE = `e2e-test-dashboard`;
-const DATASOURCE_NAME = `ClickHouse-e2e-test`;
+const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
+const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
 let datasourceUID;
 let apiToken;
 const getDashboardUid = (url) => {
@@ -35,7 +36,7 @@ export const options = {
 export async function login(page) {
   try {
     const loginURL = selectors.pages.Login.url;
-    await page.goto(`http://localhost:3000/${loginURL}`, { waitUntil: 'load' });
+    await page.goto(`http://localhost:3000${loginURL}`, { waitUntil: 'networkidle' });
     page.waitForTimeout(15000);
 
     const usernameInput = page.locator(`input[aria-label="${selectors.pages.Login.username}"]`)
@@ -255,14 +256,14 @@ export async function removeDashboard(page) {
 };
 
 export default async function () {
-  // const context = browser.newContext();
-  const page = browser.newPage();
+  const context = browser.newContext();
+  const page = context.newPage();
 
-  // await login(page);
-  // await addDatasource(page);
-  // await addDashboard(page);
-  // await configurePanel(page);
-  // await removeDashboard(page);
+  await login(page);
+  await addDatasource(page);
+  await addDashboard(page);
+  await configurePanel(page);
+  await removeDashboard(page);
 
   page.close();
 };
@@ -272,7 +273,7 @@ export function handleSummary(data) {
 
   return {
     'stdout': textSummary(data, { indent: ' ', enableColors: true}),
-    'e2e/test_summary.json': JSON.stringify(data), 
+    'test_summary.json': JSON.stringify(data), 
   };
 }
 

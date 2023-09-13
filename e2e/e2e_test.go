@@ -153,6 +153,7 @@ func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.
 		WithServiceBinding("grafana", grafanaContainer).
 		WithDirectory(".", clickHouseAssets.Directory(".")).
 		WithEnvVariable("K6_BROWSER_ARGS", "no-sandbox").
+		// WithEnvVariable("K6_BROWSER_HEADLESS", "0").
 		WithExec([]string{"run", "e2e/e2ek6.test.js"}, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}).Stderr(ctx)
 	if err != nil {
 		fmt.Println(err)
