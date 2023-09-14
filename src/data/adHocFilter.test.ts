@@ -141,7 +141,6 @@ describe('AdHocManager', () => {
     );
   });
 
-
   it('apply ad hoc filter converts "!~" to "NOT ILIKE"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');
@@ -184,8 +183,8 @@ describe('AdHocManager', () => {
   });
 
   it('log a malformed filter', () => {
-    const warn = jest.spyOn(console, "error");
-    const value = { key: 'foo.key', operator: '=', value: undefined }
+    const warn = jest.spyOn(console, 'error');
+    const value = { key: 'foo.key', operator: '=', value: undefined };
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');
     ahm.apply('SELECT foo.stuff FROM foo', [
@@ -193,6 +192,6 @@ describe('AdHocManager', () => {
       value,
     ]);
     expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn).toHaveBeenCalledWith("Invalid adhoc filter will be ignored:", value)
+    expect(warn).toHaveBeenCalledWith('Invalid adhoc filter will be ignored:', value);
   });
 });

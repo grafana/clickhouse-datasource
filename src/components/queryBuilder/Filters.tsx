@@ -66,11 +66,7 @@ const FilterValueNumberItem = (props: { value: number; onChange: (value: number)
 const FilterValueSingleStringItem = (props: { value: string; onChange: (value: string) => void }) => {
   return (
     <div data-testid="query-builder-filters-single-string-value-container">
-      <Input
-        type="text"
-        defaultValue={props.value}
-        onBlur={(e) => props.onChange(e.currentTarget.value)}
-      />
+      <Input type="text" defaultValue={props.value} onBlur={(e) => props.onChange(e.currentTarget.value)} />
     </div>
   );
 };
