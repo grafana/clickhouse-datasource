@@ -67,9 +67,9 @@ export async function addDatasource(page) {
     await clickHouseDataSource.click();
     const dataSourceName = page.locator(`input[aria-label="${selectors.pages.DataSource.name}"]`);
     dataSourceName.fill('');
-    dataSourceName.type(`${DATASOURCE_NAME}`);
+    dataSourceName.type(DATASOURCE_NAME);
     const serverAddress = page.locator(`input[aria-label="Server address"]`);
-    serverAddress.type(`http://${CLICKHOUSE_HOST}`);
+    serverAddress.type(CLICKHOUSE_HOST);
     const serverPort = page.locator('input[aria-label="Server port"]');
     serverPort.type('9000');
     console.log(selectors.pages.DataSource.saveAndTest)
@@ -79,7 +79,8 @@ export async function addDatasource(page) {
     // checks the page for the data source is working message
     check(page, {
       'add datasource successful':
-      await page.locator('[aria-label="Create a dashboard').textContent() === "building a dashboard",
+      //aria-label="Data source settings page Alert"
+      await page.locator('[aria-label="Create a dashboard"]').textContent() === "building a dashboard",
     });
 
     const pageURL = page.url().split('/');
@@ -209,18 +210,18 @@ export async function configurePanel(page) {
     };
 
     // ensures user is an admin to the org
-    http.post('http://admin:admin@${GRAFANA_HOST}:3000/api/user/using/1', null);
+    http.post(`http://admin:admin@${GRAFANA_HOST}:3000/api/user/using/1`, null);
 
     const apiKeyName = `apikey-${uuidv4()}`
 
     // creates API token 
-    const getApiToken = http.post('http://admin:admin@${GRAFANA_HOST}:3000/api/auth/keys', `{"name":"${apiKeyName}", "role": "Admin", "secondsToLive": 600 }`, {
+    const getApiToken = http.post(`http://admin:admin@${GRAFANA_HOST}:3000/api/auth/keys`, `{"name":"${apiKeyName}", "role": "Admin", "secondsToLive": 60 }`, {
       headers: { 'Content-Type': 'application/json' },
     });
     apiToken = getApiToken.json().key;
 
     // sends POST request for query
-    const res = http.post('http://admin:admin@${GRAFANA_HOST}3000/api/ds/query/', JSON.stringify(queryData), {
+    const res = http.post(`http://admin:admin@${GRAFANA_HOST}:3000/api/ds/query/`, JSON.stringify(queryData), {
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiToken}` },
     });
 

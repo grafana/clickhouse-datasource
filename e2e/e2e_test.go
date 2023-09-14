@@ -36,22 +36,14 @@ func e2eTests(cmd *cobra.Command, args []string) {
 	defer client.Close()
 
 	clickHouseAssets := buildPlugin(ctx, client)
-	grafanaContainer := startGrafana(client, clickHouseAssets)
-
-	// entries, err := clickHouseAssets.Directory("./dist").Entries(ctx)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-
-	// fmt.Println(entries)
-
 	clickHouseContainer := startClickHouse(client, ctx)
+	grafanaContainer := startGrafana(client, clickHouseAssets, clickHouseContainer)
+
 	fmt.Println("Plugin built")
 
 	// run e2e tests
 	fmt.Println("Starting k6 tests")
-	runk6(client, ctx, grafanaContainer, clickHouseContainer, client.Host().File("e2e/e2ek6.test.js"))
+	runk6(client, ctx, grafanaContainer, client.Host().File("e2e/e2ek6.test.js"))
 	fmt.Println("k6 tests ran")
 
 	//check if e2e tests pass
@@ -85,69 +77,89 @@ func e2eTests(cmd *cobra.Command, args []string) {
 
 func buildPlugin(ctx context.Context, client *dagger.Client) *dagger.Directory {
 	fmt.Println("Building plugin")
-	backend := buildBackend(ctx, client, client.Host().Directory(".", dagger.HostDirectoryOpts{Exclude: []string{"node_modules/**", "dist/**", "provisioning/**"}}))
+	backend := buildBackend(ctx, client)
 
-	frontEndDependencies := WithYarnDependencies(client, backend)
-	return BuildFrontEnd(client, frontEndDependencies).Directory("./dist")
+	nodeModules := getNodeModules(client)
+	return buildFrontEnd(client, nodeModules).WithDirectory(".", backend)
 }
 
-func buildBackend(ctx context.Context, client *dagger.Client, directory *dagger.Directory) *dagger.Container {
-	container := client.
-		Container().
-		From("golang:1.21.0").
-		WithWorkdir("./clickhouse-datasource").
-		WithDirectory(".", directory).
-		WithExec([]string{"go", "install", "github.com/magefile/mage@latest"}).
-		WithExec([]string{"mage", "build:backend"})
-
-	return container
-}
-
-func WithYarnDependencies(client *dagger.Client, container *dagger.Container) *dagger.Container {
-
+func buildBackend(ctx context.Context, client *dagger.Client) *dagger.Directory {
 	var (
-		packageJSON = container.File("package.json")
-		yarnLock    = container.File("yarn.lock")
+		host       = client.Host()
+		pkg        = host.Directory("./pkg")
+		goMod      = host.File("./go.mod")
+		goSum      = host.File("./go.sum")
+		magefile   = host.File("./Magefile.go")
+		pluginJSON = host.File("./src/plugin.json")
 	)
 
-	nodeModules := client.Container().
+	return client.
+		Container().
+		From("golang:1.21.0").
+		WithWorkdir("/plugin").
+		WithDirectory("pkg/", pkg).
+		WithFile("go.mod", goMod).
+		WithFile("go.sum", goSum).
+		WithFile("Magefile.go", magefile).
+		WithFile("src/plugin.json", pluginJSON).
+		WithExec([]string{"go", "install", "github.com/magefile/mage@latest"}).
+		WithExec([]string{"mage", "build:backend"}).
+		Directory("./dist")
+}
+
+func getNodeModules(client *dagger.Client) *dagger.Directory {
+	var (
+		host        = client.Host()
+		packageJSON = host.File("package.json")
+		yarnLock    = host.File("yarn.lock")
+	)
+
+	return client.Container().
 		From("node:16.13.2").
-		WithWorkdir("/src").
-		WithFile("/src/package.json", packageJSON).
-		WithFile("/src/yarn.lock", yarnLock).
+		WithWorkdir("./src").
+		WithFile("./package.json", packageJSON).
+		WithFile("./yarn.lock", yarnLock).
 		WithExec([]string{"yarn", "install", "--frozen-lockfile", "--no-progress"}).
 		WithExec([]string{"rm", "-rf", "/src/node_modules/@grafana/data/node_modules"}).
-		Directory("/src/node_modules")
-
-	return container.WithDirectory("node_modules", nodeModules)
+		Directory("./node_modules")
 }
 
-func BuildFrontEnd(client *dagger.Client, container *dagger.Container) *dagger.Container {
-	// [.config .eslintrc .git .github .gitignore .prettierrc.js .vscode CHANGELOG.md CONTRIBUTING.md DEV_GUIDE.md LICENSE Magefile.go README.md config config-secure cspell.config.json cypress-e2e dist docker-compose
-	//┃  go.mod go.sum jest-runner-serial.js jest-setup.js jest.config.js node_modules package.json pkg provisioning scripts src tsconfig.json yarn.lock]
-
-	// [.config .eslintrc .git .github .gitignore .prettierrc.js .vscode CHANGELOG.md CONTRIBUTING.md DEV_GUIDE.md LICENSE Magefile.go README.md config config-secure cspell.config.json cypress-e2e dist docker-compose
-	//┃  go.mod go.sum jest-runner-serial.js jest-setup.js jest.config.js node_modules package.json pkg provisioning scripts src tsconfig.json yarn.lock]
-	//return container.WithExec([]string{"yarn", "build"})
-	dist := client.Container().
+func buildFrontEnd(client *dagger.Client, nodeModules *dagger.Directory) *dagger.Directory {
+	var (
+		host        = client.Host()
+		src         = host.Directory("./src")
+		config      = host.Directory("./.config")
+		packageJSON = host.File("./package.json")
+		tsConfig    = host.File("./tsconfig.json")
+		readme      = host.File("./README.md")
+		license     = host.File("./LICENSE")
+		changelog   = host.File("./CHANGELOG.md")
+		eslintrc    = host.File("./.eslintrc")
+	)
+	return client.Container().
 		From("node:16.13.2").
-		WithWorkdir("/src").
-		WithDirectory("/src", container.Directory(".")).
+		WithWorkdir("/plugin").
+		WithDirectory("./src/", src).
+		WithDirectory("./.config/", config).
+		WithFile("./package.json", packageJSON).
+		WithFile("./tsconfig.json", tsConfig).
+		WithFile("./README.md", readme).
+		WithFile("./LICENSE", license).
+		WithFile("./CHANGELOG.md", changelog).
+		WithFile("./.eslintrc", eslintrc).
+		WithDirectory("./node_modules", nodeModules.Directory(".")).
 		WithExec([]string{"yarn", "build"}).
-		Directory("/src/dist")
-
-	return container.WithDirectory("dist", dist)
+		Directory("/plugin/dist")
 }
 
-func startGrafana(client *dagger.Client, clickHouseDist *dagger.Directory) *dagger.Container {
+func startGrafana(client *dagger.Client, clickHouseDist *dagger.Directory, clickhouseContainer *dagger.Container) *dagger.Container {
 	fmt.Println("Building Grafana")
 	container := client.
 		Container().
-		From("grafana/grafana:latest").
-		WithFile("conf/custom.ini", client.Host().File("e2e/custom.ini")).
-		WithDirectory("/data/plugins/clickhouse-datasource", clickHouseDist).
-		WithExec(nil).
-		//WithEnvVariable("P", "./plugins"). //point to clickhouseassets directory
+		From("grafana/grafana:main").
+		WithFile("/etc/grafana/grafana.ini", client.Host().File("e2e/custom.ini")).
+		WithMountedDirectory("/var/lib/grafana/plugins/clickhouse-datasource", clickHouseDist).
+		WithServiceBinding("clickhouse", clickhouseContainer).
 		WithExposedPort(3000)
 
 	fmt.Println("Grafana built")
@@ -159,7 +171,6 @@ func startClickHouse(client *dagger.Client, ctx context.Context) *dagger.Contain
 	fmt.Println("Starting ClickHouse")
 	container := client.Container().
 		From("clickhouse/clickhouse-server:latest-alpine").
-		WithExec(nil).
 		WithExposedPort(9000)
 
 	fmt.Println("ClickHouse started")
@@ -167,15 +178,13 @@ func startClickHouse(client *dagger.Client, ctx context.Context) *dagger.Contain
 	return container
 }
 
-func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.Container, clickhouseContainer *dagger.Container, testFile *dagger.File) {
+func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.Container, testFile *dagger.File) {
 	value, err := client.
 		Container().
 		From("grafana/k6:master-with-browser").
-		WithServiceBinding("clickhouse", clickhouseContainer). //dns for this? e.g. does grafana connect to localhost:9000 or "clickhouse:9000"
 		WithServiceBinding("grafana", grafanaContainer).
 		WithEnvVariable("K6_BROWSER_ARGS", "no-sandbox").
 		WithFile("k6.test.js", testFile).
-		// WithEnvVariable("K6_BROWSER_HEADLESS", "0").
 		WithExec([]string{"run", "k6.test.js"}, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}).Stderr(ctx)
 	if err != nil {
 		fmt.Println(err)
