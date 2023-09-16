@@ -21,6 +21,11 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
       value: v.version
     }));
 
+    const hasCurrentVersion = allVersions.find(v => v.version === selectedVersion);
+    if (!hasCurrentVersion) {
+      options.push({ label: selectedVersion, value: selectedVersion });
+    }
+
   const theme = useTheme();
   const switchContainerStyle: React.CSSProperties = {
     padding: `0 ${theme.spacing.sm}`,

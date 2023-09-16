@@ -90,7 +90,6 @@ interface TableColumnPickListItem {
  */
 export interface TableColumn {
   name: string;
-  label: string;
   type: string;
   picklistValues: TableColumnPickListItem[];
   filterable?: boolean;

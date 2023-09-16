@@ -40,7 +40,7 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { getSQLFromQueryOptions, getColumnByHint } from '../components/queryBuilder/utils';
+import { getSqlFromQueryBuilderOptions, getColumnByHint } from '../components/queryBuilder/utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -115,11 +115,11 @@ export class Datasource
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
       query.editorType !== EditorType.Builder ||
-      query.queryType !== QueryType.Logs ||
+      query.builderOptions.queryType !== QueryType.Logs ||
       query.builderOptions.mode !== BuilderMode.List ||
       getColumnByHint(query.builderOptions, ColumnHint.Time) === undefined ||
-      query.builderOptions.database === undefined ||
-      query.builderOptions.table === undefined
+      query.builderOptions.database === '' ||
+      query.builderOptions.table === ''
     ) {
       return undefined;
     }
@@ -167,7 +167,7 @@ export class Datasource
       ],
     };
 
-    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(query.builderOptions.database, query.builderOptions.table, logVolumeSqlBuilderOptions);
+    const logVolumeSupplementaryQuery = getSqlFromQueryBuilderOptions(logVolumeSqlBuilderOptions);
     return {
       // format: Format.AUTO,
       // selectedFormat: Format.AUTO,
@@ -313,7 +313,7 @@ export class Datasource
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: getSQLFromQueryOptions(query.builderOptions.database, query.builderOptions.table, updatedBuilder),
+        rawSql: getSqlFromQueryBuilderOptions(updatedBuilder),
         builderOptions: updatedBuilder,
       };
     }

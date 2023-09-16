@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { InlineFormLabel, Input } from '@grafana/ui';
 import labels from 'labels';
+import { selectors } from 'selectors';
 
 interface LimitEditorProps {
   limit: number;
@@ -17,6 +18,7 @@ export const LimitEditor = (props: LimitEditorProps) => {
         {label}
       </InlineFormLabel>
       <Input
+        data-testid={selectors.components.QueryBuilder.LimitEditor.input}
         width={10}
         value={limit}
         type="number"

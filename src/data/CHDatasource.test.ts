@@ -317,8 +317,8 @@ describe('ClickHouseDatasource', () => {
       editorType: EditorType.Builder,
       rawSql: 'SELECT * FROM system.numbers LIMIT 1',
       builderOptions: {
-        database: 'system',
-        table: 'numbers',
+        database: 'default',
+        table: 'logs',
         queryType: QueryType.Logs,
         mode: BuilderMode.List,
         columns: [
@@ -351,11 +351,14 @@ describe('ClickHouseDatasource', () => {
 
     describe('getSupplementaryLogsVolumeQuery', () => {
       it('should return undefined if any of the conditions are not met', async () => {
-        [QueryType.Table, QueryType.Logs, QueryType.TimeSeries, QueryType.Traces].forEach(queryType => {
+        [QueryType.Table, QueryType.TimeSeries, QueryType.Traces].forEach(queryType => {
           expect(
             datasource.getSupplementaryLogsVolumeQuery(request, {
               ...query,
-              queryType,
+              builderOptions: {
+                ...query.builderOptions,
+                queryType
+              }
             })
           ).toBeUndefined();
         });
@@ -363,7 +366,10 @@ describe('ClickHouseDatasource', () => {
           expect(
             datasource.getSupplementaryLogsVolumeQuery(request, {
               ...query,
-              builderOptions: { mode } as any,
+              builderOptions: {
+                ...query.builderOptions,
+                mode
+              },
             })
           ).toBeUndefined();
         });
@@ -379,7 +385,7 @@ describe('ClickHouseDatasource', () => {
             builderOptions: {
               ...query.builderOptions,
               database: '',
-            } as QueryBuilderOptions,
+            },
           })
         ).toBeUndefined();
         expect(
@@ -388,7 +394,7 @@ describe('ClickHouseDatasource', () => {
             builderOptions: {
               ...query.builderOptions,
               table: '',
-            } as QueryBuilderOptions,
+            },
           })
         ).toBeUndefined();
         expect(
@@ -396,7 +402,7 @@ describe('ClickHouseDatasource', () => {
             ...query,
             builderOptions: {
               ...query.builderOptions,
-              timeField: undefined,
+              columns: query.builderOptions.columns?.filter(c => c.hint !== ColumnHint.Time)
             } as QueryBuilderOptions,
           })
         ).toBeUndefined();
@@ -410,7 +416,7 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            logLevelField: undefined,
+            columns: query.builderOptions.columns?.filter(c => c.hint !== ColumnHint.LogLevel)
           } as QueryBuilderOptions,
         });
         expect(result?.rawSql).toEqual(

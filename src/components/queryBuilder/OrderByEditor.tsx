@@ -156,7 +156,7 @@ export const getOrderByFields = (
     case BuilderMode.List:
     default:
       values = allColumns.map((m) => {
-        return { value: m.name, label: m.label };
+        return { label: m.name, value: m.name };
       });
   }
   // Add selected value to the list if it does not exist.

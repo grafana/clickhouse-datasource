@@ -1,14 +1,46 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { MetricsEditor } from './Metrics';
-import { selectors } from '../../labels';
+import userEvent from '@testing-library/user-event';
+import { AggregateEditor } from './AggregateEditor';
+import { selectors } from 'selectors';
+import { AggregateColumn, AggregateType } from 'types/queryBuilder';
 
-describe('MetricsEditor', () => {
-  it('renders correctly', () => {
-    const result = render(<MetricsEditor fieldsList={[]} metrics={[]} onMetricsChange={() => {}} />);
+describe('AggregateEditor', () => {
+  it('should render with no aggregates', () => {
+    const result = render(<AggregateEditor allColumns={[]} aggregates={[]} onAggregatesChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
-    if (selectors.components.QueryEditor.QueryBuilder.AGGREGATES.AddLabel) {
-      expect(result.getByText(selectors.components.QueryEditor.QueryBuilder.AGGREGATES.AddLabel)).toBeInTheDocument();
-    }
+  });
+
+  it('should render with aggregates', () => {
+    const testAggregate: AggregateColumn = { aggregateType: AggregateType.Count, column: 'foo', alias: 'f' };
+    const result = render(<AggregateEditor allColumns={[]} aggregates={[testAggregate]} onAggregatesChange={() => {}} />);
+    expect(result.container.firstChild).not.toBeNull();
+
+    const firstAggregate = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.itemWrapper);
+    expect(firstAggregate).toBeInTheDocument();
+  });
+
+  it('should call onAggregatesChange when add aggregate button is clicked', async () => {
+    const onAggregatesChange = jest.fn();
+    const result = render(<AggregateEditor allColumns={[]} aggregates={[]} onAggregatesChange={onAggregatesChange} />);
+    expect(result.container.firstChild).not.toBeNull();
+
+    const addButton = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.addButton);
+    expect(addButton).toBeInTheDocument();
+    await userEvent.click(addButton);
+    expect(onAggregatesChange).toBeCalledTimes(1);
+    expect(onAggregatesChange).toBeCalledWith([expect.anything()]);
+  });
+
+  it('should call onAggregatesChange when remove aggregate button is clicked', async () => {
+    const testAggregate: AggregateColumn = { aggregateType: AggregateType.Count, column: 'foo', alias: 'f' };
+    const onAggregatesChange = jest.fn();
+    const result = render(<AggregateEditor allColumns={[]} aggregates={[testAggregate]} onAggregatesChange={onAggregatesChange} />);
+    expect(result.container.firstChild).not.toBeNull();
+
+    const removeButton = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton);
+    expect(removeButton).toBeInTheDocument();
+    await userEvent.click(removeButton);
+    expect(onAggregatesChange).toBeCalledWith([]);
   });
 });

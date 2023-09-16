@@ -32,7 +32,11 @@ export const ModeSwitch = (props: ModeSwitchProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup<boolean> options={options} value={value} onChange={v => onChange(v)} />
+      <RadioButtonGroup<boolean>
+        options={options}
+        value={value}
+        onChange={v => onChange(v)}
+      />
     </div>
   );
 }

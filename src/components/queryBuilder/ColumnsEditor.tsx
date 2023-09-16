@@ -3,6 +3,7 @@ import { InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { TableColumn, SelectedColumn } from 'types/queryBuilder';
 import labels from 'labels';
+import { selectors } from 'selectors';
 import { styles } from 'styles';
 
 interface ColumnsEditorProps {
@@ -63,7 +64,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <div data-testid="query-builder-fields-multi-select-container" className={styles.Common.selectWrapper}>
+      <div data-testid={selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper} className={styles.Common.selectWrapper}>
         <MultiSelect<string>
           options={options}
           value={selectedColumnNames}

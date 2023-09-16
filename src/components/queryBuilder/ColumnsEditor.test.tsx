@@ -1,64 +1,77 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
-import { FieldsEditor } from './Fields';
-import { FullField } from './../../types';
+import { fireEvent, render } from '@testing-library/react';
+import { ColumnsEditor } from './ColumnsEditor';
+import { TableColumn, SelectedColumn } from 'types/queryBuilder';
+import { selectors } from 'selectors';
 
-describe('FieldsEditor', () => {
-  const fields: string[] = ['Name', 'StageName'];
-  const list: FullField[] = [
-    { name: 'Name', label: 'Field Name', type: 'string', picklistValues: [] },
-    { name: 'Type', label: 'Field Type', type: 'string', picklistValues: [] },
-    { name: 'StageName', label: 'Stage', type: 'string', picklistValues: [] },
-    { name: 'Dummy', label: 'Dummy', type: 'string', picklistValues: [] },
+describe('ColumnsEditor', () => {
+  const allColumns: TableColumn[] = [
+    { name: 'name', type: 'string', picklistValues: [] },
+    { name: 'dummy', type: 'string', picklistValues: [] },
   ];
+  const selectedColumns: SelectedColumn[] = [
+    { name: 'name' },
+  ];
+
   it('should render default value when no options passed', () => {
-    const result = render(<FieldsEditor fieldsList={[]} fields={[]} onFieldsChange={() => {}} />);
+    const result = render(<ColumnsEditor allColumns={[]} selectedColumns={[]} onSelectedColumnsChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
-    expect(result.getByTestId('query-builder-fields-multi-select-container')).toBeInTheDocument();
+    expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
   });
+
   it('should render the correct values when passed', () => {
-    const onFieldsChange = jest.fn();
-    const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
+    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
-    expect(result.getByTestId('query-builder-fields-multi-select-container')).toBeInTheDocument();
-    expect(result.queryAllByText('Standard Fields').length).toBe(0);
-    expect(result.getByText('Field Name')).toBeInTheDocument();
-    expect(result.getByText('Stage')).toBeInTheDocument();
-    expect(result.queryAllByText('Dummy').length).toBe(0);
-    expect(onFieldsChange).toHaveBeenCalledTimes(0);
+    expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
+
+    const multiSelect = result.getByRole('combobox');
+    expect(multiSelect).toBeInTheDocument();
+    fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
+    expect(result.getByText('name')).toBeInTheDocument();
+    expect(result.getByText('dummy')).toBeInTheDocument();
   });
-  it('should render the popup values when clicked', async () => {
-    const onFieldsChange = jest.fn();
 
-    const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
-    expect(onFieldsChange).toHaveBeenCalledTimes(0);
+  it('should call onSelectedColumnsChange when a column is selected', () => {
+    const onSelectedColumnsChange = jest.fn();
+    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={onSelectedColumnsChange} />);
+    expect(result.container.firstChild).not.toBeNull();
+    expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
 
-    expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
-    fireEvent.focus(screen.getByRole('combobox'));
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
-    expect(result.getByText('Dummy')).toBeInTheDocument(); // Popup should be in the open state
-    expect(result.getByText('Field Type')).toBeInTheDocument();
-    fireEvent.click(result.getByText('Field Type'));
-    expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
-    expect(result.getByText('Field Type')).toBeInTheDocument();
-    fireEvent.blur(screen.getByRole('combobox'));
-    expect(onFieldsChange).toHaveBeenCalledTimes(2);
+    const multiSelect = result.getByRole('combobox');
+    expect(multiSelect).toBeInTheDocument();
+    fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
+    fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
+    fireEvent.keyDown(multiSelect, { key: 'Enter' });
 
-    expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
+    expect(onSelectedColumnsChange).toBeCalledTimes(1);
+    expect(onSelectedColumnsChange).toBeCalledWith([expect.any(Object), expect.any(Object)]);
+  });
+
+  it('should call onSelectedColumnsChange when a column is deselected', () => {
+    const onSelectedColumnsChange = jest.fn();
+    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={onSelectedColumnsChange} />);
+    expect(result.container.firstChild).not.toBeNull();
+    expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
+
+    const removeButton = result.getByTestId('times'); // find by "x" symbol
+    fireEvent.click(removeButton);
+    expect(onSelectedColumnsChange).toBeCalledTimes(1);
+    expect(onSelectedColumnsChange).toBeCalledWith([]);
   });
 
   it('should close when clicked outside', () => {
-    const onFieldsChange = jest.fn();
+    const onSelectedColumnsChange = jest.fn();
+    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={onSelectedColumnsChange} />);
+    expect(onSelectedColumnsChange).toHaveBeenCalledTimes(0);
 
-    const result = render(<FieldsEditor fieldsList={list} fields={fields} onFieldsChange={onFieldsChange} />);
-    expect(onFieldsChange).toHaveBeenCalledTimes(0);
+    const multiSelect = result.getByRole('combobox');
+    expect(multiSelect).toBeInTheDocument();
 
-    expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
-    fireEvent.focus(screen.getByRole('combobox'));
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
-    expect(result.getByText('Dummy')).toBeInTheDocument(); // Popup should be in the open state
-    fireEvent.keyDown(screen.getByRole('combobox'), { key: 'Esc' });
-    expect(result.queryAllByText('Dummy').length).toBe(0); // Popup should be in closed state
-    expect(onFieldsChange).toHaveBeenCalledTimes(0);
+    expect(result.queryAllByText('dummy').length).toBe(0); // is popup closed
+    fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
+    expect(result.getByText('dummy')).toBeInTheDocument(); // is popup open
+    fireEvent.keyDown(multiSelect, { key: 'Esc' });
+    expect(result.queryAllByText('dummy').length).toBe(0); // is popup closed
+    expect(onSelectedColumnsChange).toHaveBeenCalledTimes(0);
   });
 });

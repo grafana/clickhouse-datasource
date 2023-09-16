@@ -5,7 +5,7 @@ export default (datasource: Datasource, database: string): string[] => {
   const [tables, setTables] = useState<string[]>([]); 
   
   useEffect(() => {
-    if (!database) {
+    if (!datasource || !database) {
       return;
     }
 

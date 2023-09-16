@@ -91,11 +91,11 @@ const FilterValueMultiStringItem = (props: { value: string[]; onChange: (value: 
 };
 
 export const FilterValueEditor = (props: {
-  fieldsList: TableColumn[];
+  allColumns: TableColumn[];
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
 }) => {
-  const { filter, onFilterChange, fieldsList } = props;
+  const { filter, onFilterChange, allColumns: fieldsList } = props;
   const getOptions = () => {
     const matchedFilter = fieldsList.find((f) => f.name === filter.key);
     return matchedFilter?.picklistValues || [];
@@ -171,16 +171,16 @@ export const FilterValueEditor = (props: {
 };
 
 export const FilterEditor = (props: {
-  fieldsList: TableColumn[];
+  allColumns: TableColumn[];
   index: number;
   filter: Filter & PredefinedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
 }) => {
-  const { index, filter, fieldsList, onFilterChange } = props;
+  const { index, filter, allColumns: fieldsList, onFilterChange } = props;
   const [isOpen, setIsOpen] = useState(false);
   const getFields = () => {
     const values = (filter.restrictToFields || fieldsList).map((f) => {
-      return { label: f.label, value: f.name };
+      return { label: f.name, value: f.name };
     });
     // Add selected value to the list if it does not exist.
     if (filter?.key && !values.find((x) => x.value === filter.key)) {
@@ -356,7 +356,7 @@ export const FilterEditor = (props: {
         onChange={(e) => onFilterOperatorChange(e.value!)}
         menuPlacement={'bottom'}
       />
-      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} fieldsList={fieldsList} />
+      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
     </>
   );
 };
@@ -410,7 +410,7 @@ export const FiltersEditor = (props: {
             ) : (
               <div className={`width-8 ${styles.Common.firstLabel}`}></div>
             )}
-            <FilterEditor fieldsList={fieldsList} filter={filter} onFilterChange={onFilterChange} index={index} />
+            <FilterEditor allColumns={fieldsList} filter={filter} onFilterChange={onFilterChange} index={index} />
             <Button
               data-testid="query-builder-filters-remove-button"
               icon="trash-alt"

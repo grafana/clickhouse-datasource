@@ -1,15 +1,15 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './Filters';
-import { selectors } from '../../labels';
-import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types';
+import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './FilterEditor';
+import { selectors } from 'selectors';
+import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types/queryBuilder';
 
-describe('FiltersEditor', () => {
+describe('FilterEditor', () => {
   describe('FiltersEditor', () => {
     it('renders correctly', async () => {
       const onFiltersChange = jest.fn();
-      const result = render(<FiltersEditor fieldsList={[]} filters={[]} onFiltersChange={onFiltersChange} />);
+      const result = render(<FiltersEditor allColumns={[]} filters={[]} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe('FiltersEditor', () => {
           operator: FilterOperator.IsNotNull,
         },
       ];
-      const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={() => {}} />);
+      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={() => {}} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -61,7 +61,7 @@ describe('FiltersEditor', () => {
         },
       ];
       const onFiltersChange = jest.fn();
-      const result = render(<FiltersEditor fieldsList={[]} filters={filters} onFiltersChange={onFiltersChange} />);
+      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -80,7 +80,7 @@ describe('FiltersEditor', () => {
     it('renders correctly', async () => {
       const result = render(
         <FilterEditor
-          fieldsList={[]}
+          allColumns={[]}
           filter={{
             key: 'foo',
             operator: FilterOperator.IsNotNull,
@@ -97,10 +97,10 @@ describe('FiltersEditor', () => {
     it('should have all provided fields in the select', async () => {
       const result = render(
         <FilterEditor
-          fieldsList={[
-            { label: 'col1', name: 'col1', type: 'string', picklistValues: [] },
-            { label: 'col2', name: 'col2', type: 'string', picklistValues: [] },
-            { label: 'col3', name: 'col3', type: 'string', picklistValues: [] },
+          allColumns={[
+            { name: 'col1', type: 'string', picklistValues: [] },
+            { name: 'col2', type: 'string', picklistValues: [] },
+            { name: 'col3', type: 'string', picklistValues: [] },
           ]}
           filter={{
             key: 'foo',
@@ -125,7 +125,7 @@ describe('FiltersEditor', () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterEditor
-          fieldsList={[{ label: 'colName', name: 'colName', type: 'Map(String, UInt64)', picklistValues: [] }]}
+          allColumns={[{ name: 'colName', type: 'Map(String, UInt64)', picklistValues: [] }]}
           filter={{
             key: 'foo',
             type: 'boolean',
@@ -156,7 +156,7 @@ describe('FiltersEditor', () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterEditor
-          fieldsList={[{ label: 'mapField', name: 'mapField', type: 'Map(String, UInt64)', picklistValues: [] }]}
+          allColumns={[{ name: 'mapField', type: 'Map(String, UInt64)', picklistValues: [] }]}
           filter={{
             key: 'foo',
             type: 'boolean',
@@ -180,7 +180,7 @@ describe('FiltersEditor', () => {
     it('should render nothing for null operator', async () => {
       const result = render(
         <FilterValueEditor
-          fieldsList={[]}
+          allColumns={[]}
           filter={{
             key: 'foo',
             operator: FilterOperator.IsNotNull,
@@ -203,7 +203,7 @@ describe('FiltersEditor', () => {
         filterType: 'custom',
       };
       const onFilterChange = jest.fn();
-      const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
+      const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result!.container.firstChild).not.toBeNull();
       expect(result!.getByTestId('query-builder-filters-boolean-value-container')).toBeInTheDocument();
       expect(result!.getByLabelText('True')).toBeChecked();
@@ -221,7 +221,7 @@ describe('FiltersEditor', () => {
         value: 123,
       };
       const onFilterChange = jest.fn();
-      const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
+      const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-number-value-container')).toBeInTheDocument();
       expect(result.getByTestId('query-builder-filters-number-value-input')).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe('FiltersEditor', () => {
         condition: 'AND',
       };
       const onFilterChange = jest.fn();
-      const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
+      const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).toBeNull();
     });
     it('should render date filter with value for date operator with time range', async () => {
@@ -252,7 +252,7 @@ describe('FiltersEditor', () => {
         value: 'now()',
       };
       const onFilterChange = jest.fn();
-      const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
+      const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-date-value-container')).toBeInTheDocument();
       expect(result.getByText('NOW')).toBeInTheDocument();
@@ -269,11 +269,10 @@ describe('FiltersEditor', () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterValueEditor
-          fieldsList={[
+          allColumns={[
             {
               name: 'StageName',
               type: 'picklist',
-              label: 'Stage Name',
               picklistValues: [
                 { value: 'Deal won', label: 'Deal Won' },
                 { value: 'Deal lost', label: 'Deal Lost' },
@@ -302,11 +301,10 @@ describe('FiltersEditor', () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterValueEditor
-          fieldsList={[
+          allColumns={[
             {
               name: 'StageName',
               type: 'picklist',
-              label: 'Stage Name',
               picklistValues: [
                 { value: 'Deal won', label: 'Deal Won' },
                 { value: 'Deal lost', label: 'Deal Lost' },
@@ -334,7 +332,7 @@ describe('FiltersEditor', () => {
         value: 'ABC Corp',
       };
       const onFilterChange = jest.fn();
-      const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
+      const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-single-string-value-container')).toBeInTheDocument();
     });
@@ -348,7 +346,7 @@ describe('FiltersEditor', () => {
         value: ['ABC Corp'],
       };
       const onFilterChange = jest.fn();
-      const result = render(<FilterValueEditor fieldsList={[]} filter={filter} onFilterChange={onFilterChange} />);
+      const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-multi-string-value-container')).toBeInTheDocument();
     });

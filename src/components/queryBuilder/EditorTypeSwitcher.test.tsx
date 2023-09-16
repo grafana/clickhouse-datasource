@@ -1,24 +1,31 @@
 import React from 'react';
 import { render } from '@testing-library/react';
-import { QueryTypeSwitcher } from './QueryTypeSwitcher';
-import { selectors } from 'selectors';
-import { CHQuery, CHSqlQuery } from 'types/sql';
-import { QueryType } from 'types/queryBuilder';
+import { EditorTypeSwitcher } from './EditorTypeSwitcher';
+import { CHQuery, CHSqlQuery, EditorType } from 'types/sql';
+import labels from 'labels';
 
-const { options } = selectors.components.QueryEditor.Types;
+const options = {
+  SQLEditor: labels.types.EditorType.sql,
+  QueryBuilder: labels.types.EditorType.builder,
+};
 
-describe('QueryTypeSwitcher', () => {
-  it('renders default query', () => {
+describe('EditorTypeSwitcher', () => {
+  it('should render default query', () => {
     const result = render(
-      <QueryTypeSwitcher query={{ refId: 'A' } as CHQuery} onChange={() => {}} onRunQuery={() => {}} />
+      <EditorTypeSwitcher
+        query={{ refId: 'A' } as CHQuery}
+        onChange={() => {}}
+        onRunQuery={() => {}}
+      />
     );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByLabelText(options.SQLEditor)).not.toBeChecked();
     expect(result.getByLabelText(options.QueryBuilder)).toBeChecked();
   });
-  it('renders legacy query (query without query type)', () => {
+
+  it('should render legacy query (query without query type)', () => {
     const result = render(
-      <QueryTypeSwitcher
+      <EditorTypeSwitcher
         query={{ refId: 'A', rawSql: 'hello' } as CHSqlQuery}
         onChange={() => {}}
         onRunQuery={() => {}}
@@ -28,10 +35,15 @@ describe('QueryTypeSwitcher', () => {
     expect(result.getByLabelText(options.SQLEditor)).toBeChecked();
     expect(result.getByLabelText(options.QueryBuilder)).not.toBeChecked();
   });
-  it('renders correctly SQL editor', () => {
+
+  it('should render SQL editor', () => {
     const result = render(
-      <QueryTypeSwitcher
-        query={{ refId: 'A', queryType: QueryType.SQL, rawSql: '', format: Format.TABLE, selectedFormat: Format.AUTO }}
+      <EditorTypeSwitcher
+        query={{
+          refId: 'A',
+          editorType: EditorType.SQL,
+          rawSql: ''
+        }}
         onChange={() => {}}
         onRunQuery={() => {}}
       />
@@ -40,10 +52,15 @@ describe('QueryTypeSwitcher', () => {
     expect(result.getByLabelText(options.SQLEditor)).toBeChecked();
     expect(result.getByLabelText(options.QueryBuilder)).not.toBeChecked();
   });
-  it('renders correctly SQL Builder editor', () => {
+
+  it('should render Query Builder', () => {
     const result = render(
-      <QueryTypeSwitcher
-        query={{ refId: 'A', queryType: QueryType.Builder, rawSql: '' } as CHQuery}
+      <EditorTypeSwitcher
+        query={{
+            refId: 'A',
+            editorType: EditorType.Builder,
+            rawSql: ''
+        } as CHQuery}
         onChange={() => {}}
         onRunQuery={() => {}}
       />

@@ -8,21 +8,19 @@ export default (datasource: Datasource, database: string, table: string): TableC
   const [columns, setColumns] = useState<TableColumn[]>([allColumn]); 
   
   useEffect(() => {
-    const fetchTableColumns = async () => {
-      datasource
-        .fetchColumnsFull(database, table)
-        .then(columns => {
-          columns.push(allColumn);
-          setColumns(columns);
-        }).catch((ex: any) => {
-          console.error(ex);
-          throw ex;
-        });
-      };
+    if (!datasource || !database || !table) {
+      return;
+    }
 
-      if (database && table) {
-        fetchTableColumns();
-      }
+    datasource
+      .fetchColumnsFull(database, table)
+      .then(columns => {
+        columns.push(allColumn);
+        setColumns(columns);
+      }).catch((ex: any) => {
+        console.error(ex);
+        throw ex;
+      });
     }, [datasource, database, table]);
     
     return columns;

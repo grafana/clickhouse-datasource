@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { SqlEditor } from './SqlEditor';
@@ -38,7 +38,7 @@ describe('SQL Editor', () => {
   it('Should Expand Query', async () => {
     const onChangeValue = jest.fn();
     const onRunQuery = jest.fn();
-    await act(async () => {
+    await waitFor(() =>
       render(
         <SqlEditor
           query={{ rawSql: 'test', refId: 'A', editorType: EditorType.SQL }}
@@ -46,10 +46,10 @@ describe('SQL Editor', () => {
           onRunQuery={onRunQuery}
           datasource={mockDatasource}
         />
-      );
-      expect(screen.queryByText('test')).toBeInTheDocument();
-      await userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
-      expect(onChangeValue).toHaveBeenCalledTimes(1);
-    });
+      ));
+
+    expect(screen.queryByText('test')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
+    expect(onChangeValue).toHaveBeenCalledTimes(1);
   });
 });

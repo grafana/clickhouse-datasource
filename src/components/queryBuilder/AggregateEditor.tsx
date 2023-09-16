@@ -3,6 +3,7 @@ import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Select, Button, Input } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
+import { selectors } from 'selectors';
 import { styles } from 'styles';
 
 interface AggregateProps {
@@ -93,7 +94,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
     <InlineFormLabel
       width={8}
       className="query-keyword"
-      data-testid="query-builder-orderby-item-label"
+      data-testid={selectors.components.QueryBuilder.AggregateEditor.sectionLabel}
       tooltip={tooltip}
     >
       {label}
@@ -106,7 +107,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
       {aggregates.map((aggregate, index) => {
         const key = `${index}-${aggregate.column}-${aggregate.aggregateType}-${aggregate.alias}`;
         return (
-          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
+          <div className="gf-form" key={key} data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}>
             { index === 0 ? fieldLabel : fieldSpacer }
             <Aggregate
               columnOptions={columnOptions}
@@ -115,7 +116,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
               updateAggregate={updateAggregate}
             />
             <Button
-              data-testid="query-builder-orderby-remove-button"
+              data-testid={selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton}
               className={styles.Common.smallBtn}
               variant="destructive"
               size="sm"
@@ -129,7 +130,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
       <div className="gf-form">
         {aggregates.length === 0 ? fieldLabel : fieldSpacer}
         <Button
-          data-testid="query-builder-orderby-add-button"
+          data-testid={selectors.components.QueryBuilder.AggregateEditor.addButton}
           icon="plus-circle"
           variant="secondary"
           size="sm"

@@ -157,7 +157,7 @@ export default {
     QueryType: {
       table: 'Table',
       logs: 'Logs',
-      timeSeries: 'Time Series',
+      timeseries: 'Time Series',
       traces: 'Traces',
     }
   }

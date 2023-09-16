@@ -29,8 +29,8 @@
     "@swc/helpers": "^0.4.12",
     "@swc/jest": "^0.2.23",
     "@testing-library/jest-dom": "^5.16.2",
-    "@testing-library/react": "^12.1.4",
-    "@testing-library/user-event": "^14.4.3",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.5.0",
     "@types/glob": "^8.0.0",
     "@types/jest": "^29.2.2",
     "@types/lodash": "^4.14.188",
@@ -69,8 +69,8 @@
     "@grafana/ui": "9.4.3",
     "js-sql-parser": "^1.4.1",
     "pgsql-ast-parser": "^11.0.0",
-    "react": "17.0.2",
-    "react-dom": "17.0.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "react-router-dom": "^5.2.0",
     "tslib": "^2.5.0"
   }

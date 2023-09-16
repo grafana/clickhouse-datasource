@@ -190,6 +190,23 @@ export const Components = {
       },
     },
   },
+  QueryBuilder: {
+    AggregateEditor: {
+      sectionLabel: 'query-builder-aggregate-editor-section-label',
+      itemWrapper: 'query-builder-aggregate-editor-item-wrapper',
+      itemRemoveButton: 'query-builder-aggregate-editor-item-remove-button',
+      addButton: 'query-builder-aggregate-editor-add-button',
+    },
+    ColumnsEditor: {
+      multiSelectWrapper: 'query-builder-columns-editor-multi-select-wrapper'
+    },
+    GroupByEditor: {
+      multiSelectWrapper: 'query-builder-group-by-multi-select-wrapper'
+    },
+    LimitEditor: {
+      input: 'query-builder-limit-editor-input'
+    }
+  }
 };
 export const selectors: { components: E2ESelectors<typeof Components> } = {
   components: Components,

@@ -18,7 +18,7 @@ const options = [
     value: QueryType.Logs,
   },
   {
-    label: labels.types.QueryType.timeSeries,
+    label: labels.types.QueryType.timeseries,
     value: QueryType.TimeSeries,
   },
   {

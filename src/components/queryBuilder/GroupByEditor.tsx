@@ -4,6 +4,7 @@ import { SelectableValue } from '@grafana/data';
 import { TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { styles } from 'styles';
+import { selectors } from 'selectors';
 
 interface GroupByEditorProps {
   allColumns: TableColumn[];
@@ -27,7 +28,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <div data-testid="query-builder-group-by-multi-select-container" className={styles.Common.selectWrapper}>
+      <div data-testid={selectors.components.QueryBuilder.GroupByEditor.multiSelectWrapper} className={styles.Common.selectWrapper}>
         <MultiSelect
           options={options}
           isOpen={isOpen}

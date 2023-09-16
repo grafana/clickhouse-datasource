@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
-import { getQueryOptionsFromSql, getSQLFromQueryOptions } from '../queryBuilder/utils';
+import { getQueryOptionsFromSql, getSqlFromQueryBuilderOptions } from '../queryBuilder/utils';
 import labels from 'labels';
 import { EditorType, CHQuery, defaultCHBuilderQuery, CHSqlQuery } from 'types/sql';
 import { QueryBuilderOptions } from 'types/queryBuilder';
@@ -58,16 +58,14 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         onChange({
           ...query,
           editorType: EditorType.SQL,
-          rawSql: getSQLFromQueryOptions(builderOptions.database, builderOptions.table, builderOptions),
+          rawSql: getSqlFromQueryBuilderOptions(builderOptions),
           meta: { builderOptions },
-          // format: query.format,
-          // selectedFormat: query.selectedFormat,
         });
       } else if (editorType === EditorType.Builder) {
         onChange({
           ...query,
           editorType: EditorType.Builder,
-          rawSql: getSQLFromQueryOptions(builderOptions.database, builderOptions.table, builderOptions),
+          rawSql: getSqlFromQueryBuilderOptions(builderOptions),
           builderOptions
         });
       }
@@ -83,7 +81,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup options={options} value={editor} onChange={(e) => onEditorTypeChange(e!)} />
+      <RadioButtonGroup options={options} value={editor} onChange={e => onEditorTypeChange(e!)} />
       <ConfirmModal
         isOpen={confirmModalState}
         title={switcher.title}

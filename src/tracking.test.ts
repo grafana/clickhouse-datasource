@@ -26,7 +26,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.SQL, queryType: QueryType.Table }],
       expectedCounters: {
         sql_queries: 1,
-        sql_query_format_auto: 0,
         sql_query_format_table: 1,
         sql_query_format_logs: 0,
         sql_query_format_time_series: 0,
@@ -42,7 +41,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.SQL, queryType: QueryType.Logs }],
       expectedCounters: {
         sql_queries: 1,
-        sql_query_format_auto: 0,
         sql_query_format_table: 0,
         sql_query_format_logs: 1,
         sql_query_format_time_series: 0,
@@ -58,7 +56,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.SQL, queryType: QueryType.TimeSeries }],
       expectedCounters: {
         sql_queries: 1,
-        sql_query_format_auto: 0,
         sql_query_format_table: 0,
         sql_query_format_logs: 0,
         sql_query_format_time_series: 1,
@@ -74,7 +71,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.SQL, queryType: QueryType.Traces }],
       expectedCounters: {
         sql_queries: 1,
-        sql_query_format_auto: 0,
         sql_query_format_table: 0,
         sql_query_format_logs: 0,
         sql_query_format_time_series: 0,
@@ -90,7 +86,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.Builder, builderOptions: { mode: BuilderMode.List } }],
       expectedCounters: {
         sql_queries: 0,
-        sql_query_format_auto: 0,
         sql_query_format_table: 0,
         sql_query_format_logs: 0,
         sql_query_format_time_series: 0,
@@ -106,7 +101,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.Builder, builderOptions: { mode: BuilderMode.Aggregate } }],
       expectedCounters: {
         sql_queries: 0,
-        sql_query_format_auto: 0,
         sql_query_format_table: 0,
         sql_query_format_logs: 0,
         sql_query_format_time_series: 0,
@@ -122,7 +116,6 @@ describe('analyzeQueries', () => {
       queries: [{ editorType: EditorType.Builder, builderOptions: { mode: BuilderMode.Trend } }],
       expectedCounters: {
         sql_queries: 0,
-        sql_query_format_auto: 0,
         sql_query_format_table: 0,
         sql_query_format_logs: 0,
         sql_query_format_time_series: 0,

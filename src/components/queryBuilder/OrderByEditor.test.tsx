@@ -6,7 +6,6 @@ import { AggregateType, BuilderMode, ColumnHint, OrderByDirection, QueryType, Ta
 
 const newTestColumn = (name: string): TableColumn => ({
   name,
-  label: name,
   sortable: true,
   type: 'String',
   picklistValues: []
@@ -47,25 +46,9 @@ describe('OrderByEditor', () => {
       />
     );
     expect(result.container.firstChild).not.toBeNull();
-    expect(result.queryByTestId('query-builder-orderby-add-button')).not.toBeInTheDocument();
-    expect(result.getByTestId('query-builder-orderby-inline-add-button')).toBeInTheDocument();
+    expect(result.getByTestId('query-builder-orderby-add-button')).toBeInTheDocument();
     expect(result.getByTestId('query-builder-orderby-item-wrapper')).toBeInTheDocument();
     expect(result.getByTestId('query-builder-orderby-remove-button')).toBeInTheDocument();
-  });
-  it('should be only one inline add button when multiple orderby items passed', () => {
-    const result = render(
-      <OrderByEditor
-        allColumns={[testColumns[0]]}
-        orderBy={[
-          { name: 'foo', dir: OrderByDirection.ASC },
-          { name: 'bar', dir: OrderByDirection.ASC },
-        ]}
-        onOrderByChange={() => {}}
-      />
-    );
-    expect(result.container.firstChild).not.toBeNull();
-    expect(result.queryByTestId('query-builder-orderby-add-button')).not.toBeInTheDocument();
-    expect(result.getByTestId('query-builder-orderby-inline-add-button')).toBeInTheDocument();
   });
   it('should render add/remove buttons correctly when multiple orderby elements passed', () => {
     const result = render(
@@ -79,8 +62,7 @@ describe('OrderByEditor', () => {
       />
     );
     expect(result.container.firstChild).not.toBeNull();
-    expect(result.queryByTestId('query-builder-orderby-add-button')).not.toBeInTheDocument();
-    expect(result.getByTestId('query-builder-orderby-inline-add-button')).toBeInTheDocument();
+    expect(result.queryByTestId('query-builder-orderby-add-button')).toBeInTheDocument();
     expect(result.getAllByTestId('query-builder-orderby-item-wrapper').length).toBe(2);
     expect(result.getAllByTestId('query-builder-orderby-remove-button').length).toBe(2);
   });
@@ -132,7 +114,7 @@ describe('OrderByEditor', () => {
     expect(onOrderByChange).toBeCalledTimes(0);
     await userEvent.click(result.getAllByTestId('query-builder-orderby-remove-button')[1]);
     await userEvent.click(result.getAllByTestId('query-builder-orderby-remove-button')[0]);
-    await userEvent.click(result.getAllByTestId('query-builder-orderby-inline-add-button')[0]);
+    await userEvent.click(result.getAllByTestId('query-builder-orderby-add-button')[0]);
     expect(onOrderByChange).toBeCalledTimes(3);
     expect(onOrderByChange).toHaveBeenNthCalledWith(1, [{ name: 'foo', dir: OrderByDirection.ASC }]);
     expect(onOrderByChange).toHaveBeenNthCalledWith(2, [{ name: 'bar', dir: OrderByDirection.ASC }]);
@@ -148,25 +130,25 @@ describe('getOrderByFields', () => {
   const sampleFields = [
     {
       name: 'field1',
-      label: 'Field1',
+      label: 'field1',
       type: 'string',
       picklistValues: [],
     },
     {
       name: 'field11',
-      label: 'Field11',
+      label: 'field11',
       type: 'string',
       picklistValues: [],
     },
     {
       name: 'field2',
-      label: 'Field2',
+      label: 'field2',
       type: 'string',
       picklistValues: [],
     },
     {
       name: 'field3',
-      label: 'Field3',
+      label: 'field3',
       type: 'string',
       picklistValues: [],
     },
@@ -185,19 +167,19 @@ describe('getOrderByFields', () => {
       )
     ).toStrictEqual([
       {
-        label: 'Field1',
+        label: 'field1',
         value: 'field1',
       },
       {
-        label: 'Field11',
+        label: 'field11',
         value: 'field11',
       },
       {
-        label: 'Field2',
+        label: 'field2',
         value: 'field2',
       },
       {
-        label: 'Field3',
+        label: 'field3',
         value: 'field3',
       },
     ]);
@@ -320,19 +302,19 @@ describe('getOrderByFields', () => {
       )
     ).toStrictEqual([
       {
-        label: 'Field1',
+        label: 'field1',
         value: 'field1',
       },
       {
-        label: 'Field11',
+        label: 'field11',
         value: 'field11',
       },
       {
-        label: 'Field2',
+        label: 'field2',
         value: 'field2',
       },
       {
-        label: 'Field3',
+        label: 'field3',
         value: 'field3',
       },
     ]);
