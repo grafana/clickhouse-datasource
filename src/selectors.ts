@@ -192,19 +192,19 @@ export const Components = {
   },
   QueryBuilder: {
     AggregateEditor: {
-      sectionLabel: 'query-builder-aggregate-editor-section-label',
-      itemWrapper: 'query-builder-aggregate-editor-item-wrapper',
-      itemRemoveButton: 'query-builder-aggregate-editor-item-remove-button',
-      addButton: 'query-builder-aggregate-editor-add-button',
+      sectionLabel: 'query-builder__aggregate-editor__section-label',
+      itemWrapper: 'query-builder__aggregate-editor__item-wrapper',
+      itemRemoveButton: 'query-builder__aggregate-editor-item-remove-button',
+      addButton: 'query-builder__aggregate-editor__add-button',
     },
     ColumnsEditor: {
-      multiSelectWrapper: 'query-builder-columns-editor-multi-select-wrapper'
+      multiSelectWrapper: 'query-builder__columns-editor__multi-select-wrapper'
     },
     GroupByEditor: {
-      multiSelectWrapper: 'query-builder-group-by-multi-select-wrapper'
+      multiSelectWrapper: 'query-builder__group-by__multi-select-wrapper'
     },
     LimitEditor: {
-      input: 'query-builder-limit-editor-input'
+      input: 'query-builder__limit-editor__input'
     }
   }
 };
