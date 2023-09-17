@@ -11,7 +11,7 @@ import allLabels from 'labels';
 import { getColumnByHint } from 'components/queryBuilder/utils';
 
 interface LogsQueryBuilderProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
 }

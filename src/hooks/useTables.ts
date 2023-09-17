@@ -14,7 +14,6 @@ export default (datasource: Datasource, database: string): string[] => {
       then(tables => setTables(tables)).
       catch((ex: any) => {
         console.error(ex);
-        throw ex;
       });
     }, [datasource, database]);
     

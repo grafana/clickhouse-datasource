@@ -65,13 +65,13 @@ const Aggregate = (props: AggregateProps) => {
 };
 
 interface AggregateEditorProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   aggregates: AggregateColumn[];
   onAggregatesChange: (aggregates: AggregateColumn[]) => void;
 }
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
-  const columnOptions: Array<SelectableValue<string>> = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
 
   const addAggregate = () => {

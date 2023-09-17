@@ -10,7 +10,7 @@ import { AggregateEditor } from '../AggregateEditor';
 import { GroupByEditor } from '../GroupByEditor';
 
 interface TableQueryBuilderProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
 }

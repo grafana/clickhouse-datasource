@@ -7,12 +7,12 @@ import { selectors } from 'selectors';
 import { styles } from 'styles';
 
 interface ColumnsEditorProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   selectedColumns: SelectedColumn[];
   onSelectedColumnsChange: (selectedColumns: SelectedColumn[]) => void;
 }
 
-function getCustomColumns(columnNames: string[], allColumns: TableColumn[]): Array<SelectableValue<string>> {
+function getCustomColumns(columnNames: string[], allColumns: ReadonlyArray<TableColumn>): Array<SelectableValue<string>> {
   const columnNamesSet = new Set(columnNames);
   return allColumns.
     filter(c => columnNamesSet.has(c.name)).
@@ -23,7 +23,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
   const { allColumns, selectedColumns, onSelectedColumnsChange } = props;
   const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const allColumnNames = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const allColumnNames = allColumns.map(c => ({ label: c.name, value: c.name }));
   const selectedColumnNames = (selectedColumns || []).map(c => ({ label: c.name, value: c.name }));
   const { label, tooltip } = labels.components.ColumnsEditor;
 

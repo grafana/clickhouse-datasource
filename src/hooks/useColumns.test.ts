@@ -8,7 +8,7 @@ describe('useColumns', () => {
   const defaultColumnCount = 1; // the "all" column is always in the array
 
   it('should return empty array if datasource is invalid', async () => {
-    let result: { current: TableColumn[] };
+    let result: { current: ReadonlyArray<TableColumn> };
     await act(async () => {
       const r = renderHook(() => useColumns(undefined!, 'db', 'table'));
       result = r.result;
@@ -20,7 +20,7 @@ describe('useColumns', () => {
   it('should return empty array if database string is empty', async () => {
     const mockDs = {} as Datasource;
     mockDs.fetchColumnsFull = jest.fn((db: string, table: string) => Promise.resolve([]));
-    let result: { current: TableColumn[] };
+    let result: { current: ReadonlyArray<TableColumn> };
     await act(async () => {
       const r = renderHook(() => useColumns(mockDs, '', 'table'));
       result = r.result;
@@ -32,7 +32,7 @@ describe('useColumns', () => {
   it('should return empty array if table string is empty', async () => {
     const mockDs = {} as Datasource;
     mockDs.fetchColumnsFull = jest.fn((db: string, table: string) => Promise.resolve([]));
-    let result: { current: TableColumn[] };
+    let result: { current: ReadonlyArray<TableColumn> };
     await act(async () => {
       const r = renderHook(() => useColumns(mockDs, 'db', ''));
       result = r.result;
@@ -50,7 +50,7 @@ describe('useColumns', () => {
         // { name: '*' } (an "all" column is added by the hook)
       ]));
 
-    let result: { current: TableColumn[] };
+    let result: { current: ReadonlyArray<TableColumn> };
     await act(async () => {
       const r = renderHook(() => useColumns(mockDs, 'db', 'table'));
       result = r.result;

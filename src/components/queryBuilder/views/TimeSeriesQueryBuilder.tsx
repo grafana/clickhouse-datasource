@@ -12,7 +12,7 @@ import { ColumnSelect } from '../ColumnSelect';
 import { getColumnByHint } from 'components/queryBuilder/utils';
 
 interface TimeSeriesQueryBuilderProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
 }

@@ -5,7 +5,7 @@ import { TableColumn, SelectedColumn } from 'types/queryBuilder';
 import { selectors } from 'selectors';
 
 describe('ColumnsEditor', () => {
-  const allColumns: TableColumn[] = [
+  const allColumns: ReadonlyArray<TableColumn> = [
     { name: 'name', type: 'string', picklistValues: [] },
     { name: 'dummy', type: 'string', picklistValues: [] },
   ];

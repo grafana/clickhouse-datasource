@@ -11,7 +11,7 @@ const newTestColumn = (name: string): TableColumn => ({
   picklistValues: []
 });
 
-const testColumns: TableColumn[] = [
+const testColumns: ReadonlyArray<TableColumn> = [
   newTestColumn('foo'),
   newTestColumn('bar'),
   newTestColumn('baz'),

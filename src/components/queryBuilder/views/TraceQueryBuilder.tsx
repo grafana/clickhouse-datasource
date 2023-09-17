@@ -7,7 +7,7 @@ import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'components/queryBuilder/utils';
 
 interface TraceQueryBuilderProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
 }

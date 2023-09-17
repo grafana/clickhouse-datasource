@@ -10,14 +10,14 @@ describe('GroupByEditor', () => {
   });
 
   it('should render with valid properties', () => {
-    const allColumns: TableColumn[] = [{ name: 'a', type: 'string', picklistValues: [] }];
+    const allColumns: ReadonlyArray<TableColumn> = [{ name: 'a', type: 'string', picklistValues: [] }];
     const groupBy: string[] = ['a', 'b'];
     const result = render(<GroupByEditor allColumns={allColumns} groupBy={groupBy} onGroupByChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
   });
 
   it('should call onGroupByChange when a new column is selected', () => {
-    const allColumns: TableColumn[] = [{ name: 'a', type: 'string', picklistValues: [] }];
+    const allColumns: ReadonlyArray<TableColumn> = [{ name: 'a', type: 'string', picklistValues: [] }];
     const groupBy: string[] = ['b'];
     const onGroupByChange = jest.fn();
     const result = render(<GroupByEditor allColumns={allColumns} groupBy={groupBy} onGroupByChange={onGroupByChange} />);

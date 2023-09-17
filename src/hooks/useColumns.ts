@@ -4,8 +4,8 @@ import { Datasource } from 'data/CHDatasource';
 
 const allColumn = { name: '*', label: 'ALL', type: 'string', picklistValues: [] };
 
-export default (datasource: Datasource, database: string, table: string): TableColumn[] => {
-  const [columns, setColumns] = useState<TableColumn[]>([allColumn]); 
+export default (datasource: Datasource, database: string, table: string): ReadonlyArray<TableColumn> => {
+  const [columns, setColumns] = useState<ReadonlyArray<TableColumn>>([allColumn]); 
   
   useEffect(() => {
     if (!datasource || !database || !table) {
@@ -19,7 +19,6 @@ export default (datasource: Datasource, database: string, table: string): TableC
         setColumns(columns);
       }).catch((ex: any) => {
         console.error(ex);
-        throw ex;
       });
     }, [datasource, database, table]);
     

@@ -14,7 +14,6 @@ export default (datasource: Datasource): string[] => {
       then(databases => setDatabases(databases)).
       catch((ex: any) => {
         console.error(ex);
-        throw ex;
       });
     }, [datasource]);
     

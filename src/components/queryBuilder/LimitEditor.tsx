@@ -9,7 +9,7 @@ interface LimitEditorProps {
 }
 
 export const LimitEditor = (props: LimitEditorProps) => {
-  const [limit, setLimit] = useState<number>(props.limit || 100);
+  const [limit, setLimit] = useState<number>(props.limit || 1000);
   const { label, tooltip } = labels.components.LimitEditor;
 
   return (

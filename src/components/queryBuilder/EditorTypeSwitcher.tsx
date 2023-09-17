@@ -30,6 +30,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const onEditorTypeChange = (editorType: EditorType, confirm = false) => {
+    // TODO: component state has updated, but not local state.
     if (query.editorType === EditorType.SQL && editorType === EditorType.Builder && !confirm) {
       const queryOptionsFromSql = getQueryOptionsFromSql(query.rawSql);
       if (isString(queryOptionsFromSql)) {
@@ -80,7 +81,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup options={options} value={editor} onChange={e => onEditorTypeChange(e!)} />
+      <RadioButtonGroup options={options} value={editor} onChange={e => onEditorTypeChange(e)} />
       <ConfirmModal
         isOpen={confirmModalState}
         title={switcher.title}

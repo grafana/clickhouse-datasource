@@ -51,13 +51,13 @@ const OrderByItem = (props: OrderByItemProps) => {
 };
 
 interface OrderByEditorProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   orderBy: OrderBy[];
   onOrderByChange: (orderBy: OrderBy[]) => void;
 }
 export const OrderByEditor = (props: OrderByEditorProps) => {
   const { allColumns, orderBy, onOrderByChange } = props;
-  const columnOptions: Array<SelectableValue<string>> = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
   const { label, tooltip, addLabel } = allLabels.components.OrderByEditor;
 
   const addOrderByItem = () => {
@@ -136,7 +136,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
 
 export const getOrderByFields = (
   builder: QueryBuilderOptions,
-  allColumns: TableColumn[]
+  allColumns: ReadonlyArray<TableColumn>
 ): Array<SelectableValue<string>> => {
   let values: Array<SelectableValue<string>> | Array<{ value: string; label: string }> = [];
   switch (builder.mode) {

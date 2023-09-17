@@ -7,7 +7,7 @@ import { styles } from 'styles';
 import { selectors } from 'selectors';
 
 interface GroupByEditorProps {
-  allColumns: TableColumn[];
+  allColumns: ReadonlyArray<TableColumn>;
   groupBy: string[];
   onGroupByChange: (groupBy: string[]) => void;
 }
@@ -16,7 +16,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
   const { allColumns, groupBy, onGroupByChange } = props;
   const [isOpen, setIsOpen] = useState(false);
   const { label, tooltip } = labels.components.GroupByEditor;
-  const options: Array<SelectableValue<string>> = (allColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const options: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
 
   const onChange = (selection: Array<SelectableValue<string>>) => {
     setIsOpen(false);

@@ -21,11 +21,12 @@ interface Expand {
 export const SqlEditor = (props: SqlEditorProps) => {
   const defaultHeight = '150px';
   const { query, onRunQuery, onChange, datasource } = props;
+  const sqlQuery = query as CHSqlQuery;
   const [codeEditor, setCodeEditor] = useState<any>();
   const [expand, setExpand] = useState<Expand>({
     height: defaultHeight,
     icon: 'plus',
-    on: (query as CHSqlQuery).expand || false,
+    on: sqlQuery.expand || false,
   });
 
   const onSqlChange = (sql: string) => {
@@ -35,7 +36,6 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const onToggleExpand = () => {
-    const sqlQuery = query as CHSqlQuery;
     const on = !expand.on;
     const icon = on ? 'minus' : 'plus';
     onChange({ ...sqlQuery, expand: on });

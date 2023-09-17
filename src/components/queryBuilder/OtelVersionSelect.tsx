@@ -15,7 +15,7 @@ interface OtelVersionSelectProps {
 export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   const { enabled, onEnabledChange, selectedVersion, onVersionChange, defaultToLatest } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
-  const options: SelectableValue[] = (allVersions || []).
+  const options: SelectableValue[] = allVersions.
     map(v => ({
       label: `${v.version}${v.name ? (` (${v.name})`) : ''}`,
       value: v.version
