@@ -3,7 +3,7 @@ import { SelectableValue } from '@grafana/data';
 import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSqlFromQueryBuilderOptions } from '../queryBuilder/utils';
 import labels from 'labels';
-import { EditorType, CHQuery, defaultCHBuilderQuery, CHSqlQuery } from 'types/sql';
+import { EditorType, CHQuery, defaultCHBuilderQuery } from 'types/sql';
 import { QueryBuilderOptions } from 'types/queryBuilder';
 import isString from 'lodash/isString';
 
@@ -13,22 +13,21 @@ interface CHEditorTypeSwitcherProps {
   onRunQuery: () => void;
 }
 
+const options: Array<SelectableValue<EditorType>> = [
+  { label: labels.types.EditorType.sql, value: EditorType.SQL },
+  { label: labels.types.EditorType.builder, value: EditorType.Builder },
+];
+
 /**
  * Component for switching between the SQL and Query Builder editors.
  */
 export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   const { query, onChange } = props;
   const { label, tooltip, switcher, cannotConvert } = labels.components.EditorTypeSwitcher;
-  let editorType: EditorType =
-    query.editorType ||
-    ((query as CHSqlQuery).rawSql && !(query as CHQuery).editorType ? EditorType.SQL : EditorType.Builder);
+  const editorType: EditorType = query.editorType;
   const [editor, setEditor] = useState<EditorType>(editorType);
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
   const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
-  const options: Array<SelectableValue<EditorType>> = [
-    { label: labels.types.EditorType.sql, value: EditorType.SQL },
-    { label: labels.types.EditorType.builder, value: EditorType.Builder },
-  ];
   const [errorMessage, setErrorMessage] = useState<string>('');
   const onEditorTypeChange = (editorType: EditorType, confirm = false) => {
     if (query.editorType === EditorType.SQL && editorType === EditorType.Builder && !confirm) {

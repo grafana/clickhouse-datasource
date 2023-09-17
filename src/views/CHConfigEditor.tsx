@@ -34,7 +34,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
   const hasTLSClientKey = secureJsonFields && secureJsonFields.tlsClientKey;
   const protocolOptions = [
     { label: 'Native', value: Protocol.Native },
-    { label: 'HTTP', value: Protocol.HTTP },
+    { label: 'HTTP', value: Protocol.Http },
   ];
   const switchContainerStyle: React.CSSProperties = {
     padding: `0 ${theme.spacing.sm}`,

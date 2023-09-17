@@ -13,7 +13,7 @@ describe('EditorTypeSwitcher', () => {
   it('should render default query', () => {
     const result = render(
       <EditorTypeSwitcher
-        query={{ refId: 'A' } as CHQuery}
+        query={{ refId: 'A', editorType: EditorType.Builder } as CHQuery}
         onChange={() => {}}
         onRunQuery={() => {}}
       />
@@ -26,7 +26,7 @@ describe('EditorTypeSwitcher', () => {
   it('should render legacy query (query without query type)', () => {
     const result = render(
       <EditorTypeSwitcher
-        query={{ refId: 'A', rawSql: 'hello' } as CHSqlQuery}
+        query={{ refId: 'A', rawSql: 'hello', editorType: EditorType.SQL } as CHSqlQuery}
         onChange={() => {}}
         onRunQuery={() => {}}
       />

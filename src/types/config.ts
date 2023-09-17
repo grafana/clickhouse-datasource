@@ -31,5 +31,5 @@ export interface CHSecureConfig {
 
 export enum Protocol {
   Native = 'native',
-  HTTP = 'http',
+  Http = 'http',
 }

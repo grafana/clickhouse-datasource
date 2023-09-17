@@ -55,7 +55,7 @@ describe('ConfigEditor', () => {
         {...mockConfigEditorProps()}
         options={{
           ...mockConfigEditorProps().options,
-          jsonData: { ...mockConfigEditorProps().options.jsonData, protocol: Protocol.HTTP },
+          jsonData: { ...mockConfigEditorProps().options.jsonData, protocol: Protocol.Http },
         }}
       />
     );
