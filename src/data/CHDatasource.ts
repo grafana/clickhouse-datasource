@@ -117,14 +117,16 @@ export class Datasource
       query.editorType !== EditorType.Builder ||
       query.builderOptions.queryType !== QueryType.Logs ||
       query.builderOptions.mode !== BuilderMode.List ||
-      getColumnByHint(query.builderOptions, ColumnHint.Time) === undefined ||
       query.builderOptions.database === '' ||
       query.builderOptions.table === ''
     ) {
       return undefined;
     }
 
-    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time)!;
+    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time);
+    if (timeColumn === undefined) {
+      return undefined;
+    }
 
     const timeFieldRoundingClause = getTimeFieldRoundingClause(
       logsVolumeRequest.scopedVars,
