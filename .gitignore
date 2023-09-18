@@ -32,11 +32,6 @@ e2e-results/
 pkg/__debug_bin
 
 provisioning
-cypress/report.json
-cypress/videos
-cypress-e2e/report.json
-cypress-e2e/videos
 
 **/.DS_Store
 .eslintcache
-.nvmrc

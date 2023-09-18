@@ -3,12 +3,14 @@ module github.com/grafana/clickhouse-datasource
 go 1.20
 
 require (
+
 	dagger.io/dagger v0.8.4
-	github.com/ClickHouse/clickhouse-go/v2 v2.13.2
+	github.com/ClickHouse/clickhouse-go/v2 v2.13.4
+
 	github.com/docker/docker v24.0.5+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.173.0
-	github.com/grafana/sqlds/v2 v2.5.0
+	github.com/grafana/sqlds/v2 v2.7.2
 	github.com/paulmach/orb v0.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
@@ -118,18 +120,18 @@ require (
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.42.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/httptrace/otelhttptrace v0.42.0 // indirect
 	go.opentelemetry.io/contrib/propagators/jaeger v1.17.0 // indirect
-	go.opentelemetry.io/otel v1.16.0 // indirect
+	go.opentelemetry.io/otel v1.17.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/internal/retry v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.16.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.16.0 // indirect
-	go.opentelemetry.io/otel/metric v1.16.0 // indirect
+	go.opentelemetry.io/otel/metric v1.17.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.16.0 // indirect
-	go.opentelemetry.io/otel/trace v1.16.0 // indirect
+	go.opentelemetry.io/otel/trace v1.17.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	golang.org/x/crypto v0.12.0 // indirect
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
 	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/sys v0.12.0 // indirect
 	golang.org/x/term v0.11.0 // indirect
 	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect

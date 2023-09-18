@@ -37,9 +37,7 @@
     "author": {
       "name": "Grafana Labs"
     },
-    "keywords": [
-      "Simple"
-    ],
+    "keywords": ["Simple"],
     "logos": {
       "small": "img/logo.svg",
       "large": "img/logo.svg"
@@ -59,7 +57,7 @@
     "updated": "%TODAY%"
   },
   "dependencies": {
-    "grafanaDependency": ">=9.0.0",
+    "grafanaDependency": ">=9.5.0",
     "plugins": []
   }
 }

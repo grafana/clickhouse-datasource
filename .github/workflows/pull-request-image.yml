@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+permissions:
+  pull-requests: write
+  issues: write
+
 jobs:
   build:
     name: Build and archive plugin build artifacts
@@ -14,12 +18,12 @@ jobs:
       fail-fast: true
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Node.js environment
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v3.8.1
         with:
-          node-version: 'lts/*'
+          node-version-file: '.nvmrc'
 
       - name: Install Go environment
         uses: actions/setup-go@v4
@@ -36,7 +40,7 @@ jobs:
         run: yarn build
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
-      
+
       - name: Archive plugin build artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -48,7 +52,7 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     needs: build
-    steps:      
+    steps:
       - name: Download plugin build artifacts
         uses: actions/download-artifact@v3
         id: download
@@ -73,18 +77,18 @@ jobs:
           LABEL gh-sha="${{ github.event.pull_request.head.sha }}"
           LABEL gh-repo="${{ github.event.repository.name }}"
           LABEL gh-pr-number="${{ github.event.number }}"
-          
+
           # Copy plugin build artifacts into the image
           COPY . /var/lib/grafana/plugins/${{ github.event.repository.name }}/" > Dockerfile
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
       - name: Build and push Docker image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
@@ -94,7 +98,7 @@ jobs:
     name: Add PR comment
     runs-on: ubuntu-latest
     needs: push_to_registry
-    steps:      
+    steps:
       - name: Add comment to PR
         uses: peter-evans/create-or-update-comment@v3
         with:
