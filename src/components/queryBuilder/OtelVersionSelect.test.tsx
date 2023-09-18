@@ -87,4 +87,19 @@ describe('OtelVersionSelect', () => {
     expect(onVersionChange).toBeCalledTimes(1);
     expect(onVersionChange).toBeCalledWith(expect.any(String));
   });
+
+  it('should disable version selection when switch is disabled', () => {
+    const result = render(
+      <OtelVersionSelect
+        enabled={false}
+        onEnabledChange={() => {}}
+        selectedVersion={testVersion}
+        onVersionChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const select = result.getByRole('combobox', { hidden: true });
+    expect(select).toBeDisabled();
+  });
 });

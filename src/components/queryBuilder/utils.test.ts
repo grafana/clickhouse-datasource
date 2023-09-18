@@ -1,5 +1,5 @@
-import { AggregateType, BuilderMode, FilterOperator, OrderByDirection } from 'types/queryBuilder';
-import { getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isDateTimeType, isDateType, isNumberType } from './utils';
+import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, QueryBuilderOptions } from 'types/queryBuilder';
+import { getColumnByHint, getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isDateTimeType, isDateType, isNumberType } from './utils';
 import { ColumnHint, QueryType } from 'types/queryBuilder';
 
 describe('isDateType', () => {
@@ -460,3 +460,17 @@ function testCondition(name: string, sql: string, builder: any, testQueryOptions
     }
   });
 }
+
+
+describe('getColumnByHint', () => {
+  it('returns a selected column when present', () => {
+    const testColumn = { name: 'time', type: 'datetime', hint: ColumnHint.Time };
+    const builderOptions = { columns: [testColumn] } as QueryBuilderOptions;
+    expect(getColumnByHint(builderOptions, ColumnHint.Time)).toMatchObject(testColumn);
+  });
+  it('returns a undefined when column not present', () => {
+    const testColumn = { name: 'time', type: 'datetime' };
+    const builderOptions = { columns: [testColumn] } as QueryBuilderOptions;
+    expect(getColumnByHint(builderOptions, ColumnHint.Time)).toBeUndefined();
+  });
+});
