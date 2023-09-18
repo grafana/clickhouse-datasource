@@ -36,6 +36,11 @@ You can also have `yarn` watch for changes and automatically recompile them:
 yarn watch
 ```
 
+#### Running E2E tests locally
+
+1. Install [K6](https://k6.io/docs/get-started/installation/)
+1. Run `yarn test:e2e`
+
 ## Create a pull request
 
 Once you are ready to make a pull request, please read and follow [Create a pull request](https://github.com/grafana/grafana/blob/master/contribute/create-pull-request.md).
