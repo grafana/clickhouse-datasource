@@ -107,8 +107,8 @@ describe('ClickHouseDatasource', () => {
     it('should Fetch Default Tags When No Second AdHoc Variable', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
       const ds = cloneDeep(mockDatasource);
-      ds.settings.jsonData.defaultDatabase = undefined;
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      jest.spyOn(ds, 'getDefaultDatabase').mockImplementation(() => undefined!); // Disable default DB
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
 
       const keys = await ds.getTagKeys();

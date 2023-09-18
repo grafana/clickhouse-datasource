@@ -70,13 +70,6 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAggregateMode, timeColumn, selectedColumns, filters, aggregates, groupBy, orderBy, limit]);
 
-  const aggregateFields = (
-    <>
-      <AggregateEditor allColumns={allColumns} aggregates={aggregates} onAggregatesChange={setAggregates} />
-      <GroupByEditor groupBy={groupBy} onGroupByChange={setGroupBy} allColumns={allColumns} />
-    </>
-  );
-
   return (
     <div>
       <ModeSwitch
@@ -98,7 +91,12 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       />
       <ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={setSelectedColumns} />
 
-      {isAggregateMode && aggregateFields}
+      {isAggregateMode && (
+        <>
+          <AggregateEditor allColumns={allColumns} aggregates={aggregates} onAggregatesChange={setAggregates} />
+          <GroupByEditor groupBy={groupBy} onGroupByChange={setGroupBy} allColumns={allColumns} />
+        </>
+      )}
 
       <OrderByEditor
         allColumns={allColumns}

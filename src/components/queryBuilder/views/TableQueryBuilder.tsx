@@ -24,7 +24,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const [aggregates, setAggregates] = useState<AggregateColumn[]>([emptyAggregate]);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [orderBy, setOrderBy] = useState<OrderBy[]>([]);
-  const [limit, setLimit] = useState<number>(100);
+  const [limit, setLimit] = useState<number>(1000);
   const [filters, setFilters] = useState<Filter[]>([]);
   const labels = allLabels.components.TableQueryBuilder;
 
@@ -62,13 +62,6 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAggregateMode, selectedColumns, filters, aggregates, groupBy, orderBy, limit]);
 
-  const aggregateFields = (
-    <>
-      <AggregateEditor allColumns={allColumns} aggregates={aggregates} onAggregatesChange={setAggregates} />
-      <GroupByEditor groupBy={groupBy} onGroupByChange={setGroupBy} allColumns={allColumns} />
-    </>
-  );
-
   return (
     <div>
       <ModeSwitch
@@ -82,7 +75,12 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
 
       <ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={setSelectedColumns} />
 
-      {isAggregateMode && aggregateFields}
+      {isAggregateMode && (
+        <>
+          <AggregateEditor allColumns={allColumns} aggregates={aggregates} onAggregatesChange={setAggregates} />
+          <GroupByEditor groupBy={groupBy} onGroupByChange={setGroupBy} allColumns={allColumns} />
+        </>
+      )}
 
       <OrderByEditor
         allColumns={allColumns}
