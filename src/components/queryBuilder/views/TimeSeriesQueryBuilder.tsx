@@ -21,7 +21,7 @@ const emptyAggregate: AggregateColumn = { column: '', aggregateType: AggregateTy
 
 export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const { allColumns, builderOptions, onBuilderOptionsChange } = props;
-  const [isAggregateMode, setAggregateMode] = useState<boolean>(false);
+  const [isAggregateMode, setAggregateMode] = useState<boolean>(false); // Toggle Simple vs Aggregate mode
   const [timeColumn, setTimeColumn] = useState<SelectedColumn>();
   const [selectedColumns, setSelectedColumns] = useState<SelectedColumn[]>([]);
   const [aggregates, setAggregates] = useState<AggregateColumn[]>([emptyAggregate]);

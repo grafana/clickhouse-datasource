@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AggregateEditor } from './AggregateEditor';
 import { selectors } from 'selectors';
@@ -42,5 +42,20 @@ describe('AggregateEditor', () => {
     expect(removeButton).toBeInTheDocument();
     await userEvent.click(removeButton);
     expect(onAggregatesChange).toBeCalledWith([]);
+  });
+
+  it('should call onAggregatesChange when aggregate is updated', async () => {
+    const inputAggregate: AggregateColumn = { aggregateType: AggregateType.Count, column: 'foo', alias: 'f' };
+    const expectedAggregate: AggregateColumn = { aggregateType: AggregateType.Sum, column: 'foo', alias: 'f' };
+    const onAggregatesChange = jest.fn();
+    const result = render(<AggregateEditor allColumns={[]} aggregates={[inputAggregate]} onAggregatesChange={onAggregatesChange} />);
+    expect(result.container.firstChild).not.toBeNull();
+
+    const aggregateSelect = result.getAllByRole('combobox')[0];
+    expect(aggregateSelect).toBeInTheDocument();
+    fireEvent.keyDown(aggregateSelect, { key: 'ArrowDown' });
+    fireEvent.keyDown(aggregateSelect, { key: 'ArrowDown' });
+    fireEvent.keyDown(aggregateSelect, { key: 'Enter' });
+    expect(onAggregatesChange).toBeCalledWith([expectedAggregate]);
   });
 });

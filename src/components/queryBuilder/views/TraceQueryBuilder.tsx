@@ -14,7 +14,7 @@ interface TraceQueryBuilderProps {
 
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const { allColumns, builderOptions, onBuilderOptionsChange } = props;
-  const [isSearchMode, setSearchMode] = useState<boolean>(false);
+  const [isSearchMode, setSearchMode] = useState<boolean>(false); // Toggle for Trace ID vs Trace Search mode
   const [traceIdColumn, setTraceIdColumn] = useState<SelectedColumn>();
   const [spanIdColumn, setSpanIdColumn] = useState<SelectedColumn>();
   const [parentSpanIdColumn, setParentSpanIdColumn] = useState<SelectedColumn>();

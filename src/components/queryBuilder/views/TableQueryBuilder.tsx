@@ -19,7 +19,7 @@ const emptyAggregate: AggregateColumn = { column: '', aggregateType: AggregateTy
 
 export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const { allColumns, builderOptions, onBuilderOptionsChange } = props;
-  const [isAggregateMode, setAggregateMode] = useState<boolean>(false);
+  const [isAggregateMode, setAggregateMode] = useState<boolean>(false); // Toggle Simple vs Aggregate mode
   const [selectedColumns, setSelectedColumns] = useState<SelectedColumn[]>([]);
   const [aggregates, setAggregates] = useState<AggregateColumn[]>([emptyAggregate]);
   const [groupBy, setGroupBy] = useState<string[]>([]);

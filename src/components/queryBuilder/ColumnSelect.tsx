@@ -26,15 +26,13 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     map(c => ({ label: c.name, value: c.name }));
 
   const onChange = (selected: SelectableValue<string>) => {
-    const column = allColumns.find(c => c.name === selected.value);
-    if (column) {
-      onColumnChange({
-        name: column.name,
-        type: column.type,
-        custom: false,
-        hint: columnHint
-      })
-    }
+    const column = allColumns.find(c => c.name === selected.value)!;
+    onColumnChange({
+      name: column.name,
+      type: column.type,
+      custom: false,
+      hint: columnHint
+    });
   }
 
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');

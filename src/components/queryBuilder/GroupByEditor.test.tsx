@@ -25,8 +25,12 @@ describe('GroupByEditor', () => {
 
     const multiSelect = result.getByRole('combobox');
     expect(multiSelect).toBeInTheDocument();
+
+    expect(result.queryAllByText('a').length).toBe(0); // is popup closed
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
+    expect(result.queryAllByText('a').length).toBe(1); // is popup open
     fireEvent.keyDown(multiSelect, { key: 'Enter' });
+    expect(result.queryAllByText('a').length).toBe(0); // is popup closed
     expect(onGroupByChange).toBeCalledTimes(1);
     expect(onGroupByChange).toBeCalledWith(expect.any(Object));
   });
