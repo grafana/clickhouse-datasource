@@ -599,3 +599,4 @@ export function getOper(v: string): FilterOperator {
 }
 
 export const getColumnByHint = (builder: QueryBuilderOptions, hint: ColumnHint): CHSelectedColumn | undefined => builder.columns?.find(c => c.hint === hint);
+export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;

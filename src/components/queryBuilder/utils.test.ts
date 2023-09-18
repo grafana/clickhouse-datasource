@@ -1,5 +1,5 @@
 import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, QueryBuilderOptions } from 'types/queryBuilder';
-import { getColumnByHint, getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isDateTimeType, isDateType, isNumberType } from './utils';
+import { getColumnByHint, getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isAggregateQuery, isDateTimeType, isDateType, isNumberType } from './utils';
 import { ColumnHint, QueryType } from 'types/queryBuilder';
 
 describe('isDateType', () => {
@@ -472,5 +472,15 @@ describe('getColumnByHint', () => {
     const testColumn = { name: 'time', type: 'datetime' };
     const builderOptions = { columns: [testColumn] } as QueryBuilderOptions;
     expect(getColumnByHint(builderOptions, ColumnHint.Time)).toBeUndefined();
+  });
+});
+describe('isAggregateQuery', () => {
+  it('returns true for aggregate query', () => {
+    const builderOptions = { aggregates: [{ column: 'foo', aggregateType: AggregateType.Count }] } as QueryBuilderOptions;
+    expect(isAggregateQuery(builderOptions)).toEqual(true);
+  });
+  it('returns false for query without aggregates', () => {
+    const builderOptions = {} as QueryBuilderOptions;
+    expect(isAggregateQuery(builderOptions)).toEqual(false);
   });
 });

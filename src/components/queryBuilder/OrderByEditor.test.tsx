@@ -1,36 +1,30 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { OrderByEditor, getOrderByFields } from './OrderByEditor';
-import { AggregateType, BuilderMode, ColumnHint, OrderByDirection, QueryType, TableColumn } from 'types/queryBuilder';
+import { OrderByEditor, getOrderByOptions } from './OrderByEditor';
+import { AggregateType, BuilderMode, OrderByDirection, QueryType, TableColumn } from 'types/queryBuilder';
+import { SelectableValue } from '@grafana/data';
 
-const newTestColumn = (name: string): TableColumn => ({
-  name,
-  sortable: true,
-  type: 'String',
-  picklistValues: []
-});
-
-const testColumns: ReadonlyArray<TableColumn> = [
-  newTestColumn('foo'),
-  newTestColumn('bar'),
-  newTestColumn('baz'),
+const testOptions: Array<SelectableValue<string>> = [
+  { label: 'foo', value: 'foo' },
+  { label: 'bar', value: 'bar' },
+  { label: 'baz', value: 'baz' },
 ];
 
 describe('OrderByEditor', () => {
   it('should render null when no fields passed', () => {
-    const result = render(<OrderByEditor allColumns={[]} orderBy={[]} onOrderByChange={() => {}} />);
+    const result = render(<OrderByEditor orderByOptions={[]} orderBy={[]} onOrderByChange={() => {}} />);
     expect(result.container.firstChild).toBeNull();
   });
   it('should render component when fields passed', () => {
     const result = render(
-      <OrderByEditor allColumns={[testColumns[0]]} orderBy={[]} onOrderByChange={() => {}} />
+      <OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={() => {}} />
     );
     expect(result.container.firstChild).not.toBeNull();
   });
   it('should render default add button when no orderby fields passed', () => {
     const result = render(
-      <OrderByEditor allColumns={[testColumns[0]]} orderBy={[]} onOrderByChange={() => {}} />
+      <OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={() => {}} />
     );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId('query-builder-orderby-add-button')).toBeInTheDocument();
@@ -40,7 +34,7 @@ describe('OrderByEditor', () => {
   it('should render remove button when at least one orderby fields passed', () => {
     const result = render(
       <OrderByEditor
-        allColumns={[testColumns[0]]}
+        orderByOptions={[testOptions[0]]}
         orderBy={[{ name: 'foo', dir: OrderByDirection.ASC }]}
         onOrderByChange={() => {}}
       />
@@ -53,7 +47,7 @@ describe('OrderByEditor', () => {
   it('should render add/remove buttons correctly when multiple orderby elements passed', () => {
     const result = render(
       <OrderByEditor
-        allColumns={[testColumns[0]]}
+        orderByOptions={[testOptions[0]]}
         orderBy={[
           { name: 'foo', dir: OrderByDirection.ASC },
           { name: 'bar', dir: OrderByDirection.ASC },
@@ -69,7 +63,7 @@ describe('OrderByEditor', () => {
   it('should render label only once', () => {
     const result = render(
       <OrderByEditor
-        allColumns={[testColumns[0]]}
+        orderByOptions={[testOptions[0]]}
         orderBy={[
           { name: 'foo', dir: OrderByDirection.ASC },
           { name: 'bar', dir: OrderByDirection.ASC },
@@ -84,7 +78,7 @@ describe('OrderByEditor', () => {
     const onOrderByChange = jest.fn();
     const result = render(
       <OrderByEditor
-        allColumns={[testColumns[0]]}
+        orderByOptions={[testOptions[0]]}
         orderBy={[]}
         onOrderByChange={onOrderByChange}
       />
@@ -98,11 +92,11 @@ describe('OrderByEditor', () => {
     expect(onOrderByChange).toBeCalledTimes(1);
     expect(onOrderByChange).toBeCalledWith([{ name: 'foo', dir: OrderByDirection.ASC }]);
   });
-  it('should add and remove items when remove button clicked', async () => {
+  it('should remove items when remove button clicked', async () => {
     const onOrderByChange = jest.fn();
     const result = render(
       <OrderByEditor
-        allColumns={testColumns}
+        orderByOptions={testOptions}
         orderBy={[
           { name: 'foo', dir: OrderByDirection.ASC },
           { name: 'bar', dir: OrderByDirection.ASC },
@@ -126,53 +120,45 @@ describe('OrderByEditor', () => {
   });
 });
 
-describe('getOrderByFields', () => {
-  const sampleFields = [
+describe('getOrderByOptions', () => {
+  const allColumms: ReadonlyArray<TableColumn> = [
     {
       name: 'field1',
-      label: 'field1',
-      type: 'string',
-      picklistValues: [],
-    },
-    {
-      name: 'field11',
-      label: 'field11',
       type: 'string',
       picklistValues: [],
     },
     {
       name: 'field2',
-      label: 'field2',
       type: 'string',
       picklistValues: [],
     },
     {
       name: 'field3',
-      label: 'field3',
+      type: 'string',
+      picklistValues: [],
+    },
+    {
+      name: 'field4',
       type: 'string',
       picklistValues: [],
     },
   ];
-  it('list view', () => {
+
+  it('should return all columns as options', () => {
     expect(
-      getOrderByFields(
+      getOrderByOptions(
         {
           database: 'db',
           table: 'foo',
           queryType: QueryType.Table,
-          mode: BuilderMode.List,
           columns: [{ name: 'field1' }, { name: 'field3' }],
         },
-        sampleFields
+        allColumms
       )
     ).toStrictEqual([
       {
         label: 'field1',
         value: 'field1',
-      },
-      {
-        label: 'field11',
-        value: 'field11',
       },
       {
         label: 'field2',
@@ -182,78 +168,118 @@ describe('getOrderByFields', () => {
         label: 'field3',
         value: 'field3',
       },
+      {
+        label: 'field4',
+        value: 'field4',
+      },
     ]);
   });
-  it('aggregated view - no group by and no aggregates', () => {
+  it('should return only selected columns for aggregate query', () => {
     expect(
-      getOrderByFields(
+      getOrderByOptions(
         {
           database: 'db',
           table: 'foo',
           queryType: QueryType.Table,
-          mode: BuilderMode.Aggregate,
-          columns: [],
-          aggregates: [],
+          columns: [{ name: 'field1' }],
+          aggregates: [{ column: 'field2', aggregateType: AggregateType.Max }],
         },
-        sampleFields
-      )
-    ).toStrictEqual([]);
-  });
-  it('aggregated view - no group by and with two aggregates', () => {
-    expect(
-      getOrderByFields(
-        {
-          database: 'db',
-          table: 'foo',
-          queryType: QueryType.Table,
-          mode: BuilderMode.Aggregate,
-          columns: [],
-          aggregates: [
-            { column: 'field2', aggregateType: AggregateType.Max },
-            { column: 'field1', aggregateType: AggregateType.Sum },
-          ],
-        },
-        sampleFields
+        allColumms
       )
     ).toStrictEqual([
+      {
+        label: 'field1',
+        value: 'field1',
+      },
+      {
+        label: 'max(field2)',
+        value: 'max(field2)',
+      }
+    ]);
+  });
+  it('should return correct label and value for aggregates with aliases', () => {
+    expect(
+      getOrderByOptions(
+        {
+          database: 'db',
+          table: 'foo',
+          queryType: QueryType.Table,
+          aggregates: [{ column: 'field1', aggregateType: AggregateType.Max, alias: 'a' }],
+        },
+        allColumms
+      )
+    ).toStrictEqual([
+      {
+        label: 'max(field1) as a',
+        value: 'a',
+      }
+    ]);
+  });
+  it('should show options from selected columns, aggregates, and groupBy', () => {
+    expect(
+      getOrderByOptions(
+        {
+          database: 'db',
+          table: 'foo',
+          queryType: QueryType.Table,
+          columns: [{ name: 'field1' }],
+          aggregates: [
+            { column: 'field2', aggregateType: AggregateType.Max },
+          ],
+          groupBy: ['field2']
+        },
+        allColumms
+      )
+    ).toStrictEqual([
+      {
+        value: 'field1',
+        label: 'field1',
+      },
       {
         value: 'max(field2)',
         label: 'max(field2)',
       },
       {
-        value: 'sum(field1)',
-        label: 'sum(field1)',
+        value: 'field2',
+        label: 'field2',
       },
     ]);
   });
   it('aggregated view - two group by and with no aggregates', () => {
     expect(
-      getOrderByFields(
+      getOrderByOptions(
         {
           database: 'db',
           table: 'foo',
           queryType: QueryType.Table,
-          mode: BuilderMode.Aggregate,
           columns: [],
           aggregates: [],
           groupBy: ['field3', 'field1'],
         },
-        sampleFields
+        allColumms
       )
     ).toStrictEqual([
+      {
+        value: 'field1',
+        label: 'field1',
+      },
+      {
+        value: 'field2',
+        label: 'field2',
+      },
       {
         value: 'field3',
         label: 'field3',
       },
       {
-        value: 'field1',
-        label: 'field1',
+        value: 'field4',
+        label: 'field4',
       },
     ]);
   });
   it('aggregated view - two group by and with two metrics', () => {
     expect(
-      getOrderByFields(
+      getOrderByOptions(
         {
           database: 'db',
           table: 'foo',
@@ -266,7 +292,7 @@ describe('getOrderByFields', () => {
           ],
           groupBy: ['field3', 'field1'],
         },
-        sampleFields
+        allColumms
       )
     ).toStrictEqual([
       {
@@ -284,38 +310,6 @@ describe('getOrderByFields', () => {
       {
         value: 'field1',
         label: 'field1',
-      },
-    ]);
-  });
-  it('trend view', () => {
-    expect(
-      getOrderByFields(
-        {
-          database: 'db',
-          table: 'foo',
-          queryType: QueryType.Table,
-          mode: BuilderMode.Trend,
-          columns: [{ name: 'field3', type: 'datetime', hint: ColumnHint.Time }],
-          aggregates: [{ column: 'field2', aggregateType: AggregateType.Max }],
-        },
-        sampleFields
-      )
-    ).toStrictEqual([
-      {
-        label: 'field1',
-        value: 'field1',
-      },
-      {
-        label: 'field11',
-        value: 'field11',
-      },
-      {
-        label: 'field2',
-        value: 'field2',
-      },
-      {
-        label: 'field3',
-        value: 'field3',
       },
     ]);
   });

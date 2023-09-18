@@ -4,7 +4,7 @@ import { BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, Selecte
 import { ColumnSelect } from '../ColumnSelect';
 import { Switch } from '../Switch';
 import { OtelVersionSelect } from '../OtelVersionSelect';
-import { OrderByEditor } from '../OrderByEditor';
+import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
@@ -123,7 +123,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         />
       </div>
       <OrderByEditor
-        allColumns={allColumns}
+        orderByOptions={getOrderByOptions(builderOptions, allColumns)}
         orderBy={orderBy}
         onOrderByChange={setOrderBy}
       />

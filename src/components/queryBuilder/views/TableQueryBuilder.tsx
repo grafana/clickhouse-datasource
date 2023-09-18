@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { AggregateColumn, BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, AggregateType } from 'types/queryBuilder';
-import { OrderByEditor } from '../OrderByEditor';
+import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
@@ -83,7 +83,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
       )}
 
       <OrderByEditor
-        allColumns={allColumns}
+        orderByOptions={getOrderByOptions(builderOptions, allColumns)}
         orderBy={orderBy}
         onOrderByChange={setOrderBy}
       />

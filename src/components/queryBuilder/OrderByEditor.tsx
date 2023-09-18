@@ -6,11 +6,10 @@ import {
   OrderByDirection,
   QueryBuilderOptions,
   TableColumn,
-  BuilderMode,
-  AggregateColumn,
 } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { styles } from 'styles';
+import { isAggregateQuery } from './utils';
 
 interface OrderByItemProps {
   columnOptions: Array<SelectableValue<string>>;
@@ -32,7 +31,7 @@ const OrderByItem = (props: OrderByItemProps) => {
       <Select
         value={orderByItem.name}
         className={styles.Common.inlineSelect}
-        width={20}
+        width={36}
         options={columnOptions}
         onChange={e => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
         allowCustomValue={true}
@@ -51,18 +50,17 @@ const OrderByItem = (props: OrderByItemProps) => {
 };
 
 interface OrderByEditorProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  orderByOptions: Array<SelectableValue<string>>;
   orderBy: OrderBy[];
   onOrderByChange: (orderBy: OrderBy[]) => void;
 }
 export const OrderByEditor = (props: OrderByEditorProps) => {
-  const { allColumns, orderBy, onOrderByChange } = props;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
+  const { orderByOptions, orderBy, onOrderByChange } = props;
   const { label, tooltip, addLabel } = allLabels.components.OrderByEditor;
 
   const addOrderByItem = () => {
     const nextOrderBy: OrderBy[] = orderBy.slice();
-    nextOrderBy.push({ name: allColumns[0]?.name, dir: OrderByDirection.ASC });
+    nextOrderBy.push({ name: orderByOptions[0]?.value!, dir: OrderByDirection.ASC });
     onOrderByChange(nextOrderBy);
   };
   const removeOrderByItem = (index: number) => {
@@ -76,7 +74,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
     onOrderByChange(nextOrderBy);
   };
 
-  if (allColumns.length === 0) {
+  if (orderByOptions.length === 0) {
     return null;
   }
 
@@ -100,7 +98,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
           <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
             { index === 0 ? fieldLabel : fieldSpacer }
             <OrderByItem
-              columnOptions={columnOptions}
+              columnOptions={orderByOptions}
               index={index}
               orderByItem={orderByItem}
               updateOrderByItem={updateOrderByItem}
@@ -134,34 +132,37 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
   );
 };
 
-export const getOrderByFields = (
-  builder: QueryBuilderOptions,
-  allColumns: ReadonlyArray<TableColumn>
-): Array<SelectableValue<string>> => {
-  let values: Array<SelectableValue<string>> | Array<{ value: string; label: string }> = [];
-  switch (builder.mode) {
-    case BuilderMode.Aggregate:
-      values = [
-        ...(builder.columns || []).map((g) => {
-          return { value: g.name, label: g.name };
-        }),
-        ...((builder.aggregates as AggregateColumn[]) || []).map((m) => {
-          return { value: `${m.aggregateType}(${m.column})`, label: `${m.aggregateType}(${m.column})` };
-        }),
-        ...((builder.groupBy as string[]) || []).map((g) => {
-          return { value: g, label: g };
-        }),
-      ];
-      break;
-    case BuilderMode.List:
-    default:
-      values = allColumns.map((m) => {
-        return { label: m.name, value: m.name };
-      });
+export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: ReadonlyArray<TableColumn>): Array<SelectableValue<string>> => {
+  let allOptions: Array<SelectableValue<string>> = [];
+
+  if (isAggregateQuery(builder)) {
+    builder.columns?.forEach(c => {
+      allOptions.push({ label: c.name, value: c.name });
+    });
+
+    builder.aggregates!.forEach(a => {
+      let label = `${a.aggregateType}(${a.column})`;
+      let value = label;
+
+      if (a.alias) {
+        label += ` as ${a.alias}`;
+        value = a.alias;
+      }
+
+      allOptions.push({ label, value });
+    });
+
+    if (builder.groupBy && builder.groupBy.length > 0) {
+      builder.groupBy.forEach(g => allOptions.push({ label: g, value: g }));
+    }
+  } else {
+    allColumns.forEach(c => allOptions.push({ label: c.name, value: c.name }));
   }
+
   // Add selected value to the list if it does not exist.
-  builder.orderBy
-    ?.filter(x => !values.some((y: { value: string; label: string } | SelectableValue<string>) => y.value === x.name))
-    .forEach(x => values.push({ value: x.name, label: x.name }));
-  return values;
+  const allValues = new Set(allOptions.map(o => o.value));
+  const customValues = builder.orderBy?.filter(o => !allValues.has(o.name));
+  customValues?.forEach(o => allOptions.push({ label: o.name, value: o.name }));
+
+  return allOptions;
 };
