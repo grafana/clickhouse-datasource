@@ -29,10 +29,6 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const labels = allLabels.components.TableQueryBuilder;
 
   useEffect(() => {
-    if (!builderOptions) {
-      return;
-    }
-
     builderOptions.aggregates && setAggregateMode(builderOptions.aggregates.length > 0);
     builderOptions.columns && setSelectedColumns(builderOptions.columns);
     builderOptions.aggregates && setAggregates(builderOptions.aggregates);

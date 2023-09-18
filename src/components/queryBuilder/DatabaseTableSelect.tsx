@@ -21,6 +21,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
   options.push({ label: empty, value: '' }); // Allow a blank value
 
   // Add selected value to the list if it does not exist.
+  // When loading an existing query, the saved value may no longer be in the list
   if (database && !databases.includes(database)) {
     options.push({ label: database, value: database });
   }
@@ -28,7 +29,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
   useEffect(() => {
     // Auto select default db
     if (!database) {
-      onDatabaseChange(datasource.getDefaultDatabase() || 'default');
+      onDatabaseChange(datasource.getDefaultDatabase());
     }
   }, [datasource, database, onDatabaseChange]);
 

@@ -30,10 +30,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const labels = allLabels.components.TraceQueryBuilder;
 
   useEffect(() => {
-    if (!builderOptions) {
-      return;
-    }
-
     builderOptions.meta?.isTraceSearchMode !== undefined && setSearchMode(builderOptions.meta.isTraceSearchMode);
     setTraceIdColumn(getColumnByHint(builderOptions, ColumnHint.TraceId));
     setSpanIdColumn(getColumnByHint(builderOptions, ColumnHint.TraceSpanId));

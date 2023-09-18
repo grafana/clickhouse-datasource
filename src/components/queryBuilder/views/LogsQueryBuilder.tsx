@@ -31,10 +31,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   const labels = allLabels.components.LogsQueryBuilder;
 
   useEffect(() => {
-    if (!builderOptions) {
-      return;
-    }
-
     builderOptions.meta?.otelEnabled !== undefined && setOtelEnabled(builderOptions.meta.otelEnabled);
     builderOptions.meta?.otelVersion && setOtelVersion(builderOptions.meta.otelVersion);
     setTimeColumn(getColumnByHint(builderOptions, ColumnHint.Time));

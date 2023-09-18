@@ -362,8 +362,8 @@ export class Datasource
     return value;
   }
 
-  getDefaultDatabase() {
-    return this.settings.jsonData.defaultDatabase;
+  getDefaultDatabase(): string {
+    return this.settings.jsonData.defaultDatabase || 'default';
   }
 
   async fetchDatabases(): Promise<string[]> {

@@ -32,10 +32,6 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const labels = allLabels.components.TimeSeriesQueryBuilder;
 
   useEffect(() => {
-    if (!builderOptions) {
-      return;
-    }
-
     builderOptions.aggregates && setAggregateMode(builderOptions.aggregates.length > 0);
     setTimeColumn(getColumnByHint(builderOptions, ColumnHint.Time));
     builderOptions.columns && setSelectedColumns(builderOptions.columns.filter(c => c.hint === undefined));
