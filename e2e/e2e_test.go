@@ -24,6 +24,7 @@ var runTests = &cobra.Command{
 }
 
 var testFailures = 0
+var nodeVersion = "node:18.11.0"
 
 func e2eTests(cmd *cobra.Command, args []string) {
 	ctx := cmd.Context()
@@ -115,7 +116,7 @@ func getNodeModules(client *dagger.Client) *dagger.Directory {
 	)
 
 	return client.Container().
-		From("node:16.13.2").
+		From(nodeVersion).
 		WithWorkdir("./src").
 		WithFile("./package.json", packageJSON).
 		WithFile("./yarn.lock", yarnLock).
