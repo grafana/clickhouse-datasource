@@ -1,8 +1,9 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { Select } from '@grafana/ui';
 import { selectors } from './../../selectors';
 import { FullField } from 'types';
+import { EditorField } from '@grafana/experimental';
 
 interface TimeFieldEditorProps {
   fieldsList: FullField[];
@@ -23,17 +24,13 @@ export const TimeFieldEditor = (props: TimeFieldEditorProps) => {
     return matchedColumn ? matchedColumn.type : '';
   };
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <EditorField tooltip={tooltip} label={label}>
       <Select
         options={columns}
-        width={20}
+        width={25}
         onChange={(e) => props.onTimeFieldChange(e.value, getColumnType(e.value))}
         value={props.timeField}
-        menuPlacement={'bottom'}
       />
-    </div>
+    </EditorField>
   );
 };

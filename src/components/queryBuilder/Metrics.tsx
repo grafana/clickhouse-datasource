@@ -4,6 +4,7 @@ import { InlineFormLabel, Select, Button, Input } from '@grafana/ui';
 import { BuilderMetricField, BuilderMetricFieldAggregation, FullField } from './../../types';
 import { selectors } from './../../selectors';
 import { styles } from '../../styles';
+import { EditorField, EditorFieldGroup } from '@grafana/experimental';
 
 const MetricEditor = (props: {
   fieldsList: FullField[];
@@ -46,17 +47,16 @@ const MetricEditor = (props: {
     onMetricsChange(newMetrics);
   };
   return (
-    <>
+    <EditorFieldGroup>
       <Select
-        width={20}
+        width={25}
         className={styles.Common.inlineSelect}
         options={aggregationTypes}
         onChange={(e) => onMetricAggregationChange(e.value!)}
         value={metric.aggregation}
-        menuPlacement={'bottom'}
       />
       <Select<string>
-        width={28}
+        width={25}
         className={styles.Common.inlineSelect}
         options={columns}
         isOpen={isOpen}
@@ -64,19 +64,18 @@ const MetricEditor = (props: {
         onCloseMenu={() => setIsOpen(false)}
         onChange={onMetricFieldChange}
         value={metric.field}
-        menuPlacement={'bottom'}
       />
       <InlineFormLabel width={2} className="query-keyword">
         {ALIAS.label}
       </InlineFormLabel>
       <Input
-        width={20}
+        width={25}
         value={alias}
         onChange={(e) => setAlias(e.currentTarget.value)}
         onBlur={onMetricAliasChange}
         placeholder="alias"
       />
-    </>
+    </EditorFieldGroup>
   );
 };
 
@@ -98,40 +97,32 @@ export const MetricsEditor = (props: MetricsEditorProps) => {
     onMetricsChange(newMetrics);
   };
   return (
-    <>
-      {metrics.map((metric, index) => {
-        return (
-          <div className="gf-form" key={index}>
-            {index === 0 ? (
-              <InlineFormLabel width={8} className="query-keyword" tooltip={tooltipAggregate}>
-                {label}
-              </InlineFormLabel>
-            ) : (
-              <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-            )}
-            <MetricEditor
-              fieldsList={fieldsList}
-              index={index}
-              metric={metric}
-              metrics={metrics}
-              onMetricsChange={onMetricsChange}
-            />
-            {metrics.length > 1 && (
-              <Button
-                icon="trash-alt"
-                size="sm"
-                variant="destructive"
-                className={styles.Common.smallBtn}
-                onClick={() => onMetricRemove(index)}
-              >
-                {RemoveLabel}
-              </Button>
-            )}
-          </div>
-        );
-      })}
-      <div className="gf-form">
-        <div className={`width-8 ${styles.Common.firstLabel}`}></div>
+    <EditorField tooltip={tooltipAggregate} label={label}>
+      <EditorFieldGroup>
+        {metrics.map((metric, index) => {
+          return (
+            <div className="gf-form" key={index}>
+              <MetricEditor
+                fieldsList={fieldsList}
+                index={index}
+                metric={metric}
+                metrics={metrics}
+                onMetricsChange={onMetricsChange}
+              />
+              {metrics.length > 1 && (
+                <Button
+                  icon="trash-alt"
+                  size="sm"
+                  variant="destructive"
+                  className={styles.Common.smallBtn}
+                  onClick={() => onMetricRemove(index)}
+                >
+                  {RemoveLabel}
+                </Button>
+              )}
+            </div>
+          );
+        })}
         <Button
           icon="plus-circle"
           size="sm"
@@ -141,7 +132,7 @@ export const MetricsEditor = (props: MetricsEditorProps) => {
         >
           {AddLabel}
         </Button>
-      </div>
-    </>
+      </EditorFieldGroup>
+    </EditorField>
   );
 };
