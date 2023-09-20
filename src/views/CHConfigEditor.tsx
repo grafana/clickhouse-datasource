@@ -4,7 +4,7 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, Field, SecretInput, Button, InlineField, InlineFieldRow } from '@grafana/ui';
+import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from './../selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, Protocol } from './../types';
@@ -357,8 +357,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         <ConfigSubSection title="Custom Settings">
           {customSettings.map(({ setting, value }, i) => {
             return (
-              <InlineFieldRow key={i}>
-                <InlineField label={`Setting`} aria-label={`Setting`}>
+              <HorizontalGroup key={i}>
+                <Field label={`Setting`} aria-label={`Setting`}>
                   <Input
                     value={setting}
                     placeholder={'Setting'}
@@ -371,8 +371,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
                       onCustomSettingsChange(customSettings);
                     }}
                   ></Input>
-                </InlineField>
-                <InlineField label={'Value'} aria-label={`Value`}>
+                </Field>
+                <Field label={'Value'} aria-label={`Value`}>
                   <Input
                     value={value}
                     placeholder={'Value'}
@@ -385,8 +385,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
                       onCustomSettingsChange(customSettings);
                     }}
                   ></Input>
-                </InlineField>
-              </InlineFieldRow>
+                </Field>
+              </HorizontalGroup>
             );
           })}
           <Button
