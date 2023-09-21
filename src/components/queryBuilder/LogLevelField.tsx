@@ -1,8 +1,9 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { Select } from '@grafana/ui';
 import { selectors } from './../../selectors';
 import { FullField } from 'types';
+import { EditorField } from '@grafana/experimental';
 
 interface LogLevelEditorProps {
   fieldsList: FullField[];
@@ -16,18 +17,14 @@ export const LogLevelFieldEditor = (props: LogLevelEditorProps) => {
     .filter((f) => f.name !== '*')
     .map((f) => ({ label: f.label, value: f.name }));
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <EditorField tooltip={tooltip} label={label}>
       <Select
         options={columns}
-        width={20}
+        width={25}
         onChange={(e) => props.onLogLevelFieldChange(e?.value ?? e)}
-        menuPlacement={'bottom'}
         value={props.logLevelField}
         isClearable={true}
       />
-    </div>
+    </EditorField>
   );
 };

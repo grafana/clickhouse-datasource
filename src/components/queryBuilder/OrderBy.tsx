@@ -1,6 +1,6 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Select } from '@grafana/ui';
+import { Button, Select } from '@grafana/ui';
 import {
   OrderBy,
   OrderByDirection,
@@ -12,6 +12,7 @@ import {
 } from './../../types';
 import { selectors } from './../../selectors';
 import { styles } from '../../styles';
+import { EditorField, EditorFieldGroup, EditorRow } from '@grafana/experimental';
 
 const OrderByItem = (props: {
   index: number;
@@ -39,7 +40,7 @@ const OrderByItem = (props: {
     props.onOrderByItemsChange(orderByItems);
   };
   return (
-    <>
+    <EditorFieldGroup>
       <Select
         value={orderByItem.name}
         className={styles.Common.inlineSelect}
@@ -57,7 +58,7 @@ const OrderByItem = (props: {
         onChange={(e) => onOrderBySortDirectionUpdate(e.value!)}
         menuPlacement={'bottom'}
       />
-    </>
+    </EditorFieldGroup>
   );
 };
 
@@ -83,40 +84,12 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
     props.onOrderByItemsChange(orderByItems);
   };
   return columns.length === 0 ? null : (
-    <>
-      {props.orderBy.length === 0 ? (
-        <div className="gf-form">
-          <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-            {label}
-          </InlineFormLabel>
-          <Button
-            data-testid="query-builder-orderby-add-button"
-            icon="plus-circle"
-            variant="secondary"
-            size="sm"
-            onClick={onOrderByAdd}
-            className={styles.Common.smallBtn}
-          >
-            {AddLabel}
-          </Button>
-        </div>
-      ) : (
-        <>
+    <EditorRow>
+      <EditorField tooltip={tooltip} label={label}>
+        <EditorFieldGroup>
           {props.orderBy.map((o, index) => {
             return (
               <div className="gf-form" key={index} data-testid="query-builder-orderby-item-wrapper">
-                {index === 0 ? (
-                  <InlineFormLabel
-                    width={8}
-                    className="query-keyword"
-                    data-testid="query-builder-orderby-item-label"
-                    tooltip={tooltip}
-                  >
-                    {label}
-                  </InlineFormLabel>
-                ) : (
-                  <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-                )}
                 <OrderByItem
                   index={index}
                   orderBy={props.orderBy}
@@ -137,22 +110,19 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
               </div>
             );
           })}
-          <div className="gf-form">
-            <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-            <Button
-              data-testid="query-builder-orderby-inline-add-button"
-              icon="plus-circle"
-              variant="secondary"
-              size="sm"
-              onClick={onOrderByAdd}
-              className={styles.Common.smallBtn}
-            >
-              {AddLabel}
-            </Button>
-          </div>
-        </>
-      )}
-    </>
+          <Button
+            data-testid="query-builder-orderby-add-button"
+            icon="plus-circle"
+            variant="secondary"
+            size="sm"
+            onClick={onOrderByAdd}
+            className={styles.Common.smallBtn}
+          >
+            {AddLabel}
+          </Button>
+        </EditorFieldGroup>
+      </EditorField>
+    </EditorRow>
   );
 };
 

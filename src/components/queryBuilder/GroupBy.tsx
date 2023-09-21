@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { InlineFormLabel, MultiSelect } from '@grafana/ui';
+import { MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { FullField } from './../../types';
 import { selectors } from './../../selectors';
-import { styles } from '../../styles';
+import { EditorField } from '@grafana/experimental';
 
 interface GroupByEditorProps {
   fieldsList: FullField[];
@@ -22,24 +22,19 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
   // Add selected value to the list if it does not exist.
   groupBy.filter((x) => !columns.some((y) => y.value === x)).forEach((x) => columns.push({ value: x, label: x }));
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <div data-testid="query-builder-group-by-multi-select-container" className={styles.Common.selectWrapper}>
-        <MultiSelect
-          options={columns}
-          placeholder="(Optional) Click here to choose"
-          isOpen={isOpen}
-          onOpenMenu={() => setIsOpen(true)}
-          onCloseMenu={() => setIsOpen(false)}
-          onChange={onChange}
-          onBlur={() => props.onGroupByChange(groupBy)}
-          value={groupBy}
-          allowCustomValue={true}
-          menuPlacement={'bottom'}
-        />
-      </div>
-    </div>
+    <EditorField tooltip={tooltip} label={label}>
+      <MultiSelect
+        options={columns}
+        placeholder="Choose"
+        isOpen={isOpen}
+        onOpenMenu={() => setIsOpen(true)}
+        onCloseMenu={() => setIsOpen(false)}
+        onChange={onChange}
+        onBlur={() => props.onGroupByChange(groupBy)}
+        value={groupBy}
+        allowCustomValue={true}
+        width={25}
+      />
+    </EditorField>
   );
 };

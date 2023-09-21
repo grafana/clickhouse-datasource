@@ -15,11 +15,8 @@ import { SQLEditor } from 'components/SQLEditor';
 import { getSQLFromQueryOptions } from 'components/queryBuilder/utils';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { Preview } from 'components/queryBuilder/Preview';
-import { QueryTypeSwitcher } from 'components/QueryTypeSwitcher';
-import { FormatSelect } from '../components/FormatSelect';
-import { Button } from '@grafana/ui';
-import { styles } from 'styles';
 import { getFormat } from 'components/editor';
+import { QueryHeader } from 'components/QueryHeader';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -89,41 +86,9 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
     }
   }, [query, onChange]);
 
-  const runQuery = () => {
-    if (query.queryType === QueryType.SQL) {
-      const format = getFormat(query.rawSql, query.selectedFormat);
-      if (format !== query.format) {
-        onChange({ ...query, format });
-      }
-    }
-    onRunQuery();
-  };
-
-  const onFormatChange = (selectedFormat: Format) => {
-    switch (query.queryType) {
-      case QueryType.SQL:
-        onChange({ ...query, format: getFormat(query.rawSql, selectedFormat), selectedFormat });
-      case QueryType.Builder:
-      default:
-        if (selectedFormat === Format.AUTO) {
-          let builderOptions = (query as CHBuilderQuery).builderOptions;
-          const format = builderOptions && builderOptions.mode === BuilderMode.Trend ? Format.TIMESERIES : Format.TABLE;
-          onChange({ ...query, format, selectedFormat });
-        } else {
-          onChange({ ...query, format: selectedFormat, selectedFormat });
-        }
-    }
-  };
-
   return (
     <>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
-        <span>
-          <QueryTypeSwitcher {...props} />
-        </span>
-        <Button onClick={() => runQuery()}>Run Query</Button>
-      </div>
-      <FormatSelect format={query.selectedFormat ?? Format.AUTO} onChange={onFormatChange} />
+      <QueryHeader query={query} onChange={onChange} onRunQuery={onRunQuery} />
       <CHEditorByType {...props} />
     </>
   );
