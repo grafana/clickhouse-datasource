@@ -27,6 +27,7 @@ import { isDateTimeType, isDateType } from './utils';
 import { selectors } from '../../selectors';
 import { LogLevelFieldEditor } from './LogLevelField';
 import { CoreApp } from '@grafana/data';
+import { EditorFieldGroup, EditorRow, EditorRows } from '@grafana/experimental';
 
 interface QueryBuilderProps {
   builderOptions: SqlBuilderOptions;
@@ -204,68 +205,80 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   };
   const fieldsList = getFieldList();
   return builder ? (
-    <>
-      <div className="gf-form">
-        <DatabaseSelect datasource={props.datasource} value={builder.database} onChange={onDatabaseChange} />
-        <ModeEditor mode={builder.mode} onModeChange={onModeChange} />
-      </div>
-      <div className="gf-form">
-        <TableSelect
-          datasource={props.datasource}
-          database={builder.database}
-          table={builder.table}
-          onTableChange={onTableChange}
-        />
-      </div>
+    <EditorRows>
+      <EditorRow>
+        <EditorFieldGroup>
+          <DatabaseSelect datasource={props.datasource} value={builder.database} onChange={onDatabaseChange} />
+          <TableSelect
+            datasource={props.datasource}
+            database={builder.database}
+            table={builder.table}
+            onTableChange={onTableChange}
+          />
+          <ModeEditor mode={builder.mode} onModeChange={onModeChange} />
+        </EditorFieldGroup>
+      </EditorRow>
       {builder.mode === BuilderMode.Trend && (
-        <TimeFieldEditor
-          timeField={builder.timeField}
-          timeFieldType={builder.timeFieldType}
-          onTimeFieldChange={onTimeFieldChange}
-          fieldsList={fieldsList}
-          timeFieldTypeCheckFn={isDateType}
-          labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.TIME_FIELD}
-        />
+        <EditorRow>
+          <TimeFieldEditor
+            timeField={builder.timeField}
+            timeFieldType={builder.timeFieldType}
+            onTimeFieldChange={onTimeFieldChange}
+            fieldsList={fieldsList}
+            timeFieldTypeCheckFn={isDateType}
+            labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.TIME_FIELD}
+          />
+        </EditorRow>
       )}
       {
         // Time and LogLevel fields selection for Logs Volume histogram in the Explore mode
         builder.mode === BuilderMode.List && props.format === Format.LOGS && props.app === CoreApp.Explore && (
-          <>
-            <TimeFieldEditor
-              timeField={timeField}
-              timeFieldType={builder.timeFieldType}
-              onTimeFieldChange={onTimeFieldChange}
-              fieldsList={fieldsList}
-              timeFieldTypeCheckFn={isDateTimeType}
-              labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.LOGS_VOLUME_TIME_FIELD}
-            />
-            <LogLevelFieldEditor
-              logLevelField={logLevelField}
-              fieldsList={fieldsList}
-              onLogLevelFieldChange={onLogLevelFieldChange}
-            />
-          </>
+          <EditorRow>
+            <EditorFieldGroup>
+              <TimeFieldEditor
+                timeField={timeField}
+                timeFieldType={builder.timeFieldType}
+                onTimeFieldChange={onTimeFieldChange}
+                fieldsList={fieldsList}
+                timeFieldTypeCheckFn={isDateTimeType}
+                labelAndTooltip={selectors.components.QueryEditor.QueryBuilder.LOGS_VOLUME_TIME_FIELD}
+              />
+              <LogLevelFieldEditor
+                logLevelField={logLevelField}
+                fieldsList={fieldsList}
+                onLogLevelFieldChange={onLogLevelFieldChange}
+              />
+            </EditorFieldGroup>
+          </EditorRow>
         )
       }
       {builder.mode !== BuilderMode.Trend && (
-        <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
+        <EditorRow>
+          <FieldsEditor fields={builder.fields || []} onFieldsChange={onFieldsChange} fieldsList={fieldsList} />
+        </EditorRow>
       )}
 
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
-        <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
+        <EditorRow>
+          <MetricsEditor metrics={builder.metrics || []} onMetricsChange={onMetricsChange} fieldsList={fieldsList} />
+        </EditorRow>
       )}
-      <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
+      <EditorRow>
+        <FiltersEditor filters={builder.filters || []} onFiltersChange={onFiltersChange} fieldsList={fieldsList} />
+      </EditorRow>
       {(builder.mode === BuilderMode.Aggregate || builder.mode === BuilderMode.Trend) && (
-        <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
+        <EditorRow>
+          <GroupByEditor groupBy={builder.groupBy || []} onGroupByChange={onGroupByChange} fieldsList={fieldsList} />
+        </EditorRow>
       )}
-      <>
-        <OrderByEditor
-          orderBy={builder.orderBy || []}
-          onOrderByItemsChange={onOrderByChange}
-          fieldsList={getOrderByFields(builder, fieldsList)}
-        />
+      <OrderByEditor
+        orderBy={builder.orderBy || []}
+        onOrderByItemsChange={onOrderByChange}
+        fieldsList={getOrderByFields(builder, fieldsList)}
+      />
+      <EditorRow>
         <LimitEditor limit={builder.limit || 20} onLimitChange={onLimitChange} />
-      </>
-    </>
+      </EditorRow>
+    </EditorRows>
   ) : null;
 };

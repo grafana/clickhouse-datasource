@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
+import { RadioButtonGroup, ConfirmModal } from '@grafana/ui';
 import { getQueryOptionsFromSql, getSQLFromQueryOptions } from './queryBuilder/utils';
 import { selectors } from './../selectors';
 import { CHQuery, QueryType, defaultCHBuilderQuery, SqlBuilderOptions, CHSQLQuery } from 'types';
@@ -9,12 +9,10 @@ import { isString } from 'lodash';
 interface QueryTypeSwitcherProps {
   query: CHQuery;
   onChange: (query: CHQuery) => void;
-  onRunQuery: () => void;
 }
 
-export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
-  const { query, onChange } = props;
-  const { label, tooltip, options: queryTypeLabels, switcher, cannotConvert } = selectors.components.QueryEditor.Types;
+export const QueryTypeSwitcher = ({ query, onChange }: QueryTypeSwitcherProps) => {
+  const { options: queryTypeLabels, switcher, cannotConvert } = selectors.components.QueryEditor.Types;
   let queryType: QueryType =
     query.queryType ||
     ((query as CHSQLQuery).rawSql && !(query as CHQuery).queryType ? QueryType.SQL : QueryType.Builder);
@@ -71,10 +69,7 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   };
   return (
     <>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <RadioButtonGroup options={options} value={editor} onChange={(e) => onQueryTypeChange(e!)} />
+      <RadioButtonGroup size="sm" options={options} value={editor} onChange={(e) => onQueryTypeChange(e!)} />
       <ConfirmModal
         isOpen={confirmModalState}
         title={switcher.title}
