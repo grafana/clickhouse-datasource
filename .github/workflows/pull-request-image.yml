@@ -99,7 +99,27 @@ jobs:
     runs-on: ubuntu-latest
     needs: push_to_registry
     steps:
+      - name: Find previous comment (if any)
+        uses: peter-evans/find-comment@v2
+        id: fc
+        with:
+          issue-number: ${{ github.event.number }}
+          body-includes: Use the following command to run this PR with Docker
+      - name: Update comment on PR
+        if: steps.fc.outputs.comment-id != ''
+        uses: peter-evans/create-or-update-comment@v3
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          edit-mode: replace
+          issue-number: ${{ github.event.number }}
+          body: |
+            Use the following command to run this PR with Docker at http://localhost:3000:
+
+              ```
+              docker run --rm -p 3000:3000 grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
+              ```
       - name: Add comment to PR
+        if: steps.fc.outputs.comment-id == ''
         uses: peter-evans/create-or-update-comment@v3
         with:
           issue-number: ${{ github.event.number }}
