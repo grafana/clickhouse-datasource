@@ -44,7 +44,7 @@ func e2eTests(cmd *cobra.Command, args []string) {
 
 	// run e2e tests
 	fmt.Println("Starting k6 tests")
-	runk6(client, ctx, grafanaContainer, client.Host().File("e2e/e2ek6.test.js"))
+	runK6(client, ctx, grafanaContainer, client.Host().File("e2e/e2ek6.test.js"))
 	fmt.Println("k6 tests ran")
 
 	//check if e2e tests pass
@@ -179,7 +179,7 @@ func startClickHouse(client *dagger.Client, ctx context.Context) *dagger.Contain
 	return container
 }
 
-func runk6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.Container, testFile *dagger.File) {
+func runK6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.Container, testFile *dagger.File) {
 	value, err := client.
 		Container().
 		From("grafana/k6:master-with-browser").
