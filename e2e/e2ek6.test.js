@@ -47,7 +47,6 @@ export async function login(page) {
     await passwordInput.type('admin');
     const submitButton = page.locator(`button[aria-label="${selectors.pages.Login.submit}"]`)
     await submitButton.click();
- 
     // checks page for skip change password screen
     check(page, {
       'change password is presented':
