@@ -194,11 +194,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
       <Divider />
       <ConfigSection title="Credentials">
         <Field
-          required
           label={Components.ConfigEditor.Username.label}
           description={Components.ConfigEditor.Username.tooltip}
-          invalid={!jsonData.username}
-          error={'Username is required'}
         >
           <Input
             name="user"

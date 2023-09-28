@@ -7,8 +7,17 @@ import { URL } from 'https://jslib.k6.io/url/1.0.0/index.js';
 import { textSummary } from 'https://jslib.k6.io/k6-summary/0.0.1/index.js';
 import { selectors } from 'https://unpkg.com/@grafana/e2e-selectors@9.4.3/dist/index.js';
 
-const GRAFANA_HOST = `grafana`;
-const CLICKHOUSE_HOST = `clickhouse`;
+const getEnvVariables = () => {
+  if (__ENV.TEST_ENV === "local") {
+    return {
+      GRAFANA_HOST: "localhost"
+    }
+  }
+  return {
+    GRAFANA_HOST: "grafana",
+  }
+};
+const GRAFANA_HOST = getEnvVariables().GRAFANA_HOST;
 const DASHBOARD_TITLE = `e2e-test-dashboard-${uuidv4()}`;
 const DATASOURCE_NAME = `ClickHouse-e2e-test-${uuidv4()}`;
 let datasourceUID;
@@ -68,7 +77,7 @@ export async function addDatasource(page) {
     dataSourceName.fill('');
     dataSourceName.type(DATASOURCE_NAME);
     const serverAddress = page.locator(`input[aria-label="Server address"]`);
-    serverAddress.type(CLICKHOUSE_HOST);
+    serverAddress.type('clickhouse');
     const serverPort = page.locator('input[aria-label="Server port"]');
     serverPort.type('9000');
     const saveAndTestButton = page.locator(`button[data-testid="data-testid ${selectors.pages.DataSource.saveAndTest}"]`);
@@ -230,7 +239,7 @@ export function handleSummary(data) {
 
   return {
     'stdout': textSummary(data, { indent: ' ', enableColors: true}),
-    'e2e/test_summary.json': JSON.stringify(data), 
+    'test_summary.json': JSON.stringify(data), 
   };
 }
 
