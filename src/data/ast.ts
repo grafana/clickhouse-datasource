@@ -11,9 +11,6 @@ export function sqlToStatement(sql: string): Statement {
   let regExpArray: RegExpExecArray | null;
   while ((regExpArray = re.exec(sql)) !== null) {
     let n = regExpArray[0];
-    if (n.toLowerCase() === "settings") {
-      n = sql.substring(regExpArray.index)
-    }
     replaceFuncs.push({ startIndex: regExpArray.index, name: n, replacementName: '' });
   }
 
@@ -23,7 +20,7 @@ export function sqlToStatement(sql: string): Statement {
     const replacementName = 'f' + (Math.random() + 1).toString(36).substring(7);
     replaceFuncs[i].replacementName = replacementName;
     // settings do not parse and we do not need information from them so we will remove them
-    if (replaceFuncs[i].name.toLowerCase().includes("settings")) {
+    if (replaceFuncs[i].name.toLowerCase() === "settings") {
       sql = sql.substring(0, si)
       continue;
     }
@@ -106,8 +103,4 @@ export function getFields(sql: string): string[] {
       return `${exprName}`;
     }
   });
-}
-
-export function statementToSql(stm: Statement): string {
-  return toSql.statement(stm);
 }
