@@ -10,8 +10,7 @@ export function sqlToStatement(sql: string): Statement {
   const re = /(\$__|\$|default|settings)/gi;
   let regExpArray: RegExpExecArray | null;
   while ((regExpArray = re.exec(sql)) !== null) {
-    let n = regExpArray[0];
-    replaceFuncs.push({ startIndex: regExpArray.index, name: n, replacementName: '' });
+    replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
   }
 
   //need to process in reverse so starting positions aren't effected by replacing other things
