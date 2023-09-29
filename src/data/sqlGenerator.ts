@@ -136,7 +136,7 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
   const alias = 'duration';
   switch (timeUnit) {
     case TimeUnit.Seconds:
-      return `intMul(${columnIdentifier}, 1000) as ${alias}`;
+      return `multiply(${columnIdentifier}, 1000) as ${alias}`;
     case TimeUnit.Milliseconds:
       return `${columnIdentifier} as ${alias}`;
     case TimeUnit.Microseconds:
