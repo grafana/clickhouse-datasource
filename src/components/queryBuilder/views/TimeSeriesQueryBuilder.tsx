@@ -27,14 +27,14 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const [aggregates, setAggregates] = useState<AggregateColumn[]>([emptyAggregate]);
   const [groupBy, setGroupBy] = useState<string[]>([]);
   const [orderBy, setOrderBy] = useState<OrderBy[]>([]);
-  const [limit, setLimit] = useState<number>(100);
+  const [limit, setLimit] = useState<number>(1000);
   const [filters, setFilters] = useState<Filter[]>([]);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
 
   useEffect(() => {
     builderOptions.aggregates && setAggregateMode(builderOptions.aggregates.length > 0);
     setTimeColumn(getColumnByHint(builderOptions, ColumnHint.Time));
-    builderOptions.columns && setSelectedColumns(builderOptions.columns.filter(c => c.hint === undefined));
+    builderOptions.columns && setSelectedColumns(builderOptions.columns.filter(c => c.hint !== ColumnHint.Time));
     builderOptions.aggregates && setAggregates(builderOptions.aggregates);
     builderOptions.groupBy && setGroupBy(builderOptions.groupBy);
     builderOptions.orderBy && setOrderBy(builderOptions.orderBy);

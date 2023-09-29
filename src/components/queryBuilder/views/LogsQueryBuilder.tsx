@@ -36,7 +36,12 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     setTimeColumn(getColumnByHint(builderOptions, ColumnHint.Time));
     setLogLevelColumn(getColumnByHint(builderOptions, ColumnHint.LogLevel));
     setMessageColumn(getColumnByHint(builderOptions, ColumnHint.LogMessage));
-    builderOptions.columns && setSelectedColumns(builderOptions.columns.filter(c => c.hint === undefined));
+    builderOptions.columns && setSelectedColumns(builderOptions.columns.filter(c => (
+      // Only select columns that don't have their own box
+      c.hint !== ColumnHint.Time &&
+      c.hint !== ColumnHint.LogLevel &&
+      c.hint !== ColumnHint.LogMessage
+    )));
     builderOptions.meta?.liveView && setLiveView(builderOptions.meta.liveView);
     builderOptions.orderBy && setOrderBy(builderOptions.orderBy);
     builderOptions.limit && setLimit(builderOptions.limit);

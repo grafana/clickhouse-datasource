@@ -44,16 +44,24 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     const selectedColumnNames = new Set<string>(selected.map(s => s.value!));
     const customColumnNames = new Set<string>(customColumns.map(c => c.value!))
     const columnMap = new Map<string, TableColumn>();
+    const currentColumnMap = new Map<string, SelectedColumn>();
     allColumns.forEach(c => columnMap.set(c.name, c));
+    selectedColumns.forEach(c => currentColumnMap.set(c.name, c));
 
     const nextSelectedColumns: SelectedColumn[] = [];
     for (let columnName of selectedColumnNames) {
       const tableColumn = columnMap.get(columnName);
-      nextSelectedColumns.push({
-        name: columnName,
-        type: tableColumn?.type || 'String',
-        custom: customColumnNames.has(columnName)
-      });
+      const existingColumn = currentColumnMap.get(columnName);
+
+      if (existingColumn) {
+        nextSelectedColumns.push(existingColumn);
+      } else {
+        nextSelectedColumns.push({
+          name: columnName,
+          type: tableColumn?.type || 'String',
+          custom: customColumnNames.has(columnName)
+        });
+      }
     }
 
     onSelectedColumnsChange(nextSelectedColumns);
