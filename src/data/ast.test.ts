@@ -10,10 +10,10 @@ describe('ast', () => {
   });
   describe('sqlToStatement', () => {
     it('settings parse correctly', () => {
-      const sql = 'SELECT count(*) FROM mytable SETTINGS setting1=stuff setting2=stuff';
+      const sql = 'SELECT count(*) FROM myTable SETTINGS setting1=stuff setting2=stuff';
       const stm = sqlToStatement(sql);
       // this is formatted like this to match how pgsql generates its sql
-      expect(toSql.statement(stm)).toEqual('SELECT (count (*) )  FROM mytable');
+      expect(toSql.statement(stm)).toEqual('SELECT (count (*) )  FROM myTable');
     });
   });
 });
