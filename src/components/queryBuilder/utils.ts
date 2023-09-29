@@ -212,7 +212,7 @@ const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
   return `${clause}, time`;
 };
 
-const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
+export const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
   const pfx = prefix ? ' ORDER BY ' : '';
   return orderBy && orderBy.filter((o) => o.name).length > 0
     ? pfx +

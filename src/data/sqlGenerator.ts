@@ -1,4 +1,4 @@
-import { getSqlFromQueryBuilderOptions, getFilters } from 'components/queryBuilder/utils';
+import { getSqlFromQueryBuilderOptions, getFilters, getOrderBy } from 'components/queryBuilder/utils';
 import { ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn, TimeUnit } from 'types/queryBuilder';
 
 
@@ -8,6 +8,8 @@ export const generateSql = (options: QueryBuilderOptions): string => {
 
   if (options.queryType === QueryType.Traces) {
     return generateTraceQuery(options);
+  } else if (options.queryType === QueryType.Logs) {
+    return generateLogsQuery(options);
   }
 
   // const queryParts = [];
@@ -107,7 +109,68 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
   return queryParts.join(' ');
 }
 
+/**
+ * Generates logs query with columns that fit Grafana's Logs panel
+ * Column aliases follow this structure:
+ * https://grafana.com/developers/plugin-tools/tutorials/build-a-logs-data-source-plugin#logs-data-frame-format
+ * 
+ * note: column order seems to matter as well as alias name
+ */
+const generateLogsQuery = (options: QueryBuilderOptions): string => {
+  const { database, table } = options;
+  const limit = getLimit(options.limit);
+  
+  const queryParts: string[] = [];
+
+  // TODO: these columns could be a map or some other convenience function
+  const selectParts: string[] = [];
+  const logTime = getColumnByHint(options, ColumnHint.Time);
+  if (logTime !== undefined) {
+    // Must be first column in list.
+    logTime.alias = 'timestamp';
+    selectParts.push(getColumnIdentifier(logTime));
+  }
+
+  const logMessage = getColumnByHint(options, ColumnHint.LogMessage);
+  if (logMessage !== undefined) {
+    // Must be second column in list.
+    logMessage.alias = 'body';
+    selectParts.push(getColumnIdentifier(logMessage));
+  }
+
+  const logLevel = getColumnByHint(options, ColumnHint.LogLevel);
+  if (logLevel !== undefined) {
+    // TODO: "severity" should be a number, but "level" can be a string? Perhaps we can check the column type here?
+    logLevel.alias = 'level';
+    selectParts.push(getColumnIdentifier(logLevel));
+  }
+
+  const selectPartsSql = selectParts.join(', ');
+
+  queryParts.push('SELECT');
+  queryParts.push(selectPartsSql);
+  queryParts.push('FROM');
+  queryParts.push(getTableIdentifier(database, table));
+
+  if ((options.filters?.length || 0) > 0) {
+    queryParts.push('WHERE');
+    queryParts.push(getFilters(options.filters!));
+  }
+
+  if ((options.orderBy?.length || 0) > 0) {
+    queryParts.push('ORDER BY');
+    queryParts.push(getOrderBy(options.orderBy, false));
+  }
+
+  if (limit !== '') {
+    queryParts.push(limit);
+  }
+
+  return queryParts.join(' ');
+}
+
 export const getColumnByHint = (options: QueryBuilderOptions, hint: ColumnHint): SelectedColumn | undefined => options.columns?.find(c => c.hint === hint);
+export const getColumnIndexByHint = (options: QueryBuilderOptions, hint: ColumnHint): number => options.columns?.findIndex(c => c.hint === hint) || -1;
 export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly ColumnHint[]): readonly SelectedColumn[] => {
   const columns = [];
 
@@ -121,13 +184,20 @@ export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly 
   return columns;
 }
 
-// const getColumnIdentifier = (col: SelectedColumn): string => {
-//   if (col.alias) {
-//     return `${col.name} as ${col.alias}`
-//   }
+const getColumnIdentifier = (col: SelectedColumn): string => {
+  let colName = escapeIdentifier(col.name);
 
-//   return col.name;
-// }
+  // allow for functions like count()
+  if (colName.includes('(') || colName.includes(')')) {
+    colName = col.name
+  }
+
+  if (col.alias) {
+    return `${colName} as ${col.alias}`
+  }
+
+  return colName;
+}
 
 const getTableIdentifier = (database: string, table: string): string => {
   const sep = (database === '' || table === '') ? '' : '.';

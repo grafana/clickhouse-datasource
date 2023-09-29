@@ -26,7 +26,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   const [messageColumn, setMessageColumn] = useState<SelectedColumn>();
   const [liveView, setLiveView] = useState<boolean>(false);
   const [orderBy, setOrderBy] = useState<OrderBy[]>([]);
-  const [limit, setLimit] = useState<number>(100);
+  const [limit, setLimit] = useState<number>(1000);
   const [filters, setFilters] = useState<Filter[]>([]);
   const labels = allLabels.components.LogsQueryBuilder;
 
