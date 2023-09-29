@@ -137,7 +137,7 @@ const getTrendByQuery = (
   return `SELECT ${metricsQuery} FROM ${escaped(database)}${sep}${escaped(table)}`;
 };
 
-const getFilters = (filters: Filter[]): string => {
+export const getFilters = (filters: Filter[]): string => {
   return filters.reduce((previousValue, currentFilter, currentIndex) => {
     const prefixCondition = currentIndex === 0 ? '' : currentFilter.condition;
     let filter = '';

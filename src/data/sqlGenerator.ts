@@ -1,4 +1,4 @@
-import { getSqlFromQueryBuilderOptions } from 'components/queryBuilder/utils';
+import { getSqlFromQueryBuilderOptions, getFilters } from 'components/queryBuilder/utils';
 import { ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn, TimeUnit } from 'types/queryBuilder';
 
 
@@ -80,10 +80,20 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  if (!options.meta?.isTraceSearchMode && options.meta?.traceId) {
-    const traceId = options.meta.traceId;
+  const hasTraceIdFilter = !options.meta?.isTraceSearchMode && options.meta?.traceId
+  const hasFilters = (options.filters?.length || 0) > 0;
+
+  if (hasTraceIdFilter || hasFilters) {
     queryParts.push('WHERE');
+  }
+
+  if (hasTraceIdFilter) {
+    const traceId = options.meta!.traceId;
     queryParts.push(`traceID = '${traceId}'`);
+  }
+
+  if (hasFilters) {
+    queryParts.push(getFilters(options.filters!));
   }
 
   if (traceStartTime !== undefined) {
@@ -140,9 +150,9 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
     case TimeUnit.Milliseconds:
       return `${columnIdentifier} as ${alias}`;
     case TimeUnit.Microseconds:
-      return `intDiv(${columnIdentifier}, 1000) as ${alias}`;
+      return `intDivOrZero(${columnIdentifier}, 1000) as ${alias}`;
     case TimeUnit.Nanoseconds:
-      return `intDiv(${columnIdentifier}, 1000000) as ${alias}`;
+      return `intDivOrZero(${columnIdentifier}, 1000000) as ${alias}`;
     default:
       return `${columnIdentifier} as ${alias}`;
   }

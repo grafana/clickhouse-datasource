@@ -82,7 +82,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
     // TODO: ignore when builderOptions changes?
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceIdColumn, spanIdColumn, parentSpanIdColumn, serviceNameColumn, operationNameColumn, startTimeColumn, durationTimeColumn, tagsColumn, serviceTagsColumn, isSearchMode, durationUnit, traceId]);
+  }, [traceIdColumn, spanIdColumn, parentSpanIdColumn, serviceNameColumn, operationNameColumn, startTimeColumn, durationTimeColumn, tagsColumn, serviceTagsColumn, filters, isSearchMode, durationUnit, traceId]);
   
   return (
     <div>
