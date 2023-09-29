@@ -45,7 +45,7 @@ export interface QueryBuilderOptions {
     // Trace
     isTraceSearchMode?: boolean;
     traceDurationUnit?: TimeUnit;
-    traceId?: string; // TODO: this doesn't need to be persisted?
+    traceId?: string;
   }
 }
 

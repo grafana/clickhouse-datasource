@@ -15,6 +15,11 @@ export const generateSql = (options: QueryBuilderOptions): string => {
   return getSqlFromQueryBuilderOptions(options);
 }
 
+/**
+ * Generates trace query with columns that fit Grafana's Trace panel
+ * Column aliases follow this structure:
+ * https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-frame-structure
+ */
 const generateTraceQuery = (options: QueryBuilderOptions): string => {
   const { database, table } = options;
   const limit = getLimit(options.limit);
@@ -74,6 +79,12 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
   queryParts.push(selectPartsSql);
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
+
+  if (!options.meta?.isTraceSearchMode && options.meta?.traceId) {
+    const traceId = options.meta.traceId;
+    queryParts.push('WHERE');
+    queryParts.push(`traceID = '${traceId}'`);
+  }
 
   if (traceStartTime !== undefined) {
     queryParts.push('ORDER BY startTime ASC');

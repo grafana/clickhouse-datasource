@@ -104,8 +104,10 @@ export default {
       traceSearchModeLabel: 'Trace Search',
       traceModeLabel: 'Trace Mode',
       traceModeTooltip: 'Switches between trace ID and trace search mode',
+      columnsSection: 'Columns',
+      filtersSection: 'Filters',
 
-      fields: {
+      columns: {
         traceId: {
           label: 'Trace ID Column',
           tooltip: 'Column that contains the trace ID'
@@ -145,6 +147,10 @@ export default {
         serviceTags: {
           label: 'Service Tags Column',
           tooltip: 'Column that contains the service tags'
+        },
+        traceIdFilter: {
+          label: 'Trace ID',
+          tooltip: 'filter by a specific trace ID'
         }
       },
     }
