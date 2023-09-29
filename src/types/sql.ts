@@ -12,6 +12,12 @@ export enum EditorType {
 export interface CHQueryBase extends DataQuery {
   editorType: EditorType;
   rawSql: string;
+
+  /**
+   * REQUIRED by backend for auto selecting preferredVisualisationType.
+   * src: https://github.com/grafana/sqlds/blob/main/query.go#L36
+   */
+  format?: number;
 }
 
 export interface CHSqlQuery extends CHQueryBase {

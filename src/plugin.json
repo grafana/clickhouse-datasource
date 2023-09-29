@@ -6,6 +6,7 @@
   "metrics": true,
   "backend": true,
   "logs": true,
+  "tracing": true,
   "alerting": true,
   "annotations": true,
   "executable": "gpx_clickhouse",

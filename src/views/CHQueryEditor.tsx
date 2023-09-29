@@ -10,6 +10,7 @@ import { QueryBuilderOptions } from 'types/queryBuilder';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
+import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -34,7 +35,13 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange, app } = props;
   const onBuilderOptionsChange = (builderOptions: QueryBuilderOptions) => {
     const sql = generateSql(builderOptions);
-    onChange({ ...query, editorType: EditorType.Builder, rawSql: sql, builderOptions });
+    onChange({
+      ...query,
+      editorType: EditorType.Builder,
+      rawSql: sql,
+      builderOptions,
+      format: mapQueryTypeToGrafanaFormat(builderOptions.queryType)
+    });
   };
 
   if (query.editorType === EditorType.SQL) {
