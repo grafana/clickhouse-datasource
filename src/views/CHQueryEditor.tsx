@@ -8,7 +8,7 @@ import { CHQuery, EditorType, CHBuilderQuery, defaultCHBuilderQuery } from 'type
 import { CHConfig } from 'types/config';
 import { QueryBuilderOptions } from 'types/queryBuilder';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
-import { getSqlFromQueryBuilderOptions } from 'components/queryBuilder/utils';
+import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
@@ -33,7 +33,7 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange, app } = props;
   const onBuilderOptionsChange = (builderOptions: QueryBuilderOptions) => {
-    const sql = getSqlFromQueryBuilderOptions(builderOptions);
+    const sql = generateSql(builderOptions);
     onChange({ ...query, editorType: EditorType.Builder, rawSql: sql, builderOptions });
   };
 

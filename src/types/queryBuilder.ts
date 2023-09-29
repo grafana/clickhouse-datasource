@@ -44,7 +44,7 @@ export interface QueryBuilderOptions {
 
     // Trace
     isTraceSearchMode?: boolean;
-    traceDurationUnit?: string;
+    traceDurationUnit?: TimeUnit;
     traceId?: string; // TODO: this doesn't need to be persisted?
   }
 }
@@ -118,6 +118,16 @@ export enum ColumnHint {
   TraceDurationTime = 'trace_duration_time',
   TraceTags = 'trace_tags',
   TraceServiceTags = 'trace_service_tags',
+}
+
+/**
+ * TimeUnit determines a unit of time.
+ */
+export enum TimeUnit {
+  Seconds = 'seconds',
+  Milliseconds = 'milliseconds',
+  Microseconds = 'microseconds',
+  Nanoseconds = 'nanoseconds',
 }
 
 /**

@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { BuilderMode, Filter, TableColumn, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
+import { BuilderMode, Filter, TableColumn, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'components/queryBuilder/utils';
+import { InlineFormLabel, Select } from '@grafana/ui';
+import { SelectableValue } from '@grafana/data';
+import { styles } from 'styles';
 
 interface TraceQueryBuilderProps {
   allColumns: ReadonlyArray<TableColumn>;
@@ -22,7 +25,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const [operationNameColumn, setOperationNameColumn] = useState<SelectedColumn>();
   const [startTimeColumn, setStartTimeColumn] = useState<SelectedColumn>();
   const [durationTimeColumn, setDurationTimeColumn] = useState<SelectedColumn>();
-  const [, setDurationUnit] = useState<string>();
+  const [durationUnit, setDurationUnit] = useState<TimeUnit>(TimeUnit.Nanoseconds);
   const [tagsColumn, setTagsColumn] = useState<SelectedColumn>();
   const [serviceTagsColumn, setServiceTagsColumn] = useState<SelectedColumn>();
   const [, setTraceId] = useState<string>();
@@ -67,11 +70,15 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       mode: BuilderMode.List,
       columns: nextColumns,
       filters,
+      meta: {
+        ...builderOptions.meta,
+        traceDurationUnit: durationUnit
+      }
     });
 
     // TODO: ignore when builderOptions changes?
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceIdColumn, spanIdColumn, parentSpanIdColumn, serviceNameColumn, operationNameColumn, startTimeColumn, durationTimeColumn, tagsColumn, serviceTagsColumn]);
+  }, [traceIdColumn, spanIdColumn, parentSpanIdColumn, serviceNameColumn, operationNameColumn, startTimeColumn, durationTimeColumn, tagsColumn, serviceTagsColumn, durationUnit]);
   
   return (
     <div>
@@ -157,15 +164,10 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           tooltip={labels.fields.durationTime.tooltip}
           wide
         />
-        {/* <ColumnSelect
-          allColumns={allColumns}
-          selectedColumn={durationUnit}
-          onColumnChange={setDurationUnit}
-          label={selectors.fields.durationUnit.label}
-          tooltip={selectors.fields.durationUnit.tooltip}
-          wide
-          inline
-        /> */}
+        <DurationUnitSelect
+          unit={durationUnit}
+          onChange={setDurationUnit}
+        />
       </div>
       <div className="gf-form">
         <ColumnSelect
@@ -192,3 +194,35 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     </div>
   );
 }
+
+interface DurationUnitSelectProps {
+  unit: TimeUnit;
+  onChange: (u: TimeUnit) => void;
+};
+
+const durationUnitOptions: ReadonlyArray<SelectableValue<TimeUnit>> = [
+  { label: TimeUnit.Seconds, value: TimeUnit.Seconds },
+  { label: TimeUnit.Milliseconds, value: TimeUnit.Milliseconds },
+  { label: TimeUnit.Microseconds, value: TimeUnit.Microseconds },
+  { label: TimeUnit.Nanoseconds, value: TimeUnit.Nanoseconds },
+];
+
+const DurationUnitSelect = (props: DurationUnitSelectProps) => {
+  const { unit, onChange } = props;
+  const { label, tooltip } = allLabels.components.TraceQueryBuilder.fields.durationUnit;
+
+  return (
+    <div className="gf-form">
+      <InlineFormLabel width={12} className={`query-keyword ${styles.QueryEditor.inlineField}`} tooltip={tooltip}>
+        {label}
+      </InlineFormLabel>
+      <Select<TimeUnit>
+        options={durationUnitOptions as Array<SelectableValue<TimeUnit>>}
+        value={unit}
+        onChange={v => onChange(v.value!)}
+        width={25}
+        menuPlacement={'bottom'}
+      />
+    </div>
+  );
+};

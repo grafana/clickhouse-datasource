@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
-import { getQueryOptionsFromSql, getSqlFromQueryBuilderOptions } from '../queryBuilder/utils';
+import { getQueryOptionsFromSql } from '../queryBuilder/utils';
+import { generateSql } from 'data/sqlGenerator';
 import labels from 'labels';
 import { EditorType, CHQuery, defaultCHBuilderQuery } from 'types/sql';
 import { QueryBuilderOptions } from 'types/queryBuilder';
@@ -58,14 +59,14 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         onChange({
           ...query,
           editorType: EditorType.SQL,
-          rawSql: getSqlFromQueryBuilderOptions(builderOptions),
+          rawSql: generateSql(builderOptions),
           meta: { builderOptions },
         });
       } else if (editorType === EditorType.Builder) {
         onChange({
           ...query,
           editorType: EditorType.Builder,
-          rawSql: getSqlFromQueryBuilderOptions(builderOptions),
+          rawSql: generateSql(builderOptions),
           builderOptions
         });
       }
