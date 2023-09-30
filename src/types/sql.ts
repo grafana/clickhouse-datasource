@@ -53,7 +53,6 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     columns: [],
-    limit: 100,
   },
   // format: Format.TABLE,
   // selectedFormat: Format.AUTO,

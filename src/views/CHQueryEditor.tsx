@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
@@ -18,7 +18,25 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { onRunQuery } = props;
+  const { query, onChange, onRunQuery } = props;
+
+  useEffect(() => {
+    if (query.editorType) {
+      return;
+    }
+
+    onChange({
+      ...query as CHQuery,
+      ...defaultCHBuilderQuery,
+      builderOptions: {
+        ...defaultCHBuilderQuery.builderOptions,
+      },
+    });
+  }, [query, query.editorType, onChange]);
+
+  if (!query.editorType) {
+    return null;
+  }
 
   return (
     <>
@@ -51,32 +69,14 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       </div>
     );
   }
-  
-  let newQuery: CHBuilderQuery = { ...query };
-  if (query.rawSql && !query.builderOptions) {
-    return (
-      <div data-testid="query-editor-section-sql">
-        <SqlEditor {...props} />
-      </div>
-    );
-  }
 
-  if (!query.rawSql || !query.builderOptions) {
-    newQuery = {
-      ...newQuery,
-      rawSql: defaultCHBuilderQuery.rawSql,
-      builderOptions: {
-        ...defaultCHBuilderQuery.builderOptions,
-      },
-    };
-  }
-
+  const builderQuery: CHBuilderQuery = { ...query };
   return (
     <QueryBuilder
       datasource={props.datasource}
-      builderOptions={newQuery.builderOptions}
+      builderOptions={builderQuery.builderOptions}
       onBuilderOptionsChange={onBuilderOptionsChange}
-      generatedSql={newQuery.rawSql}
+      generatedSql={builderQuery.rawSql}
       app={app}
     />
   );

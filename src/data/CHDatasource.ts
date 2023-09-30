@@ -41,6 +41,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { getSqlFromQueryBuilderOptions, getColumnByHint } from '../components/queryBuilder/utils';
+import { generateSql } from './sqlGenerator';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -315,7 +316,7 @@ export class Datasource
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: getSqlFromQueryBuilderOptions(updatedBuilder),
+        rawSql: generateSql(updatedBuilder),
         builderOptions: updatedBuilder,
       };
     }
