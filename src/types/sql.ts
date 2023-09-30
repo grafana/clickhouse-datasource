@@ -15,6 +15,7 @@ export interface CHQueryBase extends DataQuery {
 
   /**
    * REQUIRED by backend for auto selecting preferredVisualisationType.
+   * Only used in explore view.
    * src: https://github.com/grafana/sqlds/blob/main/query.go#L36
    */
   format?: number;
@@ -22,6 +23,7 @@ export interface CHQueryBase extends DataQuery {
 
 export interface CHSqlQuery extends CHQueryBase {
   editorType: EditorType.SQL;
+  queryType?: QueryType; // only used in explore view
   meta?: {
     timezone?: string;
     // meta fields to be used just for building builder options when migrating back to EditorType.Builder

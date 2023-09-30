@@ -263,7 +263,6 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
-		frame.Meta.PreferredVisualization = data.VisTypeTrace // TODO: Temporary fix for Traces.
 		if frame.Meta.PreferredVisualization != data.VisTypeTrace &&
 			frame.Meta.PreferredVisualization != data.VisTypeTable {
 			var fields []*data.Field
@@ -291,7 +290,6 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 				}
 			}
 			frame.Fields = fields
-			//frame.Meta.PreferredVisualization = data.VisTypeTable // TODO: Temporary fix for Explorer view.
 		}
 	}
 	return res, nil

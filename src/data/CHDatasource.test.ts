@@ -377,6 +377,7 @@ describe('ClickHouseDatasource', () => {
           datasource.getSupplementaryLogsVolumeQuery(request, {
             ...query,
             editorType: EditorType.SQL,
+            queryType: undefined
           })
         ).toBeUndefined();
         expect(

@@ -16,7 +16,8 @@ export default {
     },
     QueryTypeSwitcher: {
       label: 'Query Type',
-      tooltip: 'Sets the layout for the query builder'
+      tooltip: 'Sets the layout for the query builder',
+      sqlTooltip: 'Sets the panel type for explore view'
     },
     DatabaseSelect: {
       label: 'Database',

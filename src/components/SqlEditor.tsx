@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { QueryEditorProps } from '@grafana/data';
+import React, { useEffect, useState } from 'react';
+import { CoreApp, QueryEditorProps } from '@grafana/data';
 import { CodeEditor } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
@@ -9,6 +9,9 @@ import { styles } from 'styles';
 import { fetchSuggestions as sugg, Schema } from './suggestions';
 import { selectors } from 'selectors';
 import { validate } from 'data/validate';
+import { mapQueryTypeToGrafanaFormat } from 'data/utils';
+import { QueryType } from 'types/queryBuilder';
+import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -20,20 +23,36 @@ interface Expand {
 
 export const SqlEditor = (props: SqlEditorProps) => {
   const defaultHeight = '150px';
-  const { query, onRunQuery, onChange, datasource } = props;
+  const { app, query, onChange, datasource } = props;
   const sqlQuery = query as CHSqlQuery;
   const [codeEditor, setCodeEditor] = useState<any>();
+  const [queryType, setQueryType] = useState<QueryType>(QueryType.Table);
+  const [sql, setSql] = useState<string>('');
   const [expand, setExpand] = useState<Expand>({
     height: defaultHeight,
     icon: 'plus',
     on: sqlQuery.expand || false,
   });
 
-  const onSqlChange = (sql: string) => {
-    // const format = getFormat(sql, query.selectedFormat);
-    onChange({ ...query, rawSql: sql, editorType: EditorType.SQL });
-    onRunQuery();
-  };
+  useEffect(() => {
+    sqlQuery.queryType && setQueryType(sqlQuery.queryType);
+    setSql(sqlQuery.rawSql);
+
+    // Run on load
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    onChange({
+      ...query,
+      editorType: EditorType.SQL,
+      queryType,
+      rawSql: sql,
+      format: mapQueryTypeToGrafanaFormat(queryType),
+    });
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryType, sql])
 
   const onToggleExpand = () => {
     const on = !expand.on;
@@ -105,26 +124,33 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   return (
-    <div className={styles.Common.wrapper}>
-      <a
-        onClick={() => onToggleExpand()}
-        className={styles.Common.expand}
-        data-testid={selectors.components.QueryEditor.CodeEditor.Expand}
-      >
-        <i className={`fa fa-${expand.icon}`}></i>
-      </a>
-      <CodeEditor
-        aria-label="SQL"
-        height={expand.height}
-        language="sql"
-        value={query.rawSql || ''}
-        onSave={onSqlChange}
-        showMiniMap={false}
-        showLineNumbers={true}
-        onBlur={(text) => onChange({ ...query, rawSql: text })}
-        onEditorDidMount={(editor: any) => handleMount(editor)}
-      />
-    </div>
+    <>
+      { app === CoreApp.Explore &&
+        <div className={'gf-form ' + styles.QueryEditor.queryType}>
+          <QueryTypeSwitcher queryType={queryType} onChange={setQueryType} sqlEditor />
+        </div>
+      }
+      <div className={styles.Common.wrapper}>
+        <a
+          onClick={() => onToggleExpand()}
+          className={styles.Common.expand}
+          data-testid={selectors.components.QueryEditor.CodeEditor.Expand}
+        >
+          <i className={`fa fa-${expand.icon}`}></i>
+        </a>
+        <CodeEditor
+          aria-label="SQL"
+          height={expand.height}
+          language="sql"
+          value={query.rawSql || ''}
+          onSave={setSql}
+          showMiniMap={false}
+          showLineNumbers={true}
+          onBlur={setSql}
+          onEditorDidMount={(editor: any) => handleMount(editor)}
+        />
+      </div>
+    </>
   );
 };
 

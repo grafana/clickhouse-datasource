@@ -7,6 +7,7 @@ import labels from 'labels';
 import { EditorType, CHQuery, defaultCHBuilderQuery } from 'types/sql';
 import { QueryBuilderOptions } from 'types/queryBuilder';
 import isString from 'lodash/isString';
+import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 
 interface CHEditorTypeSwitcherProps {
   query: CHQuery;
@@ -59,7 +60,9 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         onChange({
           ...query,
           editorType: EditorType.SQL,
+          queryType: builderOptions.queryType,
           rawSql: generateSql(builderOptions),
+          format: mapQueryTypeToGrafanaFormat(builderOptions.queryType),
           meta: { builderOptions },
         });
       } else if (editorType === EditorType.Builder) {
