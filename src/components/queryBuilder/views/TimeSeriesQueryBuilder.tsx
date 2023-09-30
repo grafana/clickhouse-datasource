@@ -13,7 +13,7 @@ import { getColumnByHint } from 'components/queryBuilder/utils';
 import { columnFilterDateTime } from 'data/columnFilters';
 
 interface TimeSeriesQueryBuilderProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
 }

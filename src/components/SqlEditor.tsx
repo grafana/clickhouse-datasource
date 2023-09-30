@@ -48,16 +48,16 @@ export const SqlEditor = (props: SqlEditorProps) => {
       editorType: EditorType.SQL,
       queryType,
       rawSql: sql,
+      expand: expand.on,
       format: mapQueryTypeToGrafanaFormat(queryType),
     });
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryType, sql])
+  }, [queryType, sql, expand])
 
   const onToggleExpand = () => {
     const on = !expand.on;
     const icon = on ? 'minus' : 'plus';
-    onChange({ ...sqlQuery, expand: on });
 
     if (!codeEditor) {
       return;

@@ -50,6 +50,6 @@ describe('SQL Editor', () => {
 
     expect(screen.queryByText('test')).toBeInTheDocument();
     await userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
-    expect(onChangeValue).toHaveBeenCalledTimes(1);
+    expect(onChangeValue).toHaveBeenCalledTimes(2);
   });
 });
