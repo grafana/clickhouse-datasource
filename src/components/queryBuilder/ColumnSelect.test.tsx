@@ -21,7 +21,7 @@ describe('ColumnSelect', () => {
   });
 
   it('should render with valid properties', () => {
-    const allColumns: ReadonlyArray<TableColumn> = [{ name: 'foo', type: 'string', picklistValues: [] }];
+    const allColumns: readonly TableColumn[] = [{ name: 'foo', type: 'string', picklistValues: [] }];
     const selectedColumn: SelectedColumn = { name: 'foo' };
     const result = render(
       <ColumnSelect
@@ -36,7 +36,7 @@ describe('ColumnSelect', () => {
   });
 
   it('should call onColumnChange when a new column is selected', () => {
-    const allColumns: ReadonlyArray<TableColumn> = [
+    const allColumns: readonly TableColumn[] = [
       { name: 'one', type: 'string', picklistValues: [] },
       { name: 'two', type: 'string', picklistValues: [] }
     ];

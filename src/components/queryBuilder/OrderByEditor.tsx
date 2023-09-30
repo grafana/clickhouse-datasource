@@ -132,7 +132,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
   );
 };
 
-export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: ReadonlyArray<TableColumn>): Array<SelectableValue<string>> => {
+export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: readonly TableColumn[]): Array<SelectableValue<string>> => {
   let allOptions: Array<SelectableValue<string>> = [];
 
   if (isAggregateQuery(builder)) {

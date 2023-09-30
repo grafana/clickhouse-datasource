@@ -10,7 +10,7 @@ import { SelectableValue } from '@grafana/data';
 import { styles } from 'styles';
 
 interface TraceQueryBuilderProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
 }

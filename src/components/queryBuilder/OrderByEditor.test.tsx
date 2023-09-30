@@ -121,7 +121,7 @@ describe('OrderByEditor', () => {
 });
 
 describe('getOrderByOptions', () => {
-  const allColumms: ReadonlyArray<TableColumn> = [
+  const allColumms: readonly TableColumn[] = [
     {
       name: 'field1',
       type: 'string',

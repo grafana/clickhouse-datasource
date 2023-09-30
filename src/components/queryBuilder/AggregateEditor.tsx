@@ -65,7 +65,7 @@ const Aggregate = (props: AggregateProps) => {
 };
 
 interface AggregateEditorProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   aggregates: AggregateColumn[];
   onAggregatesChange: (aggregates: AggregateColumn[]) => void;
 }

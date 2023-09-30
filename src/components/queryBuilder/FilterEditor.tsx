@@ -45,7 +45,7 @@ export const defaultNewFilter: NullFilter = {
   operator: FilterOperator.IsNotNull,
 };
 export interface PredefinedFilter {
-  restrictToFields?: ReadonlyArray<TableColumn>;
+  restrictToFields?: readonly TableColumn[];
 }
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
@@ -91,7 +91,7 @@ const FilterValueMultiStringItem = (props: { value: string[]; onChange: (value: 
 };
 
 export const FilterValueEditor = (props: {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
 }) => {
@@ -171,7 +171,7 @@ export const FilterValueEditor = (props: {
 };
 
 export const FilterEditor = (props: {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   index: number;
   filter: Filter & PredefinedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
@@ -362,7 +362,7 @@ export const FilterEditor = (props: {
 };
 
 export const FiltersEditor = (props: {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   filters: Filter[];
   onFiltersChange: (filters: Filter[]) => void;
 }) => {

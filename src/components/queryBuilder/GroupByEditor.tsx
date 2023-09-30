@@ -7,7 +7,7 @@ import { styles } from 'styles';
 import { selectors } from 'selectors';
 
 interface GroupByEditorProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   groupBy: string[];
   onGroupByChange: (groupBy: string[]) => void;
 }

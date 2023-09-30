@@ -4,8 +4,8 @@ import { Datasource } from 'data/CHDatasource';
 
 const allColumn = { name: '*', label: 'ALL', type: 'string', picklistValues: [] };
 
-export default (datasource: Datasource, database: string, table: string): ReadonlyArray<TableColumn> => {
-  const [columns, setColumns] = useState<ReadonlyArray<TableColumn>>([allColumn]); 
+export default (datasource: Datasource, database: string, table: string): readonly TableColumn[] => {
+  const [columns, setColumns] = useState<readonly TableColumn[]>([allColumn]); 
   
   useEffect(() => {
     if (!datasource || !database || !table) {

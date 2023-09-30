@@ -1,6 +1,5 @@
-import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, QueryBuilderOptions } from 'types/queryBuilder';
+import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, QueryBuilderOptions, ColumnHint, QueryType } from 'types/queryBuilder';
 import { getColumnByHint, getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isAggregateQuery, isDateTimeType, isDateType, isNumberType } from './utils';
-import { ColumnHint, QueryType } from 'types/queryBuilder';
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
