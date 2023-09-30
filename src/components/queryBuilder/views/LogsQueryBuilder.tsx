@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
+import { BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, OrderByDirection } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { Switch } from '../Switch';
 import { OtelVersionSelect } from '../OtelVersionSelect';
@@ -9,6 +9,7 @@ import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { getColumnByHint } from 'components/queryBuilder/utils';
+import { versions as otelVersions } from 'otel';
 
 interface LogsQueryBuilderProps {
   allColumns: readonly TableColumn[];
@@ -52,6 +53,33 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   }, []);
 
   useEffect(() => {
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    if (!otelEnabled || !otelConfig) {
+      return;
+    }
+
+    const columnMap = new Map<string, TableColumn>();
+    allColumns.forEach(c => columnMap.set(c.name, c));
+    const logColumnMap = otelConfig.logColumnMap;
+    for (const [hint, colName] of logColumnMap) {
+      const col = columnMap.get(colName);
+      if (!col) {
+        continue;
+      }
+
+      const selectedColumn: SelectedColumn = { name: col.name, type: col.type, hint };
+      switch (hint) {
+        case ColumnHint.Time:
+         setTimeColumn(selectedColumn);
+        case ColumnHint.LogMessage:
+         setMessageColumn(selectedColumn);
+        case ColumnHint.LogLevel:
+         setLogLevelColumn(selectedColumn);
+      }
+    }
+  }, [otelEnabled, otelVersion, allColumns]);
+
+  useEffect(() => {
     const nextColumns = selectedColumns.slice();
     if (timeColumn) {
       nextColumns.push(timeColumn);
@@ -90,9 +118,10 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         onVersionChange={setOtelVersion}
         defaultToLatest
       />
-      <ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={setSelectedColumns} />
+      <ColumnsEditor disabled={otelEnabled} allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={setSelectedColumns} />
       <div className="gf-form">
         <ColumnSelect
+          disabled={otelEnabled}
           allColumns={allColumns}
           selectedColumn={timeColumn}
           onColumnChange={setTimeColumn}
@@ -101,6 +130,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           tooltip={labels.logTimeColumn.tooltip}
         />
         <ColumnSelect
+          disabled={otelEnabled}
           allColumns={allColumns}
           selectedColumn={logLevelColumn}
           onColumnChange={setLogLevelColumn}
@@ -112,6 +142,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       </div>
       <div className="gf-form">
         <ColumnSelect
+          disabled={otelEnabled}
           allColumns={allColumns}
           selectedColumn={messageColumn}
           onColumnChange={setMessageColumn}

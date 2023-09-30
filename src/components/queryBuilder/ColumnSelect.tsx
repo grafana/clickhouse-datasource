@@ -5,13 +5,14 @@ import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { styles } from 'styles';
 
 interface ColumnSelectProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   selectedColumn: SelectedColumn | undefined;
   onColumnChange: (c: SelectedColumn) => void;
   columnFilterFn?: (c: TableColumn) => boolean;
   columnHint?: ColumnHint;
   label: string;
   tooltip: string;
+  disabled?: boolean;
   wide?: boolean;
   inline?: boolean;
 }
@@ -19,7 +20,7 @@ interface ColumnSelectProps {
 const defaultFilterFn = () => true;
 
 export const ColumnSelect = (props: ColumnSelectProps) => {
-  const { allColumns, selectedColumn, onColumnChange, columnFilterFn, columnHint, label, tooltip, wide, inline } = props;
+  const { allColumns, selectedColumn, onColumnChange, columnFilterFn, columnHint, label, tooltip, disabled, wide, inline } = props;
   const selectedColumnName = selectedColumn?.name;
   const columns: Array<SelectableValue<string>> = allColumns.
     filter(columnFilterFn || defaultFilterFn).
@@ -43,6 +44,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
         {label}
       </InlineFormLabel>
       <Select<string>
+        disabled={disabled}
         options={columns}
         value={selectedColumnName}
         onChange={onChange}

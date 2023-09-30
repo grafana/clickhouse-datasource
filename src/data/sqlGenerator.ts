@@ -3,17 +3,12 @@ import { ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn, TimeUnit } 
 
 
 export const generateSql = (options: QueryBuilderOptions): string => {
-  // const { database, table } = options;
-  // const limit = getLimit(options.limit);
-
   if (options.queryType === QueryType.Traces) {
     return generateTraceQuery(options);
   } else if (options.queryType === QueryType.Logs) {
     return generateLogsQuery(options);
   }
 
-  // const queryParts = [];
-  // return queryParts.join(' ').trim();
   return getSqlFromQueryBuilderOptions(options);
 }
 

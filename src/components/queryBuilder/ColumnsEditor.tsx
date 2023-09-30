@@ -7,12 +7,13 @@ import { selectors } from 'selectors';
 import { styles } from 'styles';
 
 interface ColumnsEditorProps {
-  allColumns: ReadonlyArray<TableColumn>;
+  allColumns: readonly TableColumn[];
   selectedColumns: SelectedColumn[];
   onSelectedColumnsChange: (selectedColumns: SelectedColumn[]) => void;
+  disabled?: boolean;
 }
 
-function getCustomColumns(columnNames: string[], allColumns: ReadonlyArray<TableColumn>): Array<SelectableValue<string>> {
+function getCustomColumns(columnNames: string[], allColumns: readonly TableColumn[]): Array<SelectableValue<string>> {
   const columnNamesSet = new Set(columnNames);
   return allColumns.
     filter(c => columnNamesSet.has(c.name)).
@@ -20,7 +21,7 @@ function getCustomColumns(columnNames: string[], allColumns: ReadonlyArray<Table
 }
 
 export const ColumnsEditor = (props: ColumnsEditorProps) => {
-  const { allColumns, selectedColumns, onSelectedColumnsChange } = props;
+  const { allColumns, selectedColumns, onSelectedColumnsChange, disabled } = props;
   const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const allColumnNames = allColumns.map(c => ({ label: c.name, value: c.name }));
@@ -74,6 +75,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
       </InlineFormLabel>
       <div data-testid={selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper} className={styles.Common.selectWrapper}>
         <MultiSelect<string>
+          disabled={disabled}
           options={options}
           value={selectedColumnNames}
           isOpen={isOpen}
