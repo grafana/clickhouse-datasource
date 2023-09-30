@@ -10,6 +10,7 @@ import { AggregateEditor } from '../AggregateEditor';
 import { GroupByEditor } from '../GroupByEditor';
 import { ColumnSelect } from '../ColumnSelect';
 import { getColumnByHint } from 'components/queryBuilder/utils';
+import { columnFilterDateTime } from 'data/columnFilters';
 
 interface TimeSeriesQueryBuilderProps {
   allColumns: ReadonlyArray<TableColumn>;
@@ -85,6 +86,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
         allColumns={allColumns}
         selectedColumn={timeColumn}
         onColumnChange={setTimeColumn}
+        columnFilterFn={columnFilterDateTime}
         columnHint={ColumnHint.Time}
         label={labels.timeColumn.label}
         tooltip={labels.timeColumn.tooltip}

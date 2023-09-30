@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, OrderByDirection } from 'types/queryBuilder';
+import { BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { Switch } from '../Switch';
 import { OtelVersionSelect } from '../OtelVersionSelect';
@@ -10,6 +10,7 @@ import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { getColumnByHint } from 'components/queryBuilder/utils';
 import { versions as otelVersions } from 'otel';
+import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 
 interface LogsQueryBuilderProps {
   allColumns: readonly TableColumn[];
@@ -125,6 +126,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           allColumns={allColumns}
           selectedColumn={timeColumn}
           onColumnChange={setTimeColumn}
+          columnFilterFn={columnFilterDateTime}
           columnHint={ColumnHint.Time}
           label={labels.logTimeColumn.label}
           tooltip={labels.logTimeColumn.tooltip}
@@ -134,6 +136,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           allColumns={allColumns}
           selectedColumn={logLevelColumn}
           onColumnChange={setLogLevelColumn}
+          columnFilterFn={columnFilterString}
           columnHint={ColumnHint.LogLevel}
           label={labels.logLevelColumn.label}
           tooltip={labels.logLevelColumn.tooltip}
@@ -146,6 +149,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           allColumns={allColumns}
           selectedColumn={messageColumn}
           onColumnChange={setMessageColumn}
+          columnFilterFn={columnFilterString}
           columnHint={ColumnHint.LogMessage}
           label={labels.logMessageColumn.label}
           tooltip={labels.logMessageColumn.tooltip}
