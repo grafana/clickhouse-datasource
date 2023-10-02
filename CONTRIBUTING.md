@@ -39,7 +39,7 @@ yarn watch
 #### Running E2E tests locally
 
 1. Install [K6](https://k6.io/docs/get-started/installation/)
-1. Run `yarn test:e2e`
+2. Run `yarn test:e2e:local`
 
 ## Create a pull request
 

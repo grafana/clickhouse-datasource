@@ -1,4 +1,4 @@
-name: run-tests
+name: run-backend-tests
 
 on:
   push:

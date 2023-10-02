@@ -3,6 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.20
 
 require (
+	dagger.io/dagger v0.8.4
 	github.com/ClickHouse/clickhouse-go/v2 v2.14.1
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-units v0.5.0
@@ -17,7 +18,16 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.2.3 // indirect
+	github.com/99designs/gqlgen v0.17.31 // indirect
+	github.com/Khan/genqlient v0.6.0 // indirect
+	github.com/adrg/xdg v0.4.0 // indirect
+	github.com/iancoleman/strcase v0.3.0 // indirect
+	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
+	golang.org/x/sync v0.3.0 // indirect
+)
+
+require (
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/BurntSushi/toml v1.3.2 // indirect
@@ -105,6 +115,8 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
+	github.com/spf13/cobra v1.7.0
+	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/unknwon/bra v0.0.0-20200517080246-1e3013ecaff8 // indirect
