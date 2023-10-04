@@ -4598,10 +4598,10 @@
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.4.tgz#bd86a43617df0594787d38b735f55c805becf1bc"
   integrity sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw==
 
-"@types/webpack-livereload-plugin@^2.3.3":
-  version "2.3.3"
-  resolved "https://registry.yarnpkg.com/@types/webpack-livereload-plugin/-/webpack-livereload-plugin-2.3.3.tgz#96f34133f1e1515571233a3e5099d863dc8723e7"
-  integrity sha512-R8P2HG2mAHY3Qptspt0il8zYVNqiEeOmMe2cGFcEjH7qnJZ4uC7hujLwfAm6jrIO7I5uEs6CxfpKSXM9ULAggw==
+"@types/webpack-livereload-plugin@^2.3.4":
+  version "2.3.4"
+  resolved "https://registry.yarnpkg.com/@types/webpack-livereload-plugin/-/webpack-livereload-plugin-2.3.4.tgz#f3d0ac7ffda27dc4d2ea0f2807d977e57dbb87d7"
+  integrity sha512-5THC5ANQQZtJ966bYkIdH4L8KBsp1DskQ1C12hfPURfOhpndyUAR6NvMFUJ5Yo7u6cDWFFW6b58RkSfz0jlb8Q==
   dependencies:
     "@types/webpack" "^4"
 
@@ -12176,6 +12176,7 @@ string-template@~0.2.1:
   integrity sha512-Yptehjogou2xm4UJbxJ4CxgZx12HBfeystp0y3x7s4Dj32ltVVG1Gg8YhKjHZkHicuKpZX/ffilA8505VbUbpw==
 
 "string-width-cjs@npm:string-width@^4.2.0", string-width@^4.2.3:
+  name string-width-cjs
   version "4.2.3"
   resolved "https://registry.yarnpkg.com/string-width/-/string-width-4.2.3.tgz#269c7117d27b05ad2e536830a8ec895ef9c6d010"
   integrity sha512-wKyQRQpjJ0sIp62ErSZdGsjMJWsap5oRNihHhu6G7JVO/9jIB6UyevL+tXuOqrng8j/cxKTWyWUwvSTriiZz/g==
