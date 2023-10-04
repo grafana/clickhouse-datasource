@@ -7,7 +7,7 @@ export function sqlToStatement(sql: string): Statement {
     replacementName: string;
   }> = [];
   //default is a key word in this grammar, but it can be used in CH
-  const re = /(\$__|\$|default)/gi;
+  const re = /(\$__|\$|default|settings)/gi;
   let regExpArray: RegExpExecArray | null;
   while ((regExpArray = re.exec(sql)) !== null) {
     replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
@@ -18,6 +18,11 @@ export function sqlToStatement(sql: string): Statement {
     const si = replaceFuncs[i].startIndex;
     const replacementName = 'f' + (Math.random() + 1).toString(36).substring(7);
     replaceFuncs[i].replacementName = replacementName;
+    // settings do not parse and we do not need information from them so we will remove them
+    if (replaceFuncs[i].name.toLowerCase() === "settings") {
+      sql = sql.substring(0, si)
+      continue;
+    }
     sql = sql.substring(0, si) + replacementName + sql.substring(si + replaceFuncs[i].name.length);
   }
 
