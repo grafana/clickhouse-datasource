@@ -38,7 +38,7 @@
     "@types/lodash": "^4.14.194",
     "@types/node": "^18.15.11",
     "@types/react-router-dom": "^5.3.3",
-    "@types/webpack-livereload-plugin": "^2.3.3",
+    "@types/webpack-livereload-plugin": "^2.3.4",
     "copy-webpack-plugin": "^11.0.0",
     "cspell": "^6.30.2",
     "css-loader": "^6.7.3",
