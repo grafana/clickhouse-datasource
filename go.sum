@@ -1,3 +1,4 @@
+cloud.google.com/go v0.26.0 h1:e0WKqKTd5BnrG8aKH3J3h+QvEIQtSUcf2n5UZ5ZgLtQ=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go/compute v1.23.0 h1:tP41Zoavr8ptEqaW6j+LQOnyBBhO7OkOMAGrgLopTwY=
 cloud.google.com/go/compute/metadata v0.2.3 h1:mg4jlk7mCAj6xXp9UJ4fjI9VUI5rubuGBW5aJ7UnBMY=
@@ -136,8 +137,8 @@ github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e h1:JKmoR8x90Iww1
 github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/gorilla/mux v1.8.0 h1:i40aqfkR1h2SlN9hojwV5ZA91wcXFOvkdNIeFDP5koI=
 github.com/gorilla/mux v1.8.0/go.mod h1:DVbg23sWSpFRCP0SfiEN6jmj59UnW/n46BH5rLB71So=
-github.com/grafana/grafana-plugin-sdk-go v0.179.0 h1:gaow50UDWLhvVlrPye4rESajpRItEecKi2+i+TE1r7Q=
-github.com/grafana/grafana-plugin-sdk-go v0.179.0/go.mod h1:fPX9spPWEzyUg0BLTQbdXCCq7PVSJZGNVKfNpiTQUts=
+github.com/grafana/grafana-plugin-sdk-go v0.180.0 h1:+5aFolBj2H7ze7oejIUjrkmZ9lSydnsbo3e4Kn1CN1Y=
+github.com/grafana/grafana-plugin-sdk-go v0.180.0/go.mod h1:fPX9spPWEzyUg0BLTQbdXCCq7PVSJZGNVKfNpiTQUts=
 github.com/grafana/sqlds/v2 v2.7.2 h1:5bkY9QO5Nc4uAWm3aHF2fHWcOSWhqJmfdJfPRHJVJoo=
 github.com/grafana/sqlds/v2 v2.7.2/go.mod h1:u5FkkJfuL6EwqesXWjV6cNw7aS5F51sCo/0Op57C8rs=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
