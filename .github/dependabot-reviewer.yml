@@ -1,0 +1,15 @@
+name: Dependabot reviewer
+
+on: pull_request_target
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  call-workflow-passing-data:
+    uses: grafana/security-github-actions/.github/workflows/dependabot-automerge.yaml@main
+    # with:
+    #  Add this to define production packages that dependabot can auto-update if the bump is minor
+    #  packages-minor-autoupdate: '[]'
+    secrets: inherit
