@@ -3,7 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.20
 
 require (
-	dagger.io/dagger v0.8.4
+	dagger.io/dagger v0.8.8
 	github.com/ClickHouse/clickhouse-go/v2 v2.14.1
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-units v0.5.0
@@ -23,9 +23,9 @@ require (
 	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/apache/arrow/go/v13 v13.0.0 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect
-	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
+	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	golang.org/x/sync v0.3.0 // indirect
@@ -83,7 +83,7 @@ require (
 	github.com/mattetti/filebuffer v1.0.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
-	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
@@ -144,7 +144,7 @@ require (
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
+	golang.org/x/tools v0.13.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230731193218-e0aa005b6bdf // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
