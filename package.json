@@ -68,7 +68,7 @@
     "@emotion/css": "^11.1.3",
     "@grafana/data": "9.4.3",
     "@grafana/experimental": "^1.7.0",
-    "@grafana/runtime": "9.4.3",
+    "@grafana/runtime": "10.1.5",
     "@grafana/ui": "10.1.0",
     "js-sql-parser": "^1.4.1",
     "pgsql-ast-parser": "^11.1.0",
