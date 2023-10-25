@@ -29,6 +29,7 @@ import {
   OrderByDirection,
   QueryBuilderOptions,
   ColumnHint,
+  TimeUnit,
 } from 'types/queryBuilder';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
@@ -42,6 +43,7 @@ import {
 } from './logs';
 import { getSqlFromQueryBuilderOptions, getColumnByHint } from '../components/queryBuilder/utils';
 import { generateSql } from './sqlGenerator';
+import { versions as otelVersions } from 'otel';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -365,6 +367,96 @@ export class Datasource
 
   getDefaultDatabase(): string {
     return this.settings.jsonData.defaultDatabase || 'default';
+  }
+
+  getDefaultTable(): string | undefined {
+    return this.settings.jsonData.defaultTable;
+  }
+
+  getDefaultLogsDatabase(): string | undefined {
+    return this.settings.jsonData.logs?.defaultDatabase;
+  }
+
+  getDefaultLogsTable(): string | undefined {
+    return this.settings.jsonData.logs?.defaultTable;
+  }
+
+  getDefaultLogsColumns(): Map<ColumnHint, string> {
+    const result = new Map<ColumnHint, string>();
+    const logsConfig = this.settings.jsonData.logs;
+    if (!logsConfig) {
+      return result;
+    }
+
+    const otelEnabled = logsConfig.otelEnabled;
+    const otelVersion = logsConfig.otelVersion;
+
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    if (otelEnabled && otelConfig) {
+      return otelConfig.logColumnMap;
+    }
+
+    logsConfig.timeColumn && result.set(ColumnHint.Time, logsConfig.timeColumn);
+    logsConfig.levelColumn && result.set(ColumnHint.LogLevel, logsConfig.levelColumn);
+    logsConfig.messageColumn && result.set(ColumnHint.LogMessage, logsConfig.messageColumn);
+
+    return result;
+  }
+
+  /**
+   * Get configured OTEL version for logs. Returns undefined when versioning is disabled/unset.
+   */
+  getLogsOtelVersion(): string | undefined {
+    const logConfig = this.settings.jsonData.logs;
+    return logConfig?.otelEnabled ? (logConfig.otelVersion || undefined) : undefined;
+  }
+
+  getDefaultTraceDatabase(): string | undefined {
+    return this.settings.jsonData.traces?.defaultDatabase;
+  }
+
+  getDefaultTraceTable(): string | undefined {
+    return this.settings.jsonData.traces?.defaultTable;
+  }
+
+  getDefaultTraceColumns(): Map<ColumnHint, string> {
+    const result = new Map<ColumnHint, string>();
+    const traceConfig = this.settings.jsonData.traces;
+    if (!traceConfig) {
+      return result;
+    }
+
+    const otelEnabled = traceConfig.otelEnabled;
+    const otelVersion = traceConfig.otelVersion;
+
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    if (otelEnabled && otelConfig) {
+      return otelConfig.traceColumnMap;
+    }
+
+    traceConfig.traceIdColumn && result.set(ColumnHint.TraceId, traceConfig.traceIdColumn);
+    traceConfig.spanIdColumn && result.set(ColumnHint.TraceSpanId, traceConfig.spanIdColumn);
+    traceConfig.operationNameColumn && result.set(ColumnHint.TraceOperationName, traceConfig.operationNameColumn);
+    traceConfig.parentSpanIdColumn && result.set(ColumnHint.TraceParentSpanId, traceConfig.parentSpanIdColumn);
+    traceConfig.serviceNameColumn && result.set(ColumnHint.TraceServiceName, traceConfig.serviceNameColumn);
+    traceConfig.durationColumn && result.set(ColumnHint.TraceDurationTime, traceConfig.durationColumn);
+    traceConfig.startTimeColumn && result.set(ColumnHint.Time, traceConfig.startTimeColumn);
+    traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
+    traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
+
+    return result;
+  }
+
+  /**
+   * Get configured OTEL version for traces. Returns undefined when versioning is disabled/unset.
+   */
+  getTraceOtelVersion(): string | undefined {
+    const traceConfig = this.settings.jsonData.traces;
+    return traceConfig?.otelEnabled ? (traceConfig.otelVersion || undefined) : undefined;
+  }
+
+  getDefaultTraceDurationUnit(): TimeUnit {
+    return this.settings.jsonData.traces?.durationUnit as TimeUnit || TimeUnit.Nanoseconds;
   }
 
   async fetchDatabases(): Promise<string[]> {

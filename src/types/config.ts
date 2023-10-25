@@ -1,18 +1,27 @@
 import { DataSourceJsonData } from '@grafana/data';
 
 export interface CHConfig extends DataSourceJsonData {
-  username: string;
-  server: string;
-  protocol: Protocol;
+  host: string;
   port: number;
-  defaultDatabase?: string;
+  protocol: Protocol;
+  secure?: boolean;
+
   tlsSkipVerify?: boolean;
   tlsAuth?: boolean;
   tlsAuthWithCACert?: boolean;
-  secure?: boolean;
-  validate?: boolean;
-  timeout?: string;
+
+  username: string;
+
+  defaultDatabase?: string;
+  defaultTable?: string;
+
+  dialTimeout?: string;
   queryTimeout?: string;
+  validateSql?: boolean;
+
+  logs?: CHLogsConfig;
+  traces?: CHTracesConfig;
+
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;
 }
@@ -27,6 +36,37 @@ export interface CHSecureConfig {
   tlsCACert?: string;
   tlsClientCert?: string;
   tlsClientKey?: string;
+}
+
+export interface CHLogsConfig {
+  defaultDatabase?: string;
+  defaultTable?: string;
+
+  otelEnabled?: boolean;
+  otelVersion?: string;
+
+  timeColumn?: string;
+  levelColumn?: string;
+  messageColumn?: string;
+}
+
+export interface CHTracesConfig {
+  defaultDatabase?: string;
+  defaultTable?: string;
+
+  otelEnabled?: boolean;
+  otelVersion?: string;
+
+  traceIdColumn?: string;
+  spanIdColumn?: string;
+  operationNameColumn?: string;
+  parentSpanIdColumn?: string;
+  serviceNameColumn?: string;
+  durationColumn?: string;
+  durationUnit?: string;
+  startTimeColumn?: string;
+  tagsColumn?: string;
+  serviceTagsColumn?: string;
 }
 
 export enum Protocol {

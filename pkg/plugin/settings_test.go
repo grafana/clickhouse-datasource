@@ -33,7 +33,7 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Server:             "foo",
+					Host:               "foo",
 					Port:               443,
 					Username:           "baz",
 					DefaultDatabase:    "example",
@@ -44,7 +44,7 @@ func TestLoadSettings(t *testing.T) {
 					TlsCACert:          "caCert",
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
-					Timeout:            "10",
+					DialTimeout:        "10",
 					QueryTimeout:       "60",
 					ProxyOptions: &proxy.Options{
 						Enabled: true,
@@ -69,12 +69,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Server:             "test",
+					Host:               "test",
 					Port:               443,
 					InsecureSkipVerify: true,
 					TlsClientAuth:      true,
 					TlsAuthWithCACert:  true,
-					Timeout:            "10",
+					DialTimeout:        "10",
 					QueryTimeout:       "60",
 					ProxyOptions:       nil,
 				},

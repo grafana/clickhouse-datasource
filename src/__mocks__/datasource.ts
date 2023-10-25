@@ -10,7 +10,7 @@ export const mockDatasource = new Datasource({
   type: 'grafana-clickhouse-datasource',
   name: 'ClickHouse',
   jsonData: {
-    server: 'foo.com',
+    host: 'foo.com',
     port: 443,
     username: 'user',
     defaultDatabase: 'foo',
