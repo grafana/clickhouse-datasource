@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
@@ -6,7 +6,7 @@ import { styles } from 'styles';
 import { Button } from '@grafana/ui';
 import { CHQuery, EditorType, CHBuilderQuery, defaultCHBuilderQuery } from 'types/sql';
 import { CHConfig } from 'types/config';
-import { QueryBuilderOptions } from 'types/queryBuilder';
+import { QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
@@ -51,7 +51,30 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange, app } = props;
-  const onBuilderOptionsChange = (builderOptions: QueryBuilderOptions) => {
+  const onBuilderOptionsChange = useCallback((nextBuilderOptions: Partial<QueryBuilderOptions>) => {
+    let builderOptions: QueryBuilderOptions = {
+      ...(query as CHBuilderQuery).builderOptions,
+      ...nextBuilderOptions,
+      meta: {
+        ...(query as CHBuilderQuery).builderOptions.meta,
+        ...nextBuilderOptions.meta
+      },
+    };
+
+    // If switching query type, reset the editor.
+    // Excludes Table/TimeSeries, since they're similar and less guided.
+    const prevQueryType = (query as CHBuilderQuery).builderOptions?.queryType;
+    const nextQueryType = nextBuilderOptions.queryType;
+    const queryTypeChanged = prevQueryType !== nextQueryType;
+    const isSwitchingBetweenTableAndTimeSeries = (prevQueryType === QueryType.Table && nextQueryType === QueryType.TimeSeries) || (prevQueryType === QueryType.TimeSeries && nextQueryType === QueryType.Table);
+    if (nextQueryType && queryTypeChanged && !isSwitchingBetweenTableAndTimeSeries) {
+      builderOptions = {
+        ...(query as CHBuilderQuery).builderOptions,
+        ...defaultCHBuilderQuery.builderOptions,
+        queryType: nextQueryType
+      }
+    }
+
     const sql = generateSql(builderOptions);
     onChange({
       ...query,
@@ -60,7 +83,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptions,
       format: mapQueryTypeToGrafanaFormat(builderOptions.queryType)
     });
-  };
+  }, [query, onChange]);
 
   if (query.editorType === EditorType.SQL) {
     return (

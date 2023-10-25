@@ -15,7 +15,7 @@ import { TraceQueryBuilder } from './views/TraceQueryBuilder';
 interface QueryBuilderProps {
   app: CoreApp | undefined;
   builderOptions: QueryBuilderOptions;
-  onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
+  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
   datasource: Datasource;
   generatedSql: string;
 }
@@ -24,9 +24,9 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   const { datasource, builderOptions, onBuilderOptionsChange, generatedSql } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
 
-  const onDatabaseChange = (database: string) => onBuilderOptionsChange({ ...builderOptions, database, table: '' });
-  const onTableChange = (table: string) => onBuilderOptionsChange({ ...builderOptions, table });
-  const onQueryTypeChange = (queryType: QueryType) => onBuilderOptionsChange({ ...builderOptions, queryType });
+  const onDatabaseChange = (database: string) => onBuilderOptionsChange({ database, table: '' });
+  const onTableChange = (table: string) => onBuilderOptionsChange({ table });
+  const onQueryTypeChange = (queryType: QueryType) => onBuilderOptionsChange({ queryType });
 
   return (
     <div data-testid="query-editor-section-builder">
@@ -41,10 +41,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </div>
 
-      { builderOptions.queryType === QueryType.Table && <TableQueryBuilder allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
-      { builderOptions.queryType === QueryType.Logs && <LogsQueryBuilder allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
-      { builderOptions.queryType === QueryType.TimeSeries && <TimeSeriesQueryBuilder allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
-      { builderOptions.queryType === QueryType.Traces && <TraceQueryBuilder allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { builderOptions.queryType === QueryType.Table && <TableQueryBuilder datasource={datasource} allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { builderOptions.queryType === QueryType.Logs && <LogsQueryBuilder datasource={datasource} allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { builderOptions.queryType === QueryType.TimeSeries && <TimeSeriesQueryBuilder datasource={datasource} allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { builderOptions.queryType === QueryType.Traces && <TraceQueryBuilder datasource={datasource} allColumns={allColumns} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
 
       <SqlPreview sql={generatedSql} />
     </div>

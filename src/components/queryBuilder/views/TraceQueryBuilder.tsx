@@ -1,96 +1,136 @@
 import React, { useEffect, useState } from 'react';
-import { BuilderMode, Filter, TableColumn, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
+import { Filter, TableColumn, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'components/queryBuilder/utils';
-import { Collapse, InlineFormLabel, Input, Select } from '@grafana/ui';
-import { SelectableValue } from '@grafana/data';
-import { styles } from 'styles';
+import { Alert, Collapse, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
+import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
+import { Datasource } from 'data/CHDatasource';
+import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 
 interface TraceQueryBuilderProps {
   allColumns: readonly TableColumn[];
+  datasource: Datasource;
   builderOptions: QueryBuilderOptions,
-  onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
+  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
+}
+
+interface TraceQueryBuilderState {
+  isSearchMode: boolean;
+  traceIdColumn?: SelectedColumn;
+  spanIdColumn?: SelectedColumn;
+  parentSpanIdColumn?: SelectedColumn;
+  serviceNameColumn?: SelectedColumn;
+  operationNameColumn?: SelectedColumn;
+  startTimeColumn?: SelectedColumn;
+  durationTimeColumn?: SelectedColumn;
+  durationUnit: TimeUnit;
+  tagsColumn?: SelectedColumn;
+  serviceTagsColumn?: SelectedColumn;
+  traceId: string;
+  filters: Filter[];
 }
 
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
-  const { allColumns, builderOptions, onBuilderOptionsChange } = props;
-  const [isSearchMode, setSearchMode] = useState<boolean>(false); // Toggle for Trace ID vs Trace Search mode
-  const [isColumnsOpen, setColumnsOpen] = useState<boolean>(true); // Toggle Columns collapsable section
+  const { allColumns, datasource, builderOptions, onBuilderOptionsChange } = props;
+  const showConfigWarning = datasource.getDefaultTraceColumns().size === 0;
+  const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapsable section
   const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapsable section
-  const [traceIdColumn, setTraceIdColumn] = useState<SelectedColumn>();
-  const [spanIdColumn, setSpanIdColumn] = useState<SelectedColumn>();
-  const [parentSpanIdColumn, setParentSpanIdColumn] = useState<SelectedColumn>();
-  const [serviceNameColumn, setServiceNameColumn] = useState<SelectedColumn>();
-  const [operationNameColumn, setOperationNameColumn] = useState<SelectedColumn>();
-  const [startTimeColumn, setStartTimeColumn] = useState<SelectedColumn>();
-  const [durationTimeColumn, setDurationTimeColumn] = useState<SelectedColumn>();
-  const [durationUnit, setDurationUnit] = useState<TimeUnit>(TimeUnit.Nanoseconds);
-  const [tagsColumn, setTagsColumn] = useState<SelectedColumn>();
-  const [serviceTagsColumn, setServiceTagsColumn] = useState<SelectedColumn>();
-  const [traceId, setTraceId] = useState<string>('');
-  const [filters, setFilters] = useState<Filter[]>([]);
   const labels = allLabels.components.TraceQueryBuilder;
+  const builderState: TraceQueryBuilderState = {
+    isSearchMode: builderOptions.meta?.isTraceSearchMode || false,
+    traceIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceId),
+    spanIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceSpanId),
+    parentSpanIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceParentSpanId),
+    serviceNameColumn: getColumnByHint(builderOptions, ColumnHint.TraceServiceName),
+    operationNameColumn: getColumnByHint(builderOptions, ColumnHint.TraceOperationName),
+    startTimeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
+    durationTimeColumn: getColumnByHint(builderOptions, ColumnHint.TraceDurationTime),
+    durationUnit: builderOptions.meta?.traceDurationUnit || TimeUnit.Nanoseconds,
+    tagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceTags),
+    serviceTagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceServiceTags),
+    traceId: builderOptions.meta?.traceId || '',
+    filters: builderOptions.filters || [],
+  };
 
   useEffect(() => {
-    builderOptions.meta?.isTraceSearchMode !== undefined && setSearchMode(builderOptions.meta.isTraceSearchMode);
-    setTraceIdColumn(getColumnByHint(builderOptions, ColumnHint.TraceId));
-    setSpanIdColumn(getColumnByHint(builderOptions, ColumnHint.TraceSpanId));
-    setParentSpanIdColumn(getColumnByHint(builderOptions, ColumnHint.TraceParentSpanId));
-    setServiceNameColumn(getColumnByHint(builderOptions, ColumnHint.TraceServiceName));
-    setOperationNameColumn(getColumnByHint(builderOptions, ColumnHint.TraceOperationName));
-    setStartTimeColumn(getColumnByHint(builderOptions, ColumnHint.TraceStartTime));
-    setDurationTimeColumn(getColumnByHint(builderOptions, ColumnHint.TraceDurationTime));
-    builderOptions.meta?.traceDurationUnit && setDurationUnit(builderOptions.meta.traceDurationUnit);
-    setTagsColumn(getColumnByHint(builderOptions, ColumnHint.TraceTags));
-    setServiceTagsColumn(getColumnByHint(builderOptions, ColumnHint.TraceServiceTags));
-    builderOptions.meta?.traceId && setTraceId(builderOptions.meta.traceId);
-    builderOptions.filters && setFilters(builderOptions.filters);
+    const shouldApplyDefaults = (builderOptions.columns || []).length === 0 && (builderOptions.orderBy || []).length === 0;
+    if (!shouldApplyDefaults) {
+      return;
+    }
+
+    const defaultDb = datasource.getDefaultTraceDatabase() || datasource.getDefaultDatabase();
+    const defaultTable = datasource.getDefaultTraceTable() || datasource.getDefaultTable();
+    const defaultDurationUnit = datasource.getDefaultTraceDurationUnit();
+    const otelVersion = datasource.getTraceOtelVersion();
+    const defaultColumns = datasource.getDefaultTraceColumns();
+
+    const nextColumns: SelectedColumn[] = [];
+    for (let [hint, colName] of defaultColumns) {
+      nextColumns.push({ name: colName, hint });
+    }
+
+    onBuilderOptionsChange({
+      database: defaultDb,
+      table: defaultTable || builderOptions.table,
+      columns: nextColumns,
+      // filters,
+      // orderBy,
+      meta: {
+        otelEnabled: Boolean(otelVersion),
+        otelVersion,
+        traceDurationUnit: defaultDurationUnit
+      }
+    });
 
     // Run on load
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
+  const onOptionChange = useBuilderOptionChanges<TraceQueryBuilderState>(next => {
     const nextColumns = [
-      traceIdColumn,
-      spanIdColumn,
-      parentSpanIdColumn,
-      serviceNameColumn,
-      operationNameColumn,
-      startTimeColumn,
-      durationTimeColumn,
-      tagsColumn,
-      serviceTagsColumn
+      next.traceIdColumn,
+      next.spanIdColumn,
+      next.parentSpanIdColumn,
+      next.serviceNameColumn,
+      next.operationNameColumn,
+      next.startTimeColumn,
+      next.durationTimeColumn,
+      next.tagsColumn,
+      next.serviceTagsColumn
     ].filter(c => c !== undefined) as SelectedColumn[];
-    
 
     onBuilderOptionsChange({
-      ...builderOptions,
-      mode: BuilderMode.List,
       columns: nextColumns,
-      filters,
+      filters: next.filters,
       meta: {
-        ...builderOptions.meta,
-        isTraceSearchMode: isSearchMode,
-        traceDurationUnit: durationUnit,
-        traceId: traceId,
+        isTraceSearchMode: next.isSearchMode,
+        traceDurationUnit: next.durationUnit,
+        traceId: next.traceId,
       }
     });
-
-    // TODO: ignore when builderOptions changes?
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traceIdColumn, spanIdColumn, parentSpanIdColumn, serviceNameColumn, operationNameColumn, startTimeColumn, durationTimeColumn, tagsColumn, serviceTagsColumn, filters, isSearchMode, durationUnit, traceId]);
+  }, builderState);
   
+  const configWarning = showConfigWarning && (
+    <Alert title="" severity="warning">
+      <VerticalGroup>
+        <div>
+          {'To speed up your query building, enter your default trace configuration in your '}
+          <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}`}>ClickHouse Data Source settings</a>
+        </div>
+      </VerticalGroup>
+    </Alert>
+  );
+
   return (
     <div>
       <ModeSwitch
         labelA={labels.traceIdModeLabel}
         labelB={labels.traceSearchModeLabel}
-        value={isSearchMode}
-        onChange={setSearchMode}
+        value={builderState.isSearchMode}
+        onChange={onOptionChange('isSearchMode')}
         label={labels.traceModeLabel}
         tooltip={labels.traceModeTooltip}
       />
@@ -100,11 +140,13 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         isOpen={isColumnsOpen}
         onToggle={setColumnsOpen}
       >
+        { configWarning }
         <div className="gf-form">
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={traceIdColumn}
-            onColumnChange={setTraceIdColumn}
+            selectedColumn={builderState.traceIdColumn}
+            invalid={!builderState.traceIdColumn}
+            onColumnChange={onOptionChange('traceIdColumn')}
             columnHint={ColumnHint.TraceId}
             label={labels.columns.traceId.label}
             tooltip={labels.columns.traceId.tooltip}
@@ -112,8 +154,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={spanIdColumn}
-            onColumnChange={setSpanIdColumn}
+            selectedColumn={builderState.spanIdColumn}
+            invalid={!builderState.spanIdColumn}
+            onColumnChange={onOptionChange('spanIdColumn')}
             columnHint={ColumnHint.TraceSpanId}
             label={labels.columns.spanId.label}
             tooltip={labels.columns.spanId.tooltip}
@@ -124,8 +167,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         <div className="gf-form">
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={parentSpanIdColumn}
-            onColumnChange={setParentSpanIdColumn}
+            selectedColumn={builderState.parentSpanIdColumn}
+            invalid={!builderState.parentSpanIdColumn}
+            onColumnChange={onOptionChange('parentSpanIdColumn')}
             columnHint={ColumnHint.TraceParentSpanId}
             label={labels.columns.parentSpanId.label}
             tooltip={labels.columns.parentSpanId.tooltip}
@@ -133,8 +177,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={serviceNameColumn}
-            onColumnChange={setServiceNameColumn}
+            selectedColumn={builderState.serviceNameColumn}
+            invalid={!builderState.serviceNameColumn}
+            onColumnChange={onOptionChange('serviceNameColumn')}
             columnHint={ColumnHint.TraceServiceName}
             label={labels.columns.serviceName.label}
             tooltip={labels.columns.serviceName.tooltip}
@@ -145,8 +190,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         <div className="gf-form">
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={operationNameColumn}
-            onColumnChange={setOperationNameColumn}
+            selectedColumn={builderState.operationNameColumn}
+            invalid={!builderState.operationNameColumn}
+            onColumnChange={onOptionChange('operationNameColumn')}
             columnHint={ColumnHint.TraceOperationName}
             label={labels.columns.operationName.label}
             tooltip={labels.columns.operationName.tooltip}
@@ -154,9 +200,10 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={startTimeColumn}
-            onColumnChange={setStartTimeColumn}
-            columnHint={ColumnHint.TraceStartTime}
+            selectedColumn={builderState.startTimeColumn}
+            invalid={!builderState.startTimeColumn}
+            onColumnChange={onOptionChange('startTimeColumn')}
+            columnHint={ColumnHint.Time}
             label={labels.columns.startTime.label}
             tooltip={labels.columns.startTime.tooltip}
             wide
@@ -166,23 +213,26 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         <div className="gf-form">
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={durationTimeColumn}
-            onColumnChange={setDurationTimeColumn}
+            selectedColumn={builderState.durationTimeColumn}
+            invalid={!builderState.durationTimeColumn}
+            onColumnChange={onOptionChange('durationTimeColumn')}
             columnHint={ColumnHint.TraceDurationTime}
             label={labels.columns.durationTime.label}
             tooltip={labels.columns.durationTime.tooltip}
             wide
           />
           <DurationUnitSelect
-            unit={durationUnit}
-            onChange={setDurationUnit}
+            unit={builderState.durationUnit}
+            onChange={onOptionChange('durationUnit')}
+            inline
           />
         </div>
         <div className="gf-form">
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={tagsColumn}
-            onColumnChange={setTagsColumn}
+            selectedColumn={builderState.tagsColumn}
+            invalid={!builderState.tagsColumn}
+            onColumnChange={onOptionChange('tagsColumn')}
             columnHint={ColumnHint.TraceTags}
             label={labels.columns.tags.label}
             tooltip={labels.columns.tags.tooltip}
@@ -190,8 +240,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
           <ColumnSelect
             allColumns={allColumns}
-            selectedColumn={serviceTagsColumn}
-            onColumnChange={setServiceTagsColumn}
+            selectedColumn={builderState.serviceTagsColumn}
+            invalid={!builderState.serviceTagsColumn}
+            onColumnChange={onOptionChange('serviceTagsColumn')}
             columnHint={ColumnHint.TraceServiceTags}
             label={labels.columns.serviceTags.label}
             tooltip={labels.columns.serviceTags.tooltip}
@@ -200,52 +251,24 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
       </Collapse>
-      { isSearchMode ? (
+      { builderState.isSearchMode ? (
         <Collapse label={labels.filtersSection}
           collapsible
           isOpen={isFiltersOpen}
           onToggle={setFiltersOpen}
         >
-          <FiltersEditor filters={filters} onFiltersChange={setFilters} allColumns={allColumns} />
+          <FiltersEditor
+            allColumns={allColumns}
+            filters={builderState.filters}
+            onFiltersChange={onOptionChange('filters')}
+          />
         </Collapse>
       ) :
-        <TraceIdInput traceId={traceId} onChange={setTraceId} />
+        <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />
       }
     </div>
   );
 }
-
-interface DurationUnitSelectProps {
-  unit: TimeUnit;
-  onChange: (u: TimeUnit) => void;
-};
-
-const durationUnitOptions: ReadonlyArray<SelectableValue<TimeUnit>> = [
-  { label: TimeUnit.Seconds, value: TimeUnit.Seconds },
-  { label: TimeUnit.Milliseconds, value: TimeUnit.Milliseconds },
-  { label: TimeUnit.Microseconds, value: TimeUnit.Microseconds },
-  { label: TimeUnit.Nanoseconds, value: TimeUnit.Nanoseconds },
-];
-
-const DurationUnitSelect = (props: DurationUnitSelectProps) => {
-  const { unit, onChange } = props;
-  const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.durationUnit;
-
-  return (
-    <div className="gf-form">
-      <InlineFormLabel width={12} className={`query-keyword ${styles.QueryEditor.inlineField}`} tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <Select<TimeUnit>
-        options={durationUnitOptions as Array<SelectableValue<TimeUnit>>}
-        value={unit}
-        onChange={v => onChange(v.value!)}
-        width={25}
-        menuPlacement={'bottom'}
-      />
-    </div>
-  );
-};
 
 interface TraceIdInputProps {
   traceId: string;

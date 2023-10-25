@@ -38,14 +38,16 @@ export interface QueryBuilderOptions {
    */
   meta?: {
     // Logs
-    otelEnabled?: boolean;
-    otelVersion?: string;
     liveView?: boolean;
 
     // Trace
     isTraceSearchMode?: boolean;
     traceDurationUnit?: TimeUnit;
     traceId?: string;
+
+    // Logs & Traces
+    otelEnabled?: boolean;
+    otelVersion?: string;
   }
 }
 
@@ -114,7 +116,6 @@ export enum ColumnHint {
   TraceParentSpanId = 'trace_parent_span_id',
   TraceServiceName = 'trace_service_name',
   TraceOperationName = 'trace_operation_name',
-  TraceStartTime = 'trace_start_time',
   TraceDurationTime = 'trace_duration_time',
   TraceTags = 'trace_tags',
   TraceServiceTags = 'trace_service_tags',
@@ -173,6 +174,10 @@ export interface CommonFilterProps {
   key: string;
   type: string;
   condition: 'AND' | 'OR';
+  /**
+   * Used to uniquely identify a dynamically added filter
+   */
+  id?: string;
 }
 
 export interface NullFilter extends CommonFilterProps {

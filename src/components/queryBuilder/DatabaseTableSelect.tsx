@@ -57,7 +57,6 @@ export type TableSelectProps = {
   onTableChange: (value: string) => void;
 };
 
-
 export const TableSelect = (props: TableSelectProps) => {
   const { datasource, onTableChange, database, table } = props;
   const tables = useTables(datasource, database);
@@ -66,17 +65,18 @@ export const TableSelect = (props: TableSelectProps) => {
   const options = tables.map(t => ({ label: t, value: t }));
   options.push({ label: empty, value: '' }); // Allow a blank value
 
+  // Include saved value in case it's no longer listed
   if (table && !tables.includes(table)) {
     options.push({ label: table, value: table });
   }
 
-  // useEffect(() => {
-  //   // TODO: broken. tables are loaded async when the db is changed, so it picks the first table from the previous db
-  //   // Auto select first table
-  //   if (database && !table && tables.length > 0) {
-  //       onTableChange(tables[0]);
-  //   }
-  // }, [database, table, tables, onTableChange]);
+  useEffect(() => {
+    // Auto select first/default table
+    // TODO: this still seems to lag behind when switching DB, probably due to async table fetch
+    if (database && !table && tables.length > 0) {
+      onTableChange(datasource.getDefaultTable() || tables[0]);
+    }
+  }, [database, table, tables, datasource, onTableChange]);
 
   return (
     <>

@@ -40,8 +40,8 @@ const standardTimeOptions: Array<SelectableValue<string>> = [
 export const defaultNewFilter: NullFilter = {
   filterType: 'custom',
   condition: 'AND',
-  key: 'Id',
-  type: 'id',
+  key: '',
+  type: '',
   operator: FilterOperator.IsNotNull,
 };
 export interface PredefinedFilter {

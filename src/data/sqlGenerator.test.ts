@@ -13,7 +13,7 @@ describe('SQL Generator', () => {
           { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
           { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
           { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
-          { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.TraceStartTime },
+          { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
           { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
           { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
           { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },

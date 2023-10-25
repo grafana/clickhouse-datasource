@@ -115,7 +115,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
       }
     });
     editor.onKeyUp((e: any) => {
-      if (datasource.settings.jsonData.validate) {
+      if (datasource.settings.jsonData.validateSql) {
         const sql = editor.getValue();
         validateSql(sql, editor.getModel(), me);
       }

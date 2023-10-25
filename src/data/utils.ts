@@ -14,8 +14,8 @@ export const mapQueryTypeToGrafanaFormat = (t: QueryType): number => {
     case QueryType.TimeSeries:
       return 0;
     case QueryType.Traces:
-      return 3
+      return 3;
     default:
-      return -1 // defaults to timeseries/graph on plugin backend.
+      return 1 << 8; // an unused u32, defaults to timeseries/graph on plugin backend.
   }
 }

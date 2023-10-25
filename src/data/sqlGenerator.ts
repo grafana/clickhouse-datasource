@@ -50,7 +50,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(`${escapeIdentifier(traceOperationName.name)} as operationName`);
   }
   
-  const traceStartTime = getColumnByHint(options, ColumnHint.TraceStartTime);
+  const traceStartTime = getColumnByHint(options, ColumnHint.Time);
   if (traceStartTime !== undefined) {
     selectParts.push(`toInt64(${escapeIdentifier(traceStartTime.name)}) as startTime`);
   }
@@ -61,6 +61,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
   }
   
+  // TODO: for tags and serviceTags, consider the column type. They might not require mapping, they could already be JSON.
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   if (traceTags !== undefined) {
     selectParts.push(`arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`);
@@ -140,6 +141,10 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(getColumnIdentifier(logLevel));
   }
 
+  options.columns?.
+    filter(c => c.hint === undefined). // remove specialized columns
+    forEach(c => selectParts.push(getColumnIdentifier(c)));
+
   const selectPartsSql = selectParts.join(', ');
 
   queryParts.push('SELECT');
@@ -180,7 +185,11 @@ export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly 
 }
 
 const getColumnIdentifier = (col: SelectedColumn): string => {
-  let colName = escapeIdentifier(col.name);
+  let colName = col.name;
+  
+  if (colName.includes(' ')) {
+    colName = escapeIdentifier(col.name);
+  }
 
   // allow for functions like count()
   if (colName.includes('(') || colName.includes(')')) {

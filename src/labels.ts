@@ -34,7 +34,7 @@ export default {
       tooltip: 'A list of columns to include in the query'
     },
     OtelVersionSelect: {
-      label: 'OTEL Logs',
+      label: 'Use OTEL',
       tooltip: 'Enables Open Telemetry schema versioning'
     },
     LimitEditor: {

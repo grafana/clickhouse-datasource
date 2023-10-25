@@ -10,21 +10,22 @@ interface OtelVersionSelectProps {
   selectedVersion: string,
   onVersionChange: (version: string) => void,
   defaultToLatest?: boolean,
+  wide?: boolean,
 }
 
 export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
-  const { enabled, onEnabledChange, selectedVersion, onVersionChange, defaultToLatest } = props;
+  const { enabled, onEnabledChange, selectedVersion, onVersionChange, defaultToLatest, wide } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
-  const options: SelectableValue[] = allVersions.
-    map(v => ({
-      label: `${v.version}${v.name ? (` (${v.name})`) : ''}`,
-      value: v.version
-    }));
+  const options: SelectableValue[] = allVersions.map(v => ({
+    label: `${v.version}${v.name ? (` (${v.name})`) : ''}`,
+    value: v.version
+  }));
 
-    const hasCurrentVersion = allVersions.find(v => v.version === selectedVersion);
-    if (!hasCurrentVersion) {
-      options.push({ label: selectedVersion, value: selectedVersion });
+  useEffect(() => {
+    if (defaultToLatest && selectedVersion === '') {
+      onVersionChange(allVersions[0].version);
     }
+  }, [defaultToLatest, selectedVersion, onVersionChange]);
 
   const theme = useTheme();
   const switchContainerStyle: React.CSSProperties = {
@@ -34,15 +35,9 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
     alignItems: 'center',
   };
 
-  useEffect(() => {
-    if (defaultToLatest && selectedVersion === '') {
-      onVersionChange(allVersions[0].version);
-    }
-  }, [selectedVersion, onVersionChange, defaultToLatest])
-
   return (
     <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+      <InlineFormLabel width={wide ? 12 : 8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <div style={switchContainerStyle}>

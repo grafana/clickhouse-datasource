@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { AggregateColumn, BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, AggregateType } from 'types/queryBuilder';
+import { AggregateColumn, BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
@@ -8,59 +8,49 @@ import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { AggregateEditor } from '../AggregateEditor';
 import { GroupByEditor } from '../GroupByEditor';
+import { Datasource } from 'data/CHDatasource';
+import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 
 interface TableQueryBuilderProps {
   allColumns: readonly TableColumn[];
+  datasource: Datasource;
   builderOptions: QueryBuilderOptions,
-  onBuilderOptionsChange: (builderOptions: QueryBuilderOptions) => void;
+  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
 }
 
-const emptyAggregate: AggregateColumn = { column: '', aggregateType: AggregateType.Count };
+interface TableQueryBuilderState {
+  selectedColumns: SelectedColumn[];
+  aggregates: AggregateColumn[];
+  groupBy: string[];
+  orderBy: OrderBy[];
+  limit: number;
+  filters: Filter[];
+}
 
 export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const { allColumns, builderOptions, onBuilderOptionsChange } = props;
-  const [isAggregateMode, setAggregateMode] = useState<boolean>(false); // Toggle Simple vs Aggregate mode
-  const [selectedColumns, setSelectedColumns] = useState<SelectedColumn[]>([]);
-  const [aggregates, setAggregates] = useState<AggregateColumn[]>([emptyAggregate]);
-  const [groupBy, setGroupBy] = useState<string[]>([]);
-  const [orderBy, setOrderBy] = useState<OrderBy[]>([]);
-  const [limit, setLimit] = useState<number>(1000);
-  const [filters, setFilters] = useState<Filter[]>([]);
   const labels = allLabels.components.TableQueryBuilder;
+  const [isAggregateMode, setAggregateMode] = useState<boolean>((builderOptions.aggregates?.length || 0) > 0); // Toggle Simple vs Aggregate mode
+  const builderState: TableQueryBuilderState = {
+    selectedColumns: builderOptions.columns || [],
+    aggregates: builderOptions.aggregates || [],
+    groupBy: builderOptions.groupBy || [],
+    orderBy: builderOptions.orderBy || [],
+    limit: builderOptions.limit || 1000,
+    filters: builderOptions.filters || [],
+  };
 
-  useEffect(() => {
-    builderOptions.aggregates && setAggregateMode(builderOptions.aggregates.length > 0);
-    builderOptions.columns && setSelectedColumns(builderOptions.columns);
-    builderOptions.aggregates && setAggregates(builderOptions.aggregates);
-    builderOptions.groupBy && setGroupBy(builderOptions.groupBy);
-    builderOptions.orderBy && setOrderBy(builderOptions.orderBy);
-    builderOptions.limit && setLimit(builderOptions.limit);
-    builderOptions.filters && setFilters(builderOptions.filters);
-
-    // Run on load
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const nextOptions: QueryBuilderOptions = {
-      ...builderOptions,
+  const onOptionChange = useBuilderOptionChanges<TableQueryBuilderState>(next => {
+    onBuilderOptionsChange({
       mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
-      columns: selectedColumns,
-      filters,
-      orderBy,
-      limit
-    };
-
-    if (isAggregateMode) {
-      nextOptions.aggregates = aggregates;
-      nextOptions.groupBy = groupBy;
-    }
-
-    onBuilderOptionsChange(nextOptions);
-
-    // TODO: ignore when builderOptions changes?
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAggregateMode, selectedColumns, filters, aggregates, groupBy, orderBy, limit]);
+      columns: next.selectedColumns,
+      aggregates: isAggregateMode ? next.aggregates : [],
+      groupBy: isAggregateMode ? next.groupBy : [],
+      filters: next.filters,
+      orderBy: next.orderBy,
+      limit: next.limit
+    });
+  }, builderState);
 
   return (
     <div>
@@ -73,22 +63,27 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
         tooltip={labels.builderModeTooltip}
       />
 
-      <ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={setSelectedColumns} />
+      <ColumnsEditor
+        allColumns={allColumns}
+        selectedColumns={builderState.selectedColumns}
+        onSelectedColumnsChange={onOptionChange('selectedColumns')}
+        showAllOption
+      />
 
       {isAggregateMode && (
         <>
-          <AggregateEditor allColumns={allColumns} aggregates={aggregates} onAggregatesChange={setAggregates} />
-          <GroupByEditor groupBy={groupBy} onGroupByChange={setGroupBy} allColumns={allColumns} />
+          <AggregateEditor allColumns={allColumns} aggregates={builderState.aggregates} onAggregatesChange={onOptionChange('aggregates')} />
+          <GroupByEditor groupBy={builderState.groupBy} onGroupByChange={onOptionChange('groupBy')} allColumns={allColumns} />
         </>
       )}
 
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}
-        orderBy={orderBy}
-        onOrderByChange={setOrderBy}
+        orderBy={builderState.orderBy}
+        onOrderByChange={onOptionChange('orderBy')}
       />
-      <LimitEditor limit={limit} onLimitChange={setLimit} />
-      <FiltersEditor filters={filters} onFiltersChange={setFilters} allColumns={allColumns} />
+      <LimitEditor limit={builderState.limit} onLimitChange={onOptionChange('limit')} />
+      <FiltersEditor filters={builderState.filters} onFiltersChange={onOptionChange('filters')} allColumns={allColumns} />
     </div>
   );
 }
