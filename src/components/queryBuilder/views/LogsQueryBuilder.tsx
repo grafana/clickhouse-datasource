@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, DateFilterWithoutValue, FilterOperator } from 'types/queryBuilder';
+import { Filter, TableColumn, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { OtelVersionSelect } from '../OtelVersionSelect';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
