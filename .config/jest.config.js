@@ -25,7 +25,7 @@ module.exports = {
     '^.+\\.(t|j)sx?$': [
       '@swc/jest',
       {
-        sourceMaps: true,
+        sourceMaps: 'inline',
         jsc: {
           parser: {
             syntax: 'typescript',
