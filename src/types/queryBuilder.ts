@@ -150,6 +150,7 @@ export enum OrderByDirection {
 export interface OrderBy {
   name: string;
   dir: OrderByDirection;
+  default?: boolean;
 }
 
 export enum FilterOperator {

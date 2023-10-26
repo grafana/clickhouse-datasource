@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, DateFilterWithoutValue, FilterOperator } from 'types/queryBuilder';
+import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, DateFilterWithoutValue, FilterOperator, OrderByDirection } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { OtelVersionSelect } from '../OtelVersionSelect';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
@@ -126,12 +126,29 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       nextColumns.push({ name: colName, hint });
     }
 
+    const nextFilters: Filter[] = [];
+    const nextOrderBy: OrderBy[] = [];
+    if (defaultColumns.has(ColumnHint.Time)) {
+      const timeRangeFilter: DateFilterWithoutValue = {
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: defaultColumns.get(ColumnHint.Time)!,
+        id: 'timeRange',
+        condition: 'AND'
+      };
+      nextFilters.push(timeRangeFilter);
+
+      const defaultOrderBy: OrderBy = { name: defaultColumns.get(ColumnHint.Time)!, dir: OrderByDirection.DESC, default: true };
+      nextOrderBy.push(defaultOrderBy);
+    }
+
     onBuilderOptionsChange({
       database: defaultDb,
       table: defaultTable || builderOptions.table,
       columns: nextColumns,
-      // filters,
-      // orderBy,
+      filters: nextFilters,
+      orderBy: nextOrderBy,
       meta: {
         otelEnabled: Boolean(otelVersion),
         otelVersion,
@@ -142,15 +159,16 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Select default time filter on timeColumn change
+  // Apply default filters/orderBy on timeColumn change
   const lastTimeColumn = useRef<string>(builderState.timeColumn?.name || '');
   useEffect(() => {
     if (!builderState.timeColumn) {
       return;
-    } else if ((builderState.timeColumn.name === lastTimeColumn.current) || builderState.filters.find(f => f.id === 'timeRange')) {
+    } else if ((builderState.timeColumn.name === lastTimeColumn.current)) {
       return;
     }
 
+    const nextFilters: Filter[] = builderState.filters.filter(f => f.id !== 'timeRange');
     const timeRangeFilter: DateFilterWithoutValue = {
       type: 'datetime',
       operator: FilterOperator.WithInGrafanaTimeRange,
@@ -159,15 +177,27 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       id: 'timeRange',
       condition: 'AND'
     };
+    nextFilters.unshift(timeRangeFilter);
 
+    const nextOrderBy: OrderBy[] = builderState.orderBy.filter(o => !o.default);
+    const defaultOrderBy: OrderBy = { name: builderState.timeColumn?.name, dir: OrderByDirection.DESC, default: true };
+    nextOrderBy.unshift(defaultOrderBy);
+    
     lastTimeColumn.current = builderState.timeColumn.name;
-    onOptionChange('filters')([timeRangeFilter, ...builderState.filters.filter(f => f.id !== 'timeRange')]);
-  }, [builderState.timeColumn, builderState.filters, onOptionChange]);
+    onBuilderOptionsChange({
+      filters: nextFilters,
+      orderBy: nextOrderBy
+    });
+  }, [builderState.timeColumn, builderState.filters, builderState.orderBy, onBuilderOptionsChange]);
 
   // Find and select a default time column, update when table changes
   const lastTable = useRef<string>(builderOptions.table);
   const defaultTimeSelected = useRef<boolean>(Boolean(builderState.timeColumn));
   useEffect(() => {
+    if (datasource.getDefaultLogsTable() === builderOptions.table && datasource.getDefaultLogsColumns().has(ColumnHint.Time)) {
+      return;
+    }
+
     if (builderOptions.table !== lastTable.current) {
       defaultTimeSelected.current = false;
     }
@@ -191,8 +221,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     lastTable.current = builderOptions.table;
     defaultTimeSelected.current = true;
     onOptionChange('timeColumn')(timeColumn);
-
-  }, [allColumns, builderOptions.table, builderState.timeColumn, onOptionChange]);
+  }, [allColumns, datasource, builderOptions.table, builderState.timeColumn, onOptionChange]);
   
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning">

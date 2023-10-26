@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn } from 'types/queryBuilder';
+import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn, DateFilterWithoutValue, FilterOperator } from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
@@ -53,7 +53,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     }
 
     onBuilderOptionsChange({
-      mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
+      mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.Trend,
       columns: nextColumns,
       aggregates: isAggregateMode ? next.aggregates : [],
       groupBy: isAggregateMode ? next.groupBy : [],
@@ -63,8 +63,37 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     });
   }, builderState);
 
+  // Select default time filter on timeColumn change
+  const lastTimeColumn = useRef<string>(builderState.timeColumn?.name || '');
   useEffect(() => {
-    if (allColumns.length === 0) {
+    if (!builderState.timeColumn) {
+      return;
+    } else if ((builderState.timeColumn.name === lastTimeColumn.current) || builderState.filters.find(f => f.id === 'timeRange')) {
+      return;
+    }
+
+    const timeRangeFilter: DateFilterWithoutValue = {
+      type: 'datetime',
+      operator: FilterOperator.WithInGrafanaTimeRange,
+      filterType: 'custom',
+      key: builderState.timeColumn.name,
+      id: 'timeRange',
+      condition: 'AND'
+    };
+
+    lastTimeColumn.current = builderState.timeColumn.name;
+    onOptionChange('filters')([timeRangeFilter, ...builderState.filters.filter(f => f.id !== 'timeRange')]);
+  }, [builderState.timeColumn, builderState.filters, onOptionChange]);
+
+  // Find and select a default time column, update when table changes
+  const lastTable = useRef<string>(builderOptions.table);
+  const defaultTimeSelected = useRef<boolean>(Boolean(builderState.timeColumn));
+  useEffect(() => {
+    if (builderOptions.table !== lastTable.current) {
+      defaultTimeSelected.current = false;
+    }
+
+    if (allColumns.length === 0 || !builderOptions.table || defaultTimeSelected.current) {
       return;
     }
 
@@ -80,11 +109,11 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       hint: ColumnHint.Time
     };
   
+    lastTable.current = builderOptions.table;
+    defaultTimeSelected.current = true;
     onOptionChange('timeColumn')(timeColumn);
 
-    // Find and select a default time column, update when table changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allColumns, builderOptions.table]);
+  }, [allColumns, builderOptions.table, builderState.timeColumn, onOptionChange]);
 
   return (
     <div>

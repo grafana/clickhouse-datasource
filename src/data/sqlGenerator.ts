@@ -192,7 +192,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
   }
 
   // allow for functions like count()
-  if (colName.includes('(') || colName.includes(')')) {
+  if (colName.includes('(') || colName.includes(')') || colName.includes('"') || colName.includes('"')) {
     colName = col.name
   }
 
