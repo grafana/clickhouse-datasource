@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 
 type onOptionChangeFn<T> = (key: keyof T | Object) => (nextValue: React.SetStateAction<any>) => void;
 
@@ -13,7 +13,7 @@ type onOptionChangeFn<T> = (key: keyof T | Object) => (nextValue: React.SetState
  * @returns a function used to apply changes to individual fields
  */
 export function useBuilderOptionChanges<T>(onChange: (nextState: T) => void, prevState: T): onOptionChangeFn<T> {
-  return useCallback((key: keyof T | Object) =>
+  return (key: keyof T | Object) =>
     (nextValue: React.SetStateAction<any>) => {
     let nextState: T;
     if (typeof key === 'object') {
@@ -29,5 +29,5 @@ export function useBuilderOptionChanges<T>(onChange: (nextState: T) => void, pre
     }
     
     onChange(nextState);
-  }, [onChange, prevState]);
+  };
 }

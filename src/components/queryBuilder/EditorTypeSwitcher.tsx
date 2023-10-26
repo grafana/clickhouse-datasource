@@ -27,7 +27,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   const { query, onChange } = props;
   const { label, tooltip, switcher, cannotConvert } = labels.components.EditorTypeSwitcher;
   const editorType: EditorType = query.editorType;
-  const [editor, setEditor] = useState<EditorType>(editorType);
+  const [editor, setEditor] = useState<EditorType>(editorType || EditorType.Builder);
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
   const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');

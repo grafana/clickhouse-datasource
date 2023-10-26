@@ -53,9 +53,8 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     columns: [],
+    meta: {}
   },
-  // format: Format.TABLE,
-  // selectedFormat: Format.AUTO,
 };
 export const defaultCHSqlQuery: Omit<CHSqlQuery, 'refId'> = {
   editorType: EditorType.SQL,

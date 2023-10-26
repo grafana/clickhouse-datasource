@@ -1,10 +1,10 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
 import { Button } from '@grafana/ui';
-import { CHQuery, EditorType, CHBuilderQuery, defaultCHBuilderQuery } from 'types/sql';
+import { CHBuilderQuery, CHQuery, EditorType, defaultCHBuilderQuery } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -18,25 +18,7 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { query, onChange, onRunQuery } = props;
-
-  useEffect(() => {
-    if (query.editorType) {
-      return;
-    }
-
-    onChange({
-      ...query as CHQuery,
-      ...defaultCHBuilderQuery,
-      builderOptions: {
-        ...defaultCHBuilderQuery.builderOptions,
-      },
-    });
-  }, [query, query.editorType, onChange]);
-
-  if (!query.editorType) {
-    return null;
-  }
+  const { onRunQuery } = props;
 
   return (
     <>
@@ -51,30 +33,42 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange, app } = props;
-  const onBuilderOptionsChange = useCallback((nextBuilderOptions: Partial<QueryBuilderOptions>) => {
-    let builderOptions: QueryBuilderOptions = {
-      ...(query as CHBuilderQuery).builderOptions,
-      ...nextBuilderOptions,
-      meta: {
-        ...(query as CHBuilderQuery).builderOptions.meta,
-        ...nextBuilderOptions.meta
-      },
-    };
-
-    // If switching query type, reset the editor.
-    // Excludes Table/TimeSeries, since they're similar and less guided.
-    const prevQueryType = (query as CHBuilderQuery).builderOptions?.queryType;
-    const nextQueryType = nextBuilderOptions.queryType;
-    const queryTypeChanged = prevQueryType !== nextQueryType;
-    const isSwitchingBetweenTableAndTimeSeries = (prevQueryType === QueryType.Table && nextQueryType === QueryType.TimeSeries) || (prevQueryType === QueryType.TimeSeries && nextQueryType === QueryType.Table);
-    if (nextQueryType && queryTypeChanged && !isSwitchingBetweenTableAndTimeSeries) {
-      builderOptions = {
-        ...(query as CHBuilderQuery).builderOptions,
-        ...defaultCHBuilderQuery.builderOptions,
-        queryType: nextQueryType
-      }
+  const [builderOptions, setBuilderOptions] = useState<QueryBuilderOptions>({
+    ...defaultCHBuilderQuery.builderOptions,
+    ...(query as CHBuilderQuery).builderOptions,
+    meta: {
+      ...defaultCHBuilderQuery.builderOptions.meta,
+      ...(query as CHBuilderQuery).builderOptions?.meta
     }
+  });
 
+  const onBuilderOptionsChange = useCallback((nextBuilderOptions: Partial<QueryBuilderOptions>) => {
+    setBuilderOptions(prevBuilderOptions => {
+      // If switching query type, reset the editor.
+      // Excludes Table/TimeSeries, since they're similar and less guided.
+      const prevQueryType = prevBuilderOptions.queryType;
+      const nextQueryType = nextBuilderOptions.queryType;
+      const queryTypeChanged = prevQueryType !== nextQueryType;
+      const isSwitchingBetweenTableAndTimeSeries = (prevQueryType === QueryType.Table && nextQueryType === QueryType.TimeSeries) || (prevQueryType === QueryType.TimeSeries && nextQueryType === QueryType.Table);
+      if (nextQueryType && queryTypeChanged && !isSwitchingBetweenTableAndTimeSeries) {
+        return {
+          ...defaultCHBuilderQuery.builderOptions,
+          queryType: nextQueryType
+        }
+      }
+
+      return {
+        ...prevBuilderOptions,
+        ...nextBuilderOptions,
+        meta: {
+          ...prevBuilderOptions.meta,
+          ...nextBuilderOptions.meta
+        }
+      };
+    });
+  }, []);
+
+  useEffect(() => {
     const sql = generateSql(builderOptions);
     onChange({
       ...query,
@@ -83,7 +77,9 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptions,
       format: mapQueryTypeToGrafanaFormat(builderOptions.queryType)
     });
-  }, [query, onChange]);
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [builderOptions]);
 
   if (query.editorType === EditorType.SQL) {
     return (
@@ -93,13 +89,12 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     );
   }
 
-  const builderQuery: CHBuilderQuery = { ...query };
   return (
     <QueryBuilder
       datasource={props.datasource}
-      builderOptions={builderQuery.builderOptions}
+      builderOptions={builderOptions}
       onBuilderOptionsChange={onBuilderOptionsChange}
-      generatedSql={builderQuery.rawSql}
+      generatedSql={query.rawSql}
       app={app}
     />
   );
