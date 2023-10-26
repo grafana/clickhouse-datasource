@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Filter, TableColumn, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
@@ -9,9 +9,9 @@ import { Alert, Collapse, InlineFormLabel, Input, VerticalGroup } from '@grafana
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
+import useColumns from 'hooks/useColumns';
 
 interface TraceQueryBuilderProps {
-  allColumns: readonly TableColumn[];
   datasource: Datasource;
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
@@ -34,12 +34,13 @@ interface TraceQueryBuilderState {
 }
 
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
-  const { allColumns, datasource, builderOptions, onBuilderOptionsChange } = props;
+  const { datasource, builderOptions, onBuilderOptionsChange } = props;
+  const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const showConfigWarning = datasource.getDefaultTraceColumns().size === 0;
   const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapsable section
   const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapsable section
   const labels = allLabels.components.TraceQueryBuilder;
-  const builderState: TraceQueryBuilderState = {
+  const builderState: TraceQueryBuilderState = useMemo(() => ({
     isSearchMode: builderOptions.meta?.isTraceSearchMode || false,
     traceIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceId),
     spanIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceSpanId),
@@ -53,7 +54,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     serviceTagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceServiceTags),
     traceId: builderOptions.meta?.traceId || '',
     filters: builderOptions.filters || [],
-  };
+  }), [builderOptions]);
 
   useEffect(() => {
     const shouldApplyDefaults = (builderOptions.columns || []).length === 0 && (builderOptions.orderBy || []).length === 0;

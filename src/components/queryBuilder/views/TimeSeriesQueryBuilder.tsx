@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { AggregateColumn, BuilderMode, Filter, TableColumn, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn } from 'types/queryBuilder';
+import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn } from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
@@ -13,9 +13,9 @@ import { getColumnByHint } from 'components/queryBuilder/utils';
 import { columnFilterDateTime } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
+import useColumns from 'hooks/useColumns';
 
 interface TimeSeriesQueryBuilderProps {
-  allColumns: readonly TableColumn[];
   datasource: Datasource;
   builderOptions: QueryBuilderOptions,
   onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
@@ -32,10 +32,11 @@ interface TimeSeriesQueryBuilderState {
 }
 
 export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
-  const { allColumns, builderOptions, onBuilderOptionsChange } = props;
+  const { datasource, builderOptions, onBuilderOptionsChange } = props;
+  const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
   const [isAggregateMode, setAggregateMode] = useState<boolean>((builderOptions.aggregates?.length || 0) > 0); // Toggle Simple vs Aggregate mode
-  const builderState: TimeSeriesQueryBuilderState = {
+  const builderState: TimeSeriesQueryBuilderState = useMemo(() => ({
     timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
     selectedColumns: (builderOptions.columns || []).filter(c => c.hint !== ColumnHint.Time),
     aggregates: builderOptions.aggregates || [],
@@ -43,7 +44,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 1000,
     filters: builderOptions.filters || [],
-  };
+  }), [builderOptions]);
 
   const onOptionChange = useBuilderOptionChanges<TimeSeriesQueryBuilderState>(next => {
     const nextColumns = next.selectedColumns.slice();
