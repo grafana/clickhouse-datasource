@@ -3,7 +3,7 @@ module github.com/grafana/clickhouse-datasource
 go 1.20
 
 require (
-	dagger.io/dagger v0.8.4
+	dagger.io/dagger v0.9.1
 	github.com/ClickHouse/clickhouse-go/v2 v2.14.1
 	github.com/docker/docker v24.0.6+incompatible
 	github.com/docker/go-units v0.5.0
@@ -23,12 +23,11 @@ require (
 	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/apache/arrow/go/v13 v13.0.0 // indirect
 	github.com/goccy/go-json v0.10.0 // indirect
-	github.com/iancoleman/strcase v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.3 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
-	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/sync v0.4.0 // indirect
 )
 
 require (
@@ -139,12 +138,12 @@ require (
 	go.opentelemetry.io/otel/trace v1.17.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
 	golang.org/x/crypto v0.14.0 // indirect
-	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
-	golang.org/x/mod v0.12.0 // indirect
+	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/mod v0.13.0 // indirect
 	golang.org/x/sys v0.13.0 // indirect
 	golang.org/x/term v0.13.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
-	golang.org/x/tools v0.12.1-0.20230815132531-74c255bcf846 // indirect
+	golang.org/x/tools v0.14.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20230731193218-e0aa005b6bdf // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20230815205213-6bfd019c3878 // indirect
