@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn, DateFilterWithoutValue, FilterOperator } from 'types/queryBuilder';
+import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn, DateFilterWithoutValue, FilterOperator, TableColumn } from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
@@ -14,11 +14,12 @@ import { columnFilterDateTime } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
+import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 
 interface TimeSeriesQueryBuilderProps {
   datasource: Datasource;
   builderOptions: QueryBuilderOptions,
-  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
 }
 
 interface TimeSeriesQueryBuilderState {
@@ -32,7 +33,7 @@ interface TimeSeriesQueryBuilderState {
 }
 
 export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
-  const { datasource, builderOptions, onBuilderOptionsChange } = props;
+  const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
   const [isAggregateMode, setAggregateMode] = useState<boolean>((builderOptions.aggregates?.length || 0) > 0); // Toggle Simple vs Aggregate mode
@@ -52,7 +53,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       nextColumns.push(next.timeColumn);
     }
 
-    onBuilderOptionsChange({
+    builderOptionsDispatch(setOptions({
       mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.Trend,
       columns: nextColumns,
       aggregates: isAggregateMode ? next.aggregates : [],
@@ -60,60 +61,11 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       filters: next.filters,
       orderBy: next.orderBy,
       limit: next.limit
-    });
+    }));
   }, builderState);
 
-  // Select default time filter on timeColumn change
-  const lastTimeColumn = useRef<string>(builderState.timeColumn?.name || '');
-  useEffect(() => {
-    if (!builderState.timeColumn) {
-      return;
-    } else if ((builderState.timeColumn.name === lastTimeColumn.current) || builderState.filters.find(f => f.id === 'timeRange')) {
-      return;
-    }
-
-    const timeRangeFilter: DateFilterWithoutValue = {
-      type: 'datetime',
-      operator: FilterOperator.WithInGrafanaTimeRange,
-      filterType: 'custom',
-      key: builderState.timeColumn.name,
-      id: 'timeRange',
-      condition: 'AND'
-    };
-
-    lastTimeColumn.current = builderState.timeColumn.name;
-    onOptionChange('filters')([timeRangeFilter, ...builderState.filters.filter(f => f.id !== 'timeRange')]);
-  }, [builderState.timeColumn, builderState.filters, onOptionChange]);
-
-  // Find and select a default time column, update when table changes
-  const lastTable = useRef<string>(builderOptions.table);
-  const defaultTimeSelected = useRef<boolean>(Boolean(builderState.timeColumn));
-  useEffect(() => {
-    if (builderOptions.table !== lastTable.current) {
-      defaultTimeSelected.current = false;
-    }
-
-    if (allColumns.length === 0 || !builderOptions.table || defaultTimeSelected.current) {
-      return;
-    }
-
-    const col = allColumns.filter(columnFilterDateTime)[0];
-    const currentColumnExists = (builderState.timeColumn && allColumns.find(c => c.name === builderState.timeColumn?.name));
-    if (!col || currentColumnExists) {
-      return;
-    }
-
-    const timeColumn: SelectedColumn = {
-      name: col.name,
-      type: col.type,
-      hint: ColumnHint.Time
-    };
-  
-    lastTable.current = builderOptions.table;
-    defaultTimeSelected.current = true;
-    onOptionChange('timeColumn')(timeColumn);
-
-  }, [allColumns, builderOptions.table, builderState.timeColumn, onOptionChange]);
+  useDefaultTimeColumn(allColumns, builderOptions.table, builderState.timeColumn, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.timeColumn, builderState.filters, builderOptionsDispatch);
 
   return (
     <div>
@@ -159,3 +111,66 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     </div>
   );
 }
+
+// Finds and selects a default log time column, updates when table changes
+const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: string, timeColumn: SelectedColumn | undefined, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn));
+  const lastTable = useRef<string>(table || '');
+  if (table !== lastTable.current) {
+    didSetDefaultTime.current = false;
+  }
+
+  useEffect(() => {
+    if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
+      return;
+    }
+
+    const col = allColumns.filter(columnFilterDateTime)[0];
+    if (!col) {
+      return;
+    }
+
+    const timeColumn: SelectedColumn = {
+      name: col.name,
+      type: col.type,
+      hint: ColumnHint.Time
+    };
+
+    builderOptionsDispatch(setColumnByHint(timeColumn));
+    lastTable.current = table;
+    didSetDefaultTime.current = true;
+  }, [allColumns, table, builderOptionsDispatch]);
+};
+
+// Apply default filters/orderBy on timeColumn change
+const timeRangeFilterId = 'timeRange';
+const useDefaultFilters = (table: string, timeColumn: SelectedColumn | undefined, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const lastTimeColumn = useRef<string>(timeColumn?.name || '');
+  const lastTable = useRef<string>(table || '');
+  if (!timeColumn || table !== lastTable.current) {
+    lastTimeColumn.current = '';
+  }
+
+  useEffect(() => {
+    if (!timeColumn || (timeColumn.name === lastTimeColumn.current) || !table) {
+      return;
+    }
+
+    const nextFilters: Filter[] = filters.filter(f => f.id !== timeRangeFilterId);
+    const timeRangeFilter: DateFilterWithoutValue = {
+      type: 'datetime',
+      operator: FilterOperator.WithInGrafanaTimeRange,
+      filterType: 'custom',
+      key: timeColumn.name,
+      id: timeRangeFilterId,
+      condition: 'AND'
+    };
+    nextFilters.unshift(timeRangeFilter);
+    
+    lastTable.current = table;
+    lastTimeColumn.current = timeColumn.name;
+    builderOptionsDispatch(setOptions({
+      filters: nextFilters
+    }));
+  }, [table, timeColumn, filters, builderOptionsDispatch]);
+};

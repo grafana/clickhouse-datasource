@@ -245,7 +245,7 @@ export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): str
     case BuilderMode.Trend:
       const timeColumn = getColumnByHint(options, ColumnHint.Time);
       if (!isDateType(timeColumn?.type || '')) {
-        throw new Error('timeFieldType is expected to be valid Date type.');
+        throw new Error('time column is expected to be a valid Date type.');
       }
       query += getTrendByQuery(
         database,

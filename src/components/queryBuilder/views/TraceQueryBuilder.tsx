@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
@@ -10,11 +10,13 @@ import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
+import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
+import useIsNewQuery from 'hooks/useIsNewQuery';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
-  builderOptions: QueryBuilderOptions,
-  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
+  builderOptions: QueryBuilderOptions;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
 }
 
 interface TraceQueryBuilderState {
@@ -34,8 +36,9 @@ interface TraceQueryBuilderState {
 }
 
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
-  const { datasource, builderOptions, onBuilderOptionsChange } = props;
+  const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
+  const isNewQuery = useIsNewQuery(builderOptions);
   const showConfigWarning = datasource.getDefaultTraceColumns().size === 0;
   const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapsable section
   const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapsable section
@@ -56,40 +59,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     filters: builderOptions.filters || [],
   }), [builderOptions]);
 
-  useEffect(() => {
-    const shouldApplyDefaults = (builderOptions.columns || []).length === 0 && (builderOptions.orderBy || []).length === 0;
-    if (!shouldApplyDefaults) {
-      return;
-    }
-
-    const defaultDb = datasource.getDefaultTraceDatabase() || datasource.getDefaultDatabase();
-    const defaultTable = datasource.getDefaultTraceTable() || datasource.getDefaultTable();
-    const defaultDurationUnit = datasource.getDefaultTraceDurationUnit();
-    const otelVersion = datasource.getTraceOtelVersion();
-    const defaultColumns = datasource.getDefaultTraceColumns();
-
-    const nextColumns: SelectedColumn[] = [];
-    for (let [hint, colName] of defaultColumns) {
-      nextColumns.push({ name: colName, hint });
-    }
-
-    onBuilderOptionsChange({
-      database: defaultDb,
-      table: defaultTable || builderOptions.table,
-      columns: nextColumns,
-      // filters,
-      // orderBy,
-      meta: {
-        otelEnabled: Boolean(otelVersion),
-        otelVersion,
-        traceDurationUnit: defaultDurationUnit
-      }
-    });
-
-    // Run on load
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const onOptionChange = useBuilderOptionChanges<TraceQueryBuilderState>(next => {
     const nextColumns = [
       next.traceIdColumn,
@@ -103,7 +72,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       next.serviceTagsColumn
     ].filter(c => c !== undefined) as SelectedColumn[];
 
-    onBuilderOptionsChange({
+    builderOptionsDispatch(setOptions({
       columns: nextColumns,
       filters: next.filters,
       meta: {
@@ -111,8 +80,10 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         traceDurationUnit: next.durationUnit,
         traceId: next.traceId,
       }
-    });
+    }));
   }, builderState);
+
+  useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning">
@@ -301,3 +272,38 @@ const TraceIdInput = (props: TraceIdInputProps) => {
     </div>
   )
 }
+
+/**
+ * Loads the default configuration for new queries. (Only runs on new queries)
+ */
+const useTraceDefaultsOnMount = (datasource: Datasource, isNewQuery: boolean, builderOptions: QueryBuilderOptions, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const didSetDefaults = useRef<boolean>(false);
+  useEffect(() => {
+    if (!isNewQuery || didSetDefaults.current) {
+      return;
+    }
+
+    const defaultDb = datasource.getDefaultTraceDatabase() || datasource.getDefaultDatabase();
+    const defaultTable = datasource.getDefaultTraceTable() || datasource.getDefaultTable();
+    const defaultDurationUnit = datasource.getDefaultTraceDurationUnit();
+    const otelVersion = datasource.getTraceOtelVersion();
+    const defaultColumns = datasource.getDefaultTraceColumns();
+
+    const nextColumns: SelectedColumn[] = [];
+    for (let [hint, colName] of defaultColumns) {
+      nextColumns.push({ name: colName, hint });
+    }
+
+    builderOptionsDispatch(setOptions({
+      database: defaultDb,
+      table: defaultTable || builderOptions.table,
+      columns: nextColumns,
+      meta: {
+        otelEnabled: Boolean(otelVersion),
+        otelVersion,
+        traceDurationUnit: defaultDurationUnit
+      }
+    }));
+    didSetDefaults.current = true;
+  }, [builderOptions.columns, builderOptions.orderBy, builderOptions.table, builderOptionsDispatch, datasource, isNewQuery]);
+};

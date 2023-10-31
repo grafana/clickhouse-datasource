@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, DateFilterWithoutValue, FilterOperator, OrderByDirection } from 'types/queryBuilder';
+import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, DateFilterWithoutValue, FilterOperator, OrderByDirection, TableColumn } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { OtelVersionSelect } from '../OtelVersionSelect';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
@@ -14,11 +14,13 @@ import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import { versions as otelVersions } from 'otel';
 import { Alert, VerticalGroup } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
+import { BuilderOptionsReducerAction, setColumnByHint, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
+import useIsNewQuery from 'hooks/useIsNewQuery';
 
 interface LogsQueryBuilderProps {
   datasource: Datasource;
-  builderOptions: QueryBuilderOptions,
-  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
+  builderOptions: QueryBuilderOptions;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
 }
 
 interface LogsQueryBuilderState {
@@ -35,9 +37,10 @@ interface LogsQueryBuilderState {
 }
 
 export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
-  const { datasource, builderOptions, onBuilderOptionsChange } = props;
+  const { datasource, builderOptions, builderOptionsDispatch } = props;
   const labels = allLabels.components.LogsQueryBuilder;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
+  const isNewQuery = useIsNewQuery(builderOptions);
   const builderState: LogsQueryBuilderState = useMemo(() => ({
     otelEnabled: builderOptions.meta?.otelEnabled || false,
     otelVersion: builderOptions.meta?.otelVersion || '',
@@ -51,40 +54,13 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       c.hint !== ColumnHint.LogMessage
     )) || [],
     // liveView: builderOptions.meta?.liveView || false,
+    filters: builderOptions.filters || [],
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 1000,
-    filters: builderOptions.filters || [],
     }), [builderOptions]);
   const showConfigWarning = datasource.getDefaultLogsColumns().size === 0;
 
-  function setOtelColumns(builderState: LogsQueryBuilderState) {
-    if (!builderState.otelEnabled) {
-      return;
-    }
-
-    const otelConfig = otelVersions.find(v => v.version === builderState.otelVersion);
-    const logColumnMap = otelConfig?.logColumnMap;
-    if (!otelConfig || !logColumnMap) {
-      return;
-    }
-
-    builderState.selectedColumns = [];
-    if (logColumnMap.has(ColumnHint.Time)) {
-      builderState.timeColumn = { name: logColumnMap.get(ColumnHint.Time)!, hint: ColumnHint.Time };
-    }
-    if (logColumnMap.has(ColumnHint.LogLevel)) {
-      builderState.logLevelColumn = { name: logColumnMap.get(ColumnHint.LogLevel)!, hint: ColumnHint.LogLevel };
-    }
-    if (logColumnMap.has(ColumnHint.LogMessage)) {
-      builderState.messageColumn = { name: logColumnMap.get(ColumnHint.LogMessage)!, hint: ColumnHint.LogMessage };
-    }
-  }
-
   const onOptionChange = useBuilderOptionChanges<LogsQueryBuilderState>(next => {
-    if (next.otelEnabled) {
-      setOtelColumns(next);
-    }
-
     const nextColumns = next.selectedColumns.slice();
     if (next.timeColumn) {
       nextColumns.push(next.timeColumn);
@@ -96,132 +72,18 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       nextColumns.push(next.messageColumn);
     }
 
-    const nextOptions = {
+    builderOptionsDispatch(setOptions({
       columns: nextColumns,
       filters: next.filters,
       orderBy: next.orderBy,
-      limit: next.limit,
-      meta: {
-        otelEnabled: next.otelEnabled,
-        otelVersion: next.otelVersion,
-      }
-    };
-
-    onBuilderOptionsChange(nextOptions);
+      limit: next.limit
+    }));
   }, builderState);
 
-  useEffect(() => {
-    const shouldApplyDefaults = (builderOptions.columns || []).length === 0 && (builderOptions.orderBy || []).length === 0;
-    if (!shouldApplyDefaults) {
-      return;
-    }
-
-    const defaultDb = datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase();
-    const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable();
-    const otelVersion = datasource.getLogsOtelVersion();
-    const defaultColumns = datasource.getDefaultLogsColumns();
-
-    const nextColumns: SelectedColumn[] = [];
-    for (let [hint, colName] of defaultColumns) {
-      nextColumns.push({ name: colName, hint });
-    }
-
-    const nextFilters: Filter[] = [];
-    const nextOrderBy: OrderBy[] = [];
-    if (defaultColumns.has(ColumnHint.Time)) {
-      const timeRangeFilter: DateFilterWithoutValue = {
-        type: 'datetime',
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: defaultColumns.get(ColumnHint.Time)!,
-        id: 'timeRange',
-        condition: 'AND'
-      };
-      nextFilters.push(timeRangeFilter);
-
-      const defaultOrderBy: OrderBy = { name: defaultColumns.get(ColumnHint.Time)!, dir: OrderByDirection.DESC, default: true };
-      nextOrderBy.push(defaultOrderBy);
-    }
-
-    onBuilderOptionsChange({
-      database: defaultDb,
-      table: defaultTable || builderOptions.table,
-      columns: nextColumns,
-      filters: nextFilters,
-      orderBy: nextOrderBy,
-      meta: {
-        otelEnabled: Boolean(otelVersion),
-        otelVersion,
-      }
-    });
-
-    // Run on load
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Apply default filters/orderBy on timeColumn change
-  const lastTimeColumn = useRef<string>(builderState.timeColumn?.name || '');
-  useEffect(() => {
-    if (!builderState.timeColumn) {
-      return;
-    } else if ((builderState.timeColumn.name === lastTimeColumn.current)) {
-      return;
-    }
-
-    const nextFilters: Filter[] = builderState.filters.filter(f => f.id !== 'timeRange');
-    const timeRangeFilter: DateFilterWithoutValue = {
-      type: 'datetime',
-      operator: FilterOperator.WithInGrafanaTimeRange,
-      filterType: 'custom',
-      key: builderState.timeColumn.name,
-      id: 'timeRange',
-      condition: 'AND'
-    };
-    nextFilters.unshift(timeRangeFilter);
-
-    const nextOrderBy: OrderBy[] = builderState.orderBy.filter(o => !o.default);
-    const defaultOrderBy: OrderBy = { name: builderState.timeColumn?.name, dir: OrderByDirection.DESC, default: true };
-    nextOrderBy.unshift(defaultOrderBy);
-    
-    lastTimeColumn.current = builderState.timeColumn.name;
-    onBuilderOptionsChange({
-      filters: nextFilters,
-      orderBy: nextOrderBy
-    });
-  }, [builderState.timeColumn, builderState.filters, builderState.orderBy, onBuilderOptionsChange]);
-
-  // Find and select a default time column, update when table changes
-  const lastTable = useRef<string>(builderOptions.table);
-  const defaultTimeSelected = useRef<boolean>(Boolean(builderState.timeColumn));
-  useEffect(() => {
-    if (datasource.getDefaultLogsTable() === builderOptions.table && datasource.getDefaultLogsColumns().has(ColumnHint.Time)) {
-      return;
-    }
-
-    if (builderOptions.table !== lastTable.current) {
-      defaultTimeSelected.current = false;
-    }
-
-    if (allColumns.length === 0 || !builderOptions.table || defaultTimeSelected.current) {
-      return;
-    }
-
-    const col = allColumns.filter(columnFilterDateTime)[0];
-    const currentColumnExists = (builderState.timeColumn && allColumns.find(c => c.name === builderState.timeColumn?.name));
-    if (!col || currentColumnExists) {
-      return;
-    }
-
-    const timeColumn: SelectedColumn = {
-      name: col.name,
-      type: col.type,
-      hint: ColumnHint.Time
-    };
-  
-    lastTable.current = builderOptions.table;
-    defaultTimeSelected.current = true;
-    onOptionChange('timeColumn')(timeColumn);
-  }, [allColumns, datasource, builderOptions.table, builderState.timeColumn, onOptionChange]);
+  useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
+  useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useDefaultTimeColumn(datasource, allColumns, builderOptions.table, builderState.timeColumn, builderState.otelEnabled, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.timeColumn, builderState.filters, builderState.orderBy, builderOptionsDispatch);
   
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning">
@@ -239,9 +101,9 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       { configWarning }
       <OtelVersionSelect
         enabled={builderState.otelEnabled}
-        onEnabledChange={onOptionChange('otelEnabled')}
+        onEnabledChange={e => builderOptionsDispatch(setOtelEnabled(e))}
         selectedVersion={builderState.otelVersion}
-        onVersionChange={onOptionChange('otelVersion')}
+        onVersionChange={v => builderOptionsDispatch(setOtelVersion(v))}
         defaultToLatest
       />
       <ColumnsEditor
@@ -266,6 +128,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
           selectedColumn={builderState.logLevelColumn}
+          invalid={!builderState.logLevelColumn}
           onColumnChange={onOptionChange('logLevelColumn')}
           columnFilterFn={columnFilterString}
           columnHint={ColumnHint.LogLevel}
@@ -308,3 +171,146 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     </div>
   );
 }
+
+/**
+ * Loads the default configuration for new queries. (Only runs on new queries)
+ */
+const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolean, builderOptions: QueryBuilderOptions, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const didSetDefaults = useRef<boolean>(false);
+  useEffect(() => {
+    if (!isNewQuery || didSetDefaults.current) {
+      return;
+    }
+
+    const defaultDb = datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase();
+    const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable();
+    const otelVersion = datasource.getLogsOtelVersion();
+    const defaultColumns = datasource.getDefaultLogsColumns();
+
+    const nextColumns: SelectedColumn[] = [];
+    for (let [hint, colName] of defaultColumns) {
+      nextColumns.push({ name: colName, hint });
+    }
+
+    builderOptionsDispatch(setOptions({
+      database: defaultDb,
+      table: defaultTable || builderOptions.table,
+      columns: nextColumns,
+      meta: {
+        otelEnabled: Boolean(otelVersion),
+        otelVersion,
+      }
+    }));
+    didSetDefaults.current = true;
+  }, [builderOptions.columns, builderOptions.orderBy, builderOptions.table, builderOptionsDispatch, datasource, isNewQuery]);
+};
+
+/**
+ * Sets OTEL Logs columns automatically when OTEL is enabled
+ */
+const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const didSetColumns = useRef<boolean>(otelEnabled);
+  if (!otelEnabled) {
+    didSetColumns.current = false;
+  }
+
+  useEffect(() => {
+    if (!otelEnabled || didSetColumns.current) {
+      return;
+    }
+
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const logColumnMap = otelConfig?.logColumnMap;
+    if (!otelConfig || !logColumnMap) {
+      return;
+    }
+
+    const columns: SelectedColumn[] = [];
+    if (logColumnMap.has(ColumnHint.Time)) {
+      columns.push({ name: logColumnMap.get(ColumnHint.Time)!, hint: ColumnHint.Time });
+    }
+    if (logColumnMap.has(ColumnHint.LogLevel)) {
+      columns.push({ name: logColumnMap.get(ColumnHint.LogLevel)!, hint: ColumnHint.LogLevel });
+    }
+    if (logColumnMap.has(ColumnHint.LogMessage)) {
+      columns.push({ name: logColumnMap.get(ColumnHint.LogMessage)!, hint: ColumnHint.LogMessage });
+    }
+
+    builderOptionsDispatch(setOptions({ columns }));
+    didSetColumns.current = true;
+  }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+};
+
+// Finds and selects a default log time column, updates when table changes
+const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonly TableColumn[], table: string, timeColumn: SelectedColumn | undefined, otelEnabled: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const hasDefaultColumnConfigured = useMemo(() => Boolean(datasource.getDefaultLogsTable()) && datasource.getDefaultLogsColumns().has(ColumnHint.Time), [datasource]);
+  const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn) || hasDefaultColumnConfigured);
+  const lastTable = useRef<string>(table || '');
+  if (table !== lastTable.current) {
+    didSetDefaultTime.current = false;
+  }
+
+  if (otelEnabled) {
+    lastTable.current = table;
+    didSetDefaultTime.current = true;
+  }
+
+  useEffect(() => {
+    if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
+      return;
+    }
+
+    const col = allColumns.filter(columnFilterDateTime)[0];
+    if (!col) {
+      return;
+    }
+
+    const timeColumn: SelectedColumn = {
+      name: col.name,
+      type: col.type,
+      hint: ColumnHint.Time
+    };
+
+    builderOptionsDispatch(setColumnByHint(timeColumn));
+    lastTable.current = table;
+    didSetDefaultTime.current = true;
+  }, [datasource, allColumns, table, builderOptionsDispatch]);
+};
+
+// Apply default filters/orderBy on timeColumn change
+const timeRangeFilterId = 'timeRange';
+const useDefaultFilters = (table: string, timeColumn: SelectedColumn | undefined, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const lastTimeColumn = useRef<string>(timeColumn?.name || '');
+  const lastTable = useRef<string>(table || '');
+  if (!timeColumn || table !== lastTable.current) {
+    lastTimeColumn.current = '';
+  }
+
+  useEffect(() => {
+    if (!timeColumn || (timeColumn.name === lastTimeColumn.current) || !table) {
+      return;
+    }
+
+    const nextFilters: Filter[] = filters.filter(f => f.id !== timeRangeFilterId);
+    const timeRangeFilter: DateFilterWithoutValue = {
+      type: 'datetime',
+      operator: FilterOperator.WithInGrafanaTimeRange,
+      filterType: 'custom',
+      key: timeColumn.name,
+      id: timeRangeFilterId,
+      condition: 'AND'
+    };
+    nextFilters.unshift(timeRangeFilter);
+
+    const nextOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
+    const defaultOrderBy: OrderBy = { name: timeColumn?.name, dir: OrderByDirection.DESC, default: true };
+    nextOrderBy.unshift(defaultOrderBy);
+    
+    lastTable.current = table;
+    lastTimeColumn.current = timeColumn.name;
+    builderOptionsDispatch(setOptions({
+      filters: nextFilters,
+      orderBy: nextOrderBy
+    }));
+  }, [table, timeColumn, filters, orderBy, builderOptionsDispatch]);
+};

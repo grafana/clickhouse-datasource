@@ -1,16 +1,16 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
 import { Button } from '@grafana/ui';
-import { CHBuilderQuery, CHQuery, EditorType, defaultCHBuilderQuery } from 'types/sql';
+import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
-import { QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
-import { mapQueryTypeToGrafanaFormat } from 'data/utils';
+import { isBuilderOptionsRunnable, mapQueryTypeToGrafanaFormat } from 'data/utils';
+import { setAllOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -33,42 +33,31 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
   const { query, onChange, app } = props;
-  const [builderOptions, setBuilderOptions] = useState<QueryBuilderOptions>({
-    ...defaultCHBuilderQuery.builderOptions,
-    ...(query as CHBuilderQuery).builderOptions,
-    meta: {
-      ...defaultCHBuilderQuery.builderOptions.meta,
-      ...(query as CHBuilderQuery).builderOptions?.meta
-    }
-  });
+  const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState((query as CHBuilderQuery).builderOptions);
 
-  const onBuilderOptionsChange = useCallback((nextBuilderOptions: Partial<QueryBuilderOptions>) => {
-    setBuilderOptions(prevBuilderOptions => {
-      // If switching query type, reset the editor.
-      // Excludes Table/TimeSeries, since they're similar and less guided.
-      const prevQueryType = prevBuilderOptions.queryType;
-      const nextQueryType = nextBuilderOptions.queryType;
-      const queryTypeChanged = prevQueryType !== nextQueryType;
-      const isSwitchingBetweenTableAndTimeSeries = (prevQueryType === QueryType.Table && nextQueryType === QueryType.TimeSeries) || (prevQueryType === QueryType.TimeSeries && nextQueryType === QueryType.Table);
-      if (nextQueryType && queryTypeChanged && !isSwitchingBetweenTableAndTimeSeries) {
-        return {
-          ...defaultCHBuilderQuery.builderOptions,
-          queryType: nextQueryType
-        }
-      }
+  /**
+   * Grafana will sometimes replace the builder options directly, so we need to sync in both directions.
+   * For example, selecting an entry from the query history will cause the local state to fall out of sync.
+   * The "key" property is present on these historical entries.
+   */
+  const queryKey = query.key || ''
+  const lastKey = useRef<string>(queryKey);
+  if (queryKey !== lastKey.current) {
+    builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
+    lastKey.current = queryKey;
+  }
 
-      return {
-        ...prevBuilderOptions,
-        ...nextBuilderOptions,
-        meta: {
-          ...prevBuilderOptions.meta,
-          ...nextBuilderOptions.meta
-        }
-      };
-    });
-  }, []);
+  // Prevent trying to run empty query on load
+  const shouldSkipChanges = useRef<boolean>(true);
+  if (isBuilderOptionsRunnable(builderOptions)) {
+    shouldSkipChanges.current = false;
+  }
 
   useEffect(() => {
+    if (shouldSkipChanges.current) {
+      return;
+    }
+
     const sql = generateSql(builderOptions);
     onChange({
       ...query,
@@ -78,6 +67,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       format: mapQueryTypeToGrafanaFormat(builderOptions.queryType)
     });
 
+    // TODO: fix dependency warning with "useEffectEvent" once added to stable version of react
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [builderOptions]);
 
@@ -93,7 +83,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     <QueryBuilder
       datasource={props.datasource}
       builderOptions={builderOptions}
-      onBuilderOptionsChange={onBuilderOptionsChange}
+      builderOptionsDispatch={builderOptionsDispatch}
       generatedSql={query.rawSql}
       app={app}
     />

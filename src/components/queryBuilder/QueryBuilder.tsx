@@ -10,21 +10,22 @@ import { DatabaseTableSelect } from 'components/queryBuilder/DatabaseTableSelect
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 import { styles } from 'styles';
 import { TraceQueryBuilder } from './views/TraceQueryBuilder';
+import { BuilderOptionsReducerAction, setDatabase, setQueryType, setTable } from 'hooks/useBuilderOptionsState';
 
 interface QueryBuilderProps {
   app: CoreApp | undefined;
   builderOptions: QueryBuilderOptions;
-  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
   datasource: Datasource;
   generatedSql: string;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
-  const { datasource, builderOptions, onBuilderOptionsChange, generatedSql } = props;
+  const { datasource, builderOptions, builderOptionsDispatch, generatedSql } = props;
 
-  const onDatabaseChange = (database: string) => onBuilderOptionsChange({ database, table: '' });
-  const onTableChange = (table: string) => onBuilderOptionsChange({ table });
-  const onQueryTypeChange = (queryType: QueryType) => onBuilderOptionsChange({ queryType });
+  const onDatabaseChange = (database: string) => builderOptionsDispatch(setDatabase(database));
+  const onTableChange = (table: string) => builderOptionsDispatch(setTable(table));
+  const onQueryTypeChange = (queryType: QueryType) => builderOptionsDispatch(setQueryType(queryType));
 
   return (
     <div data-testid="query-editor-section-builder">
@@ -39,10 +40,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </div>
 
-      { builderOptions.queryType === QueryType.Table && <TableQueryBuilder datasource={datasource} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
-      { builderOptions.queryType === QueryType.Logs && <LogsQueryBuilder datasource={datasource} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
-      { builderOptions.queryType === QueryType.TimeSeries && <TimeSeriesQueryBuilder datasource={datasource} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
-      { builderOptions.queryType === QueryType.Traces && <TraceQueryBuilder datasource={datasource} builderOptions={builderOptions} onBuilderOptionsChange={onBuilderOptionsChange} /> }
+      { builderOptions.queryType === QueryType.Table && <TableQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
+      { builderOptions.queryType === QueryType.Logs && <LogsQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
+      { builderOptions.queryType === QueryType.TimeSeries && <TimeSeriesQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
+      { builderOptions.queryType === QueryType.Traces && <TraceQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
 
       <SqlPreview sql={generatedSql} />
     </div>

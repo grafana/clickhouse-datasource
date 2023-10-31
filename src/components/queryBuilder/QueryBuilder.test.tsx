@@ -29,7 +29,7 @@ describe('QueryBuilder', () => {
             columns: [],
             filters: [],
           }}
-          onBuilderOptionsChange={() => {}}
+          builderOptionsDispatch={() => {}}
           datasource={mockDs}
           generatedSql=''
         />

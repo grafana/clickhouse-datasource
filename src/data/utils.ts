@@ -1,5 +1,17 @@
-import { QueryType } from "types/queryBuilder"
+import { QueryBuilderOptions, QueryType } from "types/queryBuilder"
 
+/**
+ * Returns true if the builder options contain enough information to start showing a query
+ */
+export const isBuilderOptionsRunnable = (builderOptions: QueryBuilderOptions): boolean => {
+  return (
+    (builderOptions.columns?.length || 0) > 0 ||
+    (builderOptions.filters?.length || 0) > 0 ||
+    (builderOptions.orderBy?.length || 0) > 0 ||
+    (builderOptions.aggregates?.length || 0) > 0 ||
+    (builderOptions.groupBy?.length || 0) > 0
+  );
+};
 
 /**
  * Converts QueryType to Grafana format
@@ -18,4 +30,4 @@ export const mapQueryTypeToGrafanaFormat = (t: QueryType): number => {
     default:
       return 1 << 8; // an unused u32, defaults to timeseries/graph on plugin backend.
   }
-}
+};

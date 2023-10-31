@@ -72,7 +72,6 @@ export const TableSelect = (props: TableSelectProps) => {
 
   useEffect(() => {
     // Auto select first/default table
-    // TODO: this still seems to lag behind when switching DB, probably due to async table fetch
     if (database && !table && tables.length > 0) {
       onTableChange(datasource.getDefaultTable() || tables[0]);
     }

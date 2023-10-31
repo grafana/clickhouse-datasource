@@ -3,7 +3,7 @@ import { Datasource } from 'data/CHDatasource';
 
 export default (datasource: Datasource): string[] => {
   const [databases, setDatabases] = useState<string[]>([]); 
-  
+
   useEffect(() => {
     if (!datasource) {
       return;

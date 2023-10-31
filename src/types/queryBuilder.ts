@@ -175,8 +175,10 @@ export interface CommonFilterProps {
   key: string;
   type: string;
   condition: 'AND' | 'OR';
+
   /**
    * Used to uniquely identify a dynamically added filter
+   * For example, might be set to 'timeRange' for the default added time range filter.
    */
   id?: string;
 }

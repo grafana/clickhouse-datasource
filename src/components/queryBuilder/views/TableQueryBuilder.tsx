@@ -11,11 +11,12 @@ import { GroupByEditor } from '../GroupByEditor';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
+import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
 interface TableQueryBuilderProps {
   datasource: Datasource;
-  builderOptions: QueryBuilderOptions,
-  onBuilderOptionsChange: (nextBuilderOptions: Partial<QueryBuilderOptions>) => void;
+  builderOptions: QueryBuilderOptions;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
 }
 
 interface TableQueryBuilderState {
@@ -28,7 +29,7 @@ interface TableQueryBuilderState {
 }
 
 export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
-  const { datasource, builderOptions, onBuilderOptionsChange } = props;
+  const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TableQueryBuilder;
   const [isAggregateMode, setAggregateMode] = useState<boolean>((builderOptions.aggregates?.length || 0) > 0); // Toggle Simple vs Aggregate mode
@@ -42,7 +43,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   }), [builderOptions]);
 
   const onOptionChange = useBuilderOptionChanges<TableQueryBuilderState>(next => {
-    onBuilderOptionsChange({
+    builderOptionsDispatch(setOptions({
       mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
       columns: next.selectedColumns,
       aggregates: isAggregateMode ? next.aggregates : [],
@@ -50,7 +51,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
       filters: next.filters,
       orderBy: next.orderBy,
       limit: next.limit
-    });
+    }));
   }, builderState);
 
   return (
