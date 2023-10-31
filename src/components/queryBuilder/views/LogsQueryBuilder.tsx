@@ -250,7 +250,7 @@ const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonly Table
     didSetDefaultTime.current = false;
   }
 
-  if (otelEnabled) {
+  if (Boolean(timeColumn) || otelEnabled) {
     lastTable.current = table;
     didSetDefaultTime.current = true;
   }
