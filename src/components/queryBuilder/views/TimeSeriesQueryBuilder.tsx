@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn, DateFilterWithoutValue, FilterOperator, TableColumn } from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
@@ -23,6 +23,7 @@ interface TimeSeriesQueryBuilderProps {
 }
 
 interface TimeSeriesQueryBuilderState {
+  isAggregateMode: boolean;
   timeColumn?: SelectedColumn;
   selectedColumns: SelectedColumn[];
   aggregates: AggregateColumn[];
@@ -36,8 +37,9 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
-  const [isAggregateMode, setAggregateMode] = useState<boolean>((builderOptions.aggregates?.length || 0) > 0); // Toggle Simple vs Aggregate mode
   const builderState: TimeSeriesQueryBuilderState = useMemo(() => ({
+    // TODO: do not depend on "mode"
+    isAggregateMode: builderOptions.mode === BuilderMode.Trend,
     timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
     selectedColumns: (builderOptions.columns || []).filter(c => c.hint !== ColumnHint.Time),
     aggregates: builderOptions.aggregates || [],
@@ -48,16 +50,20 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   }), [builderOptions]);
 
   const onOptionChange = useBuilderOptionChanges<TimeSeriesQueryBuilderState>(next => {
-    const nextColumns = next.selectedColumns.slice();
+    let nextColumns = next.selectedColumns.slice();
+    if (next.isAggregateMode) {
+      nextColumns = [];
+    }
+
     if (next.timeColumn) {
       nextColumns.push(next.timeColumn);
     }
 
     builderOptionsDispatch(setOptions({
-      mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.Trend,
+      mode: next.isAggregateMode ? BuilderMode.Trend : BuilderMode.Aggregate,
       columns: nextColumns,
-      aggregates: isAggregateMode ? next.aggregates : [],
-      groupBy: isAggregateMode ? next.groupBy : [],
+      aggregates: next.isAggregateMode ? next.aggregates : [],
+      groupBy: next.isAggregateMode ? next.groupBy : [],
       filters: next.filters,
       orderBy: next.orderBy,
       limit: next.limit
@@ -72,8 +78,8 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       <ModeSwitch
         labelA={labels.simpleQueryModeLabel}
         labelB={labels.aggregateQueryModeLabel}
-        value={isAggregateMode}
-        onChange={setAggregateMode}
+        value={builderState.isAggregateMode}
+        onChange={onOptionChange('isAggregateMode')}
         label={labels.builderModeLabel}
         tooltip={labels.builderModeTooltip}
       />
@@ -87,19 +93,21 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
         columnHint={ColumnHint.Time}
         label={labels.timeColumn.label}
         tooltip={labels.timeColumn.tooltip}
-      />
-      <ColumnsEditor
-        allColumns={allColumns}
-        selectedColumns={builderState.selectedColumns}
-        onSelectedColumnsChange={onOptionChange('selectedColumns')}
+        clearable={false}
       />
 
-      {isAggregateMode && (
+      { builderState.isAggregateMode ? 
         <>
           <AggregateEditor allColumns={allColumns} aggregates={builderState.aggregates} onAggregatesChange={onOptionChange('aggregates')} />
           <GroupByEditor groupBy={builderState.groupBy} onGroupByChange={onOptionChange('groupBy')} allColumns={allColumns} />
         </>
-      )}
+        :
+        <ColumnsEditor
+          allColumns={allColumns}
+          selectedColumns={builderState.selectedColumns}
+          onSelectedColumnsChange={onOptionChange('selectedColumns')}
+        />
+      }
 
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}

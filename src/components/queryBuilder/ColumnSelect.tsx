@@ -16,12 +16,13 @@ interface ColumnSelectProps {
   invalid?: boolean;
   wide?: boolean;
   inline?: boolean;
+  clearable?: boolean;
 }
 
 const defaultFilterFn = () => true;
 
 export const ColumnSelect = (props: ColumnSelectProps) => {
-  const { allColumns, selectedColumn, onColumnChange, columnFilterFn, columnHint, label, tooltip, disabled, invalid, wide, inline } = props;
+  const { allColumns, selectedColumn, onColumnChange, columnFilterFn, columnHint, label, tooltip, disabled, invalid, wide, inline, clearable } = props;
   const selectedColumnName = selectedColumn?.name;
   const columns: Array<SelectableValue<string>> = allColumns.
     filter(columnFilterFn || defaultFilterFn).
@@ -68,7 +69,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
         onChange={onChange}
         width={wide ? 25 : 20}
         menuPlacement={'bottom'}
-        isClearable
+        isClearable={clearable === undefined || clearable}
       />
     </div>
   );
