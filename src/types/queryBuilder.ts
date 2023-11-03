@@ -172,7 +172,7 @@ export enum FilterOperator {
 
 export interface CommonFilterProps {
   filterType: 'custom';
-  key: string;
+  key: string; // Column name
   type: string;
   condition: 'AND' | 'OR';
 
@@ -181,6 +181,11 @@ export interface CommonFilterProps {
    * For example, might be set to 'timeRange' for the default added time range filter.
    */
   id?: string;
+  /**
+   * If provided, SQL generator will ignore "key" and instead
+   * find the intended column by the hint
+   */
+  hint?: ColumnHint;
 }
 
 export interface NullFilter extends CommonFilterProps {

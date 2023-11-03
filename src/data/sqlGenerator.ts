@@ -1,5 +1,5 @@
-import { getSqlFromQueryBuilderOptions, getFilters, getOrderBy } from 'components/queryBuilder/utils';
-import { ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn, TimeUnit } from 'types/queryBuilder';
+import { getSqlFromQueryBuilderOptions, getOrderBy } from 'components/queryBuilder/utils';
+import { BooleanFilter, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
 
 
 export const generateSql = (options: QueryBuilderOptions): string => {
@@ -91,7 +91,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (hasFilters) {
-    queryParts.push(getFilters(options.filters!));
+    queryParts.push(getFilters(options));
   }
 
   if (traceStartTime !== undefined) {
@@ -154,7 +154,7 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
 
   if ((options.filters?.length || 0) > 0) {
     queryParts.push('WHERE');
-    queryParts.push(getFilters(options.filters!));
+    queryParts.push(getFilters(options));
   }
 
   if ((options.orderBy?.length || 0) > 0) {
@@ -239,3 +239,111 @@ const getLimit = (limit?: number | undefined): string => {
 
   return 'LIMIT ' + Math.max(0, limit || 1000);
 };
+
+const getFilters = (options: QueryBuilderOptions): string => {
+  const filters = options.filters || [];
+  const builtFilters: string[] = [];
+
+  for (const filter of filters) {
+    const filterParts: string[] = [];
+
+    let column = filter.key;
+    let type = filter.type;
+    const hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
+    if (hintedColumn) {
+      column = hintedColumn.name;
+      type = hintedColumn.type || type;
+    }
+
+    if (!column) {
+      continue;
+    }
+    filterParts.push(column);
+
+    let operator: string = filter.operator;
+    let negate = false;
+    if (filter.operator === FilterOperator.NotLike) {
+      operator = 'LIKE';
+      negate = true;
+    } else if (filter.operator === FilterOperator.OutsideGrafanaTimeRange) {
+      operator = '';
+      negate = true;
+    } else if (filter.operator === FilterOperator.WithInGrafanaTimeRange){
+        operator = '';
+    }
+
+    if (operator) {
+      filterParts.push(operator);
+    }
+    
+    if (isNullFilter(filter.operator)) {
+      // empty
+    } else if (isBooleanFilter(type)) {
+      filterParts.push(String((filter as BooleanFilter).value));
+    } else if (isNumberFilter(type)) {
+      filterParts.push(String((filter as NumberFilter).value || '0'));
+    } else if (isDateFilter(type)) {
+      if (isDateFilterWithoutValue(type, filter.operator)) {
+        if (isDateType(type)) {
+          filterParts.push('>=', '\$__fromTime', 'AND', column, '<=', '\$__toTime');
+        }
+      } else {
+        switch ((filter as DateFilterWithValue).value) {
+          case 'GRAFANA_START_TIME':
+            if (isDateType(type)) {
+              filterParts.push('\$__fromTime');
+            }
+            break;
+          case 'GRAFANA_END_TIME':
+            if (isDateType(type)) {
+              filterParts.push('\$__toTime');
+            }
+            break;
+          default:
+            filterParts.push(String((filter as DateFilterWithValue).value || 'TODAY'));
+        }
+      }
+    } else if (isStringFilter(type, filter.operator)) {
+      if (filter.operator === FilterOperator.Like || filter.operator === FilterOperator.NotLike) {
+        filterParts.push(`'%${filter.value || ''}%'`);
+      } else {
+        filterParts.push(formatStringValue((filter as StringFilter).value || ''));
+      }
+    } else if (isMultiFilter(type, filter.operator)) {
+      filterParts.push(`(${(filter as MultiFilter).value?.map(v => formatStringValue(v)).join(', ')})`);
+    } else {
+      filterParts.push(formatStringValue((filter as StringFilter).value || ''));
+    }
+
+    if (negate) {
+      filterParts.unshift('NOT', '(');
+      filterParts.push(')');
+    }
+
+    filterParts.unshift('(');
+    if (builtFilters.length > 0) {
+      filterParts.unshift(filter.condition);
+    }
+    filterParts.push(')');
+
+    const builtFilter = filterParts.join(' ');
+    builtFilters.push(builtFilter);
+  }
+
+  return builtFilters.join(' ');
+};
+
+const isBooleanType = (type: string): boolean => (type?.toLowerCase().startsWith('boolean'));
+const numberTypes = ['int', 'float', 'decimal'];
+const isNumberType = (type: string): boolean => numberTypes.some(t => type?.toLowerCase().includes(t));
+const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
+// const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
+const isStringType = (type: string): boolean => type === 'String' && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
+const isBooleanFilter = (type: string): boolean => isBooleanType(type);
+const isNumberFilter = (type: string): boolean => isNumberType(type);
+const isDateFilterWithoutValue = (type: string, operator: FilterOperator): boolean => isDateType(type) && (operator === FilterOperator.WithInGrafanaTimeRange || operator === FilterOperator.OutsideGrafanaTimeRange);
+const isDateFilter = (type: string): boolean => isDateType(type);
+const isStringFilter = (type: string, operator: FilterOperator): boolean => isStringType(type) && !(operator === FilterOperator.In || operator === FilterOperator.NotIn);
+const isMultiFilter = (type: string, operator: FilterOperator): boolean => isStringType(type) && (operator === FilterOperator.In || operator === FilterOperator.NotIn);
+const formatStringValue = (filter: string): string => filter.startsWith('$') ? (filter || '') : `'${filter || ''}'`;

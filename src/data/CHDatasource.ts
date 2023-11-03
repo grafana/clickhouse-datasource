@@ -199,8 +199,7 @@ export class Datasource
     if (!chQuery.rawSql) {
       return [];
     }
-    const q = { ...chQuery, editorType: chQuery.editorType || EditorType.SQL };
-    const frame = await this.runQuery(q, options);
+    const frame = await this.runQuery(chQuery, options);
     if (frame.fields?.length === 0) {
       return [];
     }
