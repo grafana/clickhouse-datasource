@@ -337,6 +337,8 @@ export const FilterEditor = (props: {
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
       <Select
+        disabled={Boolean(filter.hint)}
+        placeholder={filter.hint || undefined}
         value={filter.key}
         width={40}
         className={styles.Common.inlineSelect}
@@ -350,7 +352,7 @@ export const FilterEditor = (props: {
       />
       <Select
         value={filter.operator}
-        width={34}
+        width={40}
         className={styles.Common.inlineSelect}
         options={getFilterOperatorsByType(filter.type)}
         onChange={(e) => onFilterOperatorChange(e.value!)}
