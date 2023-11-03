@@ -4,9 +4,11 @@ import {
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
+  DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
+  LogRowModel,
   MetricFindValue,
   QueryFixAction,
   ScopedVars,
@@ -44,10 +46,12 @@ import {
 import { getSqlFromQueryBuilderOptions, getColumnByHint } from '../components/queryBuilder/utils';
 import { generateSql } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
+import { ReactNode } from 'react';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
-  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>
+  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>,
+  DataSourceWithLogsContextSupport<CHQuery>
 {
   // This enables default annotation support for 7.2+
   annotations = {};
@@ -666,6 +670,19 @@ export class Datasource
       console.error(`Unable to parse ClickHouse version: ${err}`);
       throw err;
     }
+  }
+
+  // interface DataSourceWithLogsContextSupport
+  async getLogRowContext(row: LogRowModel, options?: any | undefined, query?: CHQuery | undefined): Promise<DataQueryResponse> {
+    return {} as DataQueryResponse;
+  }
+
+  showContextToggle(row?: LogRowModel): boolean {
+    return false;
+  }
+  
+  getLogRowContextUi(row: LogRowModel, runContextQuery?: (() => void) | undefined): ReactNode {
+    return false;
   }
 }
 
