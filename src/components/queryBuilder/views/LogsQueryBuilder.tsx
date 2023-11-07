@@ -226,15 +226,9 @@ const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builderOption
     }
 
     const columns: SelectedColumn[] = [];
-    if (logColumnMap.has(ColumnHint.Time)) {
-      columns.push({ name: logColumnMap.get(ColumnHint.Time)!, hint: ColumnHint.Time });
-    }
-    if (logColumnMap.has(ColumnHint.LogLevel)) {
-      columns.push({ name: logColumnMap.get(ColumnHint.LogLevel)!, hint: ColumnHint.LogLevel });
-    }
-    if (logColumnMap.has(ColumnHint.LogMessage)) {
-      columns.push({ name: logColumnMap.get(ColumnHint.LogMessage)!, hint: ColumnHint.LogMessage });
-    }
+    logColumnMap.forEach((name, hint) => {
+      columns.push({ name, hint });
+    });
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;

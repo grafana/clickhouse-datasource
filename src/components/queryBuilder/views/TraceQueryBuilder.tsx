@@ -10,8 +10,10 @@ import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
-import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
+import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
+import { OtelVersionSelect } from '../OtelVersionSelect';
+import { versions as otelVersions } from 'otel';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -21,6 +23,8 @@ interface TraceQueryBuilderProps {
 
 interface TraceQueryBuilderState {
   isSearchMode: boolean;
+  otelEnabled: boolean;
+  otelVersion: string;
   traceIdColumn?: SelectedColumn;
   spanIdColumn?: SelectedColumn;
   parentSpanIdColumn?: SelectedColumn;
@@ -45,6 +49,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const labels = allLabels.components.TraceQueryBuilder;
   const builderState: TraceQueryBuilderState = useMemo(() => ({
     isSearchMode: builderOptions.meta?.isTraceSearchMode || false,
+    otelEnabled: builderOptions.meta?.otelEnabled || false,
+    otelVersion: builderOptions.meta?.otelVersion || '',
     traceIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceId),
     spanIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceSpanId),
     parentSpanIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceParentSpanId),
@@ -84,7 +90,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   }, builderState);
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
-  
+  useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning">
       <VerticalGroup>
@@ -113,8 +120,17 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         onToggle={setColumnsOpen}
       >
         { configWarning }
+        <OtelVersionSelect
+          enabled={builderState.otelEnabled}
+          onEnabledChange={e => builderOptionsDispatch(setOtelEnabled(e))}
+          selectedVersion={builderState.otelVersion}
+          onVersionChange={v => builderOptionsDispatch(setOtelVersion(v))}
+          defaultToLatest
+          wide
+        />
         <div className="gf-form">
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.traceIdColumn}
             invalid={!builderState.traceIdColumn}
@@ -125,6 +141,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.spanIdColumn}
             invalid={!builderState.spanIdColumn}
@@ -138,6 +155,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         </div>
         <div className="gf-form">
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.parentSpanIdColumn}
             invalid={!builderState.parentSpanIdColumn}
@@ -148,6 +166,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.serviceNameColumn}
             invalid={!builderState.serviceNameColumn}
@@ -161,6 +180,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         </div>
         <div className="gf-form">
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.operationNameColumn}
             invalid={!builderState.operationNameColumn}
@@ -171,6 +191,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.startTimeColumn}
             invalid={!builderState.startTimeColumn}
@@ -184,6 +205,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         </div>
         <div className="gf-form">
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.durationTimeColumn}
             invalid={!builderState.durationTimeColumn}
@@ -194,6 +216,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
           <DurationUnitSelect
+            disabled={builderState.otelEnabled}
             unit={builderState.durationUnit}
             onChange={onOptionChange('durationUnit')}
             inline
@@ -201,6 +224,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         </div>
         <div className="gf-form">
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.tagsColumn}
             invalid={!builderState.tagsColumn}
@@ -211,6 +235,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
           <ColumnSelect
+            disabled={builderState.otelEnabled}
             allColumns={allColumns}
             selectedColumn={builderState.serviceTagsColumn}
             invalid={!builderState.serviceTagsColumn}
@@ -306,4 +331,38 @@ const useTraceDefaultsOnMount = (datasource: Datasource, isNewQuery: boolean, bu
     }));
     didSetDefaults.current = true;
   }, [builderOptions.columns, builderOptions.orderBy, builderOptions.table, builderOptionsDispatch, datasource, isNewQuery]);
+};
+/**
+ * Sets OTEL Trace columns automatically when OTEL is enabled
+ */
+const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const didSetColumns = useRef<boolean>(otelEnabled);
+  if (!otelEnabled) {
+    didSetColumns.current = false;
+  }
+
+  useEffect(() => {
+    if (!otelEnabled || didSetColumns.current) {
+      return;
+    }
+
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const traceColumnMap = otelConfig?.traceColumnMap;
+    if (!otelConfig || !traceColumnMap) {
+      return;
+    }
+
+    const columns: SelectedColumn[] = [];
+    traceColumnMap.forEach((name, hint) => {
+      columns.push({ name, hint });
+    });
+
+    builderOptionsDispatch(setOptions({
+      columns,
+      meta: {
+        traceDurationUnit: otelConfig.traceDurationUnit
+      }
+    }));
+    didSetColumns.current = true;
+  }, [otelEnabled, otelVersion, builderOptionsDispatch]);
 };
