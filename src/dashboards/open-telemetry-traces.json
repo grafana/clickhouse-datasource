@@ -170,9 +170,7 @@
                 "type": "datetime"
               }
             ],
-            "groupBy": [
-              "ServiceName"
-            ],
+            "groupBy": ["ServiceName"],
             "limit": 10000,
             "metrics": [
               {
@@ -212,9 +210,7 @@
                   "type": "datetime"
                 }
               ],
-              "groupBy": [
-                "ServiceName"
-              ],
+              "groupBy": ["ServiceName"],
               "limit": 10000,
               "metrics": [
                 {
@@ -339,9 +335,7 @@
                 "type": "datetime"
               }
             ],
-            "groupBy": [
-              "ServiceName"
-            ],
+            "groupBy": ["ServiceName"],
             "limit": 10000,
             "metrics": [
               {
@@ -381,9 +375,7 @@
                   "type": "datetime"
                 }
               ],
-              "groupBy": [
-                "ServiceName"
-              ],
+              "groupBy": ["ServiceName"],
               "limit": 10000,
               "metrics": [
                 {
@@ -508,9 +500,7 @@
                 "type": "datetime"
               }
             ],
-            "groupBy": [
-              "ServiceName"
-            ],
+            "groupBy": ["ServiceName"],
             "limit": 10000,
             "metrics": [
               {
@@ -550,9 +540,7 @@
                   "type": "datetime"
                 }
               ],
-              "groupBy": [
-                "ServiceName"
-              ],
+              "groupBy": ["ServiceName"],
               "limit": 10000,
               "metrics": [
                 {
@@ -735,9 +723,7 @@
         "footer": {
           "countRows": false,
           "fields": "",
-          "reducer": [
-            "sum"
-          ],
+          "reducer": ["sum"],
           "show": false
         },
         "showHeader": true,

@@ -8,20 +8,14 @@ const { options } = selectors.components.QueryEditor.Types;
 
 describe('QueryTypeSwitcher', () => {
   it('renders default query', () => {
-    const result = render(
-      <QueryTypeSwitcher query={{ refId: 'A' } as CHQuery} onChange={() => {}} onRunQuery={() => {}} />
-    );
+    const result = render(<QueryTypeSwitcher query={{ refId: 'A' } as CHQuery} onChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByLabelText(options.SQLEditor)).not.toBeChecked();
     expect(result.getByLabelText(options.QueryBuilder)).toBeChecked();
   });
   it('renders legacy query (query without query type)', () => {
     const result = render(
-      <QueryTypeSwitcher
-        query={{ refId: 'A', rawSql: 'hello' } as CHSQLQuery}
-        onChange={() => {}}
-        onRunQuery={() => {}}
-      />
+      <QueryTypeSwitcher query={{ refId: 'A', rawSql: 'hello' } as CHSQLQuery} onChange={() => {}} />
     );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByLabelText(options.SQLEditor)).toBeChecked();
@@ -32,7 +26,6 @@ describe('QueryTypeSwitcher', () => {
       <QueryTypeSwitcher
         query={{ refId: 'A', queryType: QueryType.SQL, rawSql: '', format: Format.TABLE, selectedFormat: Format.AUTO }}
         onChange={() => {}}
-        onRunQuery={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -44,7 +37,6 @@ describe('QueryTypeSwitcher', () => {
       <QueryTypeSwitcher
         query={{ refId: 'A', queryType: QueryType.Builder, rawSql: '' } as CHQuery}
         onChange={() => {}}
-        onRunQuery={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();

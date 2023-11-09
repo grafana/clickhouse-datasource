@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/grafana/clickhouse-datasource/pkg/plugin"
@@ -18,7 +19,7 @@ func main() {
 	}
 }
 
-func newDatasource(settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+func newDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	ds := sqlds.NewDatasource(&plugin.Clickhouse{})
 	return ds.NewDatasource(settings)
 }

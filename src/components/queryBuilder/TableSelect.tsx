@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { Select } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { Datasource } from '../../data/CHDatasource';
 import { selectors } from './../../selectors';
-import { styles } from '../../styles';
+import { EditorField } from '@grafana/experimental';
 
 export type Props = {
   datasource: Datasource;
@@ -36,18 +36,14 @@ export const TableSelect = (props: Props) => {
   };
 
   return (
-    <>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <EditorField tooltip={tooltip} label={label}>
       <Select
-        className={`width-15 ${styles.Common.inlineSelect}`}
         onChange={(e) => onChange(e.value ? e.value : '')}
         options={list}
         value={table}
-        menuPlacement={'bottom'}
         allowCustomValue={true}
+        width={25}
       ></Select>
-    </>
+    </EditorField>
   );
 };

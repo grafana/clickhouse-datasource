@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { InlineFormLabel, MultiSelect } from '@grafana/ui';
+import { MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { FullField } from './../../types';
 import { selectors } from './../../selectors';
-import { styles } from '../../styles';
+import { EditorField } from '@grafana/experimental';
 
 interface FieldsEditorProps {
   fieldsList: FullField[];
@@ -54,24 +54,19 @@ export const FieldsEditor = (props: FieldsEditorProps) => {
   };
 
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltipTable}>
-        {label}
-      </InlineFormLabel>
-      <div data-testid="query-builder-fields-multi-select-container" className={styles.Common.selectWrapper}>
-        <MultiSelect<string>
-          options={[...columns, ...defaultFields, ...custom]}
-          value={fields && fields.length > 0 ? fields : []}
-          isOpen={isOpen}
-          onOpenMenu={() => setIsOpen(true)}
-          onCloseMenu={() => setIsOpen(false)}
-          onChange={onChange}
-          onBlur={onUpdateField}
-          allowCustomValue={true}
-          menuPlacement={'bottom'}
-        />
-      </div>
-    </div>
+    <EditorField tooltip={tooltipTable} label={label} data-testid={'query-builder-fields-multi-select-container'}>
+      <MultiSelect<string>
+        options={[...columns, ...defaultFields, ...custom]}
+        value={fields && fields.length > 0 ? fields : []}
+        isOpen={isOpen}
+        onOpenMenu={() => setIsOpen(true)}
+        onCloseMenu={() => setIsOpen(false)}
+        onChange={onChange}
+        onBlur={onUpdateField}
+        allowCustomValue={true}
+        width={50}
+      />
+    </EditorField>
   );
 };
 

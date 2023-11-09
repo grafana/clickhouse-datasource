@@ -51,8 +51,7 @@ export enum QueryType {
   Builder = 'builder',
 }
 
-export interface CHQueryBase extends DataQuery {
-}
+export interface CHQueryBase extends DataQuery {}
 
 export interface CHSQLQuery extends CHQueryBase {
   queryType: QueryType.SQL;
