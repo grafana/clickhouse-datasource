@@ -21,6 +21,7 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('false'))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.Path.placeholder)).toBeInTheDocument();
   });
   it('with password', async () => {
     render(
@@ -38,6 +39,19 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     const a = screen.getByText('Reset');
     expect(a).toBeInTheDocument();
+  });
+  it('with path', async () => {
+    const path = 'custom-path';
+    render(
+      <ConfigEditor
+        {...mockConfigEditorProps()}
+        options={{
+          ...mockConfigEditorProps().options,
+          jsonData: { ...mockConfigEditorProps().options.jsonData, path },
+        }}
+      />
+    );
+    expect(screen.queryByPlaceholderText(Components.ConfigEditor.Path.placeholder)).toHaveValue(path);
   });
   it('with secure connection', async () => {
     render(

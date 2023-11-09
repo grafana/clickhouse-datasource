@@ -146,6 +146,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		},
 		TLS:  tlsConfig,
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
+		HttpUrlPath: settings.Path,
 		Auth: clickhouse.Auth{
 			Username: settings.Username,
 			Password: settings.Password,

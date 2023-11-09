@@ -10,6 +10,7 @@ export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): Props => (
     jsonData: {
       server: 'foo.com',
       port: 443,
+      path: '',
       username: 'user',
       protocol: 'native',
       ...overrides,
