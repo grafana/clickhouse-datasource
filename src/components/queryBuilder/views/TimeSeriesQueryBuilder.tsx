@@ -9,7 +9,7 @@ import { ModeSwitch } from '../ModeSwitch';
 import { AggregateEditor } from '../AggregateEditor';
 import { GroupByEditor } from '../GroupByEditor';
 import { ColumnSelect } from '../ColumnSelect';
-import { getColumnByHint } from 'components/queryBuilder/utils';
+import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';

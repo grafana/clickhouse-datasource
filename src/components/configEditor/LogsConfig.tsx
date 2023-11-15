@@ -5,31 +5,32 @@ import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
 import { versions as otelVersions } from 'otel';
 import { LabeledInput } from './LabeledInput';
+import { CHLogsConfig } from 'types/config';
+import allLabels from 'labels';
 
 interface LogsConfigProps {
-  defaultDatabase?: string;
-  defaultTable?: string;
+  logsConfig?: CHLogsConfig;
   onDefaultDatabaseChange: (v: any) => void;
   onDefaultTableChange: (v: any) => void;
-
-  otelEnabled?: boolean;
-  otelVersion?: string;
   onOtelEnabledChange: (v: any) => void;
   onOtelVersionChange: (v: any) => void;
-
-  timeColumn?: string;
-  levelColumn?: string;
-  messageColumn?: string;
   onTimeColumnChange: (v: any) => void;
   onLevelColumnChange: (v: any) => void;
   onMessageColumnChange: (v: any) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
-  const { defaultDatabase, defaultTable, onDefaultDatabaseChange, onDefaultTableChange } = props;
-  const { otelEnabled, otelVersion, onOtelEnabledChange, onOtelVersionChange } = props;
-  const { onTimeColumnChange, onLevelColumnChange, onMessageColumnChange } = props;
-  let { timeColumn, levelColumn, messageColumn } = props;
+  const {
+    onDefaultDatabaseChange, onDefaultTableChange,
+    onOtelEnabledChange, onOtelVersionChange,
+    onTimeColumnChange, onLevelColumnChange, onMessageColumnChange
+  } = props;
+  let {
+    defaultDatabase, defaultTable,
+    otelEnabled, otelVersion,
+    timeColumn, levelColumn, messageColumn
+  } = (props.logsConfig || {}) as CHLogsConfig;
+  const labels = allLabels.components.Config.LogsConfig;
 
   const otelConfig = otelVersions.find(v => v.version === otelVersion);
   if (otelEnabled && otelConfig) {
@@ -40,40 +41,40 @@ export const LogsConfig = (props: LogsConfigProps) => {
 
   return (
     <ConfigSection
-      title="Logs configuration"
-      description="(Optional) default settings for log queries"
+      title={labels.title}
+      description={labels.description}
     >
       <Field
-        label={"Default logs database"}
-        description={"the default database used by the logs query builder"}
+        label={labels.defaultDatabase.label}
+        description={labels.defaultDatabase.description}
       >
         <Input
-          name="defaultDatabase"
+          name={labels.defaultDatabase.name}
           width={40}
           value={defaultDatabase || ''}
           onChange={e => onDefaultDatabaseChange(e.currentTarget.value)}
-          label="Default logs database"
-          aria-label="Default logs database"
-          placeholder="default"
+          label={labels.defaultDatabase.label}
+          aria-label={labels.defaultDatabase.label}
+          placeholder={labels.defaultDatabase.placeholder}
         />
       </Field>
       <Field
-        label={"Default logs table"}
-        description={"The default table used by the logs query builder"}
+        label={labels.defaultTable.label}
+        description={labels.defaultTable.description}
       >
         <Input
-          name="defaultTable"
+          name={labels.defaultTable.name}
           width={40}
           value={defaultTable || ''}
           onChange={e => onDefaultTableChange(e.currentTarget.value)}
-          label="Default logs table"
-          aria-label="Default logs table"
-          placeholder="logs"
+          label={labels.defaultTable.label}
+          aria-label={labels.defaultTable.label}
+          placeholder={labels.defaultTable.placeholder}
         />
       </Field>
      <ConfigSubSection
-        title="Default columns"
-        description="Default columns for log queries. Leave empty to disable."
+        title={labels.columns.title}
+        description={labels.columns.description}
       >
         <OtelVersionSelect
           enabled={otelEnabled || false}
@@ -85,22 +86,22 @@ export const LogsConfig = (props: LogsConfigProps) => {
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Time column"
-          tooltip="Column for the log time"
+          label={labels.columns.time.label}
+          tooltip={labels.columns.time.tooltip}
           value={timeColumn || ''}
           onChange={onTimeColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Log Level column"
-          tooltip="Column for log level / severity"
+          label={labels.columns.level.label}
+          tooltip={labels.columns.level.tooltip}
           value={levelColumn || ''}
           onChange={onLevelColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Log Message column"
-          tooltip="Column for log message"
+          label={labels.columns.message.label}
+          tooltip={labels.columns.message.tooltip}
           value={messageColumn || ''}
           onChange={onMessageColumnChange}
         />

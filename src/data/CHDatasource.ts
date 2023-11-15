@@ -43,8 +43,8 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { getSqlFromQueryBuilderOptions, getColumnByHint } from '../components/queryBuilder/utils';
-import { generateSql } from './sqlGenerator';
+import { getSqlFromQueryBuilderOptions } from '../components/queryBuilder/utils';
+import { generateSql, getColumnByHint } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
 import { ReactNode } from 'react';
 

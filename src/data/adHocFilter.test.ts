@@ -184,7 +184,7 @@ describe('AdHocManager', () => {
   });
 
   it('log a malformed filter', () => {
-    const warn = jest.spyOn(console, "error");
+    const warn = jest.spyOn(console, "warn");
     const value = { key: 'foo.key', operator: '=', value: undefined }
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');

@@ -9,7 +9,7 @@ import {
 } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { styles } from 'styles';
-import { isAggregateQuery } from './utils';
+import { isAggregateQuery } from 'data/sqlGenerator';
 
 interface OrderByItemProps {
   columnOptions: Array<SelectableValue<string>>;

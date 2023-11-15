@@ -49,28 +49,9 @@ export const Components = {
       label: 'Client Key',
       placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
     },
-    DefaultDatabase: {
-      label: 'Default database',
-      placeholder: 'Default database',
-      tooltip: 'Default database to be used. Can be empty.',
-    },
-    DialTimeout: {
-      label: 'Dial Timeout (seconds)',
-      placeholder: '10',
-      tooltip: 'Timeout in seconds for connection',
-    },
-    QueryTimeout: {
-      label: 'Query Timeout (seconds)',
-      placeholder: '60',
-      tooltip: 'Timeout in seconds for read queries',
-    },
     Secure: {
       label: 'Secure Connection',
       tooltip: 'Toggle on if the connection is secure',
-    },
-    ValidateSql: {
-      label: 'Validate SQL',
-      tooltip: 'Validate SQL in the editor.',
     },
     SecureSocksProxy: {
       label: 'Enable Secure Socks Proxy',

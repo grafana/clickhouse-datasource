@@ -102,16 +102,12 @@ describe('ConfigEditor', () => {
     const jsonDataOverrides = {
       defaultDatabase: 'default',
       queryTimeout: '100',
-      timeout: '100',
-      validate: true,
+      dialTimeout: '100',
+      validateSql: true,
       enableSecureSocksProxy: true,
       customSettings: [{ setting: 'test-setting', value: 'test-value' }],
     };
     render(<ConfigEditor {...mockConfigEditorProps(jsonDataOverrides)} />);
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(Components.ConfigEditor.DialTimeout.placeholder)).toBeInTheDocument();
-    expect(screen.getByText(Components.ConfigEditor.ValidateSql.label)).toBeInTheDocument();
     expect(screen.getByText(Components.ConfigEditor.SecureSocksProxy.label)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].setting)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();

@@ -4,7 +4,7 @@ import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
-import { getColumnByHint } from 'components/queryBuilder/utils';
+import { getColumnByHint } from 'data/sqlGenerator';
 import { Alert, Collapse, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';

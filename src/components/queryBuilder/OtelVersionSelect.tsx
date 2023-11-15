@@ -45,6 +45,7 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
           className="gf-form"
           value={enabled}
           onChange={e => onEnabledChange(e.currentTarget.checked)}
+          role="checkbox"
         />
       </div>
       <Select

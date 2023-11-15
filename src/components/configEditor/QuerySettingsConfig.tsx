@@ -1,7 +1,7 @@
 import React, {  } from 'react';
 import { Switch, Input, Field } from '@grafana/ui';
-import { Components } from 'selectors';
 import { ConfigSection } from '@grafana/experimental';
+import allLabels from 'labels';
 
 interface QuerySettingsConfigProps {
   dialTimeout?: string;
@@ -14,40 +14,43 @@ interface QuerySettingsConfigProps {
 
 export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
   const { dialTimeout, queryTimeout, validateSql, onDialTimeoutChange, onQueryTimeoutChange, onValidateSqlChange } = props;
+  const labels = allLabels.components.Config.QuerySettingsConfig;
+
   return (
-    <ConfigSection title="Query settings">
-      <Field label={Components.ConfigEditor.DialTimeout.label} description={Components.ConfigEditor.DialTimeout.tooltip}>
+    <ConfigSection title={labels.title}>
+      <Field label={labels.dialTimeout.label} description={labels.dialTimeout.tooltip}>
           <Input
-            name="dialTimeout"
+            name={labels.dialTimeout.name}
             width={40}
             value={dialTimeout || ''}
             onChange={onDialTimeoutChange}
-            label={Components.ConfigEditor.DialTimeout.label}
-            aria-label={Components.ConfigEditor.DialTimeout.label}
-            placeholder={Components.ConfigEditor.DialTimeout.placeholder}
+            label={labels.dialTimeout.label}
+            aria-label={labels.dialTimeout.label}
+            placeholder={labels.dialTimeout.placeholder}
             type="number"
           />
         </Field>
         <Field
-          label={Components.ConfigEditor.QueryTimeout.label}
-          description={Components.ConfigEditor.QueryTimeout.tooltip}
+          label={labels.queryTimeout.label}
+          description={labels.queryTimeout.tooltip}
         >
           <Input
-            name="queryTimeout"
+            name={labels.queryTimeout.name}
             width={40}
             value={queryTimeout || ''}
             onChange={onQueryTimeoutChange}
-            label={Components.ConfigEditor.QueryTimeout.label}
-            aria-label={Components.ConfigEditor.QueryTimeout.label}
-            placeholder={Components.ConfigEditor.QueryTimeout.placeholder}
+            label={labels.queryTimeout.label}
+            aria-label={labels.queryTimeout.label}
+            placeholder={labels.queryTimeout.placeholder}
             type="number"
           />
         </Field>
-        <Field label={Components.ConfigEditor.ValidateSql.label} description={Components.ConfigEditor.ValidateSql.tooltip}>
+        <Field label={labels.validateSql.label} description={labels.validateSql.tooltip}>
           <Switch
             className="gf-form"
             value={validateSql || false}
             onChange={onValidateSqlChange}
+            role='checkbox'
           />
         </Field>
     </ConfigSection>

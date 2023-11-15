@@ -1,5 +1,131 @@
 export default {
   components: {
+    Config: {
+      DefaultDatabaseTableConfig: {
+        title: 'Default DB and table',
+        database: {
+          label: 'Default database',
+          description: 'the default database used by the query builder',
+          name: 'defaultDatabase',
+          placeholder: 'default'
+        },
+        table: {
+          label: 'Default table',
+          description: 'the default table used by the query builder',
+          name: 'defaultTable',
+          placeholder: 'table'
+        },
+      },
+      QuerySettingsConfig: {
+        title: 'Query settings',
+        dialTimeout: {
+          label: 'Dial Timeout (seconds)',
+          tooltip: 'Timeout in seconds for connection',
+          name: 'dialTimeout',
+          placeholder: '10',
+        },
+        queryTimeout: {
+          label: 'Query Timeout (seconds)',
+          tooltip: 'Timeout in seconds for read queries',
+          name: 'queryTimeout',
+          placeholder: '60',
+        },
+        validateSql: {
+          label: 'Validate SQL',
+          tooltip: 'Validate SQL in the editor.',
+        }
+      },
+      TracesConfig: {
+        title: 'Traces configuration',
+        description: '(Optional) Default settings for trace queries',
+        defaultDatabase: {
+          label: 'Default trace database',
+          description: 'the default database used by the trace query builder',
+          name: 'defaultDatabase',
+          placeholder: 'default'
+        },
+        defaultTable: {
+          label: 'Default trace table',
+          description: 'the default table used by the trace query builder',
+          name: 'defaultTable',
+          placeholder: 'traces'
+        },
+        columns: {
+         title: 'Default columns',
+         description: 'Default columns for trace queries. Leave empty to disable.',
+         
+         traceId: {
+          label: 'Trace ID column',
+          tooltip: 'Column for the trace ID'
+          },
+          spanId: {
+            label: 'Span ID column',
+            tooltip: 'Column for the span ID'
+          },
+          parentSpanId: {
+            label: 'Parent Span ID column',
+            tooltip: 'Column for the parent span ID'
+          },
+          serviceName: {
+            label: 'Service Name column',
+            tooltip: 'Column for the service name'
+          },
+          operationName: {
+            label: 'Operation Name column',
+            tooltip: 'Column for the operation name'
+          },
+          startTime: {
+            label: 'Start Time column',
+            tooltip: 'Column for the start time'
+          },
+          durationTime: {
+            label: 'Duration Time column',
+            tooltip: 'Column for the duration time'
+          },
+          tags: {
+            label: 'Tags column',
+            tooltip: 'Column for the trace tags'
+          },
+          serviceTags: {
+            label: 'Service Tags column',
+            tooltip: 'Column for the service tags'
+          }
+        }
+      },
+      LogsConfig: {
+        title: 'Logs configuration',
+        description: '(Optional) default settings for log queries',
+        defaultDatabase: {
+          label: 'Default log database',
+          description: 'the default database used by the logs query builder',
+          name: 'defaultDatabase',
+          placeholder: 'default'
+        },
+        defaultTable: {
+          label: 'Default log table',
+          description: 'the default table used by the logs query builder',
+          name: 'defaultTable',
+          placeholder: 'logs'
+        },
+        columns: {
+          title: 'Default columns',
+          description: 'Default columns for log queries. Leave empty to disable.',
+          
+          time: {
+           label: 'Time column',
+           tooltip: 'Column for the log timestamp'
+           },
+           level: {
+             label: 'Log Level column',
+             tooltip: 'Column for the log level'
+           },
+           message: {
+             label: 'Log Message column',
+             tooltip: 'Column for log message'
+           }
+         }
+      }
+    },
     EditorTypeSwitcher: {
       label: 'Editor Type',
       tooltip: 'Switches between the raw SQL Editor and the Query Builder.',

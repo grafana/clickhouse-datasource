@@ -5,8 +5,6 @@ import useColumns from './useColumns';
 import { TableColumn } from 'types/queryBuilder';
 
 describe('useColumns', () => {
-  const defaultColumnCount = 1; // the "all" column is always in the array
-
   it('should return empty array if datasource is invalid', async () => {
     let result: { current: readonly TableColumn[] };
     await act(async () => {
@@ -14,7 +12,7 @@ describe('useColumns', () => {
       result = r.result;
     });
 
-    expect(result!.current).toHaveLength(defaultColumnCount);
+    expect(result!.current).toHaveLength(0);
   });
 
   it('should return empty array if database string is empty', async () => {
@@ -26,7 +24,7 @@ describe('useColumns', () => {
       result = r.result;
     });
 
-    expect(result!.current).toHaveLength(defaultColumnCount);
+    expect(result!.current).toHaveLength(0);
   });
 
   it('should return empty array if table string is empty', async () => {
@@ -38,7 +36,7 @@ describe('useColumns', () => {
       result = r.result;
     });
 
-    expect(result!.current).toHaveLength(defaultColumnCount);
+    expect(result!.current).toHaveLength(0);
   });
 
   it('should fetch table columns', async () => {
@@ -56,6 +54,6 @@ describe('useColumns', () => {
       result = r.result;
     });
 
-    expect(result!.current).toHaveLength(3);
+    expect(result!.current).toHaveLength(2);
   });
 });

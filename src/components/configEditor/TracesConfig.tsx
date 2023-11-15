@@ -7,28 +7,15 @@ import { ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { versions as otelVersions } from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
+import { CHTracesConfig } from 'types/config';
+import allLabels from 'labels';
 
 interface TraceConfigProps {
-  defaultDatabase?: string;
-  defaultTable?: string;
+  tracesConfig?: CHTracesConfig;
   onDefaultDatabaseChange: (v: any) => void;
   onDefaultTableChange: (v: any) => void;
-
-  otelEnabled?: boolean;
-  otelVersion?: string;
   onOtelEnabledChange: (v: any) => void;
   onOtelVersionChange: (v: any) => void;
-
-  traceIdColumn?: string;
-  spanIdColumn?: string;
-  operationNameColumn?: string;
-  parentSpanIdColumn?: string;
-  serviceNameColumn?: string;
-  durationColumn?: string;
-  durationUnit?: string;
-  startTimeColumn?: string;
-  tagsColumn?: string;
-  serviceTagsColumn?: string;
   onTraceIdColumnChange: (v: any) => void;
   onSpanIdColumnChange: (v: any) => void;
   onOperationNameColumnChange: (v: any) => void;
@@ -42,17 +29,20 @@ interface TraceConfigProps {
 }
 
 export const TracesConfig = (props: TraceConfigProps) => {
-  const { defaultDatabase, defaultTable, onDefaultDatabaseChange, onDefaultTableChange } = props;
-  const { otelEnabled, otelVersion, onOtelEnabledChange, onOtelVersionChange } = props;
   const {
+    onDefaultDatabaseChange, onDefaultTableChange,
+    onOtelEnabledChange, onOtelVersionChange,
     onTraceIdColumnChange, onSpanIdColumnChange, onOperationNameColumnChange, onParentSpanIdColumnChange,
     onServiceNameColumnChange, onDurationColumnChange, onDurationUnitChange, onStartTimeColumnChange,
     onTagsColumnChange, onServiceTagsColumnChange,
   } = props;
   let {
+    defaultDatabase, defaultTable,
+    otelEnabled, otelVersion,
     traceIdColumn, spanIdColumn, operationNameColumn, parentSpanIdColumn, serviceNameColumn,
     durationColumn, durationUnit, startTimeColumn, tagsColumn, serviceTagsColumn
-  } = props;
+  } = (props.tracesConfig || {}) as CHTracesConfig;
+  const labels = allLabels.components.Config.TracesConfig;
 
   const otelConfig = otelVersions.find(v => v.version === otelVersion);
   if (otelEnabled && otelConfig) {
@@ -70,40 +60,40 @@ export const TracesConfig = (props: TraceConfigProps) => {
 
   return (
     <ConfigSection
-      title="Traces configuration"
-      description="(Optional) Default settings for trace queries"
+      title={labels.title}
+      description={labels.description}
     >
       <Field
-        label={"Default trace database"}
-        description={"the default database used by the trace query builder"}
+        label={labels.defaultDatabase.label}
+        description={labels.defaultDatabase.description}
       >
         <Input
-          name="defaultDatabase"
+          name={labels.defaultDatabase.name}
           width={40}
           value={defaultDatabase || ''}
           onChange={e => onDefaultDatabaseChange(e.currentTarget.value)}
-          label="Default trace database"
-          aria-label="Default trace database"
-          placeholder="default"
+          label={labels.defaultDatabase.label}
+          aria-label={labels.defaultDatabase.label}
+          placeholder={labels.defaultDatabase.placeholder}
         />
       </Field>
       <Field
-        label={"Default trace table"}
-        description={"The default table used by the trace query builder"}
+        label={labels.defaultTable.label}
+        description={labels.defaultTable.description}
       >
         <Input
-          name="defaultTable"
+          name={labels.defaultTable.name}
           width={40}
           value={defaultTable || ''}
           onChange={e => onDefaultTableChange(e.currentTarget.value)}
-          label="Default trace table"
-          aria-label="Default trace table"
-          placeholder="traces"
+          label={labels.defaultTable.label}
+          aria-label={labels.defaultTable.label}
+          placeholder={labels.defaultTable.placeholder}
         />
       </Field>
       <ConfigSubSection
-        title="Default columns"
-        description="Default columns for trace queries. Leave empty to disable."
+        title={labels.columns.title}
+        description={labels.columns.description}
       >
         <OtelVersionSelect
           enabled={otelEnabled || false}
@@ -115,43 +105,43 @@ export const TracesConfig = (props: TraceConfigProps) => {
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Trace ID column"
-          tooltip="Column for the trace ID"
+          label={labels.columns.traceId.label}
+          tooltip={labels.columns.traceId.tooltip}
           value={traceIdColumn || ''}
           onChange={onTraceIdColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Span ID column"
-          tooltip="Column for the span ID"
+          label={labels.columns.spanId.label}
+          tooltip={labels.columns.spanId.tooltip}
           value={spanIdColumn || ''}
           onChange={onSpanIdColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Operation name column"
-          tooltip="Column for the operation name"
+          label={labels.columns.operationName.label}
+          tooltip={labels.columns.operationName.tooltip}
           value={operationNameColumn || ''}
           onChange={onOperationNameColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Parent Span ID column"
-          tooltip="Column for the parent span ID"
+          label={labels.columns.parentSpanId.label}
+          tooltip={labels.columns.parentSpanId.tooltip}
           value={parentSpanIdColumn || ''}
           onChange={onParentSpanIdColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Service name column"
-          tooltip="Column for the service name"
+          label={labels.columns.serviceName.label}
+          tooltip={labels.columns.serviceName.tooltip}
           value={serviceNameColumn || ''}
           onChange={onServiceNameColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Duration column"
-          tooltip="Column for the trace duration"
+          label={labels.columns.durationTime.label}
+          tooltip={labels.columns.durationTime.tooltip}
           value={durationColumn || ''}
           onChange={onDurationColumnChange}
         />
@@ -162,22 +152,22 @@ export const TracesConfig = (props: TraceConfigProps) => {
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Start time column"
-          tooltip="Column for the start time"
+          label={labels.columns.startTime.label}
+          tooltip={labels.columns.startTime.tooltip}
           value={startTimeColumn || ''}
           onChange={onStartTimeColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Tags column"
-          tooltip="Column for the trace tags"
+          label={labels.columns.tags.label}
+          tooltip={labels.columns.tags.tooltip}
           value={tagsColumn || ''}
           onChange={onTagsColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
-          label="Service Tags column"
-          tooltip="Column for the trace service tags"
+          label={labels.columns.serviceTags.label}
+          tooltip={labels.columns.serviceTags.tooltip}
           value={serviceTagsColumn || ''}
           onChange={onServiceTagsColumnChange}
         />

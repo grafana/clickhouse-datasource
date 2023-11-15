@@ -7,7 +7,7 @@ import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
-import { getColumnByHint } from 'components/queryBuilder/utils';
+import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';

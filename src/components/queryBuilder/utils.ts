@@ -32,6 +32,7 @@ import {
   QueryType,
 } from 'types/queryBuilder';
 import { sqlToStatement } from 'data/ast';
+import { getColumnByHint } from 'data/sqlGenerator';
 
 
 export const isBooleanType = (type: string): boolean => {
@@ -245,7 +246,7 @@ export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): str
     case BuilderMode.Trend:
       const timeColumn = getColumnByHint(options, ColumnHint.Time);
       if (!isDateType(timeColumn?.type || '')) {
-        throw new Error('time column is expected to be a valid Date type.');
+        throw new Error('time column is expected to be a valid date type.');
       }
       query += getTrendByQuery(
         database,
@@ -597,6 +598,3 @@ export const operMap = new Map<string, FilterOperator>([
 export function getOper(v: string): FilterOperator {
   return operMap.get(v) || FilterOperator.Equals;
 }
-
-export const getColumnByHint = (builder: QueryBuilderOptions, hint: ColumnHint): CHSelectedColumn | undefined => builder.columns?.find(c => c.hint === hint);
-export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;

@@ -1,9 +1,11 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { OtelVersionSelect } from './OtelVersionSelect';
+import { versions as allVersions } from 'otel';
 
 describe('OtelVersionSelect', () => {
-  const testVersion = '1.0.0-test';
+  const testVersion = allVersions[0];
+  const testVersionName = allVersions[0].version + ' (latest)';
 
   it('should render with empty properties', () => {
     const result = render(
@@ -22,12 +24,12 @@ describe('OtelVersionSelect', () => {
       <OtelVersionSelect
         enabled={false}
         onEnabledChange={() => {}}
-        selectedVersion={testVersion}
+        selectedVersion={testVersion.version}
         onVersionChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
-    expect(result.getByText(testVersion)).toBeInTheDocument();
+    expect(result.getByText(testVersionName)).toBeInTheDocument();
   });
 
   it('should call onEnabledChange when the switch is enabled', () => {
@@ -36,7 +38,7 @@ describe('OtelVersionSelect', () => {
       <OtelVersionSelect
         enabled={false}
         onEnabledChange={onEnabledChange}
-        selectedVersion={testVersion}
+        selectedVersion={testVersion.version}
         onVersionChange={() => {}}
       />
     );
@@ -55,7 +57,7 @@ describe('OtelVersionSelect', () => {
       <OtelVersionSelect
         enabled={true}
         onEnabledChange={onEnabledChange}
-        selectedVersion={testVersion}
+        selectedVersion={testVersion.version}
         onVersionChange={() => {}}
       />
     );
@@ -74,7 +76,7 @@ describe('OtelVersionSelect', () => {
       <OtelVersionSelect
         enabled={true}
         onEnabledChange={() => {}}
-        selectedVersion={testVersion}
+        selectedVersion={testVersion.version}
         onVersionChange={onVersionChange}
       />
     );
@@ -93,7 +95,7 @@ describe('OtelVersionSelect', () => {
       <OtelVersionSelect
         enabled={false}
         onEnabledChange={() => {}}
-        selectedVersion={testVersion}
+        selectedVersion={testVersion.version}
         onVersionChange={() => {}}
       />
     );

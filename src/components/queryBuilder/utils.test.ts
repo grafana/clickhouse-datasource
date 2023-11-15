@@ -1,5 +1,5 @@
-import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, QueryBuilderOptions, ColumnHint, QueryType } from 'types/queryBuilder';
-import { getColumnByHint, getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isAggregateQuery, isDateTimeType, isDateType, isNumberType } from './utils';
+import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, ColumnHint, QueryType } from 'types/queryBuilder';
+import { getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isDateTimeType, isDateType, isNumberType } from './utils';
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
@@ -447,7 +447,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
         aggregates: [],
         filters: [],
       })
-    ).toThrowErrorMatchingInlineSnapshot('"timeFieldType is expected to be valid Date type."');
+    ).toThrowErrorMatchingInlineSnapshot('"time column is expected to be a valid date type."');
   });
 });
 
@@ -459,27 +459,3 @@ function testCondition(name: string, sql: string, builder: any, testQueryOptions
     }
   });
 }
-
-
-describe('getColumnByHint', () => {
-  it('returns a selected column when present', () => {
-    const testColumn = { name: 'time', type: 'datetime', hint: ColumnHint.Time };
-    const builderOptions = { columns: [testColumn] } as QueryBuilderOptions;
-    expect(getColumnByHint(builderOptions, ColumnHint.Time)).toMatchObject(testColumn);
-  });
-  it('returns a undefined when column not present', () => {
-    const testColumn = { name: 'time', type: 'datetime' };
-    const builderOptions = { columns: [testColumn] } as QueryBuilderOptions;
-    expect(getColumnByHint(builderOptions, ColumnHint.Time)).toBeUndefined();
-  });
-});
-describe('isAggregateQuery', () => {
-  it('returns true for aggregate query', () => {
-    const builderOptions = { aggregates: [{ column: 'foo', aggregateType: AggregateType.Count }] } as QueryBuilderOptions;
-    expect(isAggregateQuery(builderOptions)).toEqual(true);
-  });
-  it('returns false for query without aggregates', () => {
-    const builderOptions = {} as QueryBuilderOptions;
-    expect(isAggregateQuery(builderOptions)).toEqual(false);
-  });
-});

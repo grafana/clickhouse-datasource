@@ -169,6 +169,7 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
   return queryParts.join(' ');
 }
 
+export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;
 export const getColumnByHint = (options: QueryBuilderOptions, hint: ColumnHint): SelectedColumn | undefined => options.columns?.find(c => c.hint === hint);
 export const getColumnIndexByHint = (options: QueryBuilderOptions, hint: ColumnHint): number => options.columns?.findIndex(c => c.hint === hint) || -1;
 export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly ColumnHint[]): readonly SelectedColumn[] => {

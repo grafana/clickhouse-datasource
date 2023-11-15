@@ -1,6 +1,7 @@
 import React from 'react';
 import { ConfigSection } from '@grafana/experimental';
 import { Input, Field } from '@grafana/ui';
+import allLabels from 'labels';
 
 interface DefaultDatabaseTableConfigProps {
   defaultDatabase?: string;
@@ -11,34 +12,38 @@ interface DefaultDatabaseTableConfigProps {
 
 export const DefaultDatabaseTableConfig = (props: DefaultDatabaseTableConfigProps) => {
   const { defaultDatabase, defaultTable, onDefaultDatabaseChange, onDefaultTableChange } = props;
+  const labels = allLabels.components.Config.DefaultDatabaseTableConfig;
+
   return (
-    <ConfigSection title="Default DB and table">
+    <ConfigSection title={labels.title}>
       <Field
-        label={"Default database"}
-        description={"the default database used by the query builder"}
+        label={labels.database.label}
+        description={labels.database.description}
       >
         <Input
-          name="defaultDatabase"
+          name={labels.database.name}
           width={40}
           value={defaultDatabase || ''}
           onChange={onDefaultDatabaseChange}
-          label="Default database"
-          aria-label="Default database"
-          placeholder="default"
+          label={labels.database.label}
+          aria-label={labels.database.label}
+          placeholder={labels.database.placeholder}
+          type="text"
         />
       </Field>
       <Field
-        label={"Default table"}
-        description={"The default table used by the query builder"}
+        label={labels.table.label}
+        description={labels.table.description}
       >
         <Input
-          name="defaultTable"
+          name={labels.table.name}
           width={40}
           value={defaultTable || ''}
           onChange={onDefaultTableChange}
-          label="Default table"
-          aria-label="Default table"
-          placeholder="table"
+          label={labels.table.label}
+          aria-label={labels.table.label}
+          placeholder={labels.table.placeholder}
+          type="text"
         />
       </Field>
     </ConfigSection>

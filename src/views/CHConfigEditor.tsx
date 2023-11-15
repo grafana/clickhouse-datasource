@@ -6,7 +6,7 @@ import {
 } from '@grafana/data';
 import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
-import { Components } from './../selectors';
+import { Components } from 'selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, CHLogsConfig, Protocol, CHTracesConfig } from 'types/config';
 import { gte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana/experimental';
@@ -23,6 +23,7 @@ export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CH
 export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const { jsonData, secureJsonFields } = options;
+  const labels = Components.ConfigEditor;
   const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
   const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
   const hasTLSClientCert = secureJsonFields && secureJsonFields.tlsClientCert;
@@ -170,8 +171,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <ConfigSection title="Server">
         <Field
           required
-          label={Components.ConfigEditor.ServerAddress.label}
-          description={Components.ConfigEditor.ServerAddress.tooltip}
+          label={labels.ServerAddress.label}
+          description={labels.ServerAddress.tooltip}
           invalid={!jsonData.host}
           error={'Server URL is required'}
         >
@@ -180,15 +181,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             width={40}
             value={jsonData.host || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'host')}
-            label={Components.ConfigEditor.ServerAddress.label}
-            aria-label={Components.ConfigEditor.ServerAddress.label}
-            placeholder={Components.ConfigEditor.ServerAddress.placeholder}
+            label={labels.ServerAddress.label}
+            aria-label={labels.ServerAddress.label}
+            placeholder={labels.ServerAddress.placeholder}
           />
         </Field>
         <Field
           required
-          label={Components.ConfigEditor.ServerPort.label}
-          description={Components.ConfigEditor.ServerPort.tooltip}
+          label={labels.ServerPort.label}
+          description={labels.ServerPort.tooltip}
           invalid={!jsonData.port}
           error={'Port is required'}
         >
@@ -198,12 +199,12 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             type="number"
             value={jsonData.port || ''}
             onChange={(e) => onPortChange(e.currentTarget.value)}
-            label={Components.ConfigEditor.ServerPort.label}
-            aria-label={Components.ConfigEditor.ServerPort.label}
-            placeholder={Components.ConfigEditor.ServerPort.placeholder(jsonData.secure?.toString() || 'false')}
+            label={labels.ServerPort.label}
+            aria-label={labels.ServerPort.label}
+            placeholder={labels.ServerPort.placeholder(jsonData.secure?.toString() || 'false')}
           />
         </Field>
-        <Field label={Components.ConfigEditor.Protocol.label} description={Components.ConfigEditor.Protocol.tooltip}>
+        <Field label={labels.Protocol.label} description={labels.Protocol.tooltip}>
           <RadioButtonGroup<Protocol>
             options={protocolOptions}
             disabledOptions={[]}
@@ -211,7 +212,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onChange={(e) => onProtocolToggle(e!)}
           />
         </Field>
-        <Field label={Components.ConfigEditor.Secure.label} description={Components.ConfigEditor.Secure.tooltip}>
+        <Field label={labels.Secure.label} description={labels.Secure.tooltip}>
           <Switch
             id="secure"
             className="gf-form"
@@ -224,8 +225,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <Divider />
       <ConfigSection title="TLS / SSL Settings">
         <Field
-          label={Components.ConfigEditor.TLSSkipVerify.label}
-          description={Components.ConfigEditor.TLSSkipVerify.tooltip}
+          label={labels.TLSSkipVerify.label}
+          description={labels.TLSSkipVerify.tooltip}
         >
           <Switch
             className="gf-form"
@@ -234,8 +235,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           />
         </Field>
         <Field
-          label={Components.ConfigEditor.TLSClientAuth.label}
-          description={Components.ConfigEditor.TLSClientAuth.tooltip}
+          label={labels.TLSClientAuth.label}
+          description={labels.TLSClientAuth.tooltip}
         >
           <Switch
             className="gf-form"
@@ -244,8 +245,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           />
         </Field>
         <Field
-          label={Components.ConfigEditor.TLSAuthWithCACert.label}
-          description={Components.ConfigEditor.TLSAuthWithCACert.tooltip}
+          label={labels.TLSAuthWithCACert.label}
+          description={labels.TLSAuthWithCACert.tooltip}
         >
           <Switch
             className="gf-form"
@@ -257,8 +258,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           <CertificationKey
             hasCert={!!hasTLSCACert}
             onChange={(e) => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
-            placeholder={Components.ConfigEditor.TLSCACert.placeholder}
-            label={Components.ConfigEditor.TLSCACert.label}
+            placeholder={labels.TLSCACert.placeholder}
+            label={labels.TLSCACert.label}
             onClick={() => onResetClickFactory('tlsCACert')}
           />
         )}
@@ -267,14 +268,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             <CertificationKey
               hasCert={!!hasTLSClientCert}
               onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
-              placeholder={Components.ConfigEditor.TLSClientCert.placeholder}
-              label={Components.ConfigEditor.TLSClientCert.label}
+              placeholder={labels.TLSClientCert.placeholder}
+              label={labels.TLSClientCert.label}
               onClick={() => onResetClickFactory('tlsClientCert')}
             />
             <CertificationKey
               hasCert={!!hasTLSClientKey}
-              placeholder={Components.ConfigEditor.TLSClientKey.placeholder}
-              label={Components.ConfigEditor.TLSClientKey.label}
+              placeholder={labels.TLSClientKey.placeholder}
+              label={labels.TLSClientKey.label}
               onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
               onClick={() => onResetClickFactory('tlsClientKey')}
             />
@@ -285,26 +286,26 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <Divider />
       <ConfigSection title="Credentials">
         <Field
-          label={Components.ConfigEditor.Username.label}
-          description={Components.ConfigEditor.Username.tooltip}
+          label={labels.Username.label}
+          description={labels.Username.tooltip}
         >
           <Input
             name="user"
             width={40}
             value={jsonData.username || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'username')}
-            label={Components.ConfigEditor.Username.label}
-            aria-label={Components.ConfigEditor.Username.label}
-            placeholder={Components.ConfigEditor.Username.placeholder}
+            label={labels.Username.label}
+            aria-label={labels.Username.label}
+            placeholder={labels.Username.placeholder}
           />
         </Field>
-        <Field label={Components.ConfigEditor.Password.label} description={Components.ConfigEditor.Password.tooltip}>
+        <Field label={labels.Password.label} description={labels.Password.tooltip}>
           <SecretInput
             name="pwd"
             width={40}
-            label={Components.ConfigEditor.Password.label}
-            aria-label={Components.ConfigEditor.Password.label}
-            placeholder={Components.ConfigEditor.Password.placeholder}
+            label={labels.Password.label}
+            aria-label={labels.Password.label}
+            placeholder={labels.Password.placeholder}
             value={secureJsonData.password || ''}
             isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
             onReset={onResetPassword}
@@ -340,19 +341,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
         <Divider />
         <LogsConfig
-          defaultDatabase={jsonData.logs?.defaultDatabase}
-          defaultTable={jsonData.logs?.defaultTable}
+          logsConfig={jsonData.logs}
           onDefaultDatabaseChange={db => onLogsConfigChange('defaultDatabase', db)}
           onDefaultTableChange={table => onLogsConfigChange('defaultTable', table)}
-
-          otelEnabled={jsonData.logs?.otelEnabled}
-          otelVersion={jsonData.logs?.otelVersion}
           onOtelEnabledChange={v => onLogsConfigChange('otelEnabled', v)}
           onOtelVersionChange={v => onLogsConfigChange('otelVersion', v)}
-
-          timeColumn={jsonData.logs?.timeColumn}
-          levelColumn={jsonData.logs?.levelColumn}
-          messageColumn={jsonData.logs?.messageColumn}
           onTimeColumnChange={c => onLogsConfigChange('timeColumn', c)}
           onLevelColumnChange={c => onLogsConfigChange('levelColumn', c)}
           onMessageColumnChange={c => onLogsConfigChange('messageColumn', c)}
@@ -360,26 +353,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
         <Divider />
         <TracesConfig
-          defaultDatabase={jsonData.traces?.defaultDatabase}
-          defaultTable={jsonData.traces?.defaultTable}
+          tracesConfig={jsonData.traces}
           onDefaultDatabaseChange={db => onTracesConfigChange('defaultDatabase', db)}
           onDefaultTableChange={table => onTracesConfigChange('defaultTable', table)}
-
-          otelEnabled={jsonData.traces?.otelEnabled}
-          otelVersion={jsonData.traces?.otelVersion}
           onOtelEnabledChange={v => onTracesConfigChange('otelEnabled', v)}
           onOtelVersionChange={v => onTracesConfigChange('otelVersion', v)}
-
-          traceIdColumn={jsonData.traces?.traceIdColumn}
-          spanIdColumn={jsonData.traces?.spanIdColumn}
-          operationNameColumn={jsonData.traces?.operationNameColumn}
-          parentSpanIdColumn={jsonData.traces?.parentSpanIdColumn}
-          serviceNameColumn={jsonData.traces?.serviceNameColumn}
-          durationColumn={jsonData.traces?.durationColumn}
-          durationUnit={jsonData.traces?.durationUnit}
-          startTimeColumn={jsonData.traces?.startTimeColumn}
-          tagsColumn={jsonData.traces?.tagsColumn}
-          serviceTagsColumn={jsonData.traces?.serviceTagsColumn}
           onTraceIdColumnChange={c => onTracesConfigChange('traceIdColumn', c)}
           onSpanIdColumnChange={c => onTracesConfigChange('spanIdColumn', c)}
           onOperationNameColumnChange={c => onTracesConfigChange('operationNameColumn', c)}
@@ -395,8 +373,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         {config.featureToggles['secureSocksDSProxyEnabled'] && gte(config.buildInfo.version, '10.0.0') && (
           <Field
-            label={Components.ConfigEditor.SecureSocksProxy.label}
-            description={Components.ConfigEditor.SecureSocksProxy.tooltip}
+            label={labels.SecureSocksProxy.label}
+            description={labels.SecureSocksProxy.tooltip}
           >
             <Switch
               className="gf-form"
