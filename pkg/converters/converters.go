@@ -254,7 +254,6 @@ var Converters = map[string]Converter{
 	},
 }
 
-var ComplexTypes = []string{"Map"}
 var ClickhouseConverters = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {
