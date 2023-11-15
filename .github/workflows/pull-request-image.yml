@@ -27,6 +27,8 @@ jobs:
 
       - name: Install Go environment
         uses: actions/setup-go@v4
+        with:
+          go-version: 'stable'
 
       - name: Install yarn dependencies
         run: yarn install

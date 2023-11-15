@@ -171,7 +171,10 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.TlsClientKey = tlsClientKey
 	}
 
-	proxyOpts, err := config.ProxyOptions()
+	// proxy options are only able to be loaded via environment variables
+	// currently, so we pass `nil` here so they are loaded with defaults
+	proxyOpts, err := config.ProxyOptions(nil)
+
 	if err == nil && proxyOpts != nil {
 		// the sdk expects the timeout to not be a string
 		timeout, err := strconv.ParseFloat(settings.Timeout, 64)

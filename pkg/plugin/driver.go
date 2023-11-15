@@ -144,8 +144,8 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(),
 		},
-		TLS:  tlsConfig,
-		Addr: []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
+		TLS:         tlsConfig,
+		Addr:        []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
 		HttpUrlPath: settings.Path,
 		Auth: clickhouse.Auth{
 			Username: settings.Username,
@@ -161,8 +161,10 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		Settings:    customSettings,
 	}
 
-	if sdkproxy.Cli.SecureSocksProxyEnabled(settings.ProxyOptions) {
-		dialer, err := sdkproxy.Cli.NewSecureSocksProxyContextDialer(settings.ProxyOptions)
+	p := sdkproxy.New(settings.ProxyOptions)
+
+	if p.SecureSocksProxyEnabled() {
+		dialer, err := p.NewSecureSocksProxyContextDialer()
 		if err != nil {
 			return nil, err
 		}
