@@ -4624,10 +4624,10 @@
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.4.tgz#bd86a43617df0594787d38b735f55c805becf1bc"
   integrity sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw==
 
-"@types/webpack-livereload-plugin@^2.3.4":
-  version "2.3.4"
-  resolved "https://registry.yarnpkg.com/@types/webpack-livereload-plugin/-/webpack-livereload-plugin-2.3.4.tgz#f3d0ac7ffda27dc4d2ea0f2807d977e57dbb87d7"
-  integrity sha512-5THC5ANQQZtJ966bYkIdH4L8KBsp1DskQ1C12hfPURfOhpndyUAR6NvMFUJ5Yo7u6cDWFFW6b58RkSfz0jlb8Q==
+"@types/webpack-livereload-plugin@^2.3.6":
+  version "2.3.6"
+  resolved "https://registry.yarnpkg.com/@types/webpack-livereload-plugin/-/webpack-livereload-plugin-2.3.6.tgz#2c3ccefc8858525f40aeb8be0f784d5027144e23"
+  integrity sha512-H8nZSOWSiY/6kCpOmbutZPu7Sai1xyEXo/SrXQPCymMPNBwpYWAdOsjKqr32d+IrVjnn9GGgKSYY34TEPRxJ/A==
   dependencies:
     "@types/webpack" "^4"
 
