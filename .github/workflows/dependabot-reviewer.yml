@@ -12,5 +12,5 @@ jobs:
     with:
       repository-merge-method: squash
       #  Add this to define production packages that dependabot can auto-update if the bump is minor
-      #  packages-minor-autoupdate: '[]'
+      packages-minor-autoupdate: '["@grafana/data","@grafana/ui","@grafana/runtime","@grafana/e2e","@grafana/e2e-selectors"]'
     secrets: inherit
