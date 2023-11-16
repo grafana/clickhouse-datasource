@@ -14,6 +14,14 @@ jest.mock('@grafana/runtime', () => {
   };
 });
 
+jest.mock('@grafana/runtime', () => {
+  const original = jest.requireActual('@grafana/runtime');
+  return {
+    ...original,
+    config: { buildInfo: { version: '10.0.0' }, featureToggles: { secureSocksDSProxyEnabled: true } },
+  };
+});
+
 describe('ConfigEditor', () => {
   it('new editor', () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
@@ -21,6 +29,7 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.ServerPort.placeholder('false'))).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Password.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.Path.placeholder)).toBeInTheDocument();
   });
   it('with password', async () => {
     render(
@@ -38,6 +47,19 @@ describe('ConfigEditor', () => {
     expect(screen.getByPlaceholderText(Components.ConfigEditor.Username.placeholder)).toBeInTheDocument();
     const a = screen.getByText('Reset');
     expect(a).toBeInTheDocument();
+  });
+  it('with path', async () => {
+    const path = 'custom-path';
+    render(
+      <ConfigEditor
+        {...mockConfigEditorProps()}
+        options={{
+          ...mockConfigEditorProps().options,
+          jsonData: { ...mockConfigEditorProps().options.jsonData, path },
+        }}
+      />
+    );
+    expect(screen.queryByPlaceholderText(Components.ConfigEditor.Path.placeholder)).toHaveValue(path);
   });
   it('with secure connection', async () => {
     render(

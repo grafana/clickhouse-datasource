@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
+import { Button, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
 import { styles } from 'styles';
+import { EditorField, EditorFieldGroup } from '@grafana/experimental';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -66,11 +67,7 @@ const FilterValueNumberItem = (props: { value: number; onChange: (value: number)
 const FilterValueSingleStringItem = (props: { value: string; onChange: (value: string) => void }) => {
   return (
     <div data-testid="query-builder-filters-single-string-value-container">
-      <Input
-        type="text"
-        defaultValue={props.value}
-        onBlur={(e) => props.onChange(e.currentTarget.value)}
-      />
+      <Input type="text" defaultValue={props.value} onBlur={(e) => props.onChange(e.currentTarget.value)} />
     </div>
   );
 };
@@ -332,7 +329,7 @@ export const FilterEditor = (props: {
     onFilterChange(index, filter);
   };
   return (
-    <>
+    <EditorFieldGroup>
       {index !== 0 && (
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
@@ -340,15 +337,13 @@ export const FilterEditor = (props: {
         disabled={Boolean(filter.hint)}
         placeholder={filter.hint || undefined}
         value={filter.key}
-        width={40}
-        className={styles.Common.inlineSelect}
+        width={30}
         options={getFields()}
         isOpen={isOpen}
         onOpenMenu={() => setIsOpen(true)}
         onCloseMenu={() => setIsOpen(false)}
         onChange={(e) => onFilterNameChange(e.value!)}
         allowCustomValue={true}
-        menuPlacement={'bottom'}
       />
       <Select
         value={filter.operator}
@@ -356,10 +351,9 @@ export const FilterEditor = (props: {
         className={styles.Common.inlineSelect}
         options={getFilterOperatorsByType(filter.type)}
         onChange={(e) => onFilterOperatorChange(e.value!)}
-        menuPlacement={'bottom'}
       />
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
-    </>
+    </EditorFieldGroup>
   );
 };
 
@@ -384,61 +378,34 @@ export const FiltersEditor = (props: {
     onFiltersChange(newFilters);
   };
   return (
-    <>
-      {filters.length === 0 && (
-        <div className="gf-form">
-          <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-            {label}
-          </InlineFormLabel>
-          <Button
-            data-testid="query-builder-filters-add-button"
-            icon="plus-circle"
-            variant="secondary"
-            size="sm"
-            className={styles.Common.smallBtn}
-            onClick={addFilter}
-          >
-            {addLabel}
-          </Button>
-        </div>
-      )}
-      {filters.map((filter, index) => {
-        return (
-          <div className="gf-form" key={index}>
-            {index === 0 ? (
-              <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-                {label}
-              </InlineFormLabel>
-            ) : (
-              <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-            )}
-            <FilterEditor allColumns={fieldsList} filter={filter} onFilterChange={onFilterChange} index={index} />
-            <Button
-              data-testid="query-builder-filters-remove-button"
-              icon="trash-alt"
-              variant="destructive"
-              size="sm"
-              className={styles.Common.smallBtn}
-              onClick={() => removeFilter(index)}
-            />
-          </div>
-        );
-      })}
-      {filters.length !== 0 && (
-        <div className="gf-form">
-          <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-          <Button
-            data-testid="query-builder-filters-inline-add-button"
-            icon="plus-circle"
-            variant="secondary"
-            size="sm"
-            className={styles.Common.smallBtn}
-            onClick={addFilter}
-          >
-            {addLabel}
-          </Button>
-        </div>
-      )}
-    </>
+    <EditorField tooltip={tooltip} label={label}>
+      <EditorFieldGroup>
+        {filters.map((filter, index) => {
+          return (
+            <div className="gf-form" key={index}>
+              <FilterEditor allColumns={fieldsList} filter={filter} onFilterChange={onFilterChange} index={index} />
+              <Button
+                data-testid="query-builder-filters-remove-button"
+                icon="trash-alt"
+                variant="destructive"
+                size="sm"
+                className={styles.Common.smallBtn}
+                onClick={() => removeFilter(index)}
+              />
+            </div>
+          );
+        })}
+        <Button
+          data-testid="query-builder-filters-add-button"
+          icon="plus-circle"
+          variant="secondary"
+          size="sm"
+          className={styles.Common.smallBtn}
+          onClick={addFilter}
+        >
+          {addLabel}
+        </Button>
+      </EditorFieldGroup>
+    </EditorField>
   );
 };

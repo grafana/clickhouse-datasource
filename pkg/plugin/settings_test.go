@@ -28,13 +28,14 @@ func TestLoadSettings(t *testing.T) {
 				args: args{
 					config: backend.DataSourceInstanceSettings{
 						UID:                     "ds-uid",
-						JSONData:                []byte(`{ "server": "foo", "port": 443, "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10", "enableSecureSocksProxy": true}`),
+						JSONData:                []byte(`{ "server": "foo", "port": 443, "path": "custom-path", "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10", "enableSecureSocksProxy": true}`),
 						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey", "secureSocksProxyPassword": "test"},
 					},
 				},
 				wantSettings: Settings{
 					Host:               "foo",
 					Port:               443,
+					Path:               "custom-path",
 					Username:           "baz",
 					DefaultDatabase:    "example",
 					InsecureSkipVerify: true,
@@ -64,13 +65,14 @@ func TestLoadSettings(t *testing.T) {
 				name: "should converting string values to the correct type)",
 				args: args{
 					config: backend.DataSourceInstanceSettings{
-						JSONData:                []byte(`{"server": "test", "port": "443", "tlsSkipVerify": "true", "tlsAuth" : "true", "tlsAuthWithCACert": "true"}`),
+						JSONData:                []byte(`{"server": "test", "port": "443", "path": "custom-path", "tlsSkipVerify": "true", "tlsAuth" : "true", "tlsAuthWithCACert": "true"}`),
 						DecryptedSecureJSONData: map[string]string{},
 					},
 				},
 				wantSettings: Settings{
 					Host:               "test",
 					Port:               443,
+					Path:               "custom-path",
 					InsecureSkipVerify: true,
 					TlsClientAuth:      true,
 					TlsAuthWithCACert:  true,

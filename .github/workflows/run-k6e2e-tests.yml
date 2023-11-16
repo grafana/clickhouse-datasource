@@ -1,0 +1,31 @@
+name: run-k6e2e-tests
+
+on:
+  push:
+    branches:
+      - v1
+      - main
+  pull_request:
+    branches:
+      - v1
+      - main
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v4.1.0
+        with:
+          go-version: 'stable'
+
+      - name: Install Dagger CLI
+        run: cd /usr/local && { curl -L https://dl.dagger.io/dagger/install.sh | sh; cd -; }
+      
+      - name: Run Dagger pipeline
+        run: dagger run go test e2e/e2e_test.go

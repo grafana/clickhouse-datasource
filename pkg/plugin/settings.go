@@ -17,6 +17,7 @@ type Settings struct {
 	Port     int64  `json:"port,omitempty"`
 	Protocol string `json:"protocol"`
 	Secure   bool   `json:"secure,omitempty"`
+	Path     string `json:"path,omitempty"`
 
 	InsecureSkipVerify bool `json:"tlsSkipVerify,omitempty"`
 	TlsClientAuth      bool `json:"tlsAuth,omitempty"`
@@ -84,6 +85,8 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		} else {
 			settings.Secure = jsonData["secure"].(bool)
 		}
+	if jsonData["path"] != nil {
+		settings.Path = jsonData["path"].(string)
 	}
 
 	if jsonData["tlsSkipVerify"] != nil {
@@ -173,7 +176,10 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.TlsClientKey = tlsClientKey
 	}
 
-	proxyOpts, err := config.ProxyOptions()
+	// proxy options are only able to be loaded via environment variables
+	// currently, so we pass `nil` here so they are loaded with defaults
+	proxyOpts, err := config.ProxyOptions(nil)
+
 	if err == nil && proxyOpts != nil {
 		// the sdk expects the timeout to not be a string
 		timeout, err := strconv.ParseFloat(settings.DialTimeout, 64)

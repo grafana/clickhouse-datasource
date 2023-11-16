@@ -1,5 +1,5 @@
 import React from 'react';
-import { InlineFormLabel } from '@grafana/ui';
+import { EditorField, EditorRow } from '@grafana/experimental';
 import labels from 'labels';
 
 interface SqlPreviewProps {
@@ -11,11 +11,10 @@ export const SqlPreview = (props: SqlPreviewProps) => {
   const { label, tooltip } = labels.components.SqlPreview;
 
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <pre>{sql}</pre>
-    </div>
+    <EditorRow>
+      <EditorField tooltip={tooltip} label={label}>
+        <pre>{sql}</pre>
+      </EditorField>
+    </EditorRow>
   );
 };

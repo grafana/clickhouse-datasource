@@ -1,4 +1,4 @@
-name: run-tests
+name: run-backend-tests
 
 on:
   push:
@@ -18,10 +18,6 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        go:
-          # version pinned until https://github.com/testcontainers/testcontainers-go/issues/1359
-          # is resolved
-          - '1.20.5'
         clickhouse:
           - 22.3
           - 22.8
@@ -31,12 +27,12 @@ jobs:
           - latest
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-      - name: Install Go ${{ matrix.go }}
+      - name: Install Go
         uses: actions/setup-go@v4.1.0
         with:
-          go-version: ${{ matrix.go }}
+          go-version: 'stable'
 
       - name: Build
         run: go build -v ./...

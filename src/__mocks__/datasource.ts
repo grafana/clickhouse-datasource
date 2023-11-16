@@ -12,6 +12,7 @@ export const mockDatasource = new Datasource({
   jsonData: {
     host: 'foo.com',
     port: 443,
+    path: '',
     username: 'user',
     defaultDatabase: 'foo',
     protocol: Protocol.Native,

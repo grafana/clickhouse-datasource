@@ -204,6 +204,17 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             placeholder={labels.ServerPort.placeholder(jsonData.secure?.toString() || 'false')}
           />
         </Field>
+        <Field label={labels.Path.label} description={labels.Path.tooltip}>
+          <Input
+            value={jsonData.path || ''}
+            name="path"
+            width={40}
+            onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
+            label={Components.ConfigEditor.Path.label}
+            aria-label={Components.ConfigEditor.Path.label}
+            placeholder={Components.ConfigEditor.Path.placeholder}
+          />
+        </Field>
         <Field label={labels.Protocol.label} description={labels.Protocol.tooltip}>
           <RadioButtonGroup<Protocol>
             options={protocolOptions}
