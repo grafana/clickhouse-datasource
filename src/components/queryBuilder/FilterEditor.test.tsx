@@ -38,7 +38,9 @@ describe('FilterEditor', () => {
       const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={() => {}} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
-      expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
+      expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
+      expect(result.getByTestId('query-builder-filters-inline-add-button')).toBeInTheDocument();
+      expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
       expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
     });
     it('should call the onFiltersChange with correct args', async () => {
@@ -62,9 +64,11 @@ describe('FilterEditor', () => {
       const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={onFiltersChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
-      expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
+      expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
+      expect(result.getByTestId('query-builder-filters-inline-add-button')).toBeInTheDocument();
+      expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
       expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
-      await userEvent.click(result.getByTestId('query-builder-filters-add-button'));
+      await userEvent.click(result.getByTestId('query-builder-filters-inline-add-button'));
       expect(onFiltersChange).toBeCalledTimes(1);
       expect(onFiltersChange).toHaveBeenNthCalledWith(1, [...filters, defaultNewFilter]);
       await userEvent.click(result.getAllByTestId('query-builder-filters-remove-button')[0]);

@@ -234,11 +234,12 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
 }
 
 const getLimit = (limit?: number | undefined): string => {
-  if (limit === undefined) {
-    return '';
+  limit = Math.max(0, limit || 0);
+  if (limit > 0) {
+    return 'LIMIT ' + limit;
   }
 
-  return 'LIMIT ' + Math.max(0, limit || 1000);
+  return '';
 };
 
 const getFilters = (options: QueryBuilderOptions): string => {

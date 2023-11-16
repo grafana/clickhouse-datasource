@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
+import { InlineFormLabel, Input } from '@grafana/ui';
 import labels from 'labels';
 import { selectors } from 'selectors';
-import { Input } from '@grafana/ui';
-import { EditorField } from '@grafana/experimental';
 
 interface LimitEditorProps {
   limit: number;
@@ -10,11 +9,14 @@ interface LimitEditorProps {
 }
 
 export const LimitEditor = (props: LimitEditorProps) => {
-  const [limit, setLimit] = useState<number>(props.limit || 1000);
+  const [limit, setLimit] = useState<number>(props.limit || 0);
   const { label, tooltip } = labels.components.LimitEditor;
 
   return (
-    <EditorField tooltip={tooltip} label={label}>
+    <div className="gf-form">
+      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+        {label}
+      </InlineFormLabel>
       <Input
         data-testid={selectors.components.QueryBuilder.LimitEditor.input}
         width={10}
@@ -24,6 +26,6 @@ export const LimitEditor = (props: LimitEditorProps) => {
         onChange={e => setLimit(e.currentTarget.valueAsNumber)}
         onBlur={() => props.onLimitChange(limit)}
       />
-    </EditorField>
+    </div>
   );
 };
