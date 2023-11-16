@@ -3397,7 +3397,7 @@
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.4.tgz#bd86a43617df0594787d38b735f55c805becf1bc"
   integrity sha512-c/I8ZRb51j+pYGAu5CrFMRxqZ2ke4y2grEBO5AUjgSkSk+qT2Ea+OdWElz/OiMf5MNpn2b17kuVBwZLQJXzihw==
 
-"@types/webpack-livereload-plugin@^2.3.4":
+"@types/webpack-livereload-plugin@^2.3.6":
   version "2.3.6"
   resolved "https://registry.yarnpkg.com/@types/webpack-livereload-plugin/-/webpack-livereload-plugin-2.3.6.tgz#2c3ccefc8858525f40aeb8be0f784d5027144e23"
   integrity sha512-H8nZSOWSiY/6kCpOmbutZPu7Sai1xyEXo/SrXQPCymMPNBwpYWAdOsjKqr32d+IrVjnn9GGgKSYY34TEPRxJ/A==
@@ -5549,9 +5549,9 @@ ecc-jsbn@~0.1.1:
     safer-buffer "^2.1.0"
 
 electron-to-chromium@^1.4.535:
-  version "1.4.585"
-  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.4.585.tgz#7b3cb6846bb5cc10a8d5904c351a9b8aaa76ea90"
-  integrity sha512-B4yBlX0azdA3rVMxpYwLQfDpdwOgcnLCkpvSOd68iFmeedo+WYjaBJS3/W58LVD8CB2nf+o7C4K9xz1l09RkWg==
+  version "1.4.586"
+  resolved "https://registry.yarnpkg.com/electron-to-chromium/-/electron-to-chromium-1.4.586.tgz#68683163ed52a111213e2482ff847e76a5c6e891"
+  integrity sha512-qMa+E6yf1fNQbg3G66pHLXeJUP5CCCzNat1VPczOZOqgI2w4u+8y9sQnswMdGs5m4C1rOePq37EVBr/nsPQY7w==
 
 emittery@^0.13.1:
   version "0.13.1"
@@ -7658,7 +7658,7 @@ js-cookie@^2.2.1:
   resolved "https://registry.yarnpkg.com/js-cookie/-/js-cookie-2.2.1.tgz#69e106dc5d5806894562902aa5baec3744e9b2b8"
   integrity sha512-HvdH2LzI/EAZcUwA8+0nKNtWHqS+ZmijLA30RwZA0bo7ToCckjK5MkGhjED9KoRcXO6BaGI3I9UIzSA1FKFPOQ==
 
-js-sql-parser@^1.4.1:
+js-sql-parser@^1.5.0:
   version "1.5.0"
   resolved "https://registry.yarnpkg.com/js-sql-parser/-/js-sql-parser-1.5.0.tgz#b8f05f3616f2ff47d172be9214ff8eabc7cb20e8"
   integrity sha512-scBV/03oaNVPtni/moDdBsHslS/woxiKDliJlwyiXN0KsoD9NpXKLMjxPw36pGfUb7Xw2IdZYvnr+QP2Rl6Vzg==
