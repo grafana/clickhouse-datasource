@@ -66,6 +66,8 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     const nextQueryType = action.payload.queryType;
     if (state.queryType !== nextQueryType) {
       return buildInitialState({
+        database: state.database,
+        table: state.table,
         queryType: nextQueryType
       });
     }
