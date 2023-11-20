@@ -40,7 +40,7 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={sqlEditor ? sqlTooltip : tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup options={options} value={queryType} onChange={v => onChange(v)} />
+      <RadioButtonGroup options={options} value={queryType} onChange={onChange} />
     </span>
   );
 };

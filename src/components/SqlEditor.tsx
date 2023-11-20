@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { CoreApp, QueryEditorProps } from '@grafana/data';
 import { CodeEditor } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
@@ -26,34 +26,26 @@ export const SqlEditor = (props: SqlEditorProps) => {
   const { app, query, onChange, datasource } = props;
   const sqlQuery = query as CHSqlQuery;
   const [codeEditor, setCodeEditor] = useState<any>();
-  const [queryType, setQueryType] = useState<QueryType>(QueryType.Table);
-  const [sql, setSql] = useState<string>('');
-  const [expand, setExpand] = useState<Expand>({
+  const [expand, _setExpand] = useState<Expand>({
     height: defaultHeight,
     icon: 'plus',
     on: sqlQuery.expand || false,
   });
+  const queryType = sqlQuery.queryType || QueryType.Table;
 
-  useEffect(() => {
-    sqlQuery.queryType && setQueryType(sqlQuery.queryType);
-    setSql(sqlQuery.rawSql);
-
-    // Run on load
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
+  const saveChanges = (changes: Partial<CHSqlQuery>) => {
     onChange({
-      ...query,
+      ...sqlQuery,
       editorType: EditorType.SQL,
-      queryType,
-      rawSql: sql,
-      expand: expand.on,
-      format: mapQueryTypeToGrafanaFormat(queryType),
+      format: mapQueryTypeToGrafanaFormat(changes.queryType || queryType),
+      ...changes
     });
+  }
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryType, sql, expand])
+  const setExpand = (expand: Expand) => {
+    _setExpand(expand);
+    saveChanges({ expand: expand.on });
+  }
 
   const onToggleExpand = () => {
     const on = !expand.on;
@@ -127,7 +119,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
     <>
       { app === CoreApp.Explore &&
         <div className={'gf-form ' + styles.QueryEditor.queryType}>
-          <QueryTypeSwitcher queryType={queryType} onChange={setQueryType} sqlEditor />
+          <QueryTypeSwitcher queryType={queryType} onChange={queryType => saveChanges({ queryType })} sqlEditor />
         </div>
       }
       <div className={styles.Common.wrapper}>
@@ -143,10 +135,10 @@ export const SqlEditor = (props: SqlEditorProps) => {
           height={expand.height}
           language="sql"
           value={query.rawSql || ''}
-          onSave={setSql}
+          onSave={sql => saveChanges({ rawSql: sql })}
           showMiniMap={false}
           showLineNumbers={true}
-          onBlur={setSql}
+          onBlur={sql => saveChanges({ rawSql: sql })}
           onEditorDidMount={(editor: any) => handleMount(editor)}
         />
       </div>
