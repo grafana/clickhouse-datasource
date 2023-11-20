@@ -42,7 +42,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
    */
   const queryKey = query.key || ''
   const lastKey = useRef<string>(queryKey);
-  if (queryKey !== lastKey.current) {
+  if (queryKey !== lastKey.current && query.editorType === EditorType.Builder) {
     builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
     lastKey.current = queryKey;
   }
@@ -54,7 +54,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   }
 
   useEffect(() => {
-    if (shouldSkipChanges.current) {
+    if (shouldSkipChanges.current || query.editorType !== EditorType.Builder) {
       return;
     }
 
