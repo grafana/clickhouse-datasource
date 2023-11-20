@@ -226,8 +226,8 @@ export const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
     : '';
 };
 
-const getLimit = (limit?: number): string => {
-  return ` LIMIT ` + (limit || 1000);
+const getLimit = (limit: number): string => {
+  return ` LIMIT ` + limit;
 };
 
 export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): string => {

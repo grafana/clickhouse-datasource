@@ -38,7 +38,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
     aggregates: builderOptions.aggregates || [],
     groupBy: builderOptions.groupBy || [],
     orderBy: builderOptions.orderBy || [],
-    limit: builderOptions.limit || 1000,
+    limit: builderOptions.limit || 0,
     filters: builderOptions.filters || [],
   }), [builderOptions]);
 

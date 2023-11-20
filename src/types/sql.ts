@@ -54,7 +54,7 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
     mode: BuilderMode.List,
     columns: [],
     meta: {},
-    limit: 1000
+    limit: 0
   },
 };
 export const defaultCHSqlQuery: Omit<CHSqlQuery, 'refId'> = {

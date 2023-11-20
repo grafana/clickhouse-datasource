@@ -45,7 +45,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
     aggregates: builderOptions.aggregates || [],
     groupBy: builderOptions.groupBy || [],
     orderBy: builderOptions.orderBy || [],
-    limit: builderOptions.limit || 1000,
+    limit: builderOptions.limit || 0,
     filters: builderOptions.filters || [],
   }), [builderOptions]);
 
