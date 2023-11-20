@@ -85,6 +85,7 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		} else {
 			settings.Secure = jsonData["secure"].(bool)
 		}
+	}
 	if jsonData["path"] != nil {
 		settings.Path = jsonData["path"].(string)
 	}

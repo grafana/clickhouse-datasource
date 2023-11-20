@@ -100,7 +100,7 @@ func TestLoadSettings(t *testing.T) {
 			wantErr     error
 			description string
 		}{
-			{jsonData: `{ "server": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidServerName, description: "should capture empty server name"},
+			{jsonData: `{ "server": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidHost, description: "should capture empty server name"},
 			{jsonData: `{ "server": "foo" }`, password: "", wantErr: ErrorMessageInvalidPort, description: "should capture nil port"},
 			{jsonData: `  "server": "foo", "port": 443, "username" : "foo" }`, password: "", wantErr: ErrorMessageInvalidJSON, description: "should capture invalid json"},
 		}
