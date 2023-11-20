@@ -24,11 +24,11 @@ func TestLoadSettings(t *testing.T) {
 			wantErr      error
 		}{
 			{
-				name: "should parse and set all the json fields correctly",
+				name: "should parse and set all json fields correctly",
 				args: args{
 					config: backend.DataSourceInstanceSettings{
 						UID:                     "ds-uid",
-						JSONData:                []byte(`{ "server": "foo", "port": 443, "path": "custom-path", "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10", "enableSecureSocksProxy": true}`),
+						JSONData:                []byte(`{ "host": "foo", "port": 443, "path": "custom-path", "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "dialTimeout": "10", "enableSecureSocksProxy": true}`),
 						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey", "secureSocksProxyPassword": "test"},
 					},
 				},
@@ -62,10 +62,10 @@ func TestLoadSettings(t *testing.T) {
 				wantErr: nil,
 			},
 			{
-				name: "should converting string values to the correct type)",
+				name: "should convert string values to the correct type",
 				args: args{
 					config: backend.DataSourceInstanceSettings{
-						JSONData:                []byte(`{"server": "test", "port": "443", "path": "custom-path", "tlsSkipVerify": "true", "tlsAuth" : "true", "tlsAuthWithCACert": "true"}`),
+						JSONData:                []byte(`{"host": "test", "port": "443", "path": "custom-path", "tlsSkipVerify": "true", "tlsAuth" : "true", "tlsAuthWithCACert": "true"}`),
 						DecryptedSecureJSONData: map[string]string{},
 					},
 				},
@@ -79,6 +79,22 @@ func TestLoadSettings(t *testing.T) {
 					DialTimeout:        "10",
 					QueryTimeout:       "60",
 					ProxyOptions:       nil,
+				},
+				wantErr: nil,
+			},
+			{
+				name: "should parse v3 config fields into new fields",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"server": "test", "port": 443, "timeout": "10"}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Host:         "test",
+					Port:         443,
+					DialTimeout:  "10",
+					QueryTimeout: "60",
 				},
 				wantErr: nil,
 			},
@@ -100,9 +116,9 @@ func TestLoadSettings(t *testing.T) {
 			wantErr     error
 			description string
 		}{
-			{jsonData: `{ "server": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidHost, description: "should capture empty server name"},
-			{jsonData: `{ "server": "foo" }`, password: "", wantErr: ErrorMessageInvalidPort, description: "should capture nil port"},
-			{jsonData: `  "server": "foo", "port": 443, "username" : "foo" }`, password: "", wantErr: ErrorMessageInvalidJSON, description: "should capture invalid json"},
+			{jsonData: `{ "host": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidHost, description: "should capture empty server name"},
+			{jsonData: `{ "host": "foo" }`, password: "", wantErr: ErrorMessageInvalidPort, description: "should capture nil port"},
+			{jsonData: `  "host": "foo", "port": 443, "username" : "foo" }`, password: "", wantErr: ErrorMessageInvalidJSON, description: "should capture invalid json"},
 		}
 		for i, tc := range tests {
 			t.Run(fmt.Sprintf("[%v/%v] %s", i+1, len(tests), tc.description), func(t *testing.T) {

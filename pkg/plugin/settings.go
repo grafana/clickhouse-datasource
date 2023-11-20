@@ -60,9 +60,14 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		return settings, fmt.Errorf("%s: %w", err.Error(), ErrorMessageInvalidJSON)
 	}
 
+	// Deprecated: Replaced with Host for v4. Deserializes "server" field for old v3 configs.
+	if jsonData["server"] != nil {
+		settings.Host = jsonData["server"].(string)
+	}
 	if jsonData["host"] != nil {
 		settings.Host = jsonData["host"].(string)
 	}
+
 	if jsonData["port"] != nil {
 		if port, ok := jsonData["port"].(string); ok {
 			settings.Port, err = strconv.ParseInt(port, 0, 64)
@@ -128,9 +133,14 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.DefaultDatabase = jsonData["defaultDatabase"].(string)
 	}
 
+	// Deprecated: Replaced with DialTimeout for v4. Deserializes "timeout" field for old v3 configs.
+	if jsonData["timeout"] != nil {
+		settings.DialTimeout = jsonData["timeout"].(string)
+	}
 	if jsonData["dialTimeout"] != nil {
 		settings.DialTimeout = jsonData["dialTimeout"].(string)
 	}
+
 	if jsonData["queryTimeout"] != nil {
 		if val, ok := jsonData["queryTimeout"].(string); ok {
 			settings.QueryTimeout = val
