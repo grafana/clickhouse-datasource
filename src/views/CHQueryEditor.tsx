@@ -54,7 +54,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   }
 
   useEffect(() => {
-    if (shouldSkipChanges.current || query.editorType !== EditorType.Builder) {
+    if (shouldSkipChanges.current || query.editorType === EditorType.SQL) {
       return;
     }
 
