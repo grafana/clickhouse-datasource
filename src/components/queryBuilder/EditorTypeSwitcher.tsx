@@ -26,8 +26,7 @@ const options: Array<SelectableValue<EditorType>> = [
 export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   const { query, onChange } = props;
   const { label, tooltip, switcher, cannotConvert } = labels.components.EditorTypeSwitcher;
-  const editorType: EditorType = query.editorType;
-  const [editor, setEditor] = useState<EditorType>(editorType || EditorType.Builder);
+  const editorType: EditorType = query.editorType || EditorType.Builder;
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
   const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -42,7 +41,6 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         setConfirmModalState(true);
       }
     } else {
-      setEditor(editorType);
       let builderOptions: QueryBuilderOptions;
       switch (query.editorType) {
         case EditorType.Builder:
@@ -85,7 +83,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup options={options} value={editor} onChange={e => onEditorTypeChange(e)} />
+      <RadioButtonGroup options={options} value={editorType} onChange={e => onEditorTypeChange(e)} />
       <ConfirmModal
         isOpen={confirmModalState}
         title={switcher.title}
