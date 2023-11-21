@@ -56,7 +56,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     // liveView: builderOptions.meta?.liveView || false,
     filters: builderOptions.filters || [],
     orderBy: builderOptions.orderBy || [],
-    limit: builderOptions.limit || 1000,
+    limit: builderOptions.limit || 0,
     }), [builderOptions]);
   const showConfigWarning = datasource.getDefaultLogsColumns().size === 0;
 
