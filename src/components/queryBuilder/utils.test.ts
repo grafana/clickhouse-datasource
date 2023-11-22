@@ -436,18 +436,17 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
     false
   );
 
-  it('timeseries function throws if "timeFieldType" not a DateType', () => {
-    expect(() =>
-      getSqlFromQueryBuilderOptions({
-        database: 'db',
-        table: 'foo',
-        queryType: QueryType.TimeSeries,
-        mode: BuilderMode.Trend,
-        columns: [{ name: 'time', type: 'boolean', hint: ColumnHint.Time }],
-        aggregates: [],
-        filters: [],
-      })
-    ).toThrowErrorMatchingInlineSnapshot('"time column is expected to be a valid date type."');
+  it('timeseries function returns empty $__timeInterval macro if time column missing', () => {
+    const sql = getSqlFromQueryBuilderOptions({
+      database: 'db',
+      table: 'foo',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      aggregates: [],
+      filters: [],
+    });
+
+    expect(sql).toContain('$__timeInterval()');
   });
 });
 

@@ -113,8 +113,7 @@ const getTrendByQuery = (
   table = '',
   metrics: AggregateColumn[] = [],
   groupBy: string[] = [],
-  timeField = '',
-  timeFieldType = ''
+  timeField = ''
 ): string => {
   metrics = metrics && metrics.length > 0 ? metrics : [];
 
@@ -245,16 +244,12 @@ export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): str
       break;
     case BuilderMode.Trend:
       const timeColumn = getColumnByHint(options, ColumnHint.Time);
-      if (!isDateType(timeColumn?.type || '')) {
-        throw new Error('time column is expected to be a valid date type.');
-      }
       query += getTrendByQuery(
         database,
         table,
         options.aggregates,
         options.groupBy,
-        timeColumn?.name || '',
-        timeColumn?.type || ''
+        timeColumn?.name || ''
       );
       const trendFilters = getFilters(options.filters || []);
 
