@@ -126,11 +126,6 @@ const buildInitialState = (savedOptions?: Partial<QueryBuilderOptions>): QueryBu
     }
   };
 
-  // TODO: make different defaultOptions constant per query type
-  if (savedOptions?.queryType === QueryType.Logs && savedOptions.limit === undefined) {
-    initialState.limit = 1000;
-  }
-
   return initialState;
 };
 
