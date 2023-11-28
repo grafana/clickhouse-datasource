@@ -10,6 +10,7 @@ export enum EditorType {
 }
 
 export interface CHQueryBase extends DataQuery {
+  pluginVersion: string,
   editorType: EditorType;
   rawSql: string;
 
@@ -45,6 +46,7 @@ export type CHQuery = CHSqlQuery | CHBuilderQuery;
 // TODO: these aren't really types
 export const defaultEditorType: EditorType = EditorType.Builder;
 export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
+  pluginVersion: '',
   editorType: EditorType.Builder,
   rawSql: '',
   builderOptions: {
@@ -58,6 +60,7 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
   },
 };
 export const defaultCHSqlQuery: Omit<CHSqlQuery, 'refId'> = {
+  pluginVersion: '',
   editorType: EditorType.SQL,
   rawSql: '',
   expand: false,

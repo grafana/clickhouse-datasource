@@ -27,7 +27,7 @@ describe('SQL Editor', () => {
     const rawSql = 'foo';
     render(
       <SqlEditor
-        query={{ rawSql, refId: 'A', editorType: EditorType.SQL }}
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}
@@ -41,7 +41,7 @@ describe('SQL Editor', () => {
     const result = await waitFor(() =>
       render(
         <SqlEditor
-          query={{ rawSql: 'test', refId: 'A', editorType: EditorType.SQL }}
+          query={{ pluginVersion: '', rawSql: 'test', refId: 'A', editorType: EditorType.SQL }}
           onChange={onChange}
           onRunQuery={onRunQuery}
           datasource={mockDatasource}

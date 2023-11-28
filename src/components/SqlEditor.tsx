@@ -12,6 +12,7 @@ import { validate } from 'data/validate';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { QueryType } from 'types/queryBuilder';
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
+import { pluginVersion } from 'utils/version';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -36,6 +37,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
   const saveChanges = (changes: Partial<CHSqlQuery>) => {
     onChange({
       ...sqlQuery,
+      pluginVersion,
       editorType: EditorType.SQL,
       format: mapQueryTypeToGrafanaFormat(changes.queryType || queryType),
       ...changes

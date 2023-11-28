@@ -40,6 +40,7 @@ describe('EditorTypeSwitcher', () => {
     const result = render(
       <EditorTypeSwitcher
         query={{
+          pluginVersion: '',
           refId: 'A',
           editorType: EditorType.SQL,
           rawSql: ''
@@ -57,6 +58,7 @@ describe('EditorTypeSwitcher', () => {
     const result = render(
       <EditorTypeSwitcher
         query={{
+            pluginVersion: '',
             refId: 'A',
             editorType: EditorType.Builder,
             rawSql: ''

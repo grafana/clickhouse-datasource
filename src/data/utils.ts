@@ -17,7 +17,7 @@ export const isBuilderOptionsRunnable = (builderOptions: QueryBuilderOptions): b
  * Converts QueryType to Grafana format
  * src: https://github.com/grafana/sqlds/blob/main/query.go#L20
  */
-export const mapQueryTypeToGrafanaFormat = (t: QueryType): number => {
+export const mapQueryTypeToGrafanaFormat = (t?: QueryType): number => {
   switch (t) {
     case QueryType.Table:
       return 1;
@@ -29,5 +29,24 @@ export const mapQueryTypeToGrafanaFormat = (t: QueryType): number => {
       return 3;
     default:
       return 1 << 8; // an unused u32, defaults to timeseries/graph on plugin backend.
+  }
+};
+
+/**
+ * Converts Grafana format to builder QueryType
+ * src: https://github.com/grafana/sqlds/blob/main/query.go#L20
+ */
+export const mapGrafanaFormatToQueryType = (f?: number): QueryType => {
+  switch (f) {
+    case 0:
+      return QueryType.TimeSeries;
+    case 1:
+      return QueryType.Table;
+    case 2:
+      return QueryType.Logs;
+    case 3:
+      return QueryType.Traces;
+    default:
+      return QueryType.Table;
   }
 };

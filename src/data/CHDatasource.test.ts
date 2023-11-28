@@ -312,6 +312,7 @@ describe('ClickHouseDatasource', () => {
 
   describe('SupplementaryQueriesSupport', () => {
     const query: CHBuilderQuery = {
+      pluginVersion: '',
       refId: '42',
       editorType: EditorType.Builder,
       rawSql: 'SELECT * FROM system.numbers LIMIT 1',

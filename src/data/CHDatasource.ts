@@ -180,6 +180,7 @@ export class Datasource
     return {
       // format: Format.AUTO,
       // selectedFormat: Format.AUTO,
+      pluginVersion: '',
       editorType: EditorType.SQL,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',

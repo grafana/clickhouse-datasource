@@ -11,6 +11,8 @@ import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
 import { isBuilderOptionsRunnable, mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { setAllOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import useMigratedQuery from 'hooks/useMigratedQuery';
+import { pluginVersion } from 'utils/version';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -18,15 +20,16 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { onRunQuery } = props;
+  const { query: savedQuery, onRunQuery } = props;
+  const query = useMigratedQuery(savedQuery);
 
   return (
     <>
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
-          <EditorTypeSwitcher {...props} />
+          <EditorTypeSwitcher {...props} query={query} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </div>
-      <CHEditorByType {...props} />
+      <CHEditorByType {...props} query={query} />
     </>
   );
 };
@@ -61,6 +64,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     const sql = generateSql(builderOptions);
     onChange({
       ...query,
+      pluginVersion,
       editorType: EditorType.Builder,
       rawSql: sql,
       builderOptions,
