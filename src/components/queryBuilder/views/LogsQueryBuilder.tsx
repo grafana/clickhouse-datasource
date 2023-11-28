@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint, DateFilterWithoutValue, FilterOperator, OrderByDirection, TableColumn } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
@@ -58,7 +58,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 0,
     }), [builderOptions]);
-  const showConfigWarning = datasource.getDefaultLogsColumns().size === 0;
+  const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultLogsColumns().size === 0 && builderOptions.columns?.length === 0);
 
   const onOptionChange = useBuilderOptionChanges<LogsQueryBuilderState>(next => {
     const nextColumns = next.selectedColumns.slice();
@@ -86,7 +86,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   useDefaultFilters(builderOptions.table, builderState.timeColumn, builderState.filters, builderState.orderBy, builderOptionsDispatch);
   
   const configWarning = showConfigWarning && (
-    <Alert title="" severity="warning">
+    <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
       <VerticalGroup>
         <div>
           {'To speed up your query building, enter your default logs configuration in your '}

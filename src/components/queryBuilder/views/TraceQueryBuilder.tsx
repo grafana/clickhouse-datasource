@@ -43,7 +43,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const isNewQuery = useIsNewQuery(builderOptions);
-  const showConfigWarning = datasource.getDefaultTraceColumns().size === 0;
+  const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0);
   const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapsable section
   const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapsable section
   const labels = allLabels.components.TraceQueryBuilder;
@@ -93,7 +93,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
-    <Alert title="" severity="warning">
+    <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
       <VerticalGroup>
         <div>
           {'To speed up your query building, enter your default trace configuration in your '}
