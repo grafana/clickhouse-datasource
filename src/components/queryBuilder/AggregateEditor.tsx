@@ -69,10 +69,14 @@ interface AggregateEditorProps {
   aggregates: AggregateColumn[];
   onAggregatesChange: (aggregates: AggregateColumn[]) => void;
 }
+
+const allColumnName = '*';
+
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
+  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
+  columnOptions.push({ label: allColumnName, value: allColumnName });
 
   const addAggregate = () => {
     const nextAggregates: AggregateColumn[] = aggregates.slice();
