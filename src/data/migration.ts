@@ -170,7 +170,7 @@ const isV3CHQuery = (savedQuery: AnyCHQuery): boolean => {
   // pluginVersion was added in v4
   const oldPluginVersion = !savedQuery['pluginVersion'] || !isVersionGtOrEq(savedQuery.pluginVersion, '4.0.0');
   const oldQueryType = savedQuery['queryType'] === 'sql' || savedQuery['queryType'] === 'builder';
-  return oldPluginVersion && oldQueryType;
+  return oldPluginVersion || oldQueryType;
 };
 
 /**
