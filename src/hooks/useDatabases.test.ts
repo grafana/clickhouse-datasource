@@ -5,7 +5,7 @@ import useDatabases from './useDatabases';
 
 describe('useDatabases', () => {
   it('should return empty array if invalid datasource is provided', async () => {
-    let result: { current: string[] };
+    let result: { current: readonly string[] };
     await act(async () => {
       const r = renderHook(() => useDatabases(undefined!));
       result = r.result;
@@ -18,7 +18,7 @@ describe('useDatabases', () => {
     const mockDs = {} as Datasource;
     mockDs.fetchDatabases = jest.fn(() => Promise.resolve(['a', 'b']));
 
-    let result: { current: string[] };
+    let result: { current: readonly string[] };
     await act(async () => {
       const r = renderHook(() => useDatabases(mockDs));
       result = r.result;

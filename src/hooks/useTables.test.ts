@@ -5,7 +5,7 @@ import useTables from './useTables';
 
 describe('useTables', () => {
   it('should return empty array if invalid datasource is provided', async () => {
-    let result: { current: string[] };
+    let result: { current: readonly string[] };
     await act(async () => {
       const r = renderHook(() => useTables(undefined!, 'db'));
       result = r.result;
@@ -18,7 +18,7 @@ describe('useTables', () => {
     const mockDs = {} as Datasource;
     mockDs.fetchTables = jest.fn((db: string) => Promise.resolve(['a', 'b']));
 
-    let result: { current: string[] };
+    let result: { current: readonly string[] };
     await act(async () => {
       const r = renderHook(() => useTables(mockDs, ''));
       result = r.result;
@@ -31,7 +31,7 @@ describe('useTables', () => {
     const mockDs = {} as Datasource;
     mockDs.fetchTables = jest.fn((db: string) => Promise.resolve(['a', 'b']));
 
-    let result: { current: string[] };
+    let result: { current: readonly string[] };
     await act(async () => {
       const r = renderHook(() => useTables(mockDs, 'db'));
       result = r.result;
