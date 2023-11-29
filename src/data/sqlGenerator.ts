@@ -19,7 +19,6 @@ export const generateSql = (options: QueryBuilderOptions): string => {
  */
 const generateTraceQuery = (options: QueryBuilderOptions): string => {
   const { database, table } = options;
-  const limit = getLimit(options.limit);
   
   const queryParts: string[] = [];
 
@@ -98,6 +97,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
     queryParts.push('ORDER BY startTime ASC');
   }
 
+  const limit = getLimit(options.limit);
   if (limit !== '') {
     queryParts.push(limit);
   }
@@ -114,7 +114,6 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
  */
 const generateLogsQuery = (options: QueryBuilderOptions): string => {
   const { database, table } = options;
-  const limit = getLimit(options.limit);
   
   const queryParts: string[] = [];
 
@@ -162,6 +161,7 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(getOrderBy(options.orderBy, false));
   }
 
+  const limit = getLimit(options.limit);
   if (limit !== '') {
     queryParts.push(limit);
   }
