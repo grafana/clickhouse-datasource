@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 
-export default (datasource: Datasource, database: string): string[] => {
+export default (datasource: Datasource, database: string): readonly string[] => {
   const [tables, setTables] = useState<string[]>([]); 
   
   useEffect(() => {
@@ -23,7 +23,7 @@ export default (datasource: Datasource, database: string): string[] => {
       });
 
     return () => {
-      ignore = false;
+      ignore = true;
     };
   }, [datasource, database]);
 
