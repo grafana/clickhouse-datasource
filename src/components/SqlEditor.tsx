@@ -27,7 +27,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
   const { app, query, onChange, datasource } = props;
   const sqlQuery = query as CHSqlQuery;
   const [codeEditor, setCodeEditor] = useState<any>();
-  const [expand, _setExpand] = useState<Expand>({
+  const [expand, setExpand] = useState<Expand>({
     height: defaultHeight,
     icon: 'plus',
     on: sqlQuery.expand || false,
@@ -44,8 +44,8 @@ export const SqlEditor = (props: SqlEditorProps) => {
     });
   }
 
-  const setExpand = (expand: Expand) => {
-    _setExpand(expand);
+  const updateExpand = (expand: Expand) => {
+    setExpand(expand);
     saveChanges({ expand: expand.on });
   }
 
@@ -59,12 +59,12 @@ export const SqlEditor = (props: SqlEditorProps) => {
     if (on) {
       codeEditor.expanded = true;
       const height = getEditorHeight(codeEditor);
-      setExpand({ height: `${height}px`, on, icon });
+      updateExpand({ height: `${height}px`, on, icon });
       return;
     }
 
     codeEditor.expanded = false;
-    setExpand({ height: defaultHeight, icon, on });
+    updateExpand({ height: defaultHeight, icon, on });
   };
 
   const schema: Schema = {
@@ -105,7 +105,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
     editor.onDidChangeModelDecorations((a: any) => {
       if (editor.expanded) {
         const height = getEditorHeight(editor);
-        setExpand({ height: `${height}px`, on: true, icon: 'minus' });
+        updateExpand({ height: `${height}px`, on: true, icon: 'minus' });
       }
     });
     editor.onKeyUp((e: any) => {
