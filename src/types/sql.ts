@@ -17,7 +17,7 @@ export interface CHQueryBase extends DataQuery {
   /**
    * REQUIRED by backend for auto selecting preferredVisualisationType.
    * Only used in explore view.
-   * src: https://github.com/grafana/sqlds/blob/main/query.go#L36
+   * src: https://github.com/grafana/sqlds/blob/dda2dc0a54b128961fc9f7885baabf555f3ddfdc/query.go#L36
    */
   format?: number;
 }
