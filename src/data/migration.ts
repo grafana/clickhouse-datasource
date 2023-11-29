@@ -11,6 +11,10 @@ export type AnyQueryBuilderOptions = Partial<QueryBuilderOptions> & {[k: string]
  * Returns undefined if no migration is applied.
  */
 export const migrateCHQuery = (savedQuery: CHQuery): CHQuery | undefined => {
+  if (savedQuery.rawSql === undefined) {
+    return undefined;
+  }
+
   if (isV3CHQuery(savedQuery)) {
     return migrateV3CHQuery(savedQuery);
   }

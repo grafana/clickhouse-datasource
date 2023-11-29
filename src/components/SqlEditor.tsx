@@ -136,7 +136,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
           aria-label="SQL"
           height={expand.height}
           language="sql"
-          value={query.rawSql || ''}
+          value={query.rawSql}
           onSave={sql => saveChanges({ rawSql: sql })}
           showMiniMap={false}
           showLineNumbers={true}
