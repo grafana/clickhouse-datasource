@@ -15,6 +15,7 @@ export const mockDatasource = new Datasource({
     path: '',
     username: 'user',
     defaultDatabase: 'foo',
+    defaultTable: 'bar',
     protocol: Protocol.Native,
   },
   readOnly: true,
@@ -41,7 +42,9 @@ export const mockDatasource = new Datasource({
     },
   },
 });
+
 mockDatasource.adHocFiltersStatus = 1; // most tests should skip checking the CH version. We will set ad hoc filters to enabled to avoid running the CH version check
+
 export const mockQuery: CHQuery = {
   pluginVersion: '',
   rawSql: 'select * from foo',
