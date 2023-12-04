@@ -82,7 +82,6 @@ export const LogsConfig = (props: LogsConfigProps) => {
           selectedVersion={otelVersion || ''}
           onEnabledChange={onOtelEnabledChange}
           onVersionChange={onOtelVersionChange}
-          defaultToLatest
           wide
         />
         <LabeledInput

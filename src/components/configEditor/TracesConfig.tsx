@@ -101,7 +101,6 @@ export const TracesConfig = (props: TraceConfigProps) => {
           selectedVersion={otelVersion || ''}
           onEnabledChange={onOtelEnabledChange}
           onVersionChange={onOtelVersionChange}
-          defaultToLatest
           wide
         />
         <LabeledInput

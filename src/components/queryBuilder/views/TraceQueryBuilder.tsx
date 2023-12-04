@@ -125,7 +125,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           onEnabledChange={e => builderOptionsDispatch(setOtelEnabled(e))}
           selectedVersion={builderState.otelVersion}
           onVersionChange={v => builderOptionsDispatch(setOtelVersion(v))}
-          defaultToLatest
           wide
         />
         <div className="gf-form">

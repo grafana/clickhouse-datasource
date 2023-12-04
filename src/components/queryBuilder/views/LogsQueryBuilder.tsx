@@ -104,7 +104,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         onEnabledChange={e => builderOptionsDispatch(setOtelEnabled(e))}
         selectedVersion={builderState.otelVersion}
         onVersionChange={v => builderOptionsDispatch(setOtelVersion(v))}
-        defaultToLatest
       />
       <ColumnsEditor
         disabled={builderState.otelEnabled}

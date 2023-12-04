@@ -9,12 +9,11 @@ interface OtelVersionSelectProps {
   onEnabledChange: (enabled: boolean) => void,
   selectedVersion: string,
   onVersionChange: (version: string) => void,
-  defaultToLatest?: boolean,
   wide?: boolean,
 }
 
 export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
-  const { enabled, onEnabledChange, selectedVersion, onVersionChange, defaultToLatest, wide } = props;
+  const { enabled, onEnabledChange, selectedVersion, onVersionChange, wide } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
   const options: SelectableValue[] = allVersions.map(v => ({
     label: `${v.version}${v.name ? (` (${v.name})`) : ''}`,
@@ -22,10 +21,10 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   }));
 
   useEffect(() => {
-    if (defaultToLatest && selectedVersion === '') {
+    if (selectedVersion === '') {
       onVersionChange(allVersions[0].version);
     }
-  }, [defaultToLatest, selectedVersion, onVersionChange]);
+  }, [selectedVersion, onVersionChange]);
 
   const theme = useTheme();
   const switchContainerStyle: React.CSSProperties = {
