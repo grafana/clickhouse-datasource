@@ -13,20 +13,20 @@ import { columnLabelToPlaceholder } from 'data/utils';
 
 interface TraceConfigProps {
   tracesConfig?: CHTracesConfig;
-  onDefaultDatabaseChange: (v: any) => void;
-  onDefaultTableChange: (v: any) => void;
-  onOtelEnabledChange: (v: any) => void;
-  onOtelVersionChange: (v: any) => void;
-  onTraceIdColumnChange: (v: any) => void;
-  onSpanIdColumnChange: (v: any) => void;
-  onOperationNameColumnChange: (v: any) => void;
-  onParentSpanIdColumnChange: (v: any) => void;
-  onServiceNameColumnChange: (v: any) => void;
-  onDurationColumnChange: (v: any) => void;
-  onDurationUnitChange: (v: any) => void;
-  onStartTimeColumnChange: (v: any) => void;
-  onTagsColumnChange: (v: any) => void;
-  onServiceTagsColumnChange: (v: any) => void;
+  onDefaultDatabaseChange: (v: string) => void;
+  onDefaultTableChange: (v: string) => void;
+  onOtelEnabledChange: (v: boolean) => void;
+  onOtelVersionChange: (v: string) => void;
+  onTraceIdColumnChange: (v: string) => void;
+  onSpanIdColumnChange: (v: string) => void;
+  onOperationNameColumnChange: (v: string) => void;
+  onParentSpanIdColumnChange: (v: string) => void;
+  onServiceNameColumnChange: (v: string) => void;
+  onDurationColumnChange: (v: string) => void;
+  onDurationUnitChange: (v: TimeUnit) => void;
+  onStartTimeColumnChange: (v: string) => void;
+  onTagsColumnChange: (v: string) => void;
+  onServiceTagsColumnChange: (v: string) => void;
 }
 
 export const TracesConfig = (props: TraceConfigProps) => {

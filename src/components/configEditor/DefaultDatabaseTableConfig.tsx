@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { SyntheticEvent } from 'react';
 import { ConfigSection } from '@grafana/experimental';
 import { Input, Field } from '@grafana/ui';
 import allLabels from 'labels';
@@ -6,8 +6,8 @@ import allLabels from 'labels';
 interface DefaultDatabaseTableConfigProps {
   defaultDatabase?: string;
   defaultTable?: string;
-  onDefaultDatabaseChange: (e: any) => void;
-  onDefaultTableChange: (e: any) => void;
+  onDefaultDatabaseChange: (e: SyntheticEvent<HTMLInputElement | HTMLSelectElement, Event>) => void;
+  onDefaultTableChange: (e: SyntheticEvent<HTMLInputElement | HTMLSelectElement, Event>) => void;
 }
 
 export const DefaultDatabaseTableConfig = (props: DefaultDatabaseTableConfigProps) => {

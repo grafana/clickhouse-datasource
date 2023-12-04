@@ -55,8 +55,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onDefaultDatabaseChange).toBeCalledTimes(1);
-    expect(onDefaultDatabaseChange).toBeCalledWith('changed');
+    expect(onDefaultDatabaseChange).toHaveBeenCalledTimes(1);
+    expect(onDefaultDatabaseChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onDefaultTable when changed', () => {
@@ -86,8 +86,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onDefaultTableChange).toBeCalledTimes(1);
-    expect(onDefaultTableChange).toBeCalledWith('changed');
+    expect(onDefaultTableChange).toHaveBeenCalledTimes(1);
+    expect(onDefaultTableChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onOtelEnabled when changed', () => {
@@ -116,8 +116,8 @@ describe('TracesConfig', () => {
     const input = result.getByRole('checkbox');
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
-    expect(onOtelEnabledChange).toBeCalledTimes(1);
-    expect(onOtelEnabledChange).toBeCalledWith(true);
+    expect(onOtelEnabledChange).toHaveBeenCalledTimes(1);
+    expect(onOtelEnabledChange).toHaveBeenCalledWith(true);
   });
 
   it('should call onOtelVersionChange when changed', () => {
@@ -147,8 +147,8 @@ describe('TracesConfig', () => {
     expect(select).toBeInTheDocument();
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.keyDown(select, { key: 'Enter' });
-    expect(onOtelVersionChange).toBeCalledTimes(2); // 2 from hook
-    expect(onOtelVersionChange).toBeCalledWith(expect.any(String));
+    expect(onOtelVersionChange).toHaveBeenCalledTimes(2); // 2 from hook
+    expect(onOtelVersionChange).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('should call onTraceIdColumnChange when changed', () => {
@@ -178,8 +178,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onTraceIdColumnChange).toBeCalledTimes(1);
-    expect(onTraceIdColumnChange).toBeCalledWith('changed');
+    expect(onTraceIdColumnChange).toHaveBeenCalledTimes(1);
+    expect(onTraceIdColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onSpanIdColumnChange when changed', () => {
@@ -209,8 +209,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onSpanIdColumnChange).toBeCalledTimes(1);
-    expect(onSpanIdColumnChange).toBeCalledWith('changed');
+    expect(onSpanIdColumnChange).toHaveBeenCalledTimes(1);
+    expect(onSpanIdColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onOperationNameColumnChange when changed', () => {
@@ -240,8 +240,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onOperationNameColumnChange).toBeCalledTimes(1);
-    expect(onOperationNameColumnChange).toBeCalledWith('changed');
+    expect(onOperationNameColumnChange).toHaveBeenCalledTimes(1);
+    expect(onOperationNameColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onParentSpanIdColumnChange when changed', () => {
@@ -271,8 +271,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onParentSpanIdColumnChange).toBeCalledTimes(1);
-    expect(onParentSpanIdColumnChange).toBeCalledWith('changed');
+    expect(onParentSpanIdColumnChange).toHaveBeenCalledTimes(1);
+    expect(onParentSpanIdColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onServiceNameColumnChange when changed', () => {
@@ -302,8 +302,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onServiceNameColumnChange).toBeCalledTimes(1);
-    expect(onServiceNameColumnChange).toBeCalledWith('changed');
+    expect(onServiceNameColumnChange).toHaveBeenCalledTimes(1);
+    expect(onServiceNameColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onDurationColumnChange when changed', () => {
@@ -333,8 +333,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onDurationColumnChange).toBeCalledTimes(1);
-    expect(onDurationColumnChange).toBeCalledWith('changed');
+    expect(onDurationColumnChange).toHaveBeenCalledTimes(1);
+    expect(onDurationColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onDurationUnitChange when changed', () => {
@@ -364,8 +364,8 @@ describe('TracesConfig', () => {
     expect(select).toBeInTheDocument();
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.keyDown(select, { key: 'Enter' });
-    expect(onDurationUnitChange).toBeCalledTimes(1);
-    expect(onDurationUnitChange).toBeCalledWith(expect.any(String));
+    expect(onDurationUnitChange).toHaveBeenCalledTimes(1);
+    expect(onDurationUnitChange).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('should call onStartTimeColumnChange when changed', () => {
@@ -395,8 +395,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onStartTimeColumnChange).toBeCalledTimes(1);
-    expect(onStartTimeColumnChange).toBeCalledWith('changed');
+    expect(onStartTimeColumnChange).toHaveBeenCalledTimes(1);
+    expect(onStartTimeColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onTagsColumnChange when changed', () => {
@@ -426,8 +426,8 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onTagsColumnChange).toBeCalledTimes(1);
-    expect(onTagsColumnChange).toBeCalledWith('changed');
+    expect(onTagsColumnChange).toHaveBeenCalledTimes(1);
+    expect(onTagsColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onServiceTagsColumnChange when changed', () => {
@@ -457,7 +457,7 @@ describe('TracesConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onServiceTagsColumnChange).toBeCalledTimes(1);
-    expect(onServiceTagsColumnChange).toBeCalledWith('changed');
+    expect(onServiceTagsColumnChange).toHaveBeenCalledTimes(1);
+    expect(onServiceTagsColumnChange).toHaveBeenCalledWith('changed');
   });
 });

@@ -120,7 +120,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       },
     });
   };
-  const onLogsConfigChange = (key: keyof CHLogsConfig, value: string) => {
+  const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean) => {
     onOptionsChange({
       ...options,
       jsonData: {
@@ -132,7 +132,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       }
     });
   };
-  const onTracesConfigChange = (key: keyof CHTracesConfig, value: string) => {
+  const onTracesConfigChange = (key: keyof CHTracesConfig, value: string | boolean) => {
     onOptionsChange({
       ...options,
       jsonData: {

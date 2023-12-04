@@ -18,8 +18,8 @@ describe('DefaultDatabaseTableConfig', () => {
     expect(databaseInput).toBeInTheDocument();
     fireEvent.change(databaseInput, { target: { value: 'test' } });
     fireEvent.blur(databaseInput);
-    expect(onDefaultDatabaseChange).toBeCalledTimes(1);
-    expect(onDefaultDatabaseChange).toBeCalledWith(expect.any(Object));
+    expect(onDefaultDatabaseChange).toHaveBeenCalledTimes(1);
+    expect(onDefaultDatabaseChange).toHaveBeenCalledWith(expect.any(Object));
   });
 
   it('should call onDefaultTableChange when default table is changed', () => {
@@ -31,7 +31,7 @@ describe('DefaultDatabaseTableConfig', () => {
     expect(tableInput).toBeInTheDocument();
     fireEvent.change(tableInput, { target: { value: 'test' } });
     fireEvent.blur(tableInput);
-    expect(onDefaultTableChange).toBeCalledTimes(1);
-    expect(onDefaultTableChange).toBeCalledWith(expect.any(Object));
+    expect(onDefaultTableChange).toHaveBeenCalledTimes(1);
+    expect(onDefaultTableChange).toHaveBeenCalledWith(expect.any(Object));
   });
 });

@@ -11,13 +11,13 @@ import { columnLabelToPlaceholder } from 'data/utils';
 
 interface LogsConfigProps {
   logsConfig?: CHLogsConfig;
-  onDefaultDatabaseChange: (v: any) => void;
-  onDefaultTableChange: (v: any) => void;
-  onOtelEnabledChange: (v: any) => void;
-  onOtelVersionChange: (v: any) => void;
-  onTimeColumnChange: (v: any) => void;
-  onLevelColumnChange: (v: any) => void;
-  onMessageColumnChange: (v: any) => void;
+  onDefaultDatabaseChange: (v: string) => void;
+  onDefaultTableChange: (v: string) => void;
+  onOtelEnabledChange: (v: boolean) => void;
+  onOtelVersionChange: (v: string) => void;
+  onTimeColumnChange: (v: string) => void;
+  onLevelColumnChange: (v: string) => void;
+  onMessageColumnChange: (v: string) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {

@@ -1,4 +1,4 @@
-import React, {  } from 'react';
+import React, { FormEvent } from 'react';
 import { Switch, Input, Field } from '@grafana/ui';
 import { ConfigSection } from '@grafana/experimental';
 import allLabels from 'labels';
@@ -7,9 +7,9 @@ interface QuerySettingsConfigProps {
   dialTimeout?: string;
   queryTimeout?: string;
   validateSql?: boolean;
-  onDialTimeoutChange: (e: any) => void;
-  onQueryTimeoutChange: (e: any) => void;
-  onValidateSqlChange: (e: any) => void;
+  onDialTimeoutChange: (e: FormEvent<HTMLInputElement>) => void;
+  onQueryTimeoutChange: (e: FormEvent<HTMLInputElement>) => void;
+  onValidateSqlChange: (e: FormEvent<HTMLInputElement>) => void;
 }
 
 export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
