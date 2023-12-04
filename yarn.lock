@@ -2362,12 +2362,13 @@
     eslint-plugin-react-hooks "4.6.0"
     typescript "4.8.4"
 
-"@grafana/experimental@^1.7.0":
-  version "1.7.0"
-  resolved "https://registry.yarnpkg.com/@grafana/experimental/-/experimental-1.7.0.tgz#f05ce178f3201cd5268645eb14dc5bcfefa05a4c"
-  integrity sha512-3DfDzGTUnvG/v2U0lhBaB05j4x0bczrgylrg5Co6LMyRYh1kPA4XnK0dTshSxA6igjKqAjSacfwZQ40f4rLdqw==
+"@grafana/experimental@^1.7.4":
+  version "1.7.4"
+  resolved "https://registry.yarnpkg.com/@grafana/experimental/-/experimental-1.7.4.tgz#5b5efe89abf38b1d3358251148d42b9111de539e"
+  integrity sha512-uYkv9HRx+cqJRktsY43ApG0+kgG4fNR8lv+bkaFvGyCg46dcTeNqokujoPnHp6lt9MEn+0Y3jKEQbvCXjcz2bA==
   dependencies:
     "@types/uuid" "^8.3.3"
+    semver "^7.5.4"
     uuid "^8.3.2"
 
 "@grafana/faro-core@^1.0.0-beta2":
