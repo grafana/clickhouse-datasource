@@ -11,8 +11,8 @@ import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
 import { isBuilderOptionsRunnable, mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { setAllOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
-import useMigratedQuery from 'hooks/useMigratedQuery';
 import { pluginVersion } from 'utils/version';
+import { migrateCHQuery } from 'data/migration';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -21,7 +21,7 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
   const { query: savedQuery, onRunQuery } = props;
-  const query = useMigratedQuery(savedQuery);
+  const query = migrateCHQuery(savedQuery);
 
   return (
     <>

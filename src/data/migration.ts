@@ -8,18 +8,18 @@ export type AnyQueryBuilderOptions = Partial<QueryBuilderOptions> & {[k: string]
 
 /**
  * Takes a CHQuery and transforms it to the latest interface.
- * Returns undefined if no migration is applied.
  */
-export const migrateCHQuery = (savedQuery: CHQuery): CHQuery | undefined => {
-  if (savedQuery.rawSql === undefined) {
-    return undefined;
+export const migrateCHQuery = (savedQuery: CHQuery): CHQuery => {
+  const isGrafanaDefaultQuery = savedQuery.rawSql === undefined;
+  if (isGrafanaDefaultQuery) {
+    return savedQuery;
   }
 
   if (isV3CHQuery(savedQuery)) {
     return migrateV3CHQuery(savedQuery);
   }
 
-  return undefined;
+  return savedQuery;
 };
 
 /**
