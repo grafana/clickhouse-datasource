@@ -16,11 +16,12 @@ describe('SQL Generator', () => {
       filters: [],
       orderBy: []
     };
+    const expectedSql = (
+      'SELECT timestamp as timestamp, message as body, level as level FROM "default"."logs" LIMIT 1000'
+    );
 
     const sql = generateSql(opts);
-    expect(sql).not.toBeUndefined();
-    expect(sql).not.toHaveLength(0);
-    expect(sql.length).toBeGreaterThan(0);
+    expect(sql).toEqual(expectedSql);
   });
 
   it('generates trace sql', () => {
@@ -43,11 +44,16 @@ describe('SQL Generator', () => {
       filters: [],
       orderBy: []
     };
+    const expectedSql = (
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID, "ServiceName" as serviceName, ' +
+      '"SpanName" as operationName, "Timestamp" as startTime, "Duration" as duration, ' +
+      'arrayMap(key -> map(\'key\', key, \'value\',"SpanAttributes"[key]), mapKeys("SpanAttributes")) as tags, ' +
+      'arrayMap(key -> map(\'key\', key, \'value\',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags ' +
+      'FROM "otel"."otel_traces" ORDER BY startTime ASC LIMIT 1000'
+    );
 
     const sql = generateSql(opts);
-    expect(sql).not.toBeUndefined();
-    expect(sql).not.toHaveLength(0);
-    expect(sql.length).toBeGreaterThan(0);
+    expect(sql).toEqual(expectedSql);
   });
 
   it('generates other sql', () => {
@@ -63,11 +69,41 @@ describe('SQL Generator', () => {
       filters: [],
       orderBy: []
     };
+    const expectedSql = (
+      'SELECT "timestamp", "text" FROM "default"."data" LIMIT 1000'
+    );
 
     const sql = generateSql(opts);
-    expect(sql).not.toBeUndefined();
-    expect(sql).not.toHaveLength(0);
-    expect(sql.length).toBeGreaterThan(0);
+    expect(sql).toEqual(expectedSql);
+  });
+
+  it('excludes LIMIT when limit is 0', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'data',
+      queryType: QueryType.Table,
+      limit: 0
+    };
+    const expectedSql = (
+      'SELECT  FROM "default"."data"'
+    );
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSql);
+  });
+
+  it('excludes LIMIT when limit is excluded', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'data',
+      queryType: QueryType.Table
+    };
+    const expectedSql = (
+      'SELECT  FROM "default"."data"'
+    );
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSql);
   });
 });
 
