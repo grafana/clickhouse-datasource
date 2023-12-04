@@ -30,7 +30,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     defaultDatabase, defaultTable,
     otelEnabled, otelVersion,
     timeColumn, levelColumn, messageColumn
-  } = (props.logsConfig || {}) as CHLogsConfig;
+  } = (props.logsConfig || {});
   const labels = allLabels.components.Config.LogsConfig;
 
   const otelConfig = otelVersions.find(v => v.version === otelVersion);
