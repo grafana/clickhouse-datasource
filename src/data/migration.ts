@@ -36,11 +36,12 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
       rawSql: savedQuery.rawSql || '',
       refId: savedQuery.refId || '',
       format: savedQuery.format,
-      meta: {}
     };
 
     if (savedQuery?.meta?.timezone) {
-      builderQuery.meta!.timezone = savedQuery.meta.timezone;
+      builderQuery.meta = {
+        timezone: savedQuery.meta.timezone
+      };
     }
 
     // delete unwanted properties from v3
@@ -73,6 +74,7 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
     }
 
     if (meta.builderOptions) {
+      // When chaning from builder to raw editor, the builder options are saved and also require migration
       rawSqlQuery.meta!.builderOptions = migrateV3QueryBuilderOptions(meta.builderOptions);
     }
   }
@@ -91,7 +93,8 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
   const mapped: QueryBuilderOptions = {
     database: savedOptions.database || '',
     table: savedOptions.table || '',
-    queryType: getV3QueryType(savedOptions)
+    queryType: getV3QueryType(savedOptions),
+    columns: []
   };
 
   if (savedOptions.mode) {
@@ -100,26 +103,30 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
 
   if (savedOptions['fields'] || Array.isArray(savedOptions['fields'])) {
     const oldColumns: string[] = savedOptions['fields'];
-    const timeField: string = savedOptions['timeField'];
-    const timeFieldType: string = savedOptions['timeFieldType'];
-    const logLevelField: string = savedOptions['logLevelField'];
+    mapped.columns = oldColumns.map((name: string) => ({ name }));
+  }
 
-    mapped.columns = oldColumns.map((colName: string) => {
-      const result: SelectedColumn = {
-        name: colName,
-      };
 
-      if (colName === timeField) {
-        result.hint = ColumnHint.Time;
-        if (timeFieldType) {
-          result.type = timeFieldType;
-        }
-      } else if (colName === logLevelField) {
-        result.hint = ColumnHint.LogLevel;
-      }
+  const timeField: string = savedOptions['timeField'];
+  const timeFieldType: string = savedOptions['timeFieldType'];
+  if (timeField) {
+    const timeColumn: SelectedColumn = {
+      name: timeField,
+      type: timeFieldType,
+      hint: ColumnHint.Time
+    };
 
-      return result;
-    });
+    mapped.columns!.push(timeColumn);
+  }
+  
+  const logLevelField: string = savedOptions['logLevelField'];
+  if (logLevelField) {
+    const logLevelColumn: SelectedColumn = {
+      name: logLevelField,
+      hint: ColumnHint.LogLevel
+    };
+
+    mapped.columns!.push(logLevelColumn);
   }
 
   if (savedOptions['metrics'] || Array.isArray(savedOptions['metrics'])) {
@@ -133,8 +140,6 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
 
   if (savedOptions.filters || Array.isArray(savedOptions.filters)) {
     const oldFilters: Filter[] = savedOptions.filters;
-    const timeField: string = savedOptions['timeField'];
-    const logLevelField: string = savedOptions['logLevelField'];
 
     mapped.filters = oldFilters.map((filter: Filter) => {
       const result: Filter = {
