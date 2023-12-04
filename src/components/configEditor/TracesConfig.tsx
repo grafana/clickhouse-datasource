@@ -9,6 +9,7 @@ import { LabeledInput } from './LabeledInput';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { CHTracesConfig } from 'types/config';
 import allLabels from 'labels';
+import { columnLabelToPlaceholder } from 'data/utils';
 
 interface TraceConfigProps {
   tracesConfig?: CHTracesConfig;
@@ -106,6 +107,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.traceId.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.traceId.label)}
           tooltip={labels.columns.traceId.tooltip}
           value={traceIdColumn || ''}
           onChange={onTraceIdColumnChange}
@@ -113,6 +115,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.spanId.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.spanId.label)}
           tooltip={labels.columns.spanId.tooltip}
           value={spanIdColumn || ''}
           onChange={onSpanIdColumnChange}
@@ -120,6 +123,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.operationName.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.operationName.label)}
           tooltip={labels.columns.operationName.tooltip}
           value={operationNameColumn || ''}
           onChange={onOperationNameColumnChange}
@@ -127,6 +131,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.parentSpanId.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.parentSpanId.label)}
           tooltip={labels.columns.parentSpanId.tooltip}
           value={parentSpanIdColumn || ''}
           onChange={onParentSpanIdColumnChange}
@@ -134,6 +139,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.serviceName.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.serviceName.label)}
           tooltip={labels.columns.serviceName.tooltip}
           value={serviceNameColumn || ''}
           onChange={onServiceNameColumnChange}
@@ -141,6 +147,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.durationTime.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.durationTime.label)}
           tooltip={labels.columns.durationTime.tooltip}
           value={durationColumn || ''}
           onChange={onDurationColumnChange}
@@ -153,6 +160,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.startTime.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.startTime.label)}
           tooltip={labels.columns.startTime.tooltip}
           value={startTimeColumn || ''}
           onChange={onStartTimeColumnChange}
@@ -160,6 +168,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.tags.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.tags.label)}
           tooltip={labels.columns.tags.tooltip}
           value={tagsColumn || ''}
           onChange={onTagsColumnChange}
@@ -167,6 +176,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.serviceTags.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.serviceTags.label)}
           tooltip={labels.columns.serviceTags.tooltip}
           value={serviceTagsColumn || ''}
           onChange={onServiceTagsColumnChange}

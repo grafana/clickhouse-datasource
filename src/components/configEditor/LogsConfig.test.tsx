@@ -2,8 +2,7 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { LogsConfig } from './LogsConfig';
 import allLabels from 'labels';
-
-const labelToPlaceholder = (l: string) => l.toLowerCase().replace(/ /g, '_');
+import { columnLabelToPlaceholder } from 'data/utils';
 
 describe('LogsConfig', () => {
   it('should render', () => {
@@ -42,8 +41,8 @@ describe('LogsConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onDefaultDatabaseChange).toBeCalledTimes(1);
-    expect(onDefaultDatabaseChange).toBeCalledWith('changed');
+    expect(onDefaultDatabaseChange).toHaveBeenCalledTimes(1);
+    expect(onDefaultDatabaseChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onDefaultTable when changed', () => {
@@ -66,8 +65,8 @@ describe('LogsConfig', () => {
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onDefaultTableChange).toBeCalledTimes(1);
-    expect(onDefaultTableChange).toBeCalledWith('changed');
+    expect(onDefaultTableChange).toHaveBeenCalledTimes(1);
+    expect(onDefaultTableChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onOtelEnabled when changed', () => {
@@ -89,8 +88,8 @@ describe('LogsConfig', () => {
     const input = result.getByRole('checkbox');
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
-    expect(onOtelEnabledChange).toBeCalledTimes(1);
-    expect(onOtelEnabledChange).toBeCalledWith(true);
+    expect(onOtelEnabledChange).toHaveBeenCalledTimes(1);
+    expect(onOtelEnabledChange).toHaveBeenCalledWith(true);
   });
 
   it('should call onOtelVersionChange when changed', () => {
@@ -113,8 +112,8 @@ describe('LogsConfig', () => {
     expect(select).toBeInTheDocument();
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.keyDown(select, { key: 'Enter' });
-    expect(onOtelVersionChange).toBeCalledTimes(2); // 2 from hook
-    expect(onOtelVersionChange).toBeCalledWith(expect.any(String));
+    expect(onOtelVersionChange).toHaveBeenCalledTimes(2); // 2 from hook
+    expect(onOtelVersionChange).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('should call onTimeColumnChange when changed', () => {
@@ -133,12 +132,12 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.LogsConfig.columns.time.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.time.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onTimeColumnChange).toBeCalledTimes(1);
-    expect(onTimeColumnChange).toBeCalledWith('changed');
+    expect(onTimeColumnChange).toHaveBeenCalledTimes(1);
+    expect(onTimeColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onLevelColumnChange when changed', () => {
@@ -157,12 +156,12 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.LogsConfig.columns.level.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.level.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onLevelColumnChange).toBeCalledTimes(1);
-    expect(onLevelColumnChange).toBeCalledWith('changed');
+    expect(onLevelColumnChange).toHaveBeenCalledTimes(1);
+    expect(onLevelColumnChange).toHaveBeenCalledWith('changed');
   });
 
   it('should call onMessageColumnChange when changed', () => {
@@ -181,11 +180,11 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.LogsConfig.columns.message.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.message.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
-    expect(onMessageColumnChange).toBeCalledTimes(1);
-    expect(onMessageColumnChange).toBeCalledWith('changed');
+    expect(onMessageColumnChange).toHaveBeenCalledTimes(1);
+    expect(onMessageColumnChange).toHaveBeenCalledWith('changed');
   });
 });

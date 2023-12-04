@@ -7,6 +7,7 @@ import { versions as otelVersions } from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { CHLogsConfig } from 'types/config';
 import allLabels from 'labels';
+import { columnLabelToPlaceholder } from 'data/utils';
 
 interface LogsConfigProps {
   logsConfig?: CHLogsConfig;
@@ -87,6 +88,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.time.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.time.label)}
           tooltip={labels.columns.time.tooltip}
           value={timeColumn || ''}
           onChange={onTimeColumnChange}
@@ -94,6 +96,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.level.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.level.label)}
           tooltip={labels.columns.level.tooltip}
           value={levelColumn || ''}
           onChange={onLevelColumnChange}
@@ -101,6 +104,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
         <LabeledInput
           disabled={otelEnabled}
           label={labels.columns.message.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.message.label)}
           tooltip={labels.columns.message.tooltip}
           value={messageColumn || ''}
           onChange={onMessageColumnChange}

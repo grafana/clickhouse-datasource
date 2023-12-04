@@ -2,8 +2,7 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { TracesConfig } from './TracesConfig';
 import allLabels from 'labels';
-
-const labelToPlaceholder = (l: string) => l.toLowerCase().replace(/ /g, '_');
+import { columnLabelToPlaceholder } from 'data/utils';
 
 describe('TracesConfig', () => {
   it('should render', () => {
@@ -175,7 +174,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.traceId.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.traceId.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -206,7 +205,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.spanId.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.spanId.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -237,7 +236,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.operationName.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.operationName.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -268,7 +267,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.parentSpanId.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.parentSpanId.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -299,7 +298,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceName.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceName.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -330,7 +329,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.durationTime.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.durationTime.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -392,7 +391,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.startTime.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.startTime.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -423,7 +422,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.tags.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.tags.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -454,7 +453,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(labelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceTags.label));
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceTags.label));
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);

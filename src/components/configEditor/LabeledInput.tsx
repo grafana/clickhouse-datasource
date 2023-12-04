@@ -23,7 +23,7 @@ export function LabeledInput(props: LabeledInputProps) {
         width={30}
         value={value}
         onChange={e => onChange(e.currentTarget.value)}
-        placeholder={placeholder || label.toLowerCase().replace(/ /g, '_')}
+        placeholder={placeholder}
       />
     </div>
   )

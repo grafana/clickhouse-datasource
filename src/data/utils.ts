@@ -50,3 +50,10 @@ export const mapGrafanaFormatToQueryType = (f?: number): QueryType => {
       return QueryType.Table;
   }
 };
+
+
+/**
+ * Converts label into sql-style column name.
+ * Example: "Test Column" -> "test_column"
+ */
+export const columnLabelToPlaceholder = (label: string) => label.toLowerCase().replace(/ /g, '_');
