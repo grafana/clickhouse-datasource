@@ -119,6 +119,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   return (
     <>
+      {/* Only show in explore view where panel can't be manually selected. Dashboard view lets you change the panel. */}
       { app === CoreApp.Explore &&
         <div className={'gf-form ' + styles.QueryEditor.queryType}>
           <QueryTypeSwitcher queryType={queryType} onChange={queryType => saveChanges({ queryType })} sqlEditor />
