@@ -144,3 +144,8 @@ export const useBuilderOptionsState = (savedOptions: QueryBuilderOptions): [Quer
   const [state, dispatch] = useReducer<typeof reducer, QueryBuilderOptions>(reducer, savedOptions, buildInitialState);
   return [state as QueryBuilderOptions, dispatch];
 };
+
+export const testFuncs = {
+  reducer,
+  buildInitialState
+};
