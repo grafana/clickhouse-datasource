@@ -8,7 +8,7 @@ import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Horizontal
 import { CertificationKey } from '../components/ui/CertificationKey';
 import { Components } from 'selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, CHLogsConfig, Protocol, CHTracesConfig } from 'types/config';
-import { gte } from 'semver';
+import { gte as versionGte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana/experimental';
 import { config } from '@grafana/runtime';
 import { Divider } from 'components/Divider';
@@ -17,6 +17,7 @@ import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatab
 import { QuerySettingsConfig } from 'components/configEditor/QuerySettingsConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
+import { useMigrateV3Config } from './CHConfigEditorHooks';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -32,6 +33,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     { label: 'Native', value: Protocol.Native },
     { label: 'HTTP', value: Protocol.Http },
   ];
+
+  useMigrateV3Config(options, onOptionsChange);  
+
   const onPortChange = (port: string) => {
     onOptionsChange({
       ...options,
@@ -382,7 +386,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         />
 
         <Divider />
-        {config.featureToggles['secureSocksDSProxyEnabled'] && gte(config.buildInfo.version, '10.0.0') && (
+        {config.featureToggles['secureSocksDSProxyEnabled'] && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field
             label={labels.SecureSocksProxy.label}
             description={labels.SecureSocksProxy.tooltip}
