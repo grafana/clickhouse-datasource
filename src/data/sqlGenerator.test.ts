@@ -1,4 +1,4 @@
-import { AggregateType, ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import { AggregateType, ColumnHint, FilterOperator, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { generateSql, getColumnByHint, getColumnIndexByHint, getColumnsByHints, isAggregateQuery } from './sqlGenerator';
 
 describe('SQL Generator', () => {
@@ -13,11 +13,20 @@ describe('SQL Generator', () => {
           { name: 'message', type: 'String', hint: ColumnHint.LogMessage },
       ],
       limit: 1000,
-      filters: [],
+      filters: [
+        {
+          filterType: 'custom',
+          key: 'message',
+          type: 'String',
+          condition: 'AND',
+          operator: FilterOperator.IsNotNull
+        }
+      ],
       orderBy: []
     };
     const expectedSql = (
-      'SELECT timestamp as timestamp, message as body, level as level FROM "default"."logs" LIMIT 1000'
+      'SELECT timestamp as timestamp, message as body, level as level ' +
+      'FROM "default"."logs" WHERE ( message IS NOT NULL ) LIMIT 1000'
     );
 
     const sql = generateSql(opts);
@@ -41,7 +50,17 @@ describe('SQL Generator', () => {
           { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
       ],
       limit: 1000,
-      filters: [],
+      filters: [
+        {
+          filterType: 'custom',
+          key: '', // hint property is used instead of column name
+          type: 'String',
+          condition: 'AND',
+          hint: ColumnHint.TraceId,
+          operator: FilterOperator.Equals,
+          value: '1234'
+        }
+      ],
       orderBy: []
     };
     const expectedSql = (
@@ -49,7 +68,7 @@ describe('SQL Generator', () => {
       '"SpanName" as operationName, "Timestamp" as startTime, "Duration" as duration, ' +
       'arrayMap(key -> map(\'key\', key, \'value\',"SpanAttributes"[key]), mapKeys("SpanAttributes")) as tags, ' +
       'arrayMap(key -> map(\'key\', key, \'value\',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags ' +
-      'FROM "otel"."otel_traces" ORDER BY startTime ASC LIMIT 1000'
+      'FROM "otel"."otel_traces" WHERE ( TraceId = \'1234\' ) ORDER BY startTime ASC LIMIT 1000'
     );
 
     const sql = generateSql(opts);
@@ -71,6 +90,44 @@ describe('SQL Generator', () => {
     };
     const expectedSql = (
       'SELECT "timestamp", "text" FROM "default"."data" LIMIT 1000'
+    );
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSql);
+  });
+
+  it('generates other sql with filters', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'data',
+      queryType: QueryType.Table,
+      columns: [
+          { name: 'timestamp', type: 'DateTime' },
+          { name: 'text', type: 'String' },
+      ],
+      limit: 1000,
+      filters: [
+        {
+          operator: FilterOperator.WithInGrafanaTimeRange,
+          filterType: 'custom',
+          key: 'created_at',
+          type: 'datetime',
+          condition: 'AND'
+        },
+        {
+          filterType: 'custom',
+          key: 'event',
+          type: 'String',
+          condition: 'AND',
+          operator: FilterOperator.IsNotNull
+        }
+      ],
+      orderBy: []
+    };
+    const expectedSql = (
+      'SELECT "timestamp", "text" FROM "default"."data" ' +
+      'WHERE   ( created_at  >= $__fromTime AND created_at <= $__toTime ) AND ( event IS NOT NULL ) ' +
+      'LIMIT 1000'
     );
 
     const sql = generateSql(opts);

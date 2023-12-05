@@ -1,7 +1,6 @@
 import { getSqlFromQueryBuilderOptions, getOrderBy } from 'components/queryBuilder/utils';
 import { BooleanFilter, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
 
-
 export const generateSql = (options: QueryBuilderOptions): string => {
   if (options.queryType === QueryType.Traces) {
     return generateTraceQuery(options);
@@ -102,7 +101,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(limit);
   }
 
-  return queryParts.join(' ');
+  return concatQueryParts(queryParts);
 }
 
 /**
@@ -166,7 +165,7 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(limit);
   }
 
-  return queryParts.join(' ');
+  return concatQueryParts(queryParts);
 }
 
 export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;
@@ -231,6 +230,27 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
     default:
       return `${columnIdentifier} as ${alias}`;
   }
+}
+
+/**
+ * Concats query parts with no empty spaces.
+ */
+const concatQueryParts = (parts: readonly string[]): string => {
+  let query = '';
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i];
+    if (!p) {
+      continue;
+    }
+
+    query += p;
+
+    if (i !== parts.length - 1) {
+      query += ' '
+    }
+  }
+
+  return query;
 }
 
 const getLimit = (limit?: number | undefined): string => {
@@ -328,11 +348,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
     }
     filterParts.push(')');
 
-    const builtFilter = filterParts.join(' ');
+    const builtFilter = concatQueryParts(filterParts);
     builtFilters.push(builtFilter);
   }
 
-  return builtFilters.join(' ');
+  return concatQueryParts(builtFilters);
 };
 
 const isBooleanType = (type: string): boolean => (type?.toLowerCase().startsWith('boolean'));
