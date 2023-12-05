@@ -134,7 +134,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
           <i className={`fa fa-${expand.icon}`}></i>
         </a>
         <CodeEditor
-          aria-label="SQL"
+          aria-label="SQL Editor"
           height={expand.height}
           language="sql"
           value={query.rawSql}
