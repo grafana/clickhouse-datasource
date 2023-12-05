@@ -96,7 +96,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
       />
       <ConfirmModal
         title={cannotConvert.title}
-        body={`${errorMessage} \nDo you want to delete your current query and use the query builder?`}
+        body={`${errorMessage}\n${cannotConvert.message}`}
         isOpen={cannotConvertModalState}
         icon="exclamation-triangle"
         onConfirm={onConfirmEditorTypeChange}

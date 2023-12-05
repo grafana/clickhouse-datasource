@@ -137,6 +137,7 @@ export default {
       },
       cannotConvert: {
         title: 'Cannot convert',
+        message: 'Do you want to delete your current query and use the query builder?',
         confirmText: 'Yes',
       },
     },
