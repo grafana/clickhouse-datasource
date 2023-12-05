@@ -6,7 +6,7 @@ import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHConfig } from 'types/config';
 import { CHQuery, EditorType, CHSqlQuery } from 'types/sql';
 import { styles } from 'styles';
-import { fetchSuggestions as sugg, Schema } from './suggestions';
+import { fetchSuggestions, Schema } from './suggestions';
 import { selectors } from 'selectors';
 import { validate } from 'data/validate';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
@@ -74,8 +74,8 @@ export const SqlEditor = (props: SqlEditorProps) => {
     defaultDatabase: datasource.getDefaultDatabase(),
   };
 
-  const fetchSuggestions: Fetcher = async (text: string, range: Range) => {
-    const suggestions = await sugg(text, schema, range);
+  const getSuggestions: Fetcher = async (text: string, range: Range) => {
+    const suggestions = await fetchSuggestions(text, schema, range);
     return Promise.resolve({ suggestions });
   };
 
@@ -100,7 +100,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const handleMount = (editor: any) => {
-    const me = registerSQL('chSql', editor, fetchSuggestions);
+    const me = registerSQL('chSql', editor, getSuggestions);
     editor.expanded = (query as CHSqlQuery).expand;
     editor.onDidChangeModelDecorations((a: any) => {
       if (editor.expanded) {
