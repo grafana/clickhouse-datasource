@@ -33,6 +33,7 @@ describe('ColumnSelect', () => {
       />
     );
     expect(result.container.firstChild).not.toBeNull();
+    expect(result.getByText('foo')).not.toBeUndefined();
   });
 
   it('should call onColumnChange when a new column is selected', () => {
@@ -56,7 +57,7 @@ describe('ColumnSelect', () => {
     expect(multiSelect).toBeInTheDocument();
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
     fireEvent.keyDown(multiSelect, { key: 'Enter' });
-    expect(onColumnChange).toBeCalledTimes(1);
-    expect(onColumnChange).toBeCalledWith(expect.any(Object));
+    expect(onColumnChange).toHaveBeenCalledTimes(1);
+    expect(onColumnChange).toHaveBeenCalledWith(expect.any(Object));
   });
 });
