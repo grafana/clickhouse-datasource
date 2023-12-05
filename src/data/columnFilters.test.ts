@@ -30,7 +30,7 @@ describe('columnFilterString', () => {
     { col: { name: 't', type: 'string' }, expected: true },
 
     { col: { name: 't', type: 'Int64' }, expected: false },
-    { col: { name: 't', type: 'strin' }, expected: false },
+    { col: { name: 't', type: 'str' }, expected: false },
     { col: { name: 't', type: 'Date' }, expected: false },
     { col: { name: 't', type: 'DateTime' }, expected: false },
   ])('returns $expected for case $# ("$col.type")', ({ col, expected }) => {

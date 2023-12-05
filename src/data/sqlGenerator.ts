@@ -233,7 +233,7 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
 }
 
 /**
- * Concats query parts with no empty spaces.
+ * Concatenates query parts with no empty spaces.
  */
 const concatQueryParts = (parts: readonly string[]): string => {
   let query = '';

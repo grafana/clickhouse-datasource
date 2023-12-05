@@ -121,7 +121,7 @@ describe('OrderByEditor', () => {
 });
 
 describe('getOrderByOptions', () => {
-  const allColumms: readonly TableColumn[] = [
+  const allColumns: readonly TableColumn[] = [
     {
       name: 'field1',
       type: 'string',
@@ -153,7 +153,7 @@ describe('getOrderByOptions', () => {
           queryType: QueryType.Table,
           columns: [{ name: 'field1' }, { name: 'field3' }],
         },
-        allColumms
+        allColumns
       )
     ).toStrictEqual([
       {
@@ -184,7 +184,7 @@ describe('getOrderByOptions', () => {
           columns: [{ name: 'field1' }],
           aggregates: [{ column: 'field2', aggregateType: AggregateType.Max }],
         },
-        allColumms
+        allColumns
       )
     ).toStrictEqual([
       {
@@ -206,7 +206,7 @@ describe('getOrderByOptions', () => {
           queryType: QueryType.Table,
           aggregates: [{ column: 'field1', aggregateType: AggregateType.Max, alias: 'a' }],
         },
-        allColumms
+        allColumns
       )
     ).toStrictEqual([
       {
@@ -228,7 +228,7 @@ describe('getOrderByOptions', () => {
           ],
           groupBy: ['field2']
         },
-        allColumms
+        allColumns
       )
     ).toStrictEqual([
       {
@@ -256,7 +256,7 @@ describe('getOrderByOptions', () => {
           aggregates: [],
           groupBy: ['field3', 'field1'],
         },
-        allColumms
+        allColumns
       )
     ).toStrictEqual([
       {
@@ -292,7 +292,7 @@ describe('getOrderByOptions', () => {
           ],
           groupBy: ['field3', 'field1'],
         },
-        allColumms
+        allColumns
       )
     ).toStrictEqual([
       {

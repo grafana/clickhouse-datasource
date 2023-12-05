@@ -6,7 +6,7 @@ import { setOptions } from 'hooks/useBuilderOptionsState';
 import { versions as otelVersions } from 'otel';
 
 describe('useTraceDefaultsOnMount', () => {
-  it('should call builderOptionsDispatch with default trace columms', async () => {
+  it('should call builderOptionsDispatch with default trace columns', async () => {
     const builderOptionsDispatch = jest.fn();
     jest.spyOn(mockDatasource, 'getTraceOtelVersion').mockReturnValue(undefined);
     jest.spyOn(mockDatasource, 'getDefaultTraceColumns').mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));

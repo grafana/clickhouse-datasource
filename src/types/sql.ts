@@ -15,7 +15,7 @@ export interface CHQueryBase extends DataQuery {
   rawSql: string;
 
   /**
-   * REQUIRED by backend for auto selecting preferredVisualisationType.
+   * REQUIRED by backend for auto selecting preferredVisualizationType.
    * Only used in explore view.
    * src: https://github.com/grafana/sqlds/blob/dda2dc0a54b128961fc9f7885baabf555f3ddfdc/query.go#L36
    */

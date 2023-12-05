@@ -44,8 +44,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const isNewQuery = useIsNewQuery(builderOptions);
   const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0);
-  const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapsable section
-  const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapsable section
+  const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapse section
+  const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapse section
   const labels = allLabels.components.TraceQueryBuilder;
   const builderState: TraceQueryBuilderState = useMemo(() => ({
     isSearchMode: builderOptions.meta?.isTraceSearchMode || false,

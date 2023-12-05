@@ -6,7 +6,7 @@ import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import { versions as otelVersions } from 'otel';
 
 describe('useLogDefaultsOnMount', () => {
-  it('should call builderOptionsDispatch with default log columms', async () => {
+  it('should call builderOptionsDispatch with default log columns', async () => {
     const builderOptionsDispatch = jest.fn();
     jest.spyOn(mockDatasource, 'getLogsOtelVersion').mockReturnValue(undefined);
     jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));

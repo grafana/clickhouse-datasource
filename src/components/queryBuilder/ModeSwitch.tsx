@@ -11,7 +11,7 @@ export interface ModeSwitchProps {
 };
 
 /**
- * Component for switching between modes. Boxes are labled unlike regular Switch.
+ * Component for switching between modes. Boxes are labeled unlike regular Switch.
  */
 export const ModeSwitch = (props: ModeSwitchProps) => {
   const { labelA, labelB, value, onChange, label, tooltip } = props;

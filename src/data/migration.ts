@@ -74,7 +74,7 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
     }
 
     if (meta.builderOptions) {
-      // When chaning from builder to raw editor, the builder options are saved and also require migration
+      // When changing from builder to raw editor, the builder options are saved and also require migration
       rawSqlQuery.meta!.builderOptions = migrateV3QueryBuilderOptions(meta.builderOptions);
     }
   }
