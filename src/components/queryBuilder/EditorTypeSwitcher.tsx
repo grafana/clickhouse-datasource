@@ -30,9 +30,9 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
   const [cannotConvertModalState, setCannotConvertModalState] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const onEditorTypeChange = (editorType: EditorType, confirm = false) => {
+  const onEditorTypeChange = (editorType: EditorType, confirmed = false) => {
     // TODO: component state has updated, but not local state.
-    if (query.editorType === EditorType.SQL && editorType === EditorType.Builder && !confirm) {
+    if (query.editorType === EditorType.SQL && editorType === EditorType.Builder && !confirmed) {
       const queryOptionsFromSql = getQueryOptionsFromSql(query.rawSql);
       if (isString(queryOptionsFromSql)) {
         setCannotConvertModalState(true);
