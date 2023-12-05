@@ -13,24 +13,29 @@ import (
 
 // Settings - data loaded from grafana settings database
 type Settings struct {
-	Server             string `json:"server,omitempty"`
-	Port               int64  `json:"port,omitempty"`
-	Path               string `json:"path,omitempty"`
-	Username           string `json:"username,omitempty"`
-	DefaultDatabase    string `json:"defaultDatabase,omitempty"`
-	InsecureSkipVerify bool   `json:"tlsSkipVerify,omitempty"`
-	TlsClientAuth      bool   `json:"tlsAuth,omitempty"`
-	TlsAuthWithCACert  bool   `json:"tlsAuthWithCACert,omitempty"`
-	Password           string `json:"-,omitempty"`
-	TlsCACert          string
+	Host     string `json:"host,omitempty"`
+	Port     int64  `json:"port,omitempty"`
+	Protocol string `json:"protocol"`
+	Secure   bool   `json:"secure,omitempty"`
+	Path     string `json:"path,omitempty"`
+
+	InsecureSkipVerify bool `json:"tlsSkipVerify,omitempty"`
+	TlsClientAuth      bool `json:"tlsAuth,omitempty"`
+	TlsAuthWithCACert  bool `json:"tlsAuthWithCACert,omitempty"`
 	TlsClientCert      string
+	TlsCACert          string
 	TlsClientKey       string
-	Secure             bool            `json:"secure,omitempty"`
-	Timeout            string          `json:"timeout,omitempty"`
-	QueryTimeout       string          `json:"queryTimeout,omitempty"`
-	Protocol           string          `json:"protocol"`
-	CustomSettings     []CustomSetting `json:"customSettings"`
-	ProxyOptions       *proxy.Options
+
+	Username string `json:"username,omitempty"`
+	Password string `json:"-,omitempty"`
+
+	DefaultDatabase string `json:"defaultDatabase,omitempty"`
+
+	DialTimeout  string `json:"dialTimeout,omitempty"`
+	QueryTimeout string `json:"queryTimeout,omitempty"`
+
+	CustomSettings []CustomSetting `json:"customSettings"`
+	ProxyOptions   *proxy.Options
 }
 
 type CustomSetting struct {
@@ -39,8 +44,8 @@ type CustomSetting struct {
 }
 
 func (settings *Settings) isValid() (err error) {
-	if settings.Server == "" {
-		return ErrorMessageInvalidServerName
+	if settings.Host == "" {
+		return ErrorMessageInvalidHost
 	}
 	if settings.Port == 0 {
 		return ErrorMessageInvalidPort
@@ -55,9 +60,14 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		return settings, fmt.Errorf("%s: %w", err.Error(), ErrorMessageInvalidJSON)
 	}
 
+	// Deprecated: Replaced with Host for v4. Deserializes "server" field for old v3 configs.
 	if jsonData["server"] != nil {
-		settings.Server = jsonData["server"].(string)
+		settings.Host = jsonData["server"].(string)
 	}
+	if jsonData["host"] != nil {
+		settings.Host = jsonData["host"].(string)
+	}
+
 	if jsonData["port"] != nil {
 		if port, ok := jsonData["port"].(string); ok {
 			settings.Port, err = strconv.ParseInt(port, 0, 64)
@@ -68,14 +78,21 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 			settings.Port = int64(jsonData["port"].(float64))
 		}
 	}
-	if jsonData["username"] != nil {
-		settings.Username = jsonData["username"].(string)
+	if jsonData["protocol"] != nil {
+		settings.Protocol = jsonData["protocol"].(string)
+	}
+	if jsonData["secure"] != nil {
+		if secure, ok := jsonData["secure"].(string); ok {
+			settings.Secure, err = strconv.ParseBool(secure)
+			if err != nil {
+				return settings, fmt.Errorf("could not parse secure value: %w", err)
+			}
+		} else {
+			settings.Secure = jsonData["secure"].(bool)
+		}
 	}
 	if jsonData["path"] != nil {
 		settings.Path = jsonData["path"].(string)
-	}
-	if jsonData["defaultDatabase"] != nil {
-		settings.DefaultDatabase = jsonData["defaultDatabase"].(string)
 	}
 
 	if jsonData["tlsSkipVerify"] != nil {
@@ -108,20 +125,22 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 			settings.TlsAuthWithCACert = jsonData["tlsAuthWithCACert"].(bool)
 		}
 	}
-	if jsonData["secure"] != nil {
-		if secure, ok := jsonData["secure"].(string); ok {
-			settings.Secure, err = strconv.ParseBool(secure)
-			if err != nil {
-				return settings, fmt.Errorf("could not parse secure value: %w", err)
-			}
-		} else {
-			settings.Secure = jsonData["secure"].(bool)
-		}
+
+	if jsonData["username"] != nil {
+		settings.Username = jsonData["username"].(string)
+	}
+	if jsonData["defaultDatabase"] != nil {
+		settings.DefaultDatabase = jsonData["defaultDatabase"].(string)
 	}
 
+	// Deprecated: Replaced with DialTimeout for v4. Deserializes "timeout" field for old v3 configs.
 	if jsonData["timeout"] != nil {
-		settings.Timeout = jsonData["timeout"].(string)
+		settings.DialTimeout = jsonData["timeout"].(string)
 	}
+	if jsonData["dialTimeout"] != nil {
+		settings.DialTimeout = jsonData["dialTimeout"].(string)
+	}
+
 	if jsonData["queryTimeout"] != nil {
 		if val, ok := jsonData["queryTimeout"].(string); ok {
 			settings.QueryTimeout = val
@@ -129,9 +148,6 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		if val, ok := jsonData["queryTimeout"].(float64); ok {
 			settings.QueryTimeout = fmt.Sprintf("%d", int64(val))
 		}
-	}
-	if jsonData["protocol"] != nil {
-		settings.Protocol = jsonData["protocol"].(string)
 	}
 	if jsonData["customSettings"] != nil {
 		customSettingsRaw := jsonData["customSettings"].([]interface{})
@@ -148,8 +164,8 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.CustomSettings = customSettings
 	}
 
-	if strings.TrimSpace(settings.Timeout) == "" {
-		settings.Timeout = "10"
+	if strings.TrimSpace(settings.DialTimeout) == "" {
+		settings.DialTimeout = "10"
 	}
 	if strings.TrimSpace(settings.QueryTimeout) == "" {
 		settings.QueryTimeout = "60"
@@ -177,9 +193,9 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 
 	if err == nil && proxyOpts != nil {
 		// the sdk expects the timeout to not be a string
-		timeout, err := strconv.ParseFloat(settings.Timeout, 64)
+		timeout, err := strconv.ParseFloat(settings.DialTimeout, 64)
 		if err == nil {
-			proxyOpts.Timeouts.Timeout = (time.Duration(timeout) * time.Second)
+			proxyOpts.Timeouts.Timeout = time.Duration(timeout) * time.Second
 		}
 
 		settings.ProxyOptions = proxyOpts

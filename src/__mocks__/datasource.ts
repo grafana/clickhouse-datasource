@@ -1,5 +1,7 @@
 import { PluginType } from '@grafana/data';
-import { CHQuery, Protocol, QueryType } from '../types';
+import { Protocol } from 'types/config';
+import { CHQuery, EditorType } from 'types/sql';
+import { QueryType } from 'types/queryBuilder';
 import { Datasource } from '../data/CHDatasource';
 
 export const mockDatasource = new Datasource({
@@ -8,12 +10,13 @@ export const mockDatasource = new Datasource({
   type: 'grafana-clickhouse-datasource',
   name: 'ClickHouse',
   jsonData: {
-    server: 'foo.com',
+    host: 'foo.com',
     port: 443,
     path: '',
     username: 'user',
     defaultDatabase: 'foo',
-    protocol: Protocol.NATIVE,
+    defaultTable: 'bar',
+    protocol: Protocol.Native,
   },
   readOnly: true,
   access: 'direct',
@@ -39,11 +42,13 @@ export const mockDatasource = new Datasource({
     },
   },
 });
+
 mockDatasource.adHocFiltersStatus = 1; // most tests should skip checking the CH version. We will set ad hoc filters to enabled to avoid running the CH version check
+
 export const mockQuery: CHQuery = {
+  pluginVersion: '',
   rawSql: 'select * from foo',
   refId: '',
-  format: 1,
-  queryType: QueryType.SQL,
-  selectedFormat: 4,
+  editorType: EditorType.SQL,
+  queryType: QueryType.Table
 };
