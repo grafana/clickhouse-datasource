@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -56,8 +55,10 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-func getClientInfoProducts() (products []struct{ Name, Version string }) {
-	if version := os.Getenv("GF_VERSION"); version != "" {
+func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
+	version := backend.UserAgentFromContext(ctx).GrafanaVersion()
+
+	if version != "" {
 		products = append(products, struct{ Name, Version string }{
 			Name:    "grafana",
 			Version: version,
@@ -140,9 +141,13 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		}
 	}
 
+	timeout := time.Duration(t)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
+	defer cancel()
+
 	opts := &clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
-			Products: getClientInfoProducts(),
+			Products: getClientInfoProducts(ctx),
 		},
 		TLS:         tlsConfig,
 		Addr:        []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
@@ -178,10 +183,6 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	}
 
 	db := clickhouse.OpenDB(opts)
-
-	timeout := time.Duration(t)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
-	defer cancel()
 
 	chErr := make(chan error, 1)
 	go func() {
