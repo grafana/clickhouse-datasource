@@ -54,28 +54,9 @@ export const Components = {
       label: 'Client Key',
       placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
     },
-    DefaultDatabase: {
-      label: 'Default database',
-      placeholder: 'Default database',
-      tooltip: 'Default database to be used. Can be empty.',
-    },
-    Timeout: {
-      label: 'Dial Timeout (seconds)',
-      placeholder: '10',
-      tooltip: 'Timeout in seconds for connection',
-    },
-    QueryTimeout: {
-      label: 'Query Timeout (seconds)',
-      placeholder: '60',
-      tooltip: 'Timeout in seconds for read queries',
-    },
     Secure: {
       label: 'Secure Connection',
       tooltip: 'Toggle on if the connection is secure',
-    },
-    Validate: {
-      label: 'Validate SQL',
-      tooltip: 'Validate Sql in the editor.',
     },
     SecureSocksProxy: {
       label: 'Enable Secure Socks Proxy',
@@ -195,6 +176,23 @@ export const Components = {
       },
     },
   },
+  QueryBuilder: {
+    AggregateEditor: {
+      sectionLabel: 'query-builder__aggregate-editor__section-label',
+      itemWrapper: 'query-builder__aggregate-editor__item-wrapper',
+      itemRemoveButton: 'query-builder__aggregate-editor-item-remove-button',
+      addButton: 'query-builder__aggregate-editor__add-button',
+    },
+    ColumnsEditor: {
+      multiSelectWrapper: 'query-builder__columns-editor__multi-select-wrapper'
+    },
+    GroupByEditor: {
+      multiSelectWrapper: 'query-builder__group-by__multi-select-wrapper'
+    },
+    LimitEditor: {
+      input: 'query-builder__limit-editor__input'
+    }
+  }
 };
 export const selectors: { components: E2ESelectors<typeof Components> } = {
   components: Components,

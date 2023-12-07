@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { CHQueryEditor } from './CHQueryEditor';
 import * as ui from '@grafana/ui';
 import { mockDatasource } from '__mocks__/datasource';
-import { QueryType } from 'types';
+import { EditorType } from 'types/sql';
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
@@ -25,7 +25,7 @@ describe('Query Editor', () => {
     const rawSql = 'foo';
     render(
       <CHQueryEditor
-        query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL, selectedFormat: 4 }}
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
         datasource={mockDatasource}
