@@ -1,10 +1,10 @@
 import * as fs from 'fs';
-import { ConfigEditorProps } from 'views/CHConfigEditor';
-import { CHConfig } from 'types/config';
+import { Props } from '../views/CHConfigEditor';
+import { CHConfig } from 'types';
 
 const pluginJson = JSON.parse(fs.readFileSync('./src/plugin.json', 'utf-8'));
 
-export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): ConfigEditorProps => ({
+export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): Props => ({
   options: {
     ...pluginJson,
     jsonData: {

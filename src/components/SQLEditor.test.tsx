@@ -1,7 +1,9 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
-import { CHQueryEditor } from './CHQueryEditor';
+import { SQLEditor } from './SQLEditor';
+import { Components } from '../selectors';
 import * as ui from '@grafana/ui';
 import { mockDatasource } from '__mocks__/datasource';
 import { QueryType } from 'types';
@@ -20,11 +22,11 @@ jest.mock('@grafana/ui', () => ({
   },
 }));
 
-describe('Query Editor', () => {
+describe('SQL Editor', () => {
   it('Should display sql in the editor', () => {
     const rawSql = 'foo';
     render(
-      <CHQueryEditor
+      <SQLEditor
         query={{ rawSql, refId: 'A', format: 1, queryType: QueryType.SQL, selectedFormat: 4 }}
         onChange={jest.fn()}
         onRunQuery={jest.fn()}
@@ -32,5 +34,22 @@ describe('Query Editor', () => {
       />
     );
     expect(screen.queryByText(rawSql)).toBeInTheDocument();
+  });
+  it('Should Expand Query', async () => {
+    const onChangeValue = jest.fn();
+    const onRunQuery = jest.fn();
+    await act(async () => {
+      render(
+        <SQLEditor
+          query={{ rawSql: 'test', refId: 'A', format: 1, queryType: QueryType.SQL, selectedFormat: 4 }}
+          onChange={onChangeValue}
+          onRunQuery={onRunQuery}
+          datasource={mockDatasource}
+        />
+      );
+      expect(screen.queryByText('test')).toBeInTheDocument();
+      await userEvent.click(screen.getByTestId(Components.QueryEditor.CodeEditor.Expand));
+      expect(onChangeValue).toHaveBeenCalledTimes(1);
+    });
   });
 });

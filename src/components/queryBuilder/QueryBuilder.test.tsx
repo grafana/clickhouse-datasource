@@ -1,8 +1,8 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import { QueryBuilder } from './QueryBuilder';
-import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, QueryType } from 'types/queryBuilder';
+import { Datasource } from '../../data/CHDatasource';
+import { BuilderMode, Format } from 'types';
 import { CoreApp } from '@grafana/data';
 
 describe('QueryBuilder', () => {
@@ -11,7 +11,7 @@ describe('QueryBuilder', () => {
     const mockDs = { settings: { jsonData: {} } } as Datasource;
     mockDs.fetchDatabases = jest.fn(() => Promise.resolve([]));
     mockDs.fetchTables = jest.fn((_db?: string) => Promise.resolve([]));
-    mockDs.fetchColumnsFull = jest.fn(() => {
+    mockDs.fetchFieldsFull = jest.fn(() => {
       setState();
       return Promise.resolve([]);
     });
@@ -20,18 +20,17 @@ describe('QueryBuilder', () => {
     const result = await waitFor(() =>
       render(
         <QueryBuilder
-          app={CoreApp.PanelEditor}
           builderOptions={{
-            queryType: QueryType.Table,
             mode: BuilderMode.List,
             database: 'db',
             table: 'foo',
-            columns: [],
+            fields: [],
             filters: [],
           }}
-          builderOptionsDispatch={() => {}}
+          onBuilderOptionsChange={() => {}}
           datasource={mockDs}
-          generatedSql=''
+          format={Format.AUTO}
+          app={CoreApp.PanelEditor}
         />
       )
     );

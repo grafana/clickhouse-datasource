@@ -1,7 +1,7 @@
 import React from 'react';
 import { Divider as GrafanaDivider, useTheme2 } from '@grafana/ui';
 import { config } from '@grafana/runtime';
-import { isVersionGtOrEq } from 'utils/version';
+import { isVersionGtOrEq } from '../utils/version';
 
 export function Divider() {
   const theme = useTheme2();

@@ -14,8 +14,8 @@ import {
 import { isString } from 'lodash';
 import {
   BooleanFilter,
-  AggregateColumn,
-  AggregateType,
+  BuilderMetricField,
+  BuilderMetricFieldAggregation,
   BuilderMode,
   DateFilter,
   DateFilterWithoutValue,
@@ -25,15 +25,12 @@ import {
   NullFilter,
   NumberFilter,
   OrderBy,
-  QueryBuilderOptions,
-  ColumnHint,
-  SelectedColumn as CHSelectedColumn,
+  SqlBuilderOptions,
+  SqlBuilderOptionsAggregate,
+  SqlBuilderOptionsTrend,
   StringFilter,
-  QueryType,
-} from 'types/queryBuilder';
+} from 'types';
 import { sqlToStatement } from 'data/ast';
-import { getColumnByHint } from 'data/sqlGenerator';
-
 
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type?.toLowerCase());
@@ -89,14 +86,14 @@ const getAggregationQuery = (
   database = '',
   table = '',
   fields: string[] = [],
-  metrics: AggregateColumn[] = [],
+  metrics: BuilderMetricField[] = [],
   groupBy: string[] = []
 ): string => {
   let selected = fields.length > 0 ? fields.join(', ') : '';
   let metricsQuery = metrics
     .map((m) => {
       const alias = m.alias ? ` ${m.alias.replace(/ /g, '_')}` : '';
-      return `${m.aggregateType}(${m.column})${alias}`;
+      return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
   const groupByQuery = groupBy
@@ -111,16 +108,17 @@ const getAggregationQuery = (
 const getTrendByQuery = (
   database = '',
   table = '',
-  metrics: AggregateColumn[] = [],
+  metrics: BuilderMetricField[] = [],
   groupBy: string[] = [],
-  timeField = ''
+  timeField = '',
+  timeFieldType = ''
 ): string => {
   metrics = metrics && metrics.length > 0 ? metrics : [];
 
   let metricsQuery = metrics
     .map((m) => {
       const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
-      return `${m.aggregateType}(${m.column})${alias}`;
+      return `${m.aggregation}(${m.field})${alias}`;
     })
     .join(', ');
   const time = `$__timeInterval(${timeField}) as time`;
@@ -137,7 +135,7 @@ const getTrendByQuery = (
   return `SELECT ${metricsQuery} FROM ${escaped(database)}${sep}${escaped(table)}`;
 };
 
-export const getFilters = (filters: Filter[]): string => {
+const getFilters = (filters: Filter[]): string => {
   return filters.reduce((previousValue, currentFilter, currentIndex) => {
     const prefixCondition = currentIndex === 0 ? '' : currentFilter.condition;
     let filter = '';
@@ -212,7 +210,7 @@ const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
   return `${clause}, time`;
 };
 
-export const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
+const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
   const pfx = prefix ? ' ORDER BY ' : '';
   return orderBy && orderBy.filter((o) => o.name).length > 0
     ? pfx +
@@ -225,17 +223,16 @@ export const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
     : '';
 };
 
-const getLimit = (limit: number): string => {
-  return ` LIMIT ` + limit;
+const getLimit = (limit?: number): string => {
+  return ` LIMIT ` + (limit || 100);
 };
 
-export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): string => {
-  const { database, table } = options;
+export const getSQLFromQueryOptions = (options: SqlBuilderOptions): string => {
   const limit = options.limit ? getLimit(options.limit) : '';
   let query = ``;
   switch (options.mode) {
     case BuilderMode.Aggregate:
-      query += getAggregationQuery(database, table, options.columns?.map(c => c.name), options.aggregates, options.groupBy);
+      query += getAggregationQuery(options.database, options.table, options.fields, options.metrics, options.groupBy);
       let aggregateFilters = getFilters(options.filters || []);
       if (aggregateFilters) {
         query += ` WHERE ${aggregateFilters}`;
@@ -243,23 +240,26 @@ export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): str
       query += getGroupBy(options.groupBy);
       break;
     case BuilderMode.Trend:
-      const timeColumn = getColumnByHint(options, ColumnHint.Time);
+      if (!isDateType(options.timeFieldType)) {
+        throw new Error('timeFieldType is expected to be valid Date type.');
+      }
       query += getTrendByQuery(
-        database,
-        table,
-        options.aggregates,
+        options.database,
+        options.table,
+        options.metrics,
         options.groupBy,
-        timeColumn?.name || ''
+        options.timeField,
+        options.timeFieldType
       );
       const trendFilters = getFilters(options.filters || []);
 
-      query += ` WHERE $__timeFilter(${timeColumn?.name})`;
+      query += ` WHERE $__timeFilter(${options.timeField})`;
       query += trendFilters ? ` AND ${trendFilters}` : '';
-      query += getGroupBy(options.groupBy, timeColumn?.name);
+      query += getGroupBy(options.groupBy, options.timeField);
       break;
     case BuilderMode.List:
     default:
-      query += getListQuery(options.database, options.table, options.columns?.map(c => c.name));
+      query += getListQuery(options.database, options.table, options.fields);
       const filters = getFilters(options.filters || []);
       if (filters) {
         query += ` WHERE ${filters}`;
@@ -279,7 +279,7 @@ export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): str
   return query;
 };
 
-export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | string {
+export function getQueryOptionsFromSql(sql: string): SqlBuilderOptions | string {
   const ast = sqlToStatement(sql);
   if (!ast) {
     return 'The query is not valid SQL.';
@@ -295,34 +295,31 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
   }
   const fromTable = ast.from[0] as FromTable;
 
-  const columnsAndAggregates = getAggregatesFromAst(ast.columns ? ast.columns : null);
+  const fieldsAndMetrics = getMetricsFromAst(ast.columns ? ast.columns : null);
 
   let builder = {
-    queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: fromTable.name.schema,
     table: fromTable.name.name,
-  } as QueryBuilderOptions;
+  } as SqlBuilderOptions;
 
-  if (columnsAndAggregates.columns) {
-    builder.columns = columnsAndAggregates.columns.map(f => ({ name: f }));
+  if (fieldsAndMetrics.fields) {
+    builder.fields = fieldsAndMetrics.fields;
   }
 
-  if (columnsAndAggregates.aggregates.length > 0) {
+  if (fieldsAndMetrics.metrics.length > 0) {
     builder.mode = BuilderMode.Aggregate;
-    builder.aggregates = columnsAndAggregates.aggregates;
+    (builder as SqlBuilderOptionsAggregate).metrics = fieldsAndMetrics.metrics;
   }
 
-  if (columnsAndAggregates.timeField) {
-    builder.queryType = QueryType.TimeSeries;
+  if (fieldsAndMetrics.timeField) {
     builder.mode = BuilderMode.Trend;
-    const columns: CHSelectedColumn[] = builder.columns || [];
-    columns.push({ name: columnsAndAggregates.timeField, type: 'datetime', hint: ColumnHint.Time });
-    builder.columns = columns;
+    (builder as SqlBuilderOptionsTrend).timeFieldType = 'datetime';
+    (builder as SqlBuilderOptionsTrend).timeField = fieldsAndMetrics.timeField;
   }
 
   if (ast.where) {
-    builder.filters = getFiltersFromAst(ast.where, columnsAndAggregates.timeField);
+    builder.filters = getFiltersFromAst(ast.where, fieldsAndMetrics.timeField);
   }
 
   const orderBy = ast.orderBy
@@ -335,7 +332,7 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
     .filter((x) => x.name);
 
   if (orderBy && orderBy.length > 0) {
-    builder.orderBy = orderBy!;
+    (builder as SqlBuilderOptionsAggregate).orderBy = orderBy!;
   }
 
   builder.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
@@ -349,7 +346,7 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
     })
     .filter((x) => x !== '');
   if (groupBy && groupBy.length > 0) {
-    builder.groupBy = groupBy;
+    (builder as SqlBuilderOptionsAggregate).groupBy = groupBy;
   }
   return builder;
 }
@@ -508,9 +505,9 @@ function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: b
   return notFlag;
 }
 
-function selectCallFunc(s: SelectedColumn): AggregateColumn | string {
+function selectCallFunc(s: SelectedColumn): BuilderMetricField | string {
   if (s.expr.type !== 'call') {
-    return {} as AggregateColumn;
+    return {} as BuilderMetricField;
   }
   let fields = s.expr.args.map((x) => {
     if (x.type !== 'ref') {
@@ -522,52 +519,52 @@ function selectCallFunc(s: SelectedColumn): AggregateColumn | string {
     return '';
   }
   if (
-    Object.values(AggregateType).includes(
-      s.expr.function.name.toLowerCase() as AggregateType
+    Object.values(BuilderMetricFieldAggregation).includes(
+      s.expr.function.name.toLowerCase() as BuilderMetricFieldAggregation
     )
   ) {
     return {
-      aggregateType: s.expr.function.name as AggregateType,
-      column: fields[0],
+      aggregation: s.expr.function.name as BuilderMetricFieldAggregation,
+      field: fields[0],
       alias: s.alias?.name,
-    } as AggregateColumn;
+    } as BuilderMetricField;
   }
   return fields[0];
 }
 
-function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): {
+function getMetricsFromAst(selectClauses: SelectedColumn[] | null): {
   timeField: string;
-  aggregates: AggregateColumn[];
-  columns: string[];
+  metrics: BuilderMetricField[];
+  fields: string[];
 } {
   if (!selectClauses) {
-    return { timeField: '', aggregates: [], columns: [] };
+    return { timeField: '', metrics: [], fields: [] };
   }
-  const aggregates: AggregateColumn[] = [];
-  const columns: string[] = [];
+  const metrics: BuilderMetricField[] = [];
+  const fields: string[] = [];
   let timeField = '';
 
   for (let s of selectClauses) {
     switch (s.expr.type) {
       case 'ref':
-        columns.push(s.expr.name);
+        fields.push(s.expr.name);
         break;
       case 'call':
         const f = selectCallFunc(s);
         if (!f) {
-          return { timeField: '', aggregates: [], columns: [] };
+          return { timeField: '', metrics: [], fields: [] };
         }
         if (isString(f)) {
           timeField = f;
         } else {
-          aggregates.push(f);
+          metrics.push(f);
         }
         break;
       default:
-        return { timeField: '', aggregates: [], columns: [] };
+        return { timeField: '', metrics: [], fields: [] };
     }
   }
-  return { timeField, aggregates, columns };
+  return { timeField, metrics, fields };
 }
 
 function formatStringValue(currentFilter: string): string {

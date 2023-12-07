@@ -4,11 +4,9 @@ import {
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
-  DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
-  LogRowModel,
   MetricFindValue,
   QueryFixAction,
   ScopedVars,
@@ -18,21 +16,20 @@ import {
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
-import { CHConfig } from 'types/config';
-import { EditorType, CHQuery } from 'types/sql';
 import {
-  QueryType,
-  AggregateColumn,
-  AggregateType,
+  BuilderMetricField,
+  BuilderMetricFieldAggregation,
   BuilderMode,
+  CHConfig,
+  CHQuery,
   Filter,
   FilterOperator,
-  TableColumn,
+  Format,
+  FullField,
   OrderByDirection,
-  QueryBuilderOptions,
-  ColumnHint,
-  TimeUnit,
-} from 'types/queryBuilder';
+  QueryType,
+  SqlBuilderOptionsAggregate,
+} from '../types';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
@@ -43,15 +40,11 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { getSqlFromQueryBuilderOptions } from '../components/queryBuilder/utils';
-import { generateSql, getColumnByHint } from './sqlGenerator';
-import { versions as otelVersions } from 'otel';
-import { ReactNode } from 'react';
+import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
-  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>,
-  DataSourceWithLogsContextSupport<CHQuery>
+  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>
 {
   // This enables default annotation support for 7.2+
   annotations = {};
@@ -121,52 +114,46 @@ export class Datasource
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
-      query.editorType !== EditorType.Builder ||
-      query.builderOptions.queryType !== QueryType.Logs ||
+      query.format !== Format.LOGS ||
+      query.queryType !== QueryType.Builder ||
       query.builderOptions.mode !== BuilderMode.List ||
-      query.builderOptions.database === '' ||
-      query.builderOptions.table === ''
+      query.builderOptions.timeField === undefined ||
+      query.builderOptions.database === undefined ||
+      query.builderOptions.table === undefined
     ) {
-      return undefined;
-    }
-
-    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time);
-    if (timeColumn === undefined) {
       return undefined;
     }
 
     const timeFieldRoundingClause = getTimeFieldRoundingClause(
       logsVolumeRequest.scopedVars,
-      timeColumn.name
+      query.builderOptions.timeField
     );
     const fields: string[] = [];
-    const aggregates: AggregateColumn[] = [];
+    const metrics: BuilderMetricField[] = [];
     // could be undefined or an empty string (if user deselects the field)
-    const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
-    if (logLevelColumn) {
+    if (query.builderOptions.logLevelField) {
       // Generate "fields" like
       // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
-      const llf = `toString("${logLevelColumn.name}")`;
+      const llf = `toString("${query.builderOptions.logLevelField}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
         fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`);
       }
     } else {
-      aggregates.push({
-        aggregateType: AggregateType.Count,
-        column: '*',
+      metrics.push({
+        aggregation: BuilderMetricFieldAggregation.Count,
         alias: DEFAULT_LOGS_ALIAS,
+        field: '*',
       });
     }
 
-    const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
+    const logVolumeSqlBuilderOptions: SqlBuilderOptionsAggregate = {
+      mode: BuilderMode.Aggregate,
       database: query.builderOptions.database,
       table: query.builderOptions.table,
-      queryType: QueryType.TimeSeries,
-      mode: BuilderMode.Aggregate,
       filters: query.builderOptions.filters,
-      columns: fields.map(f => ({ name: f })),
-      aggregates,
+      fields,
+      metrics,
       groupBy: [`${timeFieldRoundingClause} AS ${TIME_FIELD_ALIAS}`],
       orderBy: [
         {
@@ -176,14 +163,13 @@ export class Datasource
       ],
     };
 
-    const logVolumeSupplementaryQuery = getSqlFromQueryBuilderOptions(logVolumeSqlBuilderOptions);
+    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(logVolumeSqlBuilderOptions);
     return {
-      // format: Format.AUTO,
-      // selectedFormat: Format.AUTO,
-      pluginVersion: '',
-      editorType: EditorType.SQL,
+      format: Format.AUTO,
+      queryType: QueryType.SQL,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
+      selectedFormat: Format.AUTO,
     };
   }
 
@@ -195,16 +181,17 @@ export class Datasource
     if (this.adHocFiltersStatus === AdHocFilterStatus.none) {
       this.adHocFiltersStatus = await this.canUseAdhocFilters();
     }
-    const chQuery = isString(query) ? { rawSql: query, editorType: EditorType.SQL } : query;
+    const chQuery = isString(query) ? { rawSql: query, queryType: QueryType.SQL } : query;
 
-    if (!(chQuery.editorType === EditorType.SQL || chQuery.editorType === EditorType.Builder || !chQuery.editorType)) {
+    if (!(chQuery.queryType === QueryType.SQL || chQuery.queryType === QueryType.Builder || !chQuery.queryType)) {
       return [];
     }
 
     if (!chQuery.rawSql) {
       return [];
     }
-    const frame = await this.runQuery(chQuery, options);
+    const q = { ...chQuery, queryType: chQuery.queryType || QueryType.SQL };
+    const frame = await this.runQuery(q, options);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -269,7 +256,7 @@ export class Datasource
   modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
     // support filtering by field value in Explore
     if (
-      query.editorType === EditorType.Builder &&
+      query.queryType === QueryType.Builder &&
       action.options !== undefined &&
       'key' in action.options &&
       'value' in action.options
@@ -322,7 +309,7 @@ export class Datasource
       return {
         ...query,
         // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: generateSql(updatedBuilder),
+        rawSql: getSQLFromQueryOptions(updatedBuilder),
         builderOptions: updatedBuilder,
       };
     }
@@ -369,98 +356,8 @@ export class Datasource
     return value;
   }
 
-  getDefaultDatabase(): string {
-    return this.settings.jsonData.defaultDatabase || 'default';
-  }
-
-  getDefaultTable(): string | undefined {
-    return this.settings.jsonData.defaultTable;
-  }
-
-  getDefaultLogsDatabase(): string | undefined {
-    return this.settings.jsonData.logs?.defaultDatabase;
-  }
-
-  getDefaultLogsTable(): string | undefined {
-    return this.settings.jsonData.logs?.defaultTable;
-  }
-
-  getDefaultLogsColumns(): Map<ColumnHint, string> {
-    const result = new Map<ColumnHint, string>();
-    const logsConfig = this.settings.jsonData.logs;
-    if (!logsConfig) {
-      return result;
-    }
-
-    const otelEnabled = logsConfig.otelEnabled;
-    const otelVersion = logsConfig.otelVersion;
-
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
-    if (otelEnabled && otelConfig) {
-      return otelConfig.logColumnMap;
-    }
-
-    logsConfig.timeColumn && result.set(ColumnHint.Time, logsConfig.timeColumn);
-    logsConfig.levelColumn && result.set(ColumnHint.LogLevel, logsConfig.levelColumn);
-    logsConfig.messageColumn && result.set(ColumnHint.LogMessage, logsConfig.messageColumn);
-
-    return result;
-  }
-
-  /**
-   * Get configured OTEL version for logs. Returns undefined when versioning is disabled/unset.
-   */
-  getLogsOtelVersion(): string | undefined {
-    const logConfig = this.settings.jsonData.logs;
-    return logConfig?.otelEnabled ? (logConfig.otelVersion || undefined) : undefined;
-  }
-
-  getDefaultTraceDatabase(): string | undefined {
-    return this.settings.jsonData.traces?.defaultDatabase;
-  }
-
-  getDefaultTraceTable(): string | undefined {
-    return this.settings.jsonData.traces?.defaultTable;
-  }
-
-  getDefaultTraceColumns(): Map<ColumnHint, string> {
-    const result = new Map<ColumnHint, string>();
-    const traceConfig = this.settings.jsonData.traces;
-    if (!traceConfig) {
-      return result;
-    }
-
-    const otelEnabled = traceConfig.otelEnabled;
-    const otelVersion = traceConfig.otelVersion;
-
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
-    if (otelEnabled && otelConfig) {
-      return otelConfig.traceColumnMap;
-    }
-
-    traceConfig.traceIdColumn && result.set(ColumnHint.TraceId, traceConfig.traceIdColumn);
-    traceConfig.spanIdColumn && result.set(ColumnHint.TraceSpanId, traceConfig.spanIdColumn);
-    traceConfig.operationNameColumn && result.set(ColumnHint.TraceOperationName, traceConfig.operationNameColumn);
-    traceConfig.parentSpanIdColumn && result.set(ColumnHint.TraceParentSpanId, traceConfig.parentSpanIdColumn);
-    traceConfig.serviceNameColumn && result.set(ColumnHint.TraceServiceName, traceConfig.serviceNameColumn);
-    traceConfig.durationColumn && result.set(ColumnHint.TraceDurationTime, traceConfig.durationColumn);
-    traceConfig.startTimeColumn && result.set(ColumnHint.Time, traceConfig.startTimeColumn);
-    traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
-    traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
-
-    return result;
-  }
-
-  /**
-   * Get configured OTEL version for traces. Returns undefined when versioning is disabled/unset.
-   */
-  getTraceOtelVersion(): string | undefined {
-    const traceConfig = this.settings.jsonData.traces;
-    return traceConfig?.otelEnabled ? (traceConfig.otelVersion || undefined) : undefined;
-  }
-
-  getDefaultTraceDurationUnit(): TimeUnit {
-    return this.settings.jsonData.traces?.durationUnit as TimeUnit || TimeUnit.Nanoseconds;
+  getDefaultDatabase() {
+    return this.settings.jsonData.defaultDatabase;
   }
 
   async fetchDatabases(): Promise<string[]> {
@@ -480,7 +377,7 @@ export class Datasource
     return this.fetchData(`DESC TABLE "${database}"."${table}"`);
   }
 
-  async fetchColumnsFull(database: string | undefined, table: string): Promise<TableColumn[]> {
+  async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
     const prefix = Boolean(database) ? `"${database}".` : '';
     const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
@@ -488,7 +385,7 @@ export class Datasource
       return [];
     }
     const view = new DataFrameView(frame);
-    return view.map(item => ({
+    return view.map((item) => ({
       name: item[0],
       type: item[1],
       label: item[0],
@@ -671,19 +568,6 @@ export class Datasource
       console.error(`Unable to parse ClickHouse version: ${err}`);
       throw err;
     }
-  }
-
-  // interface DataSourceWithLogsContextSupport
-  async getLogRowContext(row: LogRowModel, options?: any | undefined, query?: CHQuery | undefined): Promise<DataQueryResponse> {
-    return {} as DataQueryResponse;
-  }
-
-  showContextToggle(row?: LogRowModel): boolean {
-    return false;
-  }
-  
-  getLogRowContextUi(row: LogRowModel, runContextQuery?: (() => void) | undefined): ReactNode {
-    return false;
   }
 }
 

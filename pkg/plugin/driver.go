@@ -34,7 +34,7 @@ type Clickhouse struct{}
 func getTLSConfig(settings Settings) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: settings.InsecureSkipVerify,
-		ServerName:         settings.Host,
+		ServerName:         settings.Server,
 	}
 	if settings.TlsClientAuth || settings.TlsAuthWithCACert {
 		if settings.TlsAuthWithCACert && len(settings.TlsCACert) > 0 {
@@ -118,9 +118,9 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			InsecureSkipVerify: settings.InsecureSkipVerify,
 		}
 	}
-	t, err := strconv.Atoi(settings.DialTimeout)
+	t, err := strconv.Atoi(settings.Timeout)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout))
+		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
 	}
 	qt, err := strconv.Atoi(settings.QueryTimeout)
 	if err != nil {
@@ -150,7 +150,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			Products: getClientInfoProducts(ctx),
 		},
 		TLS:         tlsConfig,
-		Addr:        []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
+		Addr:        []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
 		HttpUrlPath: settings.Path,
 		Auth: clickhouse.Auth{
 			Username: settings.Username,
@@ -267,8 +267,8 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
-		if frame.Meta.PreferredVisualization != data.VisTypeTrace &&
-			frame.Meta.PreferredVisualization != data.VisTypeTable {
+		if frame.Meta.PreferredVisualization != data.VisType(data.VisTypeTrace) &&
+			frame.Meta.PreferredVisualization != data.VisType(data.VisTypeTable) {
 			var fields []*data.Field
 			for _, field := range frame.Fields {
 				values := make([]*string, field.Len())

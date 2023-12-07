@@ -134,45 +134,43 @@ export async function configurePanel(page) {
 
     let queryData = {
       "queries": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": `${datasourceUID}`
-          },
-          "pluginVersion": "4.0.0",
-          "editorType": "builder",
-          "rawSql": "SELECT \"schema_name\" FROM \"information_schema\".\"schemata\" LIMIT 1000",
-          "builderOptions": {
-            "database": "information_schema",
-            "table": "schemata",
-            "queryType": "table",
-            "mode": "list",
-            "columns": [
-              {
-                "name": "schema_name",
-                "type": "String",
-                "custom": false
-              }
-            ],
-            "meta": {},
-            "limit": 1000,
-            "aggregates": [],
-            "groupBy": [],
-            "filters": [],
-            "orderBy": []
-          },
-          "format": 1,
-          "meta": {
-            "timezone": "America/New_York"
-          },
-          "datasourceId": 1,
-          "intervalMs": 10000,
-          "maxDataPoints": 1920
-        }
+          {
+              "datasource": {
+                  "type": "grafana-clickhouse-datasource",
+                  "uid": `${datasourceUID}`
+              },
+              "refId": "A",
+              "queryType": "builder",
+              "rawSql": "SELECT \"schema_name\" FROM \"INFORMATION_SCHEMA\".\"SCHEMATA\" LIMIT 100",
+              "meta": {
+                  "builderOptions": {
+                      "mode": "list",
+                      "fields": [],
+                      "limit": 100
+                  },
+                  "timezone": "America/Denver"
+              },
+              "format": 1,
+              "selectedFormat": 4,
+              "builderOptions": {
+                  "mode": "list",
+                  "fields": [
+                      "schema_name"
+                  ],
+                  "limit": 100,
+                  "database": "INFORMATION_SCHEMA",
+                  "table": "SCHEMATA",
+                  "filters": [],
+                  "orderBy": []
+              },
+              "datasourceId": 3568,
+              "intervalMs": 30000,
+              "maxDataPoints": 631
+          }
       ],
       "from": "1695121104422",
       "to": "1695142704422"
-    };
+  }
 
     // ensures user is an admin to the org
     http.post(`http://admin:admin@${GRAFANA_HOST}:3000/api/user/using/1`, null);

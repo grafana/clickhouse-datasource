@@ -1,8 +1,5 @@
 import { reportInteraction } from '@grafana/runtime';
-import { CHQuery, EditorType } from 'types/sql';
-import { QueryType, BuilderMode } from 'types/queryBuilder';
-
-// TODO: v4, determine new/updated fields to track
+import { BuilderMode, CHQuery, Format, QueryType } from 'types';
 
 export const trackClickhouseDashboardLoaded = (props: ClickhouseDashboardLoadedProps) => {
   reportInteraction('grafana_ds_clickhouse_dashboard_loaded', props);
@@ -10,6 +7,7 @@ export const trackClickhouseDashboardLoaded = (props: ClickhouseDashboardLoadedP
 
 export type ClickhouseCounters = {
   sql_queries: number;
+  sql_query_format_auto: number;
   sql_query_format_table: number;
   sql_query_format_logs: number;
   sql_query_format_time_series: number;
@@ -31,6 +29,7 @@ export interface ClickhouseDashboardLoadedProps extends ClickhouseCounters {
 export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
   const counters = {
     sql_queries: 0,
+    sql_query_format_auto: 0,
     sql_query_format_table: 0,
     sql_query_format_logs: 0,
     sql_query_format_time_series: 0,
@@ -41,21 +40,23 @@ export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
     builder_time_series_queries: 0,
   };
 
-  queries.forEach(query => {
-    switch (query.editorType) {
-      case EditorType.SQL:
+  queries.forEach((query) => {
+    switch (query.queryType) {
+      case QueryType.SQL:
         counters.sql_queries++;
-        if (query.queryType === QueryType.Table) {
+        if (query.selectedFormat === Format.AUTO) {
+          counters.sql_query_format_auto++;
+        } else if (query.selectedFormat === Format.TABLE) {
           counters.sql_query_format_table++;
-        } else if (query.queryType === QueryType.Logs) {
+        } else if (query.selectedFormat === Format.LOGS) {
           counters.sql_query_format_logs++;
-        } else if (query.queryType === QueryType.TimeSeries) {
+        } else if (query.selectedFormat === Format.TIMESERIES) {
           counters.sql_query_format_time_series++;
-        } else if (query.queryType === QueryType.Traces) {
+        } else if (query.selectedFormat === Format.TRACE) {
           counters.sql_query_format_trace++;
         }
         break;
-      case EditorType.Builder:
+      case QueryType.Builder:
         counters.builder_queries++;
         if (query.builderOptions.mode === BuilderMode.Aggregate) {
           counters.builder_aggregate_queries++;
