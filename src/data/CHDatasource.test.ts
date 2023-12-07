@@ -12,8 +12,7 @@ import { DataQuery } from '@grafana/schema';
 import { Observable, of } from 'rxjs';
 import { DataSourceWithBackend } from '@grafana/runtime';
 import { mockDatasource } from '__mocks__/datasource';
-import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
-import { ColumnHint, QueryType, BuilderMode, QueryBuilderOptions} from 'types/queryBuilder';
+import { BuilderMode, CHBuilderQuery, CHQuery, CHSQLQuery, Format, QueryType, SqlBuilderOptionsList } from 'types';
 import { cloneDeep } from 'lodash';
 import { Datasource } from './CHDatasource';
 import * as logs from './logs';
@@ -75,30 +74,30 @@ describe('ClickHouseDatasource', () => {
     it('interpolates', async () => {
       const rawSql = 'foo';
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => rawSql);
-      const query = { rawSql: 'select', editorType: EditorType.SQL } as CHQuery;
+      const query = { rawSql: 'select', queryType: QueryType.SQL } as CHQuery;
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql, editorType: EditorType.SQL });
+      expect(val).toEqual({ rawSql, queryType: QueryType.SQL });
     });
     it('should handle $__conditionalAll and not replace', async () => {
-      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
+      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
       const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => vars);
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(spyOnGetVars).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql: `foo`, editorType: EditorType.SQL });
+      expect(val).toEqual({ rawSql: `foo`, queryType: QueryType.SQL });
     });
     it('should handle $__conditionalAll and replace', async () => {
-      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
+      const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', queryType: QueryType.SQL } as CHQuery;
       const vars = [{ current: { value: '$__all' }, name: 'fieldVal' }] as TypedVariableModel[];
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
       const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => vars);
       const val = createInstance({}).applyTemplateVariables(query, {});
       expect(spyOnReplace).toHaveBeenCalled();
       expect(spyOnGetVars).toHaveBeenCalled();
-      expect(val).toEqual({ rawSql: `1=1`, editorType: EditorType.SQL });
+      expect(val).toEqual({ rawSql: `1=1`, queryType: QueryType.SQL });
     });
   });
 
@@ -106,8 +105,8 @@ describe('ClickHouseDatasource', () => {
     it('should Fetch Default Tags When No Second AdHoc Variable', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
       const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
-      jest.spyOn(ds, 'getDefaultDatabase').mockImplementation(() => undefined!); // Disable default DB
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
 
       const keys = await ds.getTagKeys();
@@ -249,12 +248,12 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe('fetchColumnsFull', () => {
+  describe('fetchFieldsFull', () => {
     it('sends a correct query when database and table names are provided', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchColumnsFull('db_name', 'table_name');
+      await ds.fetchFieldsFull('db_name', 'table_name');
       const expected = { rawSql: 'DESC TABLE "db_name"."table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -266,7 +265,7 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchColumnsFull('', 'table_name');
+      await ds.fetchFieldsFull('', 'table_name');
       const expected = { rawSql: 'DESC TABLE "table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -279,7 +278,7 @@ describe('ClickHouseDatasource', () => {
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_) => of({ data: [frame] }));
 
-      await ds.fetchColumnsFull('', 'table.name');
+      await ds.fetchFieldsFull('', 'table.name');
       const expected = { rawSql: 'DESC TABLE "table.name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -312,20 +311,18 @@ describe('ClickHouseDatasource', () => {
 
   describe('SupplementaryQueriesSupport', () => {
     const query: CHBuilderQuery = {
-      pluginVersion: '',
       refId: '42',
-      editorType: EditorType.Builder,
+      queryType: QueryType.Builder,
       rawSql: 'SELECT * FROM system.numbers LIMIT 1',
       builderOptions: {
+        mode: BuilderMode.List,
         database: 'default',
         table: 'logs',
-        queryType: QueryType.Logs,
-        mode: BuilderMode.List,
-        columns: [
-          { name: 'created_at', hint: ColumnHint.Time },
-          { name: 'level', hint: ColumnHint.LogLevel },
-        ]
+        timeField: 'created_at',
+        logLevelField: 'level',
       },
+      format: Format.LOGS,
+      selectedFormat: Format.LOGS,
     };
     const request: DataQueryRequest<CHQuery> = {
       app: CoreApp.Explore,
@@ -351,14 +348,11 @@ describe('ClickHouseDatasource', () => {
 
     describe('getSupplementaryLogsVolumeQuery', () => {
       it('should return undefined if any of the conditions are not met', async () => {
-        [QueryType.Table, QueryType.TimeSeries, QueryType.Traces].forEach(queryType => {
+        [Format.AUTO, Format.TIMESERIES, Format.TABLE, Format.TRACE].forEach((format) => {
           expect(
             datasource.getSupplementaryLogsVolumeQuery(request, {
               ...query,
-              builderOptions: {
-                ...query.builderOptions,
-                queryType
-              }
+              format,
             })
           ).toBeUndefined();
         });
@@ -366,18 +360,14 @@ describe('ClickHouseDatasource', () => {
           expect(
             datasource.getSupplementaryLogsVolumeQuery(request, {
               ...query,
-              builderOptions: {
-                ...query.builderOptions,
-                mode
-              },
+              builderOptions: { mode } as any,
             })
           ).toBeUndefined();
         });
         expect(
           datasource.getSupplementaryLogsVolumeQuery(request, {
             ...query,
-            editorType: EditorType.SQL,
-            queryType: undefined
+            queryType: QueryType.SQL,
           })
         ).toBeUndefined();
         expect(
@@ -385,8 +375,8 @@ describe('ClickHouseDatasource', () => {
             ...query,
             builderOptions: {
               ...query.builderOptions,
-              database: '',
-            },
+              database: undefined,
+            } as SqlBuilderOptionsList,
           })
         ).toBeUndefined();
         expect(
@@ -394,8 +384,8 @@ describe('ClickHouseDatasource', () => {
             ...query,
             builderOptions: {
               ...query.builderOptions,
-              table: '',
-            },
+              table: undefined,
+            } as SqlBuilderOptionsList,
           })
         ).toBeUndefined();
         expect(
@@ -403,8 +393,8 @@ describe('ClickHouseDatasource', () => {
             ...query,
             builderOptions: {
               ...query.builderOptions,
-              columns: query.builderOptions.columns?.filter(c => c.hint !== ColumnHint.Time)
-            } as QueryBuilderOptions,
+              timeField: undefined,
+            } as SqlBuilderOptionsList,
           })
         ).toBeUndefined();
       });
@@ -417,8 +407,8 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            columns: query.builderOptions.columns?.filter(c => c.hint !== ColumnHint.LogLevel)
-          } as QueryBuilderOptions,
+            logLevelField: undefined,
+          } as SqlBuilderOptionsList,
         });
         expect(result?.rawSql).toEqual(
           'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) AS time, count(*) logs ' +
@@ -471,7 +461,7 @@ describe('ClickHouseDatasource', () => {
         const range = ['from', 'to'];
         const supplementaryQuery = {
           rawSql: 'supplementaryQuery',
-        } as CHSqlQuery;
+        } as CHSQLQuery;
         jest.spyOn(Datasource.prototype, 'getSupplementaryLogsVolumeQuery').mockReturnValue(supplementaryQuery);
         jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1d' });
         const queryLogsVolumeSpy = jest

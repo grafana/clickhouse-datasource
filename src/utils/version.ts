@@ -1,7 +1,4 @@
-import pluginPackage from '../../package.json';
 import { isNumber } from 'lodash';
-
-export const pluginVersion = pluginPackage.version;
 
 const versionPattern = /^(\d+)(?:\.(\d+))?(?:\.(\d+))?(?:-([0-9A-Za-z\.]+))?/;
 

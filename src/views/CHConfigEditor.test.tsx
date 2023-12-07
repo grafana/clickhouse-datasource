@@ -1,18 +1,10 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { ConfigEditor } from './CHConfigEditor';
-import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
-import { Components } from 'selectors';
+import { mockConfigEditorProps } from '../__mocks__/ConfigEditor';
+import { Components } from './../selectors';
 import '@testing-library/jest-dom';
-import { Protocol } from 'types/config';
-
-jest.mock('@grafana/runtime', () => {
-  const original = jest.requireActual('@grafana/runtime');
-  return {
-    ...original,
-    config: { buildInfo: { version: '10.0.0' }, featureToggles: { secureSocksDSProxyEnabled: true } },
-  };
-});
+import { Protocol } from '../types';
 
 jest.mock('@grafana/runtime', () => {
   const original = jest.requireActual('@grafana/runtime');
@@ -79,7 +71,7 @@ describe('ConfigEditor', () => {
         {...mockConfigEditorProps()}
         options={{
           ...mockConfigEditorProps().options,
-          jsonData: { ...mockConfigEditorProps().options.jsonData, protocol: Protocol.Http },
+          jsonData: { ...mockConfigEditorProps().options.jsonData, protocol: Protocol.HTTP },
         }}
       />
     );
@@ -124,12 +116,16 @@ describe('ConfigEditor', () => {
     const jsonDataOverrides = {
       defaultDatabase: 'default',
       queryTimeout: '100',
-      dialTimeout: '100',
-      validateSql: true,
+      timeout: '100',
+      validate: true,
       enableSecureSocksProxy: true,
       customSettings: [{ setting: 'test-setting', value: 'test-value' }],
     };
     render(<ConfigEditor {...mockConfigEditorProps(jsonDataOverrides)} />);
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.QueryTimeout.placeholder)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(Components.ConfigEditor.Timeout.placeholder)).toBeInTheDocument();
+    expect(screen.getByText(Components.ConfigEditor.Validate.label)).toBeInTheDocument();
     expect(screen.getByText(Components.ConfigEditor.SecureSocksProxy.label)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].setting)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();
