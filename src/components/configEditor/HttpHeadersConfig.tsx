@@ -124,6 +124,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             data-testid={selectors.headerNameInput}
             width={40}
             value={name}
+            disabled={isSecureConfigured}
             placeholder={labels.headerNamePlaceholder}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
             onBlur={() => onUpdate()}
