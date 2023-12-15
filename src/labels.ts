@@ -1,6 +1,84 @@
 export default {
   components: {
     Config: {
+      ConfigEditor: {
+        serverAddress: {
+          label: 'Server address',
+          placeholder: 'Server address',
+          tooltip: 'ClickHouse host address',
+          error: 'Server address required'
+        },
+        serverPort: {
+          label: 'Server port',
+          insecureNativePort: '9000',
+          insecureHttpPort: '8123',
+          secureNativePort: '9440',
+          secureHttpPort: '8443',
+          tooltip: 'ClickHouse server port',
+          error: 'Port is required'
+        },
+        path: {
+          label: 'HTTP URL Path',
+          tooltip: 'Additional URL path for HTTP requests',
+          placeholder: 'additional-path'
+        },
+        protocol: {
+          label: 'Protocol',
+          tooltip: 'Native or HTTP for server protocol',
+        },
+        username: {
+          label: 'Username',
+          placeholder: 'default',
+          tooltip: 'ClickHouse username',
+        },
+        password: {
+          label: 'Password',
+          placeholder: 'password',
+          tooltip: 'ClickHouse password',
+        },
+        tlsSkipVerify: {
+          label: 'Skip TLS Verify',
+          tooltip: 'Skip TLS Verify',
+        },
+        tlsClientAuth: {
+          label: 'TLS Client Auth',
+          tooltip: 'TLS Client Auth',
+        },
+        tlsAuthWithCACert: {
+          label: 'With CA Cert',
+          tooltip: 'Needed for verifying self-signed TLS Certs',
+        },
+        tlsCACert: {
+          label: 'CA Cert',
+          placeholder: 'CA Cert. Begins with -----BEGIN CERTIFICATE-----',
+        },
+        tlsClientCert: {
+          label: 'Client Cert',
+          placeholder: 'Client Cert. Begins with -----BEGIN CERTIFICATE-----',
+        },
+        tlsClientKey: {
+          label: 'Client Key',
+          placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
+        },
+        secure: {
+          label: 'Secure Connection',
+          tooltip: 'Toggle on if the connection is secure',
+        },
+        secureSocksProxy: {
+          label: 'Enable Secure Socks Proxy',
+          tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',
+        },
+      },
+      HttpHeadersConfig: {
+        title: 'HTTP Headers',
+        description: 'Add HTTP headers when querying the database',
+        headerNameLabel: 'Header Name',
+        headerNamePlaceholder: 'X-Custom-Header',
+        insecureHeaderValueLabel: 'Header Value',
+        secureHeaderValueLabel: 'Secure Header Value',
+        secureLabel: 'Secure',
+        addHeaderLabel: 'Add Header'
+      },
       DefaultDatabaseTableConfig: {
         title: 'Default DB and table',
         database: {

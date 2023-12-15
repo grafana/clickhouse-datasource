@@ -3,6 +3,7 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"strconv"
 	"strings"
 	"time"
@@ -34,7 +35,8 @@ type Settings struct {
 	DialTimeout  string `json:"dialTimeout,omitempty"`
 	QueryTimeout string `json:"queryTimeout,omitempty"`
 
-	CustomSettings []CustomSetting `json:"customSettings"`
+	HttpHeaders    map[string]string `json:"-"`
+	CustomSettings []CustomSetting   `json:"customSettings"`
 	ProxyOptions   *proxy.Options
 }
 
@@ -42,6 +44,8 @@ type CustomSetting struct {
 	Setting string `json:"setting"`
 	Value   string `json:"value"`
 }
+
+const secureHeaderKeyPrefix = "secureHttpHeaders."
 
 func (settings *Settings) isValid() (err error) {
 	if settings.Host == "" {
@@ -187,8 +191,12 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.TlsClientKey = tlsClientKey
 	}
 
-	// proxy options are only able to be loaded via environment variables
-	// currently, so we pass `nil` here so they are loaded with defaults
+	if settings.Protocol == clickhouse.HTTP.String() {
+		settings.HttpHeaders = loadHttpHeaders(jsonData, config.DecryptedSecureJSONData)
+	}
+
+	// proxy options are currently only able to load via environment variables,
+	// so we pass `nil` here so that they are loaded with defaults
 	proxyOpts, err := config.ProxyOptions(nil)
 
 	if err == nil && proxyOpts != nil {
@@ -202,4 +210,31 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	}
 
 	return settings, settings.isValid()
+}
+
+// loadHttpHeaders loads secure and plain text headers from the config
+func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]string) map[string]string {
+	httpHeaders := make(map[string]string)
+
+	if jsonData["httpHeaders"] != nil {
+		httpHeadersRaw := jsonData["httpHeaders"].([]interface{})
+
+		for _, rawHeader := range httpHeadersRaw {
+			header := rawHeader.(map[string]interface{})
+			headerName := header["name"].(string)
+			headerValue := header["value"].(string)
+			if headerName != "" && headerValue != "" {
+				httpHeaders[headerName] = headerValue
+			}
+		}
+	}
+
+	for k, v := range secureJsonData {
+		if v != "" && strings.HasPrefix(k, secureHeaderKeyPrefix) {
+			headerName := k[len(secureHeaderKeyPrefix):]
+			httpHeaders[headerName] = v
+		}
+	}
+
+	return httpHeaders
 }

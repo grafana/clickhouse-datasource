@@ -1,7 +1,7 @@
 import { DataSourceSettings } from "@grafana/data";
 import { renderHook } from "@testing-library/react";
-import { CHConfig } from "types/config";
-import { useMigrateV3Config } from "./CHConfigEditorHooks";
+import { CHConfig, CHHttpHeader, CHSecureConfig } from "types/config";
+import { onHttpHeadersChange, useMigrateV3Config } from "./CHConfigEditorHooks";
 
 describe('useMigrateV3Config', () => {
   it('should not call onOptionsChange if no v3 fields are present', async () => {
@@ -56,6 +56,91 @@ describe('useMigrateV3Config', () => {
       jsonData: {
         host: 'new',
         dialTimeout: '8'
+      }
+    };
+    expect(onOptionsChange).toHaveBeenCalledTimes(1);
+    expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
+});
+
+describe('onHttpHeadersChange', () => {
+  it('should properly sort headers into secure/plain config fields', async () => {
+    const onOptionsChange = jest.fn();
+    const headers: CHHttpHeader[] = [
+      {
+        name: 'X-Existing-Auth-Header',
+        value: '',
+        secure: true
+      },
+      {
+        name: 'X-Existing-Header',
+        value: 'existing value',
+        secure: false
+      },
+      {
+        name: 'Authorization',
+        value: 'secret1234',
+        secure: true
+      },
+      {
+        name: 'X-Custom-Header',
+        value: 'plain text value',
+        secure: false
+      },
+    ];
+    const opts = {
+      jsonData: {
+        httpHeaders: [
+          {
+            name: 'X-Existing-Auth-Header',
+            value: '',
+            secure: true
+          },
+          {
+            name: 'X-Existing-Header',
+            value: 'existing value',
+            secure: false
+          },
+        ]
+      },
+      secureJsonFields: {
+        'secureHttpHeaders.X-Existing-Auth-Header': true
+      },
+    } as any as DataSourceSettings<CHConfig, CHSecureConfig>;
+
+    onHttpHeadersChange(headers, opts, onOptionsChange);
+
+    const expectedOptions = {
+      jsonData: {
+        httpHeaders: [
+          {
+            name: 'X-Existing-Auth-Header',
+            value: '',
+            secure: true
+          },
+          {
+            name: 'X-Existing-Header',
+            value: 'existing value',
+            secure: false
+          },
+          {
+            name: 'Authorization',
+            value: '',
+            secure: true
+          },
+          {
+            name: 'X-Custom-Header',
+            value: 'plain text value',
+            secure: false
+          },
+        ]
+      },
+      secureJsonFields: {
+        'secureHttpHeaders.X-Existing-Auth-Header': true,
+        'secureHttpHeaders.Authorization': true
+      },
+      secureJsonData: {
+        'secureHttpHeaders.Authorization': 'secret1234'
       }
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);

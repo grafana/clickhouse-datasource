@@ -1,4 +1,4 @@
-import { DataSourceJsonData } from '@grafana/data';
+import { DataSourceJsonData, KeyValue } from '@grafana/data';
 
 export interface CHConfig extends DataSourceJsonData {
   host: string;
@@ -23,8 +23,25 @@ export interface CHConfig extends DataSourceJsonData {
   logs?: CHLogsConfig;
   traces?: CHTracesConfig;
 
+  httpHeaders?: CHHttpHeader[];
+
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;
+}
+
+interface CHSecureConfigProperties {
+  password?: string;
+
+  tlsCACert?: string;
+  tlsClientCert?: string;
+  tlsClientKey?: string;
+}
+export type CHSecureConfig = CHSecureConfigProperties | KeyValue<string>;
+
+export interface CHHttpHeader {
+  name: string;
+  value: string;
+  secure: boolean;
 }
 
 export interface CHCustomSetting {
@@ -32,12 +49,6 @@ export interface CHCustomSetting {
   value: string;
 }
 
-export interface CHSecureConfig {
-  password: string;
-  tlsCACert?: string;
-  tlsClientCert?: string;
-  tlsClientKey?: string;
-}
 
 export interface CHLogsConfig {
   defaultDatabase?: string;

@@ -6,7 +6,6 @@ import {
 } from '@grafana/data';
 import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
-import { Components } from 'selectors';
 import { CHConfig, CHCustomSetting, CHSecureConfig, CHLogsConfig, Protocol, CHTracesConfig } from 'types/config';
 import { gte as versionGte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana/experimental';
@@ -17,14 +16,16 @@ import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatab
 import { QuerySettingsConfig } from 'components/configEditor/QuerySettingsConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
-import { useMigrateV3Config } from './CHConfigEditorHooks';
+import { onHttpHeadersChange, useMigrateV3Config } from './CHConfigEditorHooks';
+import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
+import allLabels from 'labels';
 
-export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig> {}
+export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
 export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const { jsonData, secureJsonFields } = options;
-  const labels = Components.ConfigEditor;
+  const labels = allLabels.components.Config.ConfigEditor;
   const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
   const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
   const hasTLSClientCert = secureJsonFields && secureJsonFields.tlsClientCert;
@@ -164,6 +165,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     options.jsonData.traces
   );
 
+  const defaultPort = jsonData.secure ?
+  (jsonData.protocol === Protocol.Native ? labels.serverPort.secureNativePort : labels.serverPort.secureHttpPort) :
+  (jsonData.protocol === Protocol.Native ? labels.serverPort.insecureNativePort : labels.serverPort.insecureHttpPort);
+  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`
+
   return (
     <>
       <DataSourceDescription
@@ -175,51 +181,41 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <ConfigSection title="Server">
         <Field
           required
-          label={labels.ServerAddress.label}
-          description={labels.ServerAddress.tooltip}
+          label={labels.serverAddress.label}
+          description={labels.serverAddress.tooltip}
           invalid={!jsonData.host}
-          error={'Server URL is required'}
+          error={labels.serverAddress.error}
         >
           <Input
             name="host"
             width={40}
             value={jsonData.host || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'host')}
-            label={labels.ServerAddress.label}
-            aria-label={labels.ServerAddress.label}
-            placeholder={labels.ServerAddress.placeholder}
+            label={labels.serverAddress.label}
+            aria-label={labels.serverAddress.label}
+            placeholder={labels.serverAddress.placeholder}
           />
         </Field>
         <Field
           required
-          label={labels.ServerPort.label}
-          description={labels.ServerPort.tooltip}
+          label={labels.serverPort.label}
+          description={portDescription}
           invalid={!jsonData.port}
-          error={'Port is required'}
+          error={labels.serverPort.error}
         >
           <Input
             name="port"
             width={40}
             type="number"
             value={jsonData.port || ''}
-            onChange={(e) => onPortChange(e.currentTarget.value)}
-            label={labels.ServerPort.label}
-            aria-label={labels.ServerPort.label}
-            placeholder={labels.ServerPort.placeholder(jsonData.secure?.toString() || 'false')}
+            onChange={e => onPortChange(e.currentTarget.value)}
+            label={labels.serverPort.label}
+            aria-label={labels.serverPort.label}
+            placeholder={defaultPort}
           />
         </Field>
-        <Field label={labels.Path.label} description={labels.Path.tooltip}>
-          <Input
-            value={jsonData.path || ''}
-            name="path"
-            width={40}
-            onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
-            label={Components.ConfigEditor.Path.label}
-            aria-label={Components.ConfigEditor.Path.label}
-            placeholder={Components.ConfigEditor.Path.placeholder}
-          />
-        </Field>
-        <Field label={labels.Protocol.label} description={labels.Protocol.tooltip}>
+
+        <Field label={labels.protocol.label} description={labels.protocol.tooltip}>
           <RadioButtonGroup<Protocol>
             options={protocolOptions}
             disabledOptions={[]}
@@ -227,7 +223,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onChange={(e) => onProtocolToggle(e!)}
           />
         </Field>
-        <Field label={labels.Secure.label} description={labels.Secure.tooltip}>
+        <Field label={labels.secure.label} description={labels.secure.tooltip}>
           <Switch
             id="secure"
             className="gf-form"
@@ -235,13 +231,35 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onChange={(e) => onSwitchToggle('secure', e.currentTarget.checked)}
           />
         </Field>
+
+        { jsonData.protocol === Protocol.Http &&
+          <Field label={labels.path.label} description={labels.path.tooltip}>
+            <Input
+              value={jsonData.path || ''}
+              name="path"
+              width={40}
+              onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
+              label={labels.path.label}
+              aria-label={labels.path.label}
+              placeholder={labels.path.placeholder}
+            />
+          </Field>
+        }
       </ConfigSection>
+
+      { jsonData.protocol === Protocol.Http &&
+        <HttpHeadersConfig
+          headers={options.jsonData.httpHeaders}
+          secureFields={options.secureJsonFields}
+          onHttpHeadersChange={headers => onHttpHeadersChange(headers, options, onOptionsChange)}
+        />
+      }
 
       <Divider />
       <ConfigSection title="TLS / SSL Settings">
         <Field
-          label={labels.TLSSkipVerify.label}
-          description={labels.TLSSkipVerify.tooltip}
+          label={labels.tlsSkipVerify.label}
+          description={labels.tlsSkipVerify.tooltip}
         >
           <Switch
             className="gf-form"
@@ -250,8 +268,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           />
         </Field>
         <Field
-          label={labels.TLSClientAuth.label}
-          description={labels.TLSClientAuth.tooltip}
+          label={labels.tlsClientAuth.label}
+          description={labels.tlsClientAuth.tooltip}
         >
           <Switch
             className="gf-form"
@@ -260,8 +278,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           />
         </Field>
         <Field
-          label={labels.TLSAuthWithCACert.label}
-          description={labels.TLSAuthWithCACert.tooltip}
+          label={labels.tlsAuthWithCACert.label}
+          description={labels.tlsAuthWithCACert.tooltip}
         >
           <Switch
             className="gf-form"
@@ -273,8 +291,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           <CertificationKey
             hasCert={!!hasTLSCACert}
             onChange={(e) => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
-            placeholder={labels.TLSCACert.placeholder}
-            label={labels.TLSCACert.label}
+            placeholder={labels.tlsCACert.placeholder}
+            label={labels.tlsCACert.label}
             onClick={() => onResetClickFactory('tlsCACert')}
           />
         )}
@@ -283,14 +301,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             <CertificationKey
               hasCert={!!hasTLSClientCert}
               onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
-              placeholder={labels.TLSClientCert.placeholder}
-              label={labels.TLSClientCert.label}
+              placeholder={labels.tlsClientCert.placeholder}
+              label={labels.tlsClientCert.label}
               onClick={() => onResetClickFactory('tlsClientCert')}
             />
             <CertificationKey
               hasCert={!!hasTLSClientKey}
-              placeholder={labels.TLSClientKey.placeholder}
-              label={labels.TLSClientKey.label}
+              placeholder={labels.tlsClientKey.placeholder}
+              label={labels.tlsClientKey.label}
               onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
               onClick={() => onResetClickFactory('tlsClientKey')}
             />
@@ -301,26 +319,26 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <Divider />
       <ConfigSection title="Credentials">
         <Field
-          label={labels.Username.label}
-          description={labels.Username.tooltip}
+          label={labels.username.label}
+          description={labels.username.tooltip}
         >
           <Input
             name="user"
             width={40}
             value={jsonData.username || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'username')}
-            label={labels.Username.label}
-            aria-label={labels.Username.label}
-            placeholder={labels.Username.placeholder}
+            label={labels.username.label}
+            aria-label={labels.username.label}
+            placeholder={labels.username.placeholder}
           />
         </Field>
-        <Field label={labels.Password.label} description={labels.Password.tooltip}>
+        <Field label={labels.password.label} description={labels.password.tooltip}>
           <SecretInput
             name="pwd"
             width={40}
-            label={labels.Password.label}
-            aria-label={labels.Password.label}
-            placeholder={labels.Password.placeholder}
+            label={labels.password.label}
+            aria-label={labels.password.label}
+            placeholder={labels.password.placeholder}
             value={secureJsonData.password || ''}
             isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
             onReset={onResetPassword}
@@ -388,8 +406,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         {config.featureToggles['secureSocksDSProxyEnabled'] && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field
-            label={labels.SecureSocksProxy.label}
-            description={labels.SecureSocksProxy.tooltip}
+            label={labels.secureSocksProxy.label}
+            description={labels.secureSocksProxy.tooltip}
           >
             <Switch
               className="gf-form"
