@@ -51,9 +51,9 @@ describe('HttpHeadersConfig', () => {
 
     const headerNameInput = result.getByTestId(selectors.headerNameInput);
     expect(headerNameInput).toBeInTheDocument();
-    fireEvent.change(headerNameInput, { target: { value: 'x-test ' } }); // with space
+    fireEvent.change(headerNameInput, { target: { value: 'x-test ' } }); // with space in name
     fireEvent.blur(headerNameInput);
-    expect(headerNameInput).toHaveValue('x-test'); // without space
+    expect(headerNameInput).toHaveValue('x-test ');
     expect(onHttpHeadersChange).toHaveBeenCalledTimes(1);
 
     const headerValueInput = result.getByTestId(selectors.headerValueInput);
@@ -70,7 +70,7 @@ describe('HttpHeadersConfig', () => {
     expect(onHttpHeadersChange).toHaveBeenCalledTimes(3);
 
     const expected: CHHttpHeader[] = [
-      { name: 'x-test', value: 'test value', secure: true }
+      { name: 'x-test', value: 'test value', secure: true } // without space in name
     ];
     expect(onHttpHeadersChange).toHaveBeenCalledWith(expect.objectContaining(expected));
   });

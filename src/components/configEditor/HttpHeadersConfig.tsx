@@ -29,6 +29,7 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   };
   const updateHeader = (index: number, header: CHHttpHeader) => {
     const nextHeaders: CHHttpHeader[] = headers.slice();
+    header.name = header.name.trim();
     nextHeaders[index] = header;
     setHeaders(nextHeaders);
     onHttpHeadersChange(nextHeaders);
@@ -126,7 +127,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             value={name}
             disabled={isSecureConfigured}
             placeholder={labels.headerNamePlaceholder}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setName((e.target.value || '').trim())}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
             onBlur={() => onUpdate()}
           />
         </Field>
