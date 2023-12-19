@@ -220,9 +220,10 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 		httpHeadersRaw := jsonData["httpHeaders"].([]interface{})
 
 		for _, rawHeader := range httpHeadersRaw {
-			header := rawHeader.(map[string]interface{})
-			headerName := header["name"].(string)
-			headerValue := header["value"].(string)
+			header, _ := rawHeader.(map[string]interface{})
+			headerName, _ := header["name"].(string)
+			headerName = strings.TrimSpace(headerName)
+			headerValue, _ := header["value"].(string)
 			if headerName != "" && headerValue != "" {
 				httpHeaders[headerName] = headerValue
 			}
@@ -231,7 +232,7 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 
 	for k, v := range secureJsonData {
 		if v != "" && strings.HasPrefix(k, secureHeaderKeyPrefix) {
-			headerName := k[len(secureHeaderKeyPrefix):]
+			headerName := strings.TrimSpace(k[len(secureHeaderKeyPrefix):])
 			httpHeaders[headerName] = v
 		}
 	}

@@ -51,9 +51,9 @@ describe('HttpHeadersConfig', () => {
 
     const headerNameInput = result.getByTestId(selectors.headerNameInput);
     expect(headerNameInput).toBeInTheDocument();
-    fireEvent.change(headerNameInput, { target: { value: 'x-test' } });
+    fireEvent.change(headerNameInput, { target: { value: 'x-test ' } }); // with space
     fireEvent.blur(headerNameInput);
-    expect(headerNameInput).toHaveValue('x-test');
+    expect(headerNameInput).toHaveValue('x-test'); // without space
     expect(onHttpHeadersChange).toHaveBeenCalledTimes(1);
 
     const headerValueInput = result.getByTestId(selectors.headerValueInput);

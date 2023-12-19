@@ -35,14 +35,14 @@ func TestLoadSettings(t *testing.T) {
 							"username": "baz",
 							"defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true,
 							"tlsAuthWithCACert": true, "dialTimeout": "10", "enableSecureSocksProxy": true,
-							"httpHeaders": [{ "name": "test-plain-1", "value": "value-1", "secure": false }]
+							"httpHeaders": [{ "name": " test-plain-1 ", "value": "value-1", "secure": false }]
 						}`),
 						DecryptedSecureJSONData: map[string]string{
 							"password":  "bar",
 							"tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey",
-							"secureSocksProxyPassword":        "test",
-							"secureHttpHeaders.test-secure-2": "value-2",
-							"secureHttpHeaders.test-secure-3": "value-3",
+							"secureSocksProxyPassword":          "test",
+							"secureHttpHeaders. test-secure-2 ": "value-2",
+							"secureHttpHeaders.test-secure-3":   "value-3",
 						},
 					},
 				},

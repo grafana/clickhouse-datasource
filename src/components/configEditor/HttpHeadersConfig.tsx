@@ -126,7 +126,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             value={name}
             disabled={isSecureConfigured}
             placeholder={labels.headerNamePlaceholder}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setName((e.target.value || '').trim())}
             onBlur={() => onUpdate()}
           />
         </Field>
