@@ -44,7 +44,7 @@ jobs:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Archive plugin build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: plugin-dist
           path: |
