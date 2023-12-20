@@ -56,7 +56,7 @@ jobs:
     needs: build
     steps:
       - name: Download plugin build artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         id: download
         with:
           name: plugin-dist
