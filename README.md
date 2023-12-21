@@ -72,8 +72,17 @@ datasources:
       server: localhost
       username: username
       tlsSkipVerify: false
+      # tlsAuth: <bool>
+      # tlsAuthWithCACert: <bool>
+      # secure: <bool>
+      # timout: <seconds>
+      # queryTimeout: <seconds>
+      # protocol: <native|http>
     secureJsonData:
       password: password
+      # tlsCACert: <string>
+      # tlsClientCert: <string>
+      # tlsClientKey: <string>
 ```
 
 ## Building queries
