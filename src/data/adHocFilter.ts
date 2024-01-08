@@ -24,7 +24,12 @@ export class AdHocFilter {
     if (filter.key?.includes('.')) {
       this._targetTable = filter.key.split('.')[0];
     }
-    if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+    else if (this._targetTable === '') {
+      this._targetTable = getTable(sql);
+    }
+
+    // sql can contain a query with double quotes around the database and table name, e.g. "default"."table", so we remove those
+    if (this._targetTable === '' || !sql.replace(/"/g, '').match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
       return sql;
     }
 

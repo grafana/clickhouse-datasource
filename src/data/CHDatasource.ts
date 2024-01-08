@@ -511,7 +511,6 @@ export class Datasource
     this.skipAdHocFilter = true;
 
     if (tagSource.source === undefined) {
-      this.adHocFilter.setTargetTable('default');
       const rawSql = 'SELECT name, type, table FROM system.columns';
       const results = await this.runQuery({ rawSql });
       return { type: TagType.schema, frame: results };
