@@ -3,10 +3,6 @@ import { getTable } from './ast';
 export class AdHocFilter {
   private _targetTable = '';
 
-  setTargetTable(table: string) {
-    this._targetTable = table;
-  }
-
   setTargetTableFromQuery(query: string) {
     this._targetTable = getTable(query);
     if (this._targetTable === '') {

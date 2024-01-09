@@ -518,12 +518,6 @@ export class Datasource
 
     if (tagSource.type === TagType.query) {
       this.adHocFilter.setTargetTableFromQuery(tagSource.source);
-    } else {
-      let table = tagSource.from;
-      if (table?.includes('.')) {
-        table = table.split('.')[1];
-      }
-      this.adHocFilter.setTargetTable(table || '');
     }
 
     const results = await this.runQuery({ rawSql: tagSource.source });
