@@ -15,17 +15,17 @@ export class AdHocFilter {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
-    const filter = adHocFilters[0];
 
-    if (filter.key?.includes('.')) {
-      this._targetTable = filter.key.split('.')[0];
+    // sql can contain a query with double quotes around the database and table name, e.g. "default"."table", so we remove those
+    if (this._targetTable !== '' && !sql.replace(/"/g, '').match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+      return sql;
     }
-    else if (this._targetTable === '') {
+
+    if (this._targetTable === '') {
       this._targetTable = getTable(sql);
     }
 
-    // sql can contain a query with double quotes around the database and table name, e.g. "default"."table", so we remove those
-    if (this._targetTable === '' || !sql.replace(/"/g, '').match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+    if (this._targetTable === '') {
       return sql;
     }
 
