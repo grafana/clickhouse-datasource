@@ -17,7 +17,7 @@ import {
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { CHConfig } from 'types/config';
 import { EditorType, CHQuery } from 'types/sql';
 import {
@@ -47,6 +47,7 @@ import { getSqlFromQueryBuilderOptions } from '../components/queryBuilder/utils'
 import { generateSql, getColumnByHint } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
 import { ReactNode } from 'react';
+import { transformQueryResponseWithTraceLinks } from './utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -520,7 +521,7 @@ export class Datasource
         return {
           ...t,
           meta: {
-            ...t.meta,
+            ...t?.meta,
             timezone: this.getTimezone(request),
           },
         };
@@ -529,7 +530,7 @@ export class Datasource
     return super.query({
       ...request,
       targets,
-    });
+    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceLinks(request, res)));
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

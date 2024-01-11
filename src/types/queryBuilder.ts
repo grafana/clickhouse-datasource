@@ -41,8 +41,8 @@ export interface QueryBuilderOptions {
     liveView?: boolean;
 
     // Trace
-    isTraceSearchMode?: boolean;
     traceDurationUnit?: TimeUnit;
+    isTraceIdMode?: boolean;
     traceId?: string;
 
     // Logs & Traces

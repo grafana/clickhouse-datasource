@@ -9,10 +9,11 @@ import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
-import { isBuilderOptionsRunnable, mapQueryTypeToGrafanaFormat } from 'data/utils';
+import { isBuilderOptionsRunnable, mapQueryBuilderOptionsToGrafanaFormat } from 'data/utils';
 import { setAllOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
+import { useCollapseQueryOnMount } from './CHQueryEditorHooks';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -20,8 +21,9 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { query: savedQuery, onRunQuery } = props;
+  const { app, query: savedQuery, onRunQuery } = props;
   const query = migrateCHQuery(savedQuery);
+  useCollapseQueryOnMount(app, query);
 
   return (
     <>
@@ -68,7 +70,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       editorType: EditorType.Builder,
       rawSql: sql,
       builderOptions,
-      format: mapQueryTypeToGrafanaFormat(builderOptions.queryType)
+      format: mapQueryBuilderOptionsToGrafanaFormat(builderOptions)
     });
 
     // TODO: fix dependency warning with "useEffectEvent" once added to stable version of react

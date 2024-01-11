@@ -76,7 +76,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  const hasTraceIdFilter = !options.meta?.isTraceSearchMode && options.meta?.traceId
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
   const hasFilters = (options.filters?.length || 0) > 0;
 
   if (hasTraceIdFilter || hasFilters) {
@@ -93,7 +93,7 @@ const generateTraceQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (traceStartTime !== undefined) {
-    queryParts.push('ORDER BY startTime ASC');
+    queryParts.push('ORDER BY startTime DESC');
   }
 
   const limit = getLimit(options.limit);

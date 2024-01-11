@@ -22,7 +22,7 @@ interface TraceQueryBuilderProps {
 }
 
 interface TraceQueryBuilderState {
-  isSearchMode: boolean;
+  isTraceIdMode: boolean;
   otelEnabled: boolean;
   otelVersion: string;
   traceIdColumn?: SelectedColumn;
@@ -48,7 +48,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapse section
   const labels = allLabels.components.TraceQueryBuilder;
   const builderState: TraceQueryBuilderState = useMemo(() => ({
-    isSearchMode: builderOptions.meta?.isTraceSearchMode || false,
+    isTraceIdMode: builderOptions.meta?.isTraceIdMode || false,
     otelEnabled: builderOptions.meta?.otelEnabled || false,
     otelVersion: builderOptions.meta?.otelVersion || '',
     traceIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceId),
@@ -82,7 +82,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       columns: nextColumns,
       filters: next.filters,
       meta: {
-        isTraceSearchMode: next.isSearchMode,
+        isTraceIdMode: next.isTraceIdMode,
         traceDurationUnit: next.durationUnit,
         traceId: next.traceId,
       }
@@ -106,10 +106,10 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   return (
     <div>
       <ModeSwitch
-        labelA={labels.traceIdModeLabel}
-        labelB={labels.traceSearchModeLabel}
-        value={builderState.isSearchMode}
-        onChange={onOptionChange('isSearchMode')}
+        labelA={labels.traceSearchModeLabel}
+        labelB={labels.traceIdModeLabel}
+        value={builderState.isTraceIdMode}
+        onChange={onOptionChange('isTraceIdMode')}
         label={labels.traceModeLabel}
         tooltip={labels.traceModeTooltip}
       />
@@ -247,7 +247,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
       </Collapse>
-      { builderState.isSearchMode ? (
+      { builderState.isTraceIdMode ?
+        <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />
+        : (
         <Collapse label={labels.filtersSection}
           collapsible
           isOpen={isFiltersOpen}
@@ -259,8 +261,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             onFiltersChange={onOptionChange('filters')}
           />
         </Collapse>
-      ) :
-        <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />
+      )
       }
     </div>
   );
