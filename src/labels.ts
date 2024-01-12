@@ -141,6 +141,10 @@ export default {
         confirmText: 'Yes',
       },
     },
+    expandBuilderButton: {
+      label: 'Show full query',
+      tooltip: 'Shows the full query builder'
+    },
     QueryTypeSwitcher: {
       label: 'Query Type',
       tooltip: 'Sets the layout for the query builder',

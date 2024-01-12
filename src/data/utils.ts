@@ -103,6 +103,7 @@ export const transformQueryResponseWithTraceLinks = (req: DataQueryRequest<CHQue
           filters: [], // Clear filters since it's an exact ID lookup
           meta: {
             ...originalQuery.builderOptions.meta,
+            minimized: true,
             isTraceIdMode: true,
             traceId: '${__value.raw}'
           }

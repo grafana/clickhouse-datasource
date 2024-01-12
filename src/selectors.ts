@@ -177,6 +177,7 @@ export const Components = {
     },
   },
   QueryBuilder: {
+    expandBuilderButton: 'query-builder__expand-builder-button',
     AggregateEditor: {
       sectionLabel: 'query-builder__aggregate-editor__section-label',
       itemWrapper: 'query-builder__aggregate-editor__item-wrapper',

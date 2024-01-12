@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'data/sqlGenerator';
-import { Alert, Collapse, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
+import { Alert, Collapse, VerticalGroup } from '@grafana/ui';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
@@ -14,6 +14,7 @@ import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { OtelVersionSelect } from '../OtelVersionSelect';
 import { useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
+import TraceIdInput from '../TraceIdInput';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -265,35 +266,4 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       }
     </div>
   );
-}
-
-interface TraceIdInputProps {
-  traceId: string;
-  onChange: (traceId: string) => void;
-};
-
-const TraceIdInput = (props: TraceIdInputProps) => {
-  const [inputId, setInputId] = useState<string>('');
-  const { traceId, onChange } = props;
-  const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.traceIdFilter;
-
-  useEffect(() => {
-    setInputId(traceId);
-  }, [traceId])
-
-  return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <Input
-        width={40}
-        value={inputId}
-        type="string"
-        min={1}
-        onChange={e => setInputId(e.currentTarget.value)}
-        onBlur={() => onChange(inputId)}
-      />
-    </div>
-  )
 }
