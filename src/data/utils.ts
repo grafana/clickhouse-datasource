@@ -98,6 +98,15 @@ export const transformQueryResponseWithTraceLinks = (req: DataQueryRequest<CHQue
     if (traceField) {
       const traceIdQuery: CHBuilderQuery = {
         ...originalQuery,
+
+        /**
+         * Evil bug:
+         * The rawSql value might contain time filters such as $__fromTime and $__toTime.
+         * Grafana sees these time range filters as data links and will refuse to enable the traceID link if these are present.
+         * Set rawSql to empty since it gets regenerated when the panel renders anyway.
+         */
+        rawSql: '',
+
         builderOptions: {
           ...originalQuery.builderOptions,
           filters: [], // Clear filters since it's an exact ID lookup
