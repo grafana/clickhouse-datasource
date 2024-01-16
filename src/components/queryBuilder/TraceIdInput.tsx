@@ -14,10 +14,8 @@ const TraceIdInput = (props: TraceIdInputProps) => {
   const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.traceIdFilter;
 
   useEffect(() => {
-    if (inputId !== traceId) {
-      setInputId(traceId);
-    }
-  }, [inputId, traceId])
+    setInputId(traceId);
+  }, [traceId])
 
   return (
     <div className="gf-form">
