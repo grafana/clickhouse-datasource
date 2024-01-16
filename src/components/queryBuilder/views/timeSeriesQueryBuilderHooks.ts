@@ -33,7 +33,7 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
   }, [allColumns, table, builderOptionsDispatch]);
 };
 
-// Apply default filters/orderBy on timeColumn change
+// Apply default filters on table change
 const timeRangeFilterId = 'timeRange';
 export const useDefaultFilters = (table: string, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
   const appliedDefaultFilters = useRef<boolean>(false);

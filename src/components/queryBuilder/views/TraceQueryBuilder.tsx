@@ -13,7 +13,7 @@ import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { OtelVersionSelect } from '../OtelVersionSelect';
-import { useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
+import { useDefaultFilters, useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
 import TraceIdInput from '../TraceIdInput';
 
 interface TraceQueryBuilderProps {
@@ -92,6 +92,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.filters, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
