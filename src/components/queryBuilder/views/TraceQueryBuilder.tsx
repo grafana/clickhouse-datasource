@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'data/sqlGenerator';
-import { Alert, Collapse, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
+import { Alert, Collapse, VerticalGroup } from '@grafana/ui';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
@@ -13,7 +13,8 @@ import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { OtelVersionSelect } from '../OtelVersionSelect';
-import { useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
+import { useDefaultFilters, useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
+import TraceIdInput from '../TraceIdInput';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -22,7 +23,7 @@ interface TraceQueryBuilderProps {
 }
 
 interface TraceQueryBuilderState {
-  isSearchMode: boolean;
+  isTraceIdMode: boolean;
   otelEnabled: boolean;
   otelVersion: string;
   traceIdColumn?: SelectedColumn;
@@ -48,7 +49,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapse section
   const labels = allLabels.components.TraceQueryBuilder;
   const builderState: TraceQueryBuilderState = useMemo(() => ({
-    isSearchMode: builderOptions.meta?.isTraceSearchMode || false,
+    isTraceIdMode: builderOptions.meta?.isTraceIdMode || false,
     otelEnabled: builderOptions.meta?.otelEnabled || false,
     otelVersion: builderOptions.meta?.otelVersion || '',
     traceIdColumn: getColumnByHint(builderOptions, ColumnHint.TraceId),
@@ -82,7 +83,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       columns: nextColumns,
       filters: next.filters,
       meta: {
-        isTraceSearchMode: next.isSearchMode,
+        isTraceIdMode: next.isTraceIdMode,
         traceDurationUnit: next.durationUnit,
         traceId: next.traceId,
       }
@@ -91,6 +92,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, builderState.filters, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
@@ -106,10 +108,10 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   return (
     <div>
       <ModeSwitch
-        labelA={labels.traceIdModeLabel}
-        labelB={labels.traceSearchModeLabel}
-        value={builderState.isSearchMode}
-        onChange={onOptionChange('isSearchMode')}
+        labelA={labels.traceSearchModeLabel}
+        labelB={labels.traceIdModeLabel}
+        value={builderState.isTraceIdMode}
+        onChange={onOptionChange('isTraceIdMode')}
         label={labels.traceModeLabel}
         tooltip={labels.traceModeTooltip}
       />
@@ -247,7 +249,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
       </Collapse>
-      { builderState.isSearchMode ? (
+      { builderState.isTraceIdMode ?
+        <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />
+        : (
         <Collapse label={labels.filtersSection}
           collapsible
           isOpen={isFiltersOpen}
@@ -257,42 +261,13 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             allColumns={allColumns}
             filters={builderState.filters}
             onFiltersChange={onOptionChange('filters')}
+            datasource={datasource}
+            database={builderOptions.database}
+            table={builderOptions.table}
           />
         </Collapse>
-      ) :
-        <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />
+      )
       }
     </div>
   );
-}
-
-interface TraceIdInputProps {
-  traceId: string;
-  onChange: (traceId: string) => void;
-};
-
-const TraceIdInput = (props: TraceIdInputProps) => {
-  const [inputId, setInputId] = useState<string>('');
-  const { traceId, onChange } = props;
-  const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.traceIdFilter;
-
-  useEffect(() => {
-    setInputId(traceId);
-  }, [traceId])
-
-  return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <Input
-        width={40}
-        value={inputId}
-        type="string"
-        min={1}
-        onChange={e => setInputId(e.currentTarget.value)}
-        onBlur={() => onChange(inputId)}
-      />
-    </div>
-  )
 }

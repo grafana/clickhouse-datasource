@@ -17,7 +17,7 @@ import {
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { CHConfig } from 'types/config';
 import { EditorType, CHQuery } from 'types/sql';
 import {
@@ -47,6 +47,7 @@ import { getSqlFromQueryBuilderOptions } from '../components/queryBuilder/utils'
 import { generateSql, getColumnByHint } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
 import { ReactNode } from 'react';
+import { transformQueryResponseWithTraceLinks } from './utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -472,6 +473,17 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
+  /**
+   * Used to populate suggestions in the filter editor for Map columns.
+   * 
+   * Samples rows to get a unique set of keys for the map.
+   * May not include ALL keys for a given dataset.
+   */
+  async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
   async fetchEntities() {
     return this.fetchTables();
   }
@@ -520,7 +532,7 @@ export class Datasource
         return {
           ...t,
           meta: {
-            ...t.meta,
+            ...t?.meta,
             timezone: this.getTimezone(request),
           },
         };
@@ -529,7 +541,7 @@ export class Datasource
     return super.query({
       ...request,
       targets,
-    });
+    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceLinks(request, res)));
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

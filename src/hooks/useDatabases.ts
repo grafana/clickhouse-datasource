@@ -13,7 +13,7 @@ export default (datasource: Datasource): readonly string[] => {
       fetchDatabases().
       then(databases => setDatabases(databases)).
       catch((ex: any) => {
-        console.error(ex);
+        console.error('Failed to fetch databases', ex);
       });
     }, [datasource]);
     

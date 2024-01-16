@@ -1,3 +1,5 @@
+import { ColumnHint } from "types/queryBuilder";
+
 export default {
   components: {
     Config: {
@@ -219,6 +221,10 @@ export default {
         confirmText: 'Yes',
       },
     },
+    expandBuilderButton: {
+      label: 'Show full query',
+      tooltip: 'Shows the full query builder'
+    },
     QueryTypeSwitcher: {
       label: 'Query Type',
       tooltip: 'Sets the layout for the query builder',
@@ -266,6 +272,7 @@ export default {
       label: 'Filters',
       tooltip: `List of filters`,
       addLabel: 'Filter',
+      mapKeyPlaceholder: 'map key'
     },
     GroupByEditor: {
       label: 'Group By',
@@ -287,6 +294,15 @@ export default {
       liveView: {
         label: 'Live View',
         tooltip: 'Enable to update logs in real time'
+      },
+      logMessageFilter: {
+        label: 'Message Filter',
+        tooltip: 'Applies a LIKE filter to the log message body',
+        clearButton: 'Clear'
+      },
+      logLevelFilter: {
+        label: 'Level Filter',
+        tooltip: 'Applies a filter to the log level'
       },
     },
     TimeSeriesQueryBuilder: {
@@ -371,6 +387,21 @@ export default {
       logs: 'Logs',
       timeseries: 'Time Series',
       traces: 'Traces',
+    },
+    ColumnHint: {
+      [ColumnHint.Time]: 'Time',
+
+      [ColumnHint.LogLevel]: 'Log Level',
+      [ColumnHint.LogMessage]: 'Log Message',
+
+      [ColumnHint.TraceId]: 'Trace ID',
+      [ColumnHint.TraceSpanId]: 'Trace Span ID',
+      [ColumnHint.TraceParentSpanId]: 'Trace Parent Span ID',
+      [ColumnHint.TraceServiceName]: 'Trace Service Name',
+      [ColumnHint.TraceOperationName]: 'Trace Operation Name',
+      [ColumnHint.TraceDurationTime]: 'Trace Duration Time',
+      [ColumnHint.TraceTags]: 'Trace Tags',
+      [ColumnHint.TraceServiceTags]: 'Trace Service Tags',
     }
   }
 }

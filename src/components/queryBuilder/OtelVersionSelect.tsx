@@ -21,7 +21,8 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   }));
 
   useEffect(() => {
-    if (selectedVersion === '') {
+    // Use latest version if not set or doesn't exist (which may happen if config is broken)
+    if (selectedVersion === '' || !allVersions.find(v => selectedVersion === v.version)) {
       onVersionChange(allVersions[0].version);
     }
   }, [selectedVersion, onVersionChange]);

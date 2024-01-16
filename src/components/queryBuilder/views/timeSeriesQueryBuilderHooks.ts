@@ -33,17 +33,17 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
   }, [allColumns, table, builderOptionsDispatch]);
 };
 
-// Apply default filters/orderBy on timeColumn change
+// Apply default filters on table change
 const timeRangeFilterId = 'timeRange';
-export const useDefaultFilters = (table: string, timeColumn: SelectedColumn | undefined, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const lastTimeColumn = useRef<string>(timeColumn?.name || '');
+export const useDefaultFilters = (table: string, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(false);
   const lastTable = useRef<string>(table || '');
-  if (!timeColumn || table !== lastTable.current) {
-    lastTimeColumn.current = '';
+  if (table !== lastTable.current) {
+    appliedDefaultFilters.current = false;
   }
 
   useEffect(() => {
-    if (!timeColumn || (timeColumn.name === lastTimeColumn.current) || !table) {
+    if (!table || appliedDefaultFilters.current) {
       return;
     }
 
@@ -52,16 +52,17 @@ export const useDefaultFilters = (table: string, timeColumn: SelectedColumn | un
       type: 'datetime',
       operator: FilterOperator.WithInGrafanaTimeRange,
       filterType: 'custom',
-      key: timeColumn.name,
+      key: '',
+      hint: ColumnHint.Time,
       id: timeRangeFilterId,
       condition: 'AND'
     };
     nextFilters.unshift(timeRangeFilter);
     
     lastTable.current = table;
-    lastTimeColumn.current = timeColumn.name;
+    appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
       filters: nextFilters
     }));
-  }, [table, timeColumn, filters, builderOptionsDispatch]);
+  }, [table, filters, builderOptionsDispatch]);
 };

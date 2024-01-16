@@ -5,6 +5,8 @@ import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuil
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
 import { styles } from 'styles';
+import { Datasource } from 'data/CHDatasource';
+import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -15,6 +17,8 @@ const conditions: Array<SelectableValue<'AND' | 'OR'>> = [
   { value: 'OR', label: 'OR' },
 ];
 const filterOperators: Array<SelectableValue<FilterOperator>> = [
+  { value: FilterOperator.WithInGrafanaTimeRange, label: 'Within dashboard time range' },
+  { value: FilterOperator.OutsideGrafanaTimeRange, label: 'Outside dashboard time range' },
   { value: FilterOperator.Equals, label: '=' },
   { value: FilterOperator.NotEquals, label: '!=' },
   { value: FilterOperator.LessThan, label: '<' },
@@ -27,8 +31,6 @@ const filterOperators: Array<SelectableValue<FilterOperator>> = [
   { value: FilterOperator.NotIn, label: 'NOT IN' },
   { value: FilterOperator.IsNull, label: 'IS NULL' },
   { value: FilterOperator.IsNotNull, label: 'IS NOT NULL' },
-  { value: FilterOperator.WithInGrafanaTimeRange, label: 'WITHIN DASHBOARD TIME RANGE' },
-  { value: FilterOperator.OutsideGrafanaTimeRange, label: 'OUTSIDE DASHBOARD TIME RANGE' },
 ];
 const standardTimeOptions: Array<SelectableValue<string>> = [
   { value: 'today()', label: 'TODAY' },
@@ -69,6 +71,7 @@ const FilterValueSingleStringItem = (props: { value: string; onChange: (value: s
       <Input
         type="text"
         defaultValue={props.value}
+        width={80}
         onBlur={(e) => props.onChange(e.currentTarget.value)}
       />
     </div>
@@ -114,15 +117,26 @@ export const FilterValueEditor = (props: {
   } else if (utils.isNumberFilter(filter)) {
     return <FilterValueNumberItem value={filter.value} onChange={(value) => onFilterChange({ ...filter, value })} />;
   } else if (utils.isDateFilter(filter)) {
+    if (utils.isDateFilterWithOutValue(filter)) {
+      return null;
+    }
+
     const onDateFilterValueChange = (value: string) => {
       onFilterChange({ ...filter, value });
     };
-    return utils.isDateFilterWithOutValue(filter) ? null : (
+    const dateOptions = [...standardTimeOptions];
+    if (filter.value && !standardTimeOptions.find(o => o.value === filter.value)) {
+      dateOptions.push({ label: filter.value, value: filter.value });
+    }
+
+    return (
       <div data-testid="query-builder-filters-date-value-container">
         <Select
           value={filter.value || 'TODAY'}
-          onChange={(e) => onDateFilterValueChange(e.value!)}
-          options={[...standardTimeOptions]}
+          onChange={e => onDateFilterValueChange(e.value!)}
+          options={dateOptions}
+          width={40}
+          allowCustomValue
         />
       </div>
     );
@@ -175,12 +189,27 @@ export const FilterEditor = (props: {
   index: number;
   filter: Filter & PredefinedFilter;
   onFilterChange: (index: number, filter: Filter) => void;
+  datasource: Datasource;
+  database: string;
+  table: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange } = props;
   const [isOpen, setIsOpen] = useState(false);
+  const isMapType = filter.type.startsWith('Map');
+  const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
+  const mapKeyOptions = mapKeys.map(k => ({ label: k, value: k }));
+  if (filter.mapKey && !mapKeys.includes(filter.mapKey)) {
+    mapKeyOptions.push({ label: filter.mapKey, value: filter.mapKey });
+  }
+
   const getFields = () => {
-    const values = (filter.restrictToFields || fieldsList).map((f) => {
-      return { label: f.name, value: f.name };
+    const values = (filter.restrictToFields || fieldsList).map(f => {
+      let label = f.name;
+      if (f.type.startsWith('Map')) {
+        label += '[]';
+      }
+
+      return { label, value: f.name };
     });
     // Add selected value to the list if it does not exist.
     if (filter?.key && !values.find((x) => x.value === filter.key)) {
@@ -222,63 +251,36 @@ export const FilterEditor = (props: {
     } else {
       return filterOperators.filter((f) =>
         [
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
           FilterOperator.Like,
           FilterOperator.NotLike,
           FilterOperator.In,
           FilterOperator.NotIn,
+          FilterOperator.IsNull,
+          FilterOperator.IsNotNull,
+          FilterOperator.Equals,
+          FilterOperator.NotEquals,
+          FilterOperator.LessThan,
+          FilterOperator.LessThanOrEqual,
+          FilterOperator.GreaterThan,
+          FilterOperator.GreaterThanOrEqual,
         ].includes(f.value!)
       );
     }
   };
   const onFilterNameChange = (fieldName: string) => {
     setIsOpen(false);
-    const matchingField = fieldsList.find((f) => f.name === fieldName);
-    let filterData: { key: string; type: string } | null = null;
-
-    if (matchingField) {
-      filterData = {
-        key: matchingField.name,
-        type: matchingField.type,
-      };
-    } else {
-      // In case user wants to add a custom filter for the
-      // field with `Map` type (e.g. colName['keyName'])
-      // More info: https://clickhouse.com/docs/en/sql-reference/data-types/map/
-      const matchingMapField = fieldsList.find((f) => {
-        return (
-          f.type.startsWith('Map') &&
-          fieldName.startsWith(f.name) &&
-          new RegExp(`^${f.name}\\[['"].+['"]\\]$`).test(fieldName)
-        );
-      });
-
-      if (matchingMapField) {
-        // Getting the field type. Example: getting `UInt64` from `Map(String, UInt64)`.
-        const mapFieldType = /^Map\(\w+, (\w+)\)$/.exec(matchingMapField.type)?.[1];
-
-        if (mapFieldType) {
-          filterData = {
-            key: fieldName,
-            type: mapFieldType,
-          };
-        }
-      }
-    }
-
-    if (!filterData) {
-      return;
-    }
+    const matchingField = fieldsList.find(f => f.name === fieldName);
+    const filterData = {
+      key: matchingField?.name || fieldName,
+      type: matchingField?.type || 'String'
+    };
 
     let newFilter: Filter & PredefinedFilter;
     // this is an auto-generated TimeRange filter
     if (filter.restrictToFields) {
       newFilter = {
         filterType: 'custom',
-        key: filterData.key,
+        key: filterData.key || filter.key,
         type: 'datetime',
         condition: filter.condition || 'AND',
         operator: FilterOperator.WithInGrafanaTimeRange,
@@ -313,6 +315,11 @@ export const FilterEditor = (props: {
     }
     onFilterChange(index, newFilter);
   };
+  const onFilterMapKeyChange = (mapKey: string) => {
+    const newFilter: Filter = filter;
+    newFilter.mapKey = mapKey;
+    onFilterChange(index, newFilter);
+  };
   const onFilterOperatorChange = (operator: FilterOperator) => {
     let newFilter: Filter = filter;
     newFilter.operator = operator;
@@ -331,6 +338,7 @@ export const FilterEditor = (props: {
   const onFilterValueChange = (filter: Filter) => {
     onFilterChange(index, filter);
   };
+
   return (
     <>
       {index !== 0 && (
@@ -338,7 +346,7 @@ export const FilterEditor = (props: {
       )}
       <Select
         disabled={Boolean(filter.hint)}
-        placeholder={filter.hint || undefined}
+        placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
         value={filter.key}
         width={40}
         className={styles.Common.inlineSelect}
@@ -347,9 +355,21 @@ export const FilterEditor = (props: {
         onOpenMenu={() => setIsOpen(true)}
         onCloseMenu={() => setIsOpen(false)}
         onChange={(e) => onFilterNameChange(e.value!)}
-        allowCustomValue={true}
+        allowCustomValue
         menuPlacement={'bottom'}
       />
+      { isMapType && 
+        <Select
+          value={filter.mapKey}
+          placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
+          width={40}
+          className={styles.Common.inlineSelect}
+          options={mapKeyOptions}
+          onChange={e => onFilterMapKeyChange(e.value!)}
+          allowCustomValue
+          menuPlacement={'bottom'}
+        />  
+      }
       <Select
         value={filter.operator}
         width={40}
@@ -367,8 +387,11 @@ export const FiltersEditor = (props: {
   allColumns: readonly TableColumn[];
   filters: Filter[];
   onFiltersChange: (filters: Filter[]) => void;
+  datasource: Datasource;
+  database: string;
+  table: string;
 }) => {
-  const { filters = [], onFiltersChange, allColumns: fieldsList = [] } = props;
+  const { filters = [], onFiltersChange, allColumns: fieldsList = [], datasource, database, table } = props;
   const { label, tooltip, addLabel } = labels.components.FilterEditor;
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
@@ -383,6 +406,7 @@ export const FiltersEditor = (props: {
     newFilters[index] = filter;
     onFiltersChange(newFilters);
   };
+
   return (
     <>
       {filters.length === 0 && (
@@ -412,7 +436,15 @@ export const FiltersEditor = (props: {
             ) : (
               <div className={`width-8 ${styles.Common.firstLabel}`}></div>
             )}
-            <FilterEditor allColumns={fieldsList} filter={filter} onFilterChange={onFilterChange} index={index} />
+            <FilterEditor
+              allColumns={fieldsList}
+              filter={filter}
+              onFilterChange={onFilterChange}
+              index={index}
+              datasource={datasource}
+              database={database}
+              table={table}
+            />
             <Button
               data-testid="query-builder-filters-remove-button"
               icon="trash-alt"

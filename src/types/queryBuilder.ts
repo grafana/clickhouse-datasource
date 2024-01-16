@@ -37,12 +37,21 @@ export interface QueryBuilderOptions {
    * Contains metadata for editor-specific use cases.
    */
   meta?: {
+    /**
+     * When enabled, will hide most/all of the query builder options.
+     * 
+     * Intended to be used for trace ID lookups where we only care to show the visualization panel
+     */
+    minimized?: boolean;
+
     // Logs
     liveView?: boolean;
+    logMessageLike?: string;
+    logLevel?: string; 
 
     // Trace
-    isTraceSearchMode?: boolean;
     traceDurationUnit?: TimeUnit;
+    isTraceIdMode?: boolean; // true for trace ID mode, false for trace search mode
     traceId?: string;
 
     // Logs & Traces
@@ -173,6 +182,7 @@ export enum FilterOperator {
 export interface CommonFilterProps {
   filterType: 'custom';
   key: string; // Column name
+  mapKey?: string; // key used when using a map type: exampleMap['mapKey']
   type: string;
   condition: 'AND' | 'OR';
 

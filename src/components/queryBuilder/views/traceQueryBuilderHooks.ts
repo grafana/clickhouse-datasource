@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 import { versions as otelVersions } from 'otel';
-import { QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
+import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, NumberFilter, QueryBuilderOptions, SelectedColumn, StringFilter } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
 /**
@@ -73,4 +73,65 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
     }));
     didSetColumns.current = true;
   }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+};
+
+// Apply default filters on table change
+const timeRangeFilterId = 'timeRange';
+const rootSpanFilterId = 'rootSpansOnly';
+const durationFilterId = 'duration';
+export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(filters.length > 0);
+  const lastTable = useRef<string>(table || '');
+  if (table !== lastTable.current) {
+    appliedDefaultFilters.current = false;
+  }
+
+  useEffect(() => {
+    if (isTraceIdMode || !table || appliedDefaultFilters.current) {
+      return;
+    }
+
+    const nextFilters: Filter[] = filters.filter(f => f.id !== timeRangeFilterId && f.id !== rootSpanFilterId && f.id !== durationFilterId);
+    const timeRangeFilter: DateFilterWithoutValue = {
+      type: 'datetime',
+      operator: FilterOperator.WithInGrafanaTimeRange,
+      filterType: 'custom',
+      key: '',
+      hint: ColumnHint.Time,
+      id: timeRangeFilterId,
+      condition: 'AND'
+    };
+
+    const rootSpanFilter: StringFilter = {
+      type: 'String',
+      operator: FilterOperator.Equals,
+      filterType: 'custom',
+      key: '',
+      hint: ColumnHint.TraceParentSpanId,
+      id: rootSpanFilterId,
+      condition: 'AND',
+      value: ''
+    };
+
+    const durationFilter: NumberFilter = {
+      type: 'UInt64',
+      operator: FilterOperator.GreaterThan,
+      filterType: 'custom',
+      key: '',
+      hint: ColumnHint.TraceDurationTime,
+      id: durationFilterId,
+      condition: 'AND',
+      value: 0
+    };
+
+    nextFilters.unshift(durationFilter);
+    nextFilters.unshift(rootSpanFilter);
+    nextFilters.unshift(timeRangeFilter);
+    
+    lastTable.current = table;
+    appliedDefaultFilters.current = true;
+    builderOptionsDispatch(setOptions({
+      filters: nextFilters
+    }));
+  }, [isTraceIdMode, table, filters, builderOptionsDispatch]);
 };
