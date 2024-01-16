@@ -260,6 +260,9 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             allColumns={allColumns}
             filters={builderState.filters}
             onFiltersChange={onOptionChange('filters')}
+            datasource={datasource}
+            database={builderOptions.database}
+            table={builderOptions.table}
           />
         </Collapse>
       )

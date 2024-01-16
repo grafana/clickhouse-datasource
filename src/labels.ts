@@ -192,6 +192,7 @@ export default {
       label: 'Filters',
       tooltip: `List of filters`,
       addLabel: 'Filter',
+      mapKeyPlaceholder: 'map key'
     },
     GroupByEditor: {
       label: 'Group By',

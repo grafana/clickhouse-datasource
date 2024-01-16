@@ -473,6 +473,17 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
+  /**
+   * Used to populate suggestions in the filter editor for Map columns.
+   * 
+   * Samples rows to get a unique set of keys for the map.
+   * May not include ALL keys for a given dataset.
+   */
+  async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
   async fetchEntities() {
     return this.fetchTables();
   }

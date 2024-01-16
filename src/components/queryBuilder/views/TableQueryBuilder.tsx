@@ -85,7 +85,14 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
         onOrderByChange={onOptionChange('orderBy')}
       />
       <LimitEditor limit={builderState.limit} onLimitChange={onOptionChange('limit')} />
-      <FiltersEditor filters={builderState.filters} onFiltersChange={onOptionChange('filters')} allColumns={allColumns} />
+      <FiltersEditor
+        filters={builderState.filters}
+        onFiltersChange={onOptionChange('filters')}
+        allColumns={allColumns}
+        datasource={datasource}
+        database={builderOptions.database}
+        table={builderOptions.table}
+      />
     </div>
   );
 }

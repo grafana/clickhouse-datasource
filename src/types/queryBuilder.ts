@@ -180,6 +180,7 @@ export enum FilterOperator {
 export interface CommonFilterProps {
   filterType: 'custom';
   key: string; // Column name
+  mapKey?: string; // key used when using a map type: exampleMap['mapKey']
   type: string;
   condition: 'AND' | 'OR';
 
