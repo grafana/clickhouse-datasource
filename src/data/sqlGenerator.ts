@@ -1,14 +1,92 @@
 import { getSqlFromQueryBuilderOptions, getOrderBy } from 'components/queryBuilder/utils';
-import { BooleanFilter, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
+import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
 
 export const generateSql = (options: QueryBuilderOptions): string => {
   if (options.queryType === QueryType.Traces) {
     return generateTraceQuery(options);
   } else if (options.queryType === QueryType.Logs) {
     return generateLogsQuery(options);
+  } else if (options.queryType === QueryType.TimeSeries && options.mode !== BuilderMode.Trend) {
+    return generateSimpleTimeSeriesQuery(options);
+  } else if (options.queryType === QueryType.TimeSeries && options.mode === BuilderMode.Trend) {
+    return generateAggregateTimeSeriesQuery(options);
   }
 
+  // QueryType.Table
   return getSqlFromQueryBuilderOptions(options);
+}
+
+/**
+ * Generates trace query, either search or trace ID.
+ */
+const generateTraceQuery = (options: QueryBuilderOptions): string => {
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
+  if (hasTraceIdFilter) {
+    return generateTraceIdQuery(options);
+  }
+
+  return generateTraceSearchQuery(options);
+}
+
+/**
+ * Generates trace search query.
+ */
+const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
+  const { database, table } = options;
+  
+  const queryParts: string[] = [];
+
+  // TODO: these columns could be a map or some other convenience function
+  const selectParts: string[] = [];
+  const traceId = getColumnByHint(options, ColumnHint.TraceId);
+  if (traceId !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceId.name)} as traceID`);
+  }
+  
+  const traceServiceName = getColumnByHint(options, ColumnHint.TraceServiceName);
+  if (traceServiceName !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceServiceName.name)} as serviceName`);
+  }
+  
+  const traceOperationName = getColumnByHint(options, ColumnHint.TraceOperationName);
+  if (traceOperationName !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceOperationName.name)} as operationName`);
+  }
+  
+  const traceStartTime = getColumnByHint(options, ColumnHint.Time);
+  if (traceStartTime !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceStartTime.name)} as startTime`);
+  }
+  
+  const traceDurationTime = getColumnByHint(options, ColumnHint.TraceDurationTime);
+  if (traceDurationTime !== undefined) {
+    const timeUnit = options.meta?.traceDurationUnit;
+    selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
+  }
+  
+  const selectPartsSql = selectParts.join(', ');
+
+  queryParts.push('SELECT');
+  queryParts.push(selectPartsSql);
+  queryParts.push('FROM');
+  queryParts.push(getTableIdentifier(database, table));
+
+  const hasFilters = (options.filters?.length || 0) > 0;
+  if (hasFilters) {
+    queryParts.push('WHERE');
+    queryParts.push(getFilters(options));
+  }
+
+  if (traceStartTime !== undefined) {
+    queryParts.push('ORDER BY startTime DESC');
+  }
+
+  const limit = getLimit(options.limit);
+  if (limit !== '') {
+    queryParts.push(limit);
+  }
+
+  return concatQueryParts(queryParts);
 }
 
 /**
@@ -16,7 +94,7 @@ export const generateSql = (options: QueryBuilderOptions): string => {
  * Column aliases follow this structure:
  * https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-frame-structure
  */
-const generateTraceQuery = (options: QueryBuilderOptions): string => {
+const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const { database, table } = options;
   
   const queryParts: string[] = [];
@@ -168,6 +246,151 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
   return concatQueryParts(queryParts);
 }
 
+
+/**
+ * Generates a simple time series query. Includes user selected columns.
+ */
+const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => {
+  const { database, table } = options;
+  
+  const queryParts: string[] = [];
+
+  const selectParts: string[] = [];
+  const selectNames = new Set<string>();
+  const timeColumn = getColumnByHint(options, ColumnHint.Time);
+  const timeAlias = 'time';
+  if (timeColumn !== undefined) {
+    selectParts.push(`${timeColumn.name} as ${timeAlias}`);
+    selectNames.add(timeAlias);
+  }
+
+  const columnsExcludingTimeColumn = options.columns?.filter(c => c.hint !== ColumnHint.Time);
+  columnsExcludingTimeColumn?.forEach(c => {
+    selectParts.push(getColumnIdentifier(c));
+    selectNames.add(c.alias || c.name);
+  });
+
+  const aggregateSelectParts: string[] = [];
+  options.aggregates?.forEach(agg => {
+    const alias = agg.alias ? ` as ${agg.alias.replace(/ /g, '_')}` : '';
+    const name = `${agg.aggregateType}(${agg.column})`;
+    aggregateSelectParts.push(`${name}${alias}`);
+    selectNames.add(alias ? alias.substring(4) : name);
+  });
+
+  options.groupBy?.forEach(g => {
+    if (selectNames.has(g)) {
+      // don't add if already selected
+      return;
+    }
+
+    selectParts.push(g)
+  });
+
+  // aggregate selections go AFTER group by
+  aggregateSelectParts.forEach(a => selectParts.push(a));
+  
+  const selectPartsSql = selectParts.join(', ');
+
+  queryParts.push('SELECT');
+  queryParts.push(selectPartsSql);
+  queryParts.push('FROM');
+  queryParts.push(getTableIdentifier(database, table));
+
+  if ((options.filters?.length || 0) > 0) {    
+    queryParts.push('WHERE');
+    queryParts.push(getFilters(options));
+  }
+
+  
+  if ((options.groupBy?.length || 0) > 0) {
+    queryParts.push('GROUP BY');
+    queryParts.push(`${options.groupBy!.join(', ')}, ${timeAlias}`);
+  } else {
+    // TODO: "simple" time series query doesn't have aggregates?
+    // queryParts.push(timeAlias);
+  }
+
+  queryParts.push('ORDER BY');
+  let orderBy = `${timeAlias} ASC`;
+  if ((options.orderBy?.length || 0) > 0) {
+    options.orderBy?.forEach(o => {
+      orderBy += `, ${o.name} ${o.dir}`;
+    });
+  }
+  queryParts.push(orderBy);
+
+  const limit = getLimit(options.limit);
+  if (limit !== '') {
+    queryParts.push(limit);
+  }
+
+  return concatQueryParts(queryParts);
+}
+
+/**
+ * Generates an aggregate time series query.
+ */
+const generateAggregateTimeSeriesQuery = (options: QueryBuilderOptions): string => {
+  const { database, table } = options;
+  
+  const queryParts: string[] = [];
+
+  const selectParts: string[] = [];
+  const timeColumn = getColumnByHint(options, ColumnHint.Time);
+  const timeAlias = 'time';
+  if (timeColumn !== undefined) {
+    selectParts.push(`$__timeInterval(${timeColumn.name}) as ${timeAlias}`);
+  }
+
+  options.groupBy?.forEach(g => selectParts.push(g));
+
+  options.aggregates?.forEach(agg => {
+    const alias = agg.alias ? ` as ${agg.alias.replace(/ /g, '_')}` : '';
+    const name = `${agg.aggregateType}(${agg.column})`;
+    selectParts.push(`${name}${alias}`);
+  });
+  
+  const selectPartsSql = selectParts.join(', ');
+
+  queryParts.push('SELECT');
+  queryParts.push(selectPartsSql);
+  queryParts.push('FROM');
+  queryParts.push(getTableIdentifier(database, table));
+
+  // A dashboard time filter is automatically added to time series queries, do we need this one?
+  // queryParts.push(`$__timeFilter(${timeColumn?.name})`);
+
+  const hasFilters = (options.filters?.length || 0) > 0;
+  if (hasFilters) {
+    queryParts.push('WHERE');
+    queryParts.push(getFilters(options));
+  }
+
+  queryParts.push('GROUP BY');
+  if ((options.groupBy?.length || 0) > 0) {
+    queryParts.push(`${options.groupBy!.join(', ')}, ${timeAlias}`);
+  } else {
+    queryParts.push(timeAlias);
+  }
+
+  queryParts.push('ORDER BY');
+  let orderBy = `${timeAlias} ASC`;
+  if ((options.orderBy?.length || 0) > 0) {
+    options.orderBy?.forEach(o => {
+      orderBy += `, ${o.name} ${o.dir}`;
+    });
+  }
+  queryParts.push(orderBy);
+
+  const limit = getLimit(options.limit);
+  if (limit !== '') {
+    queryParts.push(limit);
+  }
+
+  return concatQueryParts(queryParts);
+}
+
 export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;
 export const getColumnByHint = (options: QueryBuilderOptions, hint: ColumnHint): SelectedColumn | undefined => options.columns?.find(c => c.hint === hint);
 export const getColumnIndexByHint = (options: QueryBuilderOptions, hint: ColumnHint): number => options.columns?.findIndex(c => c.hint === hint) || -1;
@@ -210,6 +433,14 @@ const getTableIdentifier = (database: string, table: string): string => {
 
 const escapeIdentifier = (id: string): string => {
   return id === '' ? '' : `"${id}"`;
+}
+
+const escapeValue = (value: string): string => {
+  if (value.includes('(') || value.includes(')') || value.includes('"') || value.includes('"')) {
+    return value;
+  }
+
+  return `'${value}'`;
 }
 
 /**
@@ -280,6 +511,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
     if (!column) {
       continue;
     }
+
+    if (filter.mapKey) {
+      column += `['${filter.mapKey}']`;
+    }
+
     filterParts.push(column);
 
     let operator: string = filter.operator;
@@ -322,7 +558,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
             }
             break;
           default:
-            filterParts.push(String((filter as DateFilterWithValue).value || 'TODAY'));
+            filterParts.push(escapeValue(String((filter as DateFilterWithValue).value || 'TODAY')));
         }
       }
     } else if (isStringFilter(type, filter.operator)) {

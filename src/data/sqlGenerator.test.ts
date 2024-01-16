@@ -33,7 +33,42 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSql);
   });
 
-  it('generates trace sql', () => {
+  it('generates trace search sql', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+          { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+          { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+          { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+          { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+      ],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          key: 'serviceName',
+          type: 'String',
+          condition: 'AND',
+          operator: FilterOperator.Equals,
+          value: 'test'
+        }
+      ],
+      orderBy: []
+    };
+    const expectedSql = (
+      'SELECT "TraceId" as traceID, "ServiceName" as serviceName, ' +
+      '"SpanName" as operationName, "Timestamp" as startTime, "Duration" as duration ' +
+      'FROM "otel"."otel_traces" WHERE ( serviceName = \'test\' ) ORDER BY startTime DESC LIMIT 1000'
+    );
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSql);
+  });
+
+  it('generates trace ID sql', () => {
     const opts: QueryBuilderOptions = {
       database: 'otel',
       table: 'otel_traces',
@@ -50,25 +85,19 @@ describe('SQL Generator', () => {
           { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
       ],
       limit: 1000,
-      filters: [
-        {
-          filterType: 'custom',
-          key: '', // hint property is used instead of column name
-          type: 'String',
-          condition: 'AND',
-          hint: ColumnHint.TraceId,
-          operator: FilterOperator.Equals,
-          value: '1234'
-        }
-      ],
-      orderBy: []
+      filters: [],
+      orderBy: [],
+      meta: {
+        isTraceIdMode: true,
+        traceId: '1234'
+      }
     };
     const expectedSql = (
       'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID, "ServiceName" as serviceName, ' +
       '"SpanName" as operationName, "Timestamp" as startTime, "Duration" as duration, ' +
       'arrayMap(key -> map(\'key\', key, \'value\',"SpanAttributes"[key]), mapKeys("SpanAttributes")) as tags, ' +
       'arrayMap(key -> map(\'key\', key, \'value\',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags ' +
-      'FROM "otel"."otel_traces" WHERE ( TraceId = \'1234\' ) ORDER BY startTime ASC LIMIT 1000'
+      'FROM "otel"."otel_traces" WHERE traceID = \'1234\' ORDER BY startTime DESC LIMIT 1000'
     );
 
     const sql = generateSql(opts);
