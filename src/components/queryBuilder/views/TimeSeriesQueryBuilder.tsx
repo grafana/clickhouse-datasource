@@ -72,7 +72,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   }, builderState);
 
   useDefaultTimeColumn(allColumns, builderOptions.table, builderState.timeColumn, builderOptionsDispatch);
-  useDefaultFilters(builderOptions.table, builderState.timeColumn, builderState.filters, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.filters, builderOptionsDispatch);
 
   return (
     <div>
