@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { useTraceDefaultsOnMount, useOtelColumns, useDefaultFilters } from './traceQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
-import { ColumnHint, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
+import { ColumnHint, Filter, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
 import { setOptions } from 'hooks/useBuilderOptionsState';
 import { versions as otelVersions } from 'otel';
 
@@ -103,10 +103,9 @@ describe('useDefaultFilters', () => {
   it('should not call builderOptionsDispatch when column/table are present on initial load', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
-    const timeColumn: SelectedColumn = { name: 'timestamp', hint: ColumnHint.Time };
     const filters: Filter[] = [];
 
-    renderHook(() => useDefaultFilters(tableName, timeColumn, filters, builderOptionsDispatch));
+    renderHook(() => useDefaultFilters(tableName, false, filters, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -114,32 +113,13 @@ describe('useDefaultFilters', () => {
   it('should call builderOptionsDispatch when table changes', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
-    const timeColumn: SelectedColumn = { name: 'timestamp', hint: ColumnHint.Time };
     const filters: Filter[] = [];
 
     const hook = renderHook(table =>
-      useDefaultFilters(table, timeColumn, filters, builderOptionsDispatch),
+      useDefaultFilters(table, false, filters, builderOptionsDispatch),
       { initialProps: tableName }
     );
     hook.rerender('other_timeseries');
-
-    const expectedOptions = {
-      filters: [expect.anything()],
-    };
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
-    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
-  });
-
-  it('should call builderOptionsDispatch when time column changes', async () => {
-    const builderOptionsDispatch = jest.fn();
-    const tableName = 'timeseries';
-    const filters: Filter[] = [];
-
-    const hook = renderHook(timeColumn =>
-      useDefaultFilters(tableName, timeColumn, filters, builderOptionsDispatch),
-      { initialProps: { name: 'timestamp', hint: ColumnHint.Time } }
-    );
-    hook.rerender({ name: 'other_timestamp', hint: ColumnHint.Time });
 
     const expectedOptions = {
       filters: [expect.anything()],
