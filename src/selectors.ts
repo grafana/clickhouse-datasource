@@ -178,6 +178,11 @@ export const Components = {
   },
   QueryBuilder: {
     expandBuilderButton: 'query-builder__expand-builder-button',
+    LogsQueryBuilder: {
+      LogMessageLikeInput: {
+        input: 'query-builder__logs-query-builder__log-message-like-input__input',
+      }
+    },
     AggregateEditor: {
       sectionLabel: 'query-builder__aggregate-editor__section-label',
       itemWrapper: 'query-builder__aggregate-editor__item-wrapper',

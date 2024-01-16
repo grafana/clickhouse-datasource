@@ -217,6 +217,15 @@ export default {
         label: 'Live View',
         tooltip: 'Enable to update logs in real time'
       },
+      logMessageFilter: {
+        label: 'Message Filter',
+        tooltip: 'Applies a LIKE filter to the log message body',
+        clearButton: 'Clear'
+      },
+      logLevelFilter: {
+        label: 'Level Filter',
+        tooltip: 'Applies a filter to the log level'
+      },
     },
     TimeSeriesQueryBuilder: {
       simpleQueryModeLabel: 'Simple',

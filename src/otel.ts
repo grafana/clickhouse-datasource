@@ -5,6 +5,7 @@ export interface OtelVersion {
   version: string;
   specUrl?: string;
   logColumnMap: Map<ColumnHint, string>;
+  logLevels: string[];
   traceColumnMap: Map<ColumnHint, string>;
   traceDurationUnit: TimeUnit.Nanoseconds;
 }
@@ -19,6 +20,14 @@ export const versions: readonly OtelVersion[] = [
       [ColumnHint.LogMessage, 'Body'],
       [ColumnHint.LogLevel, 'SeverityText'],
     ]),
+    logLevels: [
+      'TRACE',
+      'DEBUG',
+      'INFO',
+      'WARN',
+      'ERROR',
+      'FATAL'
+    ],
     traceColumnMap: new Map<ColumnHint, string>([
       [ColumnHint.Time, 'Timestamp'],
       [ColumnHint.TraceId, 'TraceId'],

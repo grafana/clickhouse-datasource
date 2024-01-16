@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
@@ -11,11 +11,14 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
-import { Alert, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, InlineFormLabel, Input, Select, VerticalGroup } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { useDefaultFilters, useDefaultTimeColumn, useLogDefaultsOnMount, useOtelColumns } from './logsQueryBuilderHooks';
+import { styles } from 'styles';
+import { allLogLevels } from 'data/logs';
+import { Components as allSelectors } from 'selectors';
 
 interface LogsQueryBuilderProps {
   datasource: Datasource;
@@ -34,6 +37,8 @@ interface LogsQueryBuilderState {
   orderBy: OrderBy[];
   limit: number;
   filters: Filter[];
+  logMessageLike: string;
+  logLevel: string;
 }
 
 export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
@@ -57,6 +62,8 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     filters: builderOptions.filters || [],
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 0,
+    logMessageLike: builderOptions.meta?.logMessageLike || '',
+    logLevel: builderOptions.meta?.logLevel || '',
     }), [builderOptions]);
   const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultLogsColumns().size === 0 && builderOptions.columns?.length === 0);
 
@@ -76,7 +83,11 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       columns: nextColumns,
       filters: next.filters,
       orderBy: next.orderBy,
-      limit: next.limit
+      limit: next.limit,
+      meta: {
+        logMessageLike: next.logMessageLike,
+        logLevel: next.logLevel,
+      }
     }));
   }, builderState);
 
@@ -170,6 +181,82 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         database={builderOptions.database}
         table={builderOptions.table}
       />
+      <LogMessageLikeInput logMessageLike={builderState.logMessageLike} onChange={onOptionChange('logMessageLike')} />
+      <LogLevelFilter logLevel={builderState.logLevel} onChange={onOptionChange('logLevel')} />
     </div>
   );
+}
+
+interface LogMessageLikeInputProps {
+  logMessageLike: string;
+  onChange: (logMessageLike: string) => void;
+};
+
+const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
+  const [input, setInput] = useState<string>('');
+  const { logMessageLike, onChange } = props;
+  const { label, tooltip, clearButton } = allLabels.components.LogsQueryBuilder.logMessageFilter;
+
+  useEffect(() => {
+    setInput(logMessageLike);
+  }, [logMessageLike]);
+
+  return (
+    <div className="gf-form">
+      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+        {label}
+      </InlineFormLabel>
+      <Input
+        width={200}
+        value={input}
+        type="string"
+        onChange={e => setInput(e.currentTarget.value)}
+        onBlur={() => onChange(input)}
+      />
+      { logMessageLike &&
+        <Button
+          data-testid={allSelectors.QueryBuilder.LogsQueryBuilder.LogMessageLikeInput.input}
+          variant="secondary"
+          size="md"
+          onClick={() => onChange('')}
+          className={styles.Common.smallBtn}
+          tooltip={allLabels.components.expandBuilderButton.tooltip}
+        >
+          {clearButton}
+        </Button>
+      }
+    </div>
+  )
+}
+
+interface LogLevelFilterProps {
+  logLevel: string;
+  onChange: (logLevel: string) => void;
+};
+
+const LogLevelFilter = (props: LogLevelFilterProps) => {
+  const { logLevel, onChange } = props;
+  const { label, tooltip } = allLabels.components.LogsQueryBuilder.logLevelFilter;
+  const options = allLogLevels.map(l => ({ label: l, value: l }));
+  if (!options.find(l => l.value === logLevel)) {
+    options.push({ label: logLevel, value: logLevel });
+  }
+
+  return (
+    <div className="gf-form">
+      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+        {label}
+      </InlineFormLabel>
+      <Select<string | undefined>
+        options={options}
+        value={logLevel}
+        placeholder={label}
+        onChange={e => onChange(e?.value || '')}
+        width={25}
+        menuPlacement={'bottom'}
+        isClearable
+        allowCustomValue
+      />
+    </div>
+  )
 }

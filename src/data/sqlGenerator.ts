@@ -229,9 +229,33 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  if ((options.filters?.length || 0) > 0) {
+  
+  const hasFilters = (options.filters?.length || 0) > 0;
+  const hasLogMessageFilter = options.meta?.logMessageLike;
+  const hasLogLevelFilter =  options.meta?.logLevel;
+
+  if (hasFilters || hasLogMessageFilter || hasLogLevelFilter) {
     queryParts.push('WHERE');
+  }
+
+  if (hasFilters) {
     queryParts.push(getFilters(options));
+  }
+
+  if (hasLogMessageFilter) {
+    if (hasFilters) {
+      queryParts.push('AND');
+    }
+
+    queryParts.push(`(${logMessage?.name} LIKE '%${options.meta!.logMessageLike}%')`);
+  }
+
+  if (hasLogLevelFilter) {
+    if (hasFilters || hasLogMessageFilter) {
+      queryParts.push('AND');
+    }
+
+    queryParts.push(`(${logLevel?.name} = '${options.meta!.logLevel}')`);
   }
 
   if ((options.orderBy?.length || 0) > 0) {

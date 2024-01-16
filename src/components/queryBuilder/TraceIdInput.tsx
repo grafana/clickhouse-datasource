@@ -15,7 +15,7 @@ const TraceIdInput = (props: TraceIdInputProps) => {
 
   useEffect(() => {
     setInputId(traceId);
-  }, [traceId])
+  }, [traceId]);
 
   return (
     <div className="gf-form">

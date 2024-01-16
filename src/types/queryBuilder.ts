@@ -46,6 +46,8 @@ export interface QueryBuilderOptions {
 
     // Logs
     liveView?: boolean;
+    logMessageLike?: string;
+    logLevel?: string; 
 
     // Trace
     traceDurationUnit?: TimeUnit;
