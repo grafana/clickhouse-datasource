@@ -167,6 +167,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (hasFilters) {
+    // Filters are not rendered in query builder when in Trace ID mode.
     queryParts.push(getFilters(options));
   }
 

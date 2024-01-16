@@ -79,15 +79,15 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
 const timeRangeFilterId = 'timeRange';
 const rootSpanFilterId = 'rootSpansOnly';
 const durationFilterId = 'duration';
-export const useDefaultFilters = (table: string, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const appliedDefaultFilters = useRef<boolean>(false);
+export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(filters.length > 0);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
     appliedDefaultFilters.current = false;
   }
 
   useEffect(() => {
-    if (!table || appliedDefaultFilters.current) {
+    if (isTraceIdMode || !table || appliedDefaultFilters.current) {
       return;
     }
 
@@ -133,5 +133,5 @@ export const useDefaultFilters = (table: string, filters: Filter[], builderOptio
     builderOptionsDispatch(setOptions({
       filters: nextFilters
     }));
-  }, [table, filters, builderOptionsDispatch]);
+  }, [isTraceIdMode, table, filters, builderOptionsDispatch]);
 };
