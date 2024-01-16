@@ -150,8 +150,8 @@ func TestInterpolate(t *testing.T) {
 	}
 
 	tests := []test{
-		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= '1415792726' AND cast(sth as timestamp) <= '1447328726'", name: "clickhouse timeFilter"},
-		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= '1415792726' AND cast(sth as timestamp) <= '1447328726'", name: "clickhouse timeFilter with empty spaces"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= toDateTime64(1415792726371/1000, 3) AND cast(sth as timestamp) <= toDateTime64(1447328726371/1000, 3)", name: "clickhouse timeFilter"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime64(1415792726371/1000, 3) AND cast(sth as timestamp) <= toDateTime64(1447328726371/1000, 3)", name: "clickhouse timeFilter with empty spaces"},
 		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(1415792726371,1000)) and date <= toDateTime(intDiv(1447328726371,1000)) ) limit 100", name: "clickhouse fromTime and toTime"},
 		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(intDiv(1415792726371,1000)) ) and ( date <= toDateTime(intDiv(1447328726371,1000)) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
 	}

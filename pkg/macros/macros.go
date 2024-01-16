@@ -46,11 +46,11 @@ func TimeFilter(query *sqlds.Query, args []string) (string, error) {
 
 	var (
 		column = args[0]
-		from   = query.TimeRange.From.UTC().Unix()
-		to     = query.TimeRange.To.UTC().Unix()
+		from   = query.TimeRange.From.UTC().UnixMilli()
+		to     = query.TimeRange.To.UTC().UnixMilli()
 	)
 
-	return fmt.Sprintf("%s >= '%d' AND %s <= '%d'", column, from, column, to), nil
+	return fmt.Sprintf("%s >= toDateTime64(%d/1000, 3) AND %s <= toDateTime64(%d/1000, 3)", column, from, column, to), nil
 }
 
 func DateFilter(query *sqlds.Query, args []string) (string, error) {
