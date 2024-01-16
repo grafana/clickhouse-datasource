@@ -1,3 +1,5 @@
+import { ColumnHint } from "types/queryBuilder";
+
 export default {
   components: {
     Config: {
@@ -298,6 +300,21 @@ export default {
       logs: 'Logs',
       timeseries: 'Time Series',
       traces: 'Traces',
+    },
+    ColumnHint: {
+      [ColumnHint.Time]: 'Time',
+
+      [ColumnHint.LogLevel]: 'Log Level',
+      [ColumnHint.LogMessage]: 'Log Message',
+
+      [ColumnHint.TraceId]: 'Trace ID',
+      [ColumnHint.TraceSpanId]: 'Trace Span ID',
+      [ColumnHint.TraceParentSpanId]: 'Trace Parent Span ID',
+      [ColumnHint.TraceServiceName]: 'Trace Service Name',
+      [ColumnHint.TraceOperationName]: 'Trace Operation Name',
+      [ColumnHint.TraceDurationTime]: 'Trace Duration Time',
+      [ColumnHint.TraceTags]: 'Trace Tags',
+      [ColumnHint.TraceServiceTags]: 'Trace Service Tags',
     }
   }
 }

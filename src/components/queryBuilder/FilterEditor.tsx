@@ -346,7 +346,7 @@ export const FilterEditor = (props: {
       )}
       <Select
         disabled={Boolean(filter.hint)}
-        placeholder={filter.hint}
+        placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
         value={filter.key}
         width={40}
         className={styles.Common.inlineSelect}
