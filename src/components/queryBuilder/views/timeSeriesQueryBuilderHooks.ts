@@ -1,7 +1,7 @@
 import { columnFilterDateTime } from 'data/columnFilters';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import React, { useEffect, useRef } from 'react';
-import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, OrderBy, OrderByDirection, SelectedColumn, TableColumn } from 'types/queryBuilder';
 
 // Finds and selects a default log time column, updates when table changes
 export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: string, timeColumn: SelectedColumn | undefined, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
@@ -35,7 +35,7 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
 
 // Apply default filters on table change
 const timeRangeFilterId = 'timeRange';
-export const useDefaultFilters = (table: string, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useDefaultFilters = (table: string, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
   const appliedDefaultFilters = useRef<boolean>(false);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
@@ -58,11 +58,16 @@ export const useDefaultFilters = (table: string, filters: Filter[], builderOptio
       condition: 'AND'
     };
     nextFilters.unshift(timeRangeFilter);
+
+    const nextOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
+    const timeOrderBy: OrderBy = { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true };
+    nextOrderBy.unshift(timeOrderBy);
     
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
-      filters: nextFilters
+      filters: nextFilters,
+      orderBy: nextOrderBy,
     }));
   }, [table, filters, builderOptionsDispatch]);
 };

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit } from 'types/queryBuilder';
+import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit, OrderBy } from 'types/queryBuilder';
 import { ColumnSelect } from '../ColumnSelect';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
@@ -15,6 +15,8 @@ import useIsNewQuery from 'hooks/useIsNewQuery';
 import { OtelVersionSelect } from '../OtelVersionSelect';
 import { useDefaultFilters, useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
 import TraceIdInput from '../TraceIdInput';
+import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
+import { LimitEditor } from '../LimitEditor';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -37,6 +39,8 @@ interface TraceQueryBuilderState {
   tagsColumn?: SelectedColumn;
   serviceTagsColumn?: SelectedColumn;
   traceId: string;
+  orderBy: OrderBy[];
+  limit: number;
   filters: Filter[];
 }
 
@@ -63,6 +67,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     tagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceTags),
     serviceTagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceServiceTags),
     traceId: builderOptions.meta?.traceId || '',
+    orderBy: builderOptions.orderBy || [],
+    limit: builderOptions.limit || 0,
     filters: builderOptions.filters || [],
   }), [builderOptions]);
 
@@ -81,6 +87,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
     builderOptionsDispatch(setOptions({
       columns: nextColumns,
+      orderBy: next.orderBy,
+      limit: next.limit,
       filters: next.filters,
       meta: {
         isTraceIdMode: next.isTraceIdMode,
@@ -92,7 +100,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
-  useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, builderState.filters, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, builderState.filters, builderState.orderBy, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
@@ -257,6 +265,12 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           isOpen={isFiltersOpen}
           onToggle={setFiltersOpen}
         >
+          <OrderByEditor
+            orderByOptions={getOrderByOptions(builderOptions, allColumns)}
+            orderBy={builderState.orderBy}
+            onOrderByChange={onOptionChange('orderBy')}
+          />
+          <LimitEditor limit={builderState.limit} onLimitChange={onOptionChange('limit')} />
           <FiltersEditor
             allColumns={allColumns}
             filters={builderState.filters}

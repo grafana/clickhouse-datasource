@@ -1,4 +1,4 @@
-import { getSqlFromQueryBuilderOptions, getOrderBy } from 'components/queryBuilder/utils';
+import { getSqlFromQueryBuilderOptions } from 'components/queryBuilder/utils';
 import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
 
 export const generateSql = (options: QueryBuilderOptions): string => {
@@ -77,8 +77,10 @@ const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(getFilters(options));
   }
 
-  if (traceStartTime !== undefined) {
-    queryParts.push('ORDER BY startTime DESC');
+  const orderBy = getOrderBy(options);
+  if (orderBy) {
+    queryParts.push('ORDER BY');
+    queryParts.push(orderBy);
   }
 
   const limit = getLimit(options.limit);
@@ -171,8 +173,10 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(getFilters(options));
   }
 
-  if (traceStartTime !== undefined) {
-    queryParts.push('ORDER BY startTime DESC');
+  const orderBy = getOrderBy(options);
+  if (orderBy) {
+    queryParts.push('ORDER BY');
+    queryParts.push(orderBy);
   }
 
   const limit = getLimit(options.limit);
@@ -258,9 +262,10 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(`(${logLevel?.name} = '${options.meta!.logLevel}')`);
   }
 
-  if ((options.orderBy?.length || 0) > 0) {
+  const orderBy = getOrderBy(options);
+  if (orderBy) {
     queryParts.push('ORDER BY');
-    queryParts.push(getOrderBy(options.orderBy, false));
+    queryParts.push(orderBy);
   }
 
   const limit = getLimit(options.limit);
@@ -336,14 +341,11 @@ const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => 
     // queryParts.push(timeAlias);
   }
 
-  queryParts.push('ORDER BY');
-  let orderBy = `${timeAlias} ASC`;
-  if ((options.orderBy?.length || 0) > 0) {
-    options.orderBy?.forEach(o => {
-      orderBy += `, ${o.name} ${o.dir}`;
-    });
+  const orderBy = getOrderBy(options);
+  if (orderBy) {
+    queryParts.push('ORDER BY');
+    queryParts.push(orderBy);
   }
-  queryParts.push(orderBy);
 
   const limit = getLimit(options.limit);
   if (limit !== '') {
@@ -399,14 +401,11 @@ const generateAggregateTimeSeriesQuery = (options: QueryBuilderOptions): string 
     queryParts.push(timeAlias);
   }
 
-  queryParts.push('ORDER BY');
-  let orderBy = `${timeAlias} ASC`;
-  if ((options.orderBy?.length || 0) > 0) {
-    options.orderBy?.forEach(o => {
-      orderBy += `, ${o.name} ${o.dir}`;
-    });
+  const orderBy = getOrderBy(options);
+  if (orderBy) {
+    queryParts.push('ORDER BY');
+    queryParts.push(orderBy);
   }
-  queryParts.push(orderBy);
 
   const limit = getLimit(options.limit);
   if (limit !== '') {
@@ -509,6 +508,30 @@ const concatQueryParts = (parts: readonly string[]): string => {
   return query;
 }
 
+/**
+ * Returns the order by list, excluding the "ORDER BY" keyword.
+ */
+const getOrderBy = (options: QueryBuilderOptions): string => {
+  let orderBy = '';
+  if ((options.orderBy?.length || 0) > 0) {
+    options.orderBy?.forEach((o, index) => {
+      let colName = o.name;
+      const hintedColumn = o.hint && getColumnByHint(options, o.hint);
+      if (hintedColumn) {
+        colName = hintedColumn.name;
+      }
+
+      const isLast = index === (options.orderBy?.length || 0) - 1;
+      orderBy += `${colName} ${o.dir}${isLast ? '' : ', '}`;
+    });
+  }
+
+  return orderBy;
+};
+
+/**
+ * Returns the limit clause including the "LIMIT" keyword
+ */
 const getLimit = (limit?: number | undefined): string => {
   limit = Math.max(0, limit || 0);
   if (limit > 0) {
@@ -518,6 +541,9 @@ const getLimit = (limit?: number | undefined): string => {
   return '';
 };
 
+/**
+ * Returns the filters in the WHERE clause, exlcuding the "WHERE" keyword
+ */
 const getFilters = (options: QueryBuilderOptions): string => {
   const filters = options.filters || [];
   const builtFilters: string[] = [];

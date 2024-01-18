@@ -51,7 +51,10 @@ export interface QueryBuilderOptions {
 
     // Trace
     traceDurationUnit?: TimeUnit;
-    isTraceIdMode?: boolean; // true for trace ID mode, false for trace search mode
+    /**
+     * true for trace ID mode, false for trace search mode
+     */
+    isTraceIdMode?: boolean;
     traceId?: string;
 
     // Logs & Traces
@@ -159,7 +162,16 @@ export enum OrderByDirection {
 export interface OrderBy {
   name: string;
   dir: OrderByDirection;
+  /**
+   * true if this orderBy was configured to be present by default
+   */
   default?: boolean;
+
+  /**
+   * If provided, SQL generator will ignore "name" and instead
+   * find the intended column by the hint
+   */
+  hint?: ColumnHint;
 }
 
 export enum FilterOperator {
@@ -181,8 +193,14 @@ export enum FilterOperator {
 
 export interface CommonFilterProps {
   filterType: 'custom';
-  key: string; // Column name
-  mapKey?: string; // key used when using a map type: exampleMap['mapKey']
+  /**
+   * Column name
+   */
+  key: string;
+  /**
+   * key used when using a map type: exampleMap['mapKey']
+   */
+  mapKey?: string;
   type: string;
   condition: 'AND' | 'OR';
 

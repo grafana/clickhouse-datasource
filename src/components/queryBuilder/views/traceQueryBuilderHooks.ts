@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 import { versions as otelVersions } from 'otel';
-import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, NumberFilter, QueryBuilderOptions, SelectedColumn, StringFilter } from 'types/queryBuilder';
+import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, NumberFilter, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, StringFilter } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
 /**
@@ -79,8 +79,8 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
 const timeRangeFilterId = 'timeRange';
 const rootSpanFilterId = 'rootSpansOnly';
 const durationFilterId = 'duration';
-export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters: Filter[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const appliedDefaultFilters = useRef<boolean>(filters.length > 0);
+export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(filters.length > 0 || orderBy.length > 0);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
     appliedDefaultFilters.current = false;
@@ -128,10 +128,17 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
     nextFilters.unshift(rootSpanFilter);
     nextFilters.unshift(timeRangeFilter);
     
+    const nextOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
+    const timeOrderBy: OrderBy = { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true };
+    const durationOrderBy: OrderBy = { name: '', hint: ColumnHint.TraceDurationTime, dir: OrderByDirection.DESC, default: true };
+    nextOrderBy.unshift(durationOrderBy);
+    nextOrderBy.unshift(timeOrderBy);
+
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
-      filters: nextFilters
+      filters: nextFilters,
+      orderBy: nextOrderBy,
     }));
   }, [isTraceIdMode, table, filters, builderOptionsDispatch]);
 };
