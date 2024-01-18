@@ -549,6 +549,10 @@ const getFilters = (options: QueryBuilderOptions): string => {
   const builtFilters: string[] = [];
 
   for (const filter of filters) {
+    if (filter.operator === FilterOperator.IsAnything) {
+      continue;
+    }
+
     const filterParts: string[] = [];
 
     let column = filter.key;
@@ -571,13 +575,15 @@ const getFilters = (options: QueryBuilderOptions): string => {
 
     let operator: string = filter.operator;
     let negate = false;
-    if (filter.operator === FilterOperator.NotLike) {
+    if (filter.operator === FilterOperator.IsEmpty || filter.operator === FilterOperator.IsNotEmpty) {
+      operator = '';
+    } else if (filter.operator === FilterOperator.NotLike) {
       operator = 'LIKE';
       negate = true;
     } else if (filter.operator === FilterOperator.OutsideGrafanaTimeRange) {
       operator = '';
       negate = true;
-    } else if (filter.operator === FilterOperator.WithInGrafanaTimeRange){
+    } else if (filter.operator === FilterOperator.WithInGrafanaTimeRange) {
         operator = '';
     }
 
@@ -587,6 +593,10 @@ const getFilters = (options: QueryBuilderOptions): string => {
     
     if (isNullFilter(filter.operator)) {
       // empty
+    } else if (filter.operator === FilterOperator.IsEmpty) {
+      filterParts.push(`= ''`);
+    } else if (filter.operator === FilterOperator.IsNotEmpty) {
+      filterParts.push(`!= ''`);
     } else if (isBooleanFilter(type)) {
       filterParts.push(String((filter as BooleanFilter).value));
     } else if (isNumberFilter(type)) {

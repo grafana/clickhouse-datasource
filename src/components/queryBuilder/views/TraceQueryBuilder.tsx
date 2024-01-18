@@ -50,7 +50,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const isNewQuery = useIsNewQuery(builderOptions);
   const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0);
   const [isColumnsOpen, setColumnsOpen] = useState<boolean>(showConfigWarning); // Toggle Columns collapse section
-  const [isFiltersOpen, setFiltersOpen] = useState<boolean>(true); // Toggle Filters collapse section
+  const [isFiltersOpen, setFiltersOpen] = useState<boolean>(!(builderOptions.meta?.isTraceIdMode && builderOptions.meta.traceId)); // Toggle Filters collapse section
   const labels = allLabels.components.TraceQueryBuilder;
   const builderState: TraceQueryBuilderState = useMemo(() => ({
     isTraceIdMode: builderOptions.meta?.isTraceIdMode || false,
@@ -257,31 +257,27 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
       </Collapse>
-      { builderState.isTraceIdMode ?
-        <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />
-        : (
-        <Collapse label={labels.filtersSection}
-          collapsible
-          isOpen={isFiltersOpen}
-          onToggle={setFiltersOpen}
-        >
-          <OrderByEditor
-            orderByOptions={getOrderByOptions(builderOptions, allColumns)}
-            orderBy={builderState.orderBy}
-            onOrderByChange={onOptionChange('orderBy')}
-          />
-          <LimitEditor limit={builderState.limit} onLimitChange={onOptionChange('limit')} />
-          <FiltersEditor
-            allColumns={allColumns}
-            filters={builderState.filters}
-            onFiltersChange={onOptionChange('filters')}
-            datasource={datasource}
-            database={builderOptions.database}
-            table={builderOptions.table}
-          />
-        </Collapse>
-      )
-      }
+      <Collapse label={labels.filtersSection}
+        collapsible
+        isOpen={isFiltersOpen}
+        onToggle={setFiltersOpen}
+      >
+        <OrderByEditor
+          orderByOptions={getOrderByOptions(builderOptions, allColumns)}
+          orderBy={builderState.orderBy}
+          onOrderByChange={onOptionChange('orderBy')}
+        />
+        <LimitEditor limit={builderState.limit} onLimitChange={onOptionChange('limit')} />
+        <FiltersEditor
+          allColumns={allColumns}
+          filters={builderState.filters}
+          onFiltersChange={onOptionChange('filters')}
+          datasource={datasource}
+          database={builderOptions.database}
+          table={builderOptions.table}
+        />
+      </Collapse>
+      { builderState.isTraceIdMode && <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} /> }
     </div>
   );
 }

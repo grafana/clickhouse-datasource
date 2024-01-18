@@ -175,6 +175,17 @@ export interface OrderBy {
 }
 
 export enum FilterOperator {
+  /**
+   * A placeholder filter that gets exluded from SQL generation
+   */
+  IsAnything = 'IS ANYTHING',
+
+  /**
+   * Compares to an empty string
+   */
+  IsEmpty = 'IS EMPTY',
+  IsNotEmpty = 'IS NOT EMPTY',
+
   IsNull = 'IS NULL',
   IsNotNull = 'IS NOT NULL',
   Equals = '=',
@@ -217,22 +228,30 @@ export interface CommonFilterProps {
 }
 
 export interface NullFilter extends CommonFilterProps {
-  operator: FilterOperator.IsNull | FilterOperator.IsNotNull;
+  operator: FilterOperator.IsAnything | FilterOperator.IsNull | FilterOperator.IsNotNull;
 }
 
 export interface BooleanFilter extends CommonFilterProps {
   type: 'boolean';
-  operator: FilterOperator.Equals | FilterOperator.NotEquals;
+  operator: FilterOperator.IsAnything | FilterOperator.Equals | FilterOperator.NotEquals;
   value: boolean;
 }
 
 export interface StringFilter extends CommonFilterProps {
-  operator: FilterOperator.Equals | FilterOperator.NotEquals | FilterOperator.Like | FilterOperator.NotLike;
+  operator:
+    | FilterOperator.IsAnything
+    | FilterOperator.IsEmpty
+    | FilterOperator.IsNotEmpty
+    | FilterOperator.Equals
+    | FilterOperator.NotEquals
+    | FilterOperator.Like
+    | FilterOperator.NotLike;
   value: string;
 }
 
 export interface NumberFilter extends CommonFilterProps {
   operator:
+    | FilterOperator.IsAnything
     | FilterOperator.Equals
     | FilterOperator.NotEquals
     | FilterOperator.LessThan
@@ -245,6 +264,7 @@ export interface NumberFilter extends CommonFilterProps {
 export interface DateFilterWithValue extends CommonFilterProps {
   type: 'datetime' | 'date';
   operator:
+    | FilterOperator.IsAnything
     | FilterOperator.Equals
     | FilterOperator.NotEquals
     | FilterOperator.LessThan
@@ -256,13 +276,13 @@ export interface DateFilterWithValue extends CommonFilterProps {
 
 export interface DateFilterWithoutValue extends CommonFilterProps {
   type: 'datetime' | 'date';
-  operator: FilterOperator.WithInGrafanaTimeRange | FilterOperator.OutsideGrafanaTimeRange;
+  operator: FilterOperator.IsAnything | FilterOperator.WithInGrafanaTimeRange | FilterOperator.OutsideGrafanaTimeRange;
 }
 
 export type DateFilter = DateFilterWithValue | DateFilterWithoutValue;
 
 export interface MultiFilter extends CommonFilterProps {
-  operator: FilterOperator.In | FilterOperator.NotIn;
+  operator: FilterOperator.IsAnything | FilterOperator.In | FilterOperator.NotIn;
   value: string[];
 }
 
