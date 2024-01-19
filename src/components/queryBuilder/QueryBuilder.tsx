@@ -1,6 +1,6 @@
 import React from 'react';
 import { Datasource } from 'data/CHDatasource';
-import { QueryType, QueryBuilderOptions } from 'types/queryBuilder';
+import { QueryType, QueryBuilderOptions, ColumnHint, StringFilter } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
 import { TimeSeriesQueryBuilder } from './views/TimeSeriesQueryBuilder';
@@ -32,11 +32,17 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   const onQueryTypeChange = (queryType: QueryType) => builderOptionsDispatch(setQueryType(queryType));
 
   if (builderOptions.meta?.minimized) {
-    const isTraceIdLookup = builderOptions.queryType === QueryType.Traces && builderOptions.meta?.isTraceIdMode && builderOptions.meta.traceId;
+    let traceId;
+    if (builderOptions.queryType === QueryType.Traces && builderOptions.meta?.isTraceIdMode && builderOptions.meta.traceId) {
+      traceId = builderOptions.meta.traceId!;
+    } else if (builderOptions.queryType === QueryType.Logs && builderOptions.filters?.find(f => f.hint === ColumnHint.TraceId && 'value' in f)) {
+      const traceIdFilter = builderOptions.filters?.find(f => f.hint === ColumnHint.TraceId && 'value' in f) as StringFilter;
+      traceId = traceIdFilter.value;
+    }
 
     return (
       <div data-testid="query-editor-section-builder">
-        {isTraceIdLookup && <TraceIdInput traceId={builderOptions.meta.traceId!} onChange={() => {}} disabled /> }
+        {traceId && <TraceIdInput traceId={traceId} onChange={() => {}} disabled /> }
 
         <Button
           data-testid={allSelectors.QueryBuilder.expandBuilderButton}

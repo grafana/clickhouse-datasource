@@ -1,7 +1,8 @@
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse } from "@grafana/data";
-import { QueryBuilderOptions, QueryType } from "types/queryBuilder"
+import { ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType, StringFilter } from "types/queryBuilder"
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
 import { Datasource } from "./CHDatasource";
+import { pluginVersion } from "utils/version";
 
 /**
  * Returns true if the builder options contain enough information to start showing a query
@@ -88,10 +89,9 @@ export const columnLabelToPlaceholder = (label: string) => label.toLowerCase().r
 export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find(t => t.refId === frame.refId) as CHBuilderQuery;
-    const originalQueryValid = originalQuery && originalQuery.editorType === EditorType.Builder;
     const isExploreView = req.app === CoreApp.Explore
     // Query should only be linked if it's a builder query in explore view
-    if (!originalQueryValid || !isExploreView) {
+    if (!originalQuery || !isExploreView) {
       return;
     }
 
@@ -101,8 +101,7 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
     }
 
     const traceIdQuery: CHBuilderQuery = {
-      ...originalQuery,
-
+      editorType: EditorType.Builder,
       /**
        * Evil bug:
        * The rawSql value might contain time filters such as $__fromTime and $__toTime.
@@ -110,8 +109,15 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
        * Set rawSql to empty since it gets regenerated when the panel renders anyway.
        */
       rawSql: '',
+      builderOptions: {} as QueryBuilderOptions,
+      pluginVersion,
+      refId: 'Trace ID'
+    };
 
-      builderOptions: {
+    if (originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Traces) {
+      // Copy fields directly from trace search
+
+      traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
         filters: [], // Clear filters since it's an exact ID lookup
         meta: {
@@ -120,11 +126,10 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
           isTraceIdMode: true,
           traceId: '${__value.raw}'
         }
-      }
-    };
+      };
+    } else {
+      // Create new query based on trace defaults
 
-    // If query isn't from trace search, must be converted to direct trace ID lookup
-    if (traceIdQuery.builderOptions.queryType !== QueryType.Traces) {
       const otelVersion = datasource.getTraceOtelVersion();
       const options: QueryBuilderOptions = {
         database: datasource.getDefaultTraceDatabase() || traceIdQuery.builderOptions.database || datasource.getDefaultDatabase(),
@@ -149,6 +154,71 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
       traceIdQuery.builderOptions = options;
     }
 
+    const traceLogsQuery: CHBuilderQuery = {
+      editorType: EditorType.Builder,
+      rawSql: '',
+      builderOptions: {} as QueryBuilderOptions,
+      pluginVersion,
+      refId: 'Trace Logs'
+    };
+
+    if (originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs) {
+      // Copy fields directly from log search
+      traceLogsQuery.builderOptions = {
+        ...originalQuery.builderOptions,
+        filters: [
+          {
+            type: 'string',
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: '',
+            hint: ColumnHint.TraceId,
+            condition: 'AND',
+            value: '${__value.raw}'
+          } as StringFilter
+        ],
+        orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
+        meta: {
+          ...originalQuery.builderOptions.meta,
+          minimized: true,
+        }
+      };
+    } else {
+      // Create new query based on log defaults
+
+      const otelVersion = datasource.getLogsOtelVersion();
+      const options: QueryBuilderOptions = {
+        database: datasource.getDefaultLogsDatabase() || traceLogsQuery.builderOptions.database || datasource.getDefaultDatabase(),
+        table: datasource.getDefaultLogsTable() || datasource.getDefaultTable() || traceLogsQuery.builderOptions.table,
+        queryType: QueryType.Logs,
+        columns: [],
+        orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
+        filters: [
+          {
+            type: 'string',
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: '',
+            hint: ColumnHint.TraceId,
+            condition: 'AND',
+            value: '${__value.raw}'
+          } as StringFilter
+        ],
+        meta: {
+          minimized: true,
+          otelEnabled: Boolean(otelVersion),
+          otelVersion: otelVersion,
+        }
+      };
+
+      const defaultColumns = datasource.getDefaultLogsColumns();
+      for (let [hint, colName] of defaultColumns) {
+        options.columns!.push({ name: colName, hint });
+      }
+
+      traceLogsQuery.builderOptions = options;
+    }
+
     traceField.config.links = [];
     traceField.config.links!.push({
       title: 'View Trace',
@@ -163,7 +233,16 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
           }
         }
       }
-    });    
+    });
+    traceField.config.links!.push({
+      title: 'View Logs',
+      url: '',
+      internal: {
+        query: traceLogsQuery,
+        datasourceUid: traceLogsQuery.datasource?.uid!,
+        datasourceName: traceLogsQuery.datasource?.type!,
+      }
+    }); 
   });
 
   return res;
