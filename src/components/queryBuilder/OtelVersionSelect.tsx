@@ -16,7 +16,7 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   const { enabled, onEnabledChange, selectedVersion, onVersionChange, wide } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
   const options: SelectableValue[] = allVersions.map(v => ({
-    label: `${v.version}${v.name ? (` (${v.name})`) : ''}`,
+    label: v.name,
     value: v.version
   }));
 
