@@ -260,7 +260,9 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
 /**
  * Generates a simple time series query. Includes user selected columns.
  */
-const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => {
+const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string => {
+  // Copy columns so time alias can be safely mutated
+  const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
   
   const queryParts: string[] = [];
@@ -268,10 +270,10 @@ const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => 
   const selectParts: string[] = [];
   const selectNames = new Set<string>();
   const timeColumn = getColumnByHint(options, ColumnHint.Time);
-  const timeAlias = 'time';
   if (timeColumn !== undefined) {
-    selectParts.push(`${timeColumn.name} as ${timeAlias}`);
-    selectNames.add(timeAlias);
+    timeColumn.alias = 'time';
+    selectParts.push(getColumnIdentifier(timeColumn));
+    selectNames.add(timeColumn.alias);
   }
 
   const columnsExcludingTimeColumn = options.columns?.filter(c => c.hint !== ColumnHint.Time);
@@ -320,10 +322,10 @@ const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => 
   }
 
   if ((options.groupBy?.length || 0) > 0) {
-    const groupByTime = timeColumn !== undefined ? `, ${timeAlias}` : '';
+    const groupByTime = timeColumn !== undefined ? `, ${timeColumn.alias}` : '';
     queryParts.push(`${options.groupBy!.join(', ')}${groupByTime}`);
-  } else if (hasAggregates) {
-    queryParts.push(timeAlias);
+  } else if (hasAggregates && timeColumn) {
+    queryParts.push(timeColumn.alias!);
   }
 
   const orderBy = getOrderBy(options);
@@ -343,16 +345,19 @@ const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => 
 /**
  * Generates an aggregate time series query.
  */
-const generateAggregateTimeSeriesQuery = (options: QueryBuilderOptions): string => {
+const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string => {
+  // Copy columns so time column can be safely mutated
+  const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
   
   const queryParts: string[] = [];
-
   const selectParts: string[] = [];
+
   const timeColumn = getColumnByHint(options, ColumnHint.Time);
-  const timeAlias = 'time';
   if (timeColumn !== undefined) {
-    selectParts.push(`$__timeInterval(${timeColumn.name}) as ${timeAlias}`);
+    timeColumn.name = `$__timeInterval(${timeColumn.name})`;
+    timeColumn.alias = 'time';
+    selectParts.push(getColumnIdentifier(timeColumn));
   }
 
   options.groupBy?.forEach(g => selectParts.push(g));
@@ -378,10 +383,10 @@ const generateAggregateTimeSeriesQuery = (options: QueryBuilderOptions): string 
 
   queryParts.push('GROUP BY');
   if ((options.groupBy?.length || 0) > 0) {
-    const groupByTime = timeColumn !== undefined ? `, ${timeAlias}` : '';
+    const groupByTime = timeColumn !== undefined ? `, ${timeColumn.alias}` : '';
     queryParts.push(`${options.groupBy!.join(', ')}${groupByTime}`);
-  } else {
-    queryParts.push(timeAlias);
+  } else if (timeColumn) {
+    queryParts.push(timeColumn.alias!);
   }
 
   const orderBy = getOrderBy(options);
@@ -400,7 +405,7 @@ const generateAggregateTimeSeriesQuery = (options: QueryBuilderOptions): string 
 
 export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;
 export const getColumnByHint = (options: QueryBuilderOptions, hint: ColumnHint): SelectedColumn | undefined => options.columns?.find(c => c.hint === hint);
-export const getColumnIndexByHint = (options: QueryBuilderOptions, hint: ColumnHint): number => options.columns?.findIndex(c => c.hint === hint) || -1;
+export const getColumnIndexByHint = (options: QueryBuilderOptions, hint: ColumnHint): number => (options.columns || []).findIndex(c => c.hint === hint);
 export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly ColumnHint[]): readonly SelectedColumn[] => {
   const columns = [];
 
