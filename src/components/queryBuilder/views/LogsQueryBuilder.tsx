@@ -11,13 +11,12 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
-import { Alert, Button, InlineFormLabel, Input, Select, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { useDefaultFilters, useDefaultTimeColumn, useLogDefaultsOnMount, useOtelColumns } from './logsQueryBuilderHooks';
 import { styles } from 'styles';
-import { allLogLevels } from 'data/logs';
 import { Components as allSelectors } from 'selectors';
 
 interface LogsQueryBuilderProps {
@@ -38,7 +37,6 @@ interface LogsQueryBuilderState {
   limit: number;
   filters: Filter[];
   logMessageLike: string;
-  logLevel: string;
 }
 
 export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
@@ -63,7 +61,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 0,
     logMessageLike: builderOptions.meta?.logMessageLike || '',
-    logLevel: builderOptions.meta?.logLevel || '',
     }), [builderOptions]);
   const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultLogsColumns().size === 0 && builderOptions.columns?.length === 0);
 
@@ -86,7 +83,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       limit: next.limit,
       meta: {
         logMessageLike: next.logMessageLike,
-        logLevel: next.logLevel,
       }
     }));
   }, builderState);
@@ -94,7 +90,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
   useDefaultTimeColumn(datasource, allColumns, builderOptions.table, builderState.timeColumn, builderState.otelEnabled, builderOptionsDispatch);
-  useDefaultFilters(builderOptions.table, builderState.timeColumn, builderState.filters, builderState.orderBy, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.filters, builderState.orderBy, builderOptionsDispatch);
   
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
@@ -182,7 +178,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         table={builderOptions.table}
       />
       <LogMessageLikeInput logMessageLike={builderState.logMessageLike} onChange={onOptionChange('logMessageLike')} />
-      <LogLevelFilter logLevel={builderState.logLevel} onChange={onOptionChange('logLevel')} />
     </div>
   );
 }
@@ -225,38 +220,6 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
           {clearButton}
         </Button>
       }
-    </div>
-  )
-}
-
-interface LogLevelFilterProps {
-  logLevel: string;
-  onChange: (logLevel: string) => void;
-};
-
-const LogLevelFilter = (props: LogLevelFilterProps) => {
-  const { logLevel, onChange } = props;
-  const { label, tooltip } = allLabels.components.LogsQueryBuilder.logLevelFilter;
-  const options = allLogLevels.map(l => ({ label: l, value: l }));
-  if (!options.find(l => l.value === logLevel)) {
-    options.push({ label: logLevel, value: logLevel });
-  }
-
-  return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <Select<string | undefined>
-        options={options}
-        value={logLevel}
-        placeholder={label}
-        onChange={e => onChange(e?.value || '')}
-        width={25}
-        menuPlacement={'bottom'}
-        isClearable
-        allowCustomValue
-      />
     </div>
   )
 }

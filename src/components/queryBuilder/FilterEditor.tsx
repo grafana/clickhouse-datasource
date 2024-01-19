@@ -19,6 +19,7 @@ const conditions: Array<SelectableValue<'AND' | 'OR'>> = [
 const filterOperators: Array<SelectableValue<FilterOperator>> = [
   { value: FilterOperator.WithInGrafanaTimeRange, label: 'Within dashboard time range' },
   { value: FilterOperator.OutsideGrafanaTimeRange, label: 'Outside dashboard time range' },
+  { value: FilterOperator.IsAnything, label: 'IS ANYTHING' },
   { value: FilterOperator.Equals, label: '=' },
   { value: FilterOperator.NotEquals, label: '!=' },
   { value: FilterOperator.LessThan, label: '<' },
@@ -27,6 +28,8 @@ const filterOperators: Array<SelectableValue<FilterOperator>> = [
   { value: FilterOperator.GreaterThanOrEqual, label: '>=' },
   { value: FilterOperator.Like, label: 'LIKE' },
   { value: FilterOperator.NotLike, label: 'NOT LIKE' },
+  { value: FilterOperator.IsEmpty, label: 'IS EMPTY' },
+  { value: FilterOperator.IsNotEmpty, label: 'IS NOT EMPTY' },
   { value: FilterOperator.In, label: 'IN' },
   { value: FilterOperator.NotIn, label: 'NOT IN' },
   { value: FilterOperator.IsNull, label: 'IS NULL' },
@@ -44,7 +47,7 @@ export const defaultNewFilter: NullFilter = {
   condition: 'AND',
   key: '',
   type: '',
-  operator: FilterOperator.IsNotNull,
+  operator: FilterOperator.IsAnything,
 };
 export interface PredefinedFilter {
   restrictToFields?: readonly TableColumn[];
@@ -71,7 +74,7 @@ const FilterValueSingleStringItem = (props: { value: string; onChange: (value: s
       <Input
         type="text"
         defaultValue={props.value}
-        width={80}
+        width={100}
         onBlur={(e) => props.onChange(e.currentTarget.value)}
       />
     </div>
@@ -104,6 +107,8 @@ export const FilterValueEditor = (props: {
     return matchedFilter?.picklistValues || [];
   };
   if (utils.isNullFilter(filter)) {
+    return <></>;
+  } else if ([FilterOperator.IsAnything, FilterOperator.IsEmpty, FilterOperator.IsNotEmpty].includes(filter.operator)) {
     return <></>;
   } else if (utils.isBooleanFilter(filter)) {
     const onBoolFilterValueChange = (value: boolean) => {
@@ -223,6 +228,7 @@ export const FilterEditor = (props: {
     } else if (utils.isNumberType(type)) {
       return filterOperators.filter((f) =>
         [
+          FilterOperator.IsAnything,
           FilterOperator.IsNull,
           FilterOperator.IsNotNull,
           FilterOperator.Equals,
@@ -236,6 +242,7 @@ export const FilterEditor = (props: {
     } else if (utils.isDateType(type)) {
       return filterOperators.filter((f) =>
         [
+          FilterOperator.IsAnything,
           FilterOperator.IsNull,
           FilterOperator.IsNotNull,
           FilterOperator.Equals,
@@ -251,6 +258,7 @@ export const FilterEditor = (props: {
     } else {
       return filterOperators.filter((f) =>
         [
+          FilterOperator.IsAnything,
           FilterOperator.Like,
           FilterOperator.NotLike,
           FilterOperator.In,
@@ -259,6 +267,8 @@ export const FilterEditor = (props: {
           FilterOperator.IsNotNull,
           FilterOperator.Equals,
           FilterOperator.NotEquals,
+          FilterOperator.IsEmpty,
+          FilterOperator.IsNotEmpty,
           FilterOperator.LessThan,
           FilterOperator.LessThanOrEqual,
           FilterOperator.GreaterThan,

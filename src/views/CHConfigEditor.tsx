@@ -188,7 +188,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         >
           <Input
             name="host"
-            width={40}
+            width={80}
             value={jsonData.host || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'host')}
             label={labels.serverAddress.label}

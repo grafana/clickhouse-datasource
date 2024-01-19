@@ -391,17 +391,17 @@ export default {
     ColumnHint: {
       [ColumnHint.Time]: 'Time',
 
-      [ColumnHint.LogLevel]: 'Log Level',
-      [ColumnHint.LogMessage]: 'Log Message',
+      [ColumnHint.LogLevel]: 'Level',
+      [ColumnHint.LogMessage]: 'Message',
 
       [ColumnHint.TraceId]: 'Trace ID',
-      [ColumnHint.TraceSpanId]: 'Trace Span ID',
-      [ColumnHint.TraceParentSpanId]: 'Trace Parent Span ID',
-      [ColumnHint.TraceServiceName]: 'Trace Service Name',
-      [ColumnHint.TraceOperationName]: 'Trace Operation Name',
-      [ColumnHint.TraceDurationTime]: 'Trace Duration Time',
-      [ColumnHint.TraceTags]: 'Trace Tags',
-      [ColumnHint.TraceServiceTags]: 'Trace Service Tags',
+      [ColumnHint.TraceSpanId]: 'Span ID',
+      [ColumnHint.TraceParentSpanId]: 'Parent Span ID',
+      [ColumnHint.TraceServiceName]: 'Service Name',
+      [ColumnHint.TraceOperationName]: 'Operation Name',
+      [ColumnHint.TraceDurationTime]: 'Duration Time',
+      [ColumnHint.TraceTags]: 'Tags',
+      [ColumnHint.TraceServiceTags]: 'Service Tags',
     }
   }
 }
