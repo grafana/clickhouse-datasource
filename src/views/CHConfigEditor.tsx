@@ -182,7 +182,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         >
           <Input
             name="host"
-            width={40}
+            width={80}
             value={jsonData.host || ''}
             onChange={onUpdateDatasourceJsonDataOption(props, 'host')}
             label={labels.ServerAddress.label}
@@ -212,7 +212,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           <Input
             value={jsonData.path || ''}
             name="path"
-            width={40}
+            width={80}
             onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
             label={Components.ConfigEditor.Path.label}
             aria-label={Components.ConfigEditor.Path.label}
