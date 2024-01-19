@@ -47,7 +47,6 @@ export interface QueryBuilderOptions {
     // Logs
     liveView?: boolean;
     logMessageLike?: string;
-    logLevel?: string; 
 
     // Trace
     traceDurationUnit?: TimeUnit;
@@ -222,7 +221,10 @@ export interface CommonFilterProps {
   id?: string;
   /**
    * If provided, SQL generator will ignore "key" and instead
-   * find the intended column by the hint
+   * find the intended column by the hint.
+   * 
+   * Note that the column MUST be present in the selected columns array in order
+   * for the filter to be applied unless key is also provided.
    */
   hint?: ColumnHint;
 }

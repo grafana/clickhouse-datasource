@@ -32,6 +32,7 @@ import {
   QueryBuilderOptions,
   ColumnHint,
   TimeUnit,
+  SelectedColumn,
 } from 'types/queryBuilder';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
@@ -43,11 +44,11 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { getSqlFromQueryBuilderOptions } from '../components/queryBuilder/utils';
 import { generateSql, getColumnByHint } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
 import { ReactNode } from 'react';
 import { transformQueryResponseWithTraceLinks } from './utils';
+import { pluginVersion } from 'utils/version';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -131,28 +132,32 @@ export class Datasource
       return undefined;
     }
 
+    
+
     const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time);
     if (timeColumn === undefined) {
       return undefined;
     }
 
-    const timeFieldRoundingClause = getTimeFieldRoundingClause(
-      logsVolumeRequest.scopedVars,
-      timeColumn.name
-    );
-    const fields: string[] = [];
+    const columns: SelectedColumn[] = [];
     const aggregates: AggregateColumn[] = [];
-    // could be undefined or an empty string (if user deselects the field)
+    columns.push({
+      name: getTimeFieldRoundingClause(logsVolumeRequest.scopedVars, timeColumn.name),
+      alias: TIME_FIELD_ALIAS,
+      hint: ColumnHint.Time
+    });
+
     const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
     if (logLevelColumn) {
-      // Generate "fields" like
+      // Generates aggregates like
       // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
       const llf = `toString("${logLevelColumn.name}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
-        fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`);
+        aggregates.push({ aggregateType: AggregateType.Sum, column: `${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}`, alias: level });
       }
     } else {
+      // Count all logs if level column isn't selected
       aggregates.push({
         aggregateType: AggregateType.Count,
         column: '*',
@@ -160,28 +165,31 @@ export class Datasource
       });
     }
 
+    const filters = (query.builderOptions.filters?.slice() || []);
+    filters.forEach(f => {
+      // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
+      // For this histogram query the "level" column isn't selected, so we must find the original column name
+      if (f.hint && !f.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
+        f.key = originalColumn?.alias || originalColumn?.name || '';
+      }
+
+    });
+
     const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
       database: query.builderOptions.database,
       table: query.builderOptions.table,
       queryType: QueryType.TimeSeries,
       mode: BuilderMode.Aggregate,
-      filters: query.builderOptions.filters,
-      columns: fields.map(f => ({ name: f })),
+      filters,
+      columns,
       aggregates,
-      groupBy: [`${timeFieldRoundingClause} AS ${TIME_FIELD_ALIAS}`],
-      orderBy: [
-        {
-          name: TIME_FIELD_ALIAS,
-          dir: OrderByDirection.ASC,
-        },
-      ],
+      orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
     };
 
-    const logVolumeSupplementaryQuery = getSqlFromQueryBuilderOptions(logVolumeSqlBuilderOptions);
+    const logVolumeSupplementaryQuery = generateSql(logVolumeSqlBuilderOptions);
     return {
-      // format: Format.AUTO,
-      // selectedFormat: Format.AUTO,
-      pluginVersion: '',
+      pluginVersion,
       editorType: EditorType.SQL,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
@@ -267,67 +275,76 @@ export class Datasource
     return rawQuery;
   }
 
+  // Support filtering by field value in Explore
   modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
-    // support filtering by field value in Explore
-    if (
-      query.editorType === EditorType.Builder &&
-      action.options !== undefined &&
-      'key' in action.options &&
-      'value' in action.options
-    ) {
-      let filters: Filter[] = query.builderOptions.filters || [];
-      if (action.type === 'ADD_FILTER') {
-        // we need to remove *any other EQ or NE* for the same field,
-        // because we don't want to end up with two filters like `level=info` AND `level=error`
-        filters = (query.builderOptions.filters ?? []).filter(
-          (f) =>
-            !(
-              f.type === 'string' &&
-              f.key === action.options?.key &&
-              (f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
-            )
-        );
-        filters.push({
-          condition: 'AND',
-          key: action.options.key,
-          type: 'string',
-          filterType: 'custom',
-          operator: FilterOperator.Equals,
-          value: action.options.value,
-        });
-      } else if (action.type === 'ADD_FILTER_OUT') {
-        // with this we might want to add multiple values as NE filters
-        // for example, `level != info` AND `level != debug`
-        // thus, here we remove only exactly matching NE filters or an existing EQ filter for this field
-        filters = (query.builderOptions.filters ?? []).filter(
-          (f) =>
-            !(
-              (f.type === 'string' &&
-                f.key === action.options?.key &&
-                'value' in f &&
-                f.value === action.options?.value &&
-                f.operator === FilterOperator.NotEquals) ||
-              (f.type === 'string' && f.key === action.options?.key && f.operator === FilterOperator.Equals)
-            )
-        );
-        filters.push({
-          condition: 'AND',
-          key: action.options.key,
-          type: 'string',
-          filterType: 'custom',
-          operator: FilterOperator.NotEquals,
-          value: action.options.value,
-        });
-      }
-      const updatedBuilder = { ...query.builderOptions, filters };
-      return {
-        ...query,
-        // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: generateSql(updatedBuilder),
-        builderOptions: updatedBuilder,
-      };
+    if (query.editorType !== EditorType.Builder || !action.options || !action.options.key || !action.options.value) {
+      return query;
     }
-    return query;
+
+    const columnName = action.options.key;
+    const actionValue = action.options.value;
+
+    // Find selected column by alias/name
+    const lookupByAlias = query.builderOptions.columns?.find(c => c.alias === columnName); // Check all aliases first,
+    const lookupByName = query.builderOptions.columns?.find(c => c.name === columnName);   // then try matching column name
+    const column = lookupByAlias || lookupByName;
+    
+    let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
+    if (action.type === 'ADD_FILTER') {
+      // we need to remove *any other EQ or NE* for the same field,
+      // because we don't want to end up with two filters like `level=info` AND `level=error`
+      nextFilters = nextFilters.filter(f =>
+        !(
+          f.type === 'string' &&
+          ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
+          (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
+        )
+      );
+      nextFilters.push({
+        condition: 'AND',
+        key: (column && column.hint) ? '' : columnName,
+        hint: (column && column.hint) ? column.hint : undefined,
+        type: 'string',
+        filterType: 'custom',
+        operator: FilterOperator.Equals,
+        value: actionValue,
+      });
+    } else if (action.type === 'ADD_FILTER_OUT') {
+      // with this we might want to add multiple values as NE filters
+      // for example, `level != info` AND `level != debug`
+      // thus, here we remove only exactly matching NE filters or an existing EQ filter for this field
+      nextFilters = nextFilters.filter(f =>
+        !(
+          (f.type === 'string' &&
+            ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
+            'value' in f && f.value === actionValue &&
+            (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.NotEquals)
+          ) ||
+          (
+            f.type === 'string' &&
+            ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
+            (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
+          )
+        )
+      );
+      nextFilters.push({
+        condition: 'AND',
+        key: (column && column.hint) ? '' : columnName,
+        hint: (column && column.hint) ? column.hint : undefined,
+        type: 'string',
+        filterType: 'custom',
+        operator: FilterOperator.NotEquals,
+        value: actionValue,
+      });
+    }
+
+    // the query is updated to trigger the URL update and propagation to the panels
+    const nextOptions = { ...query.builderOptions, filters: nextFilters };
+    return {
+      ...query,
+      rawSql: generateSql(nextOptions),
+      builderOptions: nextOptions,
+    };
   }
 
   private getMacroArgs(query: string, argsIndex: number): string[] {

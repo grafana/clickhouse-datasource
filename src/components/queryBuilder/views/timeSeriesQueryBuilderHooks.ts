@@ -34,7 +34,6 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
 };
 
 // Apply default filters on table change
-const timeRangeFilterId = 'timeRange';
 export const useDefaultFilters = (table: string, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
   const appliedDefaultFilters = useRef<boolean>(false);
   const lastTable = useRef<string>(table || '');
@@ -47,27 +46,28 @@ export const useDefaultFilters = (table: string, filters: Filter[], orderBy: Ord
       return;
     }
 
-    const nextFilters: Filter[] = filters.filter(f => f.id !== timeRangeFilterId);
-    const timeRangeFilter: DateFilterWithoutValue = {
-      type: 'datetime',
-      operator: FilterOperator.WithInGrafanaTimeRange,
-      filterType: 'custom',
-      key: '',
-      hint: ColumnHint.Time,
-      id: timeRangeFilterId,
-      condition: 'AND'
-    };
-    nextFilters.unshift(timeRangeFilter);
+    const currentFilters: Filter[] = filters.filter(f => !f.hint);
+    const defaultFilters: Filter[] = [
+      {
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.Time,
+        condition: 'AND'
+      } as DateFilterWithoutValue
+    ];
 
-    const nextOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
-    const timeOrderBy: OrderBy = { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true };
-    nextOrderBy.unshift(timeOrderBy);
+    const currentOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
+    const defaultOrderBy: OrderBy[] = [
+      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true }
+    ];
     
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
-      filters: nextFilters,
-      orderBy: nextOrderBy,
+      filters: [...defaultFilters, ...currentFilters],
+      orderBy: [...defaultOrderBy, ...currentOrderBy],
     }));
-  }, [table, filters, builderOptionsDispatch]);
+  }, [table, filters, orderBy, builderOptionsDispatch]);
 };

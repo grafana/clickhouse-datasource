@@ -99,7 +99,7 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
         condition: 'AND'
       } as DateFilterWithoutValue, // Filter to dashboard time range
       {
-        type: 'String',
+        type: 'string',
         operator: FilterOperator.IsEmpty,
         filterType: 'custom',
         key: '',
@@ -117,7 +117,7 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
         value: 0
       } as NumberFilter, // Only show spans where duration > 0
       {
-        type: 'String',
+        type: 'string',
         operator: FilterOperator.IsAnything,
         filterType: 'custom',
         key: '',
@@ -139,5 +139,5 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
       filters: [...defaultFilters, ...currentFilters],
       orderBy: [...defaultOrderBy, ...currentOrderBy],
     }));
-  }, [isTraceIdMode, table, filters, builderOptionsDispatch]);
+  }, [table, isTraceIdMode, filters, orderBy, builderOptionsDispatch]);
 };

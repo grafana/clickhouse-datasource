@@ -2,8 +2,11 @@ import { getSqlFromQueryBuilderOptions } from 'components/queryBuilder/utils';
 import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
 
 export const generateSql = (options: QueryBuilderOptions): string => {
-  if (options.queryType === QueryType.Traces) {
-    return generateTraceQuery(options);
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
+  if (options.queryType === QueryType.Traces && hasTraceIdFilter) {
+    return generateTraceIdQuery(options);
+  } else if (options.queryType === QueryType.Traces && !hasTraceIdFilter) {
+    return generateTraceSearchQuery(options);
   } else if (options.queryType === QueryType.Logs) {
     return generateLogsQuery(options);
   } else if (options.queryType === QueryType.TimeSeries && options.mode !== BuilderMode.Trend) {
@@ -14,18 +17,6 @@ export const generateSql = (options: QueryBuilderOptions): string => {
 
   // QueryType.Table
   return getSqlFromQueryBuilderOptions(options);
-}
-
-/**
- * Generates trace query, either search or trace ID.
- */
-const generateTraceQuery = (options: QueryBuilderOptions): string => {
-  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
-  if (hasTraceIdFilter) {
-    return generateTraceIdQuery(options);
-  }
-
-  return generateTraceSearchQuery(options);
 }
 
 /**
@@ -71,10 +62,10 @@ const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  const hasFilters = (options.filters?.length || 0) > 0;
-  if (hasFilters) {
+  const filterParts = getFilters(options);
+  if (filterParts) {
     queryParts.push('WHERE');
-    queryParts.push(getFilters(options));
+    queryParts.push(filterParts);
   }
 
   const orderBy = getOrderBy(options);
@@ -157,9 +148,9 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   queryParts.push(getTableIdentifier(database, table));
 
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
-  const hasFilters = (options.filters?.length || 0) > 0;
+  const filterParts = getFilters(options);
 
-  if (hasTraceIdFilter || hasFilters) {
+  if (hasTraceIdFilter || filterParts) {
     queryParts.push('WHERE');
   }
 
@@ -168,9 +159,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(`traceID = '${traceId}'`);
   }
 
-  if (hasFilters) {
-    // Filters are not rendered in query builder when in Trace ID mode.
-    queryParts.push(getFilters(options));
+  if (filterParts) {
+    queryParts.push(filterParts);
   }
 
   const orderBy = getOrderBy(options);
@@ -234,32 +224,23 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
   queryParts.push(getTableIdentifier(database, table));
 
   
-  const hasFilters = (options.filters?.length || 0) > 0;
-  const hasLogMessageFilter = options.meta?.logMessageLike;
-  const hasLogLevelFilter =  options.meta?.logLevel;
+  const filterParts = getFilters(options);
+  const hasLogMessageFilter = logMessage && options.meta?.logMessageLike;
 
-  if (hasFilters || hasLogMessageFilter || hasLogLevelFilter) {
+  if (filterParts || hasLogMessageFilter) {
     queryParts.push('WHERE');
   }
 
-  if (hasFilters) {
-    queryParts.push(getFilters(options));
+  if (filterParts) {
+    queryParts.push(filterParts);
   }
 
   if (hasLogMessageFilter) {
-    if (hasFilters) {
+    if (filterParts) {
       queryParts.push('AND');
     }
 
-    queryParts.push(`(${logMessage?.name} LIKE '%${options.meta!.logMessageLike}%')`);
-  }
-
-  if (hasLogLevelFilter) {
-    if (hasFilters || hasLogMessageFilter) {
-      queryParts.push('AND');
-    }
-
-    queryParts.push(`(${logLevel?.name} = '${options.meta!.logLevel}')`);
+    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${options.meta!.logMessageLike}%')`);
   }
 
   const orderBy = getOrderBy(options);
@@ -275,7 +256,6 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
 
   return concatQueryParts(queryParts);
 }
-
 
 /**
  * Generates a simple time series query. Includes user selected columns.
@@ -327,18 +307,23 @@ const generateSimpleTimeSeriesQuery = (options: QueryBuilderOptions): string => 
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  if ((options.filters?.length || 0) > 0) {    
+  const filterParts = getFilters(options);
+  if (filterParts) {
     queryParts.push('WHERE');
-    queryParts.push(getFilters(options));
+    queryParts.push(filterParts);
+  }
+  
+  const hasAggregates = (options.aggregates?.length || 0 > 0);
+  const hasGroupBy = (options.groupBy?.length || 0 > 0);
+  if (hasAggregates || hasGroupBy) {
+    queryParts.push('GROUP BY');
   }
 
-  
   if ((options.groupBy?.length || 0) > 0) {
-    queryParts.push('GROUP BY');
-    queryParts.push(`${options.groupBy!.join(', ')}, ${timeAlias}`);
-  } else {
-    // TODO: "simple" time series query doesn't have aggregates?
-    // queryParts.push(timeAlias);
+    const groupByTime = timeColumn !== undefined ? `, ${timeAlias}` : '';
+    queryParts.push(`${options.groupBy!.join(', ')}${groupByTime}`);
+  } else if (hasAggregates) {
+    queryParts.push(timeAlias);
   }
 
   const orderBy = getOrderBy(options);
@@ -385,18 +370,16 @@ const generateAggregateTimeSeriesQuery = (options: QueryBuilderOptions): string 
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  // A dashboard time filter is automatically added to time series queries, do we need this one?
-  // queryParts.push(`$__timeFilter(${timeColumn?.name})`);
-
-  const hasFilters = (options.filters?.length || 0) > 0;
-  if (hasFilters) {
+  const filterParts = getFilters(options);
+  if (filterParts) {
     queryParts.push('WHERE');
-    queryParts.push(getFilters(options));
+    queryParts.push(filterParts);
   }
 
   queryParts.push('GROUP BY');
   if ((options.groupBy?.length || 0) > 0) {
-    queryParts.push(`${options.groupBy!.join(', ')}, ${timeAlias}`);
+    const groupByTime = timeColumn !== undefined ? `, ${timeAlias}` : '';
+    queryParts.push(`${options.groupBy!.join(', ')}${groupByTime}`);
   } else {
     queryParts.push(timeAlias);
   }
@@ -518,7 +501,7 @@ const getOrderBy = (options: QueryBuilderOptions): string => {
       let colName = o.name;
       const hintedColumn = o.hint && getColumnByHint(options, o.hint);
       if (hintedColumn) {
-        colName = hintedColumn.name;
+        colName = hintedColumn.alias || hintedColumn.name;
       }
 
       const isLast = index === (options.orderBy?.length || 0) - 1;
@@ -559,7 +542,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
     let type = filter.type;
     const hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
     if (hintedColumn) {
-      column = hintedColumn.name;
+      column = hintedColumn.alias || hintedColumn.name;
       type = hintedColumn.type || type;
     }
 
