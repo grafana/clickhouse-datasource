@@ -46,7 +46,7 @@ const reducer = (state: QueryBuilderOptions, action: BuilderOptionsReducerAction
   }
 
   const nextState = actionFn(state, action);
-  // console.log('ACTION:', action.type, 'PAYLOAD:', action.payload, 'NEXT STATE:', nextState);
+  // console.log('ACTION:', action.type, 'PAYLOAD:', action.payload, 'PREV STATE:', state, 'NEXT STATE:', nextState);
   return nextState;
 };
 

@@ -107,7 +107,7 @@ export const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonl
 
 // Apply default filters/orderBy on table change
 export const useDefaultFilters = (table: string, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const appliedDefaultFilters = useRef<boolean>(false);
+  const appliedDefaultFilters = useRef<boolean>(filters.length > 0 || orderBy.length > 0);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
     appliedDefaultFilters.current = false;
