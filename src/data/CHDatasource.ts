@@ -558,7 +558,7 @@ export class Datasource
     return super.query({
       ...request,
       targets,
-    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceLinks(request, res)));
+    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceLinks(this, request, res)));
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

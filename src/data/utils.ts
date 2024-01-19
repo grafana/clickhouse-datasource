@@ -1,6 +1,7 @@
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse } from "@grafana/data";
 import { QueryBuilderOptions, QueryType } from "types/queryBuilder"
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
+import { Datasource } from "./CHDatasource";
 
 /**
  * Returns true if the builder options contain enough information to start showing a query
@@ -84,7 +85,7 @@ export const columnLabelToPlaceholder = (label: string) => label.toLowerCase().r
  * The link will open a second query editor in split view
  * on the explore page with the selected trace ID.
  */
-export const transformQueryResponseWithTraceLinks = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
+export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find(t => t.refId === frame.refId) as CHBuilderQuery;
     const originalQueryValid = originalQuery && originalQuery.editorType === EditorType.Builder;
@@ -95,46 +96,74 @@ export const transformQueryResponseWithTraceLinks = (req: DataQueryRequest<CHQue
     }
 
     const traceField = frame.fields.find(field => field.name === 'traceID');
-    if (traceField) {
-      const traceIdQuery: CHBuilderQuery = {
-        ...originalQuery,
+    if (!traceField) {
+      return;
+    }
 
-        /**
-         * Evil bug:
-         * The rawSql value might contain time filters such as $__fromTime and $__toTime.
-         * Grafana sees these time range filters as data links and will refuse to enable the traceID link if these are present.
-         * Set rawSql to empty since it gets regenerated when the panel renders anyway.
-         */
-        rawSql: '',
+    const traceIdQuery: CHBuilderQuery = {
+      ...originalQuery,
 
-        builderOptions: {
-          ...originalQuery.builderOptions,
-          filters: [], // Clear filters since it's an exact ID lookup
-          meta: {
-            ...originalQuery.builderOptions.meta,
-            minimized: true,
-            isTraceIdMode: true,
-            traceId: '${__value.raw}'
-          }
+      /**
+       * Evil bug:
+       * The rawSql value might contain time filters such as $__fromTime and $__toTime.
+       * Grafana sees these time range filters as data links and will refuse to enable the traceID link if these are present.
+       * Set rawSql to empty since it gets regenerated when the panel renders anyway.
+       */
+      rawSql: '',
+
+      builderOptions: {
+        ...originalQuery.builderOptions,
+        filters: [], // Clear filters since it's an exact ID lookup
+        meta: {
+          ...originalQuery.builderOptions.meta,
+          minimized: true,
+          isTraceIdMode: true,
+          traceId: '${__value.raw}'
+        }
+      }
+    };
+
+    // If query isn't from trace search, must be converted to direct trace ID lookup
+    if (traceIdQuery.builderOptions.queryType !== QueryType.Traces) {
+      const otelVersion = datasource.getTraceOtelVersion();
+      const options: QueryBuilderOptions = {
+        database: datasource.getDefaultTraceDatabase() || traceIdQuery.builderOptions.database || datasource.getDefaultDatabase(),
+        table: datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table,
+        queryType: QueryType.Traces,
+        columns: [],
+        meta: {
+          minimized: true,
+          isTraceIdMode: true,
+          traceId: '${__value.raw}',
+          traceDurationUnit: datasource.getDefaultTraceDurationUnit(),
+          otelEnabled: Boolean(otelVersion),
+          otelVersion: otelVersion,
         }
       };
 
-      traceField.config.links = [];
-      traceField.config.links!.push({
-        title: 'View Trace ${__value.raw}',
-        url: '',
-        internal: {
-          query: traceIdQuery,
-          datasourceUid: traceIdQuery.datasource?.uid!,
-          datasourceName: traceIdQuery.datasource?.type!,
-          panelsState: {
-            trace: {
-              spanId: '${__value.raw}'
-            }
+      const defaultColumns = datasource.getDefaultTraceColumns();
+      for (let [hint, colName] of defaultColumns) {
+        options.columns!.push({ name: colName, hint });
+      }
+
+      traceIdQuery.builderOptions = options;
+    }
+
+    traceField.config.links = [];
+    traceField.config.links!.push({
+      title: 'View Trace ${__value.raw}',
+      url: '',
+      internal: {
+        query: traceIdQuery,
+        datasourceUid: traceIdQuery.datasource?.uid!,
+        datasourceName: traceIdQuery.datasource?.type!,
+        panelsState: {
+          trace: {
+            spanId: '${__value.raw}'
           }
         }
-      });
-    }
+      }
+    });    
   });
 
   return res;
