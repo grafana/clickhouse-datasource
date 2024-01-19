@@ -95,7 +95,7 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
       return;
     }
 
-    const traceField = frame.fields.find(field => field.name === 'traceID');
+    const traceField = frame.fields.find(field => field.name.toLowerCase() === 'traceid' || field.name.toLowerCase() === 'trace_id');
     if (!traceField) {
       return;
     }

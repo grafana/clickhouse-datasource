@@ -19,6 +19,7 @@ export const versions: readonly OtelVersion[] = [
       [ColumnHint.Time, 'Timestamp'],
       [ColumnHint.LogMessage, 'Body'],
       [ColumnHint.LogLevel, 'SeverityText'],
+      [ColumnHint.TraceId, 'TraceId'],
     ]),
     logLevels: [
       'TRACE',
