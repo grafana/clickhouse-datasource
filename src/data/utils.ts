@@ -151,7 +151,7 @@ export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req
 
     traceField.config.links = [];
     traceField.config.links!.push({
-      title: 'View Trace ${__value.raw}',
+      title: 'View Trace',
       url: '',
       internal: {
         query: traceIdQuery,
