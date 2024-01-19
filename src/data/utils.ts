@@ -82,11 +82,13 @@ export const mapGrafanaFormatToQueryType = (f?: number): QueryType => {
 export const columnLabelToPlaceholder = (label: string) => label.toLowerCase().replace(/ /g, '_');
 
 /**
- * Mutates the DataQueryResponse to include links on the traceID field.
+ * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view
  * on the explore page with the selected trace ID.
+ * 
+ * Requires defaults to be configured when crossing query types.
  */
-export const transformQueryResponseWithTraceLinks = (datasource: Datasource, req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
+export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasource, req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find(t => t.refId === frame.refId) as CHBuilderQuery;
     const isExploreView = req.app === CoreApp.Explore
