@@ -44,7 +44,7 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { generateSql, getColumnByHint } from './sqlGenerator';
+import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
 import { ReactNode } from 'react';
 import { transformQueryResponseWithTraceLinks } from './utils';
@@ -165,8 +165,7 @@ export class Datasource
       });
     }
 
-    const filters = (query.builderOptions.filters?.slice() || []);
-    filters.forEach(f => {
+    const filters = (query.builderOptions.filters?.slice() || []).map(f => {
       // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
       // For this histogram query the "level" column isn't selected, so we must find the original column name
       if (f.hint && !f.key) {
@@ -174,6 +173,7 @@ export class Datasource
         f.key = originalColumn?.alias || originalColumn?.name || '';
       }
 
+      return f;
     });
 
     const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
@@ -190,7 +190,8 @@ export class Datasource
     const logVolumeSupplementaryQuery = generateSql(logVolumeSqlBuilderOptions);
     return {
       pluginVersion,
-      editorType: EditorType.SQL,
+      editorType: EditorType.Builder,
+      builderOptions: logVolumeSqlBuilderOptions,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
     };
@@ -287,7 +288,8 @@ export class Datasource
     // Find selected column by alias/name
     const lookupByAlias = query.builderOptions.columns?.find(c => c.alias === columnName); // Check all aliases first,
     const lookupByName = query.builderOptions.columns?.find(c => c.name === columnName);   // then try matching column name
-    const column = lookupByAlias || lookupByName;
+    const lookupByLogsAlias = logAliasToColumnHints.has(columnName) ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!) : undefined;
+    const column = lookupByAlias || lookupByName || lookupByLogsAlias;
     
     let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
     if (action.type === 'ADD_FILTER') {

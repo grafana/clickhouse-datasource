@@ -184,7 +184,9 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
  * 
  * note: column order seems to matter as well as alias name
  */
-const generateLogsQuery = (options: QueryBuilderOptions): string => {
+const generateLogsQuery = (_options: QueryBuilderOptions): string => {
+  // Copy columns so column aliases can be safely mutated
+  const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
   
   const queryParts: string[] = [];
@@ -267,7 +269,7 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
  * Generates a simple time series query. Includes user selected columns.
  */
 const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string => {
-  // Copy columns so time alias can be safely mutated
+  // Copy columns so column aliases can be safely mutated
   const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
   
@@ -352,7 +354,7 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
  * Generates an aggregate time series query.
  */
 const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string => {
-  // Copy columns so time column can be safely mutated
+  // Copy columns so column aliases can be safely mutated
   const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
   
@@ -663,3 +665,15 @@ const isDateFilter = (type: string): boolean => isDateType(type);
 const isStringFilter = (type: string, operator: FilterOperator): boolean => isStringType(type) && !(operator === FilterOperator.In || operator === FilterOperator.NotIn);
 const isMultiFilter = (type: string, operator: FilterOperator): boolean => isStringType(type) && (operator === FilterOperator.In || operator === FilterOperator.NotIn);
 const formatStringValue = (filter: string): string => filter.startsWith('$') ? (filter || '') : `'${filter || ''}'`;
+
+/**
+ * When filtering in the logs panel in explore view, we need a way to
+ * map from the SQL generator's aliases back to the original column hints
+ * so that filters can be added properly.
+ */
+export const logAliasToColumnHints: Map<string, ColumnHint> = new Map([
+  ['timestamp', ColumnHint.Time],
+  ['body', ColumnHint.LogMessage],
+  ['level', ColumnHint.LogLevel],
+  ['traceID', ColumnHint.TraceId],
+]);
