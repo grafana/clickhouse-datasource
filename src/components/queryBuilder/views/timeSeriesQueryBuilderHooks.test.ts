@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { useDefaultFilters, useDefaultTimeColumn } from './timeSeriesQueryBuilderHooks';
-import { ColumnHint, Filter, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { ColumnHint, Filter, OrderBy, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 
 describe('useDefaultTimeColumn', () => {
@@ -58,8 +58,9 @@ describe('useDefaultFilters', () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
     const filters: Filter[] = [];
+    const orderBy: OrderBy[] = [];
 
-    renderHook(() => useDefaultFilters(tableName, filters, builderOptionsDispatch));
+    renderHook(() => useDefaultFilters(tableName, filters, orderBy, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -68,9 +69,10 @@ describe('useDefaultFilters', () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
     const filters: Filter[] = [];
+    const orderBy: OrderBy[] = [];
 
     const hook = renderHook(table =>
-      useDefaultFilters(table, filters, builderOptionsDispatch),
+      useDefaultFilters(table, filters, orderBy, builderOptionsDispatch),
       { initialProps: tableName }
     );
     hook.rerender('other_timeseries');
@@ -86,9 +88,10 @@ describe('useDefaultFilters', () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
     const filters: Filter[] = [];
+    const orderBy: OrderBy[] = [];
 
     const hook = renderHook(timeColumn =>
-      useDefaultFilters(tableName, filters, builderOptionsDispatch),
+      useDefaultFilters(tableName, filters, orderBy, builderOptionsDispatch),
       { initialProps: { name: 'timestamp', hint: ColumnHint.Time } }
     );
     hook.rerender({ name: 'other_timestamp', hint: ColumnHint.Time });

@@ -157,11 +157,10 @@ describe('useDefaultFilters', () => {
   it('should not call builderOptionsDispatch when column/table are present on initial load', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'logs';
-    const timeColumn: SelectedColumn = { name: 'timestamp', hint: ColumnHint.Time };
     const filters: Filter[] = [];
     const orderBy: OrderBy[] = [];
 
-    renderHook(() => useDefaultFilters(tableName, timeColumn, filters, orderBy, builderOptionsDispatch));
+    renderHook(() => useDefaultFilters(tableName, filters, orderBy, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -169,12 +168,11 @@ describe('useDefaultFilters', () => {
   it('should call builderOptionsDispatch when table changes', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'logs';
-    const timeColumn: SelectedColumn = { name: 'timestamp', hint: ColumnHint.Time };
     const filters: Filter[] = [];
     const orderBy: OrderBy[] = [];
 
     const hook = renderHook(table =>
-      useDefaultFilters(table, timeColumn, filters, orderBy, builderOptionsDispatch),
+      useDefaultFilters(table, filters, orderBy, builderOptionsDispatch),
       { initialProps: tableName }
     );
     hook.rerender('other_logs');
@@ -194,7 +192,7 @@ describe('useDefaultFilters', () => {
     const orderBy: OrderBy[] = [];
 
     const hook = renderHook(timeColumn =>
-      useDefaultFilters(tableName, timeColumn, filters, orderBy, builderOptionsDispatch),
+      useDefaultFilters(tableName, filters, orderBy, builderOptionsDispatch),
       { initialProps: { name: 'timestamp', hint: ColumnHint.Time } }
     );
     hook.rerender({ name: 'other_timestamp', hint: ColumnHint.Time });

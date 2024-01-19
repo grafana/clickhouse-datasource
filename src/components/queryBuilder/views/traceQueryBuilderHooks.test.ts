@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { useTraceDefaultsOnMount, useOtelColumns, useDefaultFilters } from './traceQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
-import { ColumnHint, Filter, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
+import { ColumnHint, Filter, OrderBy, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
 import { setOptions } from 'hooks/useBuilderOptionsState';
 import { versions as otelVersions } from 'otel';
 
@@ -104,8 +104,9 @@ describe('useDefaultFilters', () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
     const filters: Filter[] = [];
+    const orderBy: OrderBy[] = [];
 
-    renderHook(() => useDefaultFilters(tableName, false, filters, builderOptionsDispatch));
+    renderHook(() => useDefaultFilters(tableName, false, filters, orderBy, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -114,9 +115,10 @@ describe('useDefaultFilters', () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
     const filters: Filter[] = [];
+    const orderBy: OrderBy[] = [];
 
     const hook = renderHook(table =>
-      useDefaultFilters(table, false, filters, builderOptionsDispatch),
+      useDefaultFilters(table, false, filters, orderBy, builderOptionsDispatch),
       { initialProps: tableName }
     );
     hook.rerender('other_timeseries');
