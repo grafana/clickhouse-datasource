@@ -212,6 +212,12 @@ const generateLogsQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(getColumnIdentifier(logLevel));
   }
 
+  const traceId = getColumnByHint(options, ColumnHint.TraceId);
+  if (traceId !== undefined) {
+    traceId.alias = 'traceID';
+    selectParts.push(getColumnIdentifier(traceId));
+  }
+
   options.columns?.
     filter(c => c.hint === undefined). // remove specialized columns
     forEach(c => selectParts.push(getColumnIdentifier(c)));
