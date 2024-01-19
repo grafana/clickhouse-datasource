@@ -495,21 +495,24 @@ const concatQueryParts = (parts: readonly string[]): string => {
  * Returns the order by list, excluding the "ORDER BY" keyword.
  */
 const getOrderBy = (options: QueryBuilderOptions): string => {
-  let orderBy = '';
+  const orderByParts: string[] = [];
   if ((options.orderBy?.length || 0) > 0) {
-    options.orderBy?.forEach((o, index) => {
+    options.orderBy?.forEach(o => {
       let colName = o.name;
       const hintedColumn = o.hint && getColumnByHint(options, o.hint);
       if (hintedColumn) {
         colName = hintedColumn.alias || hintedColumn.name;
       }
 
-      const isLast = index === (options.orderBy?.length || 0) - 1;
-      orderBy += `${colName} ${o.dir}${isLast ? '' : ', '}`;
+      if (!colName) {
+        return;
+      }
+
+      orderByParts.push(`${colName} ${o.dir}`);
     });
   }
 
-  return orderBy;
+  return orderByParts.join(', ');
 };
 
 /**
