@@ -1,11 +1,13 @@
-import { getSqlFromQueryBuilderOptions } from 'components/queryBuilder/utils';
 import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
 
+/**
+ * Generates a SQL string for the given QueryBuilderOptions
+ */
 export const generateSql = (options: QueryBuilderOptions): string => {
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
   if (options.queryType === QueryType.Traces && hasTraceIdFilter) {
     return generateTraceIdQuery(options);
-  } else if (options.queryType === QueryType.Traces && !hasTraceIdFilter) {
+  } else if (options.queryType === QueryType.Traces) {
     return generateTraceSearchQuery(options);
   } else if (options.queryType === QueryType.Logs) {
     return generateLogsQuery(options);
@@ -13,10 +15,11 @@ export const generateSql = (options: QueryBuilderOptions): string => {
     return generateSimpleTimeSeriesQuery(options);
   } else if (options.queryType === QueryType.TimeSeries && options.mode === BuilderMode.Trend) {
     return generateAggregateTimeSeriesQuery(options);
+  } else if (options.queryType === QueryType.Table) {
+    return generateTableQuery(options);
   }
 
-  // QueryType.Table
-  return getSqlFromQueryBuilderOptions(options);
+  return '';
 }
 
 /**
@@ -307,7 +310,7 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
     selectParts.push(g)
   });
 
-  // aggregate selections go AFTER group by
+  // (v3) aggregate selections go AFTER group by
   aggregateSelectParts.forEach(a => selectParts.push(a));
   
   const selectPartsSql = selectParts.join(', ');
@@ -395,6 +398,73 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
     queryParts.push(`${options.groupBy!.join(', ')}${groupByTime}`);
   } else if (timeColumn) {
     queryParts.push(timeColumn.alias!);
+  }
+
+  const orderBy = getOrderBy(options);
+  if (orderBy) {
+    queryParts.push('ORDER BY');
+    queryParts.push(orderBy);
+  }
+
+  const limit = getLimit(options.limit);
+  if (limit !== '') {
+    queryParts.push(limit);
+  }
+
+  return concatQueryParts(queryParts);
+}
+
+/**
+ * Generates a table query.
+ */
+const generateTableQuery = (options: QueryBuilderOptions): string => {
+  const { database, table } = options;
+  const isAggregateMode = options.mode === BuilderMode.Aggregate;
+
+  const queryParts: string[] = [];
+  const selectParts: string[] = [];
+  const selectNames = new Set<string>();
+
+  options.columns?.forEach(c => {
+    selectParts.push(getColumnIdentifier(c));
+    selectNames.add(c.alias || c.name);
+  });
+
+  if (isAggregateMode) {
+    options.aggregates?.forEach(agg => {
+      const alias = agg.alias ? ` as ${agg.alias.replace(/ /g, '_')}` : '';
+      const name = `${agg.aggregateType}(${agg.column})`;
+      selectParts.push(`${name}${alias}`);
+      selectNames.add(alias ? alias.substring(4) : name);
+    });
+
+    options.groupBy?.forEach(g => {
+      if (selectNames.has(g)) {
+        // don't add if already selected
+        return;
+      }
+
+      // user must manually select groupBys, for flexibility
+      // selectParts.push(g)
+    });
+  }
+  
+  const selectPartsSql = selectParts.join(', ');
+
+  queryParts.push('SELECT');
+  queryParts.push(selectPartsSql);
+  queryParts.push('FROM');
+  queryParts.push(getTableIdentifier(database, table));
+
+  const filterParts = getFilters(options);
+  if (filterParts) {
+    queryParts.push('WHERE');
+    queryParts.push(filterParts);
+  }
+
+  if (isAggregateMode && (options.groupBy?.length || 0) > 0) {
+    queryParts.push('GROUP BY');
+    queryParts.push(options.groupBy!.join(', '));
   }
 
   const orderBy = getOrderBy(options);
