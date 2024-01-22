@@ -1,6 +1,11 @@
 import { DataSourceJsonData } from '@grafana/data';
 
 export interface CHConfig extends DataSourceJsonData {
+  /**
+   * The version of the plugin this config was saved with
+   */
+  version: string;
+
   host: string;
   port: number;
   protocol: Protocol;

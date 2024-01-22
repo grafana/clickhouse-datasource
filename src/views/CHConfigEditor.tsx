@@ -17,7 +17,7 @@ import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatab
 import { QuerySettingsConfig } from 'components/configEditor/QuerySettingsConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
-import { useMigrateV3Config } from './CHConfigEditorHooks';
+import { useConfigDefaults, useMigrateV3Config } from './CHConfigEditorHooks';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig> {}
 
@@ -34,7 +34,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     { label: 'HTTP', value: Protocol.Http },
   ];
 
-  useMigrateV3Config(options, onOptionsChange);  
+  useMigrateV3Config(options, onOptionsChange);
+  useConfigDefaults(options, onOptionsChange);
 
   const onPortChange = (port: string) => {
     onOptionsChange({
