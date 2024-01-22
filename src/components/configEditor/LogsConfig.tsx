@@ -45,6 +45,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
       title={labels.title}
       description={labels.description}
     >
+      <div id="logs-config" />
       <Field
         label={labels.defaultDatabase.label}
         description={labels.defaultDatabase.description}

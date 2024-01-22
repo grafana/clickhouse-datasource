@@ -45,16 +45,14 @@ export const useMigrateV3Config = (options: DataSourceSettings<CHConfig>, onOpti
  * Applies default settings to config options.
  */
 export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptionsChange: (opts: DataSourceSettings<CHConfig>) => void) => {
-  const { jsonData: currentJsonData } = options;
-
   const appliedDefaults = useRef<boolean>(false);
   useEffect(() => {
     if (appliedDefaults.current) {
       return;
     }
 
-    const jsonData = { ...currentJsonData };
-    jsonData.version = pluginVersion; // Always set version
+    const jsonData = { ...options.jsonData };
+    jsonData.version = pluginVersion; // Always overwrite version
     const latestOtelVersion = getLatestVersion();
 
     if (!jsonData.logs) {

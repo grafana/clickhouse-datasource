@@ -97,7 +97,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       <VerticalGroup>
         <div>
           {'To speed up your query building, enter your default logs configuration in your '}
-          <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}`}>ClickHouse Data Source settings</a>
+          <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}#logs-config`}>ClickHouse Data Source settings</a>
         </div>
       </VerticalGroup>
     </Alert>

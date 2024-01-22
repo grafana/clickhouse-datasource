@@ -50,7 +50,7 @@ export default {
           label: 'Default trace table',
           description: 'the default table used by the trace query builder',
           name: 'defaultTable',
-          placeholder: 'traces'
+          placeholder: 'otel_traces'
         },
         columns: {
          title: 'Default columns',
@@ -107,7 +107,7 @@ export default {
           label: 'Default log table',
           description: 'the default table used by the logs query builder',
           name: 'defaultTable',
-          placeholder: 'logs'
+          placeholder: 'otel_logs'
         },
         columns: {
           title: 'Default columns',
@@ -167,7 +167,7 @@ export default {
       tooltip: 'A list of columns to include in the query'
     },
     OtelVersionSelect: {
-      label: 'Use OTEL',
+      label: 'Use OTel',
       tooltip: 'Enables Open Telemetry schema versioning'
     },
     LimitEditor: {

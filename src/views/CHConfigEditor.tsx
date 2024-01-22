@@ -153,7 +153,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
 
-  const hasAdditionalSettings = !!(
+  const hasAdditionalSettings = Boolean(
+    window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
     options.jsonData.defaultDatabase ||
     options.jsonData.defaultTable ||
     options.jsonData.dialTimeout ||
