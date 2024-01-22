@@ -13,7 +13,7 @@ interface AggregateProps {
   updateAggregate: (index: number, aggregate: AggregateColumn) => void;
 }
 
-const aggregateOptions: Array<SelectableValue<AggregateType>> = [
+const allAggregateOptions: Array<SelectableValue<AggregateType>> = [
   { label: 'Count', value: AggregateType.Count },
   { label: 'Sum', value: AggregateType.Sum },
   { label: 'Min', value: AggregateType.Min },
@@ -24,10 +24,24 @@ const aggregateOptions: Array<SelectableValue<AggregateType>> = [
 ];
 
 const Aggregate = (props: AggregateProps) => {
-  const { columnOptions, index, aggregate, updateAggregate } = props;
+  const { index, aggregate, updateAggregate } = props;
   const [isOpen, setIsOpen] = useState(false);
   const [alias, setAlias] = useState(aggregate.alias || '');
   const { aliasLabel } = labels.components.AggregatesEditor;
+
+  // Add current value to aggregate functions
+  const aggregateOptions = allAggregateOptions.slice();
+  if (!aggregateOptions.find(a => a.value === aggregate.aggregateType)) {
+    aggregateOptions.push({ label: aggregate.aggregateType, value: aggregate.aggregateType });
+  }
+
+  // Add current value to column options
+  const columnOptions = props.columnOptions.slice();
+  if (!columnOptions.find(c => c.value === aggregate.column)) {
+    columnOptions.push({ label: aggregate.column, value: aggregate.column });
+  }
+  console.log(columnOptions)
+
 
   return (
     <>
@@ -38,9 +52,10 @@ const Aggregate = (props: AggregateProps) => {
         value={aggregate.aggregateType}
         onChange={e => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
         menuPlacement={'bottom'}
+        allowCustomValue
       />
       <Select<string>
-        width={28}
+        width={40}
         className={styles.Common.inlineSelect}
         options={columnOptions}
         isOpen={isOpen}
@@ -49,6 +64,7 @@ const Aggregate = (props: AggregateProps) => {
         onChange={e => updateAggregate(index, { ...aggregate, column: e.value! })}
         value={aggregate.column}
         menuPlacement={'bottom'}
+        allowCustomValue
       />
       <InlineFormLabel width={2} className="query-keyword">
         {aliasLabel}
