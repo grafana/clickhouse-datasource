@@ -526,7 +526,7 @@ const escapeIdentifier = (id: string): string => {
 }
 
 const escapeValue = (value: string): string => {
-  if (value.includes('(') || value.includes(')') || value.includes('"') || value.includes('"')) {
+  if (value.includes('$') || value.includes('(') || value.includes(')') || value.includes('\'') || value.includes('"')) {
     return value;
   }
 
@@ -695,12 +695,12 @@ const getFilters = (options: QueryBuilderOptions): string => {
       if (filter.operator === FilterOperator.Like || filter.operator === FilterOperator.NotLike) {
         filterParts.push(`'%${filter.value || ''}%'`);
       } else {
-        filterParts.push(formatStringValue((filter as StringFilter).value || ''));
+        filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }
     } else if (isMultiFilter(type, filter.operator)) {
-      filterParts.push(`(${(filter as MultiFilter).value?.map(v => formatStringValue(v)).join(', ')})`);
+      filterParts.push(`(${(filter as MultiFilter).value?.map(v => escapeValue(v)).join(', ')})`);
     } else {
-      filterParts.push(formatStringValue((filter as StringFilter).value || ''));
+      filterParts.push(escapeValue((filter as StringFilter).value || ''));
     }
 
     if (negate) {
@@ -734,7 +734,6 @@ const isDateFilterWithoutValue = (type: string, operator: FilterOperator): boole
 const isDateFilter = (type: string): boolean => isDateType(type);
 const isStringFilter = (type: string, operator: FilterOperator): boolean => isStringType(type) && !(operator === FilterOperator.In || operator === FilterOperator.NotIn);
 const isMultiFilter = (type: string, operator: FilterOperator): boolean => isStringType(type) && (operator === FilterOperator.In || operator === FilterOperator.NotIn);
-const formatStringValue = (filter: string): string => filter.startsWith('$') ? (filter || '') : `'${filter || ''}'`;
 
 /**
  * When filtering in the logs panel in explore view, we need a way to
