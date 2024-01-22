@@ -64,6 +64,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
       title={labels.title}
       description={labels.description}
     >
+      <div id="traces-config" />
       <Field
         label={labels.defaultDatabase.label}
         description={labels.defaultDatabase.description}

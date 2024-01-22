@@ -1,7 +1,7 @@
 import { DataSourceSettings } from "@grafana/data";
 import { renderHook } from "@testing-library/react";
 import { CHConfig, CHHttpHeader, CHSecureConfig } from "types/config";
-import { onHttpHeadersChange, useMigrateV3Config } from "./CHConfigEditorHooks";
+import { onHttpHeadersChange, useConfigDefaults, useMigrateV3Config } from "./CHConfigEditorHooks";
 
 describe('useMigrateV3Config', () => {
   it('should not call onOptionsChange if no v3 fields are present', async () => {
@@ -145,5 +145,53 @@ describe('onHttpHeadersChange', () => {
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
+});
+
+describe('useConfigDefaults', () => {
+  it('should update plugin version', async () => {
+    const onOptionsChange = jest.fn();
+    const options = {
+      jsonData: {
+      }
+    } as any as DataSourceSettings<CHConfig>;
+
+    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+
+    const expectedOptions = {
+      jsonData: {
+      }
+    };
+    expect(onOptionsChange).toHaveBeenCalledTimes(1);
+    expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
+
+  it('should apply defaults for unset config fields', async () => {
+    const onOptionsChange = jest.fn();
+    const options = {
+      jsonData: {
+      }
+    } as any as DataSourceSettings<CHConfig>;
+
+    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+
+    const expectedOptions = {
+      jsonData: {
+      }
+    };
+    expect(onOptionsChange).toHaveBeenCalledTimes(1);
+    expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
+
+  it('should not call onOptionsChange after defaults are already set', async () => {
+    const onOptionsChange = jest.fn();
+    const options = {
+      jsonData: {
+      }
+    } as any as DataSourceSettings<CHConfig>;
+
+    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+
+    expect(onOptionsChange).toHaveBeenCalledTimes(0);
   });
 });

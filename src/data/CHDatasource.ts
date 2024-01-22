@@ -47,7 +47,7 @@ import {
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { versions as otelVersions } from 'otel';
 import { ReactNode } from 'react';
-import { transformQueryResponseWithTraceLinks } from './utils';
+import { transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { pluginVersion } from 'utils/version';
 
 export class Datasource
@@ -560,7 +560,7 @@ export class Datasource
     return super.query({
       ...request,
       targets,
-    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceLinks(this, request, res)));
+    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

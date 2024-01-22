@@ -16,9 +16,9 @@ import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatab
 import { QuerySettingsConfig } from 'components/configEditor/QuerySettingsConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
-import { onHttpHeadersChange, useMigrateV3Config } from './CHConfigEditorHooks';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from 'labels';
+import { onHttpHeadersChange, useConfigDefaults, useMigrateV3Config } from './CHConfigEditorHooks';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -35,7 +35,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     { label: 'HTTP', value: Protocol.Http },
   ];
 
-  useMigrateV3Config(options, onOptionsChange);  
+  useMigrateV3Config(options, onOptionsChange);
+  useConfigDefaults(options, onOptionsChange);
 
   const onPortChange = (port: string) => {
     onOptionsChange({
@@ -153,7 +154,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
 
-  const hasAdditionalSettings = !!(
+  const hasAdditionalSettings = Boolean(
+    window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
     options.jsonData.defaultDatabase ||
     options.jsonData.defaultTable ||
     options.jsonData.dialTimeout ||

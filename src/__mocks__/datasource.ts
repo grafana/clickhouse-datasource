@@ -3,6 +3,7 @@ import { Protocol } from 'types/config';
 import { CHQuery, EditorType } from 'types/sql';
 import { QueryType } from 'types/queryBuilder';
 import { Datasource } from '../data/CHDatasource';
+import { pluginVersion } from 'utils/version';
 
 export const mockDatasource = new Datasource({
   id: 1,
@@ -10,6 +11,7 @@ export const mockDatasource = new Datasource({
   type: 'grafana-clickhouse-datasource',
   name: 'ClickHouse',
   jsonData: {
+    version: pluginVersion,
     host: 'foo.com',
     port: 443,
     path: '',
