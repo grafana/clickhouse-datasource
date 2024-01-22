@@ -75,7 +75,7 @@ datasources:
       # tlsAuth: <bool>
       # tlsAuthWithCACert: <bool>
       # secure: <bool>
-      # timout: <seconds>
+      # timeout: <seconds>
       # queryTimeout: <seconds>
       # protocol: <native|http>
     secureJsonData:
