@@ -1,5 +1,5 @@
 import { DataSourceSettings } from "@grafana/data";
-import { getLatestVersion } from "otel";
+// import { getLatestVersion } from "otel";
 import { useEffect, useRef } from "react";
 import { CHConfig } from "types/config";
 import { pluginVersion } from "utils/version";
@@ -53,21 +53,23 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
 
     const jsonData = { ...options.jsonData };
     jsonData.version = pluginVersion; // Always overwrite version
-    const latestOtelVersion = getLatestVersion();
+    // const latestOtelVersion = getLatestVersion();
+
+    // TODO: Should OTel be enabled by default for new datasources?
 
     if (!jsonData.logs) {
       jsonData.logs = {
-        defaultTable: latestOtelVersion.logsTable,
-        otelEnabled: true,
-        otelVersion: latestOtelVersion.version
+        // defaultTable: latestOtelVersion.logsTable,
+        // otelEnabled: true,
+        // otelVersion: latestOtelVersion.version
       };
     }
 
     if (!jsonData.traces) {
       jsonData.traces = {
-        defaultTable: latestOtelVersion.traceTable,
-        otelEnabled: true,
-        otelVersion: latestOtelVersion.version
+        // defaultTable: latestOtelVersion.traceTable,
+        // otelEnabled: true,
+        // otelVersion: latestOtelVersion.version
       };
     }
 
