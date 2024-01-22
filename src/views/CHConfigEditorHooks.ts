@@ -113,19 +113,19 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
     // TODO: Should OTel be enabled by default for new datasources?
 
     if (!jsonData.logs) {
-      jsonData.logs = {
-        // defaultTable: latestOtelVersion.logsTable,
-        // otelEnabled: true,
-        // otelVersion: latestOtelVersion.version
-      };
+      // jsonData.logs = {
+      //   defaultTable: latestOtelVersion.logsTable,
+      //   otelEnabled: true,
+      //   otelVersion: latestOtelVersion.version
+      // };
     }
 
     if (!jsonData.traces) {
-      jsonData.traces = {
-        // defaultTable: latestOtelVersion.traceTable,
-        // otelEnabled: true,
-        // otelVersion: latestOtelVersion.version
-      };
+      // jsonData.traces = {
+      //   defaultTable: latestOtelVersion.traceTable,
+      //   otelEnabled: true,
+      //   otelVersion: latestOtelVersion.version
+      // };
     }
 
     onOptionsChange({
