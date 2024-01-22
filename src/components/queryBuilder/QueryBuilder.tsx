@@ -108,6 +108,13 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
           </VerticalGroup>
         </Alert>
       )}
+      { !traceId && (
+        <Alert title="" severity="warning">
+          <VerticalGroup>
+            <div>Trace ID is empty</div>
+          </VerticalGroup>
+        </Alert>
+      )}
 
       {traceId && <TraceIdInput traceId={traceId} onChange={() => {}} disabled /> }
 
