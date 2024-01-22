@@ -91,9 +91,7 @@ export const columnLabelToPlaceholder = (label: string) => label.toLowerCase().r
 export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasource, req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find(t => t.refId === frame.refId) as CHBuilderQuery;
-    const isExploreView = req.app === CoreApp.Explore
-    // Query should only be linked if it's a builder query in explore view
-    if (!originalQuery || !isExploreView) {
+    if (!originalQuery) {
       return;
     }
 
@@ -221,9 +219,11 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
       traceLogsQuery.builderOptions = options;
     }
 
+    const openInNewWindow = req.app !== CoreApp.Explore;
     traceField.config.links = [];
     traceField.config.links!.push({
       title: 'View trace',
+      targetBlank: openInNewWindow,
       url: '',
       internal: {
         query: traceIdQuery,
@@ -238,6 +238,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
     });
     traceField.config.links!.push({
       title: 'View logs',
+      targetBlank: openInNewWindow,
       url: '',
       internal: {
         query: traceLogsQuery,
