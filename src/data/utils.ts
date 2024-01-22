@@ -223,7 +223,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
 
     traceField.config.links = [];
     traceField.config.links!.push({
-      title: 'View Trace',
+      title: 'View trace',
       url: '',
       internal: {
         query: traceIdQuery,
@@ -237,7 +237,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
       }
     });
     traceField.config.links!.push({
-      title: 'View Logs',
+      title: 'View logs',
       url: '',
       internal: {
         query: traceLogsQuery,
