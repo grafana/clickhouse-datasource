@@ -91,6 +91,7 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={() => {}}
+          removeFilter={() => {}}
           datasource={mockDatasource}
           database=''
           table='' 
@@ -115,6 +116,7 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={() => {}}
+          removeFilter={() => {}}
           datasource={mockDatasource}
           database=''
           table='' 
@@ -142,6 +144,7 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={onFilterChange}
+          removeFilter={() => {}}
           datasource={mockDatasource}
           database=''
           table=''
@@ -176,6 +179,7 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={onFilterChange}
+          removeFilter={() => {}}
           datasource={mockDatasource}
           database=''
           table=''

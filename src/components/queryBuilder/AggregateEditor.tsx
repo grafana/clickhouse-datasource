@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select, Button, Input } from '@grafana/ui';
+import { InlineFormLabel, Select, Button, Input, HorizontalGroup } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
@@ -11,6 +11,7 @@ interface AggregateProps {
   index: number,
   aggregate: AggregateColumn;
   updateAggregate: (index: number, aggregate: AggregateColumn) => void;
+  removeAggregate: (index: number) => void;
 }
 
 const allAggregateOptions: Array<SelectableValue<AggregateType>> = [
@@ -24,7 +25,7 @@ const allAggregateOptions: Array<SelectableValue<AggregateType>> = [
 ];
 
 const Aggregate = (props: AggregateProps) => {
-  const { index, aggregate, updateAggregate } = props;
+  const { index, aggregate, updateAggregate, removeAggregate } = props;
   const [isOpen, setIsOpen] = useState(false);
   const [alias, setAlias] = useState(aggregate.alias || '');
   const { aliasLabel } = labels.components.AggregatesEditor;
@@ -40,11 +41,9 @@ const Aggregate = (props: AggregateProps) => {
   if (!columnOptions.find(c => c.value === aggregate.column)) {
     columnOptions.push({ label: aggregate.column, value: aggregate.column });
   }
-  console.log(columnOptions)
-
 
   return (
-    <>
+    <HorizontalGroup wrap align="flex-start" justify="flex-start">
       <Select
         width={20}
         className={styles.Common.inlineSelect}
@@ -76,7 +75,15 @@ const Aggregate = (props: AggregateProps) => {
         onBlur={e => updateAggregate(index, { ...aggregate, alias: e.currentTarget.value })}
         placeholder="alias"
       />
-    </>
+      <Button
+        data-testid={selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton}
+        className={styles.Common.smallBtn}
+        variant="destructive"
+        size="sm"
+        icon="trash-alt"
+        onClick={() => removeAggregate(index)}
+      />
+    </HorizontalGroup>
   );
 };
 
@@ -134,14 +141,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
               index={index}
               aggregate={aggregate}
               updateAggregate={updateAggregate}
-            />
-            <Button
-              data-testid={selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton}
-              className={styles.Common.smallBtn}
-              variant="destructive"
-              size="sm"
-              icon="trash-alt"
-              onClick={() => removeAggregate(index)}
+              removeAggregate={removeAggregate}
             />
           </div>
         );
