@@ -12,7 +12,7 @@ export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): ConfigEdit
       port: 443,
       path: '',
       username: 'user',
-      protocol: 'native',
+      protocol: 'http',
       ...overrides,
     },
   },
