@@ -119,7 +119,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
-        filters: [], // Clear filters since it's an exact ID lookup
+        filters: [], // Clear filters and orderBy since it's an exact ID lookup
+        orderBy: [],
         meta: {
           ...originalQuery.builderOptions.meta,
           minimized: true,
@@ -136,6 +137,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
         table: datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table,
         queryType: QueryType.Traces,
         columns: [],
+        filters: [],
+        orderBy: [],
         meta: {
           minimized: true,
           isTraceIdMode: true,

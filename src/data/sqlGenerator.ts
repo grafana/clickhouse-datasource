@@ -500,13 +500,11 @@ export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly 
 const getColumnIdentifier = (col: SelectedColumn): string => {
   let colName = col.name;
   
-  if (colName.includes(' ')) {
-    colName = escapeIdentifier(col.name);
-  }
-
   // allow for functions like count()
   if (colName.includes('(') || colName.includes(')') || colName.includes('"') || colName.includes('"')) {
     colName = col.name
+  } else if (colName.includes(' ')) {
+    colName = escapeIdentifier(col.name);
   }
 
   if (col.alias) {
@@ -746,3 +744,15 @@ export const logAliasToColumnHints: Map<string, ColumnHint> = new Map([
   ['level', ColumnHint.LogLevel],
   ['traceID', ColumnHint.TraceId],
 ]);
+
+
+export const _testExports = {
+  getColumnIdentifier,
+  getTableIdentifier,
+  escapeIdentifier,
+  escapeValue,
+  concatQueryParts,
+  getOrderBy,
+  getLimit,
+  getFilters,
+};
