@@ -160,7 +160,7 @@ func startGrafana(client *dagger.Client, clickHouseDist *dagger.Directory, click
 		From("grafana/grafana:main").
 		WithFile("/etc/grafana/grafana.ini", client.Host().File("e2e/custom.ini")).
 		WithMountedDirectory("/var/lib/grafana/plugins/clickhouse-datasource", clickHouseDist).
-		WithServiceBinding("clickhouse", clickhouseContainer).
+		WithServiceBinding("clickhouse", clickhouseContainer.AsService()).
 		WithExposedPort(3000)
 
 	fmt.Println("Grafana built")
@@ -183,7 +183,7 @@ func runK6(client *dagger.Client, ctx context.Context, grafanaContainer *dagger.
 	value, err := client.
 		Container().
 		From("grafana/k6:master-with-browser").
-		WithServiceBinding("grafana", grafanaContainer).
+		WithServiceBinding("grafana", grafanaContainer.AsService()).
 		WithEnvVariable("K6_BROWSER_ARGS", "no-sandbox").
 		WithFile("k6.test.js", testFile).
 		WithExec([]string{"run", "k6.test.js"}, dagger.ContainerWithExecOpts{InsecureRootCapabilities: true}).Stderr(ctx)
