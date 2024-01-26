@@ -9,7 +9,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with no inner query and no existing WHERE', () => {
@@ -20,7 +20,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`
+      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with an inner query without existing WHERE', () => {
@@ -31,7 +31,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM (SELECT * FROM foo) as r , bar GROUP BY s ORDER BY s settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`
+      `SELECT stuff FROM (SELECT * FROM foo) as r , bar GROUP BY s ORDER BY s settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with an inner from query with existing WHERE', () => {
@@ -42,7 +42,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM (SELECT * FROM foo WHERE col = test) as r GROUP BY s ORDER BY s settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = 123 '}`
+      `SELECT stuff FROM (SELECT * FROM foo WHERE col = test) as r GROUP BY s ORDER BY s settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with an inner where query with existing WHERE', () => {

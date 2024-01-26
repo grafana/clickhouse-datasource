@@ -38,7 +38,7 @@ export class AdHocFilter {
       })
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
-        const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
+        const value = `\\'${f.value}\\'`;
         const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
