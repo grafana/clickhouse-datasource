@@ -645,7 +645,6 @@ export class Datasource
     this.skipAdHocFilter = true;
 
     if (tagSource.source === undefined) {
-      this.adHocFilter.setTargetTable('default');
       const rawSql = 'SELECT name, type, table FROM system.columns';
       const results = await this.runQuery({ rawSql });
       return { type: TagType.schema, frame: results };
@@ -653,12 +652,6 @@ export class Datasource
 
     if (tagSource.type === TagType.query) {
       this.adHocFilter.setTargetTableFromQuery(tagSource.source);
-    } else {
-      let table = tagSource.from;
-      if (table?.includes('.')) {
-        table = table.split('.')[1];
-      }
-      this.adHocFilter.setTargetTable(table || '');
     }
 
     const results = await this.runQuery({ rawSql: tagSource.source });

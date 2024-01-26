@@ -3,10 +3,6 @@ import { getTable } from './ast';
 export class AdHocFilter {
   private _targetTable = '';
 
-  setTargetTable(table: string) {
-    this._targetTable = table;
-  }
-
   setTargetTableFromQuery(query: string) {
     this._targetTable = getTable(query);
     if (this._targetTable === '') {
@@ -18,12 +14,17 @@ export class AdHocFilter {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
-    const filter = adHocFilters[0];
 
-    if (filter.key?.includes('.')) {
-      this._targetTable = filter.key.split('.')[0];
+    // sql can contain a query with double quotes around the database and table name, e.g. "default"."table", so we remove those
+    if (this._targetTable !== '' && !sql.replace(/"/g, '').match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+      return sql;
     }
-    if (this._targetTable === '' || !sql.match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+
+    if (this._targetTable === '') {
+      this._targetTable = getTable(sql);
+    }
+
+    if (this._targetTable === '') {
       return sql;
     }
 
@@ -37,7 +38,7 @@ export class AdHocFilter {
       })
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
-        const value = isNaN(Number(f.value)) ? `\\'${f.value}\\'` : Number(f.value);
+        const value = `\\'${f.value}\\'`;
         const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
