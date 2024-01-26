@@ -194,4 +194,14 @@ describe('AdHocManager', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith('Invalid adhoc filter will be ignored:', value);
   });
+
+  it('apply ad hoc filter with no set table', () => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply('SELECT stuff FROM foo', [
+      { key: 'key', operator: '=', value: 'val' }
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
+    );
+  });
 });
