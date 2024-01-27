@@ -307,50 +307,44 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 }
 
 func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {
-	var args map[string]interface{}
-
-	if message == nil {
+	// An example of the message we're trying to parse:
+	// {
+	//   "grafana-http-headers": {
+	//     "x-grafana-org-id": ["12345"],
+	//     "x-grafana-user": ["admin"]
+	//   }
+	// }
+	if message == nil || len(message) == 0 {
 		message = []byte("{}")
 	}
 
-	messageBytes, err := message.MarshalJSON()
+	messageArgs := make(map[string]interface{})
+	err := json.Unmarshal(message, &messageArgs)
 	if err != nil {
-		return nil, errors.New("Couldn't json marshal message")
-	}
-
-	if len(messageBytes) == 0 {
-		args = make(map[string]interface{})
-	} else {
-		err = json.Unmarshal(messageBytes, &args)
-		if err != nil {
-			backend.Logger.Warn(fmt.Sprintf("Failed to apply headers: %s", err.Error()))
-			return nil, errors.New("Couldn't parse message as args")
-		}
-	}
-
-	var fwdHeaders map[string]interface{}
-
-	headers, ok := args[sqlds.HeaderKey]
-	if ok {
-		fwdHeaders, ok = headers.(map[string]interface{})
-		if !ok {
-			return nil, errors.New(fmt.Sprintf("Couldn't parse headers %T", headers))
-		}
+		backend.Logger.Warn(fmt.Sprintf("Failed to apply headers: %s", err.Error()))
+		return nil, errors.New("Couldn't parse message as args")
 	}
 
 	httpHeaders := make(map[string]string)
-	for k, v := range fwdHeaders {
-		vArr, ok := v.([]interface{})
+	if grafanaHttpHeaders, ok := messageArgs[sqlds.HeaderKey]; ok {
+		fwdHeaders, ok := grafanaHttpHeaders.(map[string]interface{})
 		if !ok {
-			return nil, errors.New(fmt.Sprintf("Couldn't parse header %s %T", k, v))
+			return nil, errors.New("Couldn't parse grafana HTTP headers")
 		}
 
-		stringHeaders := make([]string, len(vArr))
-		for ind, val := range vArr {
-			stringHeaders[ind] = val.(string)
-		}
+		for k, v := range fwdHeaders {
+			anyHeadersArr, ok := v.([]interface{})
+			if !ok {
+				return nil, errors.New(fmt.Sprintf("Couldn't parse header %s as an array", k))
+			}
 
-		httpHeaders[k] = strings.Join(stringHeaders, ",")
+			strHeadersArr := make([]string, len(anyHeadersArr))
+			for ind, val := range anyHeadersArr {
+				strHeadersArr[ind] = val.(string)
+			}
+
+			httpHeaders[k] = strings.Join(strHeadersArr, ",")
+		}
 	}
 
 	return httpHeaders, nil
