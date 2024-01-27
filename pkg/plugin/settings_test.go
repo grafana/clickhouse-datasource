@@ -28,7 +28,7 @@ func TestLoadSettings(t *testing.T) {
 				args: args{
 					config: backend.DataSourceInstanceSettings{
 						UID:                     "ds-uid",
-						JSONData:                []byte(`{ "server": "foo", "port": 443, "path": "custom-path", "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10", "enableSecureSocksProxy": true}`),
+						JSONData:                []byte(`{ "server": "foo", "port": 443, "path": "custom-path", "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "timeout": "10", "enableSecureSocksProxy": true, "forwardHeaders": true}`),
 						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey", "secureSocksProxyPassword": "test"},
 					},
 				},
@@ -47,6 +47,7 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientKey:       "clientKey",
 					Timeout:            "10",
 					QueryTimeout:       "60",
+					ForwardHeaders:     true,
 					ProxyOptions: &proxy.Options{
 						Enabled: true,
 						Auth: &proxy.AuthOptions{
