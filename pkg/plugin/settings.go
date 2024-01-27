@@ -22,6 +22,7 @@ type Settings struct {
 	TlsClientAuth      bool   `json:"tlsAuth,omitempty"`
 	TlsAuthWithCACert  bool   `json:"tlsAuthWithCACert,omitempty"`
 	Password           string `json:"-,omitempty"`
+	ForwardHeaders     bool   `json:"forwardHeaders,omitempty"`
 	TlsCACert          string
 	TlsClientCert      string
 	TlsClientKey       string
@@ -146,6 +147,16 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		}
 
 		settings.CustomSettings = customSettings
+	}
+	if jsonData["forwardHeaders"] != nil {
+		if forwardHeaders, ok := jsonData["forwardHeaders"].(string); ok {
+			settings.ForwardHeaders, err = strconv.ParseBool(forwardHeaders)
+			if err != nil {
+				return settings, fmt.Errorf("could not parse forwardHeaders value: %w", err)
+			}
+		} else {
+			settings.ForwardHeaders = jsonData["forwardHeaders"].(bool)
+		}
 	}
 
 	if strings.TrimSpace(settings.Timeout) == "" {

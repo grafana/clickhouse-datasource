@@ -145,6 +145,11 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
 	defer cancel()
 
+	httpHeaders, err := extractForwardedHeadersFromMessage(message)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := &clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
@@ -152,6 +157,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		TLS:         tlsConfig,
 		Addr:        []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
 		HttpUrlPath: settings.Path,
+		HttpHeaders: httpHeaders,
 		Auth: clickhouse.Auth{
 			Username: settings.Username,
 			Password: settings.Password,
@@ -241,6 +247,7 @@ func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.D
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
+		ForwardHeaders: settings.ForwardHeaders,
 	}
 }
 
@@ -297,4 +304,54 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 		}
 	}
 	return res, nil
+}
+
+func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {
+	var args map[string]interface{}
+
+	if message == nil {
+		message = []byte("{}")
+	}
+
+	messageBytes, err := message.MarshalJSON()
+	if err != nil {
+		return nil, errors.New("Couldn't json marshal message")
+	}
+
+	if len(messageBytes) == 0 {
+		args = make(map[string]interface{})
+	} else {
+		err = json.Unmarshal(messageBytes, &args)
+		if err != nil {
+			backend.Logger.Warn(fmt.Sprintf("Failed to apply headers: %s", err.Error()))
+			return nil, errors.New("Couldn't parse message as args")
+		}
+	}
+
+	var fwdHeaders map[string]interface{}
+
+	headers, ok := args[sqlds.HeaderKey]
+	if ok {
+		fwdHeaders, ok = headers.(map[string]interface{})
+		if !ok {
+			return nil, errors.New(fmt.Sprintf("Couldn't parse headers %T", headers))
+		}
+	}
+
+	httpHeaders := make(map[string]string)
+	for k, v := range fwdHeaders {
+		vArr, ok := v.([]interface{})
+		if !ok {
+			return nil, errors.New(fmt.Sprintf("Couldn't parse header %s %T", k, v))
+		}
+
+		stringHeaders := make([]string, len(vArr))
+		for ind, val := range vArr {
+			stringHeaders[ind] = val.(string)
+		}
+
+		httpHeaders[k] = strings.Join(stringHeaders, ",")
+	}
+
+	return httpHeaders, nil
 }

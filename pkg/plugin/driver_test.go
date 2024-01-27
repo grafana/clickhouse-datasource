@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"reflect"
@@ -19,11 +20,13 @@ import (
 	clickhouse_sql "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
+	"github.com/elazarl/goproxy"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/sqlds/v2"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1111,5 +1114,69 @@ func TestMutateResponse(t *testing.T) {
 		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableString)
 		assert.NoError(t, err)
 		assert.Equal(t, "{\"test\":{\"test\":[\"2\",\"3\"]}}", *frames[0].Fields[0].At(0).(*string))
+	})
+}
+
+func TestHTTPConnectWithHeaders(t *testing.T) {
+	proxy := goproxy.NewProxyHttpServer()
+	proxyHost := "localhost"
+	proxyPort := getEnv("CLICKHOUSE_PROXY_PORT", "8122")
+	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+
+	go func() {
+		err := http.ListenAndServe(fmt.Sprintf("%s:%s", proxyHost, proxyPort), proxy)
+		assert.Equal(t, nil, err)
+	}()
+
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	secure := map[string]string{}
+	secure["password"] = password
+
+	t.Run("should pass grafana headers", func(t *testing.T) {
+		// We create a new proxy which does nothing but redirecting to receive the defaul connection by the new datasource
+		proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			req.URL.Scheme = "http"
+			req.URL.Host = fmt.Sprintf("%s:%s", host, port)
+			proxy.ServeHTTP(w, req)
+		})
+
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We now create a proxy that validates that the new connection forwards the headers correctly
+		proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			assert.Equal(t, "Hello World!", req.Header.Get("X-Test"))
+			req.URL.Scheme = "http"
+			req.URL.Host = fmt.Sprintf("%s:%s", host, port)
+			proxy.ServeHTTP(w, req)
+		})
+
+		req := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{
+				DataSourceInstanceSettings: &settings,
+			},
+			Headers: map[string]string{
+				// only headers starting with http_ are forwarded, except for Authorization, Cookie and X-Id-Token
+				"http_X-Test": "Hello World!",
+			},
+			Queries: []backend.DataQuery{
+				{
+					RefID: "A",
+					JSON: []byte(`{
+						"rawSql": "SELECT 1"
+					}`),
+				},
+			},
+		}
+
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
 	})
 }

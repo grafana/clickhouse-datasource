@@ -77,6 +77,10 @@ export const Components = {
       label: 'Validate SQL',
       tooltip: 'Validate Sql in the editor.',
     },
+    ForwardHeaders: {
+      label: 'Forward HTTP Headers',
+      tooltip: 'Forward HTTP Headers to datasource.',
+    },
     SecureSocksProxy: {
       label: 'Enable Secure Socks Proxy',
       tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',

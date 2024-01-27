@@ -13,7 +13,7 @@ import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana
 import { config } from '@grafana/runtime';
 import { Divider } from 'components/Divider';
 
-export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> {}
+export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig> { }
 
 export const ConfigEditor: React.FC<Props> = (props) => {
   const { options, onOptionsChange } = props;
@@ -48,7 +48,7 @@ export const ConfigEditor: React.FC<Props> = (props) => {
     });
   };
   const onSwitchToggle = (
-    key: keyof Pick<CHConfig, 'secure' | 'validate' | 'enableSecureSocksProxy'>,
+    key: keyof Pick<CHConfig, 'secure' | 'validate' | 'forwardHeaders' | 'enableSecureSocksProxy'>,
     value: boolean
   ) => {
     onOptionsChange({
@@ -125,7 +125,8 @@ export const ConfigEditor: React.FC<Props> = (props) => {
         options.jsonData.timeout ||
         options.jsonData.validate ||
         options.jsonData.enableSecureSocksProxy ||
-        options.jsonData.customSettings
+        options.jsonData.customSettings ||
+        options.jsonData.forwardHeaders
       ),
     [options]
   );
@@ -348,6 +349,13 @@ export const ConfigEditor: React.FC<Props> = (props) => {
             className="gf-form"
             value={jsonData.validate || false}
             onChange={(e) => onSwitchToggle('validate', e.currentTarget.checked)}
+          />
+        </Field>
+        <Field label={Components.ConfigEditor.ForwardHeaders.label} description={Components.ConfigEditor.ForwardHeaders.tooltip}>
+          <Switch
+            className="gf-form"
+            value={jsonData.forwardHeaders || false}
+            onChange={(e) => onSwitchToggle('forwardHeaders', e.currentTarget.checked)}
           />
         </Field>
 

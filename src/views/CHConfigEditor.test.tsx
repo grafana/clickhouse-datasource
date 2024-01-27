@@ -120,6 +120,7 @@ describe('ConfigEditor', () => {
       validate: true,
       enableSecureSocksProxy: true,
       customSettings: [{ setting: 'test-setting', value: 'test-value' }],
+      forwardHeaders: true,
     };
     render(<ConfigEditor {...mockConfigEditorProps(jsonDataOverrides)} />);
     expect(screen.getByPlaceholderText(Components.ConfigEditor.DefaultDatabase.placeholder)).toBeInTheDocument();
@@ -129,5 +130,6 @@ describe('ConfigEditor', () => {
     expect(screen.getByText(Components.ConfigEditor.SecureSocksProxy.label)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].setting)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();
+    expect(screen.getByText(Components.ConfigEditor.ForwardHeaders.label)).toBeInTheDocument();
   });
 });
