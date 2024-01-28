@@ -354,7 +354,7 @@ describe('getColumnsByHints', () => {
 });
 
 describe('getColumnIdentifier', () => {
-  const cases: { input: SelectedColumn, expected: string }[] = [
+  const cases: Array<{ input: SelectedColumn, expected: string }> = [
     { input: { name: '' }, expected: `` },
     { input: { name: ' ' }, expected: `" "` },
     { input: { name: 'test' }, expected: `test` },
@@ -369,7 +369,7 @@ describe('getColumnIdentifier', () => {
 });
 
 describe('getTableIdentifier', () => {
-  const cases: { input: { database: string, table: string }, expected: string }[] = [
+  const cases: Array<{ input: { database: string, table: string }, expected: string }> = [
     { input: { database: '', table: '' }, expected: '' },
     { input: { database: 'database', table: '' }, expected: '"database"' },
     { input: { database: 'database', table: 'table' }, expected: '"database"."table"' },
@@ -382,7 +382,7 @@ describe('getTableIdentifier', () => {
 });
 
 describe('escapeIdentifier', () => {
-  const cases: { input: string, expected: string }[] = [
+  const cases: Array<{ input: string, expected: string }> = [
     { input: '', expected: '' },
     { input: ' ', expected: `" "` },
     { input: 'x', expected: `"x"` },
@@ -395,7 +395,7 @@ describe('escapeIdentifier', () => {
 });
 
 describe('escapeValue', () => {
-  const cases: { input: string, expected: string }[] = [
+  const cases: Array<{ input: string, expected: string }> = [
     { input: ``, expected: `''` },
     { input: ` `, expected: `' '` },
     { input: `$variable`, expected: `$variable` },
@@ -466,7 +466,7 @@ describe('getOrderBy', () => {
 });
 
 describe('getLimit', () => {
-  const cases: { input: number | undefined, expected: string }[] = [
+  const cases: Array<{ input: number | undefined, expected: string }> = [
     { input: undefined, expected: '' },
     { input: -1, expected: '' },
     { input: 0, expected: '' },

@@ -144,6 +144,9 @@ export const Components = {
     },
     LimitEditor: {
       input: 'query-builder__limit-editor__input'
+    },
+    TraceIdInput: {
+      input: 'query-builder__trace-id-input__input'
     }
   }
 };

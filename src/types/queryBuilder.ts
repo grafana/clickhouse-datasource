@@ -175,7 +175,7 @@ export interface OrderBy {
 
 export enum FilterOperator {
   /**
-   * A placeholder filter that gets exluded from SQL generation
+   * A placeholder filter that gets excluded from SQL generation
    */
   IsAnything = 'IS ANYTHING',
 

@@ -100,7 +100,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
-  useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, builderState.filters, builderState.orderBy, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, isNewQuery, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>

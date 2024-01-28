@@ -76,8 +76,8 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
 };
 
 // Apply default filters on table change
-export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const appliedDefaultFilters = useRef<boolean>(filters.length > 0 || orderBy.length > 0);
+export const useDefaultFilters = (table: string, isTraceIdMode: boolean, isNewQuery: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
     appliedDefaultFilters.current = false;
@@ -88,7 +88,6 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
       return;
     }
 
-    const currentFilters: Filter[] = filters.filter(f => !f.hint);
     const defaultFilters: Filter[] = [
       {
         type: 'datetime',
@@ -127,7 +126,6 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
       } as StringFilter, // Placeholder service name filter for convenience
     ];
     
-    const currentOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
     const defaultOrderBy: OrderBy[] = [
       { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
       { name: '', hint: ColumnHint.TraceDurationTime, dir: OrderByDirection.DESC, default: true },
@@ -136,8 +134,8 @@ export const useDefaultFilters = (table: string, isTraceIdMode: boolean, filters
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
-      filters: [...defaultFilters, ...currentFilters],
-      orderBy: [...defaultOrderBy, ...currentOrderBy],
+      filters: defaultFilters,
+      orderBy: defaultOrderBy,
     }));
-  }, [table, isTraceIdMode, filters, orderBy, builderOptionsDispatch]);
+  }, [table, isTraceIdMode, builderOptionsDispatch]);
 };

@@ -5,7 +5,7 @@ import { versions as allVersions } from 'otel';
 
 describe('OtelVersionSelect', () => {
   const testVersion = allVersions[0];
-  const testVersionName = allVersions[0].version + ' (latest)';
+  const testVersionName = testVersion.name;
 
   it('should render with empty properties', () => {
     const result = render(

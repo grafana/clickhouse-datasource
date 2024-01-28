@@ -34,8 +34,8 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
 };
 
 // Apply default filters on table change
-export const useDefaultFilters = (table: string, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const appliedDefaultFilters = useRef<boolean>(false);
+export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
     appliedDefaultFilters.current = false;
@@ -46,7 +46,6 @@ export const useDefaultFilters = (table: string, filters: Filter[], orderBy: Ord
       return;
     }
 
-    const currentFilters: Filter[] = filters.filter(f => !f.hint);
     const defaultFilters: Filter[] = [
       {
         type: 'datetime',
@@ -58,7 +57,6 @@ export const useDefaultFilters = (table: string, filters: Filter[], orderBy: Ord
       } as DateFilterWithoutValue
     ];
 
-    const currentOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
     const defaultOrderBy: OrderBy[] = [
       { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true }
     ];
@@ -66,8 +64,8 @@ export const useDefaultFilters = (table: string, filters: Filter[], orderBy: Ord
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
-      filters: [...defaultFilters, ...currentFilters],
-      orderBy: [...defaultOrderBy, ...currentOrderBy],
+      filters: defaultFilters,
+      orderBy: defaultOrderBy,
     }));
-  }, [table, filters, orderBy, builderOptionsDispatch]);
+  }, [table, builderOptionsDispatch]);
 };

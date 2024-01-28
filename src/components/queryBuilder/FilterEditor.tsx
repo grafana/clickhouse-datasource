@@ -72,6 +72,7 @@ const FilterValueSingleStringItem = (props: { value: string; onChange: (value: s
   return (
     <div data-testid="query-builder-filters-single-string-value-container">
       <Input
+        data-testid="query-builder-filters-single-string-value-input"
         type="text"
         defaultValue={props.value}
         width={70}

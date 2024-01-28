@@ -180,7 +180,6 @@ export class Datasource
       database: query.builderOptions.database,
       table: query.builderOptions.table,
       queryType: QueryType.TimeSeries,
-      mode: BuilderMode.Trend,
       filters,
       columns,
       aggregates,

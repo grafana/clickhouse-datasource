@@ -2,6 +2,7 @@ import { DataSourceSettings } from "@grafana/data";
 import { renderHook } from "@testing-library/react";
 import { CHConfig, CHHttpHeader, CHSecureConfig } from "types/config";
 import { onHttpHeadersChange, useConfigDefaults, useMigrateV3Config } from "./CHConfigEditorHooks";
+import { pluginVersion } from "utils/version";
 
 describe('useMigrateV3Config', () => {
   it('should not call onOptionsChange if no v3 fields are present', async () => {
@@ -31,6 +32,7 @@ describe('useMigrateV3Config', () => {
 
     const expectedOptions = {
       jsonData: {
+        version: pluginVersion,
         host: 'address',
         dialTimeout: '8'
       }
@@ -54,6 +56,7 @@ describe('useMigrateV3Config', () => {
 
     const expectedOptions = {
       jsonData: {
+        version: pluginVersion,
         host: 'new',
         dialTimeout: '8'
       }
@@ -149,7 +152,7 @@ describe('onHttpHeadersChange', () => {
 });
 
 describe('useConfigDefaults', () => {
-  it('should update plugin version', async () => {
+  it('should add plugin version', async () => {
     const onOptionsChange = jest.fn();
     const options = {
       jsonData: {
@@ -160,16 +163,18 @@ describe('useConfigDefaults', () => {
 
     const expectedOptions = {
       jsonData: {
+        version: pluginVersion,
       }
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
   });
 
-  it('should apply defaults for unset config fields', async () => {
+  it('should overwrite plugin version', async () => {
     const onOptionsChange = jest.fn();
     const options = {
       jsonData: {
+        version: '3.0.0',
       }
     } as any as DataSourceSettings<CHConfig>;
 
@@ -177,11 +182,30 @@ describe('useConfigDefaults', () => {
 
     const expectedOptions = {
       jsonData: {
+        version: pluginVersion,
       }
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
   });
+
+  // TODO: There's no defaults being set yet. Right now it only adds the plugin version
+  // it('should apply defaults for unset config fields', async () => {
+  //   const onOptionsChange = jest.fn();
+  //   const options = {
+  //     jsonData: {
+  //     }
+  //   } as any as DataSourceSettings<CHConfig>;
+
+  //   renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+
+  //   const expectedOptions = {
+  //     jsonData: {
+  //     }
+  //   };
+  //   expect(onOptionsChange).toHaveBeenCalledTimes(1);
+  //   expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  // });
 
   it('should not call onOptionsChange after defaults are already set', async () => {
     const onOptionsChange = jest.fn();
@@ -190,8 +214,9 @@ describe('useConfigDefaults', () => {
       }
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    const hook = renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    hook.rerender();
 
-    expect(onOptionsChange).toHaveBeenCalledTimes(0);
+    expect(onOptionsChange).toHaveBeenCalledTimes(1);
   });
 });

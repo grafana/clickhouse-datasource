@@ -90,7 +90,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
   useDefaultTimeColumn(datasource, allColumns, builderOptions.table, builderState.timeColumn, builderState.otelEnabled, builderOptionsDispatch);
-  useDefaultFilters(builderOptions.table, builderState.filters, builderState.orderBy, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, isNewQuery, builderOptionsDispatch);
   
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>

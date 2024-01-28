@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import allLabels from 'labels';
 import { InlineFormLabel, Input } from '@grafana/ui';
+import { selectors } from 'selectors';
 
 interface TraceIdInputProps {
   traceId: string;
@@ -23,6 +24,7 @@ const TraceIdInput = (props: TraceIdInputProps) => {
         {label}
       </InlineFormLabel>
       <Input
+        data-testid={selectors.components.QueryBuilder.TraceIdInput.input}
         width={40}
         value={inputId}
         disabled={disabled}

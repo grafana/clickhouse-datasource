@@ -609,7 +609,7 @@ const getLimit = (limit?: number | undefined): string => {
 };
 
 /**
- * Returns the filters in the WHERE clause, exlcuding the "WHERE" keyword
+ * Returns the filters in the WHERE clause, excluding the "WHERE" keyword
  */
 const getFilters = (options: QueryBuilderOptions): string => {
   const filters = options.filters || [];

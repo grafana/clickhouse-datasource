@@ -16,6 +16,7 @@ import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 import { useDefaultFilters, useDefaultTimeColumn } from './timeSeriesQueryBuilderHooks';
+import useIsNewQuery from 'hooks/useIsNewQuery';
 
 interface TimeSeriesQueryBuilderProps {
   datasource: Datasource;
@@ -36,6 +37,7 @@ interface TimeSeriesQueryBuilderState {
 
 export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
+  const isNewQuery = useIsNewQuery(builderOptions);
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
   const builderState: TimeSeriesQueryBuilderState = useMemo(() => ({
@@ -72,7 +74,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   }, builderState);
 
   useDefaultTimeColumn(allColumns, builderOptions.table, builderState.timeColumn, builderOptionsDispatch);
-  useDefaultFilters(builderOptions.table, builderState.filters, builderState.orderBy, builderOptionsDispatch);
+  useDefaultFilters(builderOptions.table, isNewQuery, builderOptionsDispatch);
 
   return (
     <div>
