@@ -70,3 +70,47 @@ docker run -d -p 8443:8443 -p 9440:9440 -p 9000:9000 -p 8123:8123 --name secure-
 docker exec -it secure-clickhouse-server bash
 cp /etc/clickhouse-server/my-own-ca.crt /usr/local/share/ca-certificates/root.ca.crt
 update-ca-certificates
+
+# Code Structure / Notes
+
+## Column Hints
+
+Column hints are used within the query builder and SQL generator to enable flexible and dynamic queries.
+
+Here's an example of some column hints:
+```js
+ColumnHint.Time
+ColumnHint.LogMessage
+ColumnHint.LogLevel
+ColumnHint.TraceId
+```
+
+The easiest example is the time hint (`ColumnHint.Time`). When building a Logs query, we need to know what the primary log time column is:
+
+```ts
+const logTimeColumn: SelectedColumn = { name: 'my_time_column_on_my_table', hint: ColumnHint.Time, alias: 'logTime' };
+```
+
+Using the column hint, we can add an `ORDER BY` statement to the query without having to know the actual column name:
+
+```ts
+const logsOrderBy: OrderBy = { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC };
+```
+
+Notice how `name` can be left empty, this is because the SQL generator knows to find the final column/alias by the time hint:
+
+```ts
+// Input options
+const queryBuilderOptions: QueryBuilderOptions = {
+  table: 'logs',
+  columns: [logTimeColumn],
+  orderBy: [logsOrderBy],
+  . . .
+};
+```
+```sql
+-- Final output from SQL generator
+SELECT my_time_column_on_my_table as logTime FROM logs ORDER BY logTime ASC
+```
+
+By adding a simple hint, we can apply filters, orderBys, and other behaviors to the SQL generator without having to reference specific columns. This simplifies the UI logic and user experience by reducing the number of places where a column name needs to be updated.

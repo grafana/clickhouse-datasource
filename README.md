@@ -69,20 +69,43 @@ datasources:
     jsonData:
       defaultDatabase: database
       port: 9000
-      server: localhost
+      host: localhost
       username: username
       tlsSkipVerify: false
       # tlsAuth: <bool>
       # tlsAuthWithCACert: <bool>
       # secure: <bool>
-      # timeout: <seconds>
+      # dialTimeout: <seconds>
       # queryTimeout: <seconds>
       # protocol: <native|http>
+      # defaultTable: <string>
+      # httpHeaders:
+      # - name: X-Example-Header
+      #   secure: false
+      #   value: <string>
+      # - name: Authorization
+      #   secure: true
+      # logs:
+      #   defaultDatabase: <string>
+      #   defaultTable: <string>
+      #   otelEnabled: <bool>
+      #   otelVersion: <string>
+      #   timeColumn: <string>
+      #   ...Column: <string>
+      # traces:
+      #   defaultDatabase: <string>
+      #   defaultTable: <string>
+      #   otelEnabled: <bool>
+      #   otelVersion: <string>
+      #   durationUnit: <seconds|milliseconds|microseconds|nanoseconds>
+      #   traceIdColumn: <string>
+      #   ...Column: <string>
     secureJsonData:
       password: password
       # tlsCACert: <string>
       # tlsClientCert: <string>
       # tlsClientKey: <string>
+      # secureHttpHeaders.Authorization: <string>
 ```
 
 ## Building queries
@@ -170,11 +193,10 @@ WHERE $__timeFilter(date_time)
 
 | Macro                                        | Description                                                                                                                                                                         | Output example                                                        |
 |----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| *$__timeFilter(columnName)*                  | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in seconds                                                         | `time >= '1480001790' AND time <= '1482576232' )`                     |
+| *$__timeFilter(columnName)*                  | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds                                                         | `time >= toDateTime64(1480001790/1000, 3) AND time <= toDateTime64(1482576232/1000, 3) )`                     |
 | *$__dateFilter(columnName)*                  | Replaced by a conditional that filters the data (using the provided column) based on the date range of the panel                                                                    | `date >= '2022-10-21' AND date <= '2022-10-23' )`                     |
-| *$__timeFilter_ms(columnName)*               | Replaced by a conditional that filters the data (using the provided column) based on the time range of the panel in milliseconds                                                    | `time >= '1480001790671' AND time <= '1482576232479' )`               |
-| *$__fromTime*                                | Replaced by the starting time of the range of the panel casted to DateTime                                                                                                          | `toDateTime(intDiv(1415792726371,1000))`                              |
-| *$__toTime*                                  | Replaced by the ending time of the range of the panel casted to DateTime                                                                                                            | `toDateTime(intDiv(1415792726371,1000))`                              |
+| *$__fromTime*                                | Replaced by the starting time of the range of the panel casted to `DateTime64(3)`                                                                                                          | `toDateTime64(1415792726371/1000, 3`                              |
+| *$__toTime*                                  | Replaced by the ending time of the range of the panel casted to `DateTime64(3)`                                                                                                            | `toDateTime64(1415792726371/1000, 3)`                              |
 | *$__interval_s*                              | Replaced by the interval in seconds                                                                                                                                                 | `20`                                                                  |
 | *$__timeInterval(columnName)*                | Replaced by a function calculating the interval based on window size in seconds, useful when grouping                                                                               | `toStartOfInterval(toDateTime(column), INTERVAL 20 second)`           |
 | *$__timeInterval_ms(columnName)*             | Replaced by a function calculating the interval based on window size in milliseconds, useful when grouping                                                                          | `toStartOfInterval(toDateTime64(column, 3), INTERVAL 20 millisecond)` |
