@@ -123,7 +123,6 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
         <Field label={labels.headerNameLabel} aria-label={labels.headerNameLabel}>
           <Input
             data-testid={selectors.headerNameInput}
-            width={40}
             value={name}
             disabled={isSecureConfigured}
             placeholder={labels.headerNamePlaceholder}
