@@ -1,6 +1,6 @@
 import { DataSourceSettings } from "@grafana/data";
 import { renderHook } from "@testing-library/react";
-import { CHConfig, CHHttpHeader, CHSecureConfig } from "types/config";
+import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
 import { onHttpHeadersChange, useConfigDefaults, useMigrateV3Config } from "./CHConfigEditorHooks";
 import { pluginVersion } from "utils/version";
 
@@ -156,6 +156,7 @@ describe('useConfigDefaults', () => {
     const onOptionsChange = jest.fn();
     const options = {
       jsonData: {
+        protocol: Protocol.Native,
       }
     } as any as DataSourceSettings<CHConfig>;
 
@@ -164,6 +165,7 @@ describe('useConfigDefaults', () => {
     const expectedOptions = {
       jsonData: {
         version: pluginVersion,
+        protocol: Protocol.Native,
       }
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
@@ -175,6 +177,7 @@ describe('useConfigDefaults', () => {
     const options = {
       jsonData: {
         version: '3.0.0',
+        protocol: Protocol.Native,
       }
     } as any as DataSourceSettings<CHConfig>;
 
@@ -183,34 +186,38 @@ describe('useConfigDefaults', () => {
     const expectedOptions = {
       jsonData: {
         version: pluginVersion,
+        protocol: Protocol.Native,
       }
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
   });
 
-  // TODO: There's no defaults being set yet. Right now it only adds the plugin version
-  // it('should apply defaults for unset config fields', async () => {
-  //   const onOptionsChange = jest.fn();
-  //   const options = {
-  //     jsonData: {
-  //     }
-  //   } as any as DataSourceSettings<CHConfig>;
+  it('should apply defaults for unset config fields', async () => {
+    const onOptionsChange = jest.fn();
+    const options = {
+      jsonData: {
+      }
+    } as any as DataSourceSettings<CHConfig>;
 
-  //   renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
-  //   const expectedOptions = {
-  //     jsonData: {
-  //     }
-  //   };
-  //   expect(onOptionsChange).toHaveBeenCalledTimes(1);
-  //   expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
-  // });
+    const expectedOptions = {
+      jsonData: {
+        version: pluginVersion,
+        protocol: Protocol.Native,
+      }
+    };
+    expect(onOptionsChange).toHaveBeenCalledTimes(1);
+    expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
 
   it('should not call onOptionsChange after defaults are already set', async () => {
     const onOptionsChange = jest.fn();
     const options = {
       jsonData: {
+        pluginVersion,
+        protocol: Protocol.Native
       }
     } as any as DataSourceSettings<CHConfig>;
 
