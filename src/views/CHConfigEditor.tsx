@@ -170,7 +170,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const defaultPort = jsonData.secure ?
   (jsonData.protocol === Protocol.Native ? labels.serverPort.secureNativePort : labels.serverPort.secureHttpPort) :
   (jsonData.protocol === Protocol.Native ? labels.serverPort.insecureNativePort : labels.serverPort.insecureHttpPort);
-  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`
+  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol || Protocol.Native}: ${defaultPort})`
 
   return (
     <>
