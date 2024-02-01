@@ -6,7 +6,6 @@ export class AdHocFilter {
   setTargetTableFromQuery(query: string) {
     this._targetTable = getTable(query);
     if (this._targetTable === '') {
-      console.error('Failed to get table from adhoc query.');
       throw new Error('Failed to get table from adhoc query.');
     }
   }
@@ -33,7 +32,7 @@ export class AdHocFilter {
       .filter((filter: AdHocVariableFilter) => {
         const valid = isValid(filter);
         if (!valid) {
-          console.error('Invalid adhoc filter will be ignored:', filter);
+          console.warn('Invalid adhoc filter will be ignored:', filter);
         }
         return valid;
       })

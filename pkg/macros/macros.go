@@ -26,7 +26,7 @@ func newTimeFilter(queryType timeQueryType, query *sqlds.Query) (string, error) 
 	if queryType == timeQueryTypeTo {
 		date = query.TimeRange.To
 	}
-	return fmt.Sprintf("toDateTime(intDiv(%d,1000))", date.UnixMilli()), nil
+	return fmt.Sprintf("toDateTime64(%d/1000, 3)", date.UnixMilli()), nil
 }
 
 // FromTimeFilter return time filter query based on grafana's timepicker's from time
@@ -46,11 +46,11 @@ func TimeFilter(query *sqlds.Query, args []string) (string, error) {
 
 	var (
 		column = args[0]
-		from   = query.TimeRange.From.UTC().Unix()
-		to     = query.TimeRange.To.UTC().Unix()
+		from   = query.TimeRange.From.UTC().UnixMilli()
+		to     = query.TimeRange.To.UTC().UnixMilli()
 	)
 
-	return fmt.Sprintf("%s >= '%d' AND %s <= '%d'", column, from, column, to), nil
+	return fmt.Sprintf("%s >= toDateTime64(%d/1000, 3) AND %s <= toDateTime64(%d/1000, 3)", column, from, column, to), nil
 }
 
 func DateFilter(query *sqlds.Query, args []string) (string, error) {
