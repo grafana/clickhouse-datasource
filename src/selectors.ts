@@ -1,68 +1,5 @@
 import { E2ESelectors } from '@grafana/e2e-selectors';
 export const Components = {
-  ConfigEditor: {
-    ServerAddress: {
-      label: 'Server address',
-      placeholder: 'Server TCP address',
-      tooltip: 'ClickHouse native TCP server address',
-    },
-    ServerPort: {
-      label: 'Server port',
-      placeholder: (secure: string) => `Typically ${secure === 'true' ? '9440' : '9000'}`,
-      tooltip: 'ClickHouse native TCP port. Typically 9000 for unsecure, 9440 for secure',
-    },
-    Path: {
-      label: 'Path',
-      placeholder: 'Additional URL path for HTTP requests',
-      tooltip: 'Additional URL path for HTTP requests',
-    },
-    Protocol: {
-      label: 'Protocol',
-      tooltip: 'Native or HTTP for transport',
-    },
-    Username: {
-      label: 'Username',
-      placeholder: 'Username',
-      tooltip: 'ClickHouse username',
-    },
-    Password: {
-      label: 'Password',
-      placeholder: 'Password',
-      tooltip: 'ClickHouse password',
-    },
-    TLSSkipVerify: {
-      label: 'Skip TLS Verify',
-      tooltip: 'Skip TLS Verify',
-    },
-    TLSClientAuth: {
-      label: 'TLS Client Auth',
-      tooltip: 'TLS Client Auth',
-    },
-    TLSAuthWithCACert: {
-      label: 'With CA Cert',
-      tooltip: 'Needed for verifying self-signed TLS Certs',
-    },
-    TLSCACert: {
-      label: 'CA Cert',
-      placeholder: 'CA Cert. Begins with -----BEGIN CERTIFICATE-----',
-    },
-    TLSClientCert: {
-      label: 'Client Cert',
-      placeholder: 'Client Cert. Begins with -----BEGIN CERTIFICATE-----',
-    },
-    TLSClientKey: {
-      label: 'Client Key',
-      placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
-    },
-    Secure: {
-      label: 'Secure Connection',
-      tooltip: 'Toggle on if the connection is secure',
-    },
-    SecureSocksProxy: {
-      label: 'Enable Secure Socks Proxy',
-      tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',
-    },
-  },
   QueryEditor: {
     CodeEditor: {
       input: () => '.monaco-editor textarea',
@@ -176,7 +113,23 @@ export const Components = {
       },
     },
   },
+  Config: {
+    HttpHeaderConfig: {
+      headerEditor: 'config__http-header-config__header-editor',
+      addHeaderButton: 'config__http-header-config__add-header-button',
+      removeHeaderButton: 'config__http-header-config__remove-header-button',
+      headerSecureSwitch: 'config__http-header-config__header-secure-switch',
+      headerNameInput: 'config__http-header-config__header-name-input',
+      headerValueInput: 'config__http-header-config__header-value-input'
+    }
+  },
   QueryBuilder: {
+    expandBuilderButton: 'query-builder__expand-builder-button',
+    LogsQueryBuilder: {
+      LogMessageLikeInput: {
+        input: 'query-builder__logs-query-builder__log-message-like-input__input',
+      }
+    },
     AggregateEditor: {
       sectionLabel: 'query-builder__aggregate-editor__section-label',
       itemWrapper: 'query-builder__aggregate-editor__item-wrapper',
@@ -191,6 +144,9 @@ export const Components = {
     },
     LimitEditor: {
       input: 'query-builder__limit-editor__input'
+    },
+    TraceIdInput: {
+      input: 'query-builder__trace-id-input__input'
     }
   }
 };

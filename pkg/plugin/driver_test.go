@@ -79,13 +79,23 @@ func TestMain(m *testing.M) {
 		adminHostPath = "../../config/admin.21.8.xml"
 	}
 	req := testcontainers.ContainerRequest{
-		Image:        fmt.Sprintf("clickhouse/clickhouse-server:%s", chVersion),
-		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
-		WaitingFor:   wait.ForLog("Ready for connections"),
-		Mounts: []testcontainers.ContainerMount{
-			testcontainers.BindMount(path.Join(cwd, customHostPath), "/etc/clickhouse-server/config.d/custom.xml"),
-			testcontainers.BindMount(path.Join(cwd, adminHostPath), "/etc/clickhouse-server/users.d/admin.xml"),
+		Env: map[string]string{
+			"TZ": time.Local.String(),
 		},
+		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
+		Files: []testcontainers.ContainerFile{
+			{
+				ContainerFilePath: "/etc/clickhouse-server/config.d/custom.xml",
+				FileMode:          0644,
+				HostFilePath:      path.Join(cwd, customHostPath),
+			},
+			{
+				ContainerFilePath: "/etc/clickhouse-server/users.d/admin.xml",
+				FileMode:          0644,
+				HostFilePath:      path.Join(cwd, adminHostPath),
+			},
+		},
+		Image: fmt.Sprintf("clickhouse/clickhouse-server:%s", chVersion),
 		Resources: container.Resources{
 			Ulimits: []*units.Ulimit{
 				{
@@ -95,9 +105,7 @@ func TestMain(m *testing.M) {
 				},
 			},
 		},
-		Env: map[string]string{
-			"TZ": time.Local.String(),
-		},
+		WaitingFor: wait.ForLog("Ready for connections"),
 	}
 	clickhouseContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,

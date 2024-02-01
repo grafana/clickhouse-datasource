@@ -1,6 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { useDefaultFilters, useDefaultTimeColumn } from './timeSeriesQueryBuilderHooks';
-import { ColumnHint, Filter, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 
 describe('useDefaultTimeColumn', () => {
@@ -54,13 +54,27 @@ describe('useDefaultTimeColumn', () => {
 });
 
 describe('useDefaultFilters', () => {
-  it('should not call builderOptionsDispatch when column/table are present on initial load', async () => {
+  it('should call builderOptionsDispatch when query is new', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
-    const timeColumn: SelectedColumn = { name: 'timestamp', hint: ColumnHint.Time };
-    const filters: Filter[] = [];
+    const isNewQuery = true;
 
-    renderHook(() => useDefaultFilters(tableName, timeColumn, filters, builderOptionsDispatch));
+    renderHook(() => useDefaultFilters(tableName, isNewQuery, builderOptionsDispatch));
+
+    const expectedOptions = {
+      filters: [expect.anything()],
+      orderBy: [expect.anything()]
+    };
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+
+  it('should not call builderOptionsDispatch when query is not new', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const tableName = 'timeseries';
+    const isNewQuery = false;
+
+    renderHook(() => useDefaultFilters(tableName, isNewQuery, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -68,35 +82,17 @@ describe('useDefaultFilters', () => {
   it('should call builderOptionsDispatch when table changes', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
-    const timeColumn: SelectedColumn = { name: 'timestamp', hint: ColumnHint.Time };
-    const filters: Filter[] = [];
+    const isNewQuery = false;
 
     const hook = renderHook(table =>
-      useDefaultFilters(table, timeColumn, filters, builderOptionsDispatch),
+      useDefaultFilters(table, isNewQuery, builderOptionsDispatch),
       { initialProps: tableName }
     );
     hook.rerender('other_timeseries');
 
     const expectedOptions = {
       filters: [expect.anything()],
-    };
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
-    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
-  });
-
-  it('should call builderOptionsDispatch when time column changes', async () => {
-    const builderOptionsDispatch = jest.fn();
-    const tableName = 'timeseries';
-    const filters: Filter[] = [];
-
-    const hook = renderHook(timeColumn =>
-      useDefaultFilters(tableName, timeColumn, filters, builderOptionsDispatch),
-      { initialProps: { name: 'timestamp', hint: ColumnHint.Time } }
-    );
-    hook.rerender({ name: 'other_timestamp', hint: ColumnHint.Time });
-
-    const expectedOptions = {
-      filters: [expect.anything()],
+      orderBy: [expect.anything()]
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));

@@ -42,13 +42,9 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     }
 
     const column = allColumns.find(c => c.name === selected!.value)!;
-    if (!column) {
-      return;
-    }
-
     onColumnChange({
-      name: column.name,
-      type: column.type,
+      name: column?.name || selected!.value,
+      type: column?.type,
       hint: columnHint
     });
   }
@@ -70,6 +66,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
         width={wide ? 25 : 20}
         menuPlacement={'bottom'}
         isClearable={clearable === undefined || clearable}
+        allowCustomValue
       />
     </div>
   );

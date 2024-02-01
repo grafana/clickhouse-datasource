@@ -1,5 +1,5 @@
 import { ColumnHint, QueryType } from "types/queryBuilder";
-import { setAllOptions, setColumnByHint, setDatabase, setOptions, setOtelEnabled, setOtelVersion, setQueryType, setTable, testFuncs } from "./useBuilderOptionsState";
+import { setAllOptions, setBuilderMinimized, setColumnByHint, setDatabase, setOptions, setOtelEnabled, setOtelVersion, setQueryType, setTable, testFuncs } from "./useBuilderOptionsState";
 const { reducer, buildInitialState } = testFuncs;
 
 describe('reducer', () => {
@@ -123,6 +123,13 @@ describe('reducer', () => {
     expect(nextState.columns![2].name).toEqual('c');
     // Updated column is filtered and pushed to end of array
     expect(nextState.columns![3].name).toEqual('next_timestamp');
+  });
+  it('applies SetBuilderMinimized action', async () => {
+    const prevState = buildInitialState();
+    const action = setBuilderMinimized(true);
+
+    const nextState = reducer(prevState, action);
+    expect(nextState.meta?.minimized).toBe(true);
   });
 });
 

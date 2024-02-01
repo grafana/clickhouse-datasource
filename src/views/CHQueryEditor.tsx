@@ -9,7 +9,7 @@ import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
-import { isBuilderOptionsRunnable, mapQueryTypeToGrafanaFormat } from 'data/utils';
+import { isBuilderOptionsRunnable, mapQueryBuilderOptionsToGrafanaFormat } from 'data/utils';
 import { setAllOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
@@ -26,7 +26,7 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
   return (
     <>
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
-          <EditorTypeSwitcher {...props} query={query} />
+        <EditorTypeSwitcher {...props} query={query} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </div>
       <CHEditorByType {...props} query={query} />
@@ -68,7 +68,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       editorType: EditorType.Builder,
       rawSql: sql,
       builderOptions,
-      format: mapQueryTypeToGrafanaFormat(builderOptions.queryType)
+      format: mapQueryBuilderOptionsToGrafanaFormat(builderOptions)
     });
 
     // TODO: fix dependency warning with "useEffectEvent" once added to stable version of react

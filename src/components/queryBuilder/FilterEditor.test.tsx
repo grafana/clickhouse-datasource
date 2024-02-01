@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './FilterEditor';
 import { selectors } from 'selectors';
 import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types/queryBuilder';
+import { mockDatasource } from '__mocks__/datasource';
 
 describe('FilterEditor', () => {
   describe('FiltersEditor', () => {
     it('renders correctly', async () => {
       const onFiltersChange = jest.fn();
-      const result = render(<FiltersEditor allColumns={[]} filters={[]} onFiltersChange={onFiltersChange} />);
+      const result = render(<FiltersEditor allColumns={[]} filters={[]} onFiltersChange={onFiltersChange} datasource={mockDatasource} database='' table='' />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
@@ -35,7 +36,7 @@ describe('FilterEditor', () => {
           operator: FilterOperator.IsNotNull,
         },
       ];
-      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={() => {}} />);
+      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={() => {}} datasource={mockDatasource} database='' table='' />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -61,7 +62,7 @@ describe('FilterEditor', () => {
         },
       ];
       const onFiltersChange = jest.fn();
-      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={onFiltersChange} />);
+      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={onFiltersChange} datasource={mockDatasource} database='' table='' />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -76,6 +77,7 @@ describe('FilterEditor', () => {
       expect(onFiltersChange).toHaveBeenNthCalledWith(2, [filters[1]]);
     });
   });
+
   describe('FilterEditor', () => {
     it('renders correctly', async () => {
       const result = render(
@@ -90,6 +92,10 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={() => {}}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database=''
+          table='' 
         />
       );
       expect(result.container.firstChild).not.toBeNull();
@@ -111,6 +117,10 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={() => {}}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database=''
+          table='' 
         />
       );
 
@@ -125,7 +135,7 @@ describe('FilterEditor', () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterEditor
-          allColumns={[{ name: 'colName', type: 'Map(String, UInt64)', picklistValues: [] }]}
+          allColumns={[{ name: 'colName', type: 'Map(String, String)', picklistValues: [] }]}
           filter={{
             key: 'foo',
             type: 'boolean',
@@ -135,6 +145,10 @@ describe('FilterEditor', () => {
           }}
           index={0}
           onFilterChange={onFilterChange}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database=''
+          table=''
         />
       );
 
@@ -144,7 +158,7 @@ describe('FilterEditor', () => {
 
       const expectedFilter: Filter = {
         key: `colName['keyName']`,
-        type: 'UInt64',
+        type: 'String',
         operator: FilterOperator.IsNotNull,
         condition: 'AND',
         filterType: 'custom',
@@ -152,30 +166,51 @@ describe('FilterEditor', () => {
 
       expect(onFilterChange).toHaveBeenCalledWith(0, expectedFilter);
     });
-    it('should not call onFilterChange when user adds incorrect custom filter', async () => {
+
+    it('should render key input for map type', async () => {
       const onFilterChange = jest.fn();
       const result = render(
         <FilterEditor
-          allColumns={[{ name: 'mapField', type: 'Map(String, UInt64)', picklistValues: [] }]}
+          allColumns={[{ name: 'SpanAttributes', type: 'Map(String, String)', picklistValues: [] }]}
           filter={{
-            key: 'foo',
-            type: 'boolean',
-            operator: FilterOperator.IsNotNull,
+            key: 'SpanAttributes',
+            type: 'Map(String, String)',
+            value: '',
+            operator: FilterOperator.Equals,
             condition: 'AND',
             filterType: 'custom',
           }}
           index={0}
           onFilterChange={onFilterChange}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database=''
+          table=''
         />
       );
 
-      // type into the `fieldName` select box
-      await userEvent.type(result!.getAllByRole('combobox')[0], `mapField__key`);
+      // type key into the mapKey input
+      await userEvent.type(result!.getAllByRole('combobox')[1], 'http.status_code');
       await userEvent.keyboard('{Enter}');
+      // type value into the input
+      await userEvent.type(result!.getByTestId('query-builder-filters-single-string-value-input'), '200');
+      result!.getByTestId('query-builder-filters-single-string-value-input').blur();
 
-      expect(onFilterChange).not.toHaveBeenCalled();
+      const expectedFilter: Filter = {
+        key: `SpanAttributes`,
+        mapKey: 'http.status_code',
+        value: '200',
+        type: 'Map(String, String)',
+        operator: FilterOperator.Equals,
+        condition: 'AND',
+        filterType: 'custom',
+      };
+
+      expect(onFilterChange).toHaveBeenCalledTimes(2);
+      expect(onFilterChange).toHaveBeenLastCalledWith(0, expectedFilter);
     });
   });
+
   describe('FilterValueEditor', () => {
     it('should render nothing for null operator', async () => {
       const result = render(
@@ -185,6 +220,22 @@ describe('FilterEditor', () => {
             key: 'foo',
             operator: FilterOperator.IsNotNull,
             type: 'boolean',
+            condition: 'AND',
+            filterType: 'custom',
+          }}
+          onFilterChange={() => {}}
+        />
+      );
+      expect(result!.container.firstChild).toBeNull();
+    });
+    it('should render nothing for anything operator', async () => {
+      const result = render(
+        <FilterValueEditor
+          allColumns={[]}
+          filter={{
+            key: 'foo',
+            operator: FilterOperator.IsAnything,
+            type: 'String',
             condition: 'AND',
             filterType: 'custom',
           }}

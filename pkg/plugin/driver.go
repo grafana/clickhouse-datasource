@@ -160,6 +160,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		Compression: &clickhouse.Compression{
 			Method: compression,
 		},
+		HttpHeaders: settings.HttpHeaders,
 		DialTimeout: time.Duration(t) * time.Second,
 		ReadTimeout: time.Duration(qt) * time.Second,
 		Protocol:    protocol,

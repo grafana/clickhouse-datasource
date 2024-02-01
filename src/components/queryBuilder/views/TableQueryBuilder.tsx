@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
@@ -20,6 +20,7 @@ interface TableQueryBuilderProps {
 }
 
 interface TableQueryBuilderState {
+  isAggregateMode: boolean;
   selectedColumns: SelectedColumn[];
   aggregates: AggregateColumn[];
   groupBy: string[];
@@ -32,8 +33,8 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TableQueryBuilder;
-  const [isAggregateMode, setAggregateMode] = useState<boolean>((builderOptions.aggregates?.length || 0) > 0); // Toggle Simple vs Aggregate mode
   const builderState: TableQueryBuilderState = useMemo(() => ({
+    isAggregateMode: builderOptions.mode === BuilderMode.Aggregate,
     selectedColumns: builderOptions.columns || [],
     aggregates: builderOptions.aggregates || [],
     groupBy: builderOptions.groupBy || [],
@@ -44,10 +45,10 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
 
   const onOptionChange = useBuilderOptionChanges<TableQueryBuilderState>(next => {
     builderOptionsDispatch(setOptions({
-      mode: isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
+      mode: next.isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
       columns: next.selectedColumns,
-      aggregates: isAggregateMode ? next.aggregates : [],
-      groupBy: isAggregateMode ? next.groupBy : [],
+      aggregates: next.aggregates,
+      groupBy: next.groupBy,
       filters: next.filters,
       orderBy: next.orderBy,
       limit: next.limit
@@ -59,8 +60,8 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
       <ModeSwitch
         labelA={labels.simpleQueryModeLabel}
         labelB={labels.aggregateQueryModeLabel}
-        value={isAggregateMode}
-        onChange={setAggregateMode}
+        value={builderState.isAggregateMode}
+        onChange={onOptionChange('isAggregateMode')}
         label={labels.builderModeLabel}
         tooltip={labels.builderModeTooltip}
       />
@@ -72,7 +73,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
         showAllOption
       />
 
-      {isAggregateMode && (
+      {builderState.isAggregateMode && (
         <>
           <AggregateEditor allColumns={allColumns} aggregates={builderState.aggregates} onAggregatesChange={onOptionChange('aggregates')} />
           <GroupByEditor groupBy={builderState.groupBy} onGroupByChange={onOptionChange('groupBy')} allColumns={allColumns} />
@@ -85,7 +86,14 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
         onOrderByChange={onOptionChange('orderBy')}
       />
       <LimitEditor limit={builderState.limit} onLimitChange={onOptionChange('limit')} />
-      <FiltersEditor filters={builderState.filters} onFiltersChange={onOptionChange('filters')} allColumns={allColumns} />
+      <FiltersEditor
+        filters={builderState.filters}
+        onFiltersChange={onOptionChange('filters')}
+        allColumns={allColumns}
+        datasource={datasource}
+        database={builderOptions.database}
+        table={builderOptions.table}
+      />
     </div>
   );
 }

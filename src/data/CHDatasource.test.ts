@@ -421,9 +421,9 @@ describe('ClickHouseDatasource', () => {
           } as QueryBuilderOptions,
         });
         expect(result?.rawSql).toEqual(
-          'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) AS time, count(*) logs ' +
+          'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as time, count(*) as logs ' +
             'FROM "default"."logs" ' +
-            'GROUP BY toStartOfInterval("created_at", INTERVAL 1 DAY) AS time ' +
+            'GROUP BY time ' +
             'ORDER BY time ASC'
         );
       });
@@ -434,16 +434,16 @@ describe('ClickHouseDatasource', () => {
           .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
         const result = datasource.getSupplementaryLogsVolumeQuery(request, query);
         expect(result?.rawSql).toEqual(
-          `SELECT sum(toString("level") IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) AS critical, ` +
-            `sum(toString("level") IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) AS error, ` +
-            `sum(toString("level") IN ('warn','warning','WARN','WARNING','Warn','Warning')) AS warn, ` +
-            `sum(toString("level") IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')) AS info, ` +
-            `sum(toString("level") IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) AS debug, ` +
-            `sum(toString("level") IN ('trace','TRACE','Trace')) AS trace, ` +
-            `sum(toString("level") IN ('unknown','UNKNOWN','Unknown')) AS unknown, ` +
-            `toStartOfInterval("created_at", INTERVAL 1 DAY) AS time ` +
+          `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as time, ` +
+            `sum(toString("level") IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) as critical, ` +
+            `sum(toString("level") IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
+            `sum(toString("level") IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
+            `sum(toString("level") IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')) as info, ` +
+            `sum(toString("level") IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
+            `sum(toString("level") IN ('trace','TRACE','Trace')) as trace, ` +
+            `sum(toString("level") IN ('unknown','UNKNOWN','Unknown')) as unknown ` +
             `FROM "default"."logs" ` +
-            `GROUP BY toStartOfInterval("created_at", INTERVAL 1 DAY) AS time ` +
+            `GROUP BY time ` +
             `ORDER BY time ASC`
         );
       });

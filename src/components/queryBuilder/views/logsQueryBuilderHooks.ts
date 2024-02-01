@@ -2,7 +2,7 @@ import { Datasource } from "data/CHDatasource";
 import { columnFilterDateTime } from "data/columnFilters";
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from "hooks/useBuilderOptionsState";
 import { useEffect, useMemo, useRef } from "react";
-import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, TableColumn } from "types/queryBuilder";
+import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, StringFilter, TableColumn } from "types/queryBuilder";
 import { versions as otelVersions } from 'otel';
 
 /**
@@ -105,40 +105,47 @@ export const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonl
   }, [datasource, allColumns, table, builderOptionsDispatch]);
 };
 
-// Apply default filters/orderBy on timeColumn change
-const timeRangeFilterId = 'timeRange';
-export const useDefaultFilters = (table: string, timeColumn: SelectedColumn | undefined, filters: Filter[], orderBy: OrderBy[], builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const lastTimeColumn = useRef<string>(timeColumn?.name || '');
+// Apply default filters/orderBy on table change
+export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
-  if (!timeColumn || table !== lastTable.current) {
-    lastTimeColumn.current = '';
+  if (table !== lastTable.current) {
+    appliedDefaultFilters.current = false;
   }
 
   useEffect(() => {
-    if (!timeColumn || (timeColumn.name === lastTimeColumn.current) || !table) {
+    if (!table || appliedDefaultFilters.current) {
       return;
     }
 
-    const nextFilters: Filter[] = filters.filter(f => f.id !== timeRangeFilterId);
-    const timeRangeFilter: DateFilterWithoutValue = {
-      type: 'datetime',
-      operator: FilterOperator.WithInGrafanaTimeRange,
-      filterType: 'custom',
-      key: timeColumn.name,
-      id: timeRangeFilterId,
-      condition: 'AND'
-    };
-    nextFilters.unshift(timeRangeFilter);
+    const defaultFilters: Filter[] = [
+      {
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.Time,
+        condition: 'AND'
+      } as DateFilterWithoutValue,
+      {
+        type: 'string',
+        operator: FilterOperator.IsAnything,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.LogLevel,
+        condition: 'AND'
+      } as StringFilter,
+    ];
 
-    const nextOrderBy: OrderBy[] = orderBy.filter(o => !o.default);
-    const defaultOrderBy: OrderBy = { name: timeColumn?.name, dir: OrderByDirection.DESC, default: true };
-    nextOrderBy.unshift(defaultOrderBy);
+    const defaultOrderBy: OrderBy[] = [
+      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true }
+    ];
     
     lastTable.current = table;
-    lastTimeColumn.current = timeColumn.name;
+    appliedDefaultFilters.current = true;
     builderOptionsDispatch(setOptions({
-      filters: nextFilters,
-      orderBy: nextOrderBy
+      filters: defaultFilters,
+      orderBy: defaultOrderBy
     }));
-  }, [table, timeColumn, filters, orderBy, builderOptionsDispatch]);
+  }, [table, builderOptionsDispatch]);
 };
