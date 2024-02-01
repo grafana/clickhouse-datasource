@@ -1,6 +1,6 @@
 import { DataSourceSettings, KeyValue } from "@grafana/data";
 import { useEffect, useRef } from "react";
-import { CHConfig, CHHttpHeader, CHSecureConfig } from "types/config";
+import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
 // import { getLatestVersion } from "otel";
 import { pluginVersion } from "utils/version";
 
@@ -108,6 +108,11 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
 
     const jsonData = { ...options.jsonData };
     jsonData.version = pluginVersion; // Always overwrite version
+
+    if (!jsonData.protocol) {
+      jsonData.protocol = Protocol.Native;
+    }
+
     // const latestOtelVersion = getLatestVersion();
 
     // TODO: Should OTel be enabled by default for new datasources?

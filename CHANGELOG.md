@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.1
+
+### Fixes
+
+- Set `protocol` to `native` by default in config view. Fixes the "default port" description.
+
 ## 4.0.0
 
 ### Features
