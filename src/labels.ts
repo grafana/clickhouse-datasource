@@ -73,7 +73,8 @@ export default {
       },
       HttpHeadersConfig: {
         title: 'HTTP Headers',
-        description: 'Add HTTP headers when querying the database',
+        label: 'Custom HTTP Headers',
+        description: 'Add Custom HTTP headers when querying the database',
         headerNameLabel: 'Header Name',
         headerNamePlaceholder: 'X-Custom-Header',
         insecureHeaderValueLabel: 'Header Value',

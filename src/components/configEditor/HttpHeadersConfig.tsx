@@ -45,29 +45,32 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   return (
     <ConfigSection
       title={labels.title}
-      description={labels.description}
     >
-      {headers.map((header, index) => (
-        <HttpHeaderEditor
-          key={header.name + index}
-          name={header.name}
-          value={header.value}
-          secure={header.secure}
-          isSecureConfigured={configuredSecureHeaders.has(header.name)}
-          onHeaderChange={header => updateHeader(index, header)}
-          onRemove={() => removeHeader(index)}
-        />
-      ))}
-      <Button
-          data-testid={selectors.addHeaderButton}
-          icon="plus-circle"
-          variant="secondary"
-          size="sm"
-          onClick={addHeader}
-          className={styles.Common.smallBtn}
-        >
-          {labels.addHeaderLabel}
-      </Button>
+      <Field label={labels.label} description={labels.description}>
+        <>
+          {headers.map((header, index) => (
+            <HttpHeaderEditor
+              key={header.name + index}
+              name={header.name}
+              value={header.value}
+              secure={header.secure}
+              isSecureConfigured={configuredSecureHeaders.has(header.name)}
+              onHeaderChange={header => updateHeader(index, header)}
+              onRemove={() => removeHeader(index)}
+            />
+          ))}
+          <Button
+              data-testid={selectors.addHeaderButton}
+              icon="plus-circle"
+              variant="secondary"
+              size="sm"
+              onClick={addHeader}
+              className={styles.Common.smallBtn}
+            >
+              {labels.addHeaderLabel}
+          </Button>
+        </>
+      </Field>
       <Field label={labels.forwardGrafanaHeaders.label} description={labels.forwardGrafanaHeaders.tooltip}>
         <Switch
           data-testid={selectors.forwardGrafanaHeadersSwitch}
