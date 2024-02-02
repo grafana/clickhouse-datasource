@@ -25,6 +25,7 @@ artifacts/
 work/
 ci/
 e2e-results/
+test_summary.json
 
 # Editor
 .idea

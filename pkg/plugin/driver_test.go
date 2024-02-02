@@ -1165,7 +1165,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	}
 	t.Run("should not forward http headers", func(t *testing.T) {
 		proxy.NonproxyHandler = proxyEnsureNoHeaderHandler
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardHeaders": false}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": false}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
 		assert.Equal(t, nil, err)
 
@@ -1182,7 +1182,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 
 	t.Run("should forward http headers", func(t *testing.T) {
 		proxy.NonproxyHandler = proxyEnsureNoHeaderHandler
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
 		assert.Equal(t, nil, err)
 

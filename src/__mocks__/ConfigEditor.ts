@@ -1,10 +1,10 @@
 import * as fs from 'fs';
-import { Props } from '../views/CHConfigEditor';
-import { CHConfig } from 'types';
+import { ConfigEditorProps } from 'views/CHConfigEditor';
+import { CHConfig } from 'types/config';
 
 const pluginJson = JSON.parse(fs.readFileSync('./src/plugin.json', 'utf-8'));
 
-export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): Props => ({
+export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): ConfigEditorProps => ({
   options: {
     ...pluginJson,
     jsonData: {
@@ -12,7 +12,7 @@ export const mockConfigEditorProps = (overrides?: Partial<CHConfig>): Props => (
       port: 443,
       path: '',
       username: 'user',
-      protocol: 'native',
+      protocol: 'http',
       ...overrides,
     },
   },

@@ -34,7 +34,7 @@ type Clickhouse struct{}
 func getTLSConfig(settings Settings) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: settings.InsecureSkipVerify,
-		ServerName:         settings.Server,
+		ServerName:         settings.Host,
 	}
 	if settings.TlsClientAuth || settings.TlsAuthWithCACert {
 		if settings.TlsAuthWithCACert && len(settings.TlsCACert) > 0 {
@@ -118,9 +118,9 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 			InsecureSkipVerify: settings.InsecureSkipVerify,
 		}
 	}
-	t, err := strconv.Atoi(settings.Timeout)
+	t, err := strconv.Atoi(settings.DialTimeout)
 	if err != nil {
-		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.Timeout))
+		return nil, errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout))
 	}
 	qt, err := strconv.Atoi(settings.QueryTimeout)
 	if err != nil {
@@ -150,12 +150,17 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		return nil, err
 	}
 
+	// merge settings.HttpHeaders with message httpHeaders
+	for k, v := range settings.HttpHeaders {
+		httpHeaders[k] = v
+	}
+
 	opts := &clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
 		},
 		TLS:         tlsConfig,
-		Addr:        []string{fmt.Sprintf("%s:%d", settings.Server, settings.Port)},
+		Addr:        []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
 		HttpUrlPath: settings.Path,
 		HttpHeaders: httpHeaders,
 		Auth: clickhouse.Auth{
@@ -247,7 +252,7 @@ func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.D
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders: settings.ForwardHeaders,
+		ForwardHeaders: settings.ForwardGrafanaHeaders,
 	}
 }
 
@@ -274,8 +279,8 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
-		if frame.Meta.PreferredVisualization != data.VisType(data.VisTypeTrace) &&
-			frame.Meta.PreferredVisualization != data.VisType(data.VisTypeTable) {
+		if frame.Meta.PreferredVisualization != data.VisTypeTrace &&
+			frame.Meta.PreferredVisualization != data.VisTypeTable {
 			var fields []*data.Field
 			for _, field := range frame.Fields {
 				values := make([]*string, field.Len())

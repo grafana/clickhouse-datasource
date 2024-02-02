@@ -4,9 +4,11 @@ import {
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
+  DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
+  LogRowModel,
   MetricFindValue,
   QueryFixAction,
   ScopedVars,
@@ -15,21 +17,23 @@ import {
   vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
+import { CHConfig } from 'types/config';
+import { EditorType, CHQuery } from 'types/sql';
 import {
-  BuilderMetricField,
-  BuilderMetricFieldAggregation,
+  QueryType,
+  AggregateColumn,
+  AggregateType,
   BuilderMode,
-  CHConfig,
-  CHQuery,
   Filter,
   FilterOperator,
-  Format,
-  FullField,
+  TableColumn,
   OrderByDirection,
-  QueryType,
-  SqlBuilderOptionsAggregate,
-} from '../types';
+  QueryBuilderOptions,
+  ColumnHint,
+  TimeUnit,
+  SelectedColumn,
+} from 'types/queryBuilder';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
@@ -40,11 +44,16 @@ import {
   queryLogsVolume,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { getSQLFromQueryOptions } from '../components/queryBuilder/utils';
+import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { versions as otelVersions } from 'otel';
+import { ReactNode } from 'react';
+import { transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { pluginVersion } from 'utils/version';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
-  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>
+  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>,
+  DataSourceWithLogsContextSupport<CHQuery>
 {
   // This enables default annotation support for 7.2+
   annotations = {};
@@ -114,62 +123,76 @@ export class Datasource
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
-      query.format !== Format.LOGS ||
-      query.queryType !== QueryType.Builder ||
+      query.editorType !== EditorType.Builder ||
+      query.builderOptions.queryType !== QueryType.Logs ||
       query.builderOptions.mode !== BuilderMode.List ||
-      query.builderOptions.timeField === undefined ||
-      query.builderOptions.database === undefined ||
-      query.builderOptions.table === undefined
+      query.builderOptions.database === '' ||
+      query.builderOptions.table === ''
     ) {
       return undefined;
     }
 
-    const timeFieldRoundingClause = getTimeFieldRoundingClause(
-      logsVolumeRequest.scopedVars,
-      query.builderOptions.timeField
-    );
-    const fields: string[] = [];
-    const metrics: BuilderMetricField[] = [];
-    // could be undefined or an empty string (if user deselects the field)
-    if (query.builderOptions.logLevelField) {
-      // Generate "fields" like
+    
+
+    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time);
+    if (timeColumn === undefined) {
+      return undefined;
+    }
+
+    const columns: SelectedColumn[] = [];
+    const aggregates: AggregateColumn[] = [];
+    columns.push({
+      name: getTimeFieldRoundingClause(logsVolumeRequest.scopedVars, timeColumn.name),
+      alias: TIME_FIELD_ALIAS,
+      hint: ColumnHint.Time
+    });
+
+    const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
+    if (logLevelColumn) {
+      // Generates aggregates like
       // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
-      const llf = `toString("${query.builderOptions.logLevelField}")`;
+      const llf = `toString("${logLevelColumn.name}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
-        fields.push(`sum(${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}) AS ${level}`);
+        aggregates.push({ aggregateType: AggregateType.Sum, column: `${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}`, alias: level });
       }
     } else {
-      metrics.push({
-        aggregation: BuilderMetricFieldAggregation.Count,
+      // Count all logs if level column isn't selected
+      aggregates.push({
+        aggregateType: AggregateType.Count,
+        column: '*',
         alias: DEFAULT_LOGS_ALIAS,
-        field: '*',
       });
     }
 
-    const logVolumeSqlBuilderOptions: SqlBuilderOptionsAggregate = {
-      mode: BuilderMode.Aggregate,
+    const filters = (query.builderOptions.filters?.slice() || []).map(f => {
+      // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
+      // For this histogram query the "level" column isn't selected, so we must find the original column name
+      if (f.hint && !f.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
+        f.key = originalColumn?.alias || originalColumn?.name || '';
+      }
+
+      return f;
+    });
+
+    const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
       database: query.builderOptions.database,
       table: query.builderOptions.table,
-      filters: query.builderOptions.filters,
-      fields,
-      metrics,
-      groupBy: [`${timeFieldRoundingClause} AS ${TIME_FIELD_ALIAS}`],
-      orderBy: [
-        {
-          name: TIME_FIELD_ALIAS,
-          dir: OrderByDirection.ASC,
-        },
-      ],
+      queryType: QueryType.TimeSeries,
+      filters,
+      columns,
+      aggregates,
+      orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
     };
 
-    const logVolumeSupplementaryQuery = getSQLFromQueryOptions(logVolumeSqlBuilderOptions);
+    const logVolumeSupplementaryQuery = generateSql(logVolumeSqlBuilderOptions);
     return {
-      format: Format.AUTO,
-      queryType: QueryType.SQL,
+      pluginVersion,
+      editorType: EditorType.Builder,
+      builderOptions: logVolumeSqlBuilderOptions,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
-      selectedFormat: Format.AUTO,
     };
   }
 
@@ -181,17 +204,16 @@ export class Datasource
     if (this.adHocFiltersStatus === AdHocFilterStatus.none) {
       this.adHocFiltersStatus = await this.canUseAdhocFilters();
     }
-    const chQuery = isString(query) ? { rawSql: query, queryType: QueryType.SQL } : query;
+    const chQuery = isString(query) ? { rawSql: query, editorType: EditorType.SQL } : query;
 
-    if (!(chQuery.queryType === QueryType.SQL || chQuery.queryType === QueryType.Builder || !chQuery.queryType)) {
+    if (!(chQuery.editorType === EditorType.SQL || chQuery.editorType === EditorType.Builder || !chQuery.editorType)) {
       return [];
     }
 
     if (!chQuery.rawSql) {
       return [];
     }
-    const q = { ...chQuery, queryType: chQuery.queryType || QueryType.SQL };
-    const frame = await this.runQuery(q, options);
+    const frame = await this.runQuery(chQuery, options);
     if (frame.fields?.length === 0) {
       return [];
     }
@@ -253,67 +275,77 @@ export class Datasource
     return rawQuery;
   }
 
+  // Support filtering by field value in Explore
   modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
-    // support filtering by field value in Explore
-    if (
-      query.queryType === QueryType.Builder &&
-      action.options !== undefined &&
-      'key' in action.options &&
-      'value' in action.options
-    ) {
-      let filters: Filter[] = query.builderOptions.filters || [];
-      if (action.type === 'ADD_FILTER') {
-        // we need to remove *any other EQ or NE* for the same field,
-        // because we don't want to end up with two filters like `level=info` AND `level=error`
-        filters = (query.builderOptions.filters ?? []).filter(
-          (f) =>
-            !(
-              f.type === 'string' &&
-              f.key === action.options?.key &&
-              (f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
-            )
-        );
-        filters.push({
-          condition: 'AND',
-          key: action.options.key,
-          type: 'string',
-          filterType: 'custom',
-          operator: FilterOperator.Equals,
-          value: action.options.value,
-        });
-      } else if (action.type === 'ADD_FILTER_OUT') {
-        // with this we might want to add multiple values as NE filters
-        // for example, `level != info` AND `level != debug`
-        // thus, here we remove only exactly matching NE filters or an existing EQ filter for this field
-        filters = (query.builderOptions.filters ?? []).filter(
-          (f) =>
-            !(
-              (f.type === 'string' &&
-                f.key === action.options?.key &&
-                'value' in f &&
-                f.value === action.options?.value &&
-                f.operator === FilterOperator.NotEquals) ||
-              (f.type === 'string' && f.key === action.options?.key && f.operator === FilterOperator.Equals)
-            )
-        );
-        filters.push({
-          condition: 'AND',
-          key: action.options.key,
-          type: 'string',
-          filterType: 'custom',
-          operator: FilterOperator.NotEquals,
-          value: action.options.value,
-        });
-      }
-      const updatedBuilder = { ...query.builderOptions, filters };
-      return {
-        ...query,
-        // the query is updated to trigger the URL update and propagation to the panels
-        rawSql: getSQLFromQueryOptions(updatedBuilder),
-        builderOptions: updatedBuilder,
-      };
+    if (query.editorType !== EditorType.Builder || !action.options || !action.options.key || !action.options.value) {
+      return query;
     }
-    return query;
+
+    const columnName = action.options.key;
+    const actionValue = action.options.value;
+
+    // Find selected column by alias/name
+    const lookupByAlias = query.builderOptions.columns?.find(c => c.alias === columnName); // Check all aliases first,
+    const lookupByName = query.builderOptions.columns?.find(c => c.name === columnName);   // then try matching column name
+    const lookupByLogsAlias = logAliasToColumnHints.has(columnName) ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!) : undefined;
+    const column = lookupByAlias || lookupByName || lookupByLogsAlias;
+    
+    let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
+    if (action.type === 'ADD_FILTER') {
+      // we need to remove *any other EQ or NE* for the same field,
+      // because we don't want to end up with two filters like `level=info` AND `level=error`
+      nextFilters = nextFilters.filter(f =>
+        !(
+          f.type === 'string' &&
+          ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
+          (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
+        )
+      );
+      nextFilters.push({
+        condition: 'AND',
+        key: (column && column.hint) ? '' : columnName,
+        hint: (column && column.hint) ? column.hint : undefined,
+        type: 'string',
+        filterType: 'custom',
+        operator: FilterOperator.Equals,
+        value: actionValue,
+      });
+    } else if (action.type === 'ADD_FILTER_OUT') {
+      // with this we might want to add multiple values as NE filters
+      // for example, `level != info` AND `level != debug`
+      // thus, here we remove only exactly matching NE filters or an existing EQ filter for this field
+      nextFilters = nextFilters.filter(f =>
+        !(
+          (f.type === 'string' &&
+            ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
+            'value' in f && f.value === actionValue &&
+            (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.NotEquals)
+          ) ||
+          (
+            f.type === 'string' &&
+            ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
+            (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
+          )
+        )
+      );
+      nextFilters.push({
+        condition: 'AND',
+        key: (column && column.hint) ? '' : columnName,
+        hint: (column && column.hint) ? column.hint : undefined,
+        type: 'string',
+        filterType: 'custom',
+        operator: FilterOperator.NotEquals,
+        value: actionValue,
+      });
+    }
+
+    // the query is updated to trigger the URL update and propagation to the panels
+    const nextOptions = { ...query.builderOptions, filters: nextFilters };
+    return {
+      ...query,
+      rawSql: generateSql(nextOptions),
+      builderOptions: nextOptions,
+    };
   }
 
   private getMacroArgs(query: string, argsIndex: number): string[] {
@@ -356,8 +388,98 @@ export class Datasource
     return value;
   }
 
-  getDefaultDatabase() {
-    return this.settings.jsonData.defaultDatabase;
+  getDefaultDatabase(): string {
+    return this.settings.jsonData.defaultDatabase || 'default';
+  }
+
+  getDefaultTable(): string | undefined {
+    return this.settings.jsonData.defaultTable;
+  }
+
+  getDefaultLogsDatabase(): string | undefined {
+    return this.settings.jsonData.logs?.defaultDatabase;
+  }
+
+  getDefaultLogsTable(): string | undefined {
+    return this.settings.jsonData.logs?.defaultTable;
+  }
+
+  getDefaultLogsColumns(): Map<ColumnHint, string> {
+    const result = new Map<ColumnHint, string>();
+    const logsConfig = this.settings.jsonData.logs;
+    if (!logsConfig) {
+      return result;
+    }
+
+    const otelEnabled = logsConfig.otelEnabled;
+    const otelVersion = logsConfig.otelVersion;
+
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    if (otelEnabled && otelConfig) {
+      return otelConfig.logColumnMap;
+    }
+
+    logsConfig.timeColumn && result.set(ColumnHint.Time, logsConfig.timeColumn);
+    logsConfig.levelColumn && result.set(ColumnHint.LogLevel, logsConfig.levelColumn);
+    logsConfig.messageColumn && result.set(ColumnHint.LogMessage, logsConfig.messageColumn);
+
+    return result;
+  }
+
+  /**
+   * Get configured OTEL version for logs. Returns undefined when versioning is disabled/unset.
+   */
+  getLogsOtelVersion(): string | undefined {
+    const logConfig = this.settings.jsonData.logs;
+    return logConfig?.otelEnabled ? (logConfig.otelVersion || undefined) : undefined;
+  }
+
+  getDefaultTraceDatabase(): string | undefined {
+    return this.settings.jsonData.traces?.defaultDatabase;
+  }
+
+  getDefaultTraceTable(): string | undefined {
+    return this.settings.jsonData.traces?.defaultTable;
+  }
+
+  getDefaultTraceColumns(): Map<ColumnHint, string> {
+    const result = new Map<ColumnHint, string>();
+    const traceConfig = this.settings.jsonData.traces;
+    if (!traceConfig) {
+      return result;
+    }
+
+    const otelEnabled = traceConfig.otelEnabled;
+    const otelVersion = traceConfig.otelVersion;
+
+    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    if (otelEnabled && otelConfig) {
+      return otelConfig.traceColumnMap;
+    }
+
+    traceConfig.traceIdColumn && result.set(ColumnHint.TraceId, traceConfig.traceIdColumn);
+    traceConfig.spanIdColumn && result.set(ColumnHint.TraceSpanId, traceConfig.spanIdColumn);
+    traceConfig.operationNameColumn && result.set(ColumnHint.TraceOperationName, traceConfig.operationNameColumn);
+    traceConfig.parentSpanIdColumn && result.set(ColumnHint.TraceParentSpanId, traceConfig.parentSpanIdColumn);
+    traceConfig.serviceNameColumn && result.set(ColumnHint.TraceServiceName, traceConfig.serviceNameColumn);
+    traceConfig.durationColumn && result.set(ColumnHint.TraceDurationTime, traceConfig.durationColumn);
+    traceConfig.startTimeColumn && result.set(ColumnHint.Time, traceConfig.startTimeColumn);
+    traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
+    traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
+
+    return result;
+  }
+
+  /**
+   * Get configured OTEL version for traces. Returns undefined when versioning is disabled/unset.
+   */
+  getTraceOtelVersion(): string | undefined {
+    const traceConfig = this.settings.jsonData.traces;
+    return traceConfig?.otelEnabled ? (traceConfig.otelVersion || undefined) : undefined;
+  }
+
+  getDefaultTraceDurationUnit(): TimeUnit {
+    return this.settings.jsonData.traces?.durationUnit as TimeUnit || TimeUnit.Nanoseconds;
   }
 
   async fetchDatabases(): Promise<string[]> {
@@ -369,6 +491,17 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
+  /**
+   * Used to populate suggestions in the filter editor for Map columns.
+   * 
+   * Samples rows to get a unique set of keys for the map.
+   * May not include ALL keys for a given dataset.
+   */
+  async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
   async fetchEntities() {
     return this.fetchTables();
   }
@@ -377,7 +510,7 @@ export class Datasource
     return this.fetchData(`DESC TABLE "${database}"."${table}"`);
   }
 
-  async fetchFieldsFull(database: string | undefined, table: string): Promise<FullField[]> {
+  async fetchColumnsFull(database: string | undefined, table: string): Promise<TableColumn[]> {
     const prefix = Boolean(database) ? `"${database}".` : '';
     const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
@@ -385,7 +518,7 @@ export class Datasource
       return [];
     }
     const view = new DataFrameView(frame);
-    return view.map((item) => ({
+    return view.map(item => ({
       name: item[0],
       type: item[1],
       label: item[0],
@@ -417,7 +550,7 @@ export class Datasource
         return {
           ...t,
           meta: {
-            ...t.meta,
+            ...t?.meta,
             timezone: this.getTimezone(request),
           },
         };
@@ -426,7 +559,7 @@ export class Datasource
     return super.query({
       ...request,
       targets,
-    });
+    }).pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
@@ -561,6 +694,19 @@ export class Datasource
       console.error(`Unable to parse ClickHouse version: ${err}`);
       throw err;
     }
+  }
+
+  // interface DataSourceWithLogsContextSupport
+  async getLogRowContext(row: LogRowModel, options?: any | undefined, query?: CHQuery | undefined): Promise<DataQueryResponse> {
+    return {} as DataQueryResponse;
+  }
+
+  showContextToggle(row?: LogRowModel): boolean {
+    return false;
+  }
+  
+  getLogRowContextUi(row: LogRowModel, runContextQuery?: (() => void) | undefined): ReactNode {
+    return false;
   }
 }
 
