@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.2
+
+### Fixes
+
+- Fixed migration script not running when opening an existing v3 config
+
 ## 4.0.1
 
 ### Fixes
