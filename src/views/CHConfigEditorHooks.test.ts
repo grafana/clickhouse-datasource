@@ -228,6 +228,21 @@ describe('useConfigDefaults', () => {
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
   });
 
+  it('should apply defaults for unset config fields', async () => {
+    const onOptionsChange = jest.fn();
+    const options = {
+      jsonData: {}
+    } as any as DataSourceSettings<CHConfig>;
+
+    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+
+    const expectedOptions = {
+      jsonData: { ...expectedDefaults }
+    };
+    expect(onOptionsChange).toHaveBeenCalledTimes(1);
+    expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
+  });
+
   it('should not call onOptionsChange after defaults are already set', async () => {
     const onOptionsChange = jest.fn();
     const options = {
