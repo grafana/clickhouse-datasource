@@ -18,7 +18,7 @@ import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from 'labels';
-import { onHttpHeadersChange, useConfigDefaults, useMigrateV3Config } from './CHConfigEditorHooks';
+import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -35,7 +35,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     { label: 'HTTP', value: Protocol.Http },
   ];
 
-  useMigrateV3Config(options, onOptionsChange);
   useConfigDefaults(options, onOptionsChange);
 
   const onPortChange = (port: string) => {
