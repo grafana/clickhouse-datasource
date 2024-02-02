@@ -1,44 +1,7 @@
 import { DataSourceSettings, KeyValue } from "@grafana/data";
 import { useEffect, useRef } from "react";
 import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
-// import { getLatestVersion } from "otel";
 import { pluginVersion } from "utils/version";
-
-/**
- * Migrates v3 config to latest config schema.
- * Copies and removes old "server" to "host" field
- * Copies and removes old "timeout" to "dialTimeout" field
- */
-export const useMigrateV3Config = (options: DataSourceSettings<CHConfig, CHSecureConfig>, onOptionsChange: (opts: DataSourceSettings<CHConfig, CHSecureConfig>) => void) => {
-  const { jsonData } = options;
-  const v3ServerField = (jsonData as any)['server'];
-  const v3TimeoutField = (jsonData as any)['timeout'];
-
-  const migrated = useRef<boolean>(!v3ServerField && !v3TimeoutField);
-  useEffect(() => {
-    if (migrated.current) {
-      return;
-    }
-    const nextJsonOptions = { ...options.jsonData };
-    nextJsonOptions.version = pluginVersion;
-
-    if (v3ServerField && !nextJsonOptions.host) {
-      nextJsonOptions.host = v3ServerField;
-    }
-    delete (nextJsonOptions as any)['server'];
-
-    if (v3TimeoutField && !nextJsonOptions.dialTimeout) {
-      nextJsonOptions.dialTimeout = v3TimeoutField;
-    }
-    delete (nextJsonOptions as any)['timeout'];
-
-    onOptionsChange({
-      ...options,
-      jsonData: nextJsonOptions,
-    });
-    migrated.current = true;
-  }, [v3ServerField, v3TimeoutField, options, onOptionsChange]);
-};
 
 /**
  * Handles saving HTTP headers to Grafana config.
@@ -97,7 +60,7 @@ export const onHttpHeadersChange = (headers: CHHttpHeader[], options: DataSource
 }
 
 /**
- * Applies default settings to config options.
+ * Applies default settings and migrations to config options.
  */
 export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptionsChange: (opts: DataSourceSettings<CHConfig>) => void) => {
   const appliedDefaults = useRef<boolean>(false);
@@ -109,28 +72,24 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
     const jsonData = { ...options.jsonData };
     jsonData.version = pluginVersion; // Always overwrite version
 
+    // v3 Migration
+
+    const v3ServerField = (jsonData as any)['server'];
+    if (v3ServerField && !jsonData.host) {
+      jsonData.host = v3ServerField;
+    }
+    delete (jsonData as any)['server'];
+
+    const v3TimeoutField = (jsonData as any)['timeout'];
+    if (v3TimeoutField && !jsonData.dialTimeout) {
+      jsonData.dialTimeout = v3TimeoutField;
+    }
+    delete (jsonData as any)['timeout'];
+
+    // Defaults
+
     if (!jsonData.protocol) {
       jsonData.protocol = Protocol.Native;
-    }
-
-    // const latestOtelVersion = getLatestVersion();
-
-    // TODO: Should OTel be enabled by default for new datasources?
-
-    if (!jsonData.logs) {
-      // jsonData.logs = {
-      //   defaultTable: latestOtelVersion.logsTable,
-      //   otelEnabled: true,
-      //   otelVersion: latestOtelVersion.version
-      // };
-    }
-
-    if (!jsonData.traces) {
-      // jsonData.traces = {
-      //   defaultTable: latestOtelVersion.traceTable,
-      //   otelEnabled: true,
-      //   otelVersion: latestOtelVersion.version
-      // };
     }
 
     onOptionsChange({
