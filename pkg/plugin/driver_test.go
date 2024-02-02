@@ -1134,19 +1134,16 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	secure := map[string]string{}
 	secure["password"] = password
 
-	proxyEnsureNoHeaderHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "", req.Header.Get("X-Test"))
-		req.URL.Scheme = "http"
-		req.URL.Host = fmt.Sprintf("%s:%s", host, port)
-		proxy.ServeHTTP(w, req)
-	})
-
-	proxyEnsureHeaderHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		assert.Equal(t, "Hello World!", req.Header.Get("X-Test"))
-		req.URL.Scheme = "http"
-		req.URL.Host = fmt.Sprintf("%s:%s", host, port)
-		proxy.ServeHTTP(w, req)
-	})
+	proxyHandlerGenerator := func(t *testing.T, expectedHeaders map[string]string) http.HandlerFunc {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			for k, v := range expectedHeaders {
+				assert.Equal(t, v, req.Header.Get(k))
+			}
+			req.URL.Scheme = "http"
+			req.URL.Host = fmt.Sprintf("%s:%s", host, port)
+			proxy.ServeHTTP(w, req)
+		})
+	}
 
 	req := &backend.QueryDataRequest{
 		PluginContext: backend.PluginContext{},
@@ -1164,8 +1161,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		},
 	}
 	t.Run("should not forward http headers", func(t *testing.T) {
-		proxy.NonproxyHandler = proxyEnsureNoHeaderHandler
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": false}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": ""})
 		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
 		assert.Equal(t, nil, err)
 
@@ -1173,7 +1170,6 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		assert.Equal(t, true, ok)
 
 		// We test that the X-Test header is absent
-		proxy.NonproxyHandler = proxyEnsureNoHeaderHandler
 		req.PluginContext.DataSourceInstanceSettings = &settings
 		_, err = ds.QueryData(context.Background(), req)
 
@@ -1181,8 +1177,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	})
 
 	t.Run("should forward http headers", func(t *testing.T) {
-		proxy.NonproxyHandler = proxyEnsureNoHeaderHandler
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": ""})
 		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
 		assert.Equal(t, nil, err)
 
@@ -1190,7 +1186,41 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		assert.Equal(t, true, ok)
 
 		// We test that the X-Test header exists
-		proxy.NonproxyHandler = proxyEnsureHeaderHandler
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Hello World!"})
+		req.PluginContext.DataSourceInstanceSettings = &settings
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
+	})
+
+	t.Run("should forward http headers alongside custom http headers", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true, "httpHeaders": [{ "name": "custom-test-header", "value": "value-1", "secure": false}]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1"})
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We test that the X-Test header exists
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1", "X-Test": "Hello World!"})
+		req.PluginContext.DataSourceInstanceSettings = &settings
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
+	})
+
+	t.Run("should override forward headers with custom http headers", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true, "httpHeaders": [{ "name": "X-Test", "value": "Override", "secure": false}]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We test that the X-Test header exists
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
 		req.PluginContext.DataSourceInstanceSettings = &settings
 		_, err = ds.QueryData(context.Background(), req)
 
