@@ -19,10 +19,11 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
   const container = editor.getDomNode();
   const updateHeight = () => {
     if (container) {
-      const contentHeight = Math.min(1000, editor.getContentHeight());
+      const contentHeight = Math.max(100, Math.min(1000, editor.getContentHeight()));
       const width = parseInt(container.style.width, 10);
       container.style.width = `${width}px`;
       container.style.height = `${contentHeight}px`;
+      console.log('contentHeight', contentHeight, 'width', width);
       editor.layout({ width, height: contentHeight });
     }
   };
