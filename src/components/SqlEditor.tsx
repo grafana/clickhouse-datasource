@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { CoreApp, QueryEditorProps } from '@grafana/data';
 import { CodeEditor, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
