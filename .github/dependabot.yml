@@ -13,6 +13,14 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    groups:
+      dependencies:
+        patterns:
+          - "@grafana/*"
+      dev-dependencies:
+        patterns:
+          - "@grafana/e2e*"
+
     # Ignore most dependencies that are maintained via the create-plugin tool
     # See https://github.com/grafana/plugin-tools/blob/main/packages/create-plugin/templates/common/package.json
     ignore:
