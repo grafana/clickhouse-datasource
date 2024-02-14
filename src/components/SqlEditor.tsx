@@ -23,7 +23,6 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
       const width = parseInt(container.style.width, 10);
       container.style.width = `${width}px`;
       container.style.height = `${contentHeight}px`;
-      console.log('contentHeight', contentHeight, 'width', width);
       editor.layout({ width, height: contentHeight });
     }
   };
