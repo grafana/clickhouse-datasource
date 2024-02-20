@@ -1,12 +1,10 @@
-package macros_test
+package macros
 
 import (
 	"fmt"
 	"testing"
 	"time"
 
-	"github.com/grafana/clickhouse-datasource/pkg/macros"
-	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/sqlds/v2"
 	"github.com/stretchr/testify/assert"
@@ -22,9 +20,40 @@ type MockDB struct {
 }
 
 func (h *ClickhouseDriver) Macros() sqlds.Macros {
-	var C = plugin.Clickhouse{}
+	return Macros
+}
 
-	return C.Macros()
+func TestTimeToDate(t *testing.T) {
+	d, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+
+	expected := "toDate('2014-11-12')"
+	result := timeToDate(d)
+
+	if expected != result {
+		t.Errorf("unexpected output. expected: %s got: %s", expected, result)
+	}
+}
+
+func TestTimeToDateTime(t *testing.T) {
+	dt := time.Unix(1708430068, 0)
+
+	expected := "toDateTime(1708430068)"
+	result := timeToDateTime(dt)
+
+	if expected != result {
+		t.Errorf("unexpected output. expected: %s got: %s", expected, result)
+	}
+}
+
+func TestTimeToDateTime64(t *testing.T) {
+	dt := time.UnixMilli(1708430068123)
+
+	expected := "fromUnixTimestamp64Milli(1708430068123)"
+	result := timeToDateTime64(dt)
+
+	if expected != result {
+		t.Errorf("unexpected output. expected: %s got: %s", expected, result)
+	}
 }
 
 func TestMacroFromTimeFilter(t *testing.T) {
@@ -43,13 +72,13 @@ func TestMacroFromTimeFilter(t *testing.T) {
 		name    string
 	}{
 		{
-			name: "should return timefilter",
-			want: "toDateTime64(1415792726371/1000, 3)",
+			name: "should return timeFilter",
+			want: "toDateTime(1415792726)",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := macros.FromTimeFilter(&query, []string{})
+			got, err := FromTimeFilter(&query, []string{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("macroFromTimeFilter() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -75,15 +104,79 @@ func TestMacroToTimeFilter(t *testing.T) {
 		name    string
 	}{
 		{
-			name: "should return timefilter",
-			want: "toDateTime64(1447328726371/1000, 3)",
+			name: "should return timeFilter",
+			want: "toDateTime(1447328726)",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := macros.ToTimeFilter(&query, []string{})
+			got, err := ToTimeFilter(&query, []string{})
 			if (err != nil) != tt.wantErr {
 				t.Errorf("macroToTimeFilter() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestMacroFromTimeFilterMs(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	query := sqlds.Query{
+		TimeRange: backend.TimeRange{
+			From: from,
+			To:   to,
+		},
+		RawSQL: "select foo from foo where bar > $__fromTime",
+	}
+	tests := []struct {
+		want    string
+		wantErr bool
+		name    string
+	}{
+		{
+			name: "should return timeFilter_ms",
+			want: "fromUnixTimestamp64Milli(1415792726371)",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := FromTimeFilterMs(&query, []string{})
+			if (err != nil) != tt.wantErr {
+				t.Errorf("macroFromTimeFilterMs() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestMacroToTimeFilterMs(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	query := sqlds.Query{
+		TimeRange: backend.TimeRange{
+			From: from,
+			To:   to,
+		},
+		RawSQL: "select foo from foo where bar > $__toTime",
+	}
+	tests := []struct {
+		want    string
+		wantErr bool
+		name    string
+	}{
+		{
+			name: "should return timeFilter_ms",
+			want: "fromUnixTimestamp64Milli(1447328726371)",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ToTimeFilterMs(&query, []string{})
+			if (err != nil) != tt.wantErr {
+				t.Errorf("macroToTimeFilterMs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -100,9 +193,9 @@ func TestMacroDateFilter(t *testing.T) {
 			To:   to,
 		},
 	}
-	got, err := macros.DateFilter(&query, []string{"dateCol"})
+	got, err := DateFilter(&query, []string{"dateCol"})
 	assert.Nil(t, err)
-	assert.Equal(t, "dateCol >= '2014-11-12' AND dateCol <= '2015-11-12'", got)
+	assert.Equal(t, "dateCol >= toDate('2014-11-12') AND dateCol <= toDate('2015-11-12')", got)
 }
 
 func TestMacroTimeInterval(t *testing.T) {
@@ -110,7 +203,7 @@ func TestMacroTimeInterval(t *testing.T) {
 		RawSQL:   "select $__timeInterval(col) from foo",
 		Interval: time.Duration(20000000000),
 	}
-	got, err := macros.TimeInterval(&query, []string{"col"})
+	got, err := TimeInterval(&query, []string{"col"})
 	assert.Nil(t, err)
 	assert.Equal(t, "toStartOfInterval(toDateTime(col), INTERVAL 20 second)", got)
 }
@@ -120,7 +213,7 @@ func TestMacroTimeIntervalMs(t *testing.T) {
 		RawSQL:   "select $__timeInterval_ms(col) from foo",
 		Interval: time.Duration(20000000000),
 	}
-	got, err := macros.TimeIntervalMs(&query, []string{"col"})
+	got, err := TimeIntervalMs(&query, []string{"col"})
 	assert.Nil(t, err)
 	assert.Equal(t, "toStartOfInterval(toDateTime64(col, 3), INTERVAL 20000 millisecond)", got)
 }
@@ -130,15 +223,15 @@ func TestMacroIntervalSeconds(t *testing.T) {
 		RawSQL:   "select toStartOfInterval(col, INTERVAL $__interval_s second) AS time from foo",
 		Interval: time.Duration(20000000000),
 	}
-	got, err := macros.IntervalSeconds(&query, []string{})
+	got, err := IntervalSeconds(&query, []string{})
 	assert.Nil(t, err)
 	assert.Equal(t, "20", got)
 }
 
 // test sqlds query interpolation with clickhouse filters used
 func TestInterpolate(t *testing.T) {
-	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
-	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.123Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.456Z")
 
 	tableName := "my_table"
 	tableColumn := "my_col"
@@ -150,10 +243,14 @@ func TestInterpolate(t *testing.T) {
 	}
 
 	tests := []test{
-		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= toDateTime64(1415792726371/1000, 3) AND cast(sth as timestamp) <= toDateTime64(1447328726371/1000, 3)", name: "clickhouse timeFilter"},
-		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime64(1415792726371/1000, 3) AND cast(sth as timestamp) <= toDateTime64(1447328726371/1000, 3)", name: "clickhouse timeFilter with empty spaces"},
-		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime64(1415792726371/1000, 3) and date <= toDateTime64(1447328726371/1000, 3) ) limit 100", name: "clickhouse fromTime and toTime"},
-		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime64(1415792726371/1000, 3) ) and ( date <= toDateTime64(1447328726371/1000, 3) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter"},
+		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter with empty spaces"},
+		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms"},
+		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms with empty spaces"},
+		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(1415792726) and date <= toDateTime(1447328726) ) limit 100", name: "clickhouse fromTime and toTime"},
+		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(1415792726) ) and ( date <= toDateTime(1447328726) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
+		{input: "select * from foo where ( date >= $__fromTime_ms and date <= $__toTime_ms ) limit 100", output: "select * from foo where ( date >= fromUnixTimestamp64Milli(1415792726123) and date <= fromUnixTimestamp64Milli(1447328726456) ) limit 100", name: "clickhouse fromTime_ms and toTime_ms"},
+		{input: "select * from foo where ( date >= $__fromTime_ms ) and ( date <= $__toTime_ms ) limit 100", output: "select * from foo where ( date >= fromUnixTimestamp64Milli(1415792726123) ) and ( date <= fromUnixTimestamp64Milli(1447328726456) ) limit 100", name: "clickhouse fromTime_ms and toTime_ms inside a complex clauses"},
 	}
 
 	for i, tc := range tests {
