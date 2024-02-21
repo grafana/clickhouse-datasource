@@ -310,7 +310,7 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 	//     "x-grafana-user": ["admin"]
 	//   }
 	// }
-	if message == nil || len(message) == 0 {
+	if len(message) == 0 {
 		message = []byte("{}")
 	}
 
