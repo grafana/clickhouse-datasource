@@ -1,25 +1,12 @@
 package macros
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"strings"
 	"time"
 
 	"github.com/grafana/sqlds/v2"
-)
-
-var (
-	ErrorNoArgumentsToMacro           = errors.New("expected minimum of 1 argument. But no argument found")
-	ErrorInsufficientArgumentsToMacro = errors.New("expected number of arguments not matching")
-)
-
-type timeQueryType string
-
-const (
-	timeQueryTypeFrom timeQueryType = "from"
-	timeQueryTypeTo   timeQueryType = "to"
 )
 
 // Converts a time.Time to a Date
