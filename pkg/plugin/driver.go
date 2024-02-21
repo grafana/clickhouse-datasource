@@ -216,16 +216,7 @@ func (h *Clickhouse) Converters() []sqlutil.Converter {
 
 // Macros returns list of macro functions convert the macros of raw query
 func (h *Clickhouse) Macros() sqlds.Macros {
-	return map[string]sqlds.MacroFunc{
-		"fromTime":        macros.FromTimeFilter,
-		"toTime":          macros.ToTimeFilter,
-		"timeFilter_ms":   macros.TimeFilterMs,
-		"timeFilter":      macros.TimeFilter,
-		"dateFilter":      macros.DateFilter,
-		"timeInterval_ms": macros.TimeIntervalMs,
-		"timeInterval":    macros.TimeInterval,
-		"interval_s":      macros.IntervalSeconds,
-	}
+	return macros.Macros
 }
 
 func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.DriverSettings {

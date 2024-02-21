@@ -543,9 +543,9 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
     case TimeUnit.Milliseconds:
       return `${columnIdentifier} as ${alias}`;
     case TimeUnit.Microseconds:
-      return `intDivOrZero(${columnIdentifier}, 1000) as ${alias}`;
+      return `multiply(${columnIdentifier}, 0.001) as ${alias}`;
     case TimeUnit.Nanoseconds:
-      return `intDivOrZero(${columnIdentifier}, 1000000) as ${alias}`;
+      return `multiply(${columnIdentifier}, 0.000001) as ${alias}`;
     default:
       return `${columnIdentifier} as ${alias}`;
   }
