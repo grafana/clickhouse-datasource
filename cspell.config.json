@@ -70,6 +70,9 @@
     "Ulimits",
     "uuidv",
     "vectorator",
-    "WorkDir"
+    "WorkDir",
+    "elazarl",
+    "goproxy",
+    "Nonproxy"
   ]
 }
