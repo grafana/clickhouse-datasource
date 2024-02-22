@@ -1,4 +1,5 @@
 import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
+import { getVersion as getOtelVersion } from 'otel';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -145,12 +146,24 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
   const selectPartsSql = selectParts.join(', ');
 
+  // Optimize trace ID filtering for OTel enabled trace lookups
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
+  const otelVersion = getOtelVersion(options.meta?.otelVersion);
+  const applyTraceIdOptimization = options.meta?.otelEnabled && hasTraceIdFilter && otelVersion;
+  if (applyTraceIdOptimization) {
+    const traceId = options.meta!.traceId;
+    const timestampTable = getTableIdentifier(database, otelVersion.traceTimestampTable);
+    queryParts.push('WITH');
+    queryParts.push(`'${traceId}' as trace_id,`);
+    queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
+    queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = trace_id) as trace_end`);
+  }
+
   queryParts.push('SELECT');
   queryParts.push(selectPartsSql);
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
   const filterParts = getFilters(options);
 
   if (hasTraceIdFilter || filterParts) {
@@ -158,11 +171,23 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (hasTraceIdFilter) {
-    const traceId = options.meta!.traceId;
-    queryParts.push(`traceID = '${traceId}'`);
+    if (applyTraceIdOptimization) {
+      queryParts.push('traceID = trace_id');
+      queryParts.push('AND');
+      queryParts.push(`startTime >= trace_start`);
+      queryParts.push('AND');
+      queryParts.push(`startTime <= trace_end`);
+    } else {
+      const traceId = options.meta!.traceId;
+      queryParts.push(`traceID = '${traceId}'`);
+    }
   }
 
   if (filterParts) {
+    if (hasTraceIdFilter) {
+      queryParts.push('AND');
+    }
+
     queryParts.push(filterParts);
   }
 
