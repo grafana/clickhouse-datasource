@@ -149,7 +149,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // Optimize trace ID filtering for OTel enabled trace lookups
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
   const otelVersion = getOtelVersion(options.meta?.otelVersion);
-  const applyTraceIdOptimization = options.meta?.otelEnabled && hasTraceIdFilter && otelVersion;
+  const applyTraceIdOptimization = hasTraceIdFilter && options.meta?.otelEnabled && otelVersion;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
     const timestampTable = getTableIdentifier(database, otelVersion.traceTimestampTable);
@@ -170,17 +170,15 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     queryParts.push('WHERE');
   }
 
-  if (hasTraceIdFilter) {
-    if (applyTraceIdOptimization) {
-      queryParts.push('traceID = trace_id');
-      queryParts.push('AND');
-      queryParts.push(`startTime >= trace_start`);
-      queryParts.push('AND');
-      queryParts.push(`startTime <= trace_end`);
-    } else {
-      const traceId = options.meta!.traceId;
-      queryParts.push(`traceID = '${traceId}'`);
-    }
+  if (applyTraceIdOptimization) {
+    queryParts.push('traceID = trace_id');
+    queryParts.push('AND');
+    queryParts.push(`startTime >= trace_start`);
+    queryParts.push('AND');
+    queryParts.push(`startTime <= trace_end`);
+  } else if (hasTraceIdFilter) {
+    const traceId = options.meta!.traceId;
+    queryParts.push(`traceID = '${traceId}'`);
   }
 
   if (filterParts) {
