@@ -145,6 +145,16 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
 	defer cancel()
 
+	httpHeaders, err := extractForwardedHeadersFromMessage(message)
+	if err != nil {
+		return nil, err
+	}
+
+	// merge settings.HttpHeaders with message httpHeaders
+	for k, v := range settings.HttpHeaders {
+		httpHeaders[k] = v
+	}
+
 	opts := &clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
@@ -152,6 +162,7 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		TLS:         tlsConfig,
 		Addr:        []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
 		HttpUrlPath: settings.Path,
+		HttpHeaders: httpHeaders,
 		Auth: clickhouse.Auth{
 			Username: settings.Username,
 			Password: settings.Password,
@@ -160,7 +171,6 @@ func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message 
 		Compression: &clickhouse.Compression{
 			Method: compression,
 		},
-		HttpHeaders: settings.HttpHeaders,
 		DialTimeout: time.Duration(t) * time.Second,
 		ReadTimeout: time.Duration(qt) * time.Second,
 		Protocol:    protocol,
@@ -233,6 +243,7 @@ func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.D
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
+		ForwardHeaders: settings.ForwardGrafanaHeaders,
 	}
 }
 
@@ -289,4 +300,48 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 		}
 	}
 	return res, nil
+}
+
+func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {
+	// An example of the message we're trying to parse:
+	// {
+	//   "grafana-http-headers": {
+	//     "x-grafana-org-id": ["12345"],
+	//     "x-grafana-user": ["admin"]
+	//   }
+	// }
+	if len(message) == 0 {
+		message = []byte("{}")
+	}
+
+	messageArgs := make(map[string]interface{})
+	err := json.Unmarshal(message, &messageArgs)
+	if err != nil {
+		backend.Logger.Warn(fmt.Sprintf("Failed to apply headers: %s", err.Error()))
+		return nil, errors.New("Couldn't parse message as args")
+	}
+
+	httpHeaders := make(map[string]string)
+	if grafanaHttpHeaders, ok := messageArgs[sqlds.HeaderKey]; ok {
+		fwdHeaders, ok := grafanaHttpHeaders.(map[string]interface{})
+		if !ok {
+			return nil, errors.New("Couldn't parse grafana HTTP headers")
+		}
+
+		for k, v := range fwdHeaders {
+			anyHeadersArr, ok := v.([]interface{})
+			if !ok {
+				return nil, errors.New(fmt.Sprintf("Couldn't parse header %s as an array", k))
+			}
+
+			strHeadersArr := make([]string, len(anyHeadersArr))
+			for ind, val := range anyHeadersArr {
+				strHeadersArr[ind] = val.(string)
+			}
+
+			httpHeaders[k] = strings.Join(strHeadersArr, ",")
+		}
+	}
+
+	return httpHeaders, nil
 }

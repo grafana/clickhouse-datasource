@@ -3,10 +3,11 @@ package plugin
 import (
 	"errors"
 	"fmt"
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -35,7 +36,8 @@ func TestLoadSettings(t *testing.T) {
 							"username": "baz",
 							"defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true,
 							"tlsAuthWithCACert": true, "dialTimeout": "10", "enableSecureSocksProxy": true,
-							"httpHeaders": [{ "name": " test-plain-1 ", "value": "value-1", "secure": false }]
+							"httpHeaders": [{ "name": " test-plain-1 ", "value": "value-1", "secure": false }],
+							"forwardGrafanaHeaders": true
 						}`),
 						DecryptedSecureJSONData: map[string]string{
 							"password":  "bar",
@@ -67,6 +69,7 @@ func TestLoadSettings(t *testing.T) {
 						"test-secure-2": "value-2",
 						"test-secure-3": "value-3",
 					},
+					ForwardGrafanaHeaders: true,
 					ProxyOptions: &proxy.Options{
 						Enabled: true,
 						Auth: &proxy.AuthOptions{

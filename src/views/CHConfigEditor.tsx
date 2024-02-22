@@ -59,7 +59,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     });
   };
   const onSwitchToggle = (
-    key: keyof Pick<CHConfig, 'secure' | 'validateSql' | 'enableSecureSocksProxy'>,
+    key: keyof Pick<CHConfig, 'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders'>,
     value: boolean
   ) => {
     onOptionsChange({
@@ -251,8 +251,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       { jsonData.protocol === Protocol.Http &&
         <HttpHeadersConfig
           headers={options.jsonData.httpHeaders}
+          forwardGrafanaHeaders={options.jsonData.forwardGrafanaHeaders}
           secureFields={options.secureJsonFields}
           onHttpHeadersChange={headers => onHttpHeadersChange(headers, options, onOptionsChange)}
+          onForwardGrafanaHeadersChange={forwardGrafanaHeaders => onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)}
         />
       }
 

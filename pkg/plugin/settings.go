@@ -3,10 +3,11 @@ package plugin
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -35,9 +36,10 @@ type Settings struct {
 	DialTimeout  string `json:"dialTimeout,omitempty"`
 	QueryTimeout string `json:"queryTimeout,omitempty"`
 
-	HttpHeaders    map[string]string `json:"-"`
-	CustomSettings []CustomSetting   `json:"customSettings"`
-	ProxyOptions   *proxy.Options
+	HttpHeaders           map[string]string `json:"-"`
+	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	CustomSettings        []CustomSetting   `json:"customSettings"`
+	ProxyOptions          *proxy.Options
 }
 
 type CustomSetting struct {
@@ -166,6 +168,16 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		}
 
 		settings.CustomSettings = customSettings
+	}
+	if jsonData["forwardGrafanaHeaders"] != nil {
+		if forwardGrafanaHeaders, ok := jsonData["forwardGrafanaHeaders"].(string); ok {
+			settings.ForwardGrafanaHeaders, err = strconv.ParseBool(forwardGrafanaHeaders)
+			if err != nil {
+				return settings, fmt.Errorf("could not parse forwardGrafanaHeaders value: %w", err)
+			}
+		} else {
+			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
+		}
 	}
 
 	if strings.TrimSpace(settings.DialTimeout) == "" {

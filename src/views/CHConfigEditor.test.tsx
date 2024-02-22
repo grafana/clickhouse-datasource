@@ -130,6 +130,7 @@ describe('ConfigEditor', () => {
       validateSql: true,
       enableSecureSocksProxy: true,
       customSettings: [{ setting: 'test-setting', value: 'test-value' }],
+      forwardGrafanaHeaders: true,
     };
     render(<ConfigEditor {...mockConfigEditorProps(jsonDataOverrides)} />);
     expect(screen.getByText(labels.secureSocksProxy.label)).toBeInTheDocument();

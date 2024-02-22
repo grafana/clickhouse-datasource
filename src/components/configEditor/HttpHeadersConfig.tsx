@@ -9,14 +9,17 @@ import { KeyValue } from '@grafana/data';
 
 interface HttpHeadersConfigProps {
   headers?: CHHttpHeader[];
+  forwardGrafanaHeaders?: boolean;
   secureFields: KeyValue<boolean>;
   onHttpHeadersChange: (v: CHHttpHeader[]) => void;
+  onForwardGrafanaHeadersChange: (v: boolean) => void;
 }
 
 export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   const { secureFields, onHttpHeadersChange } = props;
   const configuredSecureHeaders = useConfiguredSecureHttpHeaders(secureFields);
   const [headers, setHeaders] = useState<CHHttpHeader[]>(props.headers || []);
+  const [forwardGrafanaHeaders, setForwardGrafanaHeaders] = useState<boolean>(props.forwardGrafanaHeaders || false);
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
@@ -34,33 +37,48 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
     setHeaders(nextHeaders);
     onHttpHeadersChange(nextHeaders);
   };
+  const updateForwardGrafanaHeaders = (value: boolean) => {
+    setForwardGrafanaHeaders(value);
+    props.onForwardGrafanaHeadersChange(value);
+  }
 
   return (
     <ConfigSection
       title={labels.title}
-      description={labels.description}
     >
-      {headers.map((header, index) => (
-        <HttpHeaderEditor
-          key={header.name + index}
-          name={header.name}
-          value={header.value}
-          secure={header.secure}
-          isSecureConfigured={configuredSecureHeaders.has(header.name)}
-          onHeaderChange={header => updateHeader(index, header)}
-          onRemove={() => removeHeader(index)}
+      <Field label={labels.label} description={labels.description}>
+        <>
+          {headers.map((header, index) => (
+            <HttpHeaderEditor
+              key={header.name + index}
+              name={header.name}
+              value={header.value}
+              secure={header.secure}
+              isSecureConfigured={configuredSecureHeaders.has(header.name)}
+              onHeaderChange={header => updateHeader(index, header)}
+              onRemove={() => removeHeader(index)}
+            />
+          ))}
+          <Button
+              data-testid={selectors.addHeaderButton}
+              icon="plus-circle"
+              variant="secondary"
+              size="sm"
+              onClick={addHeader}
+              className={styles.Common.smallBtn}
+            >
+              {labels.addHeaderLabel}
+          </Button>
+        </>
+      </Field>
+      <Field label={labels.forwardGrafanaHeaders.label} description={labels.forwardGrafanaHeaders.tooltip}>
+        <Switch
+          data-testid={selectors.forwardGrafanaHeadersSwitch}
+          className={"gf-form"}
+          value={forwardGrafanaHeaders}
+          onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
         />
-      ))}
-      <Button
-          data-testid={selectors.addHeaderButton}
-          icon="plus-circle"
-          variant="secondary"
-          size="sm"
-          onClick={addHeader}
-          className={styles.Common.smallBtn}
-        >
-          {labels.addHeaderLabel}
-      </Button>
+      </Field>
     </ConfigSection>
   );
 }
