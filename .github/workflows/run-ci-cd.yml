@@ -1,0 +1,26 @@
+name: run-ci-cd
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      
+      - name: Check spelling
+        run: npx --yes cspell@6.13.3 -c cspell.config.json "**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}"
+
+      - name: Lint backend
+        run: golangci-lint run --timeout=5m
