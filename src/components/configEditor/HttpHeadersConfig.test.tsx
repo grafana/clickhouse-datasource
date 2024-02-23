@@ -9,17 +9,19 @@ describe('HttpHeadersConfig', () => {
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
   it('should render', () => {
-    const result = render(<HttpHeadersConfig headers={[]} secureFields={{}} onHttpHeadersChange={() => {}} />);
+    const result = render(<HttpHeadersConfig headers={[]} secureFields={{}} onHttpHeadersChange={() => {}} onForwardGrafanaHeadersChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
   });
 
   it('should not call onHttpHeadersChange when header is added', () => {
     const onHttpHeadersChange = jest.fn();
+    const onForwardGrafanaHeadersChange = jest.fn();
     const result = render(
       <HttpHeadersConfig
         headers={[]}
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
+        onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -33,11 +35,13 @@ describe('HttpHeadersConfig', () => {
 
   it('should call onHttpHeadersChange when header is updated', () => {
     const onHttpHeadersChange = jest.fn();
+    const onForwardGrafanaHeadersChange = jest.fn();
     const result = render(
       <HttpHeadersConfig
         headers={[]}
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
+        onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -77,6 +81,7 @@ describe('HttpHeadersConfig', () => {
 
   it('should call onHttpHeadersChange when header is removed', () => {
     const onHttpHeadersChange = jest.fn();
+    const onForwardGrafanaHeadersChange = jest.fn();
     const result = render(
       <HttpHeadersConfig
         headers={[
@@ -85,6 +90,7 @@ describe('HttpHeadersConfig', () => {
         ]}
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
+        onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -119,5 +125,28 @@ describe('useConfiguredSecureHttpHeaders', () => {
     expect(result.has('a')).toBe(true);
     expect(result.has('b')).toBe(true);
     expect(result.has('c')).toBe(false);
+  });
+});
+
+describe('forwardGrafanaHTTPHeaders', () => {
+  const selectors = allSelectors.components.Config.HttpHeaderConfig;
+  
+  it('should call onForwardGrafanaHeadersChange when switch is clicked', () => {
+    const onHttpHeadersChange = jest.fn();
+    const onForwardGrafanaHeadersChange = jest.fn();
+    const result = render(
+      <HttpHeadersConfig
+        headers={[]}
+        secureFields={{}}
+        onHttpHeadersChange={onHttpHeadersChange}
+        onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const forwardGrafanaHeadersSwitch = result.getByTestId(selectors.forwardGrafanaHeadersSwitch);
+    expect(forwardGrafanaHeadersSwitch).toBeInTheDocument();
+    fireEvent.click(forwardGrafanaHeadersSwitch);
+    expect(onForwardGrafanaHeadersChange).toHaveBeenCalledTimes(1);
   });
 });

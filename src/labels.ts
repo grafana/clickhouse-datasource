@@ -73,14 +73,20 @@ export default {
       },
       HttpHeadersConfig: {
         title: 'HTTP Headers',
-        description: 'Add HTTP headers when querying the database',
+        label: 'Custom HTTP Headers',
+        description: 'Add Custom HTTP headers when querying the database',
         headerNameLabel: 'Header Name',
         headerNamePlaceholder: 'X-Custom-Header',
         insecureHeaderValueLabel: 'Header Value',
         secureHeaderValueLabel: 'Secure Header Value',
         secureLabel: 'Secure',
-        addHeaderLabel: 'Add Header'
+        addHeaderLabel: 'Add Header',
+        forwardGrafanaHeaders: {
+          label: 'Forward Grafana HTTP Headers',
+          tooltip: 'Forward Grafana HTTP Headers to datasource.',
+        },
       },
+
       DefaultDatabaseTableConfig: {
         title: 'Default DB and table',
         database: {

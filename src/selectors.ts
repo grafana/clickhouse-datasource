@@ -120,7 +120,8 @@ export const Components = {
       removeHeaderButton: 'config__http-header-config__remove-header-button',
       headerSecureSwitch: 'config__http-header-config__header-secure-switch',
       headerNameInput: 'config__http-header-config__header-name-input',
-      headerValueInput: 'config__http-header-config__header-value-input'
+      headerValueInput: 'config__http-header-config__header-value-input',
+      forwardGrafanaHeadersSwitch: 'config__http-header-config__forward-grafana-headers-switch'
     }
   },
   QueryBuilder: {
