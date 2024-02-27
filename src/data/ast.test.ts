@@ -15,5 +15,30 @@ describe('ast', () => {
       // this is formatted like this to match how pgsql generates its sql
       expect(toSql.statement(stm)).toEqual('SELECT (count (*) )  FROM foo');
     });
+
+    // https://github.com/grafana/clickhouse-datasource/issues/714
+    it('does not error when brackets/macros/variables are present', () => {
+      const errLog = jest.spyOn(console, 'error');
+      const sql = `
+        SELECT
+          *,
+          \$__timeInterval(timestamp),
+          '{"a": 1, "b": { "c": 2, "d": [1, 2, 3] }}'::json as bracketTest
+        FROM default.table
+        WHERE $__timeFilter(timestamp)
+        AND col != \${variable}
+        AND col != \${variable.key}
+        AND col != \${variable.key:singlequote}
+        AND col != '\${variable}'
+        AND col != '\${__variable}'
+        AND col != ('\${__variable.key}')
+      `;
+
+      const stm = sqlToStatement(sql);
+      const astSql = toSql.statement(stm);
+      expect(errLog).toHaveBeenCalledTimes(0);
+      expect(stm).not.toEqual({});
+      expect(astSql).not.toBeFalsy();
+    });
   });
 });
