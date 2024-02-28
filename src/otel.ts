@@ -66,3 +66,9 @@ export const getVersion = (version: string | undefined): OtelVersion | undefined
 
   return versions.find(v => v.version === version);
 };
+
+export default {
+  versions,
+  getLatestVersion,
+  getVersion
+};

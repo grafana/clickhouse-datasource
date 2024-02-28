@@ -1,5 +1,5 @@
 import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
-import { getVersion as getOtelVersion } from 'otel';
+import otel from 'otel';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -148,7 +148,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   // Optimize trace ID filtering for OTel enabled trace lookups
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
-  const otelVersion = getOtelVersion(options.meta?.otelVersion);
+  const otelVersion = otel.getVersion(options.meta?.otelVersion);
   const applyTraceIdOptimization = hasTraceIdFilter && options.meta?.otelEnabled && otelVersion;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
