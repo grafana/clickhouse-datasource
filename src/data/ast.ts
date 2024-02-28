@@ -7,6 +7,11 @@ interface ReplacePart {
 };
 type ReplaceParts = ReplacePart[];
 
+function getReplacementKey(isVariable: boolean) {
+  const prefix = isVariable ? 'v' : 'f';
+  return prefix + (Math.random() + 1).toString(36).substring(7);
+}
+
 /**
  * Replaces macro functions and keywords such as $__timeFilter() and "default"
  */
@@ -22,7 +27,7 @@ function replaceMacroFunctions(sql: string): [ReplaceParts, string] {
   // need to process in reverse so starting positions aren't affected by replacing other things
   for (let i = replaceFuncs.length - 1; i >= 0; i--) {
     const si = replaceFuncs[i].startIndex;
-    const replacementName = 'f' + (Math.random() + 1).toString(36).substring(7);
+    const replacementName = getReplacementKey(false);
     replaceFuncs[i].replacementName = replacementName;
     // settings do not parse and we do not need information from them so we will remove them
     if (replaceFuncs[i].name.toLowerCase() === 'settings') {
@@ -37,6 +42,7 @@ function replaceMacroFunctions(sql: string): [ReplaceParts, string] {
 
 /**
  * Replaces Grafana variables such as ${var} ${var.key} ${var.key:singlequote}
+ * https://grafana.com/docs/grafana/latest/dashboards/variables
  */
 function replaceMacroVariables(sql: string): [ReplaceParts, string] {
   const replaceVariables: ReplaceParts = [];
@@ -50,7 +56,7 @@ function replaceMacroVariables(sql: string): [ReplaceParts, string] {
   // need to process in reverse so starting positions aren't affected by replacing other things
   for (let i = replaceVariables.length - 1; i >= 0; i--) {
     const si = replaceVariables[i].startIndex;
-    const replacementName = 'v' + (Math.random() + 1).toString(36).substring(7);
+    const replacementName = getReplacementKey(true);
     replaceVariables[i].replacementName = replacementName;
     sql = sql.substring(0, si) + replacementName + sql.substring(si + replaceVariables[i].name.length);
   }
@@ -58,11 +64,12 @@ function replaceMacroVariables(sql: string): [ReplaceParts, string] {
   return [replaceVariables, sql];
 }
 
-export function sqlToStatement(sql: string): Statement {
-  const [replaceVars, variableSql] = replaceMacroVariables(sql);
-  const [replaceFuncs, macroSql] = replaceMacroFunctions(variableSql);
+// TODO: support query parameters: https://clickhouse.com/docs/en/interfaces/cli#cli-queries-with-parameters
+
+export function sqlToStatement(rawSql: string): Statement {
+  const [replaceVars, variableSql] = replaceMacroVariables(rawSql);
+  const [replaceFuncs, sql] = replaceMacroFunctions(variableSql);
   const replaceParts = replaceVars.concat(replaceFuncs);
-  sql = macroSql;
 
   let ast: Statement;
   try {

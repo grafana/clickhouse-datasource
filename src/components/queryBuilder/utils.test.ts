@@ -452,6 +452,7 @@ describe('getQueryOptionsFromSql', () => {
 
   it('Handles brackets and Grafana macros/variables', () => {
     const sql = `
+      /* \${__variable} \${__variable.key} */
       SELECT
         *,
         \$__timeInterval(timestamp),
@@ -464,10 +465,12 @@ describe('getQueryOptionsFromSql', () => {
       AND col != '\${variable}'
       AND col != '\${__variable}'
       AND col != ('\${__variable.key}')
+      AND col != \${variable:singlequote}
     `;
 
     const builderOptions = getQueryOptionsFromSql(sql);
     expect(builderOptions).not.toBeUndefined();
+    expect(typeof builderOptions).not.toBe('string');
   });
 });
 

@@ -20,6 +20,7 @@ describe('ast', () => {
     it('does not error when brackets/macros/variables are present', () => {
       const errLog = jest.spyOn(console, 'error');
       const sql = `
+        /* \${__variable} \${__variable.key} */
         SELECT
           *,
           \$__timeInterval(timestamp),
@@ -32,6 +33,7 @@ describe('ast', () => {
         AND col != '\${variable}'
         AND col != '\${__variable}'
         AND col != ('\${__variable.key}')
+        AND col != \${variable:singlequote}
       `;
 
       const stm = sqlToStatement(sql);
