@@ -7,6 +7,7 @@
 - Added `$__fromTime_ms` macro that represents the dashboard "from" time in milliseconds using a `DateTime64(3)`
 - Added `$__toTime_ms` macro that represents the dashboard "to" time in milliseconds using a `DateTime64(3)`
 - Added `$__timeFilter_ms` macro that uses `DateTime64(3)` for millisecond precision time filtering
+- Re-added query type selector in dashboard view. This was only visible in explore view, but somehow it affects dashboard view, and so it has been re-added. (#730)
 
 ### Fixes
 
