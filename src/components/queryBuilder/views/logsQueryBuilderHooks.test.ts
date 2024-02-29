@@ -3,7 +3,7 @@ import { useDefaultFilters, useDefaultTimeColumn, useLogDefaultsOnMount, useOtel
 import { mockDatasource } from '__mocks__/datasource';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 
 describe('useLogDefaultsOnMount', () => {
   it('should call builderOptionsDispatch with default log columns', async () => {
@@ -47,7 +47,7 @@ describe('useLogDefaultsOnMount', () => {
 });
 
 describe('useOtelColumns', () => {
-  const testOtelVersion = otelVersions[0]; // use latest version
+  const testOtelVersion = otel.getLatestVersion();
 
   it('should not call builderOptionsDispatch if OTEL is already enabled', async () => {
     const builderOptionsDispatch = jest.fn();
