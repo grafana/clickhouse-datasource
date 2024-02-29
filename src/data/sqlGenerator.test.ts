@@ -181,7 +181,50 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
-  it('generates trace ID query', () => {
+  it('generates trace ID query without OTel enabled', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: 'latest',
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg'
+      },
+      limit: 1000,
+      orderBy: []
+    };
+    const expectedSqlParts = [
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
+      '"ServiceName" as serviceName, "SpanName" as operationName, "Timestamp" as startTime,',
+      'multiply("Duration", 0.000001) as duration,',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags`,
+      `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
+      'LIMIT 1000'
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('generates trace ID query with OTel enabled', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
       table: 'otel_traces',
@@ -210,13 +253,15 @@ describe('SQL Generator', () => {
       orderBy: []
     };
     const expectedSqlParts = [
+      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
       'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
       '"ServiceName" as serviceName, "SpanName" as operationName, "Timestamp" as startTime,',
       'multiply("Duration", 0.000001) as duration,',
-      'arrayMap(key -> map(\'key\', key, \'value\',"SpanAttributes"[key]),',
-      'mapKeys("SpanAttributes")) as tags,',
-      'arrayMap(key -> map(\'key\', key, \'value\',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags',
-      'FROM "default"."otel_traces" WHERE traceID = \'abcdefg\'',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags`,
+      `FROM "default"."otel_traces" WHERE traceID = trace_id AND startTime >= trace_start AND startTime <= trace_end`,
       'LIMIT 1000'
     ];
 

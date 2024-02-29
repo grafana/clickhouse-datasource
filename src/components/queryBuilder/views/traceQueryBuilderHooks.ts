@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, NumberFilter, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, StringFilter } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
@@ -54,7 +54,7 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
       return;
     }
 
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const otelConfig = otel.getVersion(otelVersion);
     const traceColumnMap = otelConfig?.traceColumnMap;
     if (!traceColumnMap) {
       return;

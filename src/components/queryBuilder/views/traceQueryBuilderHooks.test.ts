@@ -3,7 +3,7 @@ import { useTraceDefaultsOnMount, useOtelColumns, useDefaultFilters } from './tr
 import { mockDatasource } from '__mocks__/datasource';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
 import { setOptions } from 'hooks/useBuilderOptionsState';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 
 describe('useTraceDefaultsOnMount', () => {
   it('should call builderOptionsDispatch with default trace columns', async () => {
@@ -48,7 +48,7 @@ describe('useTraceDefaultsOnMount', () => {
 });
 
 describe('useOtelColumns', () => {
-  const testOtelVersion = otelVersions[0]; // use latest version
+  const testOtelVersion = otel.getLatestVersion();
 
   it('should not call builderOptionsDispatch if OTEL is already enabled', async () => {
     const builderOptionsDispatch = jest.fn();

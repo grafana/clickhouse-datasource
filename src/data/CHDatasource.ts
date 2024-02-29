@@ -45,7 +45,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 import { ReactNode } from 'react';
 import { transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { pluginVersion } from 'utils/version';
@@ -414,7 +414,7 @@ export class Datasource
     const otelEnabled = logsConfig.otelEnabled;
     const otelVersion = logsConfig.otelVersion;
 
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const otelConfig = otel.getVersion(otelVersion);
     if (otelEnabled && otelConfig) {
       return otelConfig.logColumnMap;
     }
@@ -452,7 +452,7 @@ export class Datasource
     const otelEnabled = traceConfig.otelEnabled;
     const otelVersion = traceConfig.otelVersion;
 
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const otelConfig = otel.getVersion(otelVersion);
     if (otelEnabled && otelConfig) {
       return otelConfig.traceColumnMap;
     }

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Select, Switch as GrafanaSwitch, useTheme } from '@grafana/ui';
-import { versions as allVersions } from 'otel';
+import otel from 'otel';
 import selectors from 'labels';
 
 interface OtelVersionSelectProps {
@@ -15,15 +15,15 @@ interface OtelVersionSelectProps {
 export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   const { enabled, onEnabledChange, selectedVersion, onVersionChange, wide } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
-  const options: SelectableValue[] = allVersions.map(v => ({
+  const options: SelectableValue[] = otel.versions.map(v => ({
     label: v.name,
     value: v.version
   }));
 
   useEffect(() => {
     // Use latest version if not set or doesn't exist (which may happen if config is broken)
-    if (selectedVersion === '' || !allVersions.find(v => selectedVersion === v.version)) {
-      onVersionChange(allVersions[0].version);
+    if (selectedVersion === '' || !otel.getVersion(selectedVersion)) {
+      onVersionChange(otel.getLatestVersion().version);
     }
   }, [selectedVersion, onVersionChange]);
 
