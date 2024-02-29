@@ -7,6 +7,7 @@
 - Added `$__fromTime_ms` macro that represents the dashboard "from" time in milliseconds using a `DateTime64(3)`
 - Added `$__toTime_ms` macro that represents the dashboard "to" time in milliseconds using a `DateTime64(3)`
 - Added `$__timeFilter_ms` macro that uses `DateTime64(3)` for millisecond precision time filtering
+- When OTel is enabled, Trace ID queries now use a skip index to optimize exact ID lookups on large trace datasets (#724)
 
 ### Fixes
 
@@ -16,6 +17,7 @@
 - Fixed empty builder options when switching from SQL Editor back to Query Editor
 - Fix SQL Generator including "undefined" in `FROM` when database isn't defined
 - Allow adding spaces in multi filters (such as `WHERE .. IN`)
+- Fixed missing `AND` keyword when adding a filter to a Trace ID query 
 
 ## 4.0.2
 
