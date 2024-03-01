@@ -1,30 +1,75 @@
 import { parseFirst, Statement, SelectFromStatement, astMapper, toSql, ExprRef } from 'pgsql-ast-parser';
 
-export function sqlToStatement(sql: string): Statement {
-  const replaceFuncs: Array<{
-    startIndex: number;
-    name: string;
-    replacementName: string;
-  }> = [];
-  //default is a key word in this grammar, but it can be used in CH
-  const re = /(\$__|\$|default|settings)/gi;
+interface ReplacePart {
+  startIndex: number;
+  name: string;
+  replacementName: string;
+};
+type ReplaceParts = ReplacePart[];
+
+function getReplacementKey(isVariable: boolean) {
+  const prefix = isVariable ? 'v' : 'f';
+  return prefix + (Math.random() + 1).toString(36).substring(7);
+}
+
+/**
+ * Replaces macro functions and keywords such as $__timeFilter() and "default"
+ */
+function replaceMacroFunctions(sql: string): [ReplaceParts, string] {
+  const replaceFuncs: ReplaceParts = [];
+  // default is a keyword in this grammar, but it can be used in CH
+  const keywordRegex = /(\$__|\$|default|settings)/gi;
   let regExpArray: RegExpExecArray | null;
-  while ((regExpArray = re.exec(sql)) !== null) {
+  while ((regExpArray = keywordRegex.exec(sql)) !== null) {
     replaceFuncs.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
   }
 
-  //need to process in reverse so starting positions aren't effected by replacing other things
+  // need to process in reverse so starting positions aren't affected by replacing other things
   for (let i = replaceFuncs.length - 1; i >= 0; i--) {
     const si = replaceFuncs[i].startIndex;
-    const replacementName = 'f' + (Math.random() + 1).toString(36).substring(7);
+    const replacementName = getReplacementKey(false);
     replaceFuncs[i].replacementName = replacementName;
     // settings do not parse and we do not need information from them so we will remove them
-    if (replaceFuncs[i].name.toLowerCase() === "settings") {
-      sql = sql.substring(0, si)
+    if (replaceFuncs[i].name.toLowerCase() === 'settings') {
+      sql = sql.substring(0, si);
       continue;
     }
     sql = sql.substring(0, si) + replacementName + sql.substring(si + replaceFuncs[i].name.length);
   }
+
+  return [replaceFuncs, sql];
+}
+
+/**
+ * Replaces Grafana variables such as ${var} ${var.key} ${var.key:singlequote}
+ * https://grafana.com/docs/grafana/latest/dashboards/variables
+ */
+function replaceMacroVariables(sql: string): [ReplaceParts, string] {
+  const replaceVariables: ReplaceParts = [];
+  const variableRegex = /\${[a-zA-Z0-9_:.\w]+}/g;
+
+  let regExpArray: RegExpExecArray | null;
+  while ((regExpArray = variableRegex.exec(sql)) !== null) {
+    replaceVariables.push({ startIndex: regExpArray.index, name: regExpArray[0], replacementName: '' });
+  }
+
+  // need to process in reverse so starting positions aren't affected by replacing other things
+  for (let i = replaceVariables.length - 1; i >= 0; i--) {
+    const si = replaceVariables[i].startIndex;
+    const replacementName = getReplacementKey(true);
+    replaceVariables[i].replacementName = replacementName;
+    sql = sql.substring(0, si) + replacementName + sql.substring(si + replaceVariables[i].name.length);
+  }
+
+  return [replaceVariables, sql];
+}
+
+// TODO: support query parameters: https://clickhouse.com/docs/en/interfaces/cli#cli-queries-with-parameters
+
+export function sqlToStatement(rawSql: string): Statement {
+  const [replaceVars, variableSql] = replaceMacroVariables(rawSql);
+  const [replaceFuncs, sql] = replaceMacroFunctions(variableSql);
+  const replaceParts = replaceVars.concat(replaceFuncs);
 
   let ast: Statement;
   try {
@@ -36,26 +81,39 @@ export function sqlToStatement(sql: string): Statement {
 
   const mapper = astMapper((map) => ({
     tableRef: (t) => {
-      const rfs = replaceFuncs.find((x) => x.replacementName === t.schema);
+      const rfs = replaceParts.find((x) => x.replacementName === t.schema);
       if (rfs) {
         return { ...t, schema: t.schema?.replace(rfs.replacementName, rfs.name) };
       }
-      const rft = replaceFuncs.find((x) => x.replacementName === t.name);
+      const rft = replaceParts.find((x) => x.replacementName === t.name);
       if (rft) {
         return { ...t, name: t.name.replace(rft.replacementName, rft.name) };
       }
       return map.super().tableRef(t);
     },
     ref: (r) => {
-      const rf = replaceFuncs.find((x) => r.name.startsWith(x.replacementName));
+      const rf = replaceParts.find((x) => r.name.startsWith(x.replacementName));
       if (rf) {
         const d = r.name.replace(rf.replacementName, rf.name);
         return { ...r, name: d };
       }
       return map.super().ref(r);
     },
+    expr: (e) => {
+      if (!e || e.type !== 'string') {
+        return map.super().expr(e);
+      }
+
+      const rf = replaceParts.find(x => e.value.startsWith(x.replacementName));
+      if (rf) {
+        const d = e.value.replace(rf.replacementName, rf.name);
+        return { ...e, value: d };
+      }
+
+      return map.super().expr(e);
+    },
     call: (c) => {
-      const rf = replaceFuncs.find((x) => c.function.name.startsWith(x.replacementName));
+      const rf = replaceParts.find((x) => c.function.name.startsWith(x.replacementName));
       if (rf) {
         return { ...c, function: { ...c.function, name: c.function.name.replace(rf.replacementName, rf.name) } };
       }
