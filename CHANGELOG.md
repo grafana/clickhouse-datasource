@@ -13,6 +13,10 @@
 
 - Fixed performance issues caused by `$__timeFilter` using a `DateTime64(3)` instead of `DateTime` (#699)
 - Fixed trace queries from rounding span durations under 1ms to `0` (#720)
+- Fixed AST error when including Grafana macros/variables in SQL (#714)
+- Fixed empty builder options when switching from SQL Editor back to Query Editor
+- Fix SQL Generator including "undefined" in `FROM` when database isn't defined
+- Allow adding spaces in multi filters (such as `WHERE .. IN`)
 - Fixed missing `AND` keyword when adding a filter to a Trace ID query 
 
 ## 4.0.2

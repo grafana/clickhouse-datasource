@@ -538,12 +538,12 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
 }
 
 const getTableIdentifier = (database: string, table: string): string => {
-  const sep = (database === '' || table === '') ? '' : '.';
+  const sep = (!database || !table) ? '' : '.';
   return `${escapeIdentifier(database)}${sep}${escapeIdentifier(table)}`;
 }
 
 const escapeIdentifier = (id: string): string => {
-  return id === '' ? '' : `"${id}"`;
+  return id ? `"${id}"` : '';
 }
 
 const escapeValue = (value: string): string => {
@@ -719,7 +719,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }
     } else if (isMultiFilter(type, filter.operator)) {
-      filterParts.push(`(${(filter as MultiFilter).value?.map(v => escapeValue(v)).join(', ')})`);
+      filterParts.push(`(${(filter as MultiFilter).value?.map(v => escapeValue(v.trim())).join(', ')})`);
     } else {
       filterParts.push(escapeValue((filter as StringFilter).value || ''));
     }
@@ -747,7 +747,7 @@ const numberTypes = ['int', 'float', 'decimal'];
 const isNumberType = (type: string): boolean => numberTypes.some(t => type?.toLowerCase().includes(t));
 const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
 // const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
-const isStringType = (type: string): boolean => type === 'String' && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+const isStringType = (type: string): boolean => type.toLowerCase() === 'string' && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
 const isBooleanFilter = (type: string): boolean => isBooleanType(type);
 const isNumberFilter = (type: string): boolean => isNumberType(type);
