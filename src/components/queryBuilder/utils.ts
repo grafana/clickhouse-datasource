@@ -32,6 +32,7 @@ import {
   QueryType,
 } from 'types/queryBuilder';
 import { sqlToStatement } from 'data/ast';
+import { getColumnByHint } from 'data/sqlGenerator';
 
 
 export const isBooleanType = (type: string): boolean => {
@@ -94,39 +95,41 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
   }
   const fromTable = ast.from[0] as FromTable;
 
-  const columnsAndAggregates = getAggregatesFromAst(ast.columns ? ast.columns : null);
+  const columnsAndAggregates = getAggregatesFromAst(ast.columns || null);
 
-  let builder = {
+  const builderOptions = {
+    database: fromTable.name.schema || '',
+    table: fromTable.name.name || '',
     queryType: QueryType.Table,
     mode: BuilderMode.List,
-    database: fromTable.name.schema,
-    table: fromTable.name.name,
+    columns: [],
+    aggregates: [],
   } as QueryBuilderOptions;
 
-  if (columnsAndAggregates.columns) {
-    builder.columns = columnsAndAggregates.columns.map(f => ({ name: f }));
+  if (columnsAndAggregates.columns.length > 0) {
+    builderOptions.columns = columnsAndAggregates.columns;
   }
 
   if (columnsAndAggregates.aggregates.length > 0) {
-    builder.mode = BuilderMode.Aggregate;
-    builder.aggregates = columnsAndAggregates.aggregates;
+    builderOptions.mode = BuilderMode.Aggregate;
+    builderOptions.aggregates = columnsAndAggregates.aggregates;
   }
 
-  if (columnsAndAggregates.timeField) {
-    builder.queryType = QueryType.TimeSeries;
-    builder.mode = BuilderMode.Trend;
-    const columns: CHSelectedColumn[] = builder.columns || [];
-    columns.push({ name: columnsAndAggregates.timeField, type: 'datetime', hint: ColumnHint.Time });
-    builder.columns = columns;
+  const timeColumn = getColumnByHint(builderOptions, ColumnHint.Time);
+  if (timeColumn) {
+    builderOptions.queryType = QueryType.TimeSeries;
+    if (builderOptions.aggregates?.length || 0) {
+      builderOptions.mode = BuilderMode.Trend;
+    }
   }
 
   if (ast.where) {
-    builder.filters = getFiltersFromAst(ast.where, columnsAndAggregates.timeField);
+    builderOptions.filters = getFiltersFromAst(ast.where, timeColumn?.name || '');
   }
 
   const orderBy = ast.orderBy
     ?.map<OrderBy>((ob) => {
-      if (ob.by.type !== 'ref' || ob.by.name === 'time') {
+      if (ob.by.type !== 'ref') {
         return {} as OrderBy;
       }
       return { name: ob.by.name, dir: ob.order } as OrderBy;
@@ -134,23 +137,23 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
     .filter((x) => x.name);
 
   if (orderBy && orderBy.length > 0) {
-    builder.orderBy = orderBy!;
+    builderOptions.orderBy = orderBy!;
   }
 
-  builder.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
+  builderOptions.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
 
   const groupBy = ast.groupBy
     ?.map((gb) => {
-      if (gb.type !== 'ref' || gb.name === 'time') {
+      if (gb.type !== 'ref') {
         return '';
       }
       return gb.name;
     })
     .filter((x) => x !== '');
   if (groupBy && groupBy.length > 0) {
-    builder.groupBy = groupBy;
+    builderOptions.groupBy = groupBy;
   }
-  return builder;
+  return builderOptions;
 }
 
 function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
@@ -297,7 +300,10 @@ function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: b
   } else if (Object.values(FilterOperator).find((x) => e.op === x)) {
     if (i === 0) {
       filters.unshift({} as Filter);
+    } else if (!filters[i]) {
+      filters.push({ condition: 'AND' } as Filter);
     }
+
     filters[i].operator = e.op as FilterOperator;
     if (notFlag && filters[i].operator === FilterOperator.Like) {
       filters[i].operator = FilterOperator.NotLike;
@@ -307,9 +313,9 @@ function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: b
   return notFlag;
 }
 
-function selectCallFunc(s: SelectedColumn): AggregateColumn | string {
+function selectCallFunc(s: SelectedColumn): [AggregateColumn | string, string | undefined] {
   if (s.expr.type !== 'call') {
-    return {} as AggregateColumn;
+    return [{} as AggregateColumn, undefined];
   }
   let fields = s.expr.args.map((x) => {
     if (x.type !== 'ref') {
@@ -318,55 +324,51 @@ function selectCallFunc(s: SelectedColumn): AggregateColumn | string {
     return x.name;
   });
   if (fields.length > 1) {
-    return '';
+    return ['', undefined];
   }
   if (
     Object.values(AggregateType).includes(
       s.expr.function.name.toLowerCase() as AggregateType
     )
   ) {
-    return {
+    return [{
       aggregateType: s.expr.function.name as AggregateType,
       column: fields[0],
       alias: s.alias?.name,
-    } as AggregateColumn;
+    } as AggregateColumn, s.alias?.name];
   }
-  return fields[0];
+  return [fields[0], s.alias?.name];
 }
 
-function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): {
-  timeField: string;
-  aggregates: AggregateColumn[];
-  columns: string[];
-} {
+function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): { columns: CHSelectedColumn[]; aggregates: AggregateColumn[]; } {
   if (!selectClauses) {
-    return { timeField: '', aggregates: [], columns: [] };
+    return { columns: [], aggregates: [] };
   }
+
+  const columns: CHSelectedColumn[] = [];
   const aggregates: AggregateColumn[] = [];
-  const columns: string[] = [];
-  let timeField = '';
 
   for (let s of selectClauses) {
     switch (s.expr.type) {
       case 'ref':
-        columns.push(s.expr.name);
+        columns.push({ name: s.expr.name, alias: s.alias?.name });
         break;
       case 'call':
-        const f = selectCallFunc(s);
-        if (!f) {
-          return { timeField: '', aggregates: [], columns: [] };
+        const [columnOrAggregate, alias] = selectCallFunc(s);
+        if (!columnOrAggregate) {
+          break;
         }
-        if (isString(f)) {
-          timeField = f;
+
+        if (isString(columnOrAggregate)) {
+          columns.push({ name: columnOrAggregate, type: 'datetime', alias, hint: ColumnHint.Time });
         } else {
-          aggregates.push(f);
+          aggregates.push(columnOrAggregate);
         }
         break;
-      default:
-        return { timeField: '', aggregates: [], columns: [] };
     }
   }
-  return { timeField, aggregates, columns };
+
+  return { columns, aggregates };
 }
 
 export const operMap = new Map<string, FilterOperator>([

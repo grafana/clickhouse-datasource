@@ -432,6 +432,7 @@ describe('escapeIdentifier', () => {
     { input: ' ', expected: `" "` },
     { input: 'x', expected: `"x"` },
     { input: 'x x x', expected: `"x x x"` },
+    { input: undefined as any as string, expected: `` },
   ];
 
   it.each(cases)('returns escaped identifier (case %#)', (c) => {
@@ -444,6 +445,10 @@ describe('escapeValue', () => {
     { input: ``, expected: `''` },
     { input: ` `, expected: `' '` },
     { input: `$variable`, expected: `$variable` },
+    { input: `\${variable}`, expected: `\${variable}` },
+    { input: `\${variable:singlequote}`, expected: `\${variable:singlequote}` },
+    { input: `\${variable.key}`, expected: `\${variable.key}` },
+    { input: `\${variable.key:singlequote}`, expected: `\${variable.key:singlequote}` },
     { input: `count(column)`, expected: `count(column)` },
     { input: `'custom expression'`, expected: `'custom expression'` },
     { input: `plain text`, expected: `'plain text'` },

@@ -10,6 +10,7 @@
     "mage_output_file.go"
   ],
   "words": [
+    "singlequote",
     "concats",
     "Milli",
     "traceid",
