@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.4
 
 require (
-	dagger.io/dagger v0.9.10
+	dagger.io/dagger v0.10.1
 	github.com/ClickHouse/clickhouse-go/v2 v2.20.0
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/docker/go-units v0.5.0
@@ -14,7 +14,7 @@ require (
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.28.0
 	golang.org/x/net v0.22.0
 )
