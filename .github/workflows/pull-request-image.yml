@@ -50,6 +50,7 @@ jobs:
           path: |
             dist
           retention-days: 1
+
   push_to_registry:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
@@ -85,21 +86,45 @@ jobs:
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
+        if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
+        if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
+
+      - name: Build Docker image for use with Docker save
+        uses: docker/build-push-action@v5
+        if: ${{github.event.pull_request.head.repo.full_name != github.repository}}
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
+
+      - name: Save Docker image
+        shell: bash
+        run: docker save -o ${{ github.event.pull_request.head.sha }}pre.tar grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
+
+      - name: Archive Docker image
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.pull_request.head.sha }}pre
+          path: ${{ github.event.pull_request.head.sha }}pre.tar
+          retention-days: 5
+
   add_pr_comment:
     name: Add PR comment
     runs-on: ubuntu-latest
     needs: push_to_registry
+    if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - name: Find previous comment (if any)
         uses: peter-evans/find-comment@v3
@@ -130,4 +155,3 @@ jobs:
 
               ```
               docker run --rm -p 3000:3000 grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
-              ```
