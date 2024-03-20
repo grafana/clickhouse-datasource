@@ -2,7 +2,8 @@ import { ColumnHint, TimeUnit } from "types/queryBuilder";
 
 const defaultLogsTable = 'otel_logs';
 const defaultTraceTable = 'otel_traces';
-const defaultTraceTimestampTable = 'otel_traces_trace_id_ts';
+
+export const traceTimestampTableSuffix = '_trace_id_ts';
 
 export interface OtelVersion {
   name: string;
@@ -12,7 +13,6 @@ export interface OtelVersion {
   logColumnMap: Map<ColumnHint, string>;
   logLevels: string[];
   traceTable: string;
-  traceTimestampTable: string;
   traceColumnMap: Map<ColumnHint, string>;
   traceDurationUnit: TimeUnit.Nanoseconds;
 }
@@ -37,7 +37,6 @@ const otel129: OtelVersion = {
     'FATAL'
   ],
   traceTable: defaultTraceTable,
-  traceTimestampTable: defaultTraceTimestampTable,
   traceColumnMap: new Map<ColumnHint, string>([
     [ColumnHint.Time, 'Timestamp'],
     [ColumnHint.TraceId, 'TraceId'],
@@ -68,6 +67,7 @@ export const getVersion = (version: string | undefined): OtelVersion | undefined
 };
 
 export default {
+  traceTimestampTableSuffix,
   versions,
   getLatestVersion,
   getVersion

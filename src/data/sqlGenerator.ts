@@ -152,7 +152,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const applyTraceIdOptimization = hasTraceIdFilter && options.meta?.otelEnabled && otelVersion;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
-    const timestampTable = getTableIdentifier(database, otelVersion.traceTimestampTable);
+    const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
     queryParts.push('WITH');
     queryParts.push(`'${traceId}' as trace_id,`);
     queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
