@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Changed trace timestamp table from the constant `otel_traces_trace_id_ts` to a suffix `_trace_id_ts` applied to the current table name.
+
 ## 4.0.3
 
 ### Features
