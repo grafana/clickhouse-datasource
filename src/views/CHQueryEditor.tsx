@@ -50,6 +50,15 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     lastKey.current = queryKey;
   }
 
+  /**
+   * Sync builder options when switching from SQL Editor to Query Builder
+   */
+  const lastEditorType = useRef<EditorType>();
+  if (query.editorType !== lastEditorType.current && query.editorType === EditorType.Builder) {
+    builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
+    lastEditorType.current = query.editorType;
+  }
+
   // Prevent trying to run empty query on load
   const shouldSkipChanges = useRef<boolean>(true);
   if (isBuilderOptionsRunnable(builderOptions)) {
@@ -61,12 +70,11 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       return;
     }
 
-    const sql = generateSql(builderOptions);
     onChange({
       ...query,
       pluginVersion,
       editorType: EditorType.Builder,
-      rawSql: sql,
+      rawSql: generateSql(builderOptions),
       builderOptions,
       format: mapQueryBuilderOptionsToGrafanaFormat(builderOptions)
     });

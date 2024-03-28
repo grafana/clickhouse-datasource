@@ -1,4 +1,5 @@
 import { BooleanFilter, BuilderMode, ColumnHint, DateFilterWithValue, FilterOperator, MultiFilter, NumberFilter, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter, TimeUnit } from 'types/queryBuilder';
+import otel from 'otel';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -145,24 +146,46 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
   const selectPartsSql = selectParts.join(', ');
 
+  // Optimize trace ID filtering for OTel enabled trace lookups
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
+  const otelVersion = otel.getVersion(options.meta?.otelVersion);
+  const applyTraceIdOptimization = hasTraceIdFilter && options.meta?.otelEnabled && otelVersion;
+  if (applyTraceIdOptimization) {
+    const traceId = options.meta!.traceId;
+    const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
+    queryParts.push('WITH');
+    queryParts.push(`'${traceId}' as trace_id,`);
+    queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
+    queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = trace_id) as trace_end`);
+  }
+
   queryParts.push('SELECT');
   queryParts.push(selectPartsSql);
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
   const filterParts = getFilters(options);
 
   if (hasTraceIdFilter || filterParts) {
     queryParts.push('WHERE');
   }
 
-  if (hasTraceIdFilter) {
+  if (applyTraceIdOptimization) {
+    queryParts.push('traceID = trace_id');
+    queryParts.push('AND');
+    queryParts.push(`startTime >= trace_start`);
+    queryParts.push('AND');
+    queryParts.push(`startTime <= trace_end`);
+  } else if (hasTraceIdFilter) {
     const traceId = options.meta!.traceId;
     queryParts.push(`traceID = '${traceId}'`);
   }
 
   if (filterParts) {
+    if (hasTraceIdFilter) {
+      queryParts.push('AND');
+    }
+
     queryParts.push(filterParts);
   }
 
@@ -515,12 +538,12 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
 }
 
 const getTableIdentifier = (database: string, table: string): string => {
-  const sep = (database === '' || table === '') ? '' : '.';
+  const sep = (!database || !table) ? '' : '.';
   return `${escapeIdentifier(database)}${sep}${escapeIdentifier(table)}`;
 }
 
 const escapeIdentifier = (id: string): string => {
-  return id === '' ? '' : `"${id}"`;
+  return id ? `"${id}"` : '';
 }
 
 const escapeValue = (value: string): string => {
@@ -696,7 +719,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }
     } else if (isMultiFilter(type, filter.operator)) {
-      filterParts.push(`(${(filter as MultiFilter).value?.map(v => escapeValue(v)).join(', ')})`);
+      filterParts.push(`(${(filter as MultiFilter).value?.map(v => escapeValue(v.trim())).join(', ')})`);
     } else {
       filterParts.push(escapeValue((filter as StringFilter).value || ''));
     }
@@ -724,7 +747,7 @@ const numberTypes = ['int', 'float', 'decimal'];
 const isNumberType = (type: string): boolean => numberTypes.some(t => type?.toLowerCase().includes(t));
 const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
 // const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
-const isStringType = (type: string): boolean => type === 'String' && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+const isStringType = (type: string): boolean => type.toLowerCase() === 'string' && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
 const isBooleanFilter = (type: string): boolean => isBooleanType(type);
 const isNumberFilter = (type: string): boolean => isNumberType(type);

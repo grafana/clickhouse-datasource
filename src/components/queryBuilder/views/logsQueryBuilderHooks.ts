@@ -3,7 +3,7 @@ import { columnFilterDateTime } from "data/columnFilters";
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from "hooks/useBuilderOptionsState";
 import { useEffect, useMemo, useRef } from "react";
 import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, StringFilter, TableColumn } from "types/queryBuilder";
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -53,7 +53,7 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
       return;
     }
 
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const otelConfig = otel.getVersion(otelVersion);
     const logColumnMap = otelConfig?.logColumnMap;
     if (!logColumnMap) {
       return;

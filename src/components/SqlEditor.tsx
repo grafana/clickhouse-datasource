@@ -1,5 +1,5 @@
 import React from 'react';
-import { CoreApp, QueryEditorProps } from '@grafana/data';
+import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
@@ -31,7 +31,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 }
 
 export const SqlEditor = (props: SqlEditorProps) => {
-  const { app, query, onChange, datasource } = props;
+  const { query, onChange, datasource } = props;
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
 
@@ -90,12 +90,9 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   return (
     <>
-      {/* Only show in explore view where panel can't be manually selected. Dashboard view lets you change the panel. */}
-      {app === CoreApp.Explore && (
-        <div className={'gf-form ' + styles.QueryEditor.queryType}>
-          <QueryTypeSwitcher queryType={queryType} onChange={(queryType) => saveChanges({ queryType })} sqlEditor />
-        </div>
-      )}
+      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+        <QueryTypeSwitcher queryType={queryType} onChange={(queryType) => saveChanges({ queryType })} sqlEditor />
+      </div>
       <div className={styles.Common.wrapper}>
         <CodeEditor
           aria-label="SQL Editor"

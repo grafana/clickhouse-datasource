@@ -1,7 +1,9 @@
 import { ColumnHint, TimeUnit } from "types/queryBuilder";
 
 const defaultLogsTable = 'otel_logs';
-const defaultTraceTable = 'otel_traces'
+const defaultTraceTable = 'otel_traces';
+
+export const traceTimestampTableSuffix = '_trace_id_ts';
 
 export interface OtelVersion {
   name: string;
@@ -56,3 +58,17 @@ export const versions: readonly OtelVersion[] = [
 ];
 
 export const getLatestVersion = (): OtelVersion => versions[0];
+export const getVersion = (version: string | undefined): OtelVersion | undefined => {
+  if (!version) {
+    return;
+  }
+
+  return versions.find(v => v.version === version);
+};
+
+export default {
+  traceTimestampTableSuffix,
+  versions,
+  getLatestVersion,
+  getVersion
+};
