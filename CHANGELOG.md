@@ -1,5 +1,8 @@
 # Changelog
 
+### Fixes
+- Fixed converter regex for `Nullable(IP)` and `Nullable(String)`. It won't match to `Array(Nullable(IP))` or `Array(Nullable(String))` any more. (#783)
+
 ## 4.0.4
 
 ### Fixes

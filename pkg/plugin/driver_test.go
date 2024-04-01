@@ -868,6 +868,20 @@ func TestArrayNullableUInt256(t *testing.T) {
 	}
 }
 
+func TestArrayNullableString(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var val []*string
+			conn, close := setupTest(t, "col1 Array(Nullable(String))", protocol, nil)
+			defer close(t)
+			v := "48"
+			val = append(val, &v, nil)
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
 func TestMap(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
