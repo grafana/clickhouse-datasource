@@ -882,6 +882,19 @@ func TestArrayNullableString(t *testing.T) {
 	}
 }
 
+func TestArrayNullableIPv4(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Array(Nullable(IPv4))", protocol, nil)
+			defer close(t)
+			ipv4Addr := net.ParseIP("192.0.2.1")
+			val := []*net.IP{&ipv4Addr, nil}
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
 func TestMap(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
