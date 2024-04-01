@@ -895,6 +895,20 @@ func TestArrayNullableIPv4(t *testing.T) {
 	}
 }
 
+func TestArrayNullableIPv6(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var val []*net.IP
+			conn, close := setupTest(t, "col1 Array(Nullable(IPv6))", protocol, nil)
+			defer close(t)
+			ipv6Addr := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+			val = append(val, &ipv6Addr, nil)
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
 func TestMap(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
