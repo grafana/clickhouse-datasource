@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -59,7 +60,7 @@ func TestTimeToDateTime64(t *testing.T) {
 func TestMacroFromTimeFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		TimeRange: backend.TimeRange{
 			From: from,
 			To:   to,
@@ -91,7 +92,7 @@ func TestMacroFromTimeFilter(t *testing.T) {
 func TestMacroToTimeFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		TimeRange: backend.TimeRange{
 			From: from,
 			To:   to,
@@ -123,7 +124,7 @@ func TestMacroToTimeFilter(t *testing.T) {
 func TestMacroFromTimeFilterMs(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		TimeRange: backend.TimeRange{
 			From: from,
 			To:   to,
@@ -155,7 +156,7 @@ func TestMacroFromTimeFilterMs(t *testing.T) {
 func TestMacroToTimeFilterMs(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		TimeRange: backend.TimeRange{
 			From: from,
 			To:   to,
@@ -187,7 +188,7 @@ func TestMacroToTimeFilterMs(t *testing.T) {
 func TestMacroDateFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		TimeRange: backend.TimeRange{
 			From: from,
 			To:   to,
@@ -199,7 +200,7 @@ func TestMacroDateFilter(t *testing.T) {
 }
 
 func TestMacroTimeInterval(t *testing.T) {
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		RawSQL:   "select $__timeInterval(col) from foo",
 		Interval: time.Duration(20000000000),
 	}
@@ -209,7 +210,7 @@ func TestMacroTimeInterval(t *testing.T) {
 }
 
 func TestMacroTimeIntervalMs(t *testing.T) {
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		RawSQL:   "select $__timeInterval_ms(col) from foo",
 		Interval: time.Duration(20000000000),
 	}
@@ -219,7 +220,7 @@ func TestMacroTimeIntervalMs(t *testing.T) {
 }
 
 func TestMacroIntervalSeconds(t *testing.T) {
-	query := sqlds.Query{
+	query := sqlutil.Query{
 		RawSQL:   "select toStartOfInterval(col, INTERVAL $__interval_s second) AS time from foo",
 		Interval: time.Duration(20000000000),
 	}
@@ -256,7 +257,7 @@ func TestInterpolate(t *testing.T) {
 	for i, tc := range tests {
 		driver := MockDB{}
 		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
-			query := &sqlds.Query{
+			query := &sqlutil.Query{
 				RawSQL: tc.input,
 				Table:  tableName,
 				Column: tableColumn,
