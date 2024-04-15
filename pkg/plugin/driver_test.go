@@ -26,7 +26,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/sqlds/v2"
+	"github.com/grafana/sqlds/v3"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,14 +141,14 @@ func TestConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, path, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 	t.Run("should not error when valid settings passed - with query timeout as number", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -165,7 +165,7 @@ func TestHTTPConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "protocol": "http" }`, host, port, path, username, ssl)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }

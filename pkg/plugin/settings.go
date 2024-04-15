@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -60,7 +61,7 @@ func (settings *Settings) isValid() (err error) {
 }
 
 // LoadSettings will read and validate Settings from the DataSourceConfig
-func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings, err error) {
+func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings) (settings Settings, err error) {
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(config.JSONData, &jsonData); err != nil {
 		return settings, fmt.Errorf("%s: %w", err.Error(), ErrorMessageInvalidJSON)
@@ -209,7 +210,7 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 
 	// proxy options are currently only able to load via environment variables,
 	// so we pass `nil` here so that they are loaded with defaults
-	proxyOpts, err := config.ProxyOptions(nil)
+	proxyOpts, err := config.ProxyOptionsFromContext(ctx)
 
 	if err == nil && proxyOpts != nil {
 		// the sdk expects the timeout to not be a string

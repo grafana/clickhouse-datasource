@@ -5,15 +5,15 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
-	"github.com/grafana/sqlds/v2"
+	"github.com/grafana/sqlds/v3"
 )
 
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	clickhousePlugin := Clickhouse{}
 	ds := sqlds.NewDatasource(&clickhousePlugin)
-	pluginSettings := clickhousePlugin.Settings(settings)
+	pluginSettings := clickhousePlugin.Settings(ctx, settings)
 	if pluginSettings.ForwardHeaders {
 		ds.EnableMultipleConnections = true
 	}
-	return ds.NewDatasource(settings)
+	return ds.NewDatasource(ctx, settings)
 }
