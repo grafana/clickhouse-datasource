@@ -208,8 +208,6 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		settings.HttpHeaders = loadHttpHeaders(jsonData, config.DecryptedSecureJSONData)
 	}
 
-	// proxy options are currently only able to load via environment variables,
-	// so we pass `nil` here so that they are loaded with defaults
 	proxyOpts, err := config.ProxyOptionsFromContext(ctx)
 
 	if err == nil && proxyOpts != nil {
