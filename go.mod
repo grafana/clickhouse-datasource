@@ -6,14 +6,14 @@ toolchain go1.21.4
 
 require (
 	dagger.io/dagger v0.10.2
-	github.com/ClickHouse/clickhouse-go/v2 v2.21.1
-	github.com/docker/docker v25.0.4+incompatible
+	github.com/ClickHouse/clickhouse-go/v2 v2.23.1
+	github.com/docker/docker v26.0.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.223.0
 	github.com/grafana/sqlds/v3 v3.2.0
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
-	github.com/shopspring/decimal v1.3.1
+	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.9.0
 	github.com/testcontainers/testcontainers-go v0.29.1
 	golang.org/x/net v0.22.0
@@ -31,6 +31,7 @@ require (
 	github.com/grafana/dataplane/sdata v0.0.7 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
+	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/user v0.1.0 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
