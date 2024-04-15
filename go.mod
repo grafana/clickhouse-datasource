@@ -7,7 +7,7 @@ toolchain go1.21.4
 require (
 	dagger.io/dagger v0.10.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.21.1
-	github.com/docker/docker v25.0.4+incompatible
+	github.com/docker/docker v25.0.5+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.223.0
 	github.com/grafana/sqlds/v3 v3.2.0
@@ -15,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.3.1
 	github.com/stretchr/testify v1.9.0
-	github.com/testcontainers/testcontainers-go v0.29.1
+	github.com/testcontainers/testcontainers-go v0.30.0
 	golang.org/x/net v0.22.0
 )
 
