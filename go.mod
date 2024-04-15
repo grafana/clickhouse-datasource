@@ -4,8 +4,6 @@ go 1.21
 
 toolchain go1.21.4
 
-replace github.com/grafana/grafana-plugin-sdk-go => ../grafana-plugin-sdk-go
-
 require (
 	dagger.io/dagger v0.10.2
 	github.com/ClickHouse/clickhouse-go/v2 v2.21.1
