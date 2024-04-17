@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.0.6
+
+### Fixes
+
+- Add support for configuring proxy options from context rather than environment variables (supported by updating `sqlds`) (#799)
+
 ## 4.0.5
 
 ### Fixes
