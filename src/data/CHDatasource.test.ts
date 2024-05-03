@@ -421,7 +421,7 @@ describe('ClickHouseDatasource', () => {
           } as QueryBuilderOptions,
         });
         expect(result?.rawSql).toEqual(
-          'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as time, count(*) as logs ' +
+          'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", count(*) as logs ' +
             'FROM "default"."logs" ' +
             'GROUP BY time ' +
             'ORDER BY time ASC'
@@ -434,7 +434,7 @@ describe('ClickHouseDatasource', () => {
           .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
         const result = datasource.getSupplementaryLogsVolumeQuery(request, query);
         expect(result?.rawSql).toEqual(
-          `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as time, ` +
+          `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", ` +
             `sum(toString("level") IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) as critical, ` +
             `sum(toString("level") IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
             `sum(toString("level") IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +

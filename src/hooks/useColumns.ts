@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { TableColumn } from 'types/queryBuilder';
 import { Datasource } from 'data/CHDatasource';
 
+const FEATURE_FLAT_QUERYING = true;
+
 export default (datasource: Datasource, database: string, table: string): readonly TableColumn[] => {
   const [columns, setColumns] = useState<readonly TableColumn[]>([]);
 
@@ -10,10 +12,15 @@ export default (datasource: Datasource, database: string, table: string): readon
       return;
     }
 
+    let columnPromise: Promise<readonly TableColumn[]>;
+    if (FEATURE_FLAT_QUERYING) {
+      columnPromise = datasource.fetchColumnsFlat(database, `${table}_query_aliases`);
+    } else {
+      columnPromise = datasource.fetchColumnsFull(database, table);
+    }
+
     let ignore = false;
-    datasource
-      .fetchColumnsFull(database, table)
-      .then(columns => {
+    columnPromise.then(columns => {
         if (ignore) {
           return;
         }

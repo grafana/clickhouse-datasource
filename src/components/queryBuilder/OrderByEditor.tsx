@@ -141,7 +141,7 @@ export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: read
 
   if (isAggregateQuery(builder)) {
     builder.columns?.forEach(c => {
-      allOptions.push({ label: c.name, value: c.name });
+      allOptions.push({ label: c.alias || c.name, value: c.name });
     });
 
     builder.aggregates!.forEach(a => {
@@ -160,7 +160,7 @@ export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: read
       builder.groupBy.forEach(g => allOptions.push({ label: g, value: g }));
     }
   } else {
-    allColumns.forEach(c => allOptions.push({ label: c.name, value: c.name }));
+    allColumns.forEach(c => allOptions.push({ label: c.label || c.name, value: c.name }));
   }
 
   // Add selected value to the list if it does not exist.

@@ -531,7 +531,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
   }
 
   if (col.alias) {
-    return `${colName} as ${col.alias}`
+    return `${colName} as "${col.alias}"`
   }
 
   return colName;

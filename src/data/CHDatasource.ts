@@ -526,6 +526,22 @@ export class Datasource
     }));
   }
 
+  async fetchColumnsFlat(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const prefix = Boolean(database) ? `"${database}".` : '';
+    const rawSql = `SELECT alias, select, "type" FROM ${prefix}"${table}"`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const view = new DataFrameView(frame);
+    return view.map(item => ({
+      name: item[1],
+      type: item[2],
+      label: item[0],
+      picklistValues: [],
+    }));
+  }
+
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);

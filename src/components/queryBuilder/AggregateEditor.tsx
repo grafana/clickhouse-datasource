@@ -98,7 +98,7 @@ const allColumnName = '*';
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
+  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.label || c.name, value: c.name }));
   columnOptions.push({ label: allColumnName, value: allColumnName });
 
   const addAggregate = () => {
