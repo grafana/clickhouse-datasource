@@ -1,6 +1,19 @@
 # Changelog
 
-## Unreleased
+## 4.0.6
+
+### Fixes
+
+- Add support for configuring proxy options from context rather than environment variables (supported by updating `sqlds`) (#799)
+
+## 4.0.5
+
+### Fixes
+
+- Fixed converter regex for `Nullable(IP)` and `Nullable(String)`. It won't match to `Array(Nullable(IP))` or `Array(Nullable(String))` any more. (#783)
+- Updated `grafana-plugin-sdk-go` to fix a PDC issue. More details [here](https://github.com/grafana/grafana-plugin-sdk-go/releases/tag/v0.217.0) (#790)
+
+## 4.0.4
 
 ### Fixes
 

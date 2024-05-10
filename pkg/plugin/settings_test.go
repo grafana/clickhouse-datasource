@@ -1,6 +1,7 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -124,7 +125,7 @@ func TestLoadSettings(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotSettings, err := LoadSettings(tt.args.config)
+				gotSettings, err := LoadSettings(context.Background(), tt.args.config)
 				assert.Equal(t, tt.wantErr, err)
 				if !reflect.DeepEqual(gotSettings, tt.wantSettings) {
 					t.Errorf("LoadSettings() = %v, want %v", gotSettings, tt.wantSettings)
@@ -145,7 +146,7 @@ func TestLoadSettings(t *testing.T) {
 		}
 		for i, tc := range tests {
 			t.Run(fmt.Sprintf("[%v/%v] %s", i+1, len(tests), tc.description), func(t *testing.T) {
-				_, err := LoadSettings(backend.DataSourceInstanceSettings{
+				_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
 					JSONData:                []byte(tc.jsonData),
 					DecryptedSecureJSONData: map[string]string{"password": tc.password},
 				})

@@ -595,3 +595,19 @@ func TestPoint(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, msg, *v.(*json.RawMessage))
 }
+
+func TestLowCardinality(t *testing.T) {
+	value := "value"
+	sut := converters.GetConverter("LowCardinality(String)")
+	v, err := sut.FrameConverter.ConverterFunc(value)
+	assert.Nil(t, err)
+	assert.Equal(t, value, v)
+}
+
+func TestLowCardinalityNullable(t *testing.T) {
+	value := "value"
+	sut := converters.GetConverter("LowCardinality(Nullable(String))")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Equal(t, value, v)
+}

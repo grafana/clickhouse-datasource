@@ -26,7 +26,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/sqlds/v2"
+	"github.com/grafana/sqlds/v3"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -141,14 +141,14 @@ func TestConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, path, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 	t.Run("should not error when valid settings passed - with query timeout as number", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -165,7 +165,7 @@ func TestHTTPConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "protocol": "http" }`, host, port, path, username, ssl)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -862,6 +862,47 @@ func TestArrayNullableUInt256(t *testing.T) {
 			conn, close := setupTest(t, "col1 Array(Nullable(UInt256))", protocol, nil)
 			defer close(t)
 			val := []*big.Int{big.NewInt(47), nil}
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
+func TestArrayNullableString(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var val []*string
+			conn, close := setupTest(t, "col1 Array(Nullable(String))", protocol, nil)
+			defer close(t)
+			v := "48"
+			val = append(val, &v, nil)
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
+func TestArrayNullableIPv4(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Array(Nullable(IPv4))", protocol, nil)
+			defer close(t)
+			ipv4Addr := net.ParseIP("192.0.2.1")
+			val := []*net.IP{&ipv4Addr, nil}
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
+func TestArrayNullableIPv6(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var val []*net.IP
+			conn, close := setupTest(t, "col1 Array(Nullable(IPv6))", protocol, nil)
+			defer close(t)
+			ipv6Addr := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+			val = append(val, &ipv6Addr, nil)
 			insertData(t, conn, val)
 			checkRows(t, conn, 1, val)
 		})

@@ -21,7 +21,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/sqlds/v2"
+	"github.com/grafana/sqlds/v3"
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
 )
@@ -102,8 +102,8 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 }
 
 // Connect opens a sql.DB connection using datasource settings
-func (h *Clickhouse) Connect(config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
-	settings, err := LoadSettings(config)
+func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+	settings, err := LoadSettings(ctx, config)
 	if err != nil {
 		return nil, err
 	}
@@ -229,8 +229,8 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 	return macros.Macros
 }
 
-func (h *Clickhouse) Settings(config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
-	settings, err := LoadSettings(config)
+func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
+	settings, err := LoadSettings(ctx, config)
 	timeout := 60
 	if err == nil {
 		t, err := strconv.Atoi(settings.QueryTimeout)
