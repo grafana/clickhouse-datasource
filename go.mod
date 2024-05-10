@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.4
 
 require (
-	dagger.io/dagger v0.10.2
+	dagger.io/dagger v0.11.4
 	github.com/ClickHouse/clickhouse-go/v2 v2.21.1
 	github.com/docker/docker v26.1.2+incompatible
 	github.com/docker/go-units v0.5.0
@@ -20,8 +20,8 @@ require (
 )
 
 require (
-	github.com/99designs/gqlgen v0.17.31 // indirect
-	github.com/Khan/genqlient v0.6.0 // indirect
+	github.com/99designs/gqlgen v0.17.44 // indirect
+	github.com/Khan/genqlient v0.7.0 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/containerd/log v0.1.0 // indirect
@@ -35,7 +35,8 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/user v0.1.0 // indirect
-	github.com/vektah/gqlparser/v2 v2.5.6 // indirect
+	github.com/sosodev/duration v1.2.0 // indirect
+	github.com/vektah/gqlparser/v2 v2.5.11 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.51.0 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.20.0 // indirect
@@ -90,7 +91,7 @@ require (
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattetti/filebuffer v1.0.1 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.9 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect
@@ -149,7 +150,7 @@ require (
 	golang.org/x/sys v0.20.0 // indirect
 	golang.org/x/term v0.20.0 // indirect
 	golang.org/x/text v0.15.0 // indirect
-	golang.org/x/tools v0.15.0 // indirect
+	golang.org/x/tools v0.18.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240415180920-8c6c420018be // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240415180920-8c6c420018be // indirect
