@@ -530,11 +530,40 @@ describe('getLimit', () => {
   });
 });
 
+describe('is*Type', () => {
+  it.each<{ input: string, expected: boolean }>([
+    { input: 'Nullable(String)', expected: true },
+    { input: 'FixedString(1)', expected: true },
+    { input: 'String', expected: true },
+    { input: 'Array(String)', expected: false },
+  ])('$input isStringType $expected', (c) => {
+    expect(_testExports.isStringType(c.input)).toEqual(c.expected);
+  });
+});
+
 describe('getFilters', () => {
   it('returns empty filter array', () => {
     const options = {} as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
     const expectedSql = '';
+    expect(sql).toEqual(expectedSql);
+  });
+
+  it('returns correct IN clause for escaped and unescaped values', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'col',
+          operator: FilterOperator.In,
+          type: 'string',
+          value: '1, (2), 3, some string, \'another string\', someFunction(123), "column reference"'.split(',')
+        }
+      ]
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    const expectedSql = `( col IN ('1', (2), '3', 'some string', 'another string', someFunction(123), "column reference") )`;
     expect(sql).toEqual(expectedSql);
   });
 

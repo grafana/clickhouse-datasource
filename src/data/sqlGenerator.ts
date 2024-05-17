@@ -747,7 +747,7 @@ const numberTypes = ['int', 'float', 'decimal'];
 const isNumberType = (type: string): boolean => numberTypes.some(t => type?.toLowerCase().includes(t));
 const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
 // const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
-const isStringType = (type: string): boolean => type.toLowerCase() === 'string' && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+const isStringType = (type: string): boolean => (type.toLowerCase() === 'string' || type.toLowerCase().startsWith('nullable(string') || type.toLowerCase().startsWith('fixedstring')) && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
 const isBooleanFilter = (type: string): boolean => isBooleanType(type);
 const isNumberFilter = (type: string): boolean => isNumberType(type);
@@ -778,4 +778,5 @@ export const _testExports = {
   getOrderBy,
   getLimit,
   getFilters,
+  isStringType,
 };
