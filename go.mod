@@ -9,8 +9,8 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.24.0
 	github.com/docker/docker v26.1.3+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/grafana-plugin-sdk-go v0.230.0
-	github.com/grafana/sqlds/v3 v3.2.0
+	github.com/grafana/grafana-plugin-sdk-go v0.231.0
+	github.com/grafana/sqlds/v3 v3.3.0
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.4.0
@@ -79,7 +79,7 @@ require (
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1 // indirect
 	github.com/hashicorp/go-hclog v1.6.3 // indirect
-	github.com/hashicorp/go-plugin v1.6.0 // indirect
+	github.com/hashicorp/go-plugin v1.6.1 // indirect
 	github.com/hashicorp/yamux v0.1.1 // indirect
 	github.com/invopop/yaml v0.2.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
