@@ -742,12 +742,24 @@ const getFilters = (options: QueryBuilderOptions): string => {
   return concatQueryParts(builtFilters);
 };
 
+const stripTypeModifiers = (type: string): string => {
+    return type.toLowerCase().
+      replace(/\(/g, '').
+      replace(/\)/g, '').
+      replace(/nullable/g, '').
+      replace(/lowcardinality/g, '');
+
+}
 const isBooleanType = (type: string): boolean => (type?.toLowerCase().startsWith('boolean'));
 const numberTypes = ['int', 'float', 'decimal'];
 const isNumberType = (type: string): boolean => numberTypes.some(t => type?.toLowerCase().includes(t));
 const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
 // const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
-const isStringType = (type: string): boolean => (type.toLowerCase() === 'string' || type.toLowerCase().startsWith('nullable(string') || type.toLowerCase().startsWith('fixedstring')) && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+const isStringType = (type: string): boolean => {
+  type = stripTypeModifiers(type.toLowerCase());
+  return (type === 'string' || type.startsWith('fixedstring'))
+  && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+}
 const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
 const isBooleanFilter = (type: string): boolean => isBooleanType(type);
 const isNumberFilter = (type: string): boolean => isNumberType(type);

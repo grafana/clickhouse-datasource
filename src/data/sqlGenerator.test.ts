@@ -532,9 +532,13 @@ describe('getLimit', () => {
 
 describe('is*Type', () => {
   it.each<{ input: string, expected: boolean }>([
-    { input: 'Nullable(String)', expected: true },
-    { input: 'FixedString(1)', expected: true },
     { input: 'String', expected: true },
+    { input: 'Nullable(String)', expected: true },
+    { input: 'LowCardinality(Nullable(String))', expected: true },
+    { input: 'FixedString(1)', expected: true },
+    { input: 'LowCardinality(Nullable(FixedString(1)))', expected: true },
+    { input: 'LowCardinality(FixedString(1))', expected: true },
+    { input: 'Nullable(FixedString(1))', expected: true },
     { input: 'Array(String)', expected: false },
   ])('$input isStringType $expected', (c) => {
     expect(_testExports.isStringType(c.input)).toEqual(c.expected);
