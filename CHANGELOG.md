@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Fixed `IN` operator escaping the entire string (specifically with `Nullable(String)`), also added `FixedString(N)` (#830)
+- Fixed query builder filter editor on alert rules page (#828)
+
 ## 4.0.7
 
 - Upgrade dependencies
