@@ -192,6 +192,28 @@ describe('FilterEditor', () => {
       // type key into the mapKey input
       await userEvent.type(result!.getAllByRole('combobox')[1], 'http.status_code');
       await userEvent.keyboard('{Enter}');
+
+      result.rerender(
+        <FilterEditor
+          allColumns={[{ name: 'SpanAttributes', type: 'Map(String, String)', picklistValues: [] }]}
+          filter={{
+            key: 'SpanAttributes',
+            type: 'Map(String, String)',
+            mapKey: 'http.status_code',
+            value: '',
+            operator: FilterOperator.Equals,
+            condition: 'AND',
+            filterType: 'custom',
+          }}
+          index={0}
+          onFilterChange={onFilterChange}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database=''
+          table=''
+        />
+      );
+
       // type value into the input
       await userEvent.type(result!.getByTestId('query-builder-filters-single-string-value-input'), '200');
       result!.getByTestId('query-builder-filters-single-string-value-input').blur();

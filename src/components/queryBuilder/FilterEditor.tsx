@@ -333,12 +333,12 @@ export const FilterEditor = (props: {
     onFilterChange(index, newFilter);
   };
   const onFilterMapKeyChange = (mapKey: string) => {
-    const newFilter: Filter = filter;
+    const newFilter: Filter = { ...filter };
     newFilter.mapKey = mapKey;
     onFilterChange(index, newFilter);
   };
   const onFilterOperatorChange = (operator: FilterOperator) => {
-    let newFilter: Filter = filter;
+    const newFilter: Filter = { ...filter };
     newFilter.operator = operator;
     if (utils.isMultiFilter(newFilter)) {
       if (!Array.isArray(newFilter.value)) {
@@ -348,7 +348,7 @@ export const FilterEditor = (props: {
     onFilterChange(index, newFilter);
   };
   const onFilterConditionChange = (condition: 'AND' | 'OR') => {
-    let newFilter: Filter = filter;
+    const newFilter: Filter = { ...filter };
     newFilter.condition = condition;
     onFilterChange(index, newFilter);
   };

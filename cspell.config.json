@@ -10,6 +10,8 @@
     "mage_output_file.go"
   ],
   "words": [
+    "lowcardinality",
+    "fixedstring",
     "singlequote",
     "concats",
     "Milli",
