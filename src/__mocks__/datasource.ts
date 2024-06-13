@@ -19,6 +19,7 @@ export const newMockDatasource = (): Datasource => {
       username: 'user',
       defaultDatabase: 'foo',
       defaultTable: 'bar',
+      aliasTables: [],
       protocol: Protocol.Native,
     },
     readOnly: true,

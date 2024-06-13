@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Added the ability to define column alias tables in the config, which simplifies query syntax for tables with a known schema.
+
 ## 4.0.8
 
 ### Fixes

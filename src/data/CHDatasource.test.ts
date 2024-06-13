@@ -249,12 +249,12 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe('fetchColumnsFull', () => {
+  describe('fetchColumnsFromTable', () => {
     it('sends a correct query when database and table names are provided', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchColumnsFull('db_name', 'table_name');
+      await ds.fetchColumnsFromTable('db_name', 'table_name');
       const expected = { rawSql: 'DESC TABLE "db_name"."table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -266,7 +266,7 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchColumnsFull('', 'table_name');
+      await ds.fetchColumnsFromTable('', 'table_name');
       const expected = { rawSql: 'DESC TABLE "table_name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
@@ -279,12 +279,54 @@ describe('ClickHouseDatasource', () => {
       const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_) => of({ data: [frame] }));
 
-      await ds.fetchColumnsFull('', 'table.name');
+      await ds.fetchColumnsFromTable('', 'table.name');
       const expected = { rawSql: 'DESC TABLE "table.name"' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
       );
+    });
+  });
+
+  describe('fetchColumnsFromAliasTable', () => {
+    it('sends a correct query when full table name is provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchColumnsFromAliasTable('"db_name"."table_name"');
+      const expected = { rawSql: 'SELECT alias, select, "type" FROM "db_name"."table_name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+          expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+  });
+
+  describe('getAliasTable', () => {
+    it('returns the matching table alias', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.aliasTables = [{
+        targetDatabase: 'db_name',
+        targetTable: 'table_name',
+        aliasDatabase: 'alias_db',
+        aliasTable: 'alias_table'
+      }];
+      const result = ds.getAliasTable('db_name', 'table_name');
+      const expected = '"alias_db"."alias_table"';
+
+      expect(result).toBe(expected);
+    });
+
+    it('returns null when no alias matches found', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.aliasTables = [{
+        targetDatabase: 'db_name',
+        targetTable: 'table_name',
+        aliasDatabase: 'alias_db',
+        aliasTable: 'alias_table'
+      }];
+      const result = ds.getAliasTable('other_db', 'other_table');
+      expect(result).toBeNull();
     });
   });
 

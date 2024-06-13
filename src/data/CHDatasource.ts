@@ -510,7 +510,10 @@ export class Datasource
     return this.fetchData(`DESC TABLE "${database}"."${table}"`);
   }
 
-  async fetchColumnsFull(database: string | undefined, table: string): Promise<TableColumn[]> {
+  /**
+   * Fetches column suggestions from the table schema.
+   */
+  async fetchColumnsFromTable(database: string | undefined, table: string): Promise<TableColumn[]> {
     const prefix = Boolean(database) ? `"${database}".` : '';
     const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
@@ -526,9 +529,11 @@ export class Datasource
     }));
   }
 
-  async fetchColumnsFlat(database: string | undefined, table: string): Promise<TableColumn[]> {
-    const prefix = Boolean(database) ? `"${database}".` : '';
-    const rawSql = `SELECT alias, select, "type" FROM ${prefix}"${table}"`;
+  /**
+   * Fetches column suggestions from an alias definition table.
+   */
+  async fetchColumnsFromAliasTable(fullTableName: string): Promise<TableColumn[]> {
+    const rawSql = `SELECT alias, select, "type" FROM ${fullTableName}`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
@@ -540,6 +545,33 @@ export class Datasource
       label: item[0],
       picklistValues: [],
     }));
+  }
+
+  getAliasTable(targetDatabase: string | undefined, targetTable: string): string | null {
+    const aliasEntries = this.settings?.jsonData?.aliasTables || [];
+    const matchedEntry = aliasEntries.find(e => {
+      const matchDatabase = !e.targetDatabase || (e.targetDatabase === targetDatabase);
+      const matchTable = e.targetTable === targetTable;
+      return matchDatabase && matchTable;
+    }) || null;
+
+    if (matchedEntry === null) {
+      return null;
+    }
+
+    const aliasDatabase = matchedEntry.aliasDatabase || targetDatabase || null;
+    const aliasTable = matchedEntry.aliasTable;
+    const prefix = Boolean(aliasDatabase) ? `"${aliasDatabase}".` : '';
+    return `${prefix}"${aliasTable}"`;
+  }
+
+  async fetchColumns(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const fullAliasTableName = this.getAliasTable(database, table);
+    if (fullAliasTableName !== null) {
+      return this.fetchColumnsFromAliasTable(fullAliasTableName);
+    }
+
+    return this.fetchColumnsFromTable(database, table);
   }
 
   private async fetchData(rawSql: string) {

@@ -406,6 +406,7 @@ describe('getColumnIdentifier', () => {
     { input: { name: 'test with space' }, expected: `"test with space"` },
     { input: { name: 'test with alias', alias: 'a' }, expected: `"test with alias" as "a"` },
     { input: { name: 'test_with_alias', alias: 'b' }, expected: `test_with_alias as "b"` },
+    { input: { name: '"test" as a', alias: '' }, expected: `"test" as a` },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {
