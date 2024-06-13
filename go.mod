@@ -9,7 +9,7 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.25.0
 	github.com/docker/docker v26.1.4+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/grafana-plugin-sdk-go v0.234.0
+	github.com/grafana/grafana-plugin-sdk-go v0.235.0
 	github.com/grafana/sqlds/v3 v3.4.2
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
@@ -29,6 +29,8 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/grafana/dataplane/sdata v0.0.7 // indirect
+	github.com/grafana/otel-profiling-go v0.5.1 // indirect
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.7 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
