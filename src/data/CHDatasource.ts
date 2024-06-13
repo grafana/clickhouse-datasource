@@ -496,6 +496,8 @@ export class Datasource
    * 
    * Samples rows to get a unique set of keys for the map.
    * May not include ALL keys for a given dataset.
+   * 
+   * TODO: This query can be slow/expensive
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
     const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;

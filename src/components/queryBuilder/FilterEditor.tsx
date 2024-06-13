@@ -203,7 +203,7 @@ export const FilterEditor = (props: {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter } = props;
   const [isOpen, setIsOpen] = useState(false);
   const isMapType = filter.type.startsWith('Map');
-  const mapKeys = useUniqueMapKeys(props.datasource, (isMapType && !filter.label) ? filter.key : '', props.database, props.table);
+  const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
   const mapKeyOptions = mapKeys.map(k => ({ label: k, value: k }));
   if (filter.mapKey && !mapKeys.includes(filter.mapKey)) {
     mapKeyOptions.push({ label: filter.label || filter.mapKey, value: filter.mapKey });
@@ -375,7 +375,7 @@ export const FilterEditor = (props: {
         allowCustomValue
         menuPlacement={'bottom'}
       />
-      { (isMapType && !filter.label) &&
+      { isMapType &&
         <Select
           value={filter.mapKey}
           placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
