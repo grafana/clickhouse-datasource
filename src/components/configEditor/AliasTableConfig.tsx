@@ -40,7 +40,8 @@ export const AliasTableConfig = (props: AliasTablesConfigProps) => {
         }]));
     }
     const removeEntry = (index: number) => {
-        let nextEntries = entries.toSpliced(index, 1);
+        let nextEntries: AliasTableEntry[] = entries.slice();
+        nextEntries.splice(index, 1);
         nextEntries = removeDuplicateEntries(nextEntries);
         setEntries(nextEntries);
         onAliasTablesChange(nextEntries);
