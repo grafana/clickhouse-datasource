@@ -11,7 +11,8 @@
     "rootDir": "../src",
     "baseUrl": "../src",
     "typeRoots": ["../node_modules/@types"],
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "lib": ["ES2023.Array"],
   },
   "ts-node": {
     "compilerOptions": {
