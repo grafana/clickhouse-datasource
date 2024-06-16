@@ -524,14 +524,14 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
   let colName = col.name;
   
   // allow for functions like count()
-  if (colName.includes('(') || colName.includes(')') || colName.includes('"') || colName.includes('"')) {
+  if (colName.includes('(') || colName.includes(')') || colName.includes('"') || colName.includes('"') || colName.includes(' as ')) {
     colName = col.name
   } else if (colName.includes(' ')) {
     colName = escapeIdentifier(col.name);
   }
 
-  if (col.alias) {
-    return `${colName} as ${col.alias}`
+  if (col.alias && (col.alias !== col.name && escapeIdentifier(col.alias) !== colName)) {
+    return `${colName} as "${col.alias}"`
   }
 
   return colName;

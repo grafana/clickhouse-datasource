@@ -105,6 +105,7 @@ export interface TableColumn {
   name: string;
   type: string;
   picklistValues: TableColumnPickListItem[];
+  label?: string;
   filterable?: boolean;
   sortable?: boolean;
   groupable?: boolean;
@@ -227,6 +228,11 @@ export interface CommonFilterProps {
    * for the filter to be applied unless key is also provided.
    */
   hint?: ColumnHint;
+
+  /**
+   * Display label for filter
+   */
+  label?: string;
 }
 
 export interface NullFilter extends CommonFilterProps {

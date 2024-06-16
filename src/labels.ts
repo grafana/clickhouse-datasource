@@ -86,6 +86,17 @@ export default {
           tooltip: 'Forward Grafana HTTP Headers to datasource.',
         },
       },
+      AliasTableConfig: {
+        title: 'Column Alias Tables',
+        descriptionParts: ['Provide alias tables with a', '(`alias` String, `select` String, `type` String)', 'schema to use as a source for column selection.'],
+        addTableLabel: 'Add Table',
+        targetDatabaseLabel: 'Target Database',
+        targetDatabasePlaceholder: '(optional)',
+        targetTableLabel: 'Target Table',
+        aliasDatabaseLabel: 'Alias Database',
+        aliasDatabasePlaceholder: '(optional)',
+        aliasTableLabel: 'Alias Table',
+      },
 
       DefaultDatabaseTableConfig: {
         title: 'Default DB and table',

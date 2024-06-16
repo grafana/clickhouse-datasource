@@ -122,6 +122,15 @@ export const Components = {
       headerNameInput: 'config__http-header-config__header-name-input',
       headerValueInput: 'config__http-header-config__header-value-input',
       forwardGrafanaHeadersSwitch: 'config__http-header-config__forward-grafana-headers-switch'
+    },
+    AliasTableConfig: {
+      aliasEditor: 'config__alias-table-config__alias-editor',
+      addEntryButton: 'config__alias-table-config__add-entry-button',
+      removeEntryButton: 'config__alias-table-config__remove-entry-button',
+      targetDatabaseInput: 'config__alias-table-config__target-database-input',
+      targetTableInput: 'config__alias-table-config__target-table-input',
+      aliasDatabaseInput: 'config__alias-table-config__alias-database-input',
+      aliasTableInput: 'config__alias-table-config__alias-table-input',
     }
   },
   QueryBuilder: {

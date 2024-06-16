@@ -414,7 +414,7 @@ describe('getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType"',
-    'SELECT $__timeInterval(time) as time FROM "db"."foo" GROUP BY time',
+    'SELECT $__timeInterval(time) as "time" FROM "db"."foo" GROUP BY time',
     {
       queryType: QueryType.TimeSeries,
       mode: BuilderMode.Trend,
@@ -429,7 +429,7 @@ describe('getQueryOptionsFromSql', () => {
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType" with a filter',
-    'SELECT $__timeInterval(time) as time FROM "db"."foo" WHERE ( base IS NOT NULL ) GROUP BY time',
+    'SELECT $__timeInterval(time) as "time" FROM "db"."foo" WHERE ( base IS NOT NULL ) GROUP BY time',
     {
       queryType: QueryType.TimeSeries,
       mode: BuilderMode.Trend,

@@ -6,7 +6,15 @@ import {
 } from '@grafana/data';
 import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
-import { CHConfig, CHCustomSetting, CHSecureConfig, CHLogsConfig, Protocol, CHTracesConfig } from 'types/config';
+import {
+  CHConfig,
+  CHCustomSetting,
+  CHSecureConfig,
+  CHLogsConfig,
+  Protocol,
+  CHTracesConfig,
+  AliasTableEntry
+} from 'types/config';
 import { gte as versionGte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana/experimental';
 import { config } from '@grafana/runtime';
@@ -19,6 +27,7 @@ import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from 'labels';
 import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
+import {AliasTableConfig} from "../components/configEditor/AliasTableConfig";
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -147,6 +156,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           durationUnit: options.jsonData.traces?.durationUnit || TimeUnit.Nanoseconds,
           [key]: value
         }
+      }
+    });
+  };
+  const onAliasTableConfigChange = (aliasTables: AliasTableEntry[]) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        aliasTables
       }
     });
   };
@@ -406,6 +424,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onServiceTagsColumnChange={c => onTracesConfigChange('serviceTagsColumn', c)}
         />
 
+        <Divider />
+        <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
         <Divider />
         {config.featureToggles['secureSocksDSProxyEnabled'] && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field

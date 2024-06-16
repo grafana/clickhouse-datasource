@@ -26,12 +26,12 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
   const selectedColumnName = selectedColumn?.name;
   const columns: Array<SelectableValue<string>> = allColumns.
     filter(columnFilterFn || defaultFilterFn).
-    map(c => ({ label: c.name, value: c.name }));
+    map(c => ({ label: c.label || c.name, value: c.name }));
 
   // Select component WILL NOT display the value if it isn't present in the options.
   let staleOption = false;
   if (selectedColumn && !columns.find(c => c.value === selectedColumn.name)) {
-    columns.push({ label: selectedColumn.name, value: selectedColumn.name });
+    columns.push({ label: selectedColumn.alias || selectedColumn.name, value: selectedColumn.name });
     staleOption = true;
   }
 
@@ -42,11 +42,17 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     }
 
     const column = allColumns.find(c => c.name === selected!.value)!;
-    onColumnChange({
+    const nextColumn: SelectedColumn = {
       name: column?.name || selected!.value,
       type: column?.type,
-      hint: columnHint
-    });
+      hint: columnHint,
+    };
+
+    if (column && column.label !== undefined) {
+      nextColumn.alias = column.label;
+    }
+
+    onColumnChange(nextColumn);
   }
 
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');

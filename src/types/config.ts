@@ -28,6 +28,8 @@ export interface CHConfig extends DataSourceJsonData {
   logs?: CHLogsConfig;
   traces?: CHTracesConfig;
 
+  aliasTables?: AliasTableEntry[];
+
   httpHeaders?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
   
@@ -85,6 +87,13 @@ export interface CHTracesConfig {
   startTimeColumn?: string;
   tagsColumn?: string;
   serviceTagsColumn?: string;
+}
+
+export interface AliasTableEntry {
+  targetDatabase: string;
+  targetTable: string;
+  aliasDatabase: string;
+  aliasTable: string;
 }
 
 export enum Protocol {

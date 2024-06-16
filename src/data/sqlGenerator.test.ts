@@ -105,7 +105,7 @@ describe('SQL Generator', () => {
     };
 
     const expectedSqlParts = [
-      'SELECT log_ts as timestamp, log_body as body, log_level as level',
+      'SELECT log_ts as "timestamp", log_body as "body", log_level as "level"',
       'FROM "default"."logs"',
       'WHERE ( timestamp >= $__fromTime AND timestamp <= $__toTime )',
       'AND ( level = \'error\' )',
@@ -139,7 +139,7 @@ describe('SQL Generator', () => {
       orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }]
     };
     const expectedSqlParts = [
-      'SELECT time_field as time, number_field',
+      'SELECT time_field as "time", number_field',
       'FROM "default"."time_data" WHERE ( number_field > 0 )',
       'ORDER BY time ASC LIMIT 100'
     ];
@@ -172,7 +172,7 @@ describe('SQL Generator', () => {
       orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }]
     };
     const expectedSqlParts = [
-      'SELECT time_field as time, number_field, sum(number_field) as total',
+      'SELECT time_field as "time", number_field, sum(number_field) as total',
       'FROM "default"."time_data" WHERE ( number_field > 0 )',
       'GROUP BY time ORDER BY time ASC LIMIT 100'
     ];
@@ -404,8 +404,9 @@ describe('getColumnIdentifier', () => {
     { input: { name: ' ' }, expected: `" "` },
     { input: { name: 'test' }, expected: `test` },
     { input: { name: 'test with space' }, expected: `"test with space"` },
-    { input: { name: 'test with alias', alias: 'a' }, expected: `"test with alias" as a` },
-    { input: { name: 'test_with_alias', alias: 'b' }, expected: `test_with_alias as b` },
+    { input: { name: 'test with alias', alias: 'a' }, expected: `"test with alias" as "a"` },
+    { input: { name: 'test_with_alias', alias: 'b' }, expected: `test_with_alias as "b"` },
+    { input: { name: '"test" as a', alias: '' }, expected: `"test" as a` },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {

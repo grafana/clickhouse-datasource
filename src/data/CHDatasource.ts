@@ -496,6 +496,8 @@ export class Datasource
    * 
    * Samples rows to get a unique set of keys for the map.
    * May not include ALL keys for a given dataset.
+   * 
+   * TODO: This query can be slow/expensive
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
     const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
@@ -510,7 +512,10 @@ export class Datasource
     return this.fetchData(`DESC TABLE "${database}"."${table}"`);
   }
 
-  async fetchColumnsFull(database: string | undefined, table: string): Promise<TableColumn[]> {
+  /**
+   * Fetches column suggestions from the table schema.
+   */
+  async fetchColumnsFromTable(database: string | undefined, table: string): Promise<TableColumn[]> {
     const prefix = Boolean(database) ? `"${database}".` : '';
     const rawSql = `DESC TABLE ${prefix}"${table}"`;
     const frame = await this.runQuery({ rawSql });
@@ -524,6 +529,51 @@ export class Datasource
       label: item[0],
       picklistValues: [],
     }));
+  }
+
+  /**
+   * Fetches column suggestions from an alias definition table.
+   */
+  async fetchColumnsFromAliasTable(fullTableName: string): Promise<TableColumn[]> {
+    const rawSql = `SELECT alias, select, "type" FROM ${fullTableName}`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const view = new DataFrameView(frame);
+    return view.map(item => ({
+      name: item[1],
+      type: item[2],
+      label: item[0],
+      picklistValues: [],
+    }));
+  }
+
+  getAliasTable(targetDatabase: string | undefined, targetTable: string): string | null {
+    const aliasEntries = this.settings?.jsonData?.aliasTables || [];
+    const matchedEntry = aliasEntries.find(e => {
+      const matchDatabase = !e.targetDatabase || (e.targetDatabase === targetDatabase);
+      const matchTable = e.targetTable === targetTable;
+      return matchDatabase && matchTable;
+    }) || null;
+
+    if (matchedEntry === null) {
+      return null;
+    }
+
+    const aliasDatabase = matchedEntry.aliasDatabase || targetDatabase || null;
+    const aliasTable = matchedEntry.aliasTable;
+    const prefix = Boolean(aliasDatabase) ? `"${aliasDatabase}".` : '';
+    return `${prefix}"${aliasTable}"`;
+  }
+
+  async fetchColumns(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const fullAliasTableName = this.getAliasTable(database, table);
+    if (fullAliasTableName !== null) {
+      return this.fetchColumnsFromAliasTable(fullAliasTableName);
+    }
+
+    return this.fetchColumnsFromTable(database, table);
   }
 
   private async fetchData(rawSql: string) {

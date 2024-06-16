@@ -206,12 +206,12 @@ export const FilterEditor = (props: {
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
   const mapKeyOptions = mapKeys.map(k => ({ label: k, value: k }));
   if (filter.mapKey && !mapKeys.includes(filter.mapKey)) {
-    mapKeyOptions.push({ label: filter.mapKey, value: filter.mapKey });
+    mapKeyOptions.push({ label: filter.label || filter.mapKey, value: filter.mapKey });
   }
 
   const getFields = () => {
     const values = (filter.restrictToFields || fieldsList).map(f => {
-      let label = f.name;
+      let label = f.label || f.name;
       if (f.type.startsWith('Map')) {
         label += '[]';
       }
@@ -220,7 +220,7 @@ export const FilterEditor = (props: {
     });
     // Add selected value to the list if it does not exist.
     if (filter?.key && !values.find((x) => x.value === filter.key)) {
-      values.push({ label: filter.key!, value: filter.key! });
+      values.push({ label: filter.label || filter.key!, value: filter.key! });
     }
     return values;
   };
@@ -284,7 +284,8 @@ export const FilterEditor = (props: {
     const matchingField = fieldsList.find(f => f.name === fieldName);
     const filterData = {
       key: matchingField?.name || fieldName,
-      type: matchingField?.type || 'String'
+      type: matchingField?.type || 'String',
+      label: matchingField?.label,
     };
 
     let newFilter: Filter & PredefinedFilter;
@@ -297,6 +298,7 @@ export const FilterEditor = (props: {
         condition: filter.condition || 'AND',
         operator: FilterOperator.WithInGrafanaTimeRange,
         restrictToFields: filter.restrictToFields,
+        label: filterData.label,
       };
     } else if (utils.isBooleanType(filterData.type)) {
       newFilter = {
@@ -306,6 +308,7 @@ export const FilterEditor = (props: {
         condition: filter.condition || 'AND',
         operator: FilterOperator.Equals,
         value: false,
+        label: filterData.label,
       };
     } else if (utils.isDateType(filterData.type)) {
       newFilter = {
@@ -315,6 +318,7 @@ export const FilterEditor = (props: {
         condition: filter.condition || 'AND',
         operator: FilterOperator.Equals,
         value: 'TODAY',
+        label: filterData.label,
       };
     } else {
       newFilter = {
@@ -323,6 +327,7 @@ export const FilterEditor = (props: {
         type: filterData.type,
         condition: filter.condition || 'AND',
         operator: FilterOperator.IsNotNull,
+        label: filterData.label,
       };
     }
     onFilterChange(index, newFilter);
@@ -370,7 +375,7 @@ export const FilterEditor = (props: {
         allowCustomValue
         menuPlacement={'bottom'}
       />
-      { isMapType && 
+      { isMapType &&
         <Select
           value={filter.mapKey}
           placeholder={labels.components.FilterEditor.mapKeyPlaceholder}

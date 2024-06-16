@@ -18,7 +18,7 @@ function getCustomColumns(columnNames: string[], allColumns: readonly TableColum
   const columnNamesSet = new Set(columnNames);
   return allColumns.
     filter(c => columnNamesSet.has(c.name)).
-    map(c => ({ label: c.name, value: c.name }));
+    map(c => ({ label: c.label || c.name, value: c.name }));
 }
 
 const allColumnName = '*';
@@ -27,11 +27,11 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
   const { allColumns, selectedColumns, onSelectedColumnsChange, disabled, showAllOption } = props;
   const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const allColumnNames = allColumns.map(c => ({ label: c.name, value: c.name }));
+  const allColumnNames = allColumns.map(c => ({ label: c.label || c.name, value: c.name }));
   if (showAllOption) {
     allColumnNames.push({ label: allColumnName, value: allColumnName });
   }
-  const selectedColumnNames = (selectedColumns || []).map(c => ({ label: c.name, value: c.name }));
+  const selectedColumnNames = (selectedColumns || []).map(c => ({ label: c.alias || c.name, value: c.name }));
   const { label, tooltip } = labels.components.ColumnsEditor;
 
   const options = [...allColumnNames, ...customColumns];
@@ -71,7 +71,8 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
         nextSelectedColumns.push({
           name: columnName,
           type: tableColumn?.type || 'String',
-          custom: customColumnNames.has(columnName)
+          custom: customColumnNames.has(columnName),
+          alias: tableColumn?.label || columnName,
         });
       }
     }
