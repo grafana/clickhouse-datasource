@@ -199,6 +199,20 @@ func TestMacroDateFilter(t *testing.T) {
 	assert.Equal(t, "dateCol >= toDate('2014-11-12') AND dateCol <= toDate('2015-11-12')", got)
 }
 
+func TestMacroDateTimeFilter(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	query := sqlutil.Query{
+		TimeRange: backend.TimeRange{
+			From: from,
+			To:   to,
+		},
+	}
+	got, err := DateTimeFilter(&query, []string{"dateCol", "timeCol"})
+	assert.Nil(t, err)
+	assert.Equal(t, "(dateCol >= toDate('2014-11-12') AND dateCol <= toDate('2015-11-12')) AND (timeCol >= toDateTime(1415792726) AND timeCol <= toDateTime(1447328726))", got)
+}
+
 func TestMacroTimeInterval(t *testing.T) {
 	query := sqlutil.Query{
 		RawSQL:   "select $__timeInterval(col) from foo",

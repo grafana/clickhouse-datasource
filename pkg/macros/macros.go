@@ -87,6 +87,22 @@ func DateFilter(query *sqlutil.Query, args []string) (string, error) {
 	return fmt.Sprintf("%s >= %s AND %s <= %s", column, timeToDate(from), column, timeToDate(to)), nil
 }
 
+func DateTimeFilter(query *sqlutil.Query, args []string) (string, error) {
+	if len(args) != 2 {
+		return "", fmt.Errorf("%w: expected 2 arguments, received %d", sqlds.ErrorBadArgumentCount, len(args))
+	}
+	var (
+		dateColumn = args[0]
+		timeColumn = args[1]
+		from       = query.TimeRange.From
+		to         = query.TimeRange.To
+	)
+
+	dateFilter := fmt.Sprintf("(%s >= %s AND %s <= %s)", dateColumn, timeToDate(from), dateColumn, timeToDate(to))
+	timeFilter := fmt.Sprintf("(%s >= %s AND %s <= %s)", timeColumn, timeToDateTime(from), timeColumn, timeToDateTime(to))
+	return fmt.Sprintf("%s AND %s", dateFilter, timeFilter), nil
+}
+
 func TimeInterval(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
 		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
@@ -141,6 +157,7 @@ var Macros = map[string]sqlds.MacroFunc{
 	"timeFilter":      TimeFilter,
 	"timeFilter_ms":   TimeFilterMs,
 	"dateFilter":      DateFilter,
+	"dateTimeFilter":  DateTimeFilter,
 	"timeInterval":    TimeInterval,
 	"timeInterval_ms": TimeIntervalMs,
 	"interval_s":      IntervalSeconds,
