@@ -1,5 +1,5 @@
 import React, {ChangeEvent, useState} from 'react';
-import {ConfigSection} from '@grafana/experimental';
+import {ConfigSection} from 'components/experimental/ConfigSection';
 import {Input, Field, HorizontalGroup, Button} from '@grafana/ui';
 import {AliasTableEntry} from 'types/config';
 import allLabels from 'labels';

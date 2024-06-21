@@ -1,5 +1,5 @@
 import React, { ChangeEvent, useMemo, useState } from 'react';
-import { ConfigSection } from '@grafana/experimental';
+import { ConfigSection } from 'components/experimental/ConfigSection';
 import { Input, Field, HorizontalGroup, Switch, SecretInput, Button } from '@grafana/ui';
 import { CHHttpHeader } from 'types/config';
 import allLabels from 'labels';
