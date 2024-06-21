@@ -158,6 +158,7 @@ var Macros = map[string]sqlds.MacroFunc{
 	"timeFilter_ms":   TimeFilterMs,
 	"dateFilter":      DateFilter,
 	"dateTimeFilter":  DateTimeFilter,
+	"dt":              DateTimeFilter,
 	"timeInterval":    TimeInterval,
 	"timeInterval_ms": TimeIntervalMs,
 	"interval_s":      IntervalSeconds,
