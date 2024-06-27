@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Added `$__dateTimeFilter()` macro for conveniently filtering a PRIMARY KEY composed of Date and DateTime columns.
+
 ## 4.1.0
 
 ### Features
