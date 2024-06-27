@@ -16,7 +16,7 @@ import {
   AliasTableEntry
 } from 'types/config';
 import { gte as versionGte } from 'semver';
-import { ConfigSection, ConfigSubSection, DataSourceDescription } from '@grafana/experimental';
+import { ConfigSection, ConfigSubSection, DataSourceDescription } from 'components/experimental/ConfigSection';
 import { config } from '@grafana/runtime';
 import { Divider } from 'components/Divider';
 import { TimeUnit } from 'types/queryBuilder';

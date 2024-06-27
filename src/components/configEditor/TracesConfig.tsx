@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ConfigSection, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
 import { Input, Field } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint, TimeUnit } from 'types/queryBuilder';
