@@ -1,6 +1,6 @@
 import React, { FormEvent } from 'react';
 import { Switch, Input, Field } from '@grafana/ui';
-import { ConfigSection } from '@grafana/experimental';
+import { ConfigSection } from 'components/experimental/ConfigSection';
 import allLabels from 'labels';
 
 interface QuerySettingsConfigProps {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select, Button, Input } from '@grafana/ui';
+import { InlineFormLabel, Select, Button, Input, HorizontalGroup } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
@@ -11,9 +11,10 @@ interface AggregateProps {
   index: number,
   aggregate: AggregateColumn;
   updateAggregate: (index: number, aggregate: AggregateColumn) => void;
+  removeAggregate: (index: number) => void;
 }
 
-const aggregateOptions: Array<SelectableValue<AggregateType>> = [
+const allAggregateOptions: Array<SelectableValue<AggregateType>> = [
   { label: 'Count', value: AggregateType.Count },
   { label: 'Sum', value: AggregateType.Sum },
   { label: 'Min', value: AggregateType.Min },
@@ -24,13 +25,25 @@ const aggregateOptions: Array<SelectableValue<AggregateType>> = [
 ];
 
 const Aggregate = (props: AggregateProps) => {
-  const { columnOptions, index, aggregate, updateAggregate } = props;
+  const { index, aggregate, updateAggregate, removeAggregate } = props;
   const [isOpen, setIsOpen] = useState(false);
   const [alias, setAlias] = useState(aggregate.alias || '');
   const { aliasLabel } = labels.components.AggregatesEditor;
 
+  // Add current value to aggregate functions
+  const aggregateOptions = allAggregateOptions.slice();
+  if (!aggregateOptions.find(a => a.value === aggregate.aggregateType)) {
+    aggregateOptions.push({ label: aggregate.aggregateType, value: aggregate.aggregateType });
+  }
+
+  // Add current value to column options
+  const columnOptions = props.columnOptions.slice();
+  if (!columnOptions.find(c => c.value === aggregate.column)) {
+    columnOptions.push({ label: aggregate.column, value: aggregate.column });
+  }
+
   return (
-    <>
+    <HorizontalGroup wrap align="flex-start" justify="flex-start">
       <Select
         width={20}
         className={styles.Common.inlineSelect}
@@ -38,9 +51,10 @@ const Aggregate = (props: AggregateProps) => {
         value={aggregate.aggregateType}
         onChange={e => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
         menuPlacement={'bottom'}
+        allowCustomValue
       />
       <Select<string>
-        width={28}
+        width={40}
         className={styles.Common.inlineSelect}
         options={columnOptions}
         isOpen={isOpen}
@@ -49,6 +63,7 @@ const Aggregate = (props: AggregateProps) => {
         onChange={e => updateAggregate(index, { ...aggregate, column: e.value! })}
         value={aggregate.column}
         menuPlacement={'bottom'}
+        allowCustomValue
       />
       <InlineFormLabel width={2} className="query-keyword">
         {aliasLabel}
@@ -60,7 +75,15 @@ const Aggregate = (props: AggregateProps) => {
         onBlur={e => updateAggregate(index, { ...aggregate, alias: e.currentTarget.value })}
         placeholder="alias"
       />
-    </>
+      <Button
+        data-testid={selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton}
+        className={styles.Common.smallBtn}
+        variant="destructive"
+        size="sm"
+        icon="trash-alt"
+        onClick={() => removeAggregate(index)}
+      />
+    </HorizontalGroup>
   );
 };
 
@@ -75,7 +98,7 @@ const allColumnName = '*';
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.name, value: c.name }));
+  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.label || c.name, value: c.name }));
   columnOptions.push({ label: allColumnName, value: allColumnName });
 
   const addAggregate = () => {
@@ -118,14 +141,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
               index={index}
               aggregate={aggregate}
               updateAggregate={updateAggregate}
-            />
-            <Button
-              data-testid={selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton}
-              className={styles.Common.smallBtn}
-              variant="destructive"
-              size="sm"
-              icon="trash-alt"
-              onClick={() => removeAggregate(index)}
+              removeAggregate={removeAggregate}
             />
           </div>
         );

@@ -1,10 +1,10 @@
 
 import React from 'react';
-import { ConfigSection, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
 import { Input, Field } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint, TimeUnit } from 'types/queryBuilder';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { CHTracesConfig } from 'types/config';
@@ -45,7 +45,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
   } = (props.tracesConfig || {}) as CHTracesConfig;
   const labels = allLabels.components.Config.TracesConfig;
 
-  const otelConfig = otelVersions.find(v => v.version === otelVersion);
+  const otelConfig = otel.getVersion(otelVersion);
   if (otelEnabled && otelConfig) {
     startTimeColumn = otelConfig.traceColumnMap.get(ColumnHint.Time);
     traceIdColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceId);
@@ -64,6 +64,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
       title={labels.title}
       description={labels.description}
     >
+      <div id="traces-config" />
       <Field
         label={labels.defaultDatabase.label}
         description={labels.defaultDatabase.description}

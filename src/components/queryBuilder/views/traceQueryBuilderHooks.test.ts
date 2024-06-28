@@ -1,9 +1,9 @@
 import { renderHook } from '@testing-library/react';
-import { useTraceDefaultsOnMount, useOtelColumns } from './traceQueryBuilderHooks';
+import { useTraceDefaultsOnMount, useOtelColumns, useDefaultFilters } from './traceQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
 import { setOptions } from 'hooks/useBuilderOptionsState';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 
 describe('useTraceDefaultsOnMount', () => {
   it('should call builderOptionsDispatch with default trace columns', async () => {
@@ -48,7 +48,7 @@ describe('useTraceDefaultsOnMount', () => {
 });
 
 describe('useOtelColumns', () => {
-  const testOtelVersion = otelVersions[0]; // use latest version
+  const testOtelVersion = otel.getLatestVersion();
 
   it('should not call builderOptionsDispatch if OTEL is already enabled', async () => {
     const builderOptionsDispatch = jest.fn();
@@ -95,5 +95,66 @@ describe('useOtelColumns', () => {
     hook.rerender(otelEnabled); // OTEL still on, should not set again
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+  });
+});
+
+
+describe('useDefaultFilters', () => {
+  it('should call builderOptionsDispatch when query is new', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const tableName = 'timeseries';
+    const isTraceIdMode = false;
+    const isNewQuery = true;
+
+    renderHook(() => useDefaultFilters(tableName, isTraceIdMode, isNewQuery, builderOptionsDispatch));
+
+    const expectedOptions = {
+      filters: [expect.anything(), expect.anything(), expect.anything(), expect.anything()],
+      orderBy: [expect.anything(), expect.anything()],
+    };
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+
+  it('should not call builderOptionsDispatch when query is not new', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const tableName = 'timeseries';
+    const isTraceIdMode = false;
+    const isNewQuery = false;
+
+    renderHook(() => useDefaultFilters(tableName, isTraceIdMode, isNewQuery, builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('should not call builderOptionsDispatch when query is trace ID mode', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const tableName = 'timeseries';
+    const isTraceIdMode = true;
+    const isNewQuery = true;
+
+    renderHook(() => useDefaultFilters(tableName, isTraceIdMode, isNewQuery, builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('should call builderOptionsDispatch when table changes', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const tableName = 'timeseries';
+    const isTraceIdMode = false;
+    const isNewQuery = false;
+
+    const hook = renderHook(table =>
+      useDefaultFilters(table, isTraceIdMode, isNewQuery, builderOptionsDispatch),
+      { initialProps: tableName }
+    );
+    hook.rerender('other_timeseries');
+
+    const expectedOptions = {
+      filters: [expect.anything(), expect.anything(), expect.anything(), expect.anything()],
+      orderBy: [expect.anything(), expect.anything()],
+    };
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
   });
 });

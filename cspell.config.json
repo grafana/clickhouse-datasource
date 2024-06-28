@@ -10,6 +10,12 @@
     "mage_output_file.go"
   ],
   "words": [
+    "lowcardinality",
+    "fixedstring",
+    "singlequote",
+    "concats",
+    "Milli",
+    "traceid",
     "aggregatable",
     "aheads",
     "apikey",
@@ -68,6 +74,9 @@
     "Ulimits",
     "uuidv",
     "vectorator",
-    "WorkDir"
+    "WorkDir",
+    "elazarl",
+    "goproxy",
+    "Nonproxy"
   ]
 }

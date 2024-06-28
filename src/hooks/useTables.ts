@@ -19,7 +19,7 @@ export default (datasource: Datasource, database: string): readonly string[] => 
         setTables(tables);
       }).
       catch((ex: any) => {
-        console.error(ex);
+        console.error('Failed to fetch tables for database:', database, ex);
       });
 
     return () => {

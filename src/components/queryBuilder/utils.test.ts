@@ -1,5 +1,6 @@
-import { AggregateType, BuilderMode, FilterOperator, OrderByDirection, ColumnHint, QueryType } from 'types/queryBuilder';
-import { getQueryOptionsFromSql, getSqlFromQueryBuilderOptions, isDateTimeType, isDateType, isNumberType } from './utils';
+import { generateSql } from 'data/sqlGenerator';
+import { getQueryOptionsFromSql, isDateTimeType, isDateType, isNumberType } from './utils';
+import { AggregateType, BuilderMode, ColumnHint, DateFilterWithoutValue, FilterOperator, MultiFilter, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
@@ -116,84 +117,94 @@ describe('isNumberType', () => {
   });
 });
 
-describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () => {
-  testCondition('handles a table without a database', 'SELECT "name" FROM "foo"', {
+describe('getQueryOptionsFromSql', () => {
+  testCondition('handles a table without a database', 'SELECT name FROM "foo"', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
+    database: '',
     table: 'foo',
-    columns: [{ name: 'name' }],
+    columns: [{ name: 'name', alias: undefined }],
+    aggregates: [],
   });
 
-  testCondition('handles a database with a special character', 'SELECT "name" FROM "foo-bar"."buzz"', {
+  testCondition('handles a database with a special character', 'SELECT name FROM "foo-bar"."buzz"', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: 'foo-bar',
     table: 'buzz',
-    columns: [{ name: 'name' }],
+    columns: [{ name: 'name', alias: undefined }],
+    aggregates: [],
   });
 
-  testCondition('handles a database and a table', 'SELECT "name" FROM "db"."foo"', {
+  testCondition('handles a database and a table', 'SELECT name FROM "db"."foo"', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'name' }],
+    columns: [{ name: 'name', alias: undefined }],
+    aggregates: [],
   });
 
-  testCondition('handles a database and a table with a dot', 'SELECT "name" FROM "db"."foo.bar"', {
+  testCondition('handles a database and a table with a dot', 'SELECT name FROM "db"."foo.bar"', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo.bar',
-    columns: [{ name: 'name' }],
+    columns: [{ name: 'name', alias: undefined }],
+    aggregates: [],
   });
 
-  testCondition('handles 2 columns', 'SELECT "field1", "field2" FROM "db"."foo"', {
+  testCondition('handles 2 columns', 'SELECT field1, field2 FROM "db"."foo"', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'field1'}, { name: 'field2' }],
+    columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+    aggregates: [],
   });
 
-  testCondition('handles a limit', 'SELECT "field1", "field2" FROM "db"."foo" LIMIT 20', {
+  testCondition('handles a limit', 'SELECT field1, field2 FROM "db"."foo" LIMIT 20', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'field1'}, { name: 'field2' }],
+    columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+    aggregates: [],
     limit: 20,
   });
 
   testCondition(
     'handles empty orderBy array',
-    'SELECT "field1", "field2" FROM "db"."foo" LIMIT 20',
+    'SELECT field1, field2 FROM "db"."foo" LIMIT 20',
     {
       queryType: QueryType.Table,
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'field1'}, { name: 'field2' }],
+      columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+      aggregates: [],
       orderBy: [],
       limit: 20,
     },
     false
   );
 
-  testCondition('handles order by', 'SELECT "field1", "field2" FROM "db"."foo" ORDER BY field1 ASC LIMIT 20', {
+  testCondition('handles order by', 'SELECT field1, field2 FROM "db"."foo" ORDER BY field1 ASC LIMIT 20', {
     queryType: QueryType.Table,
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'field1'}, { name: 'field2' }],
+    columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+    aggregates: [],
     orderBy: [{ name: 'field1', dir: OrderByDirection.ASC }],
     limit: 20,
   });
 
   testCondition(
     'handles no select',
-    'SELECT  FROM "db"',
+    'SELECT FROM "db"',
     {
+      queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
       database: 'db',
       table: '',
@@ -228,7 +239,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
     limit: undefined
   });
 
-  testCondition('handles aggregation with alias', 'SELECT sum(field1) total_records FROM "db"."foo"', {
+  testCondition('handles aggregation with alias', 'SELECT sum(field1) as total_records FROM "db"."foo"', {
     queryType: QueryType.Table,
     mode: BuilderMode.Aggregate,
     database: 'db',
@@ -240,7 +251,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles 2 aggregations',
-    'SELECT sum(field1) total_records, count(field2) total_records2 FROM "db"."foo"',
+    'SELECT sum(field1) as total_records, count(field2) as total_records2 FROM "db"."foo"',
     {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
@@ -257,11 +268,12 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles aggregation with groupBy',
-    'SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM "db"."foo" GROUP BY field3',
+    'SELECT sum(field1) as total_records, count(field2) as total_records2 FROM "db"."foo" GROUP BY field3',
     {
-      mode: BuilderMode.Aggregate,
-      table: 'foo',
       database: 'db',
+      table: 'foo',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
       columns: [],
       aggregates: [
         { column: 'field1', aggregateType: AggregateType.Sum, alias: 'total_records' },
@@ -274,7 +286,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles aggregation with groupBy with columns having group by value',
-    'SELECT field3, sum(field1) total_records, count(field2) total_records2 FROM "db"."foo" GROUP BY field3',
+    'SELECT field3, sum(field1) as total_records, count(field2) as total_records2 FROM "db"."foo" GROUP BY field3',
     {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
@@ -292,19 +304,23 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles aggregation with group by and order by',
-    'SELECT StageName, Type, count(Id) count_of, sum(Amount) FROM "db"."foo" GROUP BY StageName, Type ORDER BY count(Id) DESC, StageName ASC',
+    'SELECT StageName, Type, count(Id) as count_of, sum(Amount) FROM "db"."foo" GROUP BY StageName, Type ORDER BY count_of DESC, StageName ASC',
     {
       mode: BuilderMode.Aggregate,
       database: 'db',
       table: 'foo',
-      columns: [],
+      queryType: QueryType.Table,
+      columns: [
+        { name: 'StageName' },
+        { name: 'Type' },
+      ],
       aggregates: [
         { column: 'Id', aggregateType: AggregateType.Count, alias: 'count_of' },
         { column: 'Amount', aggregateType: AggregateType.Sum, alias: undefined },
       ],
       groupBy: ['StageName', 'Type'],
       orderBy: [
-        { name: 'count(Id)', dir: OrderByDirection.DESC },
+        { name: 'count_of', dir: OrderByDirection.DESC },
         { name: 'StageName', dir: OrderByDirection.ASC },
       ],
     },
@@ -313,7 +329,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles aggregation with a IN filter',
-    `SELECT count(id) FROM "db"."foo" WHERE   ( stagename IN ('Deal Won', 'Deal Lost' ) )`,
+    `SELECT count(id) FROM "db"."foo" WHERE ( stagename IN ('Deal Won', 'Deal Lost') )`,
     {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
@@ -326,16 +342,15 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
           key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won', 'Deal Lost'],
-          type: 'string',
-        },
-      ],
-      limit: undefined
+          type: 'string'
+        } as MultiFilter,
+      ]
     }
   );
 
   testCondition(
     'handles aggregation with a NOT IN filter',
-    `SELECT count(id) FROM "db"."foo" WHERE   ( stagename NOT IN ('Deal Won', 'Deal Lost' ) )`,
+    `SELECT count(id) FROM "db"."foo" WHERE ( stagename NOT IN ('Deal Won', 'Deal Lost') )`,
     {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
@@ -349,7 +364,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
           operator: FilterOperator.NotIn,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
-        },
+        } as MultiFilter,
       ],
       limit: undefined
     }
@@ -357,7 +372,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles aggregation with datetime filter',
-    `SELECT count(id) FROM "db"."foo" WHERE   ( createddate  >= $__fromTime AND createddate <= $__toTime )`,
+    `SELECT count(id) FROM "db"."foo" WHERE ( createddate >= $__fromTime AND createddate <= $__toTime )`,
     {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
@@ -370,7 +385,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
           key: 'createddate',
           operator: FilterOperator.WithInGrafanaTimeRange,
           type: 'datetime',
-        },
+        } as DateFilterWithoutValue,
       ],
       limit: undefined
     }
@@ -378,7 +393,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles aggregation with date filter',
-    `SELECT count(id) FROM "db"."foo" WHERE   (  NOT ( closedate  >= $__fromTime AND closedate <= $__toTime ) )`,
+    `SELECT count(id) FROM "db"."foo" WHERE ( NOT ( closedate >= $__fromTime AND closedate <= $__toTime ) )`,
     {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
@@ -391,7 +406,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
           key: 'closedate',
           operator: FilterOperator.OutsideGrafanaTimeRange,
           type: 'datetime',
-        },
+        } as DateFilterWithoutValue,
       ],
       limit: undefined
     }
@@ -399,7 +414,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType"',
-    'SELECT $__timeInterval(time) as time FROM "db"."foo" WHERE $__timeFilter(time) GROUP BY time ORDER BY time ASC',
+    'SELECT $__timeInterval(time) as "time" FROM "db"."foo" GROUP BY time',
     {
       queryType: QueryType.TimeSeries,
       mode: BuilderMode.Trend,
@@ -414,7 +429,7 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
 
   testCondition(
     'handles timeseries function with "timeFieldType: DateType" with a filter',
-    'SELECT $__timeInterval(time) as time FROM "db"."foo" WHERE $__timeFilter(time) AND   ( base IS NOT NULL ) GROUP BY time ORDER BY time ASC',
+    'SELECT $__timeInterval(time) as "time" FROM "db"."foo" WHERE ( base IS NOT NULL ) GROUP BY time',
     {
       queryType: QueryType.TimeSeries,
       mode: BuilderMode.Trend,
@@ -427,32 +442,41 @@ describe('Utils: getSqlFromQueryBuilderOptions and getQueryOptionsFromSql', () =
           condition: 'AND',
           filterType: 'custom',
           key: 'base',
-          operator: 'IS NOT NULL',
-          type: 'LowCardinality(String)',
-          value: 'GBP',
+          operator: FilterOperator.IsNotNull,
+          type: 'LowCardinality(String)'
         },
       ],
     },
     false
   );
 
-  it('timeseries function returns empty $__timeInterval macro if time column missing', () => {
-    const sql = getSqlFromQueryBuilderOptions({
-      database: 'db',
-      table: 'foo',
-      queryType: QueryType.TimeSeries,
-      mode: BuilderMode.Trend,
-      aggregates: [],
-      filters: [],
-    });
+  it('Handles brackets and Grafana macros/variables', () => {
+    const sql = `
+      /* \${__variable} \${__variable.key} */
+      SELECT
+        *,
+        \$__timeInterval(timestamp),
+        '{"a": 1, "b": { "c": 2, "d": [1, 2, 3] }}'::json as bracketTest
+      FROM default.table
+      WHERE $__timeFilter(timestamp)
+      AND col != \${variable}
+      AND col != \${variable.key}
+      AND col != \${variable.key:singlequote}
+      AND col != '\${variable}'
+      AND col != '\${__variable}'
+      AND col != ('\${__variable.key}')
+      AND col != \${variable:singlequote}
+    `;
 
-    expect(sql).toContain('$__timeInterval()');
+    const builderOptions = getQueryOptionsFromSql(sql);
+    expect(builderOptions).not.toBeUndefined();
+    expect(typeof builderOptions).not.toBe('string');
   });
 });
 
-function testCondition(name: string, sql: string, builder: any, testQueryOptionsFromSql = true) {
+function testCondition(name: string, sql: string, builder: QueryBuilderOptions, testQueryOptionsFromSql = true) {
   it(name, () => {
-    expect(getSqlFromQueryBuilderOptions(builder)).toBe(sql);
+    expect(generateSql(builder)).toBe(sql);
     if (testQueryOptionsFromSql) {
       expect(getQueryOptionsFromSql(sql)).toEqual(builder);
     }

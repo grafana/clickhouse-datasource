@@ -1,11 +1,14 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -34,14 +37,18 @@ type Settings struct {
 	DialTimeout  string `json:"dialTimeout,omitempty"`
 	QueryTimeout string `json:"queryTimeout,omitempty"`
 
-	CustomSettings []CustomSetting `json:"customSettings"`
-	ProxyOptions   *proxy.Options
+	HttpHeaders           map[string]string `json:"-"`
+	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	CustomSettings        []CustomSetting   `json:"customSettings"`
+	ProxyOptions          *proxy.Options
 }
 
 type CustomSetting struct {
 	Setting string `json:"setting"`
 	Value   string `json:"value"`
 }
+
+const secureHeaderKeyPrefix = "secureHttpHeaders."
 
 func (settings *Settings) isValid() (err error) {
 	if settings.Host == "" {
@@ -54,7 +61,7 @@ func (settings *Settings) isValid() (err error) {
 }
 
 // LoadSettings will read and validate Settings from the DataSourceConfig
-func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings, err error) {
+func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings) (settings Settings, err error) {
 	var jsonData map[string]interface{}
 	if err := json.Unmarshal(config.JSONData, &jsonData); err != nil {
 		return settings, fmt.Errorf("%s: %w", err.Error(), ErrorMessageInvalidJSON)
@@ -163,6 +170,16 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 
 		settings.CustomSettings = customSettings
 	}
+	if jsonData["forwardGrafanaHeaders"] != nil {
+		if forwardGrafanaHeaders, ok := jsonData["forwardGrafanaHeaders"].(string); ok {
+			settings.ForwardGrafanaHeaders, err = strconv.ParseBool(forwardGrafanaHeaders)
+			if err != nil {
+				return settings, fmt.Errorf("could not parse forwardGrafanaHeaders value: %w", err)
+			}
+		} else {
+			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
+		}
+	}
 
 	if strings.TrimSpace(settings.DialTimeout) == "" {
 		settings.DialTimeout = "10"
@@ -187,9 +204,11 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 		settings.TlsClientKey = tlsClientKey
 	}
 
-	// proxy options are only able to be loaded via environment variables
-	// currently, so we pass `nil` here so they are loaded with defaults
-	proxyOpts, err := config.ProxyOptions(nil)
+	if settings.Protocol == clickhouse.HTTP.String() {
+		settings.HttpHeaders = loadHttpHeaders(jsonData, config.DecryptedSecureJSONData)
+	}
+
+	proxyOpts, err := config.ProxyOptionsFromContext(ctx)
 
 	if err == nil && proxyOpts != nil {
 		// the sdk expects the timeout to not be a string
@@ -202,4 +221,32 @@ func LoadSettings(config backend.DataSourceInstanceSettings) (settings Settings,
 	}
 
 	return settings, settings.isValid()
+}
+
+// loadHttpHeaders loads secure and plain text headers from the config
+func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]string) map[string]string {
+	httpHeaders := make(map[string]string)
+
+	if jsonData["httpHeaders"] != nil {
+		httpHeadersRaw := jsonData["httpHeaders"].([]interface{})
+
+		for _, rawHeader := range httpHeadersRaw {
+			header, _ := rawHeader.(map[string]interface{})
+			headerName, _ := header["name"].(string)
+			headerName = strings.TrimSpace(headerName)
+			headerValue, _ := header["value"].(string)
+			if headerName != "" && headerValue != "" {
+				httpHeaders[headerName] = headerValue
+			}
+		}
+	}
+
+	for k, v := range secureJsonData {
+		if v != "" && strings.HasPrefix(k, secureHeaderKeyPrefix) {
+			headerName := strings.TrimSpace(k[len(secureHeaderKeyPrefix):])
+			httpHeaders[headerName] = v
+		}
+	}
+
+	return httpHeaders
 }

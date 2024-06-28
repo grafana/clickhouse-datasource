@@ -17,7 +17,7 @@ describe('useColumns', () => {
 
   it('should return empty array if database string is empty', async () => {
     const mockDs = {} as Datasource;
-    mockDs.fetchColumnsFull = jest.fn((db: string, table: string) => Promise.resolve([]));
+    mockDs.fetchColumns = jest.fn((db: string, table: string) => Promise.resolve([]));
     let result: { current: readonly TableColumn[] };
     await act(async () => {
       const r = renderHook(() => useColumns(mockDs, '', 'table'));
@@ -29,7 +29,7 @@ describe('useColumns', () => {
 
   it('should return empty array if table string is empty', async () => {
     const mockDs = {} as Datasource;
-    mockDs.fetchColumnsFull = jest.fn((db: string, table: string) => Promise.resolve([]));
+    mockDs.fetchColumns = jest.fn((db: string, table: string) => Promise.resolve([]));
     let result: { current: readonly TableColumn[] };
     await act(async () => {
       const r = renderHook(() => useColumns(mockDs, 'db', ''));
@@ -41,7 +41,7 @@ describe('useColumns', () => {
 
   it('should fetch table columns', async () => {
     const mockDs = {} as Datasource;
-    mockDs.fetchColumnsFull = jest.fn(
+    mockDs.fetchColumns = jest.fn(
       (db: string, table: string) => Promise.resolve([
         { name: 'a', type: 'string', picklistValues: [] },
         { name: 'b', type: 'string', picklistValues: [] },

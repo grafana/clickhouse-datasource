@@ -1,11 +1,14 @@
 package plugin
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/ClickHouse/clickhouse-go/v2"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
@@ -27,15 +30,30 @@ func TestLoadSettings(t *testing.T) {
 				name: "should parse and set all json fields correctly",
 				args: args{
 					config: backend.DataSourceInstanceSettings{
-						UID:                     "ds-uid",
-						JSONData:                []byte(`{ "host": "foo", "port": 443, "path": "custom-path", "username": "baz", "defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true, "tlsAuthWithCACert": true, "dialTimeout": "10", "enableSecureSocksProxy": true}`),
-						DecryptedSecureJSONData: map[string]string{"password": "bar", "tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey", "secureSocksProxyPassword": "test"},
+						UID: "ds-uid",
+						JSONData: []byte(`{
+							"host": "foo", "port": 443,
+							"path": "custom-path", "protocol": "http",
+							"username": "baz",
+							"defaultDatabase":"example", "tlsSkipVerify": true, "tlsAuth" : true,
+							"tlsAuthWithCACert": true, "dialTimeout": "10", "enableSecureSocksProxy": true,
+							"httpHeaders": [{ "name": " test-plain-1 ", "value": "value-1", "secure": false }],
+							"forwardGrafanaHeaders": true
+						}`),
+						DecryptedSecureJSONData: map[string]string{
+							"password":  "bar",
+							"tlsCACert": "caCert", "tlsClientCert": "clientCert", "tlsClientKey": "clientKey",
+							"secureSocksProxyPassword":          "test",
+							"secureHttpHeaders. test-secure-2 ": "value-2",
+							"secureHttpHeaders.test-secure-3":   "value-3",
+						},
 					},
 				},
 				wantSettings: Settings{
 					Host:               "foo",
 					Port:               443,
 					Path:               "custom-path",
+					Protocol:           clickhouse.HTTP.String(),
 					Username:           "baz",
 					DefaultDatabase:    "example",
 					InsecureSkipVerify: true,
@@ -47,6 +65,12 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientKey:       "clientKey",
 					DialTimeout:        "10",
 					QueryTimeout:       "60",
+					HttpHeaders: map[string]string{
+						"test-plain-1":  "value-1",
+						"test-secure-2": "value-2",
+						"test-secure-3": "value-3",
+					},
+					ForwardGrafanaHeaders: true,
 					ProxyOptions: &proxy.Options{
 						Enabled: true,
 						Auth: &proxy.AuthOptions{
@@ -101,7 +125,7 @@ func TestLoadSettings(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotSettings, err := LoadSettings(tt.args.config)
+				gotSettings, err := LoadSettings(context.Background(), tt.args.config)
 				assert.Equal(t, tt.wantErr, err)
 				if !reflect.DeepEqual(gotSettings, tt.wantSettings) {
 					t.Errorf("LoadSettings() = %v, want %v", gotSettings, tt.wantSettings)
@@ -122,7 +146,7 @@ func TestLoadSettings(t *testing.T) {
 		}
 		for i, tc := range tests {
 			t.Run(fmt.Sprintf("[%v/%v] %s", i+1, len(tests), tc.description), func(t *testing.T) {
-				_, err := LoadSettings(backend.DataSourceInstanceSettings{
+				_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
 					JSONData:                []byte(tc.jsonData),
 					DecryptedSecureJSONData: map[string]string{"password": tc.password},
 				})

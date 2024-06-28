@@ -11,6 +11,7 @@ enum BuilderOptionsActionType {
   SetOtelEnabled = 'set_otel_enabled',
   SetOtelVersion = 'set_otel_version',
   SetColumnByHint = 'set_column_by_hint',
+  SetBuilderMinimized = 'set_builder_minimized',
 };
 
 type QueryBuilderOptionsReducerAction = {
@@ -35,6 +36,8 @@ export const setTable = (table: string): BuilderOptionsReducerAction => createAc
 export const setOtelEnabled = (otelEnabled: boolean): BuilderOptionsReducerAction => createAction(BuilderOptionsActionType.SetOtelEnabled, { meta: { otelEnabled } });
 export const setOtelVersion = (otelVersion: string): BuilderOptionsReducerAction => createAction(BuilderOptionsActionType.SetOtelVersion, { meta: { otelVersion } });
 export const setColumnByHint = (column: SelectedColumn): GenericReducerAction => createGenericAction(BuilderOptionsActionType.SetColumnByHint, { column });
+export const setBuilderMinimized = (minimized: boolean): GenericReducerAction => createGenericAction(BuilderOptionsActionType.SetBuilderMinimized, { minimized });
+
 
 const reducer = (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
   const actionFn = actions.get(action.type);
@@ -43,7 +46,7 @@ const reducer = (state: QueryBuilderOptions, action: BuilderOptionsReducerAction
   }
 
   const nextState = actionFn(state, action);
-  // console.log('ACTION:', action.type, 'PAYLOAD:', action.payload, 'NEXT STATE:', nextState);
+  // console.log('ACTION:', action.type, 'PAYLOAD:', action.payload, 'PREV STATE:', state, 'NEXT STATE:', nextState);
   return nextState;
 };
 
@@ -111,6 +114,12 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
 
     return mergeBuilderOptionsState(state, {
       columns: nextColumns
+    });
+  }],  
+  [BuilderOptionsActionType.SetBuilderMinimized, (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
+    const minimized = action.payload.minimized as boolean;
+    return mergeBuilderOptionsState(state, {
+      meta: { minimized }
     });
   }],
 ]);

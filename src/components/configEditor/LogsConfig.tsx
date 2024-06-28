@@ -1,9 +1,9 @@
 import React from 'react';
-import { ConfigSection, ConfigSubSection } from '@grafana/experimental';
+import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
 import { Input, Field } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
-import { versions as otelVersions } from 'otel';
+import otel from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { CHLogsConfig } from 'types/config';
 import allLabels from 'labels';
@@ -33,7 +33,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
   } = (props.logsConfig || {});
   const labels = allLabels.components.Config.LogsConfig;
 
-  const otelConfig = otelVersions.find(v => v.version === otelVersion);
+  const otelConfig = otel.getVersion(otelVersion);
   if (otelEnabled && otelConfig) {
     timeColumn = otelConfig.logColumnMap.get(ColumnHint.Time);
     levelColumn = otelConfig.logColumnMap.get(ColumnHint.LogLevel);
@@ -45,6 +45,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
       title={labels.title}
       description={labels.description}
     >
+      <div id="logs-config" />
       <Field
         label={labels.defaultDatabase.label}
         description={labels.defaultDatabase.description}

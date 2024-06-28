@@ -16,6 +16,7 @@ interface OrderByItemProps {
   index: number,
   orderByItem: OrderBy;
   updateOrderByItem: (index: number, orderByItem: OrderBy) => void;
+  removeOrderByItem: (index: number) => void;
 }
 
 const sortOptions = [
@@ -24,19 +25,21 @@ const sortOptions = [
 ];
 
 const OrderByItem = (props: OrderByItemProps) => {
-  const { columnOptions, index, orderByItem, updateOrderByItem } = props;
+  const { columnOptions, index, orderByItem, updateOrderByItem, removeOrderByItem } = props;
 
   return (
     <>
       <Select
-        value={orderByItem.name}
+        disabled={Boolean(orderByItem.hint)}
+        placeholder={orderByItem.hint ? allLabels.types.ColumnHint[orderByItem.hint] : undefined}
+        value={orderByItem.hint ? undefined : orderByItem.name}
         className={styles.Common.inlineSelect}
         width={36}
         options={columnOptions}
         onChange={e => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
-        allowCustomValue={true}
+        allowCustomValue
         menuPlacement={'bottom'}
-      ></Select>
+      />
       <Select<OrderByDirection>
         value={orderByItem.dir}
         className={styles.Common.inlineSelect}
@@ -44,6 +47,14 @@ const OrderByItem = (props: OrderByItemProps) => {
         options={sortOptions}
         onChange={e => updateOrderByItem(index, { ...orderByItem, dir: e.value! })}
         menuPlacement={'bottom'}
+      />
+      <Button
+        data-testid="query-builder-orderby-remove-button"
+        className={styles.Common.smallBtn}
+        variant="destructive"
+        size="sm"
+        icon="trash-alt"
+        onClick={() => removeOrderByItem(index)}
       />
     </>
   );
@@ -93,7 +104,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
   return (
     <>
       {orderBy.map((orderByItem, index) => {
-        const key = `${index}-${orderByItem.name}-${orderByItem.dir}`;
+        const key = `${index}-${orderByItem.name}-${orderByItem.hint || ''}-${orderByItem.dir}`;
         return (
           <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
             { index === 0 ? fieldLabel : fieldSpacer }
@@ -102,14 +113,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
               index={index}
               orderByItem={orderByItem}
               updateOrderByItem={updateOrderByItem}
-            />
-            <Button
-              data-testid="query-builder-orderby-remove-button"
-              className={styles.Common.smallBtn}
-              variant="destructive"
-              size="sm"
-              icon="trash-alt"
-              onClick={() => removeOrderByItem(index)}
+              removeOrderByItem={removeOrderByItem}
             />
           </div>
         );
@@ -137,7 +141,7 @@ export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: read
 
   if (isAggregateQuery(builder)) {
     builder.columns?.forEach(c => {
-      allOptions.push({ label: c.name, value: c.name });
+      allOptions.push({ label: c.alias || c.name, value: c.name });
     });
 
     builder.aggregates!.forEach(a => {
@@ -156,7 +160,7 @@ export const getOrderByOptions = (builder: QueryBuilderOptions, allColumns: read
       builder.groupBy.forEach(g => allOptions.push({ label: g, value: g }));
     }
   } else {
-    allColumns.forEach(c => allOptions.push({ label: c.name, value: c.name }));
+    allColumns.forEach(c => allOptions.push({ label: c.label || c.name, value: c.name }));
   }
 
   // Add selected value to the list if it does not exist.

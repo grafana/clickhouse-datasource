@@ -1,5 +1,5 @@
 import React, { SyntheticEvent } from 'react';
-import { ConfigSection } from '@grafana/experimental';
+import { ConfigSection } from 'components/experimental/ConfigSection';
 import { Input, Field } from '@grafana/ui';
 import allLabels from 'labels';
 

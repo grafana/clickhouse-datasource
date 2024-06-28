@@ -1,10 +1,143 @@
 # Changelog
 
-## Unreleased
+## Release 4.2.0
 
 ### Features
 
-- Add a new optional `path` setting to specify an additional URL path. [#512](https://github.com/grafana/clickhouse-datasource/pull/512)
+- Added `$__dateTimeFilter()` macro for conveniently filtering a PRIMARY KEY composed of Date and DateTime columns.
+
+## 4.1.0
+
+### Features
+
+- Added the ability to define column alias tables in the config, which simplifies query syntax for tables with a known schema.
+
+## 4.0.8
+
+### Fixes
+
+- Fixed `IN` operator escaping the entire string (specifically with `Nullable(String)`), also added `FixedString(N)` (#830)
+- Fixed query builder filter editor on alert rules page (#828)
+
+## 4.0.7
+
+- Upgrade dependencies
+
+## 4.0.6
+
+### Fixes
+
+- Add support for configuring proxy options from context rather than environment variables (supported by updating `sqlds`) (#799)
+
+## 4.0.5
+
+### Fixes
+
+- Fixed converter regex for `Nullable(IP)` and `Nullable(String)`. It won't match to `Array(Nullable(IP))` or `Array(Nullable(String))` any more. (#783)
+- Updated `grafana-plugin-sdk-go` to fix a PDC issue. More details [here](https://github.com/grafana/grafana-plugin-sdk-go/releases/tag/v0.217.0) (#790)
+
+## 4.0.4
+
+### Fixes
+
+- Changed trace timestamp table from the constant `otel_traces_trace_id_ts` to a suffix `_trace_id_ts` applied to the current table name.
+
+## 4.0.3
+
+### Features
+
+- Added `$__fromTime_ms` macro that represents the dashboard "from" time in milliseconds using a `DateTime64(3)`
+- Added `$__toTime_ms` macro that represents the dashboard "to" time in milliseconds using a `DateTime64(3)`
+- Added `$__timeFilter_ms` macro that uses `DateTime64(3)` for millisecond precision time filtering
+- Re-added query type selector in dashboard view. This was only visible in explore view, but somehow it affects dashboard view, and so it has been re-added. (#730)
+- When OTel is enabled, Trace ID queries now use a skip index to optimize exact ID lookups on large trace datasets (#724)
+
+### Fixes
+
+- Fixed performance issues caused by `$__timeFilter` using a `DateTime64(3)` instead of `DateTime` (#699)
+- Fixed trace queries from rounding span durations under 1ms to `0` (#720)
+- Fixed AST error when including Grafana macros/variables in SQL (#714)
+- Fixed empty builder options when switching from SQL Editor back to Query Editor
+- Fix SQL Generator including "undefined" in `FROM` when database isn't defined
+- Allow adding spaces in multi filters (such as `WHERE .. IN`)
+- Fixed missing `AND` keyword when adding a filter to a Trace ID query 
+
+## 4.0.2
+
+### Fixes
+
+- Fixed migration script not running when opening an existing v3 config
+
+## 4.0.1
+
+### Fixes
+
+- Set `protocol` to `native` by default in config view. Fixes the "default port" description.
+
+## 4.0.0
+
+### Features
+
+Version 4.0.0 contains major revisions to the query builder and datasource configuration settings.
+
+#### Query Builder
+
+- Completely rebuilt query builder to have specialized editors for Table, Logs, Time Series, and Traces.
+- Completely rebuilt SQL generator to support more complicated and dynamic queries.
+- Updated query builder options structure to be clearer and support more complex queries.
+- Updated database/table selector to be in a more convenient location. Database and table options are automatically selected on initial load.
+- Upgraded query builder state management so queries stay consistent when saving/editing/sharing queries.
+- Separated Table and Time Series query builders. Table view operates as a catch-all for queries that don't fit the other query types.
+- Combined "format" into the query type switcher for simplicity. The query tab now changes the builder view and the display format when on the Explore page. This includes the raw SQL editor.
+- Added an OTEL switch for logs and trace views. This will allow for quicker query building for those using the OTEL exporter for ClickHouse.
+- Updated Time Series query builder with dedicated Time column. Default filters are added on-load.
+- Added an `IS ANYTHING` filter that acts as a placeholder for easily editing later (useful for query templates/bookmarks on the Explore page.)
+- Added better support for Map types on the Filter editor.
+- LIMIT editor can now be set to 0 to be excluded from the query.
+- Table and Time Series views now have a simple / aggregate mode, depending on the query complexity.
+- Updated the logs histogram query to use the new query builder options and column hints.
+- Added Logs query builder with dedicated Time, Level, and Message columns. Includes OTEL switch for automatically loading OTEL schema columns. Default filters are added on-load.
+- Added Trace query builder with dedicated trace columns. Includes OTEL switch for automatically loading OTEL schema columns. Default filters are added on-load.
+- Updated data panel filtering to append filters with column hints. Visible in logs view when filtering by a specific level. Instead of referencing a column by name, it will use its hint.
+- Order By now lists aggregates by their full name + alias.
+- Order By column allows for custom value to be typed in.
+- Aggregate column name allows for custom value to be typed in.
+- Filter editor allows for custom column names to be typed in.
+- Increased width of filter value text input.
+- Columns with the `Map*` type now show a `[]` at the end to indicate they are complex types. For example, `SpanAttributes[]`.
+- Filter editor now has a dedicated field for map key. You can now select a map column and its key separately. For example, `SpanAttributes['key']`.
+- Map types now load a sample of options when editing the `key` for the map. This doesn't include all unique values, but for most datasets it should be a convenience.
+- Added column hints, which offers better linking across query components when working with columns and filters. For example, a filter can be added for the `Time` column, even without knowing what the time column name is yet. This enables better SQL generation that is "aware" of a column's intended use.
+
+### Plugin Backend
+- Added migration logic for `v3` configs going to `v4+`. This is applied when the config is loaded when building a database connection.
+- `$__timeFilter`, `$__fromTime`, and `$__toTime` macros now convert to `DateTime64(3)` for better server-side type conversion. Also enables millisecond precision time range filtering.
+
+#### Datasource Configuration
+- Added migration script for `v3.x` configurations to `v4+`. This runs automatically when opening/saving the datasource configuration.
+- Renamed config value `server` to `host`.
+- Renamed config value `timeout` to the more specific `dial_timeout`.
+- Updated labeling for port selection. The default port will now change depending on native/http and secure/unsecure setting.
+- Rearranged fields and sections to flow better for initial setup of a new datasource.
+- Added plugin version to config data for easier config version migrations in the future.
+- Added fields for setting default values for database/table.
+- Added section for setting default log database/table/columns. Includes OTEL. These are used when using the log query builder.
+- Added section for setting default trace database/table/columns. Includes OTEL. These are used when using the trace query builder.
+- Added OTEL switches for logs/traces for quicker query building. OTEL defaults to the latest version, and will auto update if kept on this setting.
+- Increased width of inputs for typically long values (server URL, path, etc.)
+- Allow adding custom HTTP headers with either plain text or secure credentials. [#633](https://github.com/grafana/clickhouse-datasource/pull/633)
+- Add `path` setting to specify an additional URL path when using the HTTP protocol. [#512](https://github.com/grafana/clickhouse-datasource/pull/512)
+
+### Fixes
+
+- Queries will now remain consistent when reloading/editing a previously saved query.
+- Fixed default Ad-Hoc filters. [#650](https://github.com/grafana/clickhouse-datasource/pull/650)
+- Fixed Ad-Hoc filters parsing numeric fields. [#629](https://github.com/grafana/clickhouse-datasource/pull/629)
+- Fixed majority of usability quirks with redesigned query builder.
+
+### Upgrades
+
+- Updated all dependencies to latest compatible versions (Includes Dependabot PRs)
 
 ## 3.3.0
 

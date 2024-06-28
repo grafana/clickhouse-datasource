@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"reflect"
@@ -19,11 +20,13 @@ import (
 	clickhouse_sql "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-units"
+	"github.com/elazarl/goproxy"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/plugin"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/sqlds/v3"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,13 +82,23 @@ func TestMain(m *testing.M) {
 		adminHostPath = "../../config/admin.21.8.xml"
 	}
 	req := testcontainers.ContainerRequest{
-		Image:        fmt.Sprintf("clickhouse/clickhouse-server:%s", chVersion),
-		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
-		WaitingFor:   wait.ForLog("Ready for connections"),
-		Mounts: []testcontainers.ContainerMount{
-			testcontainers.BindMount(path.Join(cwd, customHostPath), "/etc/clickhouse-server/config.d/custom.xml"),
-			testcontainers.BindMount(path.Join(cwd, adminHostPath), "/etc/clickhouse-server/users.d/admin.xml"),
+		Env: map[string]string{
+			"TZ": time.Local.String(),
 		},
+		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
+		Files: []testcontainers.ContainerFile{
+			{
+				ContainerFilePath: "/etc/clickhouse-server/config.d/custom.xml",
+				FileMode:          0644,
+				HostFilePath:      path.Join(cwd, customHostPath),
+			},
+			{
+				ContainerFilePath: "/etc/clickhouse-server/users.d/admin.xml",
+				FileMode:          0644,
+				HostFilePath:      path.Join(cwd, adminHostPath),
+			},
+		},
+		Image: fmt.Sprintf("clickhouse/clickhouse-server:%s", chVersion),
 		Resources: container.Resources{
 			Ulimits: []*units.Ulimit{
 				{
@@ -95,9 +108,7 @@ func TestMain(m *testing.M) {
 				},
 			},
 		},
-		Env: map[string]string{
-			"TZ": time.Local.String(),
-		},
+		WaitingFor: wait.ForLog("Ready for connections"),
 	}
 	clickhouseContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
@@ -130,14 +141,14 @@ func TestConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, path, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 	t.Run("should not error when valid settings passed - with query timeout as number", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -154,7 +165,7 @@ func TestHTTPConnect(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "protocol": "http" }`, host, port, path, username, ssl)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(settings, json.RawMessage{})
+		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -857,6 +868,47 @@ func TestArrayNullableUInt256(t *testing.T) {
 	}
 }
 
+func TestArrayNullableString(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var val []*string
+			conn, close := setupTest(t, "col1 Array(Nullable(String))", protocol, nil)
+			defer close(t)
+			v := "48"
+			val = append(val, &v, nil)
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
+func TestArrayNullableIPv4(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Array(Nullable(IPv4))", protocol, nil)
+			defer close(t)
+			ipv4Addr := net.ParseIP("192.0.2.1")
+			val := []*net.IP{&ipv4Addr, nil}
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
+func TestArrayNullableIPv6(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			var val []*net.IP
+			conn, close := setupTest(t, "col1 Array(Nullable(IPv6))", protocol, nil)
+			defer close(t)
+			ipv6Addr := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
+			val = append(val, &ipv6Addr, nil)
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, val)
+		})
+	}
+}
+
 func TestMap(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
@@ -1103,5 +1155,116 @@ func TestMutateResponse(t *testing.T) {
 		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableString)
 		assert.NoError(t, err)
 		assert.Equal(t, "{\"test\":{\"test\":[\"2\",\"3\"]}}", *frames[0].Fields[0].At(0).(*string))
+	})
+}
+
+func TestHTTPConnectWithHeaders(t *testing.T) {
+	proxy := goproxy.NewProxyHttpServer()
+	proxyHost := "localhost"
+	proxyPort := getEnv("CLICKHOUSE_PROXY_PORT", "8122")
+	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+
+	go func() {
+		err := http.ListenAndServe(fmt.Sprintf("%s:%s", proxyHost, proxyPort), proxy)
+		assert.Equal(t, nil, err)
+	}()
+
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	secure := map[string]string{}
+	secure["password"] = password
+
+	proxyHandlerGenerator := func(t *testing.T, expectedHeaders map[string]string) http.HandlerFunc {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			for k, v := range expectedHeaders {
+				assert.Equal(t, v, req.Header.Get(k))
+			}
+			req.URL.Scheme = "http"
+			req.URL.Host = fmt.Sprintf("%s:%s", host, port)
+			proxy.ServeHTTP(w, req)
+		})
+	}
+
+	req := &backend.QueryDataRequest{
+		PluginContext: backend.PluginContext{},
+		Headers: map[string]string{
+			// only headers starting with http_ are forwarded, except for Authorization, Cookie and X-Id-Token
+			"http_X-Test": "Hello World!",
+		},
+		Queries: []backend.DataQuery{
+			{
+				RefID: "A",
+				JSON: []byte(`{
+					"rawSql": "SELECT 1"
+				}`),
+			},
+		},
+	}
+	t.Run("should not forward http headers", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": false}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": ""})
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We test that the X-Test header is absent
+		req.PluginContext.DataSourceInstanceSettings = &settings
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
+	})
+
+	t.Run("should forward http headers", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": ""})
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We test that the X-Test header exists
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Hello World!"})
+		req.PluginContext.DataSourceInstanceSettings = &settings
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
+	})
+
+	t.Run("should forward http headers alongside custom http headers", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true, "httpHeaders": [{ "name": "custom-test-header", "value": "value-1", "secure": false}]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1"})
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We test that the X-Test header exists
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1", "X-Test": "Hello World!"})
+		req.PluginContext.DataSourceInstanceSettings = &settings
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
+	})
+
+	t.Run("should override forward headers with custom http headers", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true, "httpHeaders": [{ "name": "X-Test", "value": "Override", "secure": false}]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
+		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(*sqlds.SQLDatasource)
+		assert.Equal(t, true, ok)
+
+		// We test that the X-Test header exists
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
+		req.PluginContext.DataSourceInstanceSettings = &settings
+		_, err = ds.QueryData(context.Background(), req)
+
+		assert.Equal(t, nil, err)
 	})
 }

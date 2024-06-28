@@ -1,11 +1,11 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react';
 import { OtelVersionSelect } from './OtelVersionSelect';
-import { versions as allVersions } from 'otel';
+import otel from 'otel';
 
 describe('OtelVersionSelect', () => {
-  const testVersion = allVersions[0];
-  const testVersionName = allVersions[0].version + ' (latest)';
+  const testVersion = otel.getLatestVersion();
+  const testVersionName = testVersion.name;
 
   it('should render with empty properties', () => {
     const result = render(

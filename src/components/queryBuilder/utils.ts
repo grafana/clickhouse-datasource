@@ -79,206 +79,6 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
   return isStringType(filter.type) && [FilterOperator.In, FilterOperator.NotIn].includes(filter.operator);
 };
 
-const getListQuery = (database = '', table = '', fields: string[] = []): string => {
-  const sep = database === '' || table === '' ? '' : '.';
-  fields = fields && fields.length > 0 ? fields : [''];
-  return `SELECT ${escapedFields(fields).join(', ')} FROM ${escaped(database)}${sep}${escaped(table)}`;
-};
-
-const getAggregationQuery = (
-  database = '',
-  table = '',
-  fields: string[] = [],
-  metrics: AggregateColumn[] = [],
-  groupBy: string[] = []
-): string => {
-  let selected = fields.length > 0 ? fields.join(', ') : '';
-  let metricsQuery = metrics
-    .map((m) => {
-      const alias = m.alias ? ` ${m.alias.replace(/ /g, '_')}` : '';
-      return `${m.aggregateType}(${m.column})${alias}`;
-    })
-    .join(', ');
-  const groupByQuery = groupBy
-    .filter((x) => !fields.some((y) => y === x)) // not adding field if its already is selected
-    .join(', ');
-  const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${selected}${selected && (groupByQuery || metricsQuery) ? ', ' : ''}${groupByQuery}${
-    metricsQuery && groupByQuery ? ', ' : ''
-  }${metricsQuery} FROM ${escaped(database)}${sep}${escaped(table)}`;
-};
-
-const getTrendByQuery = (
-  database = '',
-  table = '',
-  metrics: AggregateColumn[] = [],
-  groupBy: string[] = [],
-  timeField = ''
-): string => {
-  metrics = metrics && metrics.length > 0 ? metrics : [];
-
-  let metricsQuery = metrics
-    .map((m) => {
-      const alias = m.alias ? ` ` + m.alias.replace(/ /g, '_') : '';
-      return `${m.aggregateType}(${m.column})${alias}`;
-    })
-    .join(', ');
-  const time = `$__timeInterval(${timeField}) as time`;
-  if (metricsQuery !== '') {
-    const group = groupBy.length > 0 ? `${groupBy.join(', ')},` : '';
-    metricsQuery = `${time}, ${group} ${metricsQuery}`;
-  } else if (groupBy.length > 0) {
-    metricsQuery = `${time}, ${groupBy.join(', ')}`;
-  } else {
-    metricsQuery = `${time}`;
-  }
-
-  const sep = database === '' || table === '' ? '' : '.';
-  return `SELECT ${metricsQuery} FROM ${escaped(database)}${sep}${escaped(table)}`;
-};
-
-export const getFilters = (filters: Filter[]): string => {
-  return filters.reduce((previousValue, currentFilter, currentIndex) => {
-    const prefixCondition = currentIndex === 0 ? '' : currentFilter.condition;
-    let filter = '';
-    let field = currentFilter.key;
-    let operator = '';
-    let notOperator = false;
-    if (currentFilter.operator === FilterOperator.NotLike) {
-      operator = 'LIKE';
-      notOperator = true;
-    } else if (currentFilter.operator === FilterOperator.OutsideGrafanaTimeRange) {
-      operator = '';
-      notOperator = true;
-    } else {
-      if ([FilterOperator.WithInGrafanaTimeRange].includes(currentFilter.operator)) {
-        operator = '';
-      } else {
-        operator = currentFilter.operator;
-      }
-    }
-    filter = `${field} ${operator}`;
-    if (isNullFilter(currentFilter)) {
-    } else if (isBooleanFilter(currentFilter)) {
-      filter += ` ${currentFilter.value}`;
-    } else if (isNumberFilter(currentFilter)) {
-      filter += ` ${currentFilter.value || '0'}`;
-    } else if (isDateFilter(currentFilter)) {
-      if (isDateFilterWithOutValue(currentFilter)) {
-        if (isDateType(currentFilter.type)) {
-          filter += ` >= \$__fromTime AND ${currentFilter.key} <= \$__toTime`;
-        }
-      } else {
-        switch (currentFilter.value) {
-          case 'GRAFANA_START_TIME':
-            if (isDateType(currentFilter.type)) {
-              filter += ` \$__fromTime`;
-            }
-            break;
-          case 'GRAFANA_END_TIME':
-            if (isDateType(currentFilter.type)) {
-              filter += ` \$__toTime`;
-            }
-            break;
-          default:
-            filter += ` ${currentFilter.value || 'TODAY'}`;
-        }
-      }
-    } else if (isStringFilter(currentFilter)) {
-      if (currentFilter.operator === FilterOperator.Like || currentFilter.operator === FilterOperator.NotLike) {
-        filter += ` '%${currentFilter.value || ''}%'`;
-      } else {
-        filter += formatStringValue(currentFilter.value || '');
-      }
-    } else if (isMultiFilter(currentFilter)) {
-      let values = currentFilter.value;
-      filter += ` (${values?.map((v) => formatStringValue(v).trim()).join(', ')} )`;
-    }
-    if (notOperator) {
-      filter = ` NOT ( ${filter} )`;
-    }
-    return filter ? `${previousValue} ${prefixCondition} ( ${filter} )` : previousValue;
-  }, '');
-};
-
-const getGroupBy = (groupBy: string[] = [], timeField?: string): string => {
-  const clause = groupBy.length > 0 ? ` GROUP BY ${groupBy.join(', ')}` : '';
-  if (timeField === undefined) {
-    return clause;
-  }
-  if (groupBy.length === 0) {
-    return ` GROUP BY time`;
-  }
-  return `${clause}, time`;
-};
-
-export const getOrderBy = (orderBy?: OrderBy[], prefix = true): string => {
-  const pfx = prefix ? ' ORDER BY ' : '';
-  return orderBy && orderBy.filter((o) => o.name).length > 0
-    ? pfx +
-        orderBy
-          .filter((o) => o.name)
-          .map((o) => {
-            return `${o.name} ${o.dir}`;
-          })
-          .join(', ')
-    : '';
-};
-
-const getLimit = (limit: number): string => {
-  return ` LIMIT ` + limit;
-};
-
-export const getSqlFromQueryBuilderOptions = (options: QueryBuilderOptions): string => {
-  const { database, table } = options;
-  const limit = options.limit ? getLimit(options.limit) : '';
-  let query = ``;
-  switch (options.mode) {
-    case BuilderMode.Aggregate:
-      query += getAggregationQuery(database, table, options.columns?.map(c => c.name), options.aggregates, options.groupBy);
-      let aggregateFilters = getFilters(options.filters || []);
-      if (aggregateFilters) {
-        query += ` WHERE ${aggregateFilters}`;
-      }
-      query += getGroupBy(options.groupBy);
-      break;
-    case BuilderMode.Trend:
-      const timeColumn = getColumnByHint(options, ColumnHint.Time);
-      query += getTrendByQuery(
-        database,
-        table,
-        options.aggregates,
-        options.groupBy,
-        timeColumn?.name || ''
-      );
-      const trendFilters = getFilters(options.filters || []);
-
-      query += ` WHERE $__timeFilter(${timeColumn?.name})`;
-      query += trendFilters ? ` AND ${trendFilters}` : '';
-      query += getGroupBy(options.groupBy, timeColumn?.name);
-      break;
-    case BuilderMode.List:
-    default:
-      query += getListQuery(options.database, options.table, options.columns?.map(c => c.name));
-      const filters = getFilters(options.filters || []);
-      if (filters) {
-        query += ` WHERE ${filters}`;
-      }
-  }
-  if (options.mode === BuilderMode.Trend) {
-    query += ` ORDER BY time ASC`;
-    const orderBy = getOrderBy(options.orderBy, false);
-    if (orderBy.trim() !== '') {
-      query += `, ${orderBy}`;
-    }
-    query += limit;
-  } else {
-    query += getOrderBy(options.orderBy);
-    query += limit;
-  }
-  return query;
-};
-
 export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | string {
   const ast = sqlToStatement(sql);
   if (!ast) {
@@ -295,39 +95,41 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
   }
   const fromTable = ast.from[0] as FromTable;
 
-  const columnsAndAggregates = getAggregatesFromAst(ast.columns ? ast.columns : null);
+  const columnsAndAggregates = getAggregatesFromAst(ast.columns || null);
 
-  let builder = {
+  const builderOptions = {
+    database: fromTable.name.schema || '',
+    table: fromTable.name.name || '',
     queryType: QueryType.Table,
     mode: BuilderMode.List,
-    database: fromTable.name.schema,
-    table: fromTable.name.name,
+    columns: [],
+    aggregates: [],
   } as QueryBuilderOptions;
 
-  if (columnsAndAggregates.columns) {
-    builder.columns = columnsAndAggregates.columns.map(f => ({ name: f }));
+  if (columnsAndAggregates.columns.length > 0) {
+    builderOptions.columns = columnsAndAggregates.columns;
   }
 
   if (columnsAndAggregates.aggregates.length > 0) {
-    builder.mode = BuilderMode.Aggregate;
-    builder.aggregates = columnsAndAggregates.aggregates;
+    builderOptions.mode = BuilderMode.Aggregate;
+    builderOptions.aggregates = columnsAndAggregates.aggregates;
   }
 
-  if (columnsAndAggregates.timeField) {
-    builder.queryType = QueryType.TimeSeries;
-    builder.mode = BuilderMode.Trend;
-    const columns: CHSelectedColumn[] = builder.columns || [];
-    columns.push({ name: columnsAndAggregates.timeField, type: 'datetime', hint: ColumnHint.Time });
-    builder.columns = columns;
+  const timeColumn = getColumnByHint(builderOptions, ColumnHint.Time);
+  if (timeColumn) {
+    builderOptions.queryType = QueryType.TimeSeries;
+    if (builderOptions.aggregates?.length || 0) {
+      builderOptions.mode = BuilderMode.Trend;
+    }
   }
 
   if (ast.where) {
-    builder.filters = getFiltersFromAst(ast.where, columnsAndAggregates.timeField);
+    builderOptions.filters = getFiltersFromAst(ast.where, timeColumn?.name || '');
   }
 
   const orderBy = ast.orderBy
     ?.map<OrderBy>((ob) => {
-      if (ob.by.type !== 'ref' || ob.by.name === 'time') {
+      if (ob.by.type !== 'ref') {
         return {} as OrderBy;
       }
       return { name: ob.by.name, dir: ob.order } as OrderBy;
@@ -335,23 +137,23 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
     .filter((x) => x.name);
 
   if (orderBy && orderBy.length > 0) {
-    builder.orderBy = orderBy!;
+    builderOptions.orderBy = orderBy!;
   }
 
-  builder.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
+  builderOptions.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
 
   const groupBy = ast.groupBy
     ?.map((gb) => {
-      if (gb.type !== 'ref' || gb.name === 'time') {
+      if (gb.type !== 'ref') {
         return '';
       }
       return gb.name;
     })
     .filter((x) => x !== '');
   if (groupBy && groupBy.length > 0) {
-    builder.groupBy = groupBy;
+    builderOptions.groupBy = groupBy;
   }
-  return builder;
+  return builderOptions;
 }
 
 function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
@@ -498,7 +300,10 @@ function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: b
   } else if (Object.values(FilterOperator).find((x) => e.op === x)) {
     if (i === 0) {
       filters.unshift({} as Filter);
+    } else if (!filters[i]) {
+      filters.push({ condition: 'AND' } as Filter);
     }
+
     filters[i].operator = e.op as FilterOperator;
     if (notFlag && filters[i].operator === FilterOperator.Like) {
       filters[i].operator = FilterOperator.NotLike;
@@ -508,9 +313,9 @@ function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: b
   return notFlag;
 }
 
-function selectCallFunc(s: SelectedColumn): AggregateColumn | string {
+function selectCallFunc(s: SelectedColumn): [AggregateColumn | string, string | undefined] {
   if (s.expr.type !== 'call') {
-    return {} as AggregateColumn;
+    return [{} as AggregateColumn, undefined];
   }
   let fields = s.expr.args.map((x) => {
     if (x.type !== 'ref') {
@@ -519,70 +324,51 @@ function selectCallFunc(s: SelectedColumn): AggregateColumn | string {
     return x.name;
   });
   if (fields.length > 1) {
-    return '';
+    return ['', undefined];
   }
   if (
     Object.values(AggregateType).includes(
       s.expr.function.name.toLowerCase() as AggregateType
     )
   ) {
-    return {
+    return [{
       aggregateType: s.expr.function.name as AggregateType,
       column: fields[0],
       alias: s.alias?.name,
-    } as AggregateColumn;
+    } as AggregateColumn, s.alias?.name];
   }
-  return fields[0];
+  return [fields[0], s.alias?.name];
 }
 
-function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): {
-  timeField: string;
-  aggregates: AggregateColumn[];
-  columns: string[];
-} {
+function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): { columns: CHSelectedColumn[]; aggregates: AggregateColumn[]; } {
   if (!selectClauses) {
-    return { timeField: '', aggregates: [], columns: [] };
+    return { columns: [], aggregates: [] };
   }
+
+  const columns: CHSelectedColumn[] = [];
   const aggregates: AggregateColumn[] = [];
-  const columns: string[] = [];
-  let timeField = '';
 
   for (let s of selectClauses) {
     switch (s.expr.type) {
       case 'ref':
-        columns.push(s.expr.name);
+        columns.push({ name: s.expr.name, alias: s.alias?.name });
         break;
       case 'call':
-        const f = selectCallFunc(s);
-        if (!f) {
-          return { timeField: '', aggregates: [], columns: [] };
+        const [columnOrAggregate, alias] = selectCallFunc(s);
+        if (!columnOrAggregate) {
+          break;
         }
-        if (isString(f)) {
-          timeField = f;
+
+        if (isString(columnOrAggregate)) {
+          columns.push({ name: columnOrAggregate, type: 'datetime', alias, hint: ColumnHint.Time });
         } else {
-          aggregates.push(f);
+          aggregates.push(columnOrAggregate);
         }
         break;
-      default:
-        return { timeField: '', aggregates: [], columns: [] };
     }
   }
-  return { timeField, aggregates, columns };
-}
 
-function formatStringValue(currentFilter: string): string {
-  if (currentFilter.startsWith('$')) {
-    return ` ${currentFilter || ''}`;
-  }
-  return ` '${currentFilter || ''}'`;
-}
-
-function escaped(object: string) {
-  return object === '' ? '' : `"${object}"`;
-}
-
-function escapedFields(fields: string[]) {
-  return fields.map((field) => (field === '*' ? field : escaped(field)));
+  return { columns, aggregates };
 }
 
 export const operMap = new Map<string, FilterOperator>([

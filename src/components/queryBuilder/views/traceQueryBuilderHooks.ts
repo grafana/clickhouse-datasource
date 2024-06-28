@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
-import { versions as otelVersions } from 'otel';
-import { QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
+import otel from 'otel';
+import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, NumberFilter, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, StringFilter } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
 /**
@@ -54,7 +54,7 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
       return;
     }
 
-    const otelConfig = otelVersions.find(v => v.version === otelVersion);
+    const otelConfig = otel.getVersion(otelVersion);
     const traceColumnMap = otelConfig?.traceColumnMap;
     if (!traceColumnMap) {
       return;
@@ -73,4 +73,69 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
     }));
     didSetColumns.current = true;
   }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+};
+
+// Apply default filters on table change
+export const useDefaultFilters = (table: string, isTraceIdMode: boolean, isNewQuery: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+  const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
+  const lastTable = useRef<string>(table || '');
+  if (table !== lastTable.current) {
+    appliedDefaultFilters.current = false;
+  }
+
+  useEffect(() => {
+    if (isTraceIdMode || !table || appliedDefaultFilters.current) {
+      return;
+    }
+
+    const defaultFilters: Filter[] = [
+      {
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.Time,
+        condition: 'AND'
+      } as DateFilterWithoutValue, // Filter to dashboard time range
+      {
+        type: 'string',
+        operator: FilterOperator.IsEmpty,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.TraceParentSpanId,
+        condition: 'AND',
+        value: ''
+      } as StringFilter, // Only show top level spans
+      {
+        type: 'UInt64',
+        operator: FilterOperator.GreaterThan,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.TraceDurationTime,
+        condition: 'AND',
+        value: 0
+      } as NumberFilter, // Only show spans where duration > 0
+      {
+        type: 'string',
+        operator: FilterOperator.IsAnything,
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.TraceServiceName,
+        condition: 'AND',
+        value: ''
+      } as StringFilter, // Placeholder service name filter for convenience
+    ];
+    
+    const defaultOrderBy: OrderBy[] = [
+      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
+      { name: '', hint: ColumnHint.TraceDurationTime, dir: OrderByDirection.DESC, default: true },
+    ];
+
+    lastTable.current = table;
+    appliedDefaultFilters.current = true;
+    builderOptionsDispatch(setOptions({
+      filters: defaultFilters,
+      orderBy: defaultOrderBy,
+    }));
+  }, [table, isTraceIdMode, builderOptionsDispatch]);
 };

@@ -11,7 +11,7 @@ describe('QueryBuilder', () => {
     const mockDs = { settings: { jsonData: {} } } as Datasource;
     mockDs.fetchDatabases = jest.fn(() => Promise.resolve([]));
     mockDs.fetchTables = jest.fn((_db?: string) => Promise.resolve([]));
-    mockDs.fetchColumnsFull = jest.fn(() => {
+    mockDs.fetchColumns = jest.fn(() => {
       setState();
       return Promise.resolve([]);
     });
