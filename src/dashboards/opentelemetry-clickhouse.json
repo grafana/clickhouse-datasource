@@ -4,8 +4,8 @@
       {
         "builtIn": 1,
         "datasource": {
-          "type": "grafana-clickhouse-datasource",
-          "uid": "clickhouse-observability"
+          "type": "datasource",
+          "uid": "grafana"
         },
         "enable": true,
         "hide": true,
@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 36,
+  "id": 39,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -44,7 +44,7 @@
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-observability"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -184,7 +184,7 @@
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-observability"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -326,7 +326,7 @@
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-observability"
+        "uid": "${datasource}"
       },
       "description": "",
       "fieldConfig": {
@@ -468,7 +468,7 @@
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-observability"
+        "uid": "${datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -631,7 +631,7 @@
           }
         ]
       },
-      "pluginVersion": "11.2.0-72125",
+      "pluginVersion": "11.2.0-72343",
       "targets": [
         {
           "datasource": {
@@ -680,7 +680,7 @@
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-observability"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 15,
@@ -826,7 +826,7 @@
     {
       "datasource": {
         "type": "grafana-clickhouse-datasource",
-        "uid": "clickhouse-observability"
+        "uid": "${datasource}"
       },
       "gridPos": {
         "h": 8,
@@ -879,7 +879,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "clickhouse-observability"
+            "uid": "${datasource}"
           },
           "editorType": "builder",
           "format": 2,
@@ -899,6 +899,20 @@
   "templating": {
     "list": [
       {
+        "hide": 0,
+        "includeAll": false,
+        "label": "ClickHouse instance",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "grafana-clickhouse-datasource",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
         "current": {
           "selected": true,
           "text": [
@@ -910,7 +924,7 @@
         },
         "datasource": {
           "type": "grafana-clickhouse-datasource",
-          "uid": "clickhouse-observability"
+          "uid": "${datasource}"
         },
         "definition": "SELECT DISTINCT ServiceName FROM otel_traces",
         "hide": 0,
@@ -929,13 +943,13 @@
       {
         "allValue": "ALL",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "All",
           "value": "$__all"
         },
         "datasource": {
           "type": "grafana-clickhouse-datasource",
-          "uid": "clickhouse-observability"
+          "uid": "${datasource}"
         },
         "definition": "SELECT DISTINCT TraceId FROM otel_traces WHERE ParentSpanId = '' LIMIT 100",
         "hide": 0,
@@ -961,7 +975,6 @@
   "timezone": "",
   "title": "Simple ClickHouse OTel Dashboard",
   "uid": "8klBUGfVk",
-  "version": 14,
+  "version": 2,
   "weekStart": ""
 }
-
