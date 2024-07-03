@@ -5,7 +5,7 @@ import otel from 'otel';
  * Generates a SQL string for the given QueryBuilderOptions
  */
 export const generateSql = (options: QueryBuilderOptions): string => {
-  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId !== undefined;
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
   if (options.queryType === QueryType.Traces && hasTraceIdFilter) {
     return generateTraceIdQuery(options);
   } else if (options.queryType === QueryType.Traces) {
