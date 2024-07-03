@@ -555,7 +555,7 @@ const escapeValue = (value: string): string => {
 }
 
 /**
- * Returns the a SELECT column for trace duration.
+ * Returns the SELECT column for trace duration.
  * Time unit is used to convert the value to milliseconds, as is required by Grafana's Trace panel.
  */
 const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit): string => {
