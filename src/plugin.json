@@ -25,6 +25,11 @@
       "type": "dashboard",
       "name": "Cluster Analysis",
       "path": "dashboards/cluster-analysis.json"
+    },
+    {
+      "type": "dashboard",
+      "name": "ClickHouse OTel Dashboard",
+      "path": "dashboards/opentelemetry-clickhouse.json"
     }
   ],
   "category": "sql",
