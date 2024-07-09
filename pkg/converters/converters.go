@@ -31,6 +31,7 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"FixedString()":             regexp.MustCompile(`^Nullable\(FixedString\(.*\)\)`),
 	"IP":                        regexp.MustCompile(`^IPv[4,6]`),
 	"LowCardinality()":          regexp.MustCompile(`^LowCardinality\(([^)]*)\)`),
+	"LowCardinality(Nullable)":  regexp.MustCompile(`^LowCardinality\(Nullable([^)]*)\)`),
 	"Map()":                     regexp.MustCompile(`^Map\(.*\)`),
 	"Nested()":                  regexp.MustCompile(`^Nested\(.*\)`),
 	"Nullable(Date)":            regexp.MustCompile(`^Nullable\(Date\(?`),
@@ -257,6 +258,17 @@ var Converters = map[string]Converter{
 		fieldType:  data.FieldTypeNullableJSON,
 		matchRegex: matchRegexes["Point"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	// // This is a temporary solution to handle LowCardinality types.
+	// // We'll need to add support for LowCardinality types to `sqlutil` package.
+	"LowCardinality(String)": {
+		fieldType: data.FieldTypeString,
+		scanType:  reflect.PointerTo(reflect.TypeOf("")),
+	},
+	"LowCardinality(Nullable(String))": {
+		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["LowCardinality(Nullable)"],
+		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
 	},
 }
 
