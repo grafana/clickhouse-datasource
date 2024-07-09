@@ -5,7 +5,7 @@ import otel from 'otel';
  * Generates a SQL string for the given QueryBuilderOptions
  */
 export const generateSql = (options: QueryBuilderOptions): string => {
-  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId
+  const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
   if (options.queryType === QueryType.Traces && hasTraceIdFilter) {
     return generateTraceIdQuery(options);
   } else if (options.queryType === QueryType.Traces) {
@@ -50,7 +50,7 @@ const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
   
   const traceStartTime = getColumnByHint(options, ColumnHint.Time);
   if (traceStartTime !== undefined) {
-    selectParts.push(`${escapeIdentifier(traceStartTime.name)} as startTime`);
+    selectParts.push(`${convertTimeFieldToMilliseconds(escapeIdentifier(traceStartTime.name))} as startTime`);
   }
   
   const traceDurationTime = getColumnByHint(options, ColumnHint.TraceDurationTime);
@@ -125,7 +125,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   
   const traceStartTime = getColumnByHint(options, ColumnHint.Time);
   if (traceStartTime !== undefined) {
-    selectParts.push(`${escapeIdentifier(traceStartTime.name)} as startTime`);
+    selectParts.push(`${convertTimeFieldToMilliseconds(escapeIdentifier(traceStartTime.name))} as startTime`);
   }
   
   const traceDurationTime = getColumnByHint(options, ColumnHint.TraceDurationTime);
@@ -555,7 +555,7 @@ const escapeValue = (value: string): string => {
 }
 
 /**
- * Returns the a SELECT column for trace duration.
+ * Returns the SELECT column for trace duration.
  * Time unit is used to convert the value to milliseconds, as is required by Grafana's Trace panel.
  */
 const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit): string => {
@@ -573,6 +573,10 @@ const getTraceDurationSelectSql = (columnIdentifier: string, timeUnit?: TimeUnit
       return `${columnIdentifier} as ${alias}`;
   }
 }
+
+/** Returns the input time field converted to a Unix timestamp in nanoseconds and then adjusted to milliseconds. */
+const convertTimeFieldToMilliseconds = (columnIdentifier: string) =>
+  `multiply(toUnixTimestamp64Nano(${columnIdentifier}), 0.000001)`;
 
 /**
  * Concatenates query parts with no empty spaces.
