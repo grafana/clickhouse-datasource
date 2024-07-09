@@ -958,6 +958,18 @@ func TestLowCardinalityString(t *testing.T) {
 	}
 }
 
+func TestLowCardinalityNullableString(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 LowCardinality(Nullable(String))", protocol, nil)
+			defer close(t)
+			val := "53"
+			insertData(t, conn, val)
+			checkRows(t, conn, 1, &val)
+		})
+	}
+}
+
 func TestConvertDate32(t *testing.T) {
 	conn := setupConnection(t, clickhouse_sql.Native, nil)
 	canTest, err := plugin.CheckMinServerVersion(conn, 22, 3, 0)
