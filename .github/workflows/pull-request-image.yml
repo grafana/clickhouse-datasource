@@ -92,7 +92,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           context: .
@@ -101,7 +101,7 @@ jobs:
           tags: grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
 
       - name: Build Docker image for use with Docker save
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         if: ${{github.event.pull_request.head.repo.full_name != github.repository}}
         with:
           context: .
