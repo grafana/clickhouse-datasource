@@ -1,11 +1,10 @@
 module github.com/grafana/clickhouse-datasource
 
 go 1.21
-
-toolchain go1.21.4
+toolchain go1.22.5
 
 require (
-	dagger.io/dagger v0.11.6
+	dagger.io/dagger v0.11.9
 	github.com/ClickHouse/clickhouse-go/v2 v2.26.0
 	github.com/docker/docker v27.0.3+incompatible
 	github.com/docker/go-units v0.5.0
@@ -44,6 +43,11 @@ require (
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.20.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.3.0 // indirect
+	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.27.0 // indirect
+	go.opentelemetry.io/otel/log v0.3.0 // indirect
+	go.opentelemetry.io/otel/sdk/log v0.3.0 // indirect
 	golang.org/x/sync v0.7.0 // indirect
 )
 
