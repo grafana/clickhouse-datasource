@@ -1,6 +1,18 @@
 # Changelog
 
-## Release 4.2.0
+## 4.3.0
+
+### Features
+
+- Added OpenTelemetry dashboard (#884)
+
+### Fixes
+
+- Fix support for LowCardinality strings (#857)
+- Update trace queries to better handle time fields (#890)
+- Dependency bumps
+
+## 4.2.0
 
 ### Features
 
