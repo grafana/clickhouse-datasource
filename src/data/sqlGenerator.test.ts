@@ -261,7 +261,7 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
       `mapKeys("SpanAttributes")) as tags,`,
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags`,
-      `FROM "default"."otel_traces" WHERE traceID = trace_id AND startTime >= trace_start AND startTime <= trace_end`,
+      `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
       'LIMIT 1000'
     ];
 
@@ -335,7 +335,7 @@ describe('SQL Generator', () => {
     };
     const expectedSqlParts = [
       'SELECT "TraceId" as traceID, "ServiceName" as serviceName, "SpanName" as operationName,',
-      'multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime, multiply("Duration", 0.000001) as duration',
+      '"Timestamp" as startTime, multiply("Duration", 0.000001) as duration',
       'FROM "default"."otel_traces" WHERE ( Timestamp >= $__fromTime AND Timestamp <= $__toTime )',
       'AND ( ParentSpanId = \'\' ) AND ( Duration > 0 ) ORDER BY Timestamp DESC, Duration DESC LIMIT 1000'
     ];

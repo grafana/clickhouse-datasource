@@ -4,7 +4,7 @@
 
 ### Fixes
 
-- Fix trace start/duration/end times (#900)
+- Fix trace start times in trace ID mode (#900)
 
 ## 4.3.0
 
