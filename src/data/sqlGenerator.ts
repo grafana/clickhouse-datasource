@@ -50,7 +50,7 @@ const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
   
   const traceStartTime = getColumnByHint(options, ColumnHint.Time);
   if (traceStartTime !== undefined) {
-    selectParts.push(`${convertTimeFieldToMilliseconds(escapeIdentifier(traceStartTime.name))} as startTime`);
+    selectParts.push(`${escapeIdentifier(traceStartTime.name)} as startTime`);
   }
   
   const traceDurationTime = getColumnByHint(options, ColumnHint.TraceDurationTime);
