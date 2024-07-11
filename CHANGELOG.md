@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Fix trace start times in trace ID mode (#900)
+
 ## 4.3.0
 
 ### Features
