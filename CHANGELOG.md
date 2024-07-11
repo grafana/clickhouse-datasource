@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Fix trace start/duration/end times (#900)
+
 ## 4.3.0
 
 ### Features
