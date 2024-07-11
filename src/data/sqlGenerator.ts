@@ -149,7 +149,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // Optimize trace ID filtering for OTel enabled trace lookups
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
   const otelVersion = otel.getVersion(options.meta?.otelVersion);
-  const applyTraceIdOptimization = hasTraceIdFilter && options.meta?.otelEnabled && otelVersion;
+  const applyTraceIdOptimization = hasTraceIdFilter && traceStartTime !== undefined && options.meta?.otelEnabled && otelVersion;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
     const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
@@ -173,9 +173,9 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (applyTraceIdOptimization) {
     queryParts.push('traceID = trace_id');
     queryParts.push('AND');
-    queryParts.push(`startTime >= trace_start`);
+    queryParts.push(`${escapeIdentifier(traceStartTime.name)} >= trace_start`);
     queryParts.push('AND');
-    queryParts.push(`startTime <= trace_end`);
+    queryParts.push(`${escapeIdentifier(traceStartTime.name)} <= trace_end`);
   } else if (hasTraceIdFilter) {
     const traceId = options.meta!.traceId;
     queryParts.push(`traceID = '${traceId}'`);
