@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+- Added preset dashboard from `system.dashboards` table
+
 ### Fixes
 
 - Fix trace start times in trace ID mode (#900)
