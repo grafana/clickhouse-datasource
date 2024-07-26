@@ -9,6 +9,7 @@
 ### Fixes
 
 - Fix trace start times in trace ID mode (#900)
+- Fixed OTel dashboard that waa failing to import
 
 ## 4.3.0
 
