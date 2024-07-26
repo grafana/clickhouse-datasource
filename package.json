@@ -17,7 +17,8 @@
     "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",
     "sign": "npx --yes @grafana/sign-plugin@latest",
     "test:e2e:local": "docker-compose up -d && TEST_ENV=local K6_BROWSER_HEADLESS=0 k6 run e2e/e2ek6.test.js",
-    "test:e2e:dagger": "dagger run go test -v e2e/e2e_test.go"
+    "test:e2e:dagger": "dagger run go test -v e2e/e2e_test.go",
+    "gen-dashboards": "node ./gen-db-dashboards"
   },
   "author": "Grafana Labs",
   "license": "Apache-2.0",
