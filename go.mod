@@ -6,7 +6,7 @@ toolchain go1.21.4
 
 require (
 	dagger.io/dagger v0.11.6
-	github.com/ClickHouse/clickhouse-go/v2 v2.27.0
+	github.com/ClickHouse/clickhouse-go/v2 v2.27.1
 	github.com/docker/docker v27.1.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.242.0
