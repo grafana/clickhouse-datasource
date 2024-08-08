@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Optimized performance for types dependent on the JSON converter
+
 ## 4.3.1
 
 ### Features
