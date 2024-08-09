@@ -343,11 +343,8 @@ func jsonConverter(in interface{}) (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	var rawJSON json.RawMessage
-	err = json.Unmarshal(jBytes, &rawJSON)
-	if err != nil {
-		return nil, err
-	}
+
+	rawJSON := json.RawMessage(jBytes)
 	return &rawJSON, nil
 }
 
