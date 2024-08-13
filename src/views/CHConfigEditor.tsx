@@ -4,7 +4,7 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup } from '@grafana/ui';
+import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup, Alert, VerticalGroup } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -189,8 +189,28 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   (jsonData.protocol === Protocol.Native ? labels.serverPort.insecureNativePort : labels.serverPort.insecureHttpPort);
   const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`
 
+  const uidWarning = (!options.uid) && (
+    <Alert title="" severity="warning" buttonContent="Close">
+      <VerticalGroup>
+        <div>
+          {'This datasource is missing the'}
+          <code>uid</code>
+          {'field in its configuration. If your datasource is '}
+          <a
+            style={{ textDecoration: 'underline' }}
+            href='https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources'
+            target='_blank'
+            referrerPolicy='no-referrer'
+          >provisioned via YAML</a>
+          {', please verify the UID is set. This is required to enable data linking between logs and traces.'}
+        </div>
+      </VerticalGroup>
+    </Alert>
+  );
+
   return (
     <>
+      {uidWarning}
       <DataSourceDescription
         dataSourceName="Clickhouse"
         docsLink="https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/"

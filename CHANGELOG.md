@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Added warning for when `uid` is missing in provisioned datasources.
+
 ## 4.3.2
 
 ### Fixes
