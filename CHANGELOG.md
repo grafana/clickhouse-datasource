@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Added "Labels" column selector to the log query builder
+
 ## 4.3.2
 
 ### Fixes
