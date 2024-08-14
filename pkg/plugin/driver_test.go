@@ -1155,12 +1155,24 @@ func TestMutateResponse(t *testing.T) {
 		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableJSON)
 	})
 
-	t.Run("mutates other types", func(t *testing.T) {
+	t.Run("doesn't mutate logs", func(t *testing.T) {
 		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
 		require.NoError(t, err)
 		frame, err := sqlutil.FrameFromRows(rows, 1, converters.ClickhouseConverters...)
 		require.NoError(t, err)
 		frame.Meta = &data.FrameMeta{PreferredVisualization: data.VisType(data.VisTypeLogs)}
+		frames, err := clickhouse.MutateResponse(context.Background(), []*data.Frame{frame})
+		require.NoError(t, err)
+		require.NotNil(t, frames)
+		assert.Equal(t, frames[0].Fields[0].Type(), data.FieldTypeNullableJSON)
+	})
+
+	t.Run("mutates other types", func(t *testing.T) {
+		rows, err := conn.Query("SELECT * FROM simple_table LIMIT 1")
+		require.NoError(t, err)
+		frame, err := sqlutil.FrameFromRows(rows, 1, converters.ClickhouseConverters...)
+		require.NoError(t, err)
+		frame.Meta = &data.FrameMeta{PreferredVisualization: data.VisType(data.VisTypeGraph)}
 		frames, err := clickhouse.MutateResponse(context.Background(), []*data.Frame{frame})
 		require.NoError(t, err)
 		require.NotNil(t, frames)
