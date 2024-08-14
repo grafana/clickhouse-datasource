@@ -7,7 +7,7 @@ toolchain go1.22.6
 require (
 	dagger.io/dagger v0.12.4
 	github.com/ClickHouse/clickhouse-go/v2 v2.27.1
-	github.com/docker/docker v27.1.1+incompatible
+	github.com/docker/docker v27.1.2+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.242.0
 	github.com/grafana/sqlds/v3 v3.4.2
@@ -39,6 +39,7 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/user v0.1.0 // indirect
+	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.16 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
