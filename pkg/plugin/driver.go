@@ -271,7 +271,8 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
 		if frame.Meta.PreferredVisualization != data.VisTypeTrace &&
-			frame.Meta.PreferredVisualization != data.VisTypeTable {
+			frame.Meta.PreferredVisualization != data.VisTypeTable &&
+			frame.Meta.PreferredVisualization != data.VisTypeLogs {
 			var fields []*data.Field
 			for _, field := range frame.Fields {
 				values := make([]*string, field.Len())
