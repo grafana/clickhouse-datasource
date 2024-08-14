@@ -11,7 +11,7 @@ services:
     ports:
       - 3000:3000
     volumes:
-      - ./dist:/var/lib/grafana/plugins/grafanalabs-clickhouse-datasource
+      - ./dist:/var/lib/grafana/plugins/grafana-clickhouse-datasource
       - ./provisioning:/etc/grafana/provisioning
       - .:/root/grafana-clickhouse-datasource
     healthcheck:
@@ -22,6 +22,7 @@ services:
       start_period: 30s
     environment:
       - GF_LOG_LEVEL=debug
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=true
     networks:
       - grafana
 

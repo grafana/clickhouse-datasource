@@ -35,7 +35,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.22
+          go-version: 'stable'
 
       - name: Install yarn dependencies
         run: yarn install
