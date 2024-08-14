@@ -6,6 +6,10 @@
 
 - Added "Labels" column selector to the log query builder
 
+### Fixes
+
+- Map filters in the query builder now correctly show the key instead of the column name
+
 ## 4.3.2
 
 ### Fixes
