@@ -22,10 +22,10 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: 1.22
 
       - name: Install Dagger CLI
         run: cd /usr/local && { curl -L https://dl.dagger.io/dagger/install.sh | sh; cd -; }
-      
+
       - name: Run Dagger pipeline
         run: dagger run go test e2e/e2e_test.go
