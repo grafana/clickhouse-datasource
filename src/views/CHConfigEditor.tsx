@@ -200,7 +200,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             style={{ textDecoration: 'underline' }}
             href='https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources'
             target='_blank'
-            referrerPolicy='no-referrer'
+            rel='noreferrer'
           >provisioned via YAML</a>
           {', please verify the UID is set. This is required to enable data linking between logs and traces.'}
         </div>
