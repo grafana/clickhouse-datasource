@@ -1,4 +1,4 @@
-name: run-frontend-tests
+name: Frontend unit tests
 
 on:
   push:
