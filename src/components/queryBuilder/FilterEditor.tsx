@@ -206,7 +206,7 @@ export const FilterEditor = (props: {
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
   const mapKeyOptions = mapKeys.map(k => ({ label: k, value: k }));
   if (filter.mapKey && !mapKeys.includes(filter.mapKey)) {
-    mapKeyOptions.push({ label: filter.label || filter.mapKey, value: filter.mapKey });
+    mapKeyOptions.push({ label: filter.mapKey, value: filter.mapKey });
   }
 
   const getFields = () => {
