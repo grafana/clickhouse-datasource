@@ -131,6 +131,7 @@ export enum ColumnHint {
   TraceDurationTime = 'trace_duration_time',
   TraceTags = 'trace_tags',
   TraceServiceTags = 'trace_service_tags',
+  TraceStatusCode = 'trace_status_code',
 }
 
 /**

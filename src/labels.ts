@@ -419,6 +419,7 @@ export default {
       [ColumnHint.TraceDurationTime]: 'Duration Time',
       [ColumnHint.TraceTags]: 'Tags',
       [ColumnHint.TraceServiceTags]: 'Service Tags',
+      [ColumnHint.TraceStatusCode]: 'Status Code',
     }
   }
 }

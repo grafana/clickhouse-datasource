@@ -144,6 +144,11 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (traceServiceTags !== undefined) {
     selectParts.push(`arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`);
   }
+  
+  const traceStatusCode = getColumnByHint(options, ColumnHint.TraceStatusCode);
+  if (traceStatusCode !== undefined) {
+    selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} = 'STATUS_CODE_ERROR', 2, 0) as statusCode`);
+  }
   const selectPartsSql = selectParts.join(', ');
 
   // Optimize trace ID filtering for OTel enabled trace lookups

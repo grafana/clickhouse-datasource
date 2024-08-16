@@ -728,6 +728,10 @@
               {
                 "hint": "trace_service_tags",
                 "name": "ResourceAttributes"
+              },
+              {
+                "hint": "trace_status_code",
+                "name": "StatusCode"
               }
             ],
             "database": "default",
