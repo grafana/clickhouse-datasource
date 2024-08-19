@@ -217,7 +217,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		return db, errors.New("connection timed out")
 	}
 
-	return db, errorsource.DownstreamError(settings.isValid(), false)
+	return db, settings.isValid()
 }
 
 // Converters defines list of data type converters

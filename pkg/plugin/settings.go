@@ -53,10 +53,10 @@ const secureHeaderKeyPrefix = "secureHttpHeaders."
 
 func (settings *Settings) isValid() (err error) {
 	if settings.Host == "" {
-		return ErrorMessageInvalidHost
+		return errorsource.DownstreamError(ErrorMessageInvalidHost, false)
 	}
 	if settings.Port == 0 {
-		return ErrorMessageInvalidPort
+		return errorsource.DownstreamError(ErrorMessageInvalidPort, false)
 	}
 	return nil
 }
