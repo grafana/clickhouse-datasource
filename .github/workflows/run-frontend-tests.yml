@@ -31,6 +31,9 @@ jobs:
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
+      - name: Check types
+        run: yarn typecheck
+
       - name: Build Frontend
         run: yarn build
         env:
