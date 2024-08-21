@@ -1,5 +1,5 @@
-dagger.io/dagger v0.12.4 h1:PeAsBs0dgMrV4TN8prVqeDDEvg8qOMMjdQiXHe9q2uc=
-dagger.io/dagger v0.12.4/go.mod h1:e5Xuvu+FnswwG28nMk7ZcDtT+p9vadvONowzLKf/0dA=
+dagger.io/dagger v0.12.5 h1:K4ghFL/j+zqk6RqN7nAus1hfjP9lbQXRb3MGz8Ys/f4=
+dagger.io/dagger v0.12.5/go.mod h1:e5Xuvu+FnswwG28nMk7ZcDtT+p9vadvONowzLKf/0dA=
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
 github.com/99designs/gqlgen v0.17.49 h1:b3hNGexHd33fBSAd4NDT/c3NCcQzcAVkknhN9ym36YQ=
