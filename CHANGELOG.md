@@ -6,6 +6,7 @@
 
 - Added warning for when `uid` is missing in provisioned datasources.
 - Map filters in the query builder now correctly show the key instead of the column name
+- Allow empty string values for `$__conditionAll` macro (#947)
 
 ## 4.3.2
 

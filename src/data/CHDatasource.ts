@@ -265,7 +265,7 @@ export class Datasource
       if (templateVar) {
         const key = templateVars.find((x) => x.name === templateVar[0]) as any;
         let value = key?.current.value.toString();
-        if (value === '' || value === '$__all') {
+        if (value === '$__all') {
           phrase = '1=1';
         }
       }
