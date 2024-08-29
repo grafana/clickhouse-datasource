@@ -30,6 +30,11 @@
       "type": "dashboard",
       "name": "ClickHouse OTel Dashboard",
       "path": "dashboards/opentelemetry-clickhouse.json"
+    },
+    {
+      "type": "dashboard",
+      "name": "ClickHouse System Dashboards",
+      "path": "dashboards/system-dashboards.json"
     }
   ],
   "category": "sql",
