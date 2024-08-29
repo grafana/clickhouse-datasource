@@ -147,7 +147,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   
   const traceStatusCode = getColumnByHint(options, ColumnHint.TraceStatusCode);
   if (traceStatusCode !== undefined) {
-    selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} = 'STATUS_CODE_ERROR', 2, 0) as statusCode`);
+    selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} = 'Error', 2, 0) as statusCode`);
   }
   const selectPartsSql = selectParts.join(', ');
 
