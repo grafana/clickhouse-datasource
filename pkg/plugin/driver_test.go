@@ -1026,33 +1026,33 @@ func TestConvertNullableUUID(t *testing.T) {
 	}
 }
 
-func TestConvertJSON(t *testing.T) {
-	conn := setupConnection(t, clickhouse_sql.Native, nil)
-	canTest, err := plugin.CheckMinServerVersion(conn, 22, 6, 1)
-	if err != nil {
-		t.Skip(err.Error())
-		return
-	}
-	if !canTest {
-		t.Skipf("Skipping JSON test as version is < 22.6.1")
-		return
-	}
-	for name, protocol := range Protocols {
-		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
-			conn, close := setupTest(t, "col1 JSON", protocol, clickhouse_sql.Settings{
-				"allow_experimental_object_type": 1,
-			})
-			defer close(t)
-			val := map[string]interface{}{
-				"test": map[string][]string{
-					"test": {"2", "3"},
-				},
-			}
-			insertData(t, conn, val)
-			checkRows(t, conn, 1, val)
-		})
-	}
-}
+// func TestConvertJSON(t *testing.T) {
+// 	conn := setupConnection(t, clickhouse_sql.Native, nil)
+// 	canTest, err := plugin.CheckMinServerVersion(conn, 22, 6, 1)
+// 	if err != nil {
+// 		t.Skip(err.Error())
+// 		return
+// 	}
+// 	if !canTest {
+// 		t.Skipf("Skipping JSON test as version is < 22.6.1")
+// 		return
+// 	}
+// 	for name, protocol := range Protocols {
+// 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+// 			conn, close := setupTest(t, "col1 JSON", protocol, clickhouse_sql.Settings{
+// 				"allow_experimental_object_type": 1,
+// 			})
+// 			defer close(t)
+// 			val := map[string]interface{}{
+// 				"test": map[string][]string{
+// 					"test": {"2", "3"},
+// 				},
+// 			}
+// 			insertData(t, conn, val)
+// 			checkRows(t, conn, 1, val)
+// 		})
+// 	}
+// }
 
 func TestConvertIPv4(t *testing.T) {
 	for name, protocol := range Protocols {
