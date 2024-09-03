@@ -6,10 +6,10 @@ toolchain go1.22.6
 
 require (
 	dagger.io/dagger v0.12.4
-	github.com/ClickHouse/clickhouse-go/v2 v2.28.1
-	github.com/docker/docker v27.1.2+incompatible
+	github.com/ClickHouse/clickhouse-go/v2 v2.28.2
+	github.com/docker/docker v27.2.0+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/grafana-plugin-sdk-go v0.244.0
+	github.com/grafana/grafana-plugin-sdk-go v0.245.0
 	github.com/grafana/sqlds/v3 v3.4.2
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
@@ -21,7 +21,6 @@ require (
 
 require (
 	github.com/99designs/gqlgen v0.17.49 // indirect
-	github.com/AdaLogics/go-fuzz-headers v0.0.0-20230811130428-ced1acdcaa24 // indirect
 	github.com/Khan/genqlient v0.7.0 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
@@ -54,7 +53,6 @@ require (
 	go.opentelemetry.io/otel/log v0.3.0 // indirect
 	go.opentelemetry.io/otel/sdk/log v0.3.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/time v0.0.0-20220210224613-90d013bbcef8 // indirect
 )
 
 require (
