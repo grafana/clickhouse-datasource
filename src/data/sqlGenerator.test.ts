@@ -217,7 +217,7 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
       `mapKeys("SpanAttributes")) as tags,`,
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
-      `if("StatusCode" = 'Error', 2, 0) as statusCode`,
+      `if("StatusCode" = 'Error' OR "StatusCode" = 'STATUS_CODE_ERROR', 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
       'LIMIT 1000'
     ];
@@ -264,7 +264,7 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
       `mapKeys("SpanAttributes")) as tags,`,
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
-      `if("StatusCode" = 'Error', 2, 0) as statusCode`,
+      `if("StatusCode" = 'Error' OR "StatusCode" = 'STATUS_CODE_ERROR', 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
       'LIMIT 1000'
     ];

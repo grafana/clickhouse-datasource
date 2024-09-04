@@ -166,16 +166,16 @@ If using the [Open Telemetry Collector and ClickHouse exporter](https://github.c
 
 ```sql
 SELECT
-    TraceId AS traceID,
-    SpanId AS spanID,
-    SpanName AS operationName,
-    ParentSpanId AS parentSpanID,
-    ServiceName AS serviceName,
-    Duration / 1000000 AS duration,
-    Timestamp AS startTime,
-    arrayMap(key -> map('key', key, 'value', SpanAttributes[key]), mapKeys(SpanAttributes)) AS tags,
-    arrayMap(key -> map('key', key, 'value', ResourceAttributes[key]), mapKeys(ResourceAttributes)) AS serviceTags,
-    if(StatusCode = 'STATUS_CODE_ERROR', 2, 0) AS statusCode
+  TraceId AS traceID,
+  SpanId AS spanID,
+  SpanName AS operationName,
+  ParentSpanId AS parentSpanID,
+  ServiceName AS serviceName,
+  Duration / 1000000 AS duration,
+  Timestamp AS startTime,
+  arrayMap(key -> map('key', key, 'value', SpanAttributes[key]), mapKeys(SpanAttributes)) AS tags,
+  arrayMap(key -> map('key', key, 'value', ResourceAttributes[key]), mapKeys(ResourceAttributes)) AS serviceTags,
+  if(StatusCode = 'Error' OR StatusCode = 'STATUS_CODE_ERROR', 2, 0) AS statusCode
 FROM otel.otel_traces
 WHERE TraceId = '61d489320c01243966700e172ab37081'
 ORDER BY startTime ASC
