@@ -4,7 +4,7 @@
 
 ### Features
 
-- Datasource OTel configuration will now have default tables provided
+- Datasource OTel configuration will now set default table names for logs and traces.
 
 ### Fixes
 
