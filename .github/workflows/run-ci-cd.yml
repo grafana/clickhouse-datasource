@@ -17,7 +17,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 'stable'
+          go-version: 1.22
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -26,6 +26,6 @@ jobs:
           # When `install-mode` is `goinstall` the value can be v1.2.3, `latest`, or the hash of a commit.
           version: latest
           args: --timeout=5m
-      
+
       - name: Check spelling
         run: npx --yes cspell@6.13.3 -c cspell.config.json "**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}"

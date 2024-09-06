@@ -267,9 +267,11 @@ async function main() {
 	const clickHouseDashboards = await fetchDashboardsFromClickHouse();
 	const panels = generatePanels(clickHouseDashboards);
 	const dashboard = generateDashboard(panels);
+	let fileData = JSON.stringify(dashboard, null, '\t');
+	fileData += '\n';
 
 	try {
-		await fs.writeFile(OUTPUT_FILE, JSON.stringify(dashboard, null, '\t'), 'utf-8');
+		await fs.writeFile(OUTPUT_FILE, fileData, 'utf-8');
 	} catch (err) {
 		throw new Error('failed to write dashboard to file: ' + err);
 	}
