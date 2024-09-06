@@ -3,6 +3,7 @@ import { renderHook } from "@testing-library/react";
 import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
 import { onHttpHeadersChange, useConfigDefaults } from "./CHConfigEditorHooks";
 import { pluginVersion } from "utils/version";
+import { defaultLogsTable, defaultTraceTable } from "otel";
 
 describe('onHttpHeadersChange', () => {
   it('should properly sort headers into secure/plain config fields', async () => {
@@ -94,10 +95,10 @@ describe('useConfigDefaults', () => {
     version: pluginVersion,
     protocol: Protocol.Native,
     logs: {
-      defaultTable: 'otel_logs'
+      defaultTable: defaultLogsTable
     },
     traces: {
-      defaultTable: 'otel_traces'
+      defaultTable: defaultTraceTable
     }
   };
 
