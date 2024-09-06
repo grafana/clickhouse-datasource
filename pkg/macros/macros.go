@@ -9,6 +9,7 @@ import (
 	"github.com/grafana/sqlds/v3"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
 )
 
 // Converts a time.Time to a Date
@@ -48,7 +49,7 @@ func ToTimeFilterMs(query *sqlutil.Query, args []string) (string, error) {
 
 func TimeFilter(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+		return "", errorsource.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args)), false)
 	}
 
 	var (
@@ -62,7 +63,7 @@ func TimeFilter(query *sqlutil.Query, args []string) (string, error) {
 
 func TimeFilterMs(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+		return "", errorsource.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args)), false)
 	}
 
 	var (
@@ -76,7 +77,7 @@ func TimeFilterMs(query *sqlutil.Query, args []string) (string, error) {
 
 func DateFilter(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+		return "", errorsource.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args)), false)
 	}
 	var (
 		column = args[0]
@@ -89,7 +90,7 @@ func DateFilter(query *sqlutil.Query, args []string) (string, error) {
 
 func DateTimeFilter(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 2 {
-		return "", fmt.Errorf("%w: expected 2 arguments, received %d", sqlds.ErrorBadArgumentCount, len(args))
+		return "", errorsource.DownstreamError(fmt.Errorf("%w: expected 2 arguments, received %d", sqlds.ErrorBadArgumentCount, len(args)), false)
 	}
 	var (
 		dateColumn = args[0]
@@ -105,7 +106,7 @@ func DateTimeFilter(query *sqlutil.Query, args []string) (string, error) {
 
 func TimeInterval(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+		return "", errorsource.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args)), false)
 	}
 
 	seconds := math.Max(query.Interval.Seconds(), 1)
@@ -114,7 +115,7 @@ func TimeInterval(query *sqlutil.Query, args []string) (string, error) {
 
 func TimeIntervalMs(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args))
+		return "", errorsource.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlds.ErrorBadArgumentCount, len(args)), false)
 	}
 
 	milliseconds := math.Max(float64(query.Interval.Milliseconds()), 1)

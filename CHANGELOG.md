@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+- Datasource OTel configuration will now set default table names for logs and traces.
+
 ### Fixes
 
 - Added warning for when `uid` is missing in provisioned datasources.
