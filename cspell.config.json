@@ -77,6 +77,7 @@
     "WorkDir",
     "elazarl",
     "goproxy",
-    "Nonproxy"
+    "Nonproxy",
+    "errorsource"
   ]
 }
