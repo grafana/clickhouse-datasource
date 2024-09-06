@@ -90,9 +90,15 @@ describe('onHttpHeadersChange', () => {
 });
 
 describe('useConfigDefaults', () => {
-  const expectedDefaults = {
+  const expectedDefaults: Partial<CHConfig> = {
     version: pluginVersion,
     protocol: Protocol.Native,
+    logs: {
+      defaultTable: 'otel_logs'
+    },
+    traces: {
+      defaultTable: 'otel_traces'
+    }
   };
 
   it('should rename v3 fields to latest config names', async () => {
@@ -210,7 +216,13 @@ describe('useConfigDefaults', () => {
       jsonData: {
         host: 'existing',
         dialTimeout: 20,
-        protocol: Protocol.Http
+        protocol: Protocol.Http,
+        logs: {
+          defaultTable: 'not_default_logs'
+        },
+        traces: {
+          defaultTable: '' // empty
+        }
       }
     } as any as DataSourceSettings<CHConfig>;
 
@@ -221,7 +233,13 @@ describe('useConfigDefaults', () => {
         ...expectedDefaults,
         host: 'existing',
         dialTimeout: 20,
-        protocol: Protocol.Http
+        protocol: Protocol.Http,
+        logs: {
+          defaultTable: 'not_default_logs'
+        },
+        traces: {
+          defaultTable: ''
+        }
       }
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);

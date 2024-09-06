@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+- Datasource OTel configuration will now have default tables provided
+
 ### Fixes
 
 - Added warning for when `uid` is missing in provisioned datasources.

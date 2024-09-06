@@ -92,6 +92,20 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
       jsonData.protocol = Protocol.Native;
     }
 
+    if (!jsonData.logs || jsonData.logs.defaultTable === undefined) {
+      jsonData.logs = {
+        ...jsonData.logs,
+        defaultTable: 'otel_logs'
+      };
+    }
+
+    if (!jsonData.traces || jsonData.traces.defaultTable === undefined) {
+      jsonData.traces = {
+        ...jsonData.traces,
+        defaultTable: 'otel_traces'
+      };
+    }
+
     onOptionsChange({
       ...options,
       jsonData,
