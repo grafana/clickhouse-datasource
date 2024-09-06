@@ -3,6 +3,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { TracesConfig } from './TracesConfig';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
+import { defaultTraceTable } from 'otel';
 
 describe('TracesConfig', () => {
   it('should render', () => {
@@ -82,7 +83,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(allLabels.components.Config.TracesConfig.defaultTable.placeholder);
+    const input = result.getByPlaceholderText(defaultTraceTable);
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
