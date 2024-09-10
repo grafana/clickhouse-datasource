@@ -1,4 +1,5 @@
 import { DataSourceSettings, KeyValue } from "@grafana/data";
+import { defaultLogsTable, defaultTraceTable } from "otel";
 import { useEffect, useRef } from "react";
 import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
 import { pluginVersion } from "utils/version";
@@ -90,6 +91,20 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
 
     if (!jsonData.protocol) {
       jsonData.protocol = Protocol.Native;
+    }
+
+    if (!jsonData.logs || jsonData.logs.defaultTable === undefined) {
+      jsonData.logs = {
+        ...jsonData.logs,
+        defaultTable: defaultLogsTable
+      };
+    }
+
+    if (!jsonData.traces || jsonData.traces.defaultTable === undefined) {
+      jsonData.traces = {
+        ...jsonData.traces,
+        defaultTable: defaultTraceTable
+      };
     }
 
     onOptionsChange({

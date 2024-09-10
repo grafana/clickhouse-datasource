@@ -144,8 +144,7 @@ export default {
         defaultTable: {
           label: 'Default trace table',
           description: 'the default table used by the trace query builder',
-          name: 'defaultTable',
-          placeholder: 'otel_traces'
+          name: 'defaultTable'
         },
         columns: {
          title: 'Default columns',
@@ -201,8 +200,7 @@ export default {
         defaultTable: {
           label: 'Default log table',
           description: 'the default table used by the logs query builder',
-          name: 'defaultTable',
-          placeholder: 'otel_logs'
+          name: 'defaultTable'
         },
         columns: {
           title: 'Default columns',
