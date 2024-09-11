@@ -32,7 +32,10 @@ test_summary.json
 
 pkg/__debug_bin
 
-provisioning
-
 **/.DS_Store
 .eslintcache
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
