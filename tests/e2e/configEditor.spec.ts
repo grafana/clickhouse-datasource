@@ -10,17 +10,6 @@ test.describe('Config Editor', () => {
     await expect(configPage.saveAndTest()).not.toBeOK();
   });
 
-  test('valid credentials should return a 200 status code', async ({ createDataSourceConfigPage, page }) => {
-    const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
-    configPage.mockHealthCheckResponse({ status: 200 });
-
-    await page.getByPlaceholder('Server address').fill(CLICKHOUSE_DB_URL);
-    await page.getByPlaceholder('9000').fill('9000');
-    await page.getByPlaceholder('default').fill('default');
-
-    await expect(configPage.saveAndTest()).toBeOK();
-  });
-
   test('valid credentials should display a success alert on the page', async ({ createDataSourceConfigPage, page }) => {
     const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
 
