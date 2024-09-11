@@ -222,27 +222,33 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
   const logTime = getColumnByHint(options, ColumnHint.Time);
   if (logTime !== undefined) {
     // Must be first column in list.
-    logTime.alias = 'timestamp';
+    logTime.alias = logColumnHintsToAlias.get(ColumnHint.Time);
     selectParts.push(getColumnIdentifier(logTime));
   }
 
   const logMessage = getColumnByHint(options, ColumnHint.LogMessage);
   if (logMessage !== undefined) {
     // Must be second column in list.
-    logMessage.alias = 'body';
+    logMessage.alias = logColumnHintsToAlias.get(ColumnHint.LogMessage);
     selectParts.push(getColumnIdentifier(logMessage));
   }
 
   const logLevel = getColumnByHint(options, ColumnHint.LogLevel);
   if (logLevel !== undefined) {
     // TODO: "severity" should be a number, but "level" can be a string? Perhaps we can check the column type here?
-    logLevel.alias = 'level';
+    logLevel.alias = logColumnHintsToAlias.get(ColumnHint.LogLevel);
     selectParts.push(getColumnIdentifier(logLevel));
+  }
+
+  const logLabels = getColumnByHint(options, ColumnHint.LogLabels);
+  if (logLabels !== undefined) {
+    logLabels.alias = logColumnHintsToAlias.get(ColumnHint.LogLabels);
+    selectParts.push(getColumnIdentifier(logLabels));
   }
 
   const traceId = getColumnByHint(options, ColumnHint.TraceId);
   if (traceId !== undefined) {
-    traceId.alias = 'traceID';
+    traceId.alias = logColumnHintsToAlias.get(ColumnHint.TraceId);
     selectParts.push(getColumnIdentifier(traceId));
   }
 
@@ -777,12 +783,15 @@ const isMultiFilter = (type: string, operator: FilterOperator): boolean => isStr
  * map from the SQL generator's aliases back to the original column hints
  * so that filters can be added properly.
  */
-export const logAliasToColumnHints: Map<string, ColumnHint> = new Map([
+const logAliasToColumnHintsEntries: ReadonlyArray<[string, ColumnHint]> = [
   ['timestamp', ColumnHint.Time],
   ['body', ColumnHint.LogMessage],
   ['level', ColumnHint.LogLevel],
+  ['labels', ColumnHint.LogLabels],
   ['traceID', ColumnHint.TraceId],
-]);
+];
+export const logAliasToColumnHints: Map<string, ColumnHint> = new Map(logAliasToColumnHintsEntries);
+export const logColumnHintsToAlias: Map<ColumnHint, string> = new Map(logAliasToColumnHintsEntries.map(e => [e[1], e[0]]));
 
 
 export const _testExports = {

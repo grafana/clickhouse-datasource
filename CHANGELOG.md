@@ -4,6 +4,7 @@
 
 ### Features
 
+- Added "Labels" column selector to the log query builder
 - Datasource OTel configuration will now set default table names for logs and traces.
 
 ### Fixes

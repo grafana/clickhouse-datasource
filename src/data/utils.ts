@@ -3,6 +3,7 @@ import { ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, Quer
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
 import { Datasource } from "./CHDatasource";
 import { pluginVersion } from "utils/version";
+import { logColumnHintsToAlias } from "./sqlGenerator";
 
 /**
  * Returns true if the builder options contain enough information to start showing a query
@@ -253,3 +254,28 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
 
   return res;
 };
+
+
+/**
+ * Returns true if the dataframe contains a log label that matches the provided name.
+ * 
+ * This function exists for the logs panel, when clicking "filter for value" on a single log row.
+ * A dataframe will be provided for that single row, and we need to check the labels object to see if it
+ * contains a field with that name. If it does then we can create a filter using the labels column hint.
+ */
+export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name: string): boolean => {
+  if (!frame || !frame.fields || frame.fields.length === 0) {
+    return false;
+  }
+
+  const logLabelsFieldName = logColumnHintsToAlias.get(ColumnHint.LogLabels);
+  const field = frame.fields.find(f => f.name === logLabelsFieldName);
+  if (!field || !field.values || field.values.length < 1 || !field.values.get(0)) {
+    return false;
+  }
+
+  const labels = (field.values.get(0) || {}) as object;
+  const labelKeys = Object.keys(labels);
+
+  return labelKeys.includes(name);
+}
