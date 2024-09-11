@@ -5,11 +5,10 @@ go 1.22
 toolchain go1.22.6
 
 require (
-	dagger.io/dagger v0.12.7
 	github.com/ClickHouse/clickhouse-go/v2 v2.28.2
 	github.com/docker/docker v27.2.1+incompatible
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/grafana-plugin-sdk-go v0.247.0
+	github.com/grafana/grafana-plugin-sdk-go v0.248.0
 	github.com/grafana/sqlds/v3 v3.4.2
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
@@ -20,9 +19,6 @@ require (
 )
 
 require (
-	github.com/99designs/gqlgen v0.17.49 // indirect
-	github.com/Khan/genqlient v0.7.0 // indirect
-	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/containerd/log v0.1.0 // indirect
 	github.com/containerd/platforms v0.2.1 // indirect
@@ -35,23 +31,16 @@ require (
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.8 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.0.1 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0 // indirect
-	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jszwedko/go-datemath v0.1.1-0.20230526204004-640a500621d6 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.5 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/user v0.1.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/sosodev/duration v1.3.1 // indirect
-	github.com/vektah/gqlparser/v2 v2.5.16 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.53.0 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.23.0 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240518090000-14441aefdf88 // indirect
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp v0.3.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.27.0 // indirect
-	go.opentelemetry.io/otel/log v0.3.0 // indirect
-	go.opentelemetry.io/otel/sdk/log v0.3.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 )
 
@@ -135,8 +124,6 @@ require (
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/smartystreets/goconvey v0.0.0-20190330032615-68dc04aab96a // indirect
-	github.com/spf13/cobra v1.8.1
-	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/unknwon/bra v0.0.0-20200517080246-1e3013ecaff8 // indirect
