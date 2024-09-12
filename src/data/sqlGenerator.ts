@@ -28,7 +28,7 @@ export const generateSql = (options: QueryBuilderOptions): string => {
  */
 const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
   const { database, table } = options;
-  
+
   const queryParts: string[] = [];
 
   // TODO: these columns could be a map or some other convenience function
@@ -37,28 +37,28 @@ const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
   if (traceId !== undefined) {
     selectParts.push(`${escapeIdentifier(traceId.name)} as traceID`);
   }
-  
+
   const traceServiceName = getColumnByHint(options, ColumnHint.TraceServiceName);
   if (traceServiceName !== undefined) {
     selectParts.push(`${escapeIdentifier(traceServiceName.name)} as serviceName`);
   }
-  
+
   const traceOperationName = getColumnByHint(options, ColumnHint.TraceOperationName);
   if (traceOperationName !== undefined) {
     selectParts.push(`${escapeIdentifier(traceOperationName.name)} as operationName`);
   }
-  
+
   const traceStartTime = getColumnByHint(options, ColumnHint.Time);
   if (traceStartTime !== undefined) {
     selectParts.push(`${escapeIdentifier(traceStartTime.name)} as startTime`);
   }
-  
+
   const traceDurationTime = getColumnByHint(options, ColumnHint.TraceDurationTime);
   if (traceDurationTime !== undefined) {
     const timeUnit = options.meta?.traceDurationUnit;
     selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
   }
-  
+
   const selectPartsSql = selectParts.join(', ');
 
   queryParts.push('SELECT');
@@ -93,7 +93,7 @@ const generateTraceSearchQuery = (options: QueryBuilderOptions): string => {
  */
 const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const { database, table } = options;
-  
+
   const queryParts: string[] = [];
 
   // TODO: these columns could be a map or some other convenience function
@@ -102,47 +102,52 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (traceId !== undefined) {
     selectParts.push(`${escapeIdentifier(traceId.name)} as traceID`);
   }
-  
+
   const traceSpanId = getColumnByHint(options, ColumnHint.TraceSpanId);
   if (traceSpanId !== undefined) {
     selectParts.push(`${escapeIdentifier(traceSpanId.name)} as spanID`);
   }
-  
+
   const traceParentSpanId = getColumnByHint(options, ColumnHint.TraceParentSpanId);
   if (traceParentSpanId !== undefined) {
     selectParts.push(`${escapeIdentifier(traceParentSpanId.name)} as parentSpanID`);
   }
-  
+
   const traceServiceName = getColumnByHint(options, ColumnHint.TraceServiceName);
   if (traceServiceName !== undefined) {
     selectParts.push(`${escapeIdentifier(traceServiceName.name)} as serviceName`);
   }
-  
+
   const traceOperationName = getColumnByHint(options, ColumnHint.TraceOperationName);
   if (traceOperationName !== undefined) {
     selectParts.push(`${escapeIdentifier(traceOperationName.name)} as operationName`);
   }
-  
+
   const traceStartTime = getColumnByHint(options, ColumnHint.Time);
   if (traceStartTime !== undefined) {
     selectParts.push(`${convertTimeFieldToMilliseconds(escapeIdentifier(traceStartTime.name))} as startTime`);
   }
-  
+
   const traceDurationTime = getColumnByHint(options, ColumnHint.TraceDurationTime);
   if (traceDurationTime !== undefined) {
     const timeUnit = options.meta?.traceDurationUnit;
     selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
   }
-  
+
   // TODO: for tags and serviceTags, consider the column type. They might not require mapping, they could already be JSON.
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   if (traceTags !== undefined) {
     selectParts.push(`arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`);
   }
-  
+
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
   if (traceServiceTags !== undefined) {
     selectParts.push(`arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`);
+  }
+
+  const traceStatusCode = getColumnByHint(options, ColumnHint.TraceStatusCode);
+  if (traceStatusCode !== undefined) {
+    selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`);
   }
   const selectPartsSql = selectParts.join(', ');
 
@@ -207,14 +212,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
  * Generates logs query with columns that fit Grafana's Logs panel
  * Column aliases follow this structure:
  * https://grafana.com/developers/plugin-tools/tutorials/build-a-logs-data-source-plugin#logs-data-frame-format
- * 
+ *
  * note: column order seems to matter as well as alias name
  */
 const generateLogsQuery = (_options: QueryBuilderOptions): string => {
   // Copy columns so column aliases can be safely mutated
   const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
-  
+
   const queryParts: string[] = [];
 
   // TODO: these columns could be a map or some other convenience function
@@ -263,7 +268,7 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  
+
   const filterParts = getFilters(options);
   const hasLogMessageFilter = logMessage && options.meta?.logMessageLike;
 
@@ -304,7 +309,7 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
   // Copy columns so column aliases can be safely mutated
   const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
-  
+
   const queryParts: string[] = [];
 
   const selectParts: string[] = [];
@@ -341,7 +346,7 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
 
   // (v3) aggregate selections go AFTER group by
   aggregateSelectParts.forEach(a => selectParts.push(a));
-  
+
   const selectPartsSql = selectParts.join(', ');
 
   queryParts.push('SELECT');
@@ -354,7 +359,7 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
     queryParts.push('WHERE');
     queryParts.push(filterParts);
   }
-  
+
   const hasAggregates = (options.aggregates?.length || 0 > 0);
   const hasGroupBy = (options.groupBy?.length || 0 > 0);
   if (hasAggregates || hasGroupBy) {
@@ -389,7 +394,7 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
   // Copy columns so column aliases can be safely mutated
   const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
   const { database, table } = options;
-  
+
   const queryParts: string[] = [];
   const selectParts: string[] = [];
 
@@ -407,7 +412,7 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
     const name = `${agg.aggregateType}(${agg.column})`;
     selectParts.push(`${name}${alias}`);
   });
-  
+
   const selectPartsSql = selectParts.join(', ');
 
   queryParts.push('SELECT');
@@ -477,7 +482,7 @@ const generateTableQuery = (options: QueryBuilderOptions): string => {
       // selectParts.push(g)
     });
   }
-  
+
   const selectPartsSql = selectParts.join(', ');
 
   queryParts.push('SELECT');
@@ -528,7 +533,7 @@ export const getColumnsByHints = (options: QueryBuilderOptions, hints: readonly 
 
 const getColumnIdentifier = (col: SelectedColumn): string => {
   let colName = col.name;
-  
+
   // allow for functions like count()
   if (colName.includes('(') || colName.includes(')') || colName.includes('"') || colName.includes('"') || colName.includes(' as ')) {
     colName = col.name
@@ -690,7 +695,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
     if (operator) {
       filterParts.push(operator);
     }
-    
+
     if (isNullFilter(filter.operator)) {
       // empty
     } else if (filter.operator === FilterOperator.IsEmpty) {

@@ -196,6 +196,7 @@ describe('SQL Generator', () => {
         { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
         { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
         { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
       ],
       filters: [],
       meta: {
@@ -215,7 +216,8 @@ describe('SQL Generator', () => {
       'multiply("Duration", 0.000001) as duration,',
       `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
       `mapKeys("SpanAttributes")) as tags,`,
-      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
       'LIMIT 1000'
     ];
@@ -239,6 +241,7 @@ describe('SQL Generator', () => {
         { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
         { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
         { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
       ],
       filters: [],
       meta: {
@@ -260,7 +263,8 @@ describe('SQL Generator', () => {
       'multiply("Duration", 0.000001) as duration,',
       `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
       `mapKeys("SpanAttributes")) as tags,`,
-      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
       'LIMIT 1000'
     ];
