@@ -152,6 +152,28 @@ describe('AdHocManager', () => {
     );
   });
 
+  it('apply ad hoc filter IN operator with string values', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
+      { key: 'key', operator: 'IN', value: '(\'val1\', \'val2\')' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+        `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (\\'val1\\', \\'val2\\') '}`
+    );
+  });
+
+  it('apply ad hoc filter IN operator with integer values', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM foo');
+    const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
+      { key: 'key', operator: 'IN', value: '(1, 2, 3)' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+        `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (1, 2, 3) '}`
+    );
+  });
+
   it('does not apply an adhoc filter without "operator"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');

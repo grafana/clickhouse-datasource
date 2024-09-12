@@ -38,7 +38,7 @@ export class AdHocFilter {
       })
       .map((f, i) => {
         const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
-        const value = `\\'${f.value}\\'`;
+        const value = escapeValueBasedOnOperator(f.value, f.operator);
         const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
@@ -58,6 +58,14 @@ function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
 }
 
+function escapeValueBasedOnOperator(s: string, operator: AdHocVariableFilterOperator): string {
+  if (operator === 'IN') {
+    return `${s}`.replace(/'/g, "\\'");
+  }
+
+  return `\\'${s}\\'`;
+}
+
 function convertOperatorToClickHouseOperator(operator: AdHocVariableFilterOperator): string {
   if (operator === '=~') {
     return 'ILIKE';
@@ -68,7 +76,7 @@ function convertOperatorToClickHouseOperator(operator: AdHocVariableFilterOperat
   return operator;
 }
 
-type AdHocVariableFilterOperator = '>' | '<' | '=' | '!=' | '=~' | '!~';
+type AdHocVariableFilterOperator = '>' | '<' | '=' | '!=' | '=~' | '!~' | 'IN';
 
 export type AdHocVariableFilter = {
   key: string;
