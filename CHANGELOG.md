@@ -12,6 +12,7 @@
 - Added warning for when `uid` is missing in provisioned datasources.
 - Map filters in the query builder now correctly show the key instead of the column name
 - Updated and fixed missing `system.dashboards` dashboard in list of dashboards
+- Fix to display status codes from spans in trace queries (#950)
 
 ## 4.3.2
 
