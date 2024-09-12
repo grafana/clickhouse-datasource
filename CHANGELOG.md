@@ -12,6 +12,7 @@
 - Added warning for when `uid` is missing in provisioned datasources.
 - Map filters in the query builder now correctly show the key instead of the column name
 - Updated and fixed missing `system.dashboards` dashboard in list of dashboards
+- Updated the duration value in example traces dashboard to provide useful information
 
 ## 4.3.2
 
