@@ -3,7 +3,7 @@ import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigS
 import { Input, Field } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
-import otel from 'otel';
+import otel, { defaultLogsTable } from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { CHLogsConfig } from 'types/config';
 import allLabels from 'labels';
@@ -71,7 +71,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={e => onDefaultTableChange(e.currentTarget.value)}
           label={labels.defaultTable.label}
           aria-label={labels.defaultTable.label}
-          placeholder={labels.defaultTable.placeholder}
+          placeholder={defaultLogsTable}
         />
       </Field>
      <ConfigSubSection

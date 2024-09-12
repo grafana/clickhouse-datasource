@@ -3,6 +3,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { LogsConfig } from './LogsConfig';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
+import { defaultLogsTable } from 'otel';
 
 describe('LogsConfig', () => {
   it('should render', () => {
@@ -61,7 +62,7 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(allLabels.components.Config.LogsConfig.defaultTable.placeholder);
+    const input = result.getByPlaceholderText(defaultLogsTable);
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);

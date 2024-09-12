@@ -47,7 +47,7 @@ import {
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import otel from 'otel';
 import { ReactNode } from 'react';
-import { transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { pluginVersion } from 'utils/version';
 
 export class Datasource
@@ -282,13 +282,15 @@ export class Datasource
     }
 
     const columnName = action.options.key;
+    const actionFrame: DataFrame | undefined = (action as any).frame;
     const actionValue = action.options.value;
 
     // Find selected column by alias/name
     const lookupByAlias = query.builderOptions.columns?.find(c => c.alias === columnName); // Check all aliases first,
     const lookupByName = query.builderOptions.columns?.find(c => c.name === columnName);   // then try matching column name
     const lookupByLogsAlias = logAliasToColumnHints.has(columnName) ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!) : undefined;
-    const column = lookupByAlias || lookupByName || lookupByLogsAlias;
+    const lookupByLogLabels = dataFrameHasLogLabelWithName(actionFrame, columnName) && getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
+    const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
     
     let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
     if (action.type === 'ADD_FILTER') {
@@ -299,13 +301,20 @@ export class Datasource
           f.type === 'string' &&
           ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
           (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
+        ) &&
+        !(
+          f.type.toLowerCase().startsWith('map') &&
+          (column && lookupByLogLabels && f.mapKey === columnName) &&
+          (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
         )
       );
+
       nextFilters.push({
         condition: 'AND',
         key: (column && column.hint) ? '' : columnName,
         hint: (column && column.hint) ? column.hint : undefined,
-        type: 'string',
+        mapKey: lookupByLogLabels ? columnName : undefined,
+        type: lookupByLogLabels ? 'Map(String, String)' : 'string',
         filterType: 'custom',
         operator: FilterOperator.Equals,
         value: actionValue,
@@ -325,14 +334,21 @@ export class Datasource
             f.type === 'string' &&
             ((column && column.hint && f.hint) ? f.hint === column.hint : f.key === columnName) &&
             (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
+          ) ||
+          (
+            f.type.toLowerCase().startsWith('map') &&
+            (column && lookupByLogLabels && f.mapKey === columnName) &&
+            (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
           )
         )
       );
+
       nextFilters.push({
         condition: 'AND',
         key: (column && column.hint) ? '' : columnName,
         hint: (column && column.hint) ? column.hint : undefined,
-        type: 'string',
+        mapKey: lookupByLogLabels ? columnName : undefined,
+        type: lookupByLogLabels ? 'Map(String, String)' : 'string',
         filterType: 'custom',
         operator: FilterOperator.NotEquals,
         value: actionValue,

@@ -42,7 +42,7 @@ function generatePanels(clickHouseDashboards) {
 		const positionY = panelHeight * Math.floor(i / 2);
 		const panel = generatePanel(id, name, query, panelWidth, panelHeight, positionX, positionY);
 
-		if (lastRowName != dashboardTitle) {
+		if (lastRowName !== dashboardTitle) {
 			const rowPanel = generateRowPanel(dashboardTitle, positionY);
 			panels.push(rowPanel);
 			lastRowName = dashboardTitle;

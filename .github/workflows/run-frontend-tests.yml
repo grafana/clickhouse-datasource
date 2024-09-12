@@ -1,4 +1,4 @@
-name: run-frontend-tests
+name: Frontend unit tests
 
 on:
   push:
@@ -21,29 +21,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup packages
-        id: setup-packages
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y zip zstd jq git
-
       - name: Setup Node.js environment
         uses: actions/setup-node@v4.0.3
         with:
           node-version-file: '.nvmrc'
-
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.22
 
       - name: Install yarn dependencies
         run: yarn install
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
-      - name: Build
-        run: go build -v ./...
+      - name: Check types
+        run: yarn typecheck
 
       - name: Build Frontend
         run: yarn build
