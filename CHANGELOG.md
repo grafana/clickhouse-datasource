@@ -13,6 +13,7 @@
 - Map filters in the query builder now correctly show the key instead of the column name
 - Updated and fixed missing `system.dashboards` dashboard in list of dashboards
 - Updated the duration value in example traces dashboard to provide useful information
+- Fix to display status codes from spans in trace queries (#950)
 
 ## 4.3.2
 
