@@ -60,10 +60,15 @@ function isValid(filter: AdHocVariableFilter): boolean {
 
 function escapeValueBasedOnOperator(s: string, operator: AdHocVariableFilterOperator): string {
   if (operator === 'IN') {
-    return `${s}`.replace(/'/g, "\\'");
-  }
+    // Allow list of values without parentheses
+    if (s.length > 2 && s[0] !== '(' && s[s.length - 1] !== ')') {
+      s = `(${s})`
+    }
 
-  return `\\'${s}\\'`;
+    return s.replace(/'/g, "\\'");
+  } else {
+    return `\\'${s}\\'`;
+  }
 }
 
 function convertOperatorToClickHouseOperator(operator: AdHocVariableFilterOperator): string {
