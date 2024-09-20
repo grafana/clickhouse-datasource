@@ -96,7 +96,9 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
     if (!jsonData.logs || jsonData.logs.defaultTable === undefined) {
       jsonData.logs = {
         ...jsonData.logs,
-        defaultTable: defaultLogsTable
+        defaultTable: defaultLogsTable,
+        selectContextColumns: true,
+        contextColumns: []
       };
     }
 

@@ -19,10 +19,25 @@ export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolea
     const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable();
     const otelVersion = datasource.getLogsOtelVersion();
     const defaultColumns = datasource.getDefaultLogsColumns();
+    const shouldSelectLogContextColumns = datasource.shouldSelectLogContextColumns();
+    const contextColumnNames = datasource.getLogContextColumnNames();
 
     const nextColumns: SelectedColumn[] = [];
+    const includedColumns = new Set<string>();
     for (let [hint, colName] of defaultColumns) {
       nextColumns.push({ name: colName, hint });
+      includedColumns.add(colName);
+    }
+
+    if (shouldSelectLogContextColumns) {
+      for (let columnName of contextColumnNames) {
+        if (includedColumns.has(columnName)) {
+          continue;
+        }
+
+        nextColumns.push({ name: columnName });
+        includedColumns.add(columnName);
+      }
     }
 
     builderOptionsDispatch(setOptions({
@@ -42,7 +57,7 @@ export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolea
  * Sets OTEL Logs columns automatically when OTEL is enabled.
  * Does not run if OTEL is already enabled, only when it's changed.
  */
-export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useOtelColumns = (datasource: Datasource, otelEnabled: boolean, otelVersion: string, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
   if (!otelEnabled) {
     didSetColumns.current = false;
@@ -60,13 +75,28 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
     }
 
     const columns: SelectedColumn[] = [];
+    const includedColumns = new Set<string>();
     logColumnMap.forEach((name, hint) => {
       columns.push({ name, hint });
+      includedColumns.add(name);
     });
+
+    const shouldSelectLogContextColumns = datasource.shouldSelectLogContextColumns();
+    const contextColumnNames = datasource.getLogContextColumnNames();
+    if (shouldSelectLogContextColumns) {
+      for (let columnName of contextColumnNames) {
+        if (includedColumns.has(columnName)) {
+          continue;
+        }
+
+        columns.push({ name: columnName });
+        includedColumns.add(columnName);
+      }
+    }
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;
-  }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+  }, [datasource, otelEnabled, otelVersion, builderOptionsDispatch]);
 };
 
 // Finds and selects a default log time column, updates when table changes

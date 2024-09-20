@@ -134,7 +134,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       },
     });
   };
-  const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean) => {
+  const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
     onOptionsChange({
       ...options,
       jsonData: {
@@ -423,6 +423,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onTimeColumnChange={c => onLogsConfigChange('timeColumn', c)}
           onLevelColumnChange={c => onLogsConfigChange('levelColumn', c)}
           onMessageColumnChange={c => onLogsConfigChange('messageColumn', c)}
+          onSelectContextColumnsChange={c => onLogsConfigChange('selectContextColumns', c)}
+          onContextColumnsChange={c => onLogsConfigChange('contextColumns', c)}
         />
 
         <Divider />

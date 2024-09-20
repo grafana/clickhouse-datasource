@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Implemented log context for log queries
+- Added configuration options for log context columns
+
 ## 4.4.0
 
 ### Features
