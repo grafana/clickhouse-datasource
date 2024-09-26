@@ -76,7 +76,7 @@ export const mapGrafanaFormatToQueryType = (f?: number): QueryType => {
 };
 
 /**
- * Manipulates column array in-place to include column hints, loosely matched by query type and OTel version.
+ * Manipulates column array in-place to include column hints, loosely matched by the provided column hint map.
  */
 export const tryApplyColumnHints = (columns: SelectedColumn[], hintsToColumns?: Map<ColumnHint, string>) => {
   const columnsToHints: Map<string, ColumnHint> = new Map();
