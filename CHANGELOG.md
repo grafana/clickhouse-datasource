@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Queries parsed from the SQL editor will now attempt to re-map columns into their correct fields for Log and Trace queries.
+
+### Fixes
+
+- Fixed and enhanced the logic for parsing a query back into the query builder.
+
 ## 4.4.0
 
 ### Features
