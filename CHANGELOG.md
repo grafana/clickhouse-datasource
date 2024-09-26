@@ -6,6 +6,7 @@
 
 - Added "Labels" column selector to the log query builder
 - Datasource OTel configuration will now set default table names for logs and traces.
+- Added support for IN operator in adhoc filters
 
 ### Fixes
 
