@@ -17,6 +17,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -34,6 +36,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -58,6 +62,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -82,11 +88,15 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByRole('checkbox');
+    const checkboxes = result.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(2);
+    const input = checkboxes[0];
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
     expect(onOtelEnabledChange).toHaveBeenCalledTimes(1);
@@ -105,6 +115,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -129,6 +141,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={onTimeColumnChange}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -153,6 +167,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={onLevelColumnChange}
         onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -177,6 +193,8 @@ describe('LogsConfig', () => {
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={onMessageColumnChange}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();

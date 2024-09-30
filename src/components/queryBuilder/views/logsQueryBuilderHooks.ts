@@ -19,8 +19,6 @@ export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolea
     const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable();
     const otelVersion = datasource.getLogsOtelVersion();
     const defaultColumns = datasource.getDefaultLogsColumns();
-    const shouldSelectLogContextColumns = datasource.shouldSelectLogContextColumns();
-    const contextColumnNames = datasource.getLogContextColumnNames();
 
     const nextColumns: SelectedColumn[] = [];
     const includedColumns = new Set<string>();
@@ -29,7 +27,9 @@ export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolea
       includedColumns.add(colName);
     }
 
-    if (shouldSelectLogContextColumns) {
+    if (datasource.shouldSelectLogContextColumns()) {
+      const contextColumnNames = datasource.getLogContextColumnNames();
+
       for (let columnName of contextColumnNames) {
         if (includedColumns.has(columnName)) {
           continue;
@@ -81,9 +81,9 @@ export const useOtelColumns = (datasource: Datasource, otelEnabled: boolean, ote
       includedColumns.add(name);
     });
 
-    const shouldSelectLogContextColumns = datasource.shouldSelectLogContextColumns();
-    const contextColumnNames = datasource.getLogContextColumnNames();
-    if (shouldSelectLogContextColumns) {
+    if (datasource.shouldSelectLogContextColumns()) {
+      const contextColumnNames = datasource.getLogContextColumnNames();
+
       for (let columnName of contextColumnNames) {
         if (includedColumns.has(columnName)) {
           continue;

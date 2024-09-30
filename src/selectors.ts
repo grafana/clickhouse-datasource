@@ -133,6 +133,12 @@ export const Components = {
       aliasTableInput: 'config__alias-table-config__alias-table-input',
     }
   },
+  LogsContextPanel: {
+    alert: 'logs-context-panel__alert',
+    LogContextKey: {
+      icon: 'logs-context-panel__logs-context-key__icon',
+    }
+  },
   QueryBuilder: {
     expandBuilderButton: 'query-builder__expand-builder-button',
     LogsQueryBuilder: {

@@ -2,6 +2,7 @@ import React from 'react';
 import { Alert, Icon, IconName, useTheme2, VerticalGroup } from '@grafana/ui';
 import { css } from '@emotion/css';
 import { LogContextColumn } from 'data/CHDatasource';
+import { Components } from 'selectors';
 
 
 const LogsContextPanelStyles = css`
@@ -22,7 +23,7 @@ const LogsContextPanel = (props: LogContextPanelProps) => {
 
   if (!columns || columns.length === 0) {
     return (
-      <Alert title="" severity="warning">
+      <Alert data-testid={Components.LogsContextPanel.alert} title="" severity="warning">
         <VerticalGroup>
           <div>
             {'Unable to match any context columns. Make sure your query returns at least one log context column from your '}
@@ -144,7 +145,7 @@ const LogContextKey = (props: LogContextKeyProps) => {
   return (
     <div className={styles.container}>
       <div className={styles.containerLeft}>
-        <Icon name={iconMatcher(name)} size="md" />
+        <Icon data-testid={Components.LogsContextPanel.LogContextKey.icon} name={iconMatcher(name)} size="md" />
         <span className={styles.contextName}>{name}</span>
       </div>
       <span className={styles.contextValue}>{value}</span>
@@ -153,3 +154,8 @@ const LogContextKey = (props: LogContextKeyProps) => {
 }
 
 export default LogsContextPanel;
+
+export const _testExports = {
+  iconMatcher,
+  LogContextKey,
+};
