@@ -20,13 +20,13 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { query: savedQuery, onRunQuery } = props;
+  const { datasource, query: savedQuery, onRunQuery } = props;
   const query = migrateCHQuery(savedQuery);
 
   return (
     <>
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
-        <EditorTypeSwitcher {...props} query={query} />
+        <EditorTypeSwitcher {...props} query={query} datasource={datasource} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </div>
       <CHEditorByType {...props} query={query} />

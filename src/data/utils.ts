@@ -1,5 +1,5 @@
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse } from "@grafana/data";
-import { ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType, StringFilter } from "types/queryBuilder"
+import { ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType, SelectedColumn, StringFilter } from "types/queryBuilder"
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
 import { Datasource } from "./CHDatasource";
 import { pluginVersion } from "utils/version";
@@ -75,6 +75,36 @@ export const mapGrafanaFormatToQueryType = (f?: number): QueryType => {
   }
 };
 
+/**
+ * Manipulates column array in-place to include column hints, loosely matched by the provided column hint map.
+ */
+export const tryApplyColumnHints = (columns: SelectedColumn[], hintsToColumns?: Map<ColumnHint, string>) => {
+  const columnsToHints: Map<string, ColumnHint> = new Map();
+  if (hintsToColumns) {
+    hintsToColumns.forEach((name, hint) => {
+      columnsToHints.set(name.toLowerCase().trim(), hint);
+    });
+  }
+
+  for (const column of columns) {
+    if (column.hint) {
+      continue;
+    }
+
+    const name = column.name.toLowerCase().trim();
+    const alias = column.alias?.toLowerCase().trim() || '';
+
+    const hint = columnsToHints.get(name) || columnsToHints.get(alias);
+    if (hint) {
+      column.hint = hint;
+      continue;
+    }
+
+    if (name.includes('time')) {
+      column.hint = ColumnHint.Time;
+    }
+  }
+};
 
 /**
  * Converts label into sql-style column name.

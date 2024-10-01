@@ -8,10 +8,13 @@ import {
   DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
+  LogRowContextOptions,
+  LogRowContextQueryDirection,
   LogRowModel,
   MetricFindValue,
   QueryFixAction,
   ScopedVars,
+  SupplementaryQueryOptions,
   SupplementaryQueryType,
   TypedVariableModel,
   vectorator,
@@ -197,7 +200,7 @@ export class Datasource
     };
   }
 
-  getSupplementaryQuery(type: SupplementaryQueryType, query: CHQuery): CHQuery | undefined {
+  getSupplementaryQuery(options: SupplementaryQueryOptions, originalQuery: CHQuery): CHQuery | undefined {
     return undefined;
   }
 
@@ -929,18 +932,4 @@ interface Tags {
 export interface LogContextColumn {
   name: string;
   value: string;
-}
-
-/*
- * Can't import these types from anywhere from any version, but they are required for log context:
- * from @grafana/data https://github.com/grafana/grafana/blob/4f04b5849e72acd33fb6d621dacf860abf1305e8/packages/grafana-data/src/types/logs.ts#L132-L140
- */
-interface LogRowContextOptions {
-  direction?: LogRowContextQueryDirection;
-  limit?: number;
-}
-
-enum LogRowContextQueryDirection {
-  Backward = 'BACKWARD',
-  Forward = 'FORWARD',
 }
