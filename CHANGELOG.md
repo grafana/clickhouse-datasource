@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.5.0
+
+## Features
+
+## Fixes
+
 ## 4.4.0
 
 ### Features
