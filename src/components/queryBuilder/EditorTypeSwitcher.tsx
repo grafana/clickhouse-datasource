@@ -6,13 +6,14 @@ import { generateSql } from 'data/sqlGenerator';
 import labels from 'labels';
 import { EditorType, CHQuery, defaultCHBuilderQuery } from 'types/sql';
 import { QueryBuilderOptions } from 'types/queryBuilder';
-import isString from 'lodash/isString';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
+import { Datasource } from 'data/CHDatasource';
 
 interface CHEditorTypeSwitcherProps {
   query: CHQuery;
   onChange: (query: CHQuery) => void;
   onRunQuery: () => void;
+  datasource?: Datasource;
 }
 
 const options: Array<SelectableValue<EditorType>> = [
@@ -24,7 +25,7 @@ const options: Array<SelectableValue<EditorType>> = [
  * Component for switching between the SQL and Query Builder editors.
  */
 export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
-  const { query, onChange } = props;
+  const { datasource, query, onChange } = props;
   const { label, tooltip, switcher, cannotConvert } = labels.components.EditorTypeSwitcher;
   const editorType: EditorType = query.editorType || EditorType.Builder;
   const [confirmModalState, setConfirmModalState] = useState<boolean>(false);
@@ -33,12 +34,12 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   const onEditorTypeChange = (editorType: EditorType, confirmed = false) => {
     // TODO: component state has updated, but not local state.
     if (query.editorType === EditorType.SQL && editorType === EditorType.Builder && !confirmed) {
-      const queryOptionsFromSql = getQueryOptionsFromSql(query.rawSql);
-      if (isString(queryOptionsFromSql)) {
-        setCannotConvertModalState(true);
-        setErrorMessage(queryOptionsFromSql);
-      } else {
+      try {
+        getQueryOptionsFromSql(query.rawSql, query.queryType, datasource);
         setConfirmModalState(true);
+      } catch (err) {
+        setCannotConvertModalState(true);
+        setErrorMessage((err as Error).message);
       }
     } else {
       let builderOptions: QueryBuilderOptions;
@@ -47,7 +48,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
           builderOptions = query.builderOptions;
           break;
         case EditorType.SQL:
-          builderOptions = getQueryOptionsFromSql(query.rawSql) as QueryBuilderOptions;
+          builderOptions = getQueryOptionsFromSql(query.rawSql, query.queryType, datasource) as QueryBuilderOptions;
           break;
         default:
           builderOptions = defaultCHBuilderQuery.builderOptions;
@@ -66,6 +67,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         onChange({
           ...query,
           editorType: EditorType.Builder,
+          queryType: builderOptions.queryType,
           rawSql: generateSql(builderOptions),
           builderOptions
         });

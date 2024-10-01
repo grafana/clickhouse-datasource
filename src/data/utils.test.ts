@@ -1,5 +1,5 @@
 import { ColumnHint, QueryBuilderOptions, QueryType } from "types/queryBuilder";
-import { columnLabelToPlaceholder, dataFrameHasLogLabelWithName, isBuilderOptionsRunnable, transformQueryResponseWithTraceAndLogLinks } from "./utils";
+import { columnLabelToPlaceholder, dataFrameHasLogLabelWithName, isBuilderOptionsRunnable, transformQueryResponseWithTraceAndLogLinks, tryApplyColumnHints } from "./utils";
 import { newMockDatasource } from "__mocks__/datasource";
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from "@grafana/data";
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
@@ -29,6 +29,74 @@ describe('isBuilderOptionsRunnable', () => {
 
     const runnable = isBuilderOptionsRunnable(opts);
     expect(runnable).toBe(true);
+  });
+});
+
+describe('tryApplyColumnHints', () => {
+  it('does not apply hints when queryType and hint map are not provided', () => {
+    const columns = [
+      { name: 'a', alias: undefined, hint: undefined },
+      { name: 'b', alias: undefined, hint: undefined },
+    ];
+
+    tryApplyColumnHints(columns);
+
+    expect(columns[0].hint).toBeUndefined();
+    expect(columns[1].hint).toBeUndefined();
+  });
+
+  it('applies time hint to columns that contain "time"', () => {
+    const columns = [
+      { name: 'Timestamp', alias: undefined, hint: undefined },
+      { name: 'log_timestamp', alias: undefined, hint: undefined },
+    ];
+
+    tryApplyColumnHints(columns);
+
+    expect(columns[0].hint).toEqual(ColumnHint.Time);
+    expect(columns[1].hint).toEqual(ColumnHint.Time);
+  });
+
+  it('does not apply hints to column with existing hint', () => {
+    const columns = [
+      { name: 'time', alias: undefined, hint: ColumnHint.TraceServiceName },
+    ];
+
+    tryApplyColumnHints(columns);
+
+    expect(columns[0].hint).toEqual(ColumnHint.TraceServiceName);
+  });
+
+  it('applies hints by column name according to hint map, ignoring case', () => {
+    const columns = [
+      { name: 'Super_Custom_Timestamp', alias: undefined, hint: undefined },
+      { name: 'LogLevel', alias: undefined, hint: undefined },
+    ];
+    const hintMap: Map<ColumnHint, string> = new Map([
+      [ColumnHint.Time, "super_custom_timestamp"],
+      [ColumnHint.LogLevel, "LogLevel"]
+    ]);
+
+    tryApplyColumnHints(columns, hintMap);
+
+    expect(columns[0].hint).toEqual(ColumnHint.Time);
+    expect(columns[1].hint).toEqual(ColumnHint.LogLevel);
+  });
+
+  it('applies hints by column alias according to hint map, ignoring case', () => {
+    const columns = [
+      { name: 'other name', alias: 'Super_Custom_Timestamp', hint: undefined },
+      { name: 'other name', alias: 'LogLevel', hint: undefined },
+    ];
+    const hintMap: Map<ColumnHint, string> = new Map([
+      [ColumnHint.Time, "super_custom_timestamp"],
+      [ColumnHint.LogLevel, "LogLevel"]
+    ]);
+
+    tryApplyColumnHints(columns, hintMap);
+
+    expect(columns[0].hint).toEqual(ColumnHint.Time);
+    expect(columns[1].hint).toEqual(ColumnHint.LogLevel);
   });
 });
 
