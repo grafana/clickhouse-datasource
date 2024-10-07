@@ -3,7 +3,7 @@
   "version": "4.4.0",
   "description": "Clickhouse Datasource",
   "engines": {
-    "node": ">=16"
+    "node": ">=20"
   },
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
