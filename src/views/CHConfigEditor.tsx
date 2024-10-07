@@ -447,7 +447,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
         <Divider />
-        {config.featureToggles['secureSocksDSProxyEnabled'] && versionGte(config.buildInfo.version, '10.0.0') && (
+        {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field
             label={labels.secureSocksProxy.label}
             description={labels.secureSocksProxy.tooltip}

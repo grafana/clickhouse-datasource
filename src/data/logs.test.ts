@@ -1,5 +1,5 @@
 import { aggregateRawLogsVolume, getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE } from './logs';
-import { ArrayVector, FieldType } from '@grafana/data';
+import { FieldType } from '@grafana/data';
 
 describe('logs', () => {
   describe('aggregateRawLogsVolume', () => {
@@ -29,7 +29,7 @@ describe('logs', () => {
                 frame: 'time.Time',
               },
               config: {},
-              values: new ArrayVector([1680140003000, 1680140004000, 1680140027000, 1680140053000]),
+              values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
               entities: {},
             },
             {
@@ -39,7 +39,7 @@ describe('logs', () => {
                 frame: 'uint64',
               },
               config: {},
-              values: new ArrayVector([0, 3, 4, 10]),
+              values: [0, 3, 4, 10],
               entities: {},
             },
           ],
@@ -72,7 +72,7 @@ describe('logs', () => {
                 frame: 'time.Time',
               },
               config: {},
-              values: new ArrayVector([1680140003000, 1680140004000, 1680140027000, 1680140053000]),
+              values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
               entities: {},
             },
             {
@@ -82,7 +82,7 @@ describe('logs', () => {
                 frame: 'uint64',
               },
               config: {},
-              values: new ArrayVector([1, 0, 0, 0]),
+              values: [1, 0, 0, 0],
               entities: {},
             },
             {
@@ -92,7 +92,7 @@ describe('logs', () => {
                 frame: 'uint64',
               },
               config: {},
-              values: new ArrayVector([0, 3, 4, 10]),
+              values: [0, 3, 4, 10],
               entities: {},
             },
           ],
