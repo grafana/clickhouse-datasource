@@ -7,9 +7,7 @@ describe('logs', () => {
       config: {},
       name: 'Time',
       type: 'time',
-      values: {
-        buffer: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
-      },
+      values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
     };
     it('should do nothing if we have no DataFrames available', async () => {
       expect(aggregateRawLogsVolume([])).toEqual([]);
@@ -54,9 +52,7 @@ describe('logs', () => {
       expect(df.fields[1]).toMatchObject({
         name: 'Value',
         type: 'number',
-        values: {
-          buffer: [0, 3, 4, 10],
-        },
+        values: [0, 3, 4, 10],
       });
       expect(df.fields).toHaveLength(2);
     });
@@ -107,9 +103,7 @@ describe('logs', () => {
       expect(df1.fields[1]).toMatchObject({
         name: 'Value',
         type: 'number',
-        values: {
-          buffer: [1, 0, 0, 0],
-        },
+        values: [1, 0, 0, 0],
       });
       expect(df1.fields).toHaveLength(2);
 
@@ -118,9 +112,7 @@ describe('logs', () => {
       expect(df2.fields[1]).toMatchObject({
         name: 'Value',
         type: 'number',
-        values: {
-          buffer: [0, 3, 4, 10],
-        },
+        values: [0, 3, 4, 10],
       });
       expect(df2.fields).toHaveLength(2);
     });
