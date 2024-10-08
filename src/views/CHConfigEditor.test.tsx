@@ -10,15 +10,7 @@ jest.mock('@grafana/runtime', () => {
   const original = jest.requireActual('@grafana/runtime');
   return {
     ...original,
-    config: { buildInfo: { version: '10.0.0' }, featureToggles: { secureSocksDSProxyEnabled: true } },
-  };
-});
-
-jest.mock('@grafana/runtime', () => {
-  const original = jest.requireActual('@grafana/runtime');
-  return {
-    ...original,
-    config: { buildInfo: { version: '10.0.0' }, featureToggles: { secureSocksDSProxyEnabled: true } },
+    config: { buildInfo: { version: '10.0.0' }, secureSocksDSProxyEnabled: true },
   };
 });
 
@@ -128,7 +120,6 @@ describe('ConfigEditor', () => {
       queryTimeout: '100',
       dialTimeout: '100',
       validateSql: true,
-      enableSecureSocksProxy: true,
       customSettings: [{ setting: 'test-setting', value: 'test-value' }],
       forwardGrafanaHeaders: true,
     };
