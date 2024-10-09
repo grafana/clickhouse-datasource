@@ -1,5 +1,5 @@
 import React from 'react';
-import { Alert, Icon, IconName, useTheme2, VerticalGroup } from '@grafana/ui';
+import { Alert, Icon, IconName, Stack, useTheme2 } from '@grafana/ui';
 import { css } from '@emotion/css';
 import { LogContextColumn } from 'data/CHDatasource';
 import { Components } from 'selectors';
@@ -24,12 +24,12 @@ const LogsContextPanel = (props: LogContextPanelProps) => {
   if (!columns || columns.length === 0) {
     return (
       <Alert data-testid={Components.LogsContextPanel.alert} title="" severity="warning">
-        <VerticalGroup>
+        <Stack direction="column">
           <div>
             {'Unable to match any context columns. Make sure your query returns at least one log context column from your '}
             <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasourceUid)}#logs-config`}>ClickHouse Data Source settings</a>
           </div>
-        </VerticalGroup>
+        </Stack>
       </Alert>
     );
   }
@@ -143,9 +143,10 @@ const LogContextKey = (props: LogContextKeyProps) => {
   };
 
   return (
-    <div className={styles.container}>
+    <div className={styles.container} data-testid={Components.LogsContextPanel.LogsContextKey}>
       <div className={styles.containerLeft}>
-        <Icon data-testid={Components.LogsContextPanel.LogContextKey.icon} name={iconMatcher(name)} size="md" />
+        <Icon name={iconMatcher(name)} size="md" />
+        <div>test</div>
         <span className={styles.contextName}>{name}</span>
       </div>
       <span className={styles.contextValue}>{value}</span>

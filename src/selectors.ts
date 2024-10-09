@@ -135,9 +135,7 @@ export const Components = {
   },
   LogsContextPanel: {
     alert: 'logs-context-panel__alert',
-    LogContextKey: {
-      icon: 'logs-context-panel__logs-context-key__icon',
-    }
+    LogsContextKey: 'logs-context-panel__logs-context-key',
   },
   QueryBuilder: {
     expandBuilderButton: 'query-builder__expand-builder-button',

@@ -17,7 +17,7 @@ describe('LogsContextPanel', () => {
 
     const result = render(<LogsContextPanel columns={mockColumns} datasourceUid="test-uid" />);
 
-    expect(result.getAllByTestId(Components.LogsContextPanel.LogContextKey.icon)).toHaveLength(2);
+    expect(result.getAllByTestId(Components.LogsContextPanel.LogsContextKey)).toHaveLength(2);
     expect(result.getByText('host')).toBeInTheDocument();
     expect(result.getByText('127.0.0.1')).toBeInTheDocument();
     expect(result.getByText('service')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('LogContextKey', () => {
     
     const result = render(<LogContextKey {...props} />);
 
-    expect(result.getByTestId(Components.LogsContextPanel.LogContextKey.icon)).toBeInTheDocument();
+    expect(result.getByTestId(Components.LogsContextPanel.LogsContextKey)).toBeInTheDocument();
     expect(result.getByText('testName')).toBeInTheDocument();
     expect(result.getByText('testValue')).toBeInTheDocument();
   });
