@@ -17,7 +17,6 @@ import {
   SupplementaryQueryOptions,
   SupplementaryQueryType,
   TypedVariableModel,
-  vectorator,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable, map, firstValueFrom } from 'rxjs';
@@ -222,11 +221,11 @@ export class Datasource
       return [];
     }
     if (frame?.fields?.length === 1) {
-      return vectorator(frame?.fields[0]?.values).map((text) => ({ text, value: text }));
+      return frame?.fields[0]?.values.map((text) => ({ text, value: text }));
     }
     // convention - assume the first field is an id field
     const ids = frame?.fields[0]?.values;
-    return vectorator(frame?.fields[1]?.values).map((text, i) => ({ text, value: ids.get(i) }));
+    return frame?.fields[1]?.values.map((text, i) => ({ text, value: ids.get(i) }));
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
@@ -656,7 +655,7 @@ export class Datasource
     if (frame.fields?.length === 0) {
       return [];
     }
-    return vectorator(frame?.fields[0]?.values).map((text) => text);
+    return frame?.fields[0]?.values.map((text) => text);
   }
 
   async getTagKeys(): Promise<MetricFindValue[]> {
@@ -696,7 +695,7 @@ export class Datasource
     }
     const field = frame.fields[0];
     // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
-    return vectorator(field.values)
+    return field.values
       .filter((value) => value !== null)
       .map((value) => {
         return { text: String(value) };
@@ -708,7 +707,7 @@ export class Datasource
     const field = frame.fields.find((f) => f.name === key);
     if (field) {
       // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
-      return vectorator(field.values)
+      return field.values
         .filter((value) => value !== null)
         .map((value) => {
           return { text: String(value) };

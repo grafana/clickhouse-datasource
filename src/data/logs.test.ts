@@ -1,5 +1,5 @@
 import { aggregateRawLogsVolume, getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE } from './logs';
-import { ArrayVector, FieldType } from '@grafana/data';
+import { FieldType } from '@grafana/data';
 
 describe('logs', () => {
   describe('aggregateRawLogsVolume', () => {
@@ -7,9 +7,7 @@ describe('logs', () => {
       config: {},
       name: 'Time',
       type: 'time',
-      values: {
-        buffer: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
-      },
+      values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
     };
     it('should do nothing if we have no DataFrames available', async () => {
       expect(aggregateRawLogsVolume([])).toEqual([]);
@@ -29,7 +27,7 @@ describe('logs', () => {
                 frame: 'time.Time',
               },
               config: {},
-              values: new ArrayVector([1680140003000, 1680140004000, 1680140027000, 1680140053000]),
+              values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
               entities: {},
             },
             {
@@ -39,7 +37,7 @@ describe('logs', () => {
                 frame: 'uint64',
               },
               config: {},
-              values: new ArrayVector([0, 3, 4, 10]),
+              values: [0, 3, 4, 10],
               entities: {},
             },
           ],
@@ -54,9 +52,7 @@ describe('logs', () => {
       expect(df.fields[1]).toMatchObject({
         name: 'Value',
         type: 'number',
-        values: {
-          buffer: [0, 3, 4, 10],
-        },
+        values: [0, 3, 4, 10],
       });
       expect(df.fields).toHaveLength(2);
     });
@@ -72,7 +68,7 @@ describe('logs', () => {
                 frame: 'time.Time',
               },
               config: {},
-              values: new ArrayVector([1680140003000, 1680140004000, 1680140027000, 1680140053000]),
+              values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
               entities: {},
             },
             {
@@ -82,7 +78,7 @@ describe('logs', () => {
                 frame: 'uint64',
               },
               config: {},
-              values: new ArrayVector([1, 0, 0, 0]),
+              values: [1, 0, 0, 0],
               entities: {},
             },
             {
@@ -92,7 +88,7 @@ describe('logs', () => {
                 frame: 'uint64',
               },
               config: {},
-              values: new ArrayVector([0, 3, 4, 10]),
+              values: [0, 3, 4, 10],
               entities: {},
             },
           ],
@@ -107,9 +103,7 @@ describe('logs', () => {
       expect(df1.fields[1]).toMatchObject({
         name: 'Value',
         type: 'number',
-        values: {
-          buffer: [1, 0, 0, 0],
-        },
+        values: [1, 0, 0, 0],
       });
       expect(df1.fields).toHaveLength(2);
 
@@ -118,9 +112,7 @@ describe('logs', () => {
       expect(df2.fields[1]).toMatchObject({
         name: 'Value',
         type: 'number',
-        values: {
-          buffer: [0, 3, 4, 10],
-        },
+        values: [0, 3, 4, 10],
       });
       expect(df2.fields).toHaveLength(2);
     });
