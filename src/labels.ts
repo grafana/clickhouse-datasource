@@ -207,17 +207,31 @@ export default {
           description: 'Default columns for log queries. Leave empty to disable.',
           
           time: {
-           label: 'Time column',
-           tooltip: 'Column for the log timestamp'
-           },
-           level: {
-             label: 'Log Level column',
-             tooltip: 'Column for the log level'
-           },
-           message: {
-             label: 'Log Message column',
-             tooltip: 'Column for log message'
-           }
+            label: 'Time column',
+            tooltip: 'Column for the log timestamp'
+          },
+          level: {
+            label: 'Log Level column',
+            tooltip: 'Column for the log level'
+          },
+          message: {
+            label: 'Log Message column',
+            tooltip: 'Column for log message'
+          }
+         },
+         contextColumns: {
+          title: 'Context columns',
+          description: 'These columns are used to narrow down a single log row to its original service/container/pod source. At least one is required for the log context feature to work.',
+
+          selectContextColumns: {
+            label: 'Auto-Select Columns',
+            tooltip: 'When enabled, will always include context columns in log queries'
+          },
+          columns: {
+            label: 'Context Columns',
+            tooltip: 'Comma separated list of column names to use for identifying a log\'s source',
+            placeholder: 'Column name (enter key to add)'
+          },
          }
       }
     },
