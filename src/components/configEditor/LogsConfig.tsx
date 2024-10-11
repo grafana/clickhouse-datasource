@@ -1,6 +1,6 @@
 import React from 'react';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
-import { Input, Field } from '@grafana/ui';
+import { Input, Field, InlineFormLabel, TagsInput } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
 import otel, { defaultLogsTable } from 'otel';
@@ -8,6 +8,7 @@ import { LabeledInput } from './LabeledInput';
 import { CHLogsConfig } from 'types/config';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
+import { Switch } from 'components/queryBuilder/Switch';
 
 interface LogsConfigProps {
   logsConfig?: CHLogsConfig;
@@ -18,18 +19,22 @@ interface LogsConfigProps {
   onTimeColumnChange: (v: string) => void;
   onLevelColumnChange: (v: string) => void;
   onMessageColumnChange: (v: string) => void;
+  onSelectContextColumnsChange: (v: boolean) => void;
+  onContextColumnsChange: (v: string[]) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
   const {
     onDefaultDatabaseChange, onDefaultTableChange,
     onOtelEnabledChange, onOtelVersionChange,
-    onTimeColumnChange, onLevelColumnChange, onMessageColumnChange
+    onTimeColumnChange, onLevelColumnChange, onMessageColumnChange,
+    onSelectContextColumnsChange, onContextColumnsChange
   } = props;
   let {
     defaultDatabase, defaultTable,
     otelEnabled, otelVersion,
-    timeColumn, levelColumn, messageColumn
+    timeColumn, levelColumn, messageColumn,
+    selectContextColumns, contextColumns
   } = (props.logsConfig || {});
   const labels = allLabels.components.Config.LogsConfig;
 
@@ -39,6 +44,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     levelColumn = otelConfig.logColumnMap.get(ColumnHint.LogLevel);
     messageColumn = otelConfig.logColumnMap.get(ColumnHint.LogMessage);
   }
+
+  const onContextColumnsChangeTrimmed = (columns: string[]) => onContextColumnsChange(columns.map(c => c.trim()).filter(c => c));
 
   return (
     <ConfigSection
@@ -74,7 +81,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           placeholder={defaultLogsTable}
         />
       </Field>
-     <ConfigSubSection
+      <ConfigSubSection
         title={labels.columns.title}
         description={labels.columns.description}
       >
@@ -109,6 +116,30 @@ export const LogsConfig = (props: LogsConfigProps) => {
           value={messageColumn || ''}
           onChange={onMessageColumnChange}
         />
+      </ConfigSubSection>
+      <br/>
+      <ConfigSubSection
+        title={labels.contextColumns.title}
+        description={labels.contextColumns.description}
+      >
+        <Switch
+          label={labels.contextColumns.selectContextColumns.label}
+          tooltip={labels.contextColumns.selectContextColumns.tooltip}
+          value={selectContextColumns || false}
+          onChange={onSelectContextColumnsChange}
+          wide
+        />
+        <div className="gf-form">
+          <InlineFormLabel width={12} className="query-keyword" tooltip={labels.contextColumns.columns.tooltip}>
+            {labels.contextColumns.columns.label}
+          </InlineFormLabel>
+          <TagsInput
+            placeholder={labels.contextColumns.columns.placeholder}
+            tags={contextColumns || []}
+            onChange={onContextColumnsChangeTrimmed}
+            width={60}
+          />
+        </div>
       </ConfigSubSection>
     </ConfigSection>
   );

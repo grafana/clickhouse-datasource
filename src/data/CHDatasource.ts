@@ -8,15 +8,18 @@ import {
   DataSourceWithSupplementaryQueriesSupport,
   getTimeZone,
   getTimeZoneInfo,
+  LogRowContextOptions,
+  LogRowContextQueryDirection,
   LogRowModel,
   MetricFindValue,
   QueryFixAction,
   ScopedVars,
+  SupplementaryQueryOptions,
   SupplementaryQueryType,
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable, map } from 'rxjs';
+import { Observable, map, firstValueFrom } from 'rxjs';
 import { CHConfig } from 'types/config';
 import { EditorType, CHQuery } from 'types/sql';
 import {
@@ -45,9 +48,10 @@ import {
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import otel from 'otel';
-import { ReactNode } from 'react';
+import { createElement as createReactElement, ReactNode } from 'react';
 import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { pluginVersion } from 'utils/version';
+import LogsContextPanel from 'components/LogsContextPanel';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -195,7 +199,7 @@ export class Datasource
     };
   }
 
-  getSupplementaryQuery(): CHQuery | undefined {
+  getSupplementaryQuery(options: SupplementaryQueryOptions, originalQuery: CHQuery): CHQuery | undefined {
     return undefined;
   }
 
@@ -439,6 +443,14 @@ export class Datasource
     logsConfig.messageColumn && result.set(ColumnHint.LogMessage, logsConfig.messageColumn);
 
     return result;
+  }
+
+  shouldSelectLogContextColumns(): boolean {
+    return this.settings.jsonData.logs?.selectContextColumns || false;
+  }
+
+  getLogContextColumnNames(): string[] {
+    return this.settings.jsonData.logs?.contextColumns || [];
   }
 
   /**
@@ -762,16 +774,141 @@ export class Datasource
   }
 
   // interface DataSourceWithLogsContextSupport
-  async getLogRowContext(row: LogRowModel, options?: any | undefined, query?: CHQuery | undefined): Promise<DataQueryResponse> {
-    return {} as DataQueryResponse;
+  getLogContextColumnsFromLogRow(row: LogRowModel): LogContextColumn[] {
+    const contextColumnNames = this.getLogContextColumnNames();
+    const contextColumns: LogContextColumn[] = [];
+
+    for (let columnName of contextColumnNames) {
+      const isMapKey = columnName.includes('[\'') && columnName.includes('\']');
+      let mapName = '';
+      let keyName = '';
+      if (isMapKey) {
+        mapName = columnName.substring(0, columnName.indexOf('['));
+        keyName = columnName.substring(columnName.indexOf('[\'') + 2, columnName.lastIndexOf('\']'));
+      }
+
+      const field = row.dataFrame.fields.find(f => (
+        // exact column name match
+        f.name === columnName ||
+        (isMapKey && (
+          // entire map was selected
+          f.name === mapName ||
+           // single key was selected from map
+          f.name === `arrayElement(${mapName}, '${keyName}')`
+        ))
+      ));
+      if (!field) {
+        continue;
+      }
+
+      let value = field.values.get(row.rowIndex);
+      if (value && field.type === 'other' && isMapKey) {
+        value = value[keyName];
+      }
+
+      if (!value) {
+        continue;
+      }
+
+      let contextColumnName: string;
+      if (isMapKey) {
+        contextColumnName = `${mapName}['${keyName}']`;
+      } else {
+        contextColumnName = columnName;
+      }
+
+      contextColumns.push({
+        name: contextColumnName,
+        value
+      });
+    }
+
+    return contextColumns;
   }
 
+
+  /**
+   * Runs a query based on a single log row and a direction (forward/backward)
+   * 
+   * Will remove all filters and ORDER BYs, and will re-add them based on the configured context columns.
+   * Context columns are used to narrow down to a single logging unit as defined by your logging infrastructure.
+   * Typically this will be a single service, or container/pod in docker/k8s.
+   * 
+   * If no context columns can be matched from the selected data frame, then the query is not run.
+   */
+  async getLogRowContext(row: LogRowModel, options?: LogRowContextOptions, query?: CHQuery | undefined, cacheFilters?: boolean): Promise<DataQueryResponse> {
+    if (!query) {
+      throw new Error('Missing query for log context');
+    } else if (!options || !options.direction || options.limit === undefined) {
+      throw new Error('Missing log context options for query');
+    } else if (query.editorType === EditorType.SQL || !query.builderOptions) {
+      throw new Error('Log context feature only works for builder queries');
+    }
+
+    const contextQuery = cloneDeep(query);
+    contextQuery.refId = '';
+    const builderOptions = contextQuery.builderOptions;
+    builderOptions.limit = options.limit;
+
+    if (!getColumnByHint(builderOptions, ColumnHint.Time)) {
+      throw new Error('Missing time column for log context');
+    }
+
+    builderOptions.orderBy = [];
+    builderOptions.orderBy.push({
+      name: '',
+      hint: ColumnHint.Time,
+      dir: options.direction === LogRowContextQueryDirection.Forward ? OrderByDirection.ASC : OrderByDirection.DESC
+    });
+
+    builderOptions.filters = [];
+    builderOptions.filters.push({
+      operator: options.direction === LogRowContextQueryDirection.Forward ? FilterOperator.GreaterThanOrEqual : FilterOperator.LessThanOrEqual,
+      filterType: 'custom',
+      hint: ColumnHint.Time,
+      key: '',
+      value: `fromUnixTimestamp64Nano(${row.timeEpochNs})`,
+      type: 'datetime',
+      condition: 'AND'
+    });
+
+    const contextColumns = this.getLogContextColumnsFromLogRow(row);
+    if (contextColumns.length < 1) {
+      throw new Error('Unable to match any log context columns');
+    }
+
+    const contextColumnFilters: Filter[] = contextColumns.map(c => ({
+      operator: FilterOperator.Equals,
+      filterType: 'custom',
+      key: c.name,
+      value: c.value,
+      type: 'string',
+      condition: 'AND'
+    }));
+    builderOptions.filters.push(...contextColumnFilters);
+
+    contextQuery.rawSql = generateSql(builderOptions);
+    const req = {
+      targets: [contextQuery],
+    } as DataQueryRequest<CHQuery>;
+
+    return await firstValueFrom(this.query(req));
+  }
+
+  /**
+   * Unused + deprecated but required by interface, log context button is always visible now
+   * https://github.com/grafana/grafana/issues/66819
+   */
   showContextToggle(row?: LogRowModel): boolean {
-    return false;
+    return true;
   }
   
-  getLogRowContextUi(row: LogRowModel, runContextQuery?: (() => void) | undefined): ReactNode {
-    return false;
+  /**
+   * Returns a React component that is displayed in the top portion of the log context panel
+   */
+  getLogRowContextUi(row: LogRowModel, runContextQuery?: (() => void) | undefined, query?: CHQuery | undefined): ReactNode {
+    const contextColumns = this.getLogContextColumnsFromLogRow(row);
+    return createReactElement(LogsContextPanel, { columns: contextColumns, datasourceUid: this.uid });
   }
 }
 
@@ -789,4 +926,9 @@ enum AdHocFilterStatus {
 interface Tags {
   type?: TagType;
   frame: DataFrame;
+}
+
+export interface LogContextColumn {
+  name: string;
+  value: string;
 }
