@@ -7,6 +7,7 @@
 - Implemented log context for log queries
 - Added configuration options for log context columns
 - Queries parsed from the SQL editor will now attempt to re-map columns into their correct fields for Log and Trace queries.
+- Added support for IN operator in adhoc filters
 
 ### Fixes
 
@@ -18,7 +19,6 @@
 
 - Added "Labels" column selector to the log query builder
 - Datasource OTel configuration will now set default table names for logs and traces.
-- Added support for IN operator in adhoc filters
 
 ### Fixes
 
