@@ -1,6 +1,8 @@
 import { generateSql } from 'data/sqlGenerator';
 import { getQueryOptionsFromSql, isDateTimeType, isDateType, isNumberType } from './utils';
 import { AggregateType, BuilderMode, ColumnHint, DateFilterWithoutValue, FilterOperator, MultiFilter, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import { Datasource } from 'data/CHDatasource';
+import otel from 'otel';
 
 describe('isDateType', () => {
   it('returns true for Date type', () => {
@@ -449,6 +451,124 @@ describe('getQueryOptionsFromSql', () => {
     },
     false
   );
+
+  testCondition('handles parsing a column with a complex name with spaces and capital characters', 'SELECT "Complex Name" FROM "db"."foo"', {
+    queryType: QueryType.Table,
+    mode: BuilderMode.List,
+    database: 'db',
+    table: 'foo',
+    columns: [{ name: 'Complex Name', alias: undefined }],
+    aggregates: [],
+  });
+
+  it('matches input query type', () => {
+    const sql = 'SELECT test FROM "db"."foo"';
+    const expectedOptions: QueryBuilderOptions = {
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'test', alias: undefined }],
+      aggregates: [],
+    };
+
+    expect(getQueryOptionsFromSql(sql, QueryType.Logs)).toEqual(expectedOptions);
+  });
+
+  it('matches column hints with Grafana query aliases', () => {
+    const sql = 'SELECT a as body, b as level FROM "db"."foo"';
+    const expectedOptions: QueryBuilderOptions = {
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'a', alias: 'body', hint: ColumnHint.LogMessage }, { name: 'b', alias: 'level', hint: ColumnHint.LogLevel }],
+      aggregates: [],
+      limit: undefined
+    };
+
+    expect(getQueryOptionsFromSql(sql, QueryType.Logs)).toEqual(expectedOptions);
+  });
+
+  it('matches column hints with OTel log column names', () => {
+    const mockDs = {} as Datasource;
+    mockDs.getDefaultLogsColumns = jest.fn(() => otel.getLatestVersion().logColumnMap);
+
+    const sql = 'SELECT "Timestamp", "SeverityText" FROM "db"."foo"';
+    const expectedOptions: QueryBuilderOptions = {
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'Timestamp', alias: undefined, hint: ColumnHint.Time }, { name: 'SeverityText', alias: undefined, hint: ColumnHint.LogLevel }],
+      aggregates: [],
+      limit: undefined
+    };
+
+    expect(getQueryOptionsFromSql(sql, QueryType.Logs, mockDs)).toEqual(expectedOptions);
+  });
+
+  it('matches column hints with datasource log column names', () => {
+    const mockDs = {} as Datasource;
+    mockDs.getDefaultLogsColumns = jest.fn(() => (
+      new Map([
+        [ColumnHint.Time, 'SpecialTimestamp'],
+        [ColumnHint.LogMessage, 'LogBody']
+      ])));
+
+    const sql = 'SELECT "SpecialTimestamp", "LogBody" FROM "db"."foo"';
+    const expectedOptions: QueryBuilderOptions = {
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'SpecialTimestamp', alias: undefined, hint: ColumnHint.Time }, { name: 'LogBody', alias: undefined, hint: ColumnHint.LogMessage }],
+      aggregates: [],
+      limit: undefined
+    };
+
+    expect(getQueryOptionsFromSql(sql, QueryType.Logs, mockDs)).toEqual(expectedOptions);
+  });
+
+  it('matches column hints with OTel trace column names', () => {
+    const mockDs = {} as Datasource;
+    mockDs.getDefaultTraceColumns = jest.fn(() => otel.getLatestVersion().traceColumnMap);
+
+    const sql = 'SELECT "StartTime", "ServiceName" FROM "db"."foo"';
+    const expectedOptions: QueryBuilderOptions = {
+      queryType: QueryType.Traces,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'StartTime', alias: undefined, hint: ColumnHint.Time }, { name: 'ServiceName', alias: undefined, hint: ColumnHint.TraceServiceName }],
+      aggregates: [],
+      limit: undefined
+    };
+
+    expect(getQueryOptionsFromSql(sql, QueryType.Traces, mockDs)).toEqual(expectedOptions);
+  });
+
+  it('matches column hints with datasource trace column names', () => {
+    const mockDs = {} as Datasource;
+    mockDs.getDefaultTraceColumns = jest.fn(() => (
+      new Map([
+        [ColumnHint.Time, 'SpecialTimestamp'],
+        [ColumnHint.TraceId, 'CustomTraceID']
+      ])));
+
+    const sql = 'SELECT "SpecialTimestamp", "CustomTraceID" FROM "db"."foo"';
+    const expectedOptions: QueryBuilderOptions = {
+      queryType: QueryType.Traces,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'SpecialTimestamp', alias: undefined, hint: ColumnHint.Time }, { name: 'CustomTraceID', alias: undefined, hint: ColumnHint.TraceId }],
+      aggregates: [],
+      limit: undefined
+    };
+
+    expect(getQueryOptionsFromSql(sql, QueryType.Traces, mockDs)).toEqual(expectedOptions);
+  });
 
   it('Handles brackets and Grafana macros/variables', () => {
     const sql = `

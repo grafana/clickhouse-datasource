@@ -134,7 +134,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       },
     });
   };
-  const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean) => {
+  const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
     onOptionsChange({
       ...options,
       jsonData: {
@@ -423,6 +423,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onTimeColumnChange={c => onLogsConfigChange('timeColumn', c)}
           onLevelColumnChange={c => onLogsConfigChange('levelColumn', c)}
           onMessageColumnChange={c => onLogsConfigChange('messageColumn', c)}
+          onSelectContextColumnsChange={c => onLogsConfigChange('selectContextColumns', c)}
+          onContextColumnsChange={c => onLogsConfigChange('contextColumns', c)}
         />
 
         <Divider />
@@ -447,7 +449,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
         <Divider />
-        {config.featureToggles['secureSocksDSProxyEnabled'] && versionGte(config.buildInfo.version, '10.0.0') && (
+        {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field
             label={labels.secureSocksProxy.label}
             description={labels.secureSocksProxy.tooltip}

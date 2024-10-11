@@ -68,6 +68,9 @@ export interface CHLogsConfig {
   timeColumn?: string;
   levelColumn?: string;
   messageColumn?: string;
+
+  selectContextColumns?: boolean;
+  contextColumns?: string[];
 }
 
 export interface CHTracesConfig {

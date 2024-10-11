@@ -8,10 +8,11 @@ interface SwitchProps {
   label: string;
   tooltip: string;
   inline?: boolean;
+  wide?: boolean;
 }
 
 export const Switch = (props: SwitchProps) => {
-  const { value, onChange, label, tooltip, inline } = props;
+  const { value, onChange, label, tooltip, inline, wide } = props;
 
   const theme = useTheme();
   const switchContainerStyle: React.CSSProperties = {
@@ -25,7 +26,7 @@ export const Switch = (props: SwitchProps) => {
 
   return (
     <div className="gf-form">
-      <InlineFormLabel width={8} className={labelStyle} tooltip={tooltip}>
+      <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <div style={switchContainerStyle}>

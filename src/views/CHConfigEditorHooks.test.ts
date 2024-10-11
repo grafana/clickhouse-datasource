@@ -95,7 +95,9 @@ describe('useConfigDefaults', () => {
     version: pluginVersion,
     protocol: Protocol.Native,
     logs: {
-      defaultTable: defaultLogsTable
+      defaultTable: defaultLogsTable,
+      selectContextColumns: true,
+      contextColumns: []
     },
     traces: {
       defaultTable: defaultTraceTable

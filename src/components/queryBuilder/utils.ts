@@ -32,7 +32,9 @@ import {
   QueryType,
 } from 'types/queryBuilder';
 import { sqlToStatement } from 'data/ast';
-import { getColumnByHint } from 'data/sqlGenerator';
+import { getColumnByHint, logColumnHintsToAlias } from 'data/sqlGenerator';
+import { Datasource } from 'data/CHDatasource';
+import { tryApplyColumnHints } from 'data/utils';
 
 
 export const isBooleanType = (type: string): boolean => {
@@ -79,19 +81,19 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
   return isStringType(filter.type) && [FilterOperator.In, FilterOperator.NotIn].includes(filter.operator);
 };
 
-export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | string {
+export function getQueryOptionsFromSql(sql: string, queryType?: QueryType, datasource?: Datasource): QueryBuilderOptions {
   const ast = sqlToStatement(sql);
   if (!ast) {
-    return 'The query is not valid SQL.';
+    throw new Error('The query is not valid SQL.');
   }
   if (ast.type !== 'select') {
-    return 'The query is not a select statement.';
+    throw new Error('The query is not a select statement.');
   }
   if (!ast.from || ast.from.length !== 1) {
-    return `The query has too many 'FROM' clauses.`;
+    throw new Error(`The query has too many 'FROM' clauses.`);
   }
   if (ast.from[0].type !== 'table') {
-    return `The 'FROM' clause is not a table.`;
+    throw new Error(`The 'FROM' clause is not a table.`);
   }
   const fromTable = ast.from[0] as FromTable;
 
@@ -100,14 +102,22 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
   const builderOptions = {
     database: fromTable.name.schema || '',
     table: fromTable.name.name || '',
-    queryType: QueryType.Table,
+    queryType: queryType || QueryType.Table,
     mode: BuilderMode.List,
     columns: [],
     aggregates: [],
   } as QueryBuilderOptions;
 
   if (columnsAndAggregates.columns.length > 0) {
-    builderOptions.columns = columnsAndAggregates.columns;
+    builderOptions.columns = columnsAndAggregates.columns || [];
+  }
+
+  // Reconstruct column hints based off of known column names / aliases
+  if (queryType === QueryType.Logs) {
+    tryApplyColumnHints(builderOptions.columns!, datasource?.getDefaultLogsColumns()); // Try match default log columns
+    tryApplyColumnHints(builderOptions.columns!, logColumnHintsToAlias); // Try match Grafana aliases
+  } else if (queryType === QueryType.Traces) {
+    tryApplyColumnHints(builderOptions.columns!, datasource?.getDefaultTraceColumns());
   }
 
   if (columnsAndAggregates.aggregates.length > 0) {
@@ -116,7 +126,7 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
   }
 
   const timeColumn = getColumnByHint(builderOptions, ColumnHint.Time);
-  if (timeColumn) {
+  if (!queryType && timeColumn) {
     builderOptions.queryType = QueryType.TimeSeries;
     if (builderOptions.aggregates?.length || 0) {
       builderOptions.mode = BuilderMode.Trend;
@@ -153,6 +163,7 @@ export function getQueryOptionsFromSql(sql: string): QueryBuilderOptions | strin
   if (groupBy && groupBy.length > 0) {
     builderOptions.groupBy = groupBy;
   }
+
   return builderOptions;
 }
 
