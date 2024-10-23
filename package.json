@@ -8,6 +8,7 @@
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
+    "e2e:prepare": "yarn install --frozen-lockfile && yarn playwright install --with-deps",
     "e2e:report": "yarn playwright show-report",
     "e2e:ui": "yarn playwright test --ui",
     "e2e": "playwright test",

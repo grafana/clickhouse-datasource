@@ -1,0 +1,65 @@
+name: Grafana Bench
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
+      - name: Build backend
+        uses: magefile/mage-action@v3
+        with:
+          args: buildAll
+          version: latest
+
+      - name: Install frontend dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build frontend
+        run: yarn build
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
+
+      - name: Install and run Docker Compose
+        uses: hoverkraft-tech/compose-action@v2.0.2
+        with:
+          compose-file: './docker-compose.yml'
+
+      - name: Wait for Grafana to start
+        uses: nev7n/wait_for_response@v1
+        with:
+          url: 'http://localhost:3000/'
+          responseCode: 200
+          timeout: 60000
+          interval: 500
+
+      - name: Run Grafana Bench tests
+        run: |
+          docker run --rm \
+            --network=host \
+             --volume="./:/home/bench/tests/" \
+            ghcr.io/grafana/grafana-bench:v0.2.4 test \
+            --test-suite-base "/home/bench/tests/" \
+            --grafana-url "http://localhost:3000" \
+            --grafana-username "admin" \
+            --grafana-password "admin" \
+            --test-runner "playwright" \
+            --pw-prepare-cmd "yarn e2e:prepare" \
+            --pw-execute-cmd "yarn e2e" \
+            --log-level DEBUG
+
