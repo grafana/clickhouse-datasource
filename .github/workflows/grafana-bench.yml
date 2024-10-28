@@ -52,14 +52,15 @@ jobs:
         run: |
           docker run --rm \
             --network=host \
-             --volume="./:/home/bench/tests/" \
-            ghcr.io/grafana/grafana-bench:v0.2.4 test \
-            --test-suite-base "/home/bench/tests/" \
+            --volume="./:/home/bench/tests/" \
+            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench:v0.3.0-rc3 test \
+            --grafana-admin-password "admin" \
+            --grafana-admin-user "admin" \
             --grafana-url "http://localhost:3000" \
-            --grafana-username "admin" \
-            --grafana-password "admin" \
-            --test-runner "playwright" \
-            --pw-prepare-cmd "yarn e2e:prepare" \
+            --log-level DEBUG \
             --pw-execute-cmd "yarn e2e" \
-            --log-level DEBUG
+            --pw-prepare-cmd "yarn e2e:prepare" \
+            --test-env-vars "CI=true" \
+            --test-runner "playwright" \
+            --test-suite-base "/home/bench/tests/"
 

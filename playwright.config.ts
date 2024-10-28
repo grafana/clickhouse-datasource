@@ -28,11 +28,6 @@ export default defineConfig<PluginOptions>({
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.GRAFANA_URL || `http://localhost:${process.env.PORT || 3000}`,
 
-    grafanaAPICredentials: {
-      user: process.env.GRAFANA_USER || 'admin',
-      password: process.env.GRAFANA_PASSWORD || 'admin',
-    },
-
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
     },
