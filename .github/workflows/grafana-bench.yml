@@ -40,12 +40,15 @@ jobs:
           compose-file: './docker-compose.yml'
 
       - name: Wait for Grafana to start
-        uses: nev7n/wait_for_response@v1
-        with:
-          url: 'http://localhost:3000/'
-          responseCode: 200
-          timeout: 60000
-          interval: 500
+        run: |
+          curl http://localhost:3000
+          #RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
+          #echo $response
+          #if [ $RESPONSE -ne 200 ]; then
+          #  sleep 5;
+          #  echo "Grafana is not accessible"
+          #  exit 1
+          #fi
 
       - name: Run Grafana Bench tests
         run: |
