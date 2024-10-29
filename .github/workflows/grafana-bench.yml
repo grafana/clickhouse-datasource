@@ -1,9 +1,9 @@
-name: Playwright Tests
+name: Grafana Bench
 on:
   push:
+    # Only run on push to the main branch
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
+
 jobs:
   test:
     timeout-minutes: 60
@@ -34,9 +34,6 @@ jobs:
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
-      - name: Install Playwright Browsers
-        run: yarn playwright install --with-deps
-
       - name: Install and run Docker Compose
         uses: hoverkraft-tech/compose-action@v2.0.2
         with:
@@ -53,12 +50,19 @@ jobs:
           #  exit 1
           #fi
 
-      - name: Run Playwright tests
-        run: yarn playwright test
+      - name: Run Grafana Bench tests
+        run: |
+          docker run --rm \
+            --network=host \
+            --volume="./:/home/bench/tests/" \
+            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench:v0.3.0-rc3 test \
+            --grafana-admin-password "admin" \
+            --grafana-admin-user "admin" \
+            --grafana-url "http://localhost:3000" \
+            --log-level DEBUG \
+            --pw-execute-cmd "yarn e2e" \
+            --pw-prepare-cmd "yarn install --frozen-lockfile && yarn playwright install" \
+            --test-env-vars "CI=true" \
+            --test-runner "playwright" \
+            --test-suite-base "/home/bench/tests/"
 
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
