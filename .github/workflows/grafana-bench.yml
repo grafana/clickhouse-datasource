@@ -1,8 +1,7 @@
 name: Grafana Bench
 on:
   push:
-    branches: [main, master]
-  pull_request:
+    # Only run on push to the main branch
     branches: [main, master]
 
 jobs:
