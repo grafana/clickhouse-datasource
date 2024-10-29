@@ -58,7 +58,7 @@ jobs:
             --grafana-url "http://localhost:3000" \
             --log-level DEBUG \
             --pw-execute-cmd "yarn e2e" \
-            --pw-prepare-cmd "yarn e2e:prepare" \
+            --pw-prepare-cmd "yarn install --frozen-lockfile && yarn playwright install" \
             --test-env-vars "CI=true" \
             --test-runner "playwright" \
             --test-suite-base "/home/bench/tests/"
