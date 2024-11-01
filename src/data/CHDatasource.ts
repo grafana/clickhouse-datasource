@@ -493,6 +493,14 @@ export class Datasource
     traceConfig.startTimeColumn && result.set(ColumnHint.Time, traceConfig.startTimeColumn);
     traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
     traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
+    traceConfig.kindColumn && result.set(ColumnHint.TraceKind, traceConfig.kindColumn);
+    traceConfig.statusCodeColumn && result.set(ColumnHint.TraceStatusCode, traceConfig.statusCodeColumn);
+    traceConfig.statusMessageColumn && result.set(ColumnHint.TraceStatusMessage, traceConfig.statusMessageColumn);
+    traceConfig.instrumentationLibraryNameColumn && result.set(ColumnHint.TraceInstrumentationLibraryName, traceConfig.instrumentationLibraryNameColumn);
+    traceConfig.instrumentationLibraryVersionColumn && result.set(ColumnHint.TraceInstrumentationLibraryVersion, traceConfig.instrumentationLibraryVersionColumn);
+    traceConfig.stateColumn && result.set(ColumnHint.TraceState, traceConfig.stateColumn);
+    traceConfig.eventsColumn && result.set(ColumnHint.TraceEvents, traceConfig.eventsColumn);
+    traceConfig.linksColumn && result.set(ColumnHint.TraceLinks, traceConfig.linksColumn);
 
     return result;
   }

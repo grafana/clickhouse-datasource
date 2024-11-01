@@ -49,6 +49,13 @@ const otel129: OtelVersion = {
     [ColumnHint.TraceTags, 'SpanAttributes'],
     [ColumnHint.TraceServiceTags, 'ResourceAttributes'],
     [ColumnHint.TraceStatusCode, 'StatusCode'],
+    [ColumnHint.TraceKind, 'SpanKind'],
+    [ColumnHint.TraceStatusMessage, 'StatusMessage'],
+    [ColumnHint.TraceInstrumentationLibraryName, 'InstrumentationLibraryName'],
+    [ColumnHint.TraceInstrumentationLibraryVersion, 'InstrumentationLibraryVersion'],
+    [ColumnHint.TraceState, 'State'],
+    [ColumnHint.TraceEvents, 'Events'],
+    [ColumnHint.TraceLinks, 'Links'],
   ]),
   traceDurationUnit: TimeUnit.Nanoseconds,
 };

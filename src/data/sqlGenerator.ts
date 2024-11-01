@@ -149,6 +149,44 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (traceStatusCode !== undefined) {
     selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`);
   }
+
+  const traceKind = getColumnByHint(options, ColumnHint.TraceKind);
+  if (traceKind !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceKind.name)} as kind`);
+  }
+
+  const traceStatusMessage = getColumnByHint(options, ColumnHint.TraceStatusMessage);
+  if (traceStatusMessage !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceStatusMessage.name)} as statusMessage`);
+  }
+
+  const traceInstrumentationLibraryName = getColumnByHint(options, ColumnHint.TraceInstrumentationLibraryName);
+  if (traceInstrumentationLibraryName !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceInstrumentationLibraryName.name)} as instrumentationLibraryName`);
+  }
+
+  const traceInstrumentationLibraryVersion = getColumnByHint(options, ColumnHint.TraceInstrumentationLibraryVersion);
+  if (traceInstrumentationLibraryVersion !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceInstrumentationLibraryVersion.name)} as instrumentationLibraryVersion`);
+  }
+
+  const traceState = getColumnByHint(options, ColumnHint.TraceState);
+  if (traceState !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceState.name)} as traceState`);
+  }
+
+  const traceEvents = getColumnByHint(options, ColumnHint.TraceEvents);
+  if (traceEvents !== undefined) {
+    // Assumes `events` is of type Array(Tuple(name String, timestamp UInt64, attributes Map(String, String)))
+    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.2), 0.000001), arrayConcat(arrayMap(key -> map('key', key, 'value', event.3[key]), mapKeys(event.3)), [map('key', 'message', 'value', event.1)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEvents.name)}) as logs`);
+  }
+
+  const traceLinks = getColumnByHint(options, ColumnHint.TraceLinks);
+  if (traceLinks !== undefined) {
+    // Assumes `links` is of type Array(Tuple(traceID String, spanID String, traceState String, attributes Map(String, String)))
+    selectParts.push(`arrayMap(link -> tuple(link.1, link.2, arrayMap(key -> map('key', key, 'value', link.4[key]), mapKeys(link.4)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinks.name)}) AS references`);
+  }
+
   const selectPartsSql = selectParts.join(', ');
 
   // Optimize trace ID filtering for OTel enabled trace lookups
@@ -689,7 +727,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
       operator = '';
       negate = true;
     } else if (filter.operator === FilterOperator.WithInGrafanaTimeRange) {
-        operator = '';
+      operator = '';
     }
 
     if (operator) {
@@ -758,11 +796,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
 };
 
 const stripTypeModifiers = (type: string): string => {
-    return type.toLowerCase().
-      replace(/\(/g, '').
-      replace(/\)/g, '').
-      replace(/nullable/g, '').
-      replace(/lowcardinality/g, '');
+  return type.toLowerCase().
+    replace(/\(/g, '').
+    replace(/\)/g, '').
+    replace(/nullable/g, '').
+    replace(/lowcardinality/g, '');
 
 }
 const isBooleanType = (type: string): boolean => (type?.toLowerCase().startsWith('boolean'));
@@ -773,7 +811,7 @@ const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('da
 const isStringType = (type: string): boolean => {
   type = stripTypeModifiers(type.toLowerCase());
   return (type === 'string' || type.startsWith('fixedstring'))
-  && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+    && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 }
 const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
 const isBooleanFilter = (type: string): boolean => isBooleanType(type);
