@@ -3,6 +3,8 @@ on:
   push:
     # Only run on push to the main branch
     branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
   test:
