@@ -157,7 +157,7 @@ export class Datasource
       const llf = `toString("${logLevelColumn.name}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
-        aggregates.push({ aggregateType: AggregateType.Sum, column: `${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}`, alias: level });
+        aggregates.push({ aggregateType: AggregateType.Sum, column: `multiSearchAny(${llf}, [${LOG_LEVEL_TO_IN_CLAUSE[level]}])`, alias: level });
       }
     } else {
       // Count all logs if level column isn't selected

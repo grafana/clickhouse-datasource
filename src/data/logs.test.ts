@@ -226,13 +226,13 @@ describe('logs', () => {
     it('should generate correct IN clauses', async () => {
       expect(LOG_LEVEL_TO_IN_CLAUSE).toEqual({
         critical:
-          "IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')",
-        debug: "IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')",
-        error: "IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')",
-        info: "IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')",
-        trace: "IN ('trace','TRACE','Trace')",
-        unknown: "IN ('unknown','UNKNOWN','Unknown')",
-        warn: "IN ('warn','warning','WARN','WARNING','Warn','Warning')",
+          "'critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg'",
+        debug: "'debug','dbug','DEBUG','DBUG','Debug','Dbug'",
+        error: "'error','err','eror','ERROR','ERR','EROR','Error','Err','Eror'",
+        info: "'info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational'",
+        trace: "'trace','TRACE','Trace'",
+        unknown: "'unknown','UNKNOWN','Unknown'",
+        warn: "'warn','warning','WARN','WARNING','Warn','Warning'",
       });
     });
   });
