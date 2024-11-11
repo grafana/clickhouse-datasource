@@ -1016,14 +1016,14 @@
     ua-parser-js "^1.0.32"
     web-vitals "^4.0.1"
 
-"@grafana/plugin-e2e@^1.11.3":
-  version "1.11.3"
-  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.11.3.tgz#beca8864027a9e967e96862d44a2872408527d4a"
-  integrity sha512-42KbERnYxcVmO4l1bmolYQrw+LHbTgoUfBrtL7pDXQFqRldYiVMamKFXZN5xnydBGFs3wt02oOoh8nFSv5lMFA==
+"@grafana/plugin-e2e@^1.12.0":
+  version "1.12.0"
+  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.12.0.tgz#eea3f3f0f4621cffefcb15287582673e77f356c1"
+  integrity sha512-r129vJJ+YtjEJoMnv8m/uEJUW3pln3jgQgNxBU0djNEKaGA/wSNGQgrn3+gPlF1rtZizaIIXgrUuWejXU0l+Sg==
   dependencies:
     "@grafana/e2e-selectors" "^11.4.0-205692"
     semver "^7.5.4"
-    uuid "^11.0.0"
+    uuid "^11.0.2"
     yaml "^2.3.4"
 
 "@grafana/runtime@^11.3.0":
@@ -8633,10 +8633,10 @@ uuid@9.0.1:
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-9.0.1.tgz#e188d4c8853cc722220392c424cd637f32293f30"
   integrity sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==
 
-uuid@^11.0.0:
-  version "11.0.2"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.0.2.tgz#a8d68ba7347d051e7ea716cc8dcbbab634d66875"
-  integrity sha512-14FfcOJmqdjbBPdDjFQyk/SdT4NySW4eM0zcG+HqbHP5jzuH56xO3J1DGhgs/cEMCfwYi3HQI1gnTO62iaG+tQ==
+uuid@^11.0.2:
+  version "11.0.3"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.0.3.tgz#248451cac9d1a4a4128033e765d137e2b2c49a3d"
+  integrity sha512-d0z310fCWv5dJwnX1Y/MncBAqGMKEzlBb1AOf7z9K8ALnd0utBX/msg/fA0+sbyN1ihbMsLhrBlnl1ak7Wa0rg==
 
 v8-compile-cache-lib@^3.0.1:
   version "3.0.1"
