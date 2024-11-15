@@ -975,10 +975,10 @@
     tslib "2.7.0"
     typescript "5.5.4"
 
-"@grafana/e2e-selectors@^11.4.0-205692":
-  version "11.4.0-205796"
-  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.4.0-205796.tgz#877b7ea1f70efa40fefd45867bbecd3465c57375"
-  integrity sha512-8TbsLpwcmzv7GRB/GWqdW8zSjdrMrPTNuFaK5A/CTlfYiPEwvbA908kjmvnZDtRqrofc9HDOlvGOLsBJmM1LlA==
+"@grafana/e2e-selectors@^11.4.0-207766":
+  version "11.4.0-208043"
+  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.4.0-208043.tgz#3efd4ed8ac179c74a7b7ef887455381a915d50fb"
+  integrity sha512-Rddb5PqEAu/0Z3n0AGv4SzTsCABJkZzX9LpwbbPc+hkB+tAdk8M9X9EZ78dYusNFJo+FCciEj45nIH82yTpSIg==
   dependencies:
     "@grafana/tsconfig" "^2.0.0"
     semver "7.6.3"
@@ -1016,14 +1016,14 @@
     ua-parser-js "^1.0.32"
     web-vitals "^4.0.1"
 
-"@grafana/plugin-e2e@^1.11.3":
-  version "1.11.3"
-  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.11.3.tgz#beca8864027a9e967e96862d44a2872408527d4a"
-  integrity sha512-42KbERnYxcVmO4l1bmolYQrw+LHbTgoUfBrtL7pDXQFqRldYiVMamKFXZN5xnydBGFs3wt02oOoh8nFSv5lMFA==
+"@grafana/plugin-e2e@^1.12.1":
+  version "1.12.1"
+  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.12.1.tgz#4440b9c2358c7ffcb83b0d32d503cbc13c8ce35f"
+  integrity sha512-pxmtBn/zFGoyNwfHgwSYEqfH1vTp4r6GnMl0cl3tsQJXO8S58QCD0PFG5Op/OcHhsoglIQTWFVkGvUqu8c5q0A==
   dependencies:
-    "@grafana/e2e-selectors" "^11.4.0-205692"
+    "@grafana/e2e-selectors" "^11.4.0-207766"
     semver "^7.5.4"
-    uuid "^11.0.0"
+    uuid "^11.0.2"
     yaml "^2.3.4"
 
 "@grafana/runtime@^11.3.0":
@@ -8633,10 +8633,10 @@ uuid@9.0.1:
   resolved "https://registry.yarnpkg.com/uuid/-/uuid-9.0.1.tgz#e188d4c8853cc722220392c424cd637f32293f30"
   integrity sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==
 
-uuid@^11.0.0:
-  version "11.0.2"
-  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.0.2.tgz#a8d68ba7347d051e7ea716cc8dcbbab634d66875"
-  integrity sha512-14FfcOJmqdjbBPdDjFQyk/SdT4NySW4eM0zcG+HqbHP5jzuH56xO3J1DGhgs/cEMCfwYi3HQI1gnTO62iaG+tQ==
+uuid@^11.0.2:
+  version "11.0.3"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-11.0.3.tgz#248451cac9d1a4a4128033e765d137e2b2c49a3d"
+  integrity sha512-d0z310fCWv5dJwnX1Y/MncBAqGMKEzlBb1AOf7z9K8ALnd0utBX/msg/fA0+sbyN1ihbMsLhrBlnl1ak7Wa0rg==
 
 v8-compile-cache-lib@^3.0.1:
   version "3.0.1"
