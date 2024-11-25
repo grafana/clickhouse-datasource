@@ -13,7 +13,7 @@ require (
 	github.com/paulmach/orb v0.11.1
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.4.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	github.com/testcontainers/testcontainers-go v0.33.0
 	golang.org/x/net v0.31.0
 )
