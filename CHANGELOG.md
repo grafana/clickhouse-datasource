@@ -1,8 +1,16 @@
 # Changelog
 
+## Unreleased
+
+## 4.5.1
+
+### Fixes
+
+- Dependency updates
+
 ## 4.5.0
 
-## Features
+### Features
 
 - Implemented log context for log queries
 - Added configuration options for log context columns
