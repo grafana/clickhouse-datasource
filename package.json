@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "4.5.0",
+  "version": "4.5.1",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=20"
@@ -26,9 +26,9 @@
   "devDependencies": {
     "@babel/core": "^7.25.7",
     "@grafana/eslint-config": "^7.0.0",
-    "@grafana/plugin-e2e": "^1.11.3",
+    "@grafana/plugin-e2e": "^1.12.3",
     "@grafana/tsconfig": "^2.0.0",
-    "@playwright/test": "^1.48.2",
+    "@playwright/test": "^1.49.0",
     "@swc/core": "^1.7.26",
     "@swc/helpers": "^0.5.13",
     "@swc/jest": "^0.2.36",
@@ -43,7 +43,7 @@
     "@types/react-router-dom": "^5.3.3",
     "@types/webpack-livereload-plugin": "^2.3.6",
     "copy-webpack-plugin": "^12.0.2",
-    "cspell": "^8.15.7",
+    "cspell": "^8.16.1",
     "css-loader": "^7.1.2",
     "eslint-plugin-deprecation": "^3.0.0",
     "eslint-webpack-plugin": "^4.2.0",
@@ -74,8 +74,8 @@
   },
   "dependencies": {
     "@emotion/css": "11.13.4",
-    "@grafana/data": "^11.3.0",
-    "@grafana/runtime": "^11.3.0",
+    "@grafana/data": "^11.3.1",
+    "@grafana/runtime": "^11.3.1",
     "@grafana/schema": "^11.2.2",
     "@grafana/ui": "^11.2.2",
     "js-sql-parser": "^1.6.0",
