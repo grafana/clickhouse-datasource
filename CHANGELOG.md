@@ -2,12 +2,15 @@
 
 ## Unreleased
 
+### Fixes
+
+- Optimized performance for log volumes processing using ClickHouse `multiSearchAny`
+
 ## 4.5.1
 
 ### Fixes
 
 - Dependency updates
-- Optimized performance for log volumes processing using ClickHouse `multiSearchAny`
 
 ## 4.5.0
 
