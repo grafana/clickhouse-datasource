@@ -8,9 +8,9 @@ describe('SQL Generator', () => {
       table: 'sample',
       queryType: QueryType.Table,
       columns: [
-          { name: 'a', type: 'UInt64' },
-          { name: 'b', type: 'String' },
-          { name: 'c', type: 'String' },
+        { name: 'a', type: 'UInt64' },
+        { name: 'b', type: 'String' },
+        { name: 'c', type: 'String' },
       ],
       limit: 1000,
       filters: [
@@ -41,9 +41,9 @@ describe('SQL Generator', () => {
       queryType: QueryType.Table,
       mode: BuilderMode.Aggregate,
       columns: [
-          { name: 'a', type: 'DateTime' },
-          { name: 'b', type: 'String' },
-          { name: 'c', type: 'String' },
+        { name: 'a', type: 'DateTime' },
+        { name: 'b', type: 'String' },
+        { name: 'c', type: 'String' },
       ],
       aggregates: [
         { aggregateType: AggregateType.Count, column: '*', alias: 'd' }
@@ -77,9 +77,9 @@ describe('SQL Generator', () => {
       table: 'logs',
       queryType: QueryType.Logs,
       columns: [
-          { name: 'log_ts', type: 'DateTime', hint: ColumnHint.Time },
-          { name: 'log_level', type: 'String', hint: ColumnHint.LogLevel },
-          { name: 'log_body', type: 'String', hint: ColumnHint.LogMessage },
+        { name: 'log_ts', type: 'DateTime', hint: ColumnHint.Time },
+        { name: 'log_level', type: 'String', hint: ColumnHint.LogLevel },
+        { name: 'log_body', type: 'String', hint: ColumnHint.LogMessage },
       ],
       limit: 1000,
       filters: [
@@ -122,8 +122,8 @@ describe('SQL Generator', () => {
       table: 'time_data',
       queryType: QueryType.TimeSeries,
       columns: [
-          { name: 'time_field', type: 'DateTime', hint: ColumnHint.Time },
-          { name: 'number_field', type: 'UInt64' },
+        { name: 'time_field', type: 'DateTime', hint: ColumnHint.Time },
+        { name: 'number_field', type: 'UInt64' },
       ],
       limit: 100,
       filters: [
@@ -154,8 +154,8 @@ describe('SQL Generator', () => {
       table: 'time_data',
       queryType: QueryType.TimeSeries,
       columns: [
-          { name: 'time_field', type: 'DateTime', hint: ColumnHint.Time },
-          { name: 'number_field', type: 'UInt64' },
+        { name: 'time_field', type: 'DateTime', hint: ColumnHint.Time },
+        { name: 'number_field', type: 'UInt64' },
       ],
       limit: 100,
       aggregates: [{ aggregateType: AggregateType.Sum, column: 'number_field', alias: 'total' }],
@@ -219,6 +219,68 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
+      'LIMIT 1000'
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('generates trace ID query with additional fields (kind, statusCode, statusMessage, instrumentationLibraryName, instrumentationLibraryVersion, traceState, logs, references) and OTel enabled', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+        { name: 'Kind', type: 'String', hint: ColumnHint.TraceKind },
+        { name: 'StatusMessage', type: 'String', hint: ColumnHint.TraceStatusMessage },
+        { name: 'InstrumentationLibraryName', type: 'String', hint: ColumnHint.TraceInstrumentationLibraryName },
+        { name: 'InstrumentationLibraryVersion', type: 'String', hint: ColumnHint.TraceInstrumentationLibraryVersion },
+        { name: 'TraceState', type: 'String', hint: ColumnHint.TraceState },
+        { name: 'Events', type: 'Array(Tuple(name String, timestamp UInt64, attributes Map(String, String)))', hint: ColumnHint.TraceEvents },
+        { name: 'Links', type: 'Array(Tuple(traceID String, spanID String, traceState String, attributes Map(String, String)))', hint: ColumnHint.TraceLinks },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: true,
+        otelVersion: 'latest',
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg'
+      },
+      limit: 1000,
+      orderBy: []
+    };
+
+    const expectedSqlParts = [
+      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
+      '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
+      'multiply("Duration", 0.000001) as duration,',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode,`,
+      '"Kind" as kind,',
+      '"StatusMessage" as statusMessage,',
+      '"InstrumentationLibraryName" as instrumentationLibraryName,',
+      '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
+      '"TraceState" as traceState,',
+      `arrayMap(event -> tuple(multiply(toFloat64(event.2), 0.000001), arrayConcat(arrayMap(key -> map('key', key, 'value', event.3[key]), mapKeys(event.3)), [map('key', 'message', 'value', event.1)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), "Events") as logs,`,
+      `arrayMap(link -> tuple(link.1, link.2, arrayMap(key -> map('key', key, 'value', link.4[key]), mapKeys(link.4)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), "Links") AS references`,
+      `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
       'LIMIT 1000'
     ];
 
