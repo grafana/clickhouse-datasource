@@ -477,13 +477,13 @@ describe('ClickHouseDatasource', () => {
         const result = datasource.getSupplementaryLogsVolumeQuery(request, query);
         expect(result?.rawSql).toEqual(
           `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", ` +
-            `sum(toString("level") IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) as critical, ` +
-            `sum(toString("level") IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
-            `sum(toString("level") IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
-            `sum(toString("level") IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')) as info, ` +
-            `sum(toString("level") IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
-            `sum(toString("level") IN ('trace','TRACE','Trace')) as trace, ` +
-            `sum(toString("level") IN ('unknown','UNKNOWN','Unknown')) as unknown ` +
+            `sum(multiSearchAny(toString("level"), ['critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg'])) as critical, ` +
+            `sum(multiSearchAny(toString("level"), ['error','err','eror','ERROR','ERR','EROR','Error','Err','Eror'])) as error, ` +
+            `sum(multiSearchAny(toString("level"), ['warn','warning','WARN','WARNING','Warn','Warning'])) as warn, ` +
+            `sum(multiSearchAny(toString("level"), ['info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational'])) as info, ` +
+            `sum(multiSearchAny(toString("level"), ['debug','dbug','DEBUG','DBUG','Debug','Dbug'])) as debug, ` +
+            `sum(multiSearchAny(toString("level"), ['trace','TRACE','Trace'])) as trace, ` +
+            `sum(multiSearchAny(toString("level"), ['unknown','UNKNOWN','Unknown'])) as unknown ` +
             `FROM "default"."logs" ` +
             `GROUP BY time ` +
             `ORDER BY time ASC`
