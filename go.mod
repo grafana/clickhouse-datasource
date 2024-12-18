@@ -6,7 +6,7 @@ toolchain go1.22.6
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.30.0
-	github.com/docker/docker v27.4.0+incompatible
+	github.com/docker/docker v27.4.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.260.1
 	github.com/grafana/sqlds/v3 v3.4.2
