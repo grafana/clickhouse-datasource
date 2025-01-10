@@ -936,13 +936,13 @@
   dependencies:
     tslib "^2.4.0"
 
-"@grafana/data@11.3.1", "@grafana/data@^11.3.1":
-  version "11.3.1"
-  resolved "https://registry.yarnpkg.com/@grafana/data/-/data-11.3.1.tgz#9d1d74a4330bb9468ed865ef94867973ece86951"
-  integrity sha512-65YHLouah5gId58ov0l5ZxoRSjAFWqv4Be0Apght69Ko1rLPVdfIAlZCwREfEN+OiSJ4d4t8AFtaD8CRbawmrw==
+"@grafana/data@11.4.0", "@grafana/data@^11.4.0":
+  version "11.4.0"
+  resolved "https://registry.yarnpkg.com/@grafana/data/-/data-11.4.0.tgz#d30fb918aac1e21120bac27b54f59a4ad42fc999"
+  integrity sha512-/Og3njCvDRR+jYWAYlEjNZfyO0KaYiH/3Hvz5lXYd/B29sN8ZOfyvdB3lp+727y4sHIG+Jb1NiX0L3qHD7dLgQ==
   dependencies:
     "@braintree/sanitize-url" "7.0.1"
-    "@grafana/schema" "11.3.1"
+    "@grafana/schema" "11.4.0"
     "@types/d3-interpolate" "^3.0.0"
     "@types/string-hash" "1.1.3"
     d3-interpolate "3.0.1"
@@ -966,24 +966,24 @@
     uplot "1.6.31"
     xss "^1.0.14"
 
-"@grafana/e2e-selectors@11.3.1":
-  version "11.3.1"
-  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.3.1.tgz#9732d8d8237639c49b5d2a51c432e5a20f48af1d"
-  integrity sha512-197q3gqIJOcpq+pD/5CycwBbbxruqx2p29dkeVwb+QlnjGvmc3Fx6YUf9yCHtvhmETceRYCoLZwQwuwdju/+Mg==
+"@grafana/e2e-selectors@11.4.0":
+  version "11.4.0"
+  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.4.0.tgz#ea9460cfc4112406ea954204d3296f9a4a652118"
+  integrity sha512-6VRsmTpqtmNuXJvuUNJudHFdZJR7oc1DtZMDoaOY+3Y3yPU+4oEdM2MtsyYHPkMbfTONlJ4fdIC0WFnWhDIhLA==
   dependencies:
     "@grafana/tsconfig" "^2.0.0"
     tslib "2.7.0"
     typescript "5.5.4"
 
-"@grafana/e2e-selectors@^11.4.0-209710":
-  version "11.4.0-209816"
-  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.4.0-209816.tgz#3c1974b60479403d32182dfe4a4ca3867664ce57"
-  integrity sha512-Ssec69xJrV7kcssq6JTNyR/BgBn8lu68JT/eNEabEWXgzZukhafWWUzm9+DelqTcCDAxs2HwaaaKVko9+Y2udA==
+"@grafana/e2e-selectors@^11.5.0-216287":
+  version "11.5.0-216360"
+  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.5.0-216360.tgz#7d986f2d89c6095270e354a2e139a47dbd98f061"
+  integrity sha512-2DCikDLp0FwehaCiPIWwy4u1LwB+LggMy1V2/OtXqGf+yUBIV/ZWrHLEL+h3IhjDl09U7cTrrMHL7tCDdyRq6Q==
   dependencies:
     "@grafana/tsconfig" "^2.0.0"
     semver "7.6.3"
-    tslib "2.7.0"
-    typescript "5.5.4"
+    tslib "2.8.1"
+    typescript "5.7.3"
 
 "@grafana/eslint-config@^7.0.0":
   version "7.0.0"
@@ -1016,35 +1016,35 @@
     ua-parser-js "^1.0.32"
     web-vitals "^4.0.1"
 
-"@grafana/plugin-e2e@^1.12.3":
-  version "1.12.3"
-  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.12.3.tgz#5f3b6251cfc081a27bfc05326e3071e06e2de322"
-  integrity sha512-xSqQH1WiStc8IVE9Tu6pdPIDHM1ueoRscjU096nk09anFBdoLLwiz+vTY0TKB4KJDUaNJhYP2WVEMlFnbURw8w==
+"@grafana/plugin-e2e@^1.14.6":
+  version "1.14.6"
+  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.14.6.tgz#3ad08b4fd5aadee8dfd9170c7bb6d5e31a67bb53"
+  integrity sha512-YnARXviUFI+Ez0ygi1CypBHZGY+rNIShI428Mnrj8bn48mr0lCeiI/V2NGsQUz5YJegIfP1JSb05gb/7t8avBQ==
   dependencies:
-    "@grafana/e2e-selectors" "^11.4.0-209710"
+    "@grafana/e2e-selectors" "^11.5.0-216287"
     semver "^7.5.4"
     uuid "^11.0.2"
     yaml "^2.3.4"
 
-"@grafana/runtime@^11.3.1":
-  version "11.3.1"
-  resolved "https://registry.yarnpkg.com/@grafana/runtime/-/runtime-11.3.1.tgz#b295b7db45e925354aaf0b0941df784b84b28fd7"
-  integrity sha512-9/WvZL4fnpfKg98O6J4qTT7akF+dycnh4hmX2hzCnM5ZDowTVXXr6rGJUhu7+9c6V0Xw96++puLc8WqIudmj6g==
+"@grafana/runtime@^11.4.0":
+  version "11.4.0"
+  resolved "https://registry.yarnpkg.com/@grafana/runtime/-/runtime-11.4.0.tgz#32812909c824026bd7d84c6427b49da54921460b"
+  integrity sha512-yZIaNqHKncf97/6QjjHvI+v02+PvGpG6wWNDN+/H1R8vzrMe21asBNDm0EEW/mPUlRLtmAAGcUAt6jL6vRe+6g==
   dependencies:
-    "@grafana/data" "11.3.1"
-    "@grafana/e2e-selectors" "11.3.1"
+    "@grafana/data" "11.4.0"
+    "@grafana/e2e-selectors" "11.4.0"
     "@grafana/faro-web-sdk" "^1.3.6"
-    "@grafana/schema" "11.3.1"
-    "@grafana/ui" "11.3.1"
+    "@grafana/schema" "11.4.0"
+    "@grafana/ui" "11.4.0"
     history "4.10.1"
     lodash "4.17.21"
     rxjs "7.8.1"
     tslib "2.7.0"
 
-"@grafana/schema@11.3.1", "@grafana/schema@^11.2.2":
-  version "11.3.1"
-  resolved "https://registry.yarnpkg.com/@grafana/schema/-/schema-11.3.1.tgz#e99472a441596c0d5f23c276469f9e066f6c67f6"
-  integrity sha512-/q8v4u1+/WzTRjz7Qniwfea5rF3EmkSrk5XDhM8o2n+G/z2G1VL7k/oqp151MsulM82g9hE+UvcpmmWEd4mD8Q==
+"@grafana/schema@11.4.0", "@grafana/schema@^11.2.2":
+  version "11.4.0"
+  resolved "https://registry.yarnpkg.com/@grafana/schema/-/schema-11.4.0.tgz#5733ae4fb362be4858702ab1042c3c92e42856a0"
+  integrity sha512-ZcUZtVdNSuBmTjwPAgWwQ/9/ilozAXggfXye797Odp3mXU9erQX7CqV9JV3y5pyj1+KMd+khzfjxEZotsjHWIA==
   dependencies:
     tslib "2.7.0"
 
@@ -1053,19 +1053,19 @@
   resolved "https://registry.yarnpkg.com/@grafana/tsconfig/-/tsconfig-2.0.0.tgz#277aba907ddbe0301dc37248923e6bd2b68f5151"
   integrity sha512-cxC3Htv/GidI5FeVGAzj/lYZTMMz/Cfsc8VOQFO3Ichjx3hUjyjeoBUIpVSVMnIjKUdA5ycdxtMYPHIuIrk8+A==
 
-"@grafana/ui@11.3.1", "@grafana/ui@^11.2.2":
-  version "11.3.1"
-  resolved "https://registry.yarnpkg.com/@grafana/ui/-/ui-11.3.1.tgz#0b83905cc87d9ba00b11e8c18de8cf33472ffdad"
-  integrity sha512-Xl15hAmsNFa5rANYPnMjna0nasNiyID6bXNl4Ze1AopIEiiqMZidC3ldAUumXd/ivh84QYbfCuyWrPrg47xYRg==
+"@grafana/ui@11.4.0", "@grafana/ui@^11.2.2":
+  version "11.4.0"
+  resolved "https://registry.yarnpkg.com/@grafana/ui/-/ui-11.4.0.tgz#bb451e236f379a917afe19a65de061ca3bd44b15"
+  integrity sha512-Z2J+b6RCizecdn7gbribmzkJIZxANXFp6wvt0pZa4toZ/BTe9CK30Y2/x1KiGa9VAzIhS1pqihc+PrcJU9I5LA==
   dependencies:
     "@emotion/css" "11.13.4"
     "@emotion/react" "11.13.3"
     "@emotion/serialize" "1.3.2"
     "@floating-ui/react" "0.26.24"
-    "@grafana/data" "11.3.1"
-    "@grafana/e2e-selectors" "11.3.1"
+    "@grafana/data" "11.4.0"
+    "@grafana/e2e-selectors" "11.4.0"
     "@grafana/faro-web-sdk" "^1.3.6"
-    "@grafana/schema" "11.3.1"
+    "@grafana/schema" "11.4.0"
     "@hello-pangea/dnd" "16.6.0"
     "@leeoniya/ufuzzy" "1.0.14"
     "@monaco-editor/react" "4.6.0"
@@ -8454,6 +8454,11 @@ tslib@2.7.0, tslib@^2.1.0, tslib@^2.3.1, tslib@^2.4.0, tslib@^2.6.2:
   resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.7.0.tgz#d9b40c5c40ab59e8738f297df3087bf1a2690c01"
   integrity sha512-gLXCKdN1/j47AiHiOkJN69hJmcbGTHI0ImLmbYLHykhgeN0jVGola9yVjFgzCUklsZQMW55o+dW7IXv3RCXDzA==
 
+tslib@2.8.1:
+  version "2.8.1"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.8.1.tgz#612efe4ed235d567e8aba5f2a5fab70280ade83f"
+  integrity sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w==
+
 type-check@^0.4.0, type-check@~0.4.0:
   version "0.4.0"
   resolved "https://registry.yarnpkg.com/type-check/-/type-check-0.4.0.tgz#07b8203bfa7056c0657050e3ccd2c37730bab8f1"
@@ -8544,6 +8549,11 @@ typescript@5.6.2:
   version "5.6.2"
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.6.2.tgz#d1de67b6bef77c41823f822df8f0b3bcff60a5a0"
   integrity sha512-NW8ByodCSNCwZeghjN3o+JX5OFH0Ojg6sadjEKY4huZ52TqbJTJnDo5+Tw98lSy63NZvi4n+ez5m2u5d4PkZyw==
+
+typescript@5.7.3:
+  version "5.7.3"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.7.3.tgz#919b44a7dbb8583a9b856d162be24a54bf80073e"
+  integrity sha512-84MVSjMEHP+FQRPy3pX9sTVV/INIex71s9TL2Gm5FG/WG1SqXeKyZ0k7/blY/4FdOzI12CBy1vGc4og/eus0fw==
 
 ua-parser-js@^1.0.32:
   version "1.0.39"
@@ -8989,12 +8999,7 @@ yaml@^1.10.0:
   resolved "https://registry.yarnpkg.com/yaml/-/yaml-1.10.2.tgz#2301c5ffbf12b467de8da2333a459e29e7920e4b"
   integrity sha512-r3vXyErRCYJ7wg28yvBY5VSoAF8ZvlcW9/BwUzEtUsjvX/DKs24dIkuwjtuprwJJHsbyUbLApepYTR1BN4uHrg==
 
-yaml@^2.3.4:
-  version "2.6.0"
-  resolved "https://registry.yarnpkg.com/yaml/-/yaml-2.6.0.tgz#14059ad9d0b1680d0f04d3a60fe00f3a857303c3"
-  integrity sha512-a6ae//JvKDEra2kdi1qzCyrJW/WZCgFi8ydDV+eXExl95t+5R+ijnqHJbz9tmMh8FUjx3iv2fCQ4dclAQlO2UQ==
-
-yaml@^2.6.1:
+yaml@^2.3.4, yaml@^2.6.1:
   version "2.6.1"
   resolved "https://registry.yarnpkg.com/yaml/-/yaml-2.6.1.tgz#42f2b1ba89203f374609572d5349fb8686500773"
   integrity sha512-7r0XPzioN/Q9kXBro/XPnA6kznR73DHq+GXh5ON7ZozRO6aMjbmiBuKste2wslTFkC5d1dw0GooOCepZXJ2SAg==
