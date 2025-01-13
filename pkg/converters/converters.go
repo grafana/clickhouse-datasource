@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"math/big"
 	"net"
 	"reflect"
@@ -41,6 +42,11 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"Point":                     regexp.MustCompile(`^Point`),
 	"SimpleAggregateFunction()": regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
 	"Tuple()":                   regexp.MustCompile(`^Tuple\(.*\)`),
+	"Variant()":                 regexp.MustCompile(`^Variant\(.*\)`),
+	"Dynamic":                   regexp.MustCompile(`^Dynamic`),
+	"Dynamic()":                 regexp.MustCompile(`Dynamic\(.*\)`),
+	"JSON":                      regexp.MustCompile(`^JSON`),
+	"JSON()":                    regexp.MustCompile(`^JSON\(.*\)`),
 }
 
 var Converters = map[string]Converter{
@@ -211,6 +217,36 @@ var Converters = map[string]Converter{
 		matchRegex: matchRegexes["Tuple()"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
+	"Variant()": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Variant()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"Dynamic": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Dynamic"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"Dynamic()": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Dynamic()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"JSON": {
+		convert:    jsonObjectConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["JSON"],
+		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
+	},
+	"JSON()": {
+		convert:    jsonObjectConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["JSON()"],
+		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
+	},
 	// NestedConverter currently only supports flatten_nested=0 only which can be marshalled into []map[string]interface{}
 	"Nested()": {
 		convert:    jsonConverter,
@@ -346,6 +382,25 @@ func jsonConverter(in interface{}) (interface{}, error) {
 
 	rawJSON := json.RawMessage(jBytes)
 	return &rawJSON, nil
+}
+
+func jsonObjectConverter(in interface{}) (interface{}, error) {
+	if in == nil {
+		return nil, nil
+	}
+
+	obj, ok := in.(*clickhouse.JSON)
+	if !ok {
+		return nil, fmt.Errorf("jsonObjectConverter expected *clickhouse.JSON input, got %s", reflect.TypeOf(in).String())
+	}
+
+	objBytes, err := obj.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	rawMsg := json.RawMessage(objBytes)
+	return &rawMsg, nil
 }
 
 func defaultConvert(in interface{}) (interface{}, error) {
