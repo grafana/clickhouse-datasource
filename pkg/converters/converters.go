@@ -236,13 +236,13 @@ var Converters = map[string]Converter{
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
 	"JSON": {
-		convert:    jsonObjectConverter,
+		convert:    jsonConverter,
 		fieldType:  data.FieldTypeNullableJSON,
 		matchRegex: matchRegexes["JSON"],
 		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
 	},
 	"JSON()": {
-		convert:    jsonObjectConverter,
+		convert:    jsonConverter,
 		fieldType:  data.FieldTypeNullableJSON,
 		matchRegex: matchRegexes["JSON()"],
 		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
@@ -382,25 +382,6 @@ func jsonConverter(in interface{}) (interface{}, error) {
 
 	rawJSON := json.RawMessage(jBytes)
 	return &rawJSON, nil
-}
-
-func jsonObjectConverter(in interface{}) (interface{}, error) {
-	if in == nil {
-		return nil, nil
-	}
-
-	obj, ok := in.(*clickhouse.JSON)
-	if !ok {
-		return nil, fmt.Errorf("jsonObjectConverter expected *clickhouse.JSON input, got %s", reflect.TypeOf(in).String())
-	}
-
-	objBytes, err := obj.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	rawMsg := json.RawMessage(objBytes)
-	return &rawMsg, nil
 }
 
 func defaultConvert(in interface{}) (interface{}, error) {
