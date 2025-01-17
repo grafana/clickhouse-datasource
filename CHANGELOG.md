@@ -1,6 +1,7 @@
 # Changelog
 
-## Unreleased
+
+## 4.6.0
 
 ### Features
 
