@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Features
+
+- Add support for new Variant, Dynamic, and JSON types (https://github.com/grafana/clickhouse-datasource/pull/1108)
+
 ### Fixes
 
 - Optimized performance for log volumes processing using ClickHouse `multiSearchAny`
