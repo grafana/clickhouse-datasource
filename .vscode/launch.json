@@ -32,13 +32,17 @@
       "port": 9229
     },
     {
+      "version": "stable",
       "name": "Debug: Frontend",
       "request": "launch",
       "type": "msedge",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}/src",
+      "url": "http://localhost:3000/explore",
+      "webRoot": "${workspaceFolder}",
       "preLaunchTask": "run grafana",
-      "cwd": "${workspaceFolder}/src"
+      "cwd": "${workspaceFolder}",
+      "sourceMapPathOverrides": {
+        "webpack://grafana-clickhouse-datasource/*": "${workspaceRoot}/src/*"
+      },
     }
   ]
 }

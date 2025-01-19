@@ -45,7 +45,6 @@
 			"label": "run grafana",
 			"detail": "run test environment",
 			"dependsOn": [
-				"backend: marge build",
 				"frontend: yarn dev"
 			]
 		}

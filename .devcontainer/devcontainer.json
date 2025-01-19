@@ -28,7 +28,9 @@
 			"label": "Grafana",
 			"onAutoForward": "silent"
 		}
-	}
+	},
+
+	"updateContentCommand": "bash ${containerWorkspaceFolder}/.devcontainer/init.sh"
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	// "postCreateCommand": "yarn install",
