@@ -12,7 +12,6 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
-	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
 )
 
 // Settings - data loaded from grafana settings database
@@ -53,10 +52,10 @@ const secureHeaderKeyPrefix = "secureHttpHeaders."
 
 func (settings *Settings) isValid() (err error) {
 	if settings.Host == "" {
-		return errorsource.DownstreamError(ErrorMessageInvalidHost, false)
+		return backend.DownstreamError(ErrorMessageInvalidHost)
 	}
 	if settings.Port == 0 {
-		return errorsource.DownstreamError(ErrorMessageInvalidPort, false)
+		return backend.DownstreamError(ErrorMessageInvalidPort)
 	}
 	return nil
 }
@@ -80,7 +79,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		if port, ok := jsonData["port"].(string); ok {
 			settings.Port, err = strconv.ParseInt(port, 0, 64)
 			if err != nil {
-				return settings, errorsource.DownstreamError(fmt.Errorf("could not parse port value: %w", err), false)
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse port value: %w", err))
 			}
 		} else {
 			settings.Port = int64(jsonData["port"].(float64))
@@ -93,7 +92,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		if secure, ok := jsonData["secure"].(string); ok {
 			settings.Secure, err = strconv.ParseBool(secure)
 			if err != nil {
-				return settings, errorsource.DownstreamError(fmt.Errorf("could not parse secure value: %w", err), false)
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse secure value: %w", err))
 			}
 		} else {
 			settings.Secure = jsonData["secure"].(bool)
@@ -107,7 +106,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		if tlsSkipVerify, ok := jsonData["tlsSkipVerify"].(string); ok {
 			settings.InsecureSkipVerify, err = strconv.ParseBool(tlsSkipVerify)
 			if err != nil {
-				return settings, errorsource.DownstreamError(fmt.Errorf("could not parse tlsSkipVerify value: %w", err), false)
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsSkipVerify value: %w", err))
 			}
 		} else {
 			settings.InsecureSkipVerify = jsonData["tlsSkipVerify"].(bool)
@@ -117,7 +116,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		if tlsAuth, ok := jsonData["tlsAuth"].(string); ok {
 			settings.TlsClientAuth, err = strconv.ParseBool(tlsAuth)
 			if err != nil {
-				return settings, errorsource.DownstreamError(fmt.Errorf("could not parse tlsAuth value: %w", err), false)
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsAuth value: %w", err))
 			}
 		} else {
 			settings.TlsClientAuth = jsonData["tlsAuth"].(bool)
@@ -127,7 +126,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		if tlsAuthWithCACert, ok := jsonData["tlsAuthWithCACert"].(string); ok {
 			settings.TlsAuthWithCACert, err = strconv.ParseBool(tlsAuthWithCACert)
 			if err != nil {
-				return settings, errorsource.DownstreamError(fmt.Errorf("could not parse tlsAuthWithCACert value: %w", err), false)
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsAuthWithCACert value: %w", err))
 			}
 		} else {
 			settings.TlsAuthWithCACert = jsonData["tlsAuthWithCACert"].(bool)
@@ -175,7 +174,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		if forwardGrafanaHeaders, ok := jsonData["forwardGrafanaHeaders"].(string); ok {
 			settings.ForwardGrafanaHeaders, err = strconv.ParseBool(forwardGrafanaHeaders)
 			if err != nil {
-				return settings, errorsource.DownstreamError(fmt.Errorf("could not parse forwardGrafanaHeaders value: %w", err), false)
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse forwardGrafanaHeaders value: %w", err))
 			}
 		} else {
 			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
