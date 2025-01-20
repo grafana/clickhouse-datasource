@@ -1,0 +1,31 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+            
+			"type": "shell",
+			"command": "yarn install",
+			"label": "frontend: yarn install",
+			"detail": "install frontend dependencies"
+		},
+		{
+			"type": "shell",
+			"command": "yarn dev",
+			"label": "frontend: yarn dev",
+            "dependsOn": ["frontend: yarn install"]
+		},
+		{
+			"type": "shell",
+			"command": "mage -v build:linux",
+			"label": "backend: marge build",
+			"detail": "build clickhouse plugin backend",
+		},
+		{
+			"type": "shell",
+			"command": "docker compose up",
+			"label": "run grafana",
+			"detail": "run test environment",
+            "dependsOn": ["backend: marge build", "frontend: yarn dev"]
+		}
+	]
+}

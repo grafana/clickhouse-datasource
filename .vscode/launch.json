@@ -30,6 +30,15 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "port": 9229
+    },
+    {
+      "name": "Debug: Frontend",
+      "request": "launch",
+      "type": "msedge",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/Aveniq.Poseidon.Portal",
+      "preLaunchTask": "run grafana",
+      "cwd": "${workspaceFolder}/Aveniq.Poseidon.Portal"
     }
   ]
 }
