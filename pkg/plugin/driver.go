@@ -21,7 +21,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
 	"github.com/grafana/sqlds/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
@@ -41,7 +40,7 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 		if settings.TlsAuthWithCACert && len(settings.TlsCACert) > 0 {
 			caPool := x509.NewCertPool()
 			if ok := caPool.AppendCertsFromPEM([]byte(settings.TlsCACert)); !ok {
-				return nil, errorsource.DownstreamError(ErrorInvalidCACertificate, false)
+				return nil, backend.DownstreamError(ErrorInvalidCACertificate)
 			}
 			tlsConfig.RootCAs = caPool
 		}
@@ -121,11 +120,11 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	}
 	t, err := strconv.Atoi(settings.DialTimeout)
 	if err != nil {
-		return nil, errorsource.DownstreamError(errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout)), false)
+		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout)))
 	}
 	qt, err := strconv.Atoi(settings.QueryTimeout)
 	if err != nil {
-		return nil, errorsource.DownstreamError(errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout)), false)
+		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout)))
 	}
 	protocol := clickhouse.Native
 	if settings.Protocol == "http" {
