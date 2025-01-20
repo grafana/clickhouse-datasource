@@ -36,9 +36,9 @@
       "request": "launch",
       "type": "msedge",
       "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}/Aveniq.Poseidon.Portal",
+      "webRoot": "${workspaceFolder}/src",
       "preLaunchTask": "run grafana",
-      "cwd": "${workspaceFolder}/Aveniq.Poseidon.Portal"
+      "cwd": "${workspaceFolder}/src"
     }
   ]
 }

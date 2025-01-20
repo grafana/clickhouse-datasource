@@ -2,7 +2,6 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-            
 			"type": "shell",
 			"command": "yarn install",
 			"label": "frontend: yarn install",
@@ -12,7 +11,27 @@
 			"type": "shell",
 			"command": "yarn dev",
 			"label": "frontend: yarn dev",
-            "dependsOn": ["frontend: yarn install"]
+			"dependsOn": [
+				"frontend: yarn install"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"pattern": [
+						{
+							"regexp": ".",
+							"file": 1,
+							"location": 2,
+							"message": 3
+						}
+					],
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": ".",
+						"endsPattern": ".",
+					}
+				}
+			]
 		},
 		{
 			"type": "shell",
@@ -25,7 +44,10 @@
 			"command": "docker compose up",
 			"label": "run grafana",
 			"detail": "run test environment",
-            "dependsOn": ["backend: marge build", "frontend: yarn dev"]
+			"dependsOn": [
+				"backend: marge build",
+				"frontend: yarn dev"
+			]
 		}
 	]
 }
