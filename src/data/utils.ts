@@ -132,6 +132,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
     }
 
     const traceIdQuery: CHBuilderQuery = {
+      datasource: datasource,
       editorType: EditorType.Builder,
       /**
        * Evil bug:
@@ -189,6 +190,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
     }
 
     const traceLogsQuery: CHBuilderQuery = {
+      datasource: datasource,
       editorType: EditorType.Builder,
       rawSql: '',
       builderOptions: {} as QueryBuilderOptions,
