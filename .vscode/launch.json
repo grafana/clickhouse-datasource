@@ -32,10 +32,9 @@
       "port": 9229
     },
     {
-      "version": "stable",
       "name": "Debug: Frontend",
       "request": "launch",
-      "type": "msedge",
+      "type": "chrome",
       "url": "http://localhost:3000/explore",
       "webRoot": "${workspaceFolder}",
       "preLaunchTask": "run grafana",
