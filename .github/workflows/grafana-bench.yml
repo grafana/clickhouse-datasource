@@ -37,7 +37,7 @@ jobs:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Install and run Docker Compose
-        uses: hoverkraft-tech/compose-action@v2.0.2
+        uses: hoverkraft-tech/compose-action@v2.1.0
         with:
           compose-file: './docker-compose.yml'
 
