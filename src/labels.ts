@@ -185,6 +185,10 @@ export default {
           serviceTags: {
             label: 'Service Tags column',
             tooltip: 'Column for the service tags'
+          },
+          eventsPrefix: {
+            label: 'Events column',
+            tooltip: 'Prefix for the events column'
           }
         }
       },
@@ -406,6 +410,10 @@ export default {
         traceIdFilter: {
           label: 'Trace ID',
           tooltip: 'filter by a specific trace ID'
+        },
+        eventsPrefix: {
+          label: 'Events Prefix',
+          tooltip: 'Prefix for the events column'
         }
       },
     }
@@ -437,6 +445,7 @@ export default {
       [ColumnHint.TraceTags]: 'Tags',
       [ColumnHint.TraceServiceTags]: 'Service Tags',
       [ColumnHint.TraceStatusCode]: 'Status Code',
+      [ColumnHint.TraceEventsPrefix]: 'Events Prefix',
     }
   }
 }
