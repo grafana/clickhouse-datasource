@@ -149,7 +149,6 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (traceStatusCode !== undefined) {
     selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`);
   }
-  console.log(options);
   const traceEventsPrefix = getColumnByHint(options, ColumnHint.TraceEventsPrefix);
   if (traceEventsPrefix !== undefined) {
     selectParts.push(`arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap( key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),${escapeIdentifier(traceEventsPrefix.name)}.Name, ${escapeIdentifier(traceEventsPrefix.name)}.Timestamp, ${escapeIdentifier(traceEventsPrefix.name)}.Attributes) AS logs`);
