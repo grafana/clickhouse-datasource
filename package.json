@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=20"
@@ -35,7 +35,7 @@
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "6.5.0",
     "@testing-library/react": "^16.0.1",
-    "@testing-library/user-event": "^14.6.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.13",
     "@types/lodash": "^4.17.10",
