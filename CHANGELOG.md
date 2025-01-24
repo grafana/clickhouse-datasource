@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+### Features
+- Add JSON column sub-paths to column selection in query builder
 
 ## 4.6.0
 

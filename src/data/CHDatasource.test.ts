@@ -249,6 +249,73 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchPathsForJSONColumns', () => {
+    it('sends a correct query when database and table names are provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('sends a correct query when only table name is provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchPathsForJSONColumns('', 'table_name', 'jsonCol');
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('sends a correct query when table name contains a dot', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchPathsForJSONColumns('', 'table.name', 'jsonCol');
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('returns correct json columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = new ArrayDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      
+      const jsonColumns = await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
+      expect(jsonColumns).toMatchObject([
+        { name: 'jsonCol.a.b.c', label: 'jsonCol.a.b.c', type: 'Int64', picklistValues: [] },
+        { name: 'jsonCol.a.b.d', label: 'jsonCol.a.b.d', type: 'String', picklistValues: [] },
+        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Bool', picklistValues: [] },
+      ])
+    });
+  });
+
   describe('fetchColumnsFromTable', () => {
     it('sends a correct query when database and table names are provided', async () => {
       const ds = cloneDeep(mockDatasource);

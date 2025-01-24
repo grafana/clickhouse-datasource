@@ -540,6 +540,51 @@ export class Datasource
   }
 
   /**
+   * Fetches JSON column suggestions for each specified JSON column.
+   */
+  async fetchPathsForJSONColumns(database: string | undefined, table: string, jsonColumnName: string): Promise<TableColumn[]> {
+    const prefix = Boolean(database) ? `"${database}".` : '';
+    const rawSql = `SELECT arrayJoin(distinctJSONPathsAndTypes(${jsonColumnName})) FROM ${prefix}"${table}"`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+
+    const view = new DataFrameView(frame);
+    const jsonPathsAndTypes: Array<[string, string]> = [];
+    for (let x of view) {
+      if (!x || !x[0]) {
+        continue;
+      }
+
+      const kv = JSON.parse(x[0]);
+      if (!kv.keys || !kv.values) {
+        continue;
+      }
+
+      jsonPathsAndTypes.push([kv.keys, kv.values]);
+    }
+
+    const columns: TableColumn[] = [];
+    for (let pathAndTypes of jsonPathsAndTypes) {
+      const path = pathAndTypes[0];
+      const types = pathAndTypes[1];
+      if (!path || !types || types.length === 0) {
+        continue;
+      }
+
+      columns.push({
+        name: `${jsonColumnName}.${path}`,
+        label: `${jsonColumnName}.${path}`,
+        type: types[0],
+        picklistValues: [],
+      })
+    }
+
+    return columns;
+  }
+  
+  /**
    * Fetches column suggestions from the table schema.
    */
   async fetchColumnsFromTable(database: string | undefined, table: string): Promise<TableColumn[]> {
@@ -550,12 +595,20 @@ export class Datasource
       return [];
     }
     const view = new DataFrameView(frame);
-    return view.map(item => ({
+    const columns: TableColumn[] = view.map(item => ({
       name: item[0],
       type: item[1],
       label: item[0],
       picklistValues: [],
     }));
+
+    const jsonColumnNames = columns.filter(c => c.type.startsWith('JSON')).map(c => c.name);
+    for (let jsonColumnName of jsonColumnNames) {
+      const jsonColumns = await this.fetchPathsForJSONColumns(database, table, jsonColumnName);
+      columns.push(...jsonColumns);
+    }
+
+    return columns;
   }
 
   /**
