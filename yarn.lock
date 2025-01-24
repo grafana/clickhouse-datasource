@@ -991,10 +991,10 @@
     tslib "2.7.0"
     typescript "5.5.4"
 
-"@grafana/e2e-selectors@^11.5.0-216908":
-  version "11.5.0-217903"
-  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.5.0-217903.tgz#14a4942150b1ef0ce78dd8f8302e67ca02a2bfbb"
-  integrity sha512-94F3m0Ec7a6ghtDLvcdhMXv7/2NXJc/cgdyFLtHF2DjgHklXw8ncUNCx6qgrrLyTUnaVEKpetJfXP+rNyUoJnA==
+"@grafana/e2e-selectors@^11.5.0-219238":
+  version "11.5.0-219518"
+  resolved "https://registry.yarnpkg.com/@grafana/e2e-selectors/-/e2e-selectors-11.5.0-219518.tgz#d2078439f93097100e0a45bd10fe47ae23ed2ff7"
+  integrity sha512-bX2hLjEPGbrZsC+DyZOvT92XlbchWjTw4RxB+QlZISN6PL+7zrooDieq8nBMDmgn1gdsmSX3AgQbhes4rcdU/w==
   dependencies:
     "@grafana/tsconfig" "^2.0.0"
     semver "7.6.3"
@@ -1032,12 +1032,12 @@
     ua-parser-js "^1.0.32"
     web-vitals "^4.0.1"
 
-"@grafana/plugin-e2e@^1.15.0":
-  version "1.15.0"
-  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.15.0.tgz#5d2082acf5400d5b1752f9abb0c8881b171ccc38"
-  integrity sha512-cP3uekIPVlBNtyBynNIJl3y225MJWHYxlLIhkE74WIsLNH8gC8QtTTLO4w/Quiiz/xL171IgSE+t0EHtkesx/Q==
+"@grafana/plugin-e2e@^1.16.2":
+  version "1.16.2"
+  resolved "https://registry.yarnpkg.com/@grafana/plugin-e2e/-/plugin-e2e-1.16.2.tgz#2f79e3821001d4b4d9a958be35676dcce51b97ff"
+  integrity sha512-kDyd6eykUM/qwN/0vL/RXvIaKBvLhoUy8hG+tETzzCxeArSJC5oP1WQ4MUzmbPoOOuOzxW/FGIP295NUYelpWA==
   dependencies:
-    "@grafana/e2e-selectors" "^11.5.0-216908"
+    "@grafana/e2e-selectors" "^11.5.0-219238"
     semver "^7.5.4"
     uuid "^11.0.2"
     yaml "^2.3.4"
