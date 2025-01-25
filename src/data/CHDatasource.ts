@@ -602,13 +602,13 @@ export class Datasource
       picklistValues: [],
     }));
 
-    const jsonColumnNames = columns.filter(c => c.type.startsWith('JSON')).map(c => c.name);
-    for (let jsonColumnName of jsonColumnNames) {
-      const jsonColumns = await this.fetchPathsForJSONColumns(database, table, jsonColumnName);
-      columns.push(...jsonColumns);
-    }
+    const results = await Promise.all(
+      columns
+        .filter(c => c.type.startsWith("JSON"))
+        .map(c => this.fetchPathsForJSONColumns(database, table, c.name))
+    );
 
-    return columns;
+    return [...columns, ...results.flat()];
   }
 
   /**
