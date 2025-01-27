@@ -30,6 +30,18 @@
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",
       "port": 9229
+    },
+    {
+      "name": "Debug: Frontend",
+      "request": "launch",
+      "type": "chrome",
+      "url": "http://localhost:3000/explore",
+      "webRoot": "${workspaceFolder}",
+      "preLaunchTask": "run grafana",
+      "cwd": "${workspaceFolder}",
+      "sourceMapPathOverrides": {
+        "webpack://grafana-clickhouse-datasource/*": "${workspaceRoot}/src/*"
+      },
     }
   ]
 }

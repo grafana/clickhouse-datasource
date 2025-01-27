@@ -2,7 +2,7 @@
 -- example dataset from the ClickHouse documentation:
 -- https://clickhouse.com/docs/en/getting-started/example-datasets/uk-price-paid
 
-CREATE TABLE uk_price_paid
+CREATE TABLE IF NOT EXISTS uk_price_paid
 (
     price UInt32,
     date Date,
