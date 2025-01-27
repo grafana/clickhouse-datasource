@@ -27,6 +27,7 @@ interface TraceConfigProps {
   onStartTimeColumnChange: (v: string) => void;
   onTagsColumnChange: (v: string) => void;
   onServiceTagsColumnChange: (v: string) => void;
+  onEventsColumnPrefixChange: (v: string) => void;
 }
 
 export const TracesConfig = (props: TraceConfigProps) => {
@@ -35,13 +36,13 @@ export const TracesConfig = (props: TraceConfigProps) => {
     onOtelEnabledChange, onOtelVersionChange,
     onTraceIdColumnChange, onSpanIdColumnChange, onOperationNameColumnChange, onParentSpanIdColumnChange,
     onServiceNameColumnChange, onDurationColumnChange, onDurationUnitChange, onStartTimeColumnChange,
-    onTagsColumnChange, onServiceTagsColumnChange,
+    onTagsColumnChange, onServiceTagsColumnChange, onEventsColumnPrefixChange
   } = props;
   let {
     defaultDatabase, defaultTable,
     otelEnabled, otelVersion,
     traceIdColumn, spanIdColumn, operationNameColumn, parentSpanIdColumn, serviceNameColumn,
-    durationColumn, durationUnit, startTimeColumn, tagsColumn, serviceTagsColumn
+    durationColumn, durationUnit, startTimeColumn, tagsColumn, serviceTagsColumn, eventsColumnPrefix
   } = (props.tracesConfig || {}) as CHTracesConfig;
   const labels = allLabels.components.Config.TracesConfig;
 
@@ -56,6 +57,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     durationColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceDurationTime);
     tagsColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceTags);
     serviceTagsColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceServiceTags);
+    eventsColumnPrefix = otelConfig.traceColumnMap.get(ColumnHint.TraceEventsPrefix);
     durationUnit = otelConfig.traceDurationUnit.toString();
   }
 
@@ -180,6 +182,14 @@ export const TracesConfig = (props: TraceConfigProps) => {
           tooltip={labels.columns.serviceTags.tooltip}
           value={serviceTagsColumn || ''}
           onChange={onServiceTagsColumnChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.eventsPrefix.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.eventsPrefix.label)}
+          tooltip={labels.columns.eventsPrefix.tooltip}
+          value={eventsColumnPrefix || ''}
+          onChange={onEventsColumnPrefixChange}
         />
       </ConfigSubSection>
     </ConfigSection>

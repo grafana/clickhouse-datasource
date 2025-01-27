@@ -444,6 +444,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onStartTimeColumnChange={c => onTracesConfigChange('startTimeColumn', c)}
           onTagsColumnChange={c => onTracesConfigChange('tagsColumn', c)}
           onServiceTagsColumnChange={c => onTracesConfigChange('serviceTagsColumn', c)}
+          onEventsColumnPrefixChange={c => onTracesConfigChange('eventsColumnPrefix', c)}
         />
 
         <Divider />
