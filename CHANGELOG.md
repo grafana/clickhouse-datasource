@@ -4,6 +4,7 @@
 
 ### Features
 
+- Add JSON column sub-paths to column selection in query builder
 - Added events support in trace detail view.(https://github.com/grafana/clickhouse-datasource/pull/1128)
 
 ## 4.6.0
