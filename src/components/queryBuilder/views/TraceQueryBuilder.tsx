@@ -17,6 +17,7 @@ import { useDefaultFilters, useOtelColumns, useTraceDefaultsOnMount } from './tr
 import TraceIdInput from '../TraceIdInput';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
+import { LabeledInput } from 'components/configEditor/LabeledInput';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -38,6 +39,7 @@ interface TraceQueryBuilderState {
   durationUnit: TimeUnit;
   tagsColumn?: SelectedColumn;
   serviceTagsColumn?: SelectedColumn;
+  eventsColumnPrefix?: SelectedColumn;
   traceId: string;
   orderBy: OrderBy[];
   limit: number;
@@ -66,6 +68,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     durationUnit: builderOptions.meta?.traceDurationUnit || TimeUnit.Nanoseconds,
     tagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceTags),
     serviceTagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceServiceTags),
+    eventsColumnPrefix: getColumnByHint(builderOptions, ColumnHint.TraceEventsPrefix),
     traceId: builderOptions.meta?.traceId || '',
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 0,
@@ -82,7 +85,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       next.startTimeColumn,
       next.durationTimeColumn,
       next.tagsColumn,
-      next.serviceTagsColumn
+      next.serviceTagsColumn,
+      next.eventsColumnPrefix
     ].filter(c => c !== undefined) as SelectedColumn[];
 
     builderOptionsDispatch(setOptions({
@@ -129,7 +133,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         isOpen={isColumnsOpen}
         onToggle={setColumnsOpen}
       >
-        { configWarning }
+        {configWarning}
         <OtelVersionSelect
           enabled={builderState.otelEnabled}
           onEnabledChange={e => builderOptionsDispatch(setOtelEnabled(e))}
@@ -256,6 +260,15 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
+        <div className="gf-form">
+          <LabeledInput
+            disabled={builderState.otelEnabled}
+            label={labels.columns.eventsPrefix.label}
+            tooltip={labels.columns.eventsPrefix.tooltip}
+            value={builderState.eventsColumnPrefix?.name || ''}
+            onChange={onOptionChange('eventsColumnPrefix')}
+          />
+        </div>
       </Collapse>
       <Collapse label={labels.filtersSection}
         collapsible
@@ -277,7 +290,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           table={builderOptions.table}
         />
       </Collapse>
-      { builderState.isTraceIdMode && <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} /> }
+      {builderState.isTraceIdMode && <TraceIdInput traceId={builderState.traceId} onChange={onOptionChange('traceId')} />}
     </div>
   );
 }

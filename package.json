@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=20"
@@ -28,14 +28,14 @@
     "@grafana/eslint-config": "^7.0.0",
     "@grafana/plugin-e2e": "^1.15.0",
     "@grafana/tsconfig": "^2.0.0",
-    "@playwright/test": "^1.49.1",
+    "@playwright/test": "^1.50.0",
     "@swc/core": "^1.7.26",
     "@swc/helpers": "^0.5.13",
     "@swc/jest": "^0.2.36",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "6.5.0",
     "@testing-library/react": "^16.0.1",
-    "@testing-library/user-event": "^14.6.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/glob": "^8.1.0",
     "@types/jest": "^29.5.13",
     "@types/lodash": "^4.17.10",

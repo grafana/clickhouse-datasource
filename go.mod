@@ -6,7 +6,7 @@ toolchain go1.23.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.30.1
-	github.com/docker/docker v27.5.0+incompatible
+	github.com/docker/docker v27.5.1+incompatible
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.263.0
 	github.com/grafana/sqlds/v4 v4.1.7
@@ -63,7 +63,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/elazarl/goproxy v1.5.0
+	github.com/elazarl/goproxy v1.7.0
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/getkin/kin-openapi v0.128.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect

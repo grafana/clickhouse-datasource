@@ -1,5 +1,5 @@
 import {
-  ArrayDataFrame,
+  arrayToDataFrame,
   CoreApp,
   DataQueryRequest,
   DataQueryResponse,
@@ -106,7 +106,7 @@ describe('ClickHouseDatasource', () => {
     it('should Fetch Default Tags When No Second AdHoc Variable', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
       const ds = cloneDeep(mockDatasource);
-      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       jest.spyOn(ds, 'getDefaultDatabase').mockImplementation(() => undefined!); // Disable default DB
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
 
@@ -123,7 +123,7 @@ describe('ClickHouseDatasource', () => {
 
     it('should Fetch Tags With Default Database', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
-      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const ds = cloneDeep(mockDatasource);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
 
@@ -140,7 +140,7 @@ describe('ClickHouseDatasource', () => {
 
     it('should Fetch Tags From Query', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
-      const frame = new ArrayDataFrame([{ name: 'foo' }]);
+      const frame = arrayToDataFrame([{ name: 'foo' }]);
       const ds = cloneDeep(mockDatasource);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
 
@@ -156,7 +156,7 @@ describe('ClickHouseDatasource', () => {
     });
     it('returns no tags when CH version is less than 22.7 ', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
-      const frame = new ArrayDataFrame([{ version: '21.9.342' }]);
+      const frame = arrayToDataFrame([{ version: '21.9.342' }]);
       const ds = cloneDeep(mockDatasource);
       ds.adHocFiltersStatus = 2;
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
@@ -171,8 +171,8 @@ describe('ClickHouseDatasource', () => {
 
     it('returns tags when CH version is greater than 22.7 ', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
-      const frameVer = new ArrayDataFrame([{ version: '23.2.212' }]);
-      const frameData = new ArrayDataFrame([{ name: 'foo' }]);
+      const frameVer = arrayToDataFrame([{ version: '23.2.212' }]);
+      const frameData = arrayToDataFrame([{ name: 'foo' }]);
       const ds = cloneDeep(mockDatasource);
       ds.adHocFiltersStatus = 2;
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
@@ -193,7 +193,7 @@ describe('ClickHouseDatasource', () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
       const ds = cloneDeep(mockDatasource);
       ds.settings.jsonData.defaultDatabase = undefined;
-      const frame = new ArrayDataFrame([{ bar: 'foo' }]);
+      const frame = arrayToDataFrame([{ bar: 'foo' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       const values = await ds.getTagValues({ key: 'foo.bar' });
       expect(spyOnReplace).toHaveBeenCalled();
@@ -209,7 +209,7 @@ describe('ClickHouseDatasource', () => {
     it('should Fetch Tag Values from Query', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from bar');
       const ds = cloneDeep(mockDatasource);
-      const frame = new ArrayDataFrame([{ name: 'foo' }]);
+      const frame = arrayToDataFrame([{ name: 'foo' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       const values = await ds.getTagValues({ key: 'name' });
       expect(spyOnReplace).toHaveBeenCalled();
@@ -249,10 +249,77 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchPathsForJSONColumns', () => {
+    it('sends a correct query when database and table names are provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('sends a correct query when only table name is provided', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchPathsForJSONColumns('', 'table_name', 'jsonCol');
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('sends a correct query when table name contains a dot', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      await ds.fetchPathsForJSONColumns('', 'table.name', 'jsonCol');
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name"' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('returns correct json columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([
+        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
+        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
+        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] })
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      
+      const jsonColumns = await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
+      expect(jsonColumns).toMatchObject([
+        { name: 'jsonCol.a.b.c', label: 'jsonCol.a.b.c', type: 'Int64', picklistValues: [] },
+        { name: 'jsonCol.a.b.d', label: 'jsonCol.a.b.d', type: 'String', picklistValues: [] },
+        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Bool', picklistValues: [] },
+      ])
+    });
+  });
+
   describe('fetchColumnsFromTable', () => {
     it('sends a correct query when database and table names are provided', async () => {
       const ds = cloneDeep(mockDatasource);
-      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchColumnsFromTable('db_name', 'table_name');
       const expected = { rawSql: 'DESC TABLE "db_name"."table_name"' };
@@ -264,7 +331,7 @@ describe('ClickHouseDatasource', () => {
 
     it('sends a correct query when only table name is provided', async () => {
       const ds = cloneDeep(mockDatasource);
-      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchColumnsFromTable('', 'table_name');
       const expected = { rawSql: 'DESC TABLE "table_name"' };
@@ -276,7 +343,7 @@ describe('ClickHouseDatasource', () => {
 
     it('sends a correct query when table name contains a dot', async () => {
       const ds = cloneDeep(mockDatasource);
-      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_) => of({ data: [frame] }));
 
       await ds.fetchColumnsFromTable('', 'table.name');
@@ -291,7 +358,7 @@ describe('ClickHouseDatasource', () => {
   describe('fetchColumnsFromAliasTable', () => {
     it('sends a correct query when full table name is provided', async () => {
       const ds = cloneDeep(mockDatasource);
-      const frame = new ArrayDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchColumnsFromAliasTable('"db_name"."table_name"');
       const expected = { rawSql: 'SELECT alias, select, "type" FROM "db_name"."table_name"' };

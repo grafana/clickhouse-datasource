@@ -24,6 +24,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -48,6 +49,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -79,6 +81,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -110,6 +113,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -140,6 +144,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -171,6 +176,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -202,6 +208,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -233,6 +240,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -264,6 +272,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -295,6 +304,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -326,6 +336,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -357,6 +368,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -388,6 +400,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={onStartTimeColumnChange}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -419,6 +432,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={onTagsColumnChange}
         onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -450,6 +464,7 @@ describe('TracesConfig', () => {
         onStartTimeColumnChange={() => {}}
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={onServiceTagsColumnChange}
+        onEventsColumnPrefixChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();

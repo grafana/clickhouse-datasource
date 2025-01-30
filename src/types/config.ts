@@ -90,6 +90,7 @@ export interface CHTracesConfig {
   startTimeColumn?: string;
   tagsColumn?: string;
   serviceTagsColumn?: string;
+  eventsColumnPrefix?: string;
 }
 
 export interface AliasTableEntry {
