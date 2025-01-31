@@ -1,0 +1,70 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"command": "yarn install",
+			"label": "frontend: yarn install",
+			"detail": "install frontend dependencies"
+		},
+		{
+			"type": "shell",
+			"command": "yarn dev",
+			"label": "frontend: yarn dev",
+			"dependsOn": [
+				"frontend: yarn install"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"pattern": [
+						{
+							"regexp": ".",
+							"file": 1,
+							"location": 2,
+							"message": 3
+						}
+					],
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": ".",
+						"endsPattern": ".",
+					}
+				}
+			]
+		},
+		{
+			"type": "shell",
+			"command": "mage -v build:linux",
+			"label": "backend: marge build",
+			"detail": "build clickhouse plugin backend",
+		},
+		{
+			"type": "shell",
+			"command": "docker compose up",
+			"label": "run grafana",
+			"detail": "run test environment",
+			"dependsOn": [
+				"frontend: yarn dev"
+			],
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"pattern": [
+						{
+							"regexp": ".",
+							"file": 1,
+							"location": 2,
+							"message": 3
+						}
+					],
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": ".",
+						"endsPattern": ".",
+					}
+				}
+			]
+		}
+	]
+}
