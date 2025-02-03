@@ -152,12 +152,16 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const traceEventsPrefix = getColumnByHint(options, ColumnHint.TraceEventsPrefix);
   if (traceEventsPrefix !== undefined) {
-    selectParts.push(`arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap( key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),${escapeIdentifier(traceEventsPrefix.name)}.Name, ${escapeIdentifier(traceEventsPrefix.name)}.Timestamp, ${escapeIdentifier(traceEventsPrefix.name)}.Attributes) AS logs`);
+    // It is important to treat the prefixed columns as one nested column, as this
+    // ensures that the query will work when the column was created with flatten_nested.
+    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000), arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]), mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEventsPrefix.name)}) as logs`);
   }
 
   const traceLinksPrefix = getColumnByHint(options, ColumnHint.TraceLinksPrefix);
   if (traceLinksPrefix !== undefined) {
-    selectParts.push(`arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, arrayMap(key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinksPrefix.name)}.TraceId, ${escapeIdentifier(traceLinksPrefix.name)}.SpanId, ${escapeIdentifier(traceLinksPrefix.name)}.Attributes) AS references`);
+    // It is important to treat the prefixed columns as one nested column, as this
+    // ensures that the query will work when the column was created with flatten_nested.
+    selectParts.push(`arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]), mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinksPrefix.name)}) AS references`);
   }
 
   const traceKind = getColumnByHint(options, ColumnHint.TraceKind);
