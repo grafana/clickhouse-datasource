@@ -124,6 +124,18 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     }));
   }, builderState);
 
+  // A function to assemble custom column definitions for the prefixed Events/Links columns
+  const onColumnPrefixChange = (name: keyof TraceQueryBuilderState, columnHint: ColumnHint) => {
+    const baseOptionChange = onOptionChange(name);
+    return (name: string) => {
+      baseOptionChange({
+        name: name,
+        hint: columnHint,
+        custom: true,
+      });
+    };
+  };
+
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
   useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, isNewQuery, builderOptionsDispatch);
@@ -283,22 +295,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
         <div className="gf-form">
-          <LabeledInput
-              disabled={builderState.otelEnabled}
-              label={labels.columns.eventsPrefix.label}
-              tooltip={labels.columns.eventsPrefix.tooltip}
-              value={builderState.eventsColumnPrefix?.name || ''}
-              onChange={onOptionChange('eventsColumnPrefix')}
-          />
-          <LabeledInput
-              disabled={builderState.otelEnabled}
-              label={labels.columns.linksPrefix.label}
-              tooltip={labels.columns.linksPrefix.tooltip}
-              value={builderState.linksColumnPrefix?.name || ''}
-              onChange={onOptionChange('linksColumnPrefix')}
-          />
-        </div>
-        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -371,6 +367,24 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             tooltip={labels.columns.state.tooltip}
             wide
             inline
+          />
+        </div>
+        <div className="gf-form">
+          <LabeledInput
+              disabled={builderState.otelEnabled}
+              label={labels.columns.eventsPrefix.label}
+              tooltip={labels.columns.eventsPrefix.tooltip}
+              value={builderState.eventsColumnPrefix?.name || ''}
+              onChange={onColumnPrefixChange('eventsColumnPrefix', ColumnHint.TraceEventsPrefix)}
+          />
+        </div>
+        <div className="gf-form">
+          <LabeledInput
+              disabled={builderState.otelEnabled}
+              label={labels.columns.linksPrefix.label}
+              tooltip={labels.columns.linksPrefix.tooltip}
+              value={builderState.linksColumnPrefix?.name || ''}
+              onChange={onColumnPrefixChange('linksColumnPrefix', ColumnHint.TraceLinksPrefix)}
           />
         </div>
       </Collapse>

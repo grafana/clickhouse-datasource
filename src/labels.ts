@@ -436,11 +436,11 @@ export default {
           tooltip: 'Column that contains the service tags'
         },
         eventsPrefix: {
-          label: 'Events Prefix Column',
+          label: 'Events Prefix',
           tooltip: 'Prefix for the events column'
         },
         linksPrefix: {
-          label: 'Links Column',
+          label: 'Links Prefix',
           tooltip: 'Prefix for the trace references column'
         },
         kind: {
