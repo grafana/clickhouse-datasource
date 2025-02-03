@@ -91,6 +91,13 @@ export interface CHTracesConfig {
   tagsColumn?: string;
   serviceTagsColumn?: string;
   eventsColumnPrefix?: string;
+  linksColumnPrefix?: string;
+  kindColumn?: string;
+  statusCodeColumn?: string;
+  statusMessageColumn?: string;
+  instrumentationLibraryNameColumn?: string;
+  instrumentationLibraryVersionColumn?: string;
+  stateColumn?: string;
 }
 
 export interface AliasTableEntry {
