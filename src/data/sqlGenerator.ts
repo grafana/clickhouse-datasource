@@ -177,14 +177,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const traceEvents = getColumnByHint(options, ColumnHint.TraceEvents);
   if (traceEvents !== undefined) {
-    // Assumes `events` is of type Array(Tuple(name String, timestamp UInt64, attributes Map(String, String)))
-    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.2), 0.000001), arrayConcat(arrayMap(key -> map('key', key, 'value', event.3[key]), mapKeys(event.3)), [map('key', 'message', 'value', event.1)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEvents.name)}) as logs`);
+    // Assumes `events` is of type Nested(Timestamp DateTime64(9), Name LowCardinality(String), Attributes Map(LowCardinality(String), String))
+    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000), arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]), mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEvents.name)}) as logs`);
   }
 
   const traceLinks = getColumnByHint(options, ColumnHint.TraceLinks);
   if (traceLinks !== undefined) {
-    // Assumes `links` is of type Array(Tuple(traceID String, spanID String, traceState String, attributes Map(String, String)))
-    selectParts.push(`arrayMap(link -> tuple(link.1, link.2, arrayMap(key -> map('key', key, 'value', link.4[key]), mapKeys(link.4)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinks.name)}) AS references`);
+    // Assumes `links` is of type Nested(TraceId String, SpanId String, TraceState String, Attributes Map(LowCardinality(String), String))
+    selectParts.push(`arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]), mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinks.name)}) AS references`);
   }
 
   const selectPartsSql = selectParts.join(', ');

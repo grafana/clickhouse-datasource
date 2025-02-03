@@ -278,8 +278,8 @@ describe('SQL Generator', () => {
       '"InstrumentationLibraryName" as instrumentationLibraryName,',
       '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
       '"TraceState" as traceState,',
-      `arrayMap(event -> tuple(multiply(toFloat64(event.2), 0.000001), arrayConcat(arrayMap(key -> map('key', key, 'value', event.3[key]), mapKeys(event.3)), [map('key', 'message', 'value', event.1)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), "Events") as logs,`,
-      `arrayMap(link -> tuple(link.1, link.2, arrayMap(key -> map('key', key, 'value', link.4[key]), mapKeys(link.4)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), "Links") AS references`,
+      `arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000), arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]), mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), "Events") as logs,`,
+      `arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]), mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), "Links") AS references`,
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
       'LIMIT 1000'
     ];
