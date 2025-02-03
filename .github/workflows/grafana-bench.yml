@@ -3,6 +3,8 @@ on:
   push:
     # Only run on push to the main branch
     branches: [main, master]
+  pull_request:
+    branches: [main, master]
 
 jobs:
   test:
@@ -35,34 +37,25 @@ jobs:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Install and run Docker Compose
-        uses: hoverkraft-tech/compose-action@v2.0.2
+        uses: hoverkraft-tech/compose-action@v2.2.0
         with:
           compose-file: './docker-compose.yml'
 
-      - name: Wait for Grafana to start
+      - name: Ensure Grafana is running
         run: |
           curl http://localhost:3000
-          #RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000)
-          #echo $response
-          #if [ $RESPONSE -ne 200 ]; then
-          #  sleep 5;
-          #  echo "Grafana is not accessible"
-          #  exit 1
-          #fi
 
       - name: Run Grafana Bench tests
         run: |
           docker run --rm \
             --network=host \
             --volume="./:/home/bench/tests/" \
-            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench:v0.3.0-rc3 test \
-            --grafana-admin-password "admin" \
-            --grafana-admin-user "admin" \
-            --grafana-url "http://localhost:3000" \
-            --log-level DEBUG \
-            --pw-execute-cmd "yarn e2e" \
-            --pw-prepare-cmd "yarn install --frozen-lockfile && yarn playwright install" \
-            --test-env-vars "CI=true" \
+            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench:v0.3.0 test \
             --test-runner "playwright" \
-            --test-suite-base "/home/bench/tests/"
+            --test-suite-base "/home/bench/tests/" \
+            --grafana-url "http://localhost:3000" \
+            --pw-execute-cmd "yarn e2e" \
+            --pw-prepare-cmd "yarn install --frozen-lockfile; yarn playwright install" \
+            --test-env-vars "CI=true" \
+            --log-level DEBUG 
 

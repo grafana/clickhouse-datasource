@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"math/big"
 	"net"
 	"reflect"
@@ -41,6 +42,11 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"Point":                     regexp.MustCompile(`^Point`),
 	"SimpleAggregateFunction()": regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
 	"Tuple()":                   regexp.MustCompile(`^Tuple\(.*\)`),
+	"Variant()":                 regexp.MustCompile(`^Variant\(.*\)`),
+	"Dynamic":                   regexp.MustCompile(`^Dynamic`),
+	"Dynamic()":                 regexp.MustCompile(`Dynamic\(.*\)`),
+	"JSON":                      regexp.MustCompile(`^JSON`),
+	"JSON()":                    regexp.MustCompile(`^JSON\(.*\)`),
 }
 
 var Converters = map[string]Converter{
@@ -210,6 +216,36 @@ var Converters = map[string]Converter{
 		fieldType:  data.FieldTypeNullableJSON,
 		matchRegex: matchRegexes["Tuple()"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"Variant()": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Variant()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"Dynamic": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Dynamic"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"Dynamic()": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["Dynamic()"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+	},
+	"JSON": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["JSON"],
+		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
+	},
+	"JSON()": {
+		convert:    jsonConverter,
+		fieldType:  data.FieldTypeNullableJSON,
+		matchRegex: matchRegexes["JSON()"],
+		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
 	},
 	// NestedConverter currently only supports flatten_nested=0 only which can be marshalled into []map[string]interface{}
 	"Nested()": {

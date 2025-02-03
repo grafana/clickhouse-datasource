@@ -186,6 +186,14 @@ export default {
             label: 'Service Tags column',
             tooltip: 'Column for the service tags'
           },
+          eventsPrefix: {
+            label: 'Events column',
+            tooltip: 'Prefix for the events column'
+          },
+          linksPrefix: {
+            label: 'Links column',
+            tooltip: 'Prefix for the trace references column'
+          },
           kind: {
             label: 'Kind column',
             tooltip: 'Column for the trace kind'
@@ -209,15 +217,7 @@ export default {
           state: {
             label: 'State column',
             tooltip: 'Column for the trace state'
-          },
-          events: {
-            label: 'Events column',
-            tooltip: 'Column for the trace events'
-          },
-          links: {
-            label: 'Links column',
-            tooltip: 'Column for the trace references'
-          },
+          }
         }
       },
       LogsConfig: {
@@ -435,6 +435,14 @@ export default {
           label: 'Service Tags Column',
           tooltip: 'Column that contains the service tags'
         },
+        eventsPrefix: {
+          label: 'Events Prefix Column',
+          tooltip: 'Prefix for the events column'
+        },
+        linksPrefix: {
+          label: 'Links Column',
+          tooltip: 'Prefix for the trace references column'
+        },
         kind: {
           label: 'Kind Column',
           tooltip: 'Column that contains the trace kind'
@@ -459,18 +467,10 @@ export default {
           label: 'State Column',
           tooltip: 'Column that contains the trace state'
         },
-        events: {
-          label: 'Events Column',
-          tooltip: 'Column that contains the trace events'
-        },
-        links: {
-          label: 'Links Column',
-          tooltip: 'Column that contains the trace references'
-        },
         traceIdFilter: {
           label: 'Trace ID',
           tooltip: 'filter by a specific trace ID'
-        }
+        },
       },
     }
   },
@@ -501,13 +501,13 @@ export default {
       [ColumnHint.TraceTags]: 'Tags',
       [ColumnHint.TraceServiceTags]: 'Service Tags',
       [ColumnHint.TraceStatusCode]: 'Status Code',
+      [ColumnHint.TraceEventsPrefix]: 'Events Prefix',
+      [ColumnHint.TraceLinksPrefix]: 'Links Prefix',
       [ColumnHint.TraceKind]: 'Kind',
       [ColumnHint.TraceStatusMessage]: 'Status Message',
       [ColumnHint.TraceInstrumentationLibraryName]: 'Instrumentation Library Name',
       [ColumnHint.TraceInstrumentationLibraryVersion]: 'Instrumentation Library Version',
       [ColumnHint.TraceState]: 'State',
-      [ColumnHint.TraceEvents]: 'Events',
-      [ColumnHint.TraceLinks]: 'Links',
     }
   }
 }

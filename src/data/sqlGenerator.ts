@@ -150,6 +150,16 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`);
   }
 
+  const traceEventsPrefix = getColumnByHint(options, ColumnHint.TraceEventsPrefix);
+  if (traceEventsPrefix !== undefined) {
+    selectParts.push(`arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap( key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),${escapeIdentifier(traceEventsPrefix.name)}.Name, ${escapeIdentifier(traceEventsPrefix.name)}.Timestamp, ${escapeIdentifier(traceEventsPrefix.name)}.Attributes) AS logs`);
+  }
+
+  const traceLinksPrefix = getColumnByHint(options, ColumnHint.TraceLinksPrefix);
+  if (traceLinksPrefix !== undefined) {
+    selectParts.push(`arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, arrayMap(key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinksPrefix.name)}.TraceId, ${escapeIdentifier(traceLinksPrefix.name)}.SpanId, ${escapeIdentifier(traceLinksPrefix.name)}.Attributes) AS references`);
+  }
+
   const traceKind = getColumnByHint(options, ColumnHint.TraceKind);
   if (traceKind !== undefined) {
     selectParts.push(`${escapeIdentifier(traceKind.name)} as kind`);
@@ -173,18 +183,6 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const traceState = getColumnByHint(options, ColumnHint.TraceState);
   if (traceState !== undefined) {
     selectParts.push(`${escapeIdentifier(traceState.name)} as traceState`);
-  }
-
-  const traceEvents = getColumnByHint(options, ColumnHint.TraceEvents);
-  if (traceEvents !== undefined) {
-    // Assumes `events` is of type Nested(Timestamp DateTime64(9), Name LowCardinality(String), Attributes Map(LowCardinality(String), String))
-    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000), arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]), mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEvents.name)}) as logs`);
-  }
-
-  const traceLinks = getColumnByHint(options, ColumnHint.TraceLinks);
-  if (traceLinks !== undefined) {
-    // Assumes `links` is of type Nested(TraceId String, SpanId String, TraceState String, Attributes Map(LowCardinality(String), String))
-    selectParts.push(`arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]), mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinks.name)}) AS references`);
   }
 
   const selectPartsSql = selectParts.join(', ');

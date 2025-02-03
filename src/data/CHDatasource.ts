@@ -157,7 +157,7 @@ export class Datasource
       const llf = `toString("${logLevelColumn.name}")`;
       let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
-        aggregates.push({ aggregateType: AggregateType.Sum, column: `${llf} ${LOG_LEVEL_TO_IN_CLAUSE[level]}`, alias: level });
+        aggregates.push({ aggregateType: AggregateType.Sum, column: `multiSearchAny(${llf}, [${LOG_LEVEL_TO_IN_CLAUSE[level]}])`, alias: level });
       }
     } else {
       // Count all logs if level column isn't selected
@@ -493,14 +493,14 @@ export class Datasource
     traceConfig.startTimeColumn && result.set(ColumnHint.Time, traceConfig.startTimeColumn);
     traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
     traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
+    traceConfig.eventsColumnPrefix && result.set(ColumnHint.TraceEventsPrefix, traceConfig.eventsColumnPrefix);
+    traceConfig.linksColumnPrefix && result.set(ColumnHint.TraceLinksPrefix, traceConfig.linksColumnPrefix);
     traceConfig.kindColumn && result.set(ColumnHint.TraceKind, traceConfig.kindColumn);
     traceConfig.statusCodeColumn && result.set(ColumnHint.TraceStatusCode, traceConfig.statusCodeColumn);
     traceConfig.statusMessageColumn && result.set(ColumnHint.TraceStatusMessage, traceConfig.statusMessageColumn);
     traceConfig.instrumentationLibraryNameColumn && result.set(ColumnHint.TraceInstrumentationLibraryName, traceConfig.instrumentationLibraryNameColumn);
     traceConfig.instrumentationLibraryVersionColumn && result.set(ColumnHint.TraceInstrumentationLibraryVersion, traceConfig.instrumentationLibraryVersionColumn);
     traceConfig.stateColumn && result.set(ColumnHint.TraceState, traceConfig.stateColumn);
-    traceConfig.eventsColumn && result.set(ColumnHint.TraceEvents, traceConfig.eventsColumn);
-    traceConfig.linksColumn && result.set(ColumnHint.TraceLinks, traceConfig.linksColumn);
 
     return result;
   }
@@ -548,6 +548,51 @@ export class Datasource
   }
 
   /**
+   * Fetches JSON column suggestions for each specified JSON column.
+   */
+  async fetchPathsForJSONColumns(database: string | undefined, table: string, jsonColumnName: string): Promise<TableColumn[]> {
+    const prefix = Boolean(database) ? `"${database}".` : '';
+    const rawSql = `SELECT arrayJoin(distinctJSONPathsAndTypes(${jsonColumnName})) FROM ${prefix}"${table}"`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+
+    const view = new DataFrameView(frame);
+    const jsonPathsAndTypes: Array<[string, string]> = [];
+    for (let x of view) {
+      if (!x || !x[0]) {
+        continue;
+      }
+
+      const kv = JSON.parse(x[0]);
+      if (!kv.keys || !kv.values) {
+        continue;
+      }
+
+      jsonPathsAndTypes.push([kv.keys, kv.values]);
+    }
+
+    const columns: TableColumn[] = [];
+    for (let pathAndTypes of jsonPathsAndTypes) {
+      const path = pathAndTypes[0];
+      const types = pathAndTypes[1];
+      if (!path || !types || types.length === 0) {
+        continue;
+      }
+
+      columns.push({
+        name: `${jsonColumnName}.${path}`,
+        label: `${jsonColumnName}.${path}`,
+        type: types[0],
+        picklistValues: [],
+      })
+    }
+
+    return columns;
+  }
+
+  /**
    * Fetches column suggestions from the table schema.
    */
   async fetchColumnsFromTable(database: string | undefined, table: string): Promise<TableColumn[]> {
@@ -558,12 +603,20 @@ export class Datasource
       return [];
     }
     const view = new DataFrameView(frame);
-    return view.map(item => ({
+    const columns: TableColumn[] = view.map(item => ({
       name: item[0],
       type: item[1],
       label: item[0],
       picklistValues: [],
     }));
+
+    const results = await Promise.all(
+      columns
+        .filter(c => c.type.startsWith("JSON"))
+        .map(c => this.fetchPathsForJSONColumns(database, table, c.name))
+    );
+
+    return [...columns, ...results.flat()];
   }
 
   /**

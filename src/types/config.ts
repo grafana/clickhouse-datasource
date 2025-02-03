@@ -90,14 +90,14 @@ export interface CHTracesConfig {
   startTimeColumn?: string;
   tagsColumn?: string;
   serviceTagsColumn?: string;
+  eventsColumnPrefix?: string;
+  linksColumnPrefix?: string;
   kindColumn?: string;
   statusCodeColumn?: string;
   statusMessageColumn?: string;
   instrumentationLibraryNameColumn?: string;
   instrumentationLibraryVersionColumn?: string;
   stateColumn?: string;
-  eventsColumn?: string;
-  linksColumn?: string;
 }
 
 export interface AliasTableEntry {

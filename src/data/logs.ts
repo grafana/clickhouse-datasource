@@ -245,11 +245,11 @@ export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
     unknown: ['unknown'],
   };
   return (Object.keys(levels) as Array<keyof typeof levels>).reduce((allLevels, level) => {
-    allLevels[level] = `IN (${[
+    allLevels[level] = `${[
       ...levels[level].map((l) => `'${l}'`),
       ...levels[level].map((l) => `'${l.toUpperCase()}'`),
       ...levels[level].map((l) => `'${l.charAt(0).toUpperCase() + l.slice(1)}'`),
-    ].join(',')})`;
+    ].join(',')}`;
     return allLevels;
   }, {} as LogLevelToInClause);
 })();

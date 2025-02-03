@@ -1,8 +1,31 @@
 # Changelog
 
+## 4.7.0
+
+### Features
+
+- Add JSON column sub-paths to column selection in query builder
+- Added events support in trace detail view.(https://github.com/grafana/clickhouse-datasource/pull/1128)
+
+## 4.6.0
+
+### Features
+
+- Add support for new Variant, Dynamic, and JSON types (https://github.com/grafana/clickhouse-datasource/pull/1108)
+
+### Fixes
+
+- Optimized performance for log volumes processing using ClickHouse `multiSearchAny`
+
+## 4.5.1
+
+### Fixes
+
+- Dependency updates
+
 ## 4.5.0
 
-## Features
+### Features
 
 - Implemented log context for log queries
 - Added configuration options for log context columns
