@@ -55,6 +55,30 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+// getPDCDialContext returns a dialer function for creating a connection to PDC if a secure SOCKS proxy is enabled.
+func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Conn, error), error) {
+	p := sdkproxy.New(settings.ProxyOptions)
+
+	if !p.SecureSocksProxyEnabled() {
+		return nil, nil
+	}
+
+	dialer, err := p.NewSecureSocksProxyContextDialer()
+	if err != nil {
+		return nil, err
+	}
+
+	contextDialer, ok := dialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, errors.New("unable to cast SOCKS proxy dialer to context proxy dialer")
+	}
+
+	// Return a function matching the expected signature
+	return func(ctx context.Context, addr string) (net.Conn, error) {
+		return contextDialer.DialContext(ctx, "tcp", addr)
+	}, nil
+}
+
 func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
 	version := backend.UserAgentFromContext(ctx).GrafanaVersion()
 
@@ -182,20 +206,13 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		Settings:    customSettings,
 	}
 
-	p := sdkproxy.New(settings.ProxyOptions)
-
-	if p.SecureSocksProxyEnabled() {
-		dialer, err := p.NewSecureSocksProxyContextDialer()
+	// dialCtx is used to create a connection to PDC, if it is enabled
+	dialCtx, err := getPDCDialContext(settings)
 		if err != nil {
 			return nil, err
 		}
-		contextDialer, ok := dialer.(proxy.ContextDialer)
-		if !ok {
-			return nil, errors.New("unable to cast socks proxy dialer to context proxy dialer")
-		}
-		opts.DialContext = func(ctx context.Context, addr string) (net.Conn, error) {
-			return contextDialer.DialContext(ctx, "tcp", addr)
-		}
+	if dialCtx != nil {
+		opts.DialContext = dialCtx
 	}
 
 	db := clickhouse.OpenDB(opts)
