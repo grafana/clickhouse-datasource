@@ -83,7 +83,8 @@ func TestMain(m *testing.M) {
 	}
 	req := testcontainers.ContainerRequest{
 		Env: map[string]string{
-			"TZ": time.Local.String(),
+			"CLICKHOUSE_SKIP_USER_SETUP": "1", // added because of https://github.com/ClickHouse/ClickHouse/commit/65435a3db7214261b793acfb69388567b4c8c9b3
+			"TZ":                         time.Local.String(),
 		},
 		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
 		Files: []testcontainers.ContainerFile{
