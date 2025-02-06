@@ -25,6 +25,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -50,6 +57,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -82,6 +96,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -114,6 +135,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -145,6 +173,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -177,6 +212,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -209,6 +251,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -241,6 +290,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -273,6 +329,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -305,6 +368,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -337,6 +407,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -369,6 +446,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -401,6 +485,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -433,6 +524,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={onTagsColumnChange}
         onServiceTagsColumnChange={() => {}}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -465,6 +563,13 @@ describe('TracesConfig', () => {
         onTagsColumnChange={() => {}}
         onServiceTagsColumnChange={onServiceTagsColumnChange}
         onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -475,5 +580,317 @@ describe('TracesConfig', () => {
     fireEvent.blur(input);
     expect(onServiceTagsColumnChange).toHaveBeenCalledTimes(1);
     expect(onServiceTagsColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onEventsColumnPrefixChange when changed', () => {
+    const onEventsColumnPrefixChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={onEventsColumnPrefixChange}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.eventsPrefix.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onEventsColumnPrefixChange).toHaveBeenCalledTimes(1);
+    expect(onEventsColumnPrefixChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onLinksColumnPrefixChange when changed', () => {
+    const onLinksColumnPrefixChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={onLinksColumnPrefixChange}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.linksPrefix.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onLinksColumnPrefixChange).toHaveBeenCalledTimes(1);
+    expect(onLinksColumnPrefixChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onKindColumnChange when changed', () => {
+    const onKindColumnChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={onKindColumnChange}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.kind.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onKindColumnChange).toHaveBeenCalledTimes(1);
+    expect(onKindColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onStatusCodeColumnChange when changed', () => {
+    const onStatusCodeColumnChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={onStatusCodeColumnChange}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.statusCode.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onStatusCodeColumnChange).toHaveBeenCalledTimes(1);
+    expect(onStatusCodeColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onStatusMessageColumnChange when changed', () => {
+    const onStatusMessageColumnChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={onStatusMessageColumnChange}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.statusMessage.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onStatusMessageColumnChange).toHaveBeenCalledTimes(1);
+    expect(onStatusMessageColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onInstrumentationLibraryNameColumnChange when changed', () => {
+    const onInstrumentationLibraryNameColumnChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={onInstrumentationLibraryNameColumnChange}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.instrumentationLibraryName.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onInstrumentationLibraryNameColumnChange).toHaveBeenCalledTimes(1);
+    expect(onInstrumentationLibraryNameColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onInstrumentationLibraryVersionColumnChange when changed', () => {
+    const onInstrumentationLibraryVersionColumnChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={onInstrumentationLibraryVersionColumnChange}
+        onStateColumnChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.instrumentationLibraryVersion.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onInstrumentationLibraryVersionColumnChange).toHaveBeenCalledTimes(1);
+    expect(onInstrumentationLibraryVersionColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onStateColumnChange when changed', () => {
+    const onStateColumnChange = jest.fn();
+    const result = render(
+      <TracesConfig
+        tracesConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onTraceIdColumnChange={() => {}}
+        onSpanIdColumnChange={() => {}}
+        onOperationNameColumnChange={() => {}}
+        onParentSpanIdColumnChange={() => {}}
+        onServiceNameColumnChange={() => {}}
+        onDurationColumnChange={() => {}}
+        onDurationUnitChange={() => {}}
+        onStartTimeColumnChange={() => {}}
+        onTagsColumnChange={() => {}}
+        onServiceTagsColumnChange={() => {}}
+        onEventsColumnPrefixChange={() => {}}
+        onLinksColumnPrefixChange={() => {}}
+        onKindColumnChange={() => {}}
+        onStatusCodeColumnChange={() => {}}
+        onStatusMessageColumnChange={() => {}}
+        onInstrumentationLibraryNameColumnChange={() => {}}
+        onInstrumentationLibraryVersionColumnChange={() => {}}
+        onStateColumnChange={onStateColumnChange}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.state.label));
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onStateColumnChange).toHaveBeenCalledTimes(1);
+    expect(onStateColumnChange).toHaveBeenCalledWith('changed');
   });
 });
