@@ -107,6 +107,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	if err != nil {
 		return nil, err
 	}
+
 	var tlsConfig *tls.Config
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err = getTLSConfig(settings)
@@ -118,6 +119,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 			InsecureSkipVerify: settings.InsecureSkipVerify,
 		}
 	}
+
 	t, err := strconv.Atoi(settings.DialTimeout)
 	if err != nil {
 		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout)))
@@ -126,24 +128,23 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	if err != nil {
 		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout)))
 	}
+
 	protocol := clickhouse.Native
 	if settings.Protocol == "http" {
 		protocol = clickhouse.HTTP
 	}
+
 	compression := clickhouse.CompressionLZ4
 	if protocol == clickhouse.HTTP {
 		compression = clickhouse.CompressionGZIP
 	}
+
 	customSettings := make(clickhouse.Settings)
 	if settings.CustomSettings != nil {
 		for _, setting := range settings.CustomSettings {
 			customSettings[setting.Setting] = setting.Value
 		}
 	}
-
-	timeout := time.Duration(t)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
-	defer cancel()
 
 	httpHeaders, err := extractForwardedHeadersFromMessage(message)
 	if err != nil {
@@ -154,6 +155,10 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	for k, v := range settings.HttpHeaders {
 		httpHeaders[k] = v
 	}
+
+	timeout := time.Duration(t) * time.Second
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 
 	opts := &clickhouse.Options{
 		ClientInfo: clickhouse.ClientInfo{
@@ -195,16 +200,12 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 
 	db := clickhouse.OpenDB(opts)
 
-	chErr := make(chan error, 1)
-	go func() {
-		err = db.PingContext(ctx)
-		chErr <- err
-	}()
-
 	select {
-	case err := <-chErr:
+	case <-ctx.Done():
+		return db, fmt.Errorf("the operation was cancelled: %w", ctx.Err())
+	default:
+		err := db.PingContext(ctx)
 		if err != nil {
-			// sql ds will ping again and show error
 			if exception, ok := err.(*clickhouse.Exception); ok {
 				log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
 			} else {
@@ -212,8 +213,6 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 			}
 			return db, nil
 		}
-	case <-time.After(timeout * time.Second):
-		return db, errors.New("connection timed out")
 	}
 
 	return db, settings.isValid()
