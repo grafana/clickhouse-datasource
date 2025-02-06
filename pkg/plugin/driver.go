@@ -55,6 +55,30 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+// getPDCDialContext returns a dialer function for creating a connection to PDC if a secure SOCKS proxy is enabled.
+func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Conn, error), error) {
+	p := sdkproxy.New(settings.ProxyOptions)
+
+	if !p.SecureSocksProxyEnabled() {
+		return nil, nil
+	}
+
+	dialer, err := p.NewSecureSocksProxyContextDialer()
+	if err != nil {
+		return nil, err
+	}
+
+	contextDialer, ok := dialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, errors.New("unable to cast SOCKS proxy dialer to context proxy dialer")
+	}
+
+	// Return a function matching the expected signature
+	return func(ctx context.Context, addr string) (net.Conn, error) {
+		return contextDialer.DialContext(ctx, "tcp", addr)
+	}, nil
+}
+
 func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
 	version := backend.UserAgentFromContext(ctx).GrafanaVersion()
 
@@ -182,20 +206,13 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		Settings:    customSettings,
 	}
 
-	p := sdkproxy.New(settings.ProxyOptions)
-
-	if p.SecureSocksProxyEnabled() {
-		dialer, err := p.NewSecureSocksProxyContextDialer()
-		if err != nil {
-			return nil, err
-		}
-		contextDialer, ok := dialer.(proxy.ContextDialer)
-		if !ok {
-			return nil, errors.New("unable to cast socks proxy dialer to context proxy dialer")
-		}
-		opts.DialContext = func(ctx context.Context, addr string) (net.Conn, error) {
-			return contextDialer.DialContext(ctx, "tcp", addr)
-		}
+	// dialCtx is used to create a connection to PDC, if it is enabled
+	dialCtx, err := getPDCDialContext(settings)
+	if err != nil {
+		return nil, err
+	}
+	if dialCtx != nil {
+		opts.DialContext = dialCtx
 	}
 
 	db := clickhouse.OpenDB(opts)
@@ -266,40 +283,65 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
 }
 
-// MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
+// MutateResponse converts fields of type FieldTypeNullableJSON to string,
+// except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
-		if frame.Meta.PreferredVisualization != data.VisTypeTrace &&
-			frame.Meta.PreferredVisualization != data.VisTypeTable &&
-			frame.Meta.PreferredVisualization != data.VisTypeLogs {
-			var fields []*data.Field
-			for _, field := range frame.Fields {
-				values := make([]*string, field.Len())
-				if field.Type() == data.FieldTypeNullableJSON {
-					newField := data.NewField(field.Name, field.Labels, values)
-					newField.SetConfig(field.Config)
-					for i := 0; i < field.Len(); i++ {
-						val := field.At(i).(*json.RawMessage)
-						if val == nil {
-							newField.Set(i, nil)
-						} else {
-							bytes, err := val.MarshalJSON()
-							if err != nil {
-								return res, err
-							}
-							sVal := string(bytes)
-							newField.Set(i, &sVal)
-						}
-					}
-					fields = append(fields, newField)
-				} else {
-					fields = append(fields, field)
-				}
+		if shouldConvertFields(frame.Meta.PreferredVisualization) {
+			if err := convertNullableJSONFields(frame); err != nil {
+				return res, err
 			}
-			frame.Fields = fields
 		}
 	}
 	return res, nil
+}
+
+// shouldConvertFields determines whether field conversion is needed based on visualization type.
+func shouldConvertFields(visType data.VisType) bool {
+	return visType != data.VisTypeTrace && visType != data.VisTypeTable && visType != data.VisTypeLogs
+}
+
+// convertNullableJSONFields converts all FieldTypeNullableJSON fields in the given frame to string.
+func convertNullableJSONFields(frame *data.Frame) error {
+	var convertedFields []*data.Field
+
+	for _, field := range frame.Fields {
+		if field.Type() == data.FieldTypeNullableJSON {
+			newField, err := convertFieldToString(field)
+			if err != nil {
+				return err
+			}
+			convertedFields = append(convertedFields, newField)
+		} else {
+			convertedFields = append(convertedFields, field)
+		}
+	}
+
+	frame.Fields = convertedFields
+	return nil
+}
+
+// convertFieldToString creates a new field where JSON values are marshaled into string representations.
+func convertFieldToString(field *data.Field) (*data.Field, error) {
+	values := make([]*string, field.Len())
+	newField := data.NewField(field.Name, field.Labels, values)
+	newField.SetConfig(field.Config)
+
+	for i := 0; i < field.Len(); i++ {
+		val, _ := field.At(i).(*json.RawMessage)
+		if val == nil {
+			newField.Set(i, nil)
+		} else {
+			bytes, err := val.MarshalJSON()
+			if err != nil {
+				return nil, err
+			}
+			sVal := string(bytes)
+			newField.Set(i, &sVal)
+		}
+	}
+
+	return newField, nil
 }
 
 func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {
