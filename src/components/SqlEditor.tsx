@@ -112,7 +112,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
           showMiniMap={false}
           showLineNumbers={true}
           onBlur={(sql) => saveChanges({ rawSql: sql })}
-          onEditorDidMount={handlemount}
+          onEditorDidMount={handleMount}
         />
       </div>
     </>
