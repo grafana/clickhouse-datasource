@@ -77,7 +77,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
     }
   };
 
-  const handleMount = (editor: any) => {
+  const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
     const me = registerSQL('chSql', editor, getSuggestions);
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
@@ -85,6 +85,16 @@ export const SqlEditor = (props: SqlEditorProps) => {
         const sql = editor.getValue();
         validateSql(sql, editor.getModel(), me);
       }
+    });
+    editor.addAction({
+      id: 'run-query',
+      label: 'Run Query',
+      keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      contextMenuGroupId: 'navigation',
+      contextMenuOrder: 1.5,
+      run: function () {
+        props.onRunQuery();
+      },
     });
   };
 
@@ -102,7 +112,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
           showMiniMap={false}
           showLineNumbers={true}
           onBlur={(sql) => saveChanges({ rawSql: sql })}
-          onEditorDidMount={(editor: any) => handleMount(editor)}
+          onEditorDidMount={handlemount}
         />
       </div>
     </>
