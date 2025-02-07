@@ -73,7 +73,6 @@ func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Co
 		return nil, errors.New("unable to cast SOCKS proxy dialer to context proxy dialer")
 	}
 
-	// Return a function matching the expected signature
 	return func(ctx context.Context, addr string) (net.Conn, error) {
 		return contextDialer.DialContext(ctx, "tcp", addr)
 	}, nil
@@ -180,30 +179,26 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		httpHeaders[k] = v
 	}
 
-	timeout := time.Duration(t) * time.Second
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
 	opts := &clickhouse.Options{
+		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
+		Auth: clickhouse.Auth{
+			Database: settings.DefaultDatabase,
+			Password: settings.Password,
+			Username: settings.Username,
+		},
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
-		},
-		TLS:         tlsConfig,
-		Addr:        []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
-		HttpUrlPath: settings.Path,
-		HttpHeaders: httpHeaders,
-		Auth: clickhouse.Auth{
-			Username: settings.Username,
-			Password: settings.Password,
-			Database: settings.DefaultDatabase,
 		},
 		Compression: &clickhouse.Compression{
 			Method: compression,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
-		ReadTimeout: time.Duration(qt) * time.Second,
+		HttpHeaders: httpHeaders,
+		HttpUrlPath: settings.Path,
 		Protocol:    protocol,
+		ReadTimeout: time.Duration(qt) * time.Second,
 		Settings:    customSettings,
+		TLS:         tlsConfig,
 	}
 
 	// dialCtx is used to create a connection to PDC, if it is enabled
@@ -215,21 +210,36 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		opts.DialContext = dialCtx
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(t)*time.Second)
+	defer cancel()
+
 	db := clickhouse.OpenDB(opts)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetMaxIdleConns(25)
+	db.SetMaxOpenConns(50)
 
 	select {
 	case <-ctx.Done():
-		return db, fmt.Errorf("the operation was cancelled: %w", ctx.Err())
+		return nil, fmt.Errorf("the operation was cancelled before starting: %w", ctx.Err())
 	default:
-		err := db.PingContext(ctx)
-		if err != nil {
-			if exception, ok := err.(*clickhouse.Exception); ok {
-				log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-			} else {
-				log.DefaultLogger.Error(err.Error())
-			}
-			return db, nil
+		// proceed
+	}
+
+	// `sqlds` normally calls `db.PingContext()` to check if the connection is alive,
+	// however, as ClickHouse returns its own non-standard `Exception` type, we need
+	// to handle it here so that we can log the error code, message and stack trace
+	if err := db.PingContext(ctx); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
 		}
+
+		if exception, ok := err.(*clickhouse.Exception); ok {
+			log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
+		} else {
+			log.DefaultLogger.Error(err.Error())
+		}
+
+		return nil, err
 	}
 
 	return db, settings.isValid()
