@@ -89,7 +89,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
     editor.addAction({
       id: 'run-query',
       label: 'Run Query',
-      keybindings: [monaco.KeyMod.Shift | monaco.KeyCode.Enter],
+      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 1.5,
       run: function () {
