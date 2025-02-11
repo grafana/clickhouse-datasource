@@ -1,6 +1,7 @@
 module github.com/grafana/clickhouse-datasource
 
-go 1.23
+go 1.23.5
+
 toolchain go1.23.6
 
 require (
