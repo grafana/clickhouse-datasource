@@ -214,9 +214,17 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	defer cancel()
 
 	db := clickhouse.OpenDB(opts)
-	db.SetConnMaxLifetime(5 * time.Minute)
-	db.SetMaxIdleConns(25)
-	db.SetMaxOpenConns(50)
+
+	// Set connection pool settings
+	if i, err := strconv.Atoi(settings.ConnMaxLifetime); err == nil {
+		db.SetConnMaxLifetime(time.Duration(i) * time.Minute)
+	}
+	if i, err := strconv.Atoi(settings.MaxIdleConns); err == nil {
+		db.SetMaxIdleConns(i)
+	}
+	if i, err := strconv.Atoi(settings.MaxOpenConns); err == nil {
+		db.SetMaxOpenConns(i)
+	}
 
 	select {
 	case <-ctx.Done():
