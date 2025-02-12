@@ -134,6 +134,12 @@ export enum ColumnHint {
   TraceServiceTags = 'trace_service_tags',
   TraceStatusCode = 'trace_status_code',
   TraceEventsPrefix = 'trace_events_prefix',
+  TraceLinksPrefix = 'trace_links_prefix',
+  TraceKind = 'trace_kind',
+  TraceStatusMessage = 'trace_status_message',
+  TraceInstrumentationLibraryName = 'instrumentation_library_name',
+  TraceInstrumentationLibraryVersion = 'instrumentation_library_version',
+  TraceState = 'trace_state',
 }
 
 /**

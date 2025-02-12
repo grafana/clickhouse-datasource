@@ -28,6 +28,13 @@ interface TraceConfigProps {
   onTagsColumnChange: (v: string) => void;
   onServiceTagsColumnChange: (v: string) => void;
   onEventsColumnPrefixChange: (v: string) => void;
+  onLinksColumnPrefixChange: (v: string) => void;
+  onKindColumnChange: (v: string) => void;
+  onStatusCodeColumnChange: (v: string) => void;
+  onStatusMessageColumnChange: (v: string) => void;
+  onInstrumentationLibraryNameColumnChange: (v: string) => void;
+  onInstrumentationLibraryVersionColumnChange: (v: string) => void;
+  onStateColumnChange: (v: string) => void;
 }
 
 export const TracesConfig = (props: TraceConfigProps) => {
@@ -36,13 +43,17 @@ export const TracesConfig = (props: TraceConfigProps) => {
     onOtelEnabledChange, onOtelVersionChange,
     onTraceIdColumnChange, onSpanIdColumnChange, onOperationNameColumnChange, onParentSpanIdColumnChange,
     onServiceNameColumnChange, onDurationColumnChange, onDurationUnitChange, onStartTimeColumnChange,
-    onTagsColumnChange, onServiceTagsColumnChange, onEventsColumnPrefixChange
+    onTagsColumnChange, onServiceTagsColumnChange, onEventsColumnPrefixChange, onLinksColumnPrefixChange,
+    onKindColumnChange, onStatusCodeColumnChange, onStatusMessageColumnChange, onInstrumentationLibraryNameColumnChange,
+    onInstrumentationLibraryVersionColumnChange, onStateColumnChange
   } = props;
   let {
     defaultDatabase, defaultTable,
     otelEnabled, otelVersion,
     traceIdColumn, spanIdColumn, operationNameColumn, parentSpanIdColumn, serviceNameColumn,
-    durationColumn, durationUnit, startTimeColumn, tagsColumn, serviceTagsColumn, eventsColumnPrefix
+    durationColumn, durationUnit, startTimeColumn, tagsColumn, serviceTagsColumn, eventsColumnPrefix,
+    linksColumnPrefix, kindColumn, statusCodeColumn, statusMessageColumn, instrumentationLibraryNameColumn,
+    instrumentationLibraryVersionColumn, stateColumn
   } = (props.tracesConfig || {}) as CHTracesConfig;
   const labels = allLabels.components.Config.TracesConfig;
 
@@ -58,6 +69,13 @@ export const TracesConfig = (props: TraceConfigProps) => {
     tagsColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceTags);
     serviceTagsColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceServiceTags);
     eventsColumnPrefix = otelConfig.traceColumnMap.get(ColumnHint.TraceEventsPrefix);
+    linksColumnPrefix = otelConfig.traceColumnMap.get(ColumnHint.TraceLinksPrefix);
+    kindColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceKind);
+    statusCodeColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceStatusCode);
+    statusMessageColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceStatusMessage);
+    instrumentationLibraryNameColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceInstrumentationLibraryName);
+    instrumentationLibraryVersionColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceInstrumentationLibraryVersion);
+    stateColumn = otelConfig.traceColumnMap.get(ColumnHint.TraceState);
     durationUnit = otelConfig.traceDurationUnit.toString();
   }
 
@@ -190,6 +208,62 @@ export const TracesConfig = (props: TraceConfigProps) => {
           tooltip={labels.columns.eventsPrefix.tooltip}
           value={eventsColumnPrefix || ''}
           onChange={onEventsColumnPrefixChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.linksPrefix.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.linksPrefix.label)}
+          tooltip={labels.columns.linksPrefix.tooltip}
+          value={linksColumnPrefix || ''}
+          onChange={onLinksColumnPrefixChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.kind.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.kind.label)}
+          tooltip={labels.columns.kind.tooltip}
+          value={kindColumn || ''}
+          onChange={onKindColumnChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.statusCode.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.statusCode.label)}
+          tooltip={labels.columns.statusCode.tooltip}
+          value={statusCodeColumn || ''}
+          onChange={onStatusCodeColumnChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.statusMessage.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.statusMessage.label)}
+          tooltip={labels.columns.statusMessage.tooltip}
+          value={statusMessageColumn || ''}
+          onChange={onStatusMessageColumnChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.instrumentationLibraryName.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.instrumentationLibraryName.label)}
+          tooltip={labels.columns.instrumentationLibraryName.tooltip}
+          value={instrumentationLibraryNameColumn || ''}
+          onChange={onInstrumentationLibraryNameColumnChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.instrumentationLibraryVersion.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.instrumentationLibraryVersion.label)}
+          tooltip={labels.columns.instrumentationLibraryVersion.tooltip}
+          value={instrumentationLibraryVersionColumn || ''}
+          onChange={onInstrumentationLibraryVersionColumnChange}
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.state.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.state.label)}
+          tooltip={labels.columns.state.tooltip}
+          value={stateColumn || ''}
+          onChange={onStateColumnChange}
         />
       </ConfigSubSection>
     </ConfigSection>

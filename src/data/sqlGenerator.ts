@@ -149,9 +149,44 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (traceStatusCode !== undefined) {
     selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`);
   }
+
   const traceEventsPrefix = getColumnByHint(options, ColumnHint.TraceEventsPrefix);
   if (traceEventsPrefix !== undefined) {
-    selectParts.push(`arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap( key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),${escapeIdentifier(traceEventsPrefix.name)}.Name, ${escapeIdentifier(traceEventsPrefix.name)}.Timestamp, ${escapeIdentifier(traceEventsPrefix.name)}.Attributes) AS logs`);
+    // It is important to treat the prefixed columns as one nested column, as this
+    // ensures that the query will work when the column was created with flatten_nested.
+    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000), arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]), mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEventsPrefix.name)}) as logs`);
+  }
+
+  const traceLinksPrefix = getColumnByHint(options, ColumnHint.TraceLinksPrefix);
+  if (traceLinksPrefix !== undefined) {
+    // It is important to treat the prefixed columns as one nested column, as this
+    // ensures that the query will work when the column was created with flatten_nested.
+    selectParts.push(`arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]), mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinksPrefix.name)}) AS references`);
+  }
+
+  const traceKind = getColumnByHint(options, ColumnHint.TraceKind);
+  if (traceKind !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceKind.name)} as kind`);
+  }
+
+  const traceStatusMessage = getColumnByHint(options, ColumnHint.TraceStatusMessage);
+  if (traceStatusMessage !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceStatusMessage.name)} as statusMessage`);
+  }
+
+  const traceInstrumentationLibraryName = getColumnByHint(options, ColumnHint.TraceInstrumentationLibraryName);
+  if (traceInstrumentationLibraryName !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceInstrumentationLibraryName.name)} as instrumentationLibraryName`);
+  }
+
+  const traceInstrumentationLibraryVersion = getColumnByHint(options, ColumnHint.TraceInstrumentationLibraryVersion);
+  if (traceInstrumentationLibraryVersion !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceInstrumentationLibraryVersion.name)} as instrumentationLibraryVersion`);
+  }
+
+  const traceState = getColumnByHint(options, ColumnHint.TraceState);
+  if (traceState !== undefined) {
+    selectParts.push(`${escapeIdentifier(traceState.name)} as traceState`);
   }
 
   const selectPartsSql = selectParts.join(', ');
@@ -694,7 +729,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
       operator = '';
       negate = true;
     } else if (filter.operator === FilterOperator.WithInGrafanaTimeRange) {
-        operator = '';
+      operator = '';
     }
 
     if (operator) {
@@ -763,11 +798,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
 };
 
 const stripTypeModifiers = (type: string): string => {
-    return type.toLowerCase().
-      replace(/\(/g, '').
-      replace(/\)/g, '').
-      replace(/nullable/g, '').
-      replace(/lowcardinality/g, '');
+  return type.toLowerCase().
+    replace(/\(/g, '').
+    replace(/\)/g, '').
+    replace(/nullable/g, '').
+    replace(/lowcardinality/g, '');
 
 }
 const isBooleanType = (type: string): boolean => (type?.toLowerCase().startsWith('boolean'));
@@ -778,7 +813,7 @@ const isDateType = (type: string): boolean => type?.toLowerCase().startsWith('da
 const isStringType = (type: string): boolean => {
   type = stripTypeModifiers(type.toLowerCase());
   return (type === 'string' || type.startsWith('fixedstring'))
-  && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
+    && !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 }
 const isNullFilter = (operator: FilterOperator): boolean => operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
 const isBooleanFilter = (type: string): boolean => isBooleanType(type);
