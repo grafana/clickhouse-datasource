@@ -115,21 +115,39 @@ export default {
       },
       QuerySettingsConfig: {
         title: 'Query settings',
+        connMaxLifetime: {
+          label: 'Connection Max Lifetime (minutes)',
+          name: 'connMaxLifetime',
+          placeholder: '5',
+          tooltip: 'Maximum lifetime of a connection in minutes'
+        },
         dialTimeout: {
           label: 'Dial Timeout (seconds)',
-          tooltip: 'Timeout in seconds for connection',
           name: 'dialTimeout',
           placeholder: '10',
+          tooltip: 'Timeout in seconds for connection'
+        },
+        maxIdleConns: {
+          label: 'Max Idle Connections',
+          name: 'maxIdleConns',
+          placeholder: '25',
+          tooltip: 'Maximum number of idle connections'
+        },
+        maxOpenConns: {
+          label: 'Max Open Connections',
+          name: 'maxOpenConns',
+          placeholder: '50',
+          tooltip: 'Maximum number of open connections'
         },
         queryTimeout: {
           label: 'Query Timeout (seconds)',
-          tooltip: 'Timeout in seconds for read queries',
           name: 'queryTimeout',
           placeholder: '60',
+          tooltip: 'Timeout in seconds for read queries'
         },
         validateSql: {
           label: 'Validate SQL',
-          tooltip: 'Validate SQL in the editor.',
+          tooltip: 'Validate SQL in the editor.'
         }
       },
       TracesConfig: {
