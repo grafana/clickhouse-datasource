@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.8.1
+
+### Fixes
+
+- Dependency updates
+
 ## 4.8.0
 
 ### Features
