@@ -80,11 +80,19 @@ func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Co
 
 func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
 	version := backend.UserAgentFromContext(ctx).GrafanaVersion()
+	user := backend.UserFromContext(ctx)
 
 	if version != "" {
 		products = append(products, struct{ Name, Version string }{
 			Name:    "grafana",
 			Version: version,
+		})
+	}
+
+	if user != nil {
+		products = append(products, struct{ Name, Version string }{
+			Name:    "grafana_user",
+			Version: user.Login,
 		})
 	}
 
@@ -187,6 +195,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 			Username: settings.Username,
 		},
 		ClientInfo: clickhouse.ClientInfo{
+			User:     getClientInfoUser(ctx),
 			Products: getClientInfoProducts(ctx),
 		},
 		Compression: &clickhouse.Compression{
