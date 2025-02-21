@@ -195,7 +195,6 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 			Username: settings.Username,
 		},
 		ClientInfo: clickhouse.ClientInfo{
-			User:     getClientInfoUser(ctx),
 			Products: getClientInfoProducts(ctx),
 		},
 		Compression: &clickhouse.Compression{
