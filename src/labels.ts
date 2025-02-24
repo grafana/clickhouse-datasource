@@ -207,6 +207,34 @@ export default {
           eventsPrefix: {
             label: 'Events column',
             tooltip: 'Prefix for the events column'
+          },
+          linksPrefix: {
+            label: 'Links column',
+            tooltip: 'Prefix for the trace references column'
+          },
+          kind: {
+            label: 'Kind column',
+            tooltip: 'Column for the trace kind'
+          },
+          statusCode: {
+            label: 'Status Code column',
+            tooltip: 'Column for the trace status code'
+          },
+          statusMessage: {
+            label: 'Status Message column',
+            tooltip: 'Column for the trace status message'
+          },
+          instrumentationLibraryName: {
+            label: 'Library Name column',
+            tooltip: 'Column for the instrumentation library name'
+          },
+          instrumentationLibraryVersion: {
+            label: 'Library Version column',
+            tooltip: 'Column for the instrumentation library version'
+          },
+          state: {
+            label: 'State column',
+            tooltip: 'Column for the trace state'
           }
         }
       },
@@ -425,14 +453,42 @@ export default {
           label: 'Service Tags Column',
           tooltip: 'Column that contains the service tags'
         },
+        eventsPrefix: {
+          label: 'Events Prefix',
+          tooltip: 'Prefix for the events column'
+        },
+        linksPrefix: {
+          label: 'Links Prefix',
+          tooltip: 'Prefix for the trace references column'
+        },
+        kind: {
+          label: 'Kind Column',
+          tooltip: 'Column that contains the trace kind'
+        },
+        statusCode: {
+          label: 'Status Code Column',
+          tooltip: 'Column that contains the trace status code'
+        },
+        statusMessage: {
+          label: 'Status Message Column',
+          tooltip: 'Column that contains the trace status message'
+        },
+        instrumentationLibraryName: {
+          label: 'Library Name Column',
+          tooltip: 'Column that contains the instrumentation library name'
+        },
+        instrumentationLibraryVersion: {
+          label: 'Library Version Column',
+          tooltip: 'Column that contains the instrumentation library version'
+        },
+        state: {
+          label: 'State Column',
+          tooltip: 'Column that contains the trace state'
+        },
         traceIdFilter: {
           label: 'Trace ID',
           tooltip: 'filter by a specific trace ID'
         },
-        eventsPrefix: {
-          label: 'Events Prefix',
-          tooltip: 'Prefix for the events column'
-        }
       },
     }
   },
@@ -464,6 +520,12 @@ export default {
       [ColumnHint.TraceServiceTags]: 'Service Tags',
       [ColumnHint.TraceStatusCode]: 'Status Code',
       [ColumnHint.TraceEventsPrefix]: 'Events Prefix',
+      [ColumnHint.TraceLinksPrefix]: 'Links Prefix',
+      [ColumnHint.TraceKind]: 'Kind',
+      [ColumnHint.TraceStatusMessage]: 'Status Message',
+      [ColumnHint.TraceInstrumentationLibraryName]: 'Instrumentation Library Name',
+      [ColumnHint.TraceInstrumentationLibraryVersion]: 'Instrumentation Library Version',
+      [ColumnHint.TraceState]: 'State',
     }
   }
 }
