@@ -65,7 +65,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
-	github.com/elazarl/goproxy v1.7.1
+	github.com/elazarl/goproxy v1.7.2
 	github.com/fatih/color v1.15.0 // indirect
 	github.com/getkin/kin-openapi v0.129.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
