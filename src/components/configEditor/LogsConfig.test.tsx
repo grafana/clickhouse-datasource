@@ -93,8 +93,8 @@ describe('LogsConfig', () => {
       />
     );
     expect(result.container.firstChild).not.toBeNull();
-
-    const checkboxes = result.getAllByRole('checkbox');
+    
+    const checkboxes = result.container.querySelectorAll('input[type="checkbox"]');
     expect(checkboxes).toHaveLength(2);
     const input = checkboxes[0];
     expect(input).toBeInTheDocument();
