@@ -1,13 +1,13 @@
-declare const monaco: any;
+import { Monaco, MonacoEditor } from '@grafana/ui'
+import { format } from 'sql-formatter';
 
-interface Lang {
-  id: string;
-}
+declare const monaco: Monaco;
 
 interface Model {
   getValueInRange: Function;
   getWordUntilPosition: Function;
   getValue: Function;
+  getOffsetAt: Function;
 }
 
 interface Position {
@@ -36,31 +36,31 @@ export interface Suggestion {
 }
 
 export type Fetcher = {
-  (text: string, range: Range): Promise<SuggestionResponse>;
+  (text: string, range: Range, cursorPosition: number): Promise<SuggestionResponse>;
 };
 
-export function registerSQL(lang: string, editor: any, fetchSuggestions: Fetcher) {
+export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions: Fetcher) {
   // so options are visible outside query editor
   editor.updateOptions({ fixedOverflowWidgets: true, scrollBeyondLastLine: false });
 
-  const registeredLang = monaco.languages.getLanguages().find((l: Lang) => l.id === lang);
-  if (registeredLang !== undefined) {
-    return monaco.editor;
-  }
+  // const registeredLang = monaco.languages.getLanguages().find((l: Lang) => l.id === lang);
+  // if (registeredLang !== undefined) {
+  //   return monaco.editor;
+  // }
 
-  monaco.languages.register({ id: lang });
+  // monaco.languages.register({ id: lang });
 
   // just extend sql for now so we get syntax highlighting
   monaco.languages.registerCompletionItemProvider('sql', {
-    triggerCharacters: [' ', '$', '.', ','],
+    triggerCharacters: [' ', '.', '$'],
     provideCompletionItems: async (model: Model, position: Position) => {
       const word = model.getWordUntilPosition(position);
-      const textUntilPosition = model.getValueInRange({
-        startLineNumber: 1,
-        startColumn: 1,
-        endLineNumber: position.lineNumber,
-        endColumn: position.column,
-      });
+      // const textUntilPosition = model.getValueInRange({
+      //   startLineNumber: 1,
+      //   startColumn: 1,
+      //   endLineNumber: position.lineNumber,
+      //   endColumn: position.column,
+      // });
 
       const range: Range = {
         startLineNumber: position.lineNumber,
@@ -69,8 +69,22 @@ export function registerSQL(lang: string, editor: any, fetchSuggestions: Fetcher
         endColumn: word.endColumn,
       };
 
-      return fetchSuggestions(textUntilPosition, range);
+      return fetchSuggestions(model.getValue(), range, model.getOffsetAt(position));
     },
+  });
+
+  monaco.languages.registerDocumentFormattingEditProvider('sql', {
+    provideDocumentFormattingEdits(model, options) {
+      const formatted = format(model.getValue(), {
+        indent: ' '.repeat(options.tabSize)
+      } as any);
+      return [
+        {
+          range: model.getFullModelRange(),
+          text: formatted
+        }
+      ];
+    }
   });
 
   return monaco.editor;
