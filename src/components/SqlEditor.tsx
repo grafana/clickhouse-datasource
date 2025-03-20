@@ -6,7 +6,7 @@ import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHConfig } from 'types/config';
 import { CHQuery, EditorType, CHSqlQuery } from 'types/sql';
 import { styles } from 'styles';
-import { fetchSuggestions, Schema } from './suggestions';
+import { getSuggestions, Schema } from './suggestions';
 import { validate } from 'data/validate';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { QueryType } from 'types/queryBuilder';
@@ -48,13 +48,13 @@ export const SqlEditor = (props: SqlEditorProps) => {
   const schema: Schema = {
     databases: () => datasource.fetchDatabases(),
     tables: (db?: string) => datasource.fetchTables(db),
-    fields: (db: string, table: string) => datasource.fetchFields(db, table),
+    columns: (db: string, table: string) => datasource.fetchColumnsFromTable(db, table),
     defaultDatabase: datasource.getDefaultDatabase(),
   };
 
-  const getSuggestions: Fetcher = async (text: string, range: Range) => {
-    const suggestions = await fetchSuggestions(text, schema, range);
-    return Promise.resolve({ suggestions });
+  const _getSuggestions: Fetcher = async (text: string, range: Range, cursorPosition: number) => {
+    const suggestions = await getSuggestions(text, schema, range, cursorPosition);
+    return { suggestions };
   };
 
   const validateSql = (sql: string, model: any, me: any) => {
@@ -78,7 +78,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
-    const me = registerSQL('chSql', editor, getSuggestions);
+    const me = registerSQL('sql', editor, _getSuggestions);
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
       if (datasource.settings.jsonData.validateSql) {
@@ -86,6 +86,16 @@ export const SqlEditor = (props: SqlEditorProps) => {
         validateSql(sql, editor.getModel(), me);
       }
     });
+    // editor.addAction({
+    //   id: 'run-query',
+    //   label: 'Run Query',
+    //   keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+    //   contextMenuGroupId: 'navigation',
+    //   contextMenuOrder: 1.5,
+    //   run: function() {
+    //     props.onRunQuery();
+    //   },
+    // });
     editor.addAction({
       id: 'run-query',
       label: 'Run Query',
@@ -93,7 +103,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 1.5,
       run: function() {
-        props.onRunQuery();
+        editor.trigger("editor", "editor.action.formatDocument", "");
       },
     });
   };
