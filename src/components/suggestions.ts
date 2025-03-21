@@ -22,36 +22,17 @@ interface CursorData {
   database?: string;
   table?: string;
   prefix?: string;
-}
 
-function getTokenRangeForSelectQueryNode(root: SelectQueryNode, subquery: boolean): { begin: number, end: number } {
-  let begin = root.token.begin;
-  let end = root.token.end;
-
-  if (root.children && root.children.length > 0) {
-    const lastChild = root.children[root.children.length - 1];
-    if (lastChild.type === QueryNodeType.Select) {
-      const subqueryRange = getTokenRangeForSelectQueryNode(lastChild, true);
-      end = subqueryRange.end;
-    } if (lastChild.type === QueryNodeType.From) {
-      const fromNode = lastChild as FromQueryNode;
-      end = fromNode.token.end + (fromNode.database?.length || 0) + (fromNode.table?.length || 1); // 1 includes dot for table ref
-    } else {
-      end = lastChild.token.end;
-    }
-  }
-
-  if (subquery) {
-    return { begin: begin - 1, end: end + 1 };
-  }
-
-  return { begin, end };
+  begin: number;
+  end: number;
 }
 
 function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: number): CursorData {
   const cursorData: CursorData = {
     clause: ClauseType.None,
     identifiers: [],
+    begin: root.token.begin,
+    end: root.token.end
   };
 
   if (cursorPosition > root.token.end) {
@@ -72,15 +53,25 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
       case QueryNodeType.Select:
         const selectNode = node as SelectQueryNode;
         const nestedCursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
-        const tokenRange = getTokenRangeForSelectQueryNode(selectNode, true);
-        if (cursorPosition >= tokenRange.begin && cursorPosition <= tokenRange.end) {
+        // +1/-1 to exclude subquery parenthesis
+        if (cursorPosition >= (nestedCursorData.begin-1) && cursorPosition <= (nestedCursorData.end+1)) {
           return nestedCursorData;
         }
 
         break;
       default:
-        if (node.type === QueryNodeType.From && (node as FromQueryNode).prefix) {
-          cursorData.prefix = (node as FromQueryNode).prefix;
+        cursorData.end = node.token.end;
+        if (node.type === QueryNodeType.From) {
+          const fromNode = node as FromQueryNode;
+          const dbLen = (fromNode.database?.length || 0);
+          const separatorLen = dbLen > 0 ? 1 : 0;
+          const tableLen = (fromNode.table?.length || 0);
+          const extendedTokenLen = dbLen + separatorLen + tableLen;
+          cursorData.end = fromNode.token.end + extendedTokenLen;
+
+          if ((node as FromQueryNode).prefix) {
+            cursorData.prefix = (node as FromQueryNode).prefix;
+          }
         }
 
         if (node.token.type === TokenType.QuotedIdentifier || node.type === QueryNodeType.Identifier || (node.token.type === TokenType.BareWord && !node.token.isKeyword())) {
