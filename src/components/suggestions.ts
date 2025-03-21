@@ -33,6 +33,9 @@ function getTokenRangeForSelectQueryNode(root: SelectQueryNode, subquery: boolea
     if (lastChild.type === QueryNodeType.Select) {
       const subqueryRange = getTokenRangeForSelectQueryNode(lastChild, true);
       end = subqueryRange.end;
+    } if (lastChild.type === QueryNodeType.From) {
+      const fromNode = lastChild as FromQueryNode;
+      end = fromNode.token.end + (fromNode.database?.length || 0) + (fromNode.table?.length || 1); // 1 includes dot for table ref
     } else {
       end = lastChild.token.end;
     }
@@ -128,7 +131,7 @@ export async function getSuggestions(text: string, schema: Schema, range: Range,
   }
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
-  // console.log('database:', cursorData.database, 'table:', cursorData.table, 'identifiers:', cursorData.identifiers, 'prefix:', cursorData.prefix);
+  // console.log('database:', cursorData.database, 'table:', cursorData.table, 'identifiers:', cursorData.identifiers, 'prefix:', cursorData.prefix, 'clause:', cursorData.clause);
 
   return await getSuggestionsFromCursorData(cursorData, schema, range);
 }
@@ -169,6 +172,7 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
   }
 
   const contextType = mapping[data.clause];
+  // console.log(contextType);
 
   const db = data.database || schema.defaultDatabase || 'default';
   switch (contextType) {
