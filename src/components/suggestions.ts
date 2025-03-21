@@ -191,7 +191,7 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
       const variables = await getVariableSuggestions(range);
       results.push(...variables);
 
-      // Causes duplicates. Must fix identifier parsing first, or filter/dupecheck.
+      // Causes duplicates. Must fix identifier parsing first, or filter/dupe check.
       // results.push(...data.identifiers.map(id => ({
       //   label: id,
       //   insertText: id,
