@@ -1,4 +1,4 @@
-import { Monaco, MonacoEditor } from '@grafana/ui'
+import { Monaco, MonacoEditor, monacoTypes } from '@grafana/ui'
 import { format } from 'sql-formatter';
 
 declare const monaco: Monaco;
@@ -23,7 +23,7 @@ export interface Range {
 }
 
 export interface SuggestionResponse {
-  suggestions: Suggestion[];
+  suggestions: monacoTypes.languages.CompletionItem[];
 }
 
 export interface Suggestion {
@@ -33,6 +33,7 @@ export interface Suggestion {
   insertText: string;
   range: Range;
   detail?: string;
+  sortText?: string;
 }
 
 export type Fetcher = {
@@ -88,11 +89,4 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
   });
 
   return monaco.editor;
-}
-
-export enum SchemaKind {
-  FIELD = 3, // monaco.languages.CompletionItemKind.Field,
-  DATABASE = 8, // monaco.languages.CompletionItemKind.Module,
-  TABLE = 5, // monaco.languages.CompletionItemKind.Class,
-  VARIABLE = 4, // monaco.languages.CompletionItemKind.Variable,
 }

@@ -1,253 +1,19 @@
 import { getTemplateSrv } from '@grafana/runtime';
-import { Monaco } from '@grafana/ui'
-import { Range, SchemaKind, Suggestion } from './sqlProvider';
+import { Monaco, monacoTypes } from '@grafana/ui'
+import { Range } from './sqlProvider';
 import { Lexer } from 'ch-parser/lexer';
-import { Token, TokenType } from 'ch-parser/types';
-import { TableColumn } from 'types/queryBuilder';
+import { keywords, TokenType } from 'ch-parser/types';
+import { SqlFunction, TableColumn } from 'types/queryBuilder';
+import { pluginMacros } from 'ch-parser/pluginMacros';
+import { ClauseType, FromQueryNode, IdentifierQueryNode, parseSelectQueryNode, QueryNodeParser, QueryNodeType, SelectQueryNode } from 'ch-parser/parser';
 
 declare const monaco: Monaco;
 export interface Schema {
   databases: () => Promise<string[]>;
   tables: (db?: string) => Promise<string[]>;
   columns: (db: string, table: string) => Promise<TableColumn[]>;
+  functions: () => Promise<SqlFunction[]>;
   defaultDatabase?: string;
-}
-
-async function fetchDatabaseSuggestions(schema: Schema, range: Range) {
-  const databases = await schema.databases();
-  return databases.map((val) => ({
-    label: val,
-    kind: monaco.languages.CompletionItemKind.Module,
-    detail: 'Database',
-    documentation: 'Database',
-    insertText: val,
-    range,
-  }));
-}
-
-async function fetchTableSuggestions(schema: Schema, range: Range, database?: string) {
-  const tables = await schema.tables(database);
-  return tables.map((val) => ({
-    label: val,
-    kind: monaco.languages.CompletionItemKind.Class,
-    detail: 'Table',
-    documentation: 'Table',
-    insertText: val,
-    range,
-  }));
-}
-
-async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string, prefix?: string) {
-  console.log('field prefix:', prefix);
-  const columns = await schema.columns(db, table);
-  return columns.map(c => ({
-    label: c.label!,
-    kind: monaco.languages.CompletionItemKind.Field,
-    detail: c.type,
-    documentation: c.type,
-    insertText: prefix && prefix.includes('.') ? c.name.substring(prefix?.length || 0) : c.name,
-    range,
-  })).filter(c => !prefix || c.label.startsWith(prefix));
-}
-
-export function getVariableSuggestions(range: Range) {
-  const templateSrv = getTemplateSrv();
-  if (!templateSrv) {
-    return [];
-  }
-  return templateSrv.getVariables().map((variable) => {
-    const label = `\${${variable.name}}`;
-    const val = templateSrv.replace(label);
-    return {
-      label,
-      detail: `(Template Variable) ${val}`,
-      kind: SchemaKind.VARIABLE,
-      documentation: `(Template Variable) ${val}`,
-      insertText: `{${variable.name}}`,
-      range,
-    };
-  });
-}
-
-const CLICKHOUSE_KEYWORDS = [
-  'SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT',
-  'HAVING', 'JOIN', 'INNER JOIN', 'LEFT JOIN', 'RIGHT JOIN',
-  'FULL JOIN', 'ON', 'USING', 'PREWHERE', 'FINAL', 'SAMPLE'
-];
-
-
-/// NEW STUFF
-
-class QueryNodeParser {
-  private tokens: Token[];
-  private offset: number;
-
-  constructor(tokens: Token[]) {
-    this.tokens = tokens;
-    this.offset = 0;
-  }
-
-  public advance() {
-    this.offset++;
-  }
-
-  public hasNext(): boolean {
-    return this.offset < this.tokens.length;
-  }
-
-  public next(): Token {
-    const token = this.tokens[this.offset];
-    this.advance();
-
-    return token;
-  }
-
-  public peek(): Token {
-    return this.tokens[this.offset];
-  }
-
-  public nextIs(type: TokenType): boolean {
-    const next = this.peek();
-    if (next.type === type) {
-      this.advance();
-      return true;
-    }
-
-    return false;
-  }
-
-  public peekIs(type: TokenType): boolean {
-    return this.peek().type === type;
-  }
-}
-
-enum QueryNodeType {
-  Default,
-  Select,
-  From,
-  Identifier,
-}
-
-interface QueryNode {
-  type: QueryNodeType;
-  token: Token;
-  clause: ClauseType;
-  children?: QueryNode[];
-}
-
-interface FromQueryNode extends QueryNode {
-  token: Token;
-  database?: string;
-  table?: string;
-}
-
-interface IdentifierQueryNode extends QueryNode {
-  prefix?: string;
-}
-
-interface SelectQueryNode extends QueryNode {
-  from?: FromQueryNode
-}
-
-function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode | null {
-  if (!parser.hasNext()) {
-    return null;
-  }
-
-  const firstToken = parser.peek();
-  const node: SelectQueryNode = {
-    type: QueryNodeType.Select,
-    clause: ClauseType.Select,
-    children: [],
-    token: null!
-  };
-
-  if (firstToken.matchKeyword('WITH')) {
-    node.children!.push({ type: QueryNodeType.Default, token: firstToken, clause: ClauseType.With });
-  } else if (firstToken.matchKeyword('SELECT')) {
-    node.token = firstToken;
-  } else {
-    return null;
-  }
-  parser.advance();
-
-  let parenDepth = 0;
-  let endOfNode = false;
-  while (!endOfNode && parser.hasNext()) {
-    const token = parser.next();
-
-    if (token.matchKeyword('SELECT')) {
-      node.token = token;
-    } else if (token.matchKeyword('FROM')) {
-      node.from = { type: QueryNodeType.From, token, clause: ClauseType.From };
-      node.children!.push(node.from);
-
-      if (parser.hasNext() && ((parser.peek().type === TokenType.BareWord && !parser.peek().isKeyword()) || parser.peek().type === TokenType.QuotedIdentifier)) {
-        const databaseOrTable = parser.next().text;
-        if (parser.hasNext() && parser.peek().type === TokenType.Dot) {
-          parser.next()
-          node.from.database = databaseOrTable;
-
-          if (parser.hasNext() && ((parser.peek().type === TokenType.BareWord && !parser.peek().isKeyword()) || parser.peek().type === TokenType.QuotedIdentifier)) {
-            node.from.table = parser.next().text;
-          }
-        } else {
-          node.from.table = databaseOrTable
-        }
-      }
-    } else if (token.type === TokenType.OpeningRoundBracket) {
-      const nestedNode = parseSelectQueryNode(parser)
-      if (nestedNode === null) {
-        parenDepth++;
-      } else {
-        node.children!.push(nestedNode);
-      }
-    } else if (token.type === TokenType.ClosingRoundBracket) {
-      if (parenDepth === 0) {
-        endOfNode = true;
-      } else {
-        parenDepth--;
-      }
-    } else if (token.matchKeyword('JOIN')) {
-      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Join });
-    } else if (token.matchKeyword('GROUP') && parser.hasNext() && parser.peek().matchKeyword('BY')) {
-      node.children!.push({ type: QueryNodeType.Default, token: parser.next(), clause: ClauseType.GroupBy });
-    } else if (token.matchKeyword('WHERE')) {
-      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Where });
-    } else if (token.matchKeyword('HAVING')) {
-      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Having });
-    } else if (token.matchKeyword('ORDER') && parser.hasNext() && parser.peek().matchKeyword('BY')) {
-      node.children!.push({ type: QueryNodeType.Default, token: parser.next(), clause: ClauseType.OrderBy });
-    } else if (token.matchKeyword('LIMIT')) {
-      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Limit });
-    } else if (token.type === TokenType.BareWord && !token.isKeyword()) {
-      let fullIdent = token.text;
-      let identToken = token;
-      while (parser.hasNext() && (parser.peekIs(TokenType.Dot) || (parser.peekIs(TokenType.BareWord) && !parser.peek().isKeyword()))) {
-        identToken = parser.next();
-        fullIdent += identToken.text;
-      }
-      node.children!.push({ type: QueryNodeType.Identifier, token: identToken, prefix: fullIdent, clause: ClauseType.NestedIdent } as IdentifierQueryNode);
-    } else {
-      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.None });
-    }
-  }
-
-  return node;
-}
-
-enum ClauseType {
-	None,
-	With,
-	Select,
-	From,
-	Join,
-	Where,
-	GroupBy,
-	Having,
-	OrderBy,
-	Limit,
-  NestedIdent,
 }
 
 interface CursorData {
@@ -273,10 +39,10 @@ function getTokenRangeForSelectQueryNode(root: SelectQueryNode, subquery: boolea
   }
 
   if (subquery) {
-    return { begin: begin - 1, end: end + 1 }; 
+    return { begin: begin - 1, end: end + 1 };
   }
 
-  return { begin, end }; 
+  return { begin, end };
 }
 
 function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: number): CursorData {
@@ -310,6 +76,10 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
 
         break;
       default:
+        if (node.type === QueryNodeType.From && (node as FromQueryNode).prefix) {
+          cursorData.prefix = (node as FromQueryNode).prefix;
+        }
+
         if (node.token.type === TokenType.QuotedIdentifier || node.type === QueryNodeType.Identifier || (node.token.type === TokenType.BareWord && !node.token.isKeyword())) {
           if (node.type === QueryNodeType.Identifier) {
             cursorData.identifiers.push((node as IdentifierQueryNode).prefix || node.token.text);
@@ -333,12 +103,12 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
   return cursorData;
 }
 
-export async function getSuggestions(text: string, schema: Schema, range: Range, cursorPosition: number): Promise<Suggestion[]> {
+export async function getSuggestions(text: string, schema: Schema, range: Range, cursorPosition: number): Promise<monacoTypes.languages.CompletionItem[]> {
   const lexer = new Lexer(text);
   const tokens = [];
   while (true) {
     const token = lexer.nextToken();
-    if (token.isEnd() || token.isError()) {
+    if (token.isEnd()) {
       break;
     }
 
@@ -351,21 +121,20 @@ export async function getSuggestions(text: string, schema: Schema, range: Range,
 
   const parser = new QueryNodeParser(tokens);
   const selectNode = parseSelectQueryNode(parser);
-  console.log(selectNode);
+  // console.log(selectNode);
 
   if (!selectNode) {
     return [];
   }
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
-
-  console.log('database:', cursorData.database, 'table:', cursorData.table, 'identifiers:', cursorData.identifiers);
+  // console.log('database:', cursorData.database, 'table:', cursorData.table, 'identifiers:', cursorData.identifiers, 'prefix:', cursorData.prefix);
 
   return await getSuggestionsFromCursorData(cursorData, schema, range);
 }
 
-async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, range: Range): Promise<Suggestion[]> {
-  let results: Suggestion[] = [];
+async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, range: Range): Promise<monacoTypes.languages.CompletionItem[]> {
+  let results: monacoTypes.languages.CompletionItem[] = [];
 
   if (data.database && (data.database.includes('"') || data.database.includes('`'))) {
     data.database = data.database.substring(1, data.database.length - 1);
@@ -385,31 +154,31 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
     [ClauseType.Having]: 'column',
     [ClauseType.OrderBy]: 'column',
     [ClauseType.Limit]: 'keyword',
-    [ClauseType.NestedIdent]: 'column',
+    [ClauseType.Identifier]: 'column',
   });
 
   if (data.database && !data.table) {
     mapping[ClauseType.From] = 'table';
     mapping[ClauseType.Join] = 'table';
   } else if (data.table && !data.database) {
-    mapping[ClauseType.From] = 'table';
-    mapping[ClauseType.Join] = 'table';
+    mapping[ClauseType.From] = 'database_or_table';
+    mapping[ClauseType.Join] = 'database_or_table';
   } else if (data.database && data.table) {
     mapping[ClauseType.From] = 'table';
     mapping[ClauseType.Join] = 'table';
   }
 
   const contextType = mapping[data.clause];
-  console.log('contextType', contextType);
 
+  const db = data.database || schema.defaultDatabase || 'default';
   switch (contextType) {
     case 'database':
       results = await fetchDatabaseSuggestions(schema, range);
       break;
 
     case 'database_or_table':
-      const databases = await fetchDatabaseSuggestions(schema, range);
-      const defaultTables = await fetchTableSuggestions(schema, range, 'default');
+      const databases = await fetchDatabaseSuggestions(schema, range, data.prefix);
+      const defaultTables = await fetchTableSuggestions(schema, range, db, data.prefix);
 
       results = [
         ...databases,
@@ -418,29 +187,47 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
       break;
 
     case 'table':
-      const db = data.database || 'default';
-      results = await fetchTableSuggestions(schema, range, db);
+      results = await fetchTableSuggestions(schema, range, db, data.prefix);
       break;
 
     case 'column':
+      const macros = await getMacroSuggestions(range, data.prefix);
+      results.push(...macros);
+      const variables = await getVariableSuggestions(range);
+      results.push(...variables);
+
+      // Causes duplicates. Must fix identifier parsing first, or filter/dupecheck.
+      // results.push(...data.identifiers.map(id => ({
+      //   label: id,
+      //   insertText: id,
+      //   sortText: `!!${id}`,
+      //   kind: monaco.languages.CompletionItemKind.Field,
+      //   documentation: '',
+      //   range
+      // })));
+
+      results.push({
+        label: 'NULL',
+        insertText: 'NULL',
+        sortText: '!!!NULL',
+        kind: monaco.languages.CompletionItemKind.Keyword,
+        documentation: '',
+        range
+      });
+
+      const sqlFunctions = await fetchFunctionSuggestions(schema, range);
+      results.push(...sqlFunctions);
+
       if (data.table) {
-        const database = data.database || 'default';
-        results = await fetchFieldSuggestions(schema, range, database, data.table, data.prefix);
+        const database = data.database || schema.defaultDatabase || 'default';
+        const columns = await fetchFieldSuggestions(schema, range, database, data.table, data.prefix);
+        results.push(...columns);
 
-        // result = result.map(column => ({
-        //   ...column,
-        //   needsQuotes: needsQuotes(column.name)
-        // }));
-      } else {
-        // result = COMMON_COLUMNS.map(col => ({
-        //   name: col,
-        //   type: 'common_column'
-        // }));
       }
-      break;
 
+      break;
     case 'keyword':
-      results = CLICKHOUSE_KEYWORDS.map(keyword => ({
+      results = Array.from(keywords).map(keyword => ({
         label: keyword,
         insertText: keyword,
         kind: monaco.languages.CompletionItemKind.Keyword,
@@ -451,4 +238,127 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
   }
 
   return results;
+}
+
+
+async function fetchDatabaseSuggestions(schema: Schema, range: Range, prefix?: string) {
+  const databases = await schema.databases();
+  return databases.map((val) => {
+    let quoteType = '';
+    if (prefix && prefix.startsWith('"')) {
+      quoteType = '"';
+    } else if (prefix && prefix.startsWith('`')) {
+      quoteType = '`';
+    }
+    const quoteClosed = val.endsWith(quoteType);
+
+    return {
+      label: val,
+      kind: monaco.languages.CompletionItemKind.Module,
+      detail: 'Database',
+      documentation: 'Database',
+      insertText: quoteType ? `${val}${quoteClosed ? '' :quoteType}` : val,
+      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+      range,
+    }
+  });
+}
+
+async function fetchTableSuggestions(schema: Schema, range: Range, database: string, prefix?: string) {
+  const tables = await schema.tables(database);
+  return tables.map((val) => {
+    let quoteType = '';
+    if (prefix && prefix.startsWith('"')) {
+      quoteType = '"';
+    } else if (prefix && prefix.startsWith('`')) {
+      quoteType = '`';
+    }
+    const quoteClosed = val.endsWith(quoteType);
+
+    return {
+      label: val,
+      kind: monaco.languages.CompletionItemKind.Class,
+      detail: 'Table',
+      documentation: 'Table',
+      insertText: quoteType ? `${val}${quoteClosed ? '' :quoteType}` : val,
+      insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+      range,
+    }
+  });
+}
+
+async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string, prefix?: string) {
+  const columns = await schema.columns(db, table);
+  return columns.map(c => ({
+    label: c.label!,
+    kind: monaco.languages.CompletionItemKind.Field,
+    sortText: `!!!!${c.label}`,
+    detail: c.type,
+    documentation: c.type,
+    insertText: prefix && prefix.includes('.') ? c.name.substring(prefix?.length || 0) : c.name,
+    range,
+  })).filter(c => !prefix || c.label.startsWith(prefix));
+}
+
+async function fetchFunctionSuggestions(schema: Schema, range: Range) {
+  const sqlFunctions = await schema.functions();
+  return sqlFunctions.map(c => ({
+    label: c.name,
+    kind: monaco.languages.CompletionItemKind.Function,
+    sortText: `${c.name}`,
+    detail: c.categories || (c.isAggregate && 'Aggregate') || '',
+    documentation: [
+      `Category: ${c.categories || '(none)'}`,
+      `Alias: ${c.aliasTo || '(none)'}`,
+      `Aggregate: ${c.isAggregate}`,
+      `Case insensitive: ${c.caseInsensitive}`,
+      `Origin: ${c.origin}`,
+      `Description: ${c.description || '(none)'}`,
+      `Syntax: ${c.syntax || '(none)'}`,
+      `Arguments: ${c.arguments || '(none)'}`,
+      `Returned value: ${c.returnedValue || '(none)'}`,
+    ].join('\n'),
+    insertText: `${c.name}(\${1})`,
+    insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+    range,
+  }));
+}
+
+
+export function getVariableSuggestions(range: Range) {
+  const templateSrv = getTemplateSrv();
+  if (!templateSrv) {
+    return [];
+  }
+  return templateSrv.getVariables().map((variable) => {
+    const label = `\${${variable.name}}`;
+    const val = templateSrv.replace(label);
+    return {
+      label,
+      detail: `(Template Variable) ${val}`,
+      kind: monaco.languages.CompletionItemKind.Variable,
+      sortText: `!!!${label}`,
+      documentation: `(Template Variable) ${val}`,
+      insertText: `\${${variable.name}}`,
+      range,
+    };
+  });
+}
+
+export function getMacroSuggestions(range: Range, prefix?: string) {
+  return pluginMacros.map(macro => {
+    const hasPrefix = prefix === '$';
+    const nameNoPrefix = macro.name.substring(1);
+
+    return {
+      label: macro.name,
+      detail: `(Plugin Macro) ${macro.columnType || ''}`,
+      kind: macro.isFunction ? monaco.languages.CompletionItemKind.Function : monaco.languages.CompletionItemKind.Variable,
+      sortText: `!!${macro.name.substring(3)}`,
+      documentation: macro.documentation + (macro.example ? '\nExample output: ' + macro.example : ''),
+      insertText: macro.isFunction ? `${hasPrefix ? nameNoPrefix : macro.name.replaceAll('$', '\\$')}(\${1})` : (hasPrefix ? nameNoPrefix : macro.name),
+      insertTextRules: macro.isFunction ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
+      range,
+    };
+  });
 }
