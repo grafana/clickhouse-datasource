@@ -71,7 +71,7 @@ export enum TokenType {
 	ErrorMaxQuerySizeExceeded
 }
 
-const keywords = new Set([
+export const keywords = new Set([
 	'SELECT', 'FROM', 'WHERE', 'GROUP', 'BY', 'HAVING', 'ORDER',
 	'LIMIT', 'OFFSET', 'JOIN', 'INNER', 'OUTER', 'LEFT', 'RIGHT',
 	'FULL', 'CROSS', 'ON', 'USING', 'AS', 'WITH', 'UNION', 'ALL',
