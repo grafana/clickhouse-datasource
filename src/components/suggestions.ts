@@ -342,7 +342,7 @@ export function getVariableSuggestions(range: Range) {
 
 export function getMacroSuggestions(range: Range, prefix?: string) {
   return pluginMacros.map(macro => {
-    const hasPrefix = (prefix || '').startsWith('$');
+    const hasPrefix = (prefix || '').includes('$');
     const nameNoPrefix = macro.name.substring(1);
 
     return {
