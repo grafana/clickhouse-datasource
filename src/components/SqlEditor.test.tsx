@@ -20,7 +20,6 @@ const mockMonaco = {
     register: jest.fn(),
     setMonarchTokensProvider: jest.fn(),
     registerCompletionItemProvider: jest.fn(),
-    registerDocumentFormattingEditProvider: jest.fn(),
   }
 };
 
