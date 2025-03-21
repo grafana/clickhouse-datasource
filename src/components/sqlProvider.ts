@@ -1,5 +1,4 @@
 import { Monaco, MonacoEditor, monacoTypes } from '@grafana/ui'
-import { format } from 'sql-formatter';
 
 declare const monaco: Monaco;
 
@@ -72,20 +71,6 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
 
       return fetchSuggestions(model.getValue(), range, model.getOffsetAt(position));
     },
-  });
-
-  monaco.languages.registerDocumentFormattingEditProvider('sql', {
-    provideDocumentFormattingEdits(model, options) {
-      const formatted = format(model.getValue(), {
-        indent: ' '.repeat(options.tabSize)
-      } as any);
-      return [
-        {
-          range: model.getFullModelRange(),
-          text: formatted
-        }
-      ];
-    }
   });
 
   return monaco.editor;
