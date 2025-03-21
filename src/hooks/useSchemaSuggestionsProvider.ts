@@ -22,15 +22,12 @@ function defaultSchemaCache(): SchemaCache {
 /**
  * Provides an interface for the auto-complete to read schema data from.
  * This data is cached since the auto-complete is always looking for schema data.
+ * 
+ * Sometimes another CH datasource's suggestions will show up.
+ * There's no way to detect this (tried using datasource.uid), it could be monaco caching suggestions since it does show a mix
  */
 export function useSchemaSuggestionsProvider(datasource: Datasource): Schema {
-  const [datasourceID, setDatasourceID] = useState('');
   const cache = useRef<SchemaCache>(defaultSchemaCache());
-
-  if (datasource.uid && datasource.uid !== datasourceID) {
-	cache.current = defaultSchemaCache();
-	setDatasourceID(datasource.uid);
-  }
 
   async function fetchFunctions() {
 	if (cache.current.functions === null) {
