@@ -25,7 +25,7 @@ export class Lexer {
    * @param text The input text to tokenize
    * @param maxQuerySize Optional maximum query size (0 for unlimited)
    */
-  public constructor(text: string, maxQuerySize: number = 0) {
+  public constructor(text: string, maxQuerySize = 0) {
     this.text = text;
     this.pos = 0;
     this.end = text.length;
@@ -610,7 +610,7 @@ export class Lexer {
       return this.parseQuotedHexOrBinString();
     }
     
-    // Barewords (identifiers or keywords)
+    // Bare words (identifiers or keywords)
     if (isWordCharASCII(currentChar) || currentChar === '$') {
       this.pos++;
       while (this.pos < this.end && (isWordCharASCII(this.text[this.pos]) || this.text[this.pos] === '$')) {

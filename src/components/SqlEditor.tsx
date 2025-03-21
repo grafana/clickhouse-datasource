@@ -82,16 +82,6 @@ export const SqlEditor = (props: SqlEditorProps) => {
         validateSql(sql, editor.getModel(), me);
       }
     });
-    // editor.addAction({
-    //   id: 'run-query',
-    //   label: 'Run Query',
-    //   keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
-    //   contextMenuGroupId: 'navigation',
-    //   contextMenuOrder: 1.5,
-    //   run: function() {
-    //     props.onRunQuery();
-    //   },
-    // });
     editor.addAction({
       id: 'run-query',
       label: 'Run Query',
@@ -99,9 +89,19 @@ export const SqlEditor = (props: SqlEditorProps) => {
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 1.5,
       run: function() {
-        editor.trigger("editor", "editor.action.formatDocument", "");
+        props.onRunQuery();
       },
     });
+    // editor.addAction({
+    //   id: 'run-query',
+    //   label: 'Run Query',
+    //   keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+    //   contextMenuGroupId: 'navigation',
+    //   contextMenuOrder: 1.5,
+    //   run: function() {
+    //     editor.trigger("editor", "editor.action.formatDocument", "");
+    //   },
+    // });
   };
 
   return (

@@ -1,6 +1,6 @@
 import { Schema } from "components/suggestions";
 import { Datasource } from "data/CHDatasource";
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { SqlFunction, TableColumn } from "types/queryBuilder";
 
 export interface SchemaCache {
