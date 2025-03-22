@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
@@ -13,6 +13,7 @@ import { QueryType } from 'types/queryBuilder';
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 import { pluginVersion } from 'utils/version';
 import { useSchemaSuggestionsProvider } from 'hooks/useSchemaSuggestionsProvider';
+import { QueryToolbox } from './QueryToolbox';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -33,6 +34,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 
 export const SqlEditor = (props: SqlEditorProps) => {
   const { query, onChange, datasource } = props;
+  const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
 
@@ -74,6 +76,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
+    editorRef.current = editor;
     const me = registerSQL('sql', editor, _getSuggestions);
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
@@ -82,16 +85,27 @@ export const SqlEditor = (props: SqlEditorProps) => {
         validateSql(sql, editor.getModel(), me);
       }
     });
+
     editor.addAction({
       id: 'run-query',
       label: 'Run Query',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 1.5,
-      run: function() {
+      run: (editor: monacoTypes.editor.IStandaloneCodeEditor) => {
+        saveChanges({ rawSql: editor.getValue() });
         props.onRunQuery();
       },
     });
+  };
+
+  const onEditorWillUnmount = () => {
+    editorRef.current = null
+  };
+  const triggerFormat = () => {
+    if (editorRef.current !== null) {
+      editorRef.current.trigger("editor", "editor.action.formatDocument", "");
+    }
   };
 
   return (
@@ -109,6 +123,11 @@ export const SqlEditor = (props: SqlEditorProps) => {
           showLineNumbers={true}
           onBlur={(sql) => saveChanges({ rawSql: sql })}
           onEditorDidMount={handleMount}
+          onEditorWillUnmount={onEditorWillUnmount}
+        />
+        <QueryToolbox
+          showTools
+          onFormatCode={triggerFormat}
         />
       </div>
     </>

@@ -20,6 +20,7 @@ const mockMonaco = {
     register: jest.fn(),
     setMonarchTokensProvider: jest.fn(),
     registerCompletionItemProvider: jest.fn(),
+    registerDocumentFormattingEditProvider: jest.fn(),
   }
 };
 
@@ -121,7 +122,7 @@ describe('SQL Editor', () => {
     ]);
 
     // Trigger the action
-    registeredAction.run();
+    registeredAction.run(mockEditorInstance);
 
     // Verify mockOnRunQuery was called once
     expect(mockOnRunQuery).toHaveBeenCalledTimes(1);
