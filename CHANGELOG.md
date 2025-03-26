@@ -1,5 +1,33 @@
 # Changelog
 
+## 4.8.2
+
+### Fixes
+
+- Dependency updates
+
+## 4.8.1
+
+### Fixes
+
+- Dependency updates
+
+## 4.8.0
+
+### Features
+
+- Enable CtrlCmd + Enter keyboard shortcut to Run Query (#1158)
+
+### Fixes
+
+- Refactor `MutateResponse` function and PDC dialler creation (#1155)
+- Refactor `clickhouse.Connect` to improve context cancellation handling (#1154)
+- Prevent usage of failed connections and improve connection management (#1156). Please note that following this change, the following limits will be set. Although we believe these limits are reasonable, you can adjust them in the datasource settings if needed:
+  - `MaxOpenConns` to 50.
+  - `MaxIdleConns` to 25.
+  - `ConnMaxLifetime` to 5 minutes.
+- Dependency updates
+
 ## 4.7.0
 
 ### Features

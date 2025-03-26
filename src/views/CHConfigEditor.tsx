@@ -405,9 +405,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         
         <Divider />
         <QuerySettingsConfig
+          connMaxLifetime={jsonData.connMaxLifetime}
           dialTimeout={jsonData.dialTimeout}
+          maxIdleConns={jsonData.maxIdleConns}
+          maxOpenConns={jsonData.maxOpenConns}
           queryTimeout={jsonData.queryTimeout}
           validateSql={jsonData.validateSql}
+          onConnMaxIdleConnsChange={onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')}
+          onConnMaxLifetimeChange={onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')}
+          onConnMaxOpenConnsChange={onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')}
           onDialTimeoutChange={onUpdateDatasourceJsonDataOption(props, 'dialTimeout')}
           onQueryTimeoutChange={onUpdateDatasourceJsonDataOption(props, 'queryTimeout')}
           onValidateSqlChange={e => onSwitchToggle('validateSql', e.currentTarget.checked)}
