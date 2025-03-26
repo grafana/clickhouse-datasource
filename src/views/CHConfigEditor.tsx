@@ -4,7 +4,7 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, HorizontalGroup, Alert, VerticalGroup } from '@grafana/ui';
+import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -191,7 +191,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const uidWarning = (!options.uid) && (
     <Alert title="" severity="warning" buttonContent="Close">
-      <VerticalGroup>
+      <Stack>
         <div>
           {'This datasource is missing the'}
           <code>uid</code>
@@ -204,7 +204,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           >provisioned via YAML</a>
           {', please verify the UID is set. This is required to enable data linking between logs and traces.'}
         </div>
-      </VerticalGroup>
+      </Stack>
     </Alert>
   );
 
@@ -450,14 +450,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onStartTimeColumnChange={c => onTracesConfigChange('startTimeColumn', c)}
           onTagsColumnChange={c => onTracesConfigChange('tagsColumn', c)}
           onServiceTagsColumnChange={c => onTracesConfigChange('serviceTagsColumn', c)}
-          onEventsColumnPrefixChange={c => onTracesConfigChange('eventsColumnPrefix', c)}
-          onLinksPrefixColumnChange={c => onTracesConfigChange('linksColumnPrefix', c)}
           onKindColumnChange={c => onTracesConfigChange('kindColumn', c)}
           onStatusCodeColumnChange={c => onTracesConfigChange('statusCodeColumn', c)}
           onStatusMessageColumnChange={c => onTracesConfigChange('statusMessageColumn', c)}
+          onStateColumnChange={c => onTracesConfigChange('stateColumn', c)}
           onInstrumentationLibraryNameColumnChange={c => onTracesConfigChange('instrumentationLibraryNameColumn', c)}
           onInstrumentationLibraryVersionColumnChange={c => onTracesConfigChange('instrumentationLibraryVersionColumn', c)}
-          onStateColumnChange={c => onTracesConfigChange('stateColumn', c)}
+          onFlattenNestedChange={c => onTracesConfigChange('flattenNested', c)}
+          onEventsColumnPrefixChange={c => onTracesConfigChange('traceEventsColumnPrefix', c)}
+          onLinksColumnPrefixChange={c => onTracesConfigChange('traceLinksColumnPrefix', c)}
         />
 
         <Divider />
@@ -478,7 +479,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <ConfigSubSection title="Custom Settings">
           {customSettings.map(({ setting, value }, i) => {
             return (
-              <HorizontalGroup key={i}>
+              <Stack key={i} direction='row'>
                 <Field label={`Setting`} aria-label={`Setting`}>
                   <Input
                     value={setting}
@@ -507,7 +508,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                     }}
                   ></Input>
                 </Field>
-              </HorizontalGroup>
+              </Stack>
             );
           })}
           <Button

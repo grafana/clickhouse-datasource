@@ -56,6 +56,14 @@ export interface QueryBuilderOptions {
     isTraceIdMode?: boolean;
     traceId?: string;
 
+    /**
+     * True if "Nested" column types should be treated as if they
+     * were created with flatten_nested=1. Applies to trace Events and Links columns.
+     */
+    flattenNested?: boolean;
+    traceEventsColumnPrefix?: string;
+    traceLinksColumnPrefix?: string;
+
     // Logs & Traces
     otelEnabled?: boolean;
     otelVersion?: string;
@@ -133,8 +141,6 @@ export enum ColumnHint {
   TraceTags = 'trace_tags',
   TraceServiceTags = 'trace_service_tags',
   TraceStatusCode = 'trace_status_code',
-  TraceEventsPrefix = 'trace_events_prefix',
-  TraceLinksPrefix = 'trace_links_prefix',
   TraceKind = 'trace_kind',
   TraceStatusMessage = 'trace_status_message',
   TraceInstrumentationLibraryName = 'instrumentation_library_name',

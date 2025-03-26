@@ -226,7 +226,7 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
-  it('generates trace ID query with additional fields (kind, statusCode, statusMessage, instrumentationLibraryName, instrumentationLibraryVersion, traceState, logs, references) and OTel enabled', () => {
+  it('generates trace ID query with additional fields, flatten nested disabled', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
       table: 'otel_traces',
@@ -242,8 +242,6 @@ describe('SQL Generator', () => {
         { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
         { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
         { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
-        { name: 'Events', type: 'Nested(Timestamp DateTime64(9), Name LowCardinality(String), Attributes Map(LowCardinality(String), String))', hint: ColumnHint.TraceEventsPrefix },
-        { name: 'Links', type: 'Nested(TraceId String, SpanId String, TraceState String, Attributes Map(LowCardinality(String), String))', hint: ColumnHint.TraceLinksPrefix },
         { name: 'Kind', type: 'String', hint: ColumnHint.TraceKind },
         { name: 'StatusMessage', type: 'String', hint: ColumnHint.TraceStatusMessage },
         { name: 'InstrumentationLibraryName', type: 'String', hint: ColumnHint.TraceInstrumentationLibraryName },
@@ -257,7 +255,73 @@ describe('SQL Generator', () => {
         otelVersion: 'latest',
         traceDurationUnit: TimeUnit.Nanoseconds,
         isTraceIdMode: true,
-        traceId: 'abcdefg'
+        traceId: 'abcdefg',
+        flattenNested: false,
+        traceEventsColumnPrefix: 'Events',
+        traceLinksColumnPrefix: 'Links',
+      },
+      limit: 1000,
+      orderBy: []
+    };
+
+    const expectedSqlParts = [
+      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
+      '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
+      'multiply("Duration", 0.000001) as duration,',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode,`,
+      `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap( key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))), "Events".Name, "Events".Timestamp, "Events".Attributes) AS logs,`,
+      `arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, arrayMap(key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), "Links".TraceId, "Links".SpanId, "Links".Attributes) AS references,`,
+      '"Kind" as kind,',
+      '"StatusMessage" as statusMessage,',
+      '"InstrumentationLibraryName" as instrumentationLibraryName,',
+      '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
+      '"TraceState" as traceState',
+      `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+      'LIMIT 1000'
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('generates trace ID query with additional fields, flatten nested enabled', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+        { name: 'Kind', type: 'String', hint: ColumnHint.TraceKind },
+        { name: 'StatusMessage', type: 'String', hint: ColumnHint.TraceStatusMessage },
+        { name: 'InstrumentationLibraryName', type: 'String', hint: ColumnHint.TraceInstrumentationLibraryName },
+        { name: 'InstrumentationLibraryVersion', type: 'String', hint: ColumnHint.TraceInstrumentationLibraryVersion },
+        { name: 'TraceState', type: 'String', hint: ColumnHint.TraceState },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: true,
+        otelVersion: 'latest',
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        flattenNested: true,
+        traceEventsColumnPrefix: 'Events',
+        traceLinksColumnPrefix: 'Links',
       },
       limit: 1000,
       orderBy: []

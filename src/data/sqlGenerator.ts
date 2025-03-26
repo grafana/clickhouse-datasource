@@ -150,18 +150,44 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(`if(${escapeIdentifier(traceStatusCode.name)} IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`);
   }
 
-  const traceEventsPrefix = getColumnByHint(options, ColumnHint.TraceEventsPrefix);
-  if (traceEventsPrefix !== undefined) {
-    // It is important to treat the prefixed columns as one nested column, as this
-    // ensures that the query will work when the column was created with flatten_nested.
-    selectParts.push(`arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000), arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]), mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))), ${escapeIdentifier(traceEventsPrefix.name)}) as logs`);
+  const flattenNested = Boolean(options.meta?.flattenNested);
+
+  const traceEventsPrefix = options.meta?.traceEventsColumnPrefix || '';
+  if (traceEventsPrefix !== '') {
+    if (flattenNested) {
+      selectParts.push([
+        `arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000),`,
+        `arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]),`,
+        `mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))),`,
+        `${escapeIdentifier(traceEventsPrefix)}) as logs`
+      ].join(' '));
+    } else {
+      selectParts.push([
+        `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)),`,
+        `arrayMap( key -> map('key', key, 'value', attributes[key]),`,
+        `mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),`,
+        `${escapeIdentifier(traceEventsPrefix)}.Name, ${escapeIdentifier(traceEventsPrefix)}.Timestamp,`,
+        `${escapeIdentifier(traceEventsPrefix)}.Attributes) AS logs`
+      ].join(' '));
+    }
   }
 
-  const traceLinksPrefix = getColumnByHint(options, ColumnHint.TraceLinksPrefix);
-  if (traceLinksPrefix !== undefined) {
-    // It is important to treat the prefixed columns as one nested column, as this
-    // ensures that the query will work when the column was created with flatten_nested.
-    selectParts.push(`arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]), mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), ${escapeIdentifier(traceLinksPrefix.name)}) AS references`);
+  const traceLinksPrefix = options.meta?.traceLinksColumnPrefix || '';
+  if (traceLinksPrefix !== '') {
+    if (flattenNested) {
+      selectParts.push([
+        `arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]),`,
+        `mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))),`,
+        `${escapeIdentifier(traceLinksPrefix)}) AS references`
+      ].join(' '));
+    } else {
+      selectParts.push([
+        `arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, arrayMap(key -> map('key', key, 'value', attributes[key]),`,
+        `mapKeys(attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))),`,
+        `${escapeIdentifier(traceLinksPrefix)}.TraceId, ${escapeIdentifier(traceLinksPrefix)}.SpanId,`,
+        `${escapeIdentifier(traceLinksPrefix)}.Attributes) AS references`
+      ].join(' '));
+    }
   }
 
   const traceKind = getColumnByHint(options, ColumnHint.TraceKind);

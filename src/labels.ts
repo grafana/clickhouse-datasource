@@ -204,13 +204,17 @@ export default {
             label: 'Service Tags column',
             tooltip: 'Column for the service tags'
           },
+          flattenNested: {
+            label: 'Use Flatten Nested',
+            tooltip: 'Enable if your traces table was created with flatten_nested=1',
+          },
           eventsPrefix: {
-            label: 'Events column',
-            tooltip: 'Prefix for the events column'
+            label: 'Events prefix',
+            tooltip: 'Prefix for the events column (Events.Timestamp, Events.Name, etc.)'
           },
           linksPrefix: {
-            label: 'Links column',
-            tooltip: 'Prefix for the trace references column'
+            label: 'Links prefix',
+            tooltip: 'Prefix for the trace references column (Links.TraceId, Links.TraceState, etc.)'
           },
           kind: {
             label: 'Kind column',
@@ -453,6 +457,10 @@ export default {
           label: 'Service Tags Column',
           tooltip: 'Column that contains the service tags'
         },
+        flattenNested: {
+          label: 'Use Flatten Nested',
+          tooltip: 'Enable if your traces table was created with flatten_nested=1',
+        },
         eventsPrefix: {
           label: 'Events Prefix',
           tooltip: 'Prefix for the events column'
@@ -475,11 +483,11 @@ export default {
         },
         instrumentationLibraryName: {
           label: 'Library Name Column',
-          tooltip: 'Column that contains the instrumentation library name'
+          tooltip: 'Column that contains the instrumentation library name (Optional)'
         },
         instrumentationLibraryVersion: {
           label: 'Library Version Column',
-          tooltip: 'Column that contains the instrumentation library version'
+          tooltip: 'Column that contains the instrumentation library version (Optional)'
         },
         state: {
           label: 'State Column',
@@ -519,8 +527,6 @@ export default {
       [ColumnHint.TraceTags]: 'Tags',
       [ColumnHint.TraceServiceTags]: 'Service Tags',
       [ColumnHint.TraceStatusCode]: 'Status Code',
-      [ColumnHint.TraceEventsPrefix]: 'Events Prefix',
-      [ColumnHint.TraceLinksPrefix]: 'Links Prefix',
       [ColumnHint.TraceKind]: 'Kind',
       [ColumnHint.TraceStatusMessage]: 'Status Message',
       [ColumnHint.TraceInstrumentationLibraryName]: 'Instrumentation Library Name',
