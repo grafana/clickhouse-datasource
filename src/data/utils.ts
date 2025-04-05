@@ -3,7 +3,7 @@ import { ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, Quer
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
 import { Datasource } from "./CHDatasource";
 import { pluginVersion } from "utils/version";
-import { logColumnHintsToAlias } from "./sqlGenerator";
+import { LABELS_ALIAS } from "./sqlGenerator";
 
 /**
  * Returns true if the builder options contain enough information to start showing a query
@@ -281,33 +281,62 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
         datasourceUid: traceLogsQuery.datasource?.uid!,
         datasourceName: traceLogsQuery.datasource?.type!,
       }
-    }); 
+    });
   });
 
   return res;
 };
 
 
+type FoundLabelWithColumnHint = {
+  type: 'hint',
+  hint: ColumnHint
+  mapKey: string,
+}
+type FoundLabelWithColumnName = {
+  type: 'name',
+  name: string,
+  mapKey: string,
+}
+
 /**
- * Returns true if the dataframe contains a log label that matches the provided name.
- * 
+ * Returns the source labels column if the dataframe contains a log label that matches the provided name.
+ *
  * This function exists for the logs panel, when clicking "filter for value" on a single log row.
  * A dataframe will be provided for that single row, and we need to check the labels object to see if it
- * contains a field with that name. If it does then we can create a filter using the labels column hint.
+ * contains a field with that name. If it does then we can create a filter using the labels column.
  */
-export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name: string): boolean => {
+export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name: string): FoundLabelWithColumnHint | FoundLabelWithColumnName | undefined => {
   if (!frame || !frame.fields || frame.fields.length === 0) {
-    return false;
+    return undefined;
   }
 
-  const logLabelsFieldName = logColumnHintsToAlias.get(ColumnHint.LogLabels);
-  const field = frame.fields.find(f => f.name === logLabelsFieldName);
+  const field = frame.fields.find(f => f.name === LABELS_ALIAS);
   if (!field || !field.values || field.values.length < 1 || !field.values.get(0)) {
-    return false;
+    return undefined;
   }
 
   const labels = (field.values.get(0) || {}) as object;
   const labelKeys = Object.keys(labels);
 
-  return labelKeys.includes(name);
+  if (!labelKeys.includes(name)) {
+    return undefined;
+  }
+
+  const {prefix, mapKey} = /^(?<prefix>.+?)\.(?<mapKey>.+)$/.exec(name)?.groups ?? {};
+  if (!prefix || !mapKey) {
+    return undefined
+  }
+
+  const hint = new Map<string|undefined, ColumnHint>(Object.entries({
+    'attr': ColumnHint.LogAttributes,
+    'res': ColumnHint.LogResourceAttributes,
+    'scope': ColumnHint.LogScopeAttributes
+  })).get(prefix);
+
+  if (hint) {
+    return {type: 'hint', hint, mapKey}
+  } else {
+    return {type: 'name', name: prefix, mapKey}
+  }
 }

@@ -3,7 +3,7 @@ import { columnLabelToPlaceholder, dataFrameHasLogLabelWithName, isBuilderOption
 import { newMockDatasource } from "__mocks__/datasource";
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from "@grafana/data";
 import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
-import { logColumnHintsToAlias } from "./sqlGenerator";
+import { LABELS_ALIAS } from "./sqlGenerator";
 
 describe('isBuilderOptionsRunnable', () => {
   it('should return false for empty builder options', () => {
@@ -209,7 +209,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
 
 describe('dataFrameHasLogLabelWithName', () => {
-  const logLabelsFieldName = logColumnHintsToAlias.get(ColumnHint.LogLabels);
+  const logLabelsFieldName = LABELS_ALIAS;
 
   it('should return false for undefined dataframe', () => {
     expect(dataFrameHasLogLabelWithName(undefined, 'testLabel')).toBe(false);

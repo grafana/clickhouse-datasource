@@ -23,7 +23,8 @@ export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolea
     const nextColumns: SelectedColumn[] = [];
     const includedColumns = new Set<string>();
     for (let [hint, colName] of defaultColumns) {
-      nextColumns.push({ name: colName, hint });
+      const mapForLabels = (hint === ColumnHint.LogAttributes || hint === ColumnHint.LogResourceAttributes || hint === ColumnHint.LogScopeAttributes)
+      nextColumns.push({ name: colName, hint, mapForLabels });
       includedColumns.add(colName);
     }
 
@@ -77,7 +78,8 @@ export const useOtelColumns = (datasource: Datasource, otelEnabled: boolean, ote
     const columns: SelectedColumn[] = [];
     const includedColumns = new Set<string>();
     logColumnMap.forEach((name, hint) => {
-      columns.push({ name, hint });
+      const mapForLabels = (hint === ColumnHint.LogAttributes || hint === ColumnHint.LogResourceAttributes || hint === ColumnHint.LogScopeAttributes)
+      columns.push({ name, hint, mapForLabels });
       includedColumns.add(name);
     });
 

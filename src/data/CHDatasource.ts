@@ -292,9 +292,21 @@ export class Datasource
     const lookupByAlias = query.builderOptions.columns?.find(c => c.alias === columnName); // Check all aliases first,
     const lookupByName = query.builderOptions.columns?.find(c => c.name === columnName);   // then try matching column name
     const lookupByLogsAlias = logAliasToColumnHints.has(columnName) ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!) : undefined;
-    const lookupByLogLabels = dataFrameHasLogLabelWithName(actionFrame, columnName) && getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
+
+    let lookupByLogLabels: SelectedColumn | undefined = undefined;
+    let mapKey: string | undefined = undefined;
+    const labelColumn = dataFrameHasLogLabelWithName(actionFrame, columnName);
+    if (labelColumn) {
+      if (labelColumn.type === 'hint') {
+        lookupByLogLabels = getColumnByHint(query.builderOptions, labelColumn.hint)
+      } else {
+        lookupByLogLabels = query.builderOptions.columns?.find(c => c.name === labelColumn.name)
+      }
+      mapKey = labelColumn.mapKey
+    }
+
     const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
-    
+
     let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
     if (action.type === 'ADD_FILTER') {
       // we need to remove *any other EQ or NE* for the same field,
@@ -307,16 +319,16 @@ export class Datasource
         ) &&
         !(
           f.type.toLowerCase().startsWith('map') &&
-          (column && lookupByLogLabels && f.mapKey === columnName) &&
+          (column && lookupByLogLabels && f.key === lookupByLogLabels.name && f.mapKey === mapKey) &&
           (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
         )
       );
 
       nextFilters.push({
         condition: 'AND',
-        key: (column && column.hint) ? '' : columnName,
+        key: lookupByLogLabels ? lookupByLogLabels.name : columnName,
         hint: (column && column.hint) ? column.hint : undefined,
-        mapKey: lookupByLogLabels ? columnName : undefined,
+        mapKey: lookupByLogLabels ? mapKey : undefined,
         type: lookupByLogLabels ? 'Map(String, String)' : 'string',
         filterType: 'custom',
         operator: FilterOperator.Equals,
@@ -340,7 +352,7 @@ export class Datasource
           ) ||
           (
             f.type.toLowerCase().startsWith('map') &&
-            (column && lookupByLogLabels && f.mapKey === columnName) &&
+            (column && lookupByLogLabels && f.key === lookupByLogLabels.name && f.mapKey === mapKey) &&
             (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
           )
         )
@@ -348,9 +360,9 @@ export class Datasource
 
       nextFilters.push({
         condition: 'AND',
-        key: (column && column.hint) ? '' : columnName,
+        key:  lookupByLogLabels ? lookupByLogLabels.name : columnName,
         hint: (column && column.hint) ? column.hint : undefined,
-        mapKey: lookupByLogLabels ? columnName : undefined,
+        mapKey: lookupByLogLabels ? mapKey : undefined,
         type: lookupByLogLabels ? 'Map(String, String)' : 'string',
         filterType: 'custom',
         operator: FilterOperator.NotEquals,

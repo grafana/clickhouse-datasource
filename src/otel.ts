@@ -26,7 +26,9 @@ const otel129: OtelVersion = {
     [ColumnHint.Time, 'Timestamp'],
     [ColumnHint.LogMessage, 'Body'],
     [ColumnHint.LogLevel, 'SeverityText'],
-    [ColumnHint.LogLabels, 'LogAttributes'],
+    [ColumnHint.LogAttributes, 'LogAttributes'],
+    [ColumnHint.LogResourceAttributes, 'ResourceAttributes'],
+    [ColumnHint.LogScopeAttributes, 'ScopeAttributes'],
     [ColumnHint.TraceId, 'TraceId'],
   ]),
   logLevels: [
