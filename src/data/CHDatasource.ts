@@ -159,6 +159,7 @@ export class Datasource
       for (level in LOG_LEVEL_TO_IN_CLAUSE) {
         aggregates.push({ aggregateType: AggregateType.Sum, column: `multiSearchAny(${llf}, [${LOG_LEVEL_TO_IN_CLAUSE[level]}])`, alias: level });
       }
+      columns.push({name: `count(*) - (${Object.keys(LOG_LEVEL_TO_IN_CLAUSE).join('+')})`, alias: 'unknown'})
     } else {
       // Count all logs if level column isn't selected
       aggregates.push({
