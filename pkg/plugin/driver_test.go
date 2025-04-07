@@ -83,7 +83,8 @@ func TestMain(m *testing.M) {
 	}
 	req := testcontainers.ContainerRequest{
 		Env: map[string]string{
-			"TZ": time.Local.String(),
+			"CLICKHOUSE_SKIP_USER_SETUP": "1", // added because of https://github.com/ClickHouse/ClickHouse/commit/65435a3db7214261b793acfb69388567b4c8c9b3
+			"TZ":                         time.Local.String(),
 		},
 		ExposedPorts: []string{"9000/tcp", "8123/tcp"},
 		Files: []testcontainers.ContainerFile{
@@ -159,12 +160,11 @@ func TestHTTPConnect(t *testing.T) {
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
 	ssl := getEnv("CLICKHOUSE_SSL", "false")
-	path := "custom-path"
 	clickhouse := plugin.Clickhouse{}
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "protocol": "http" }`, host, port, path, username, ssl)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})

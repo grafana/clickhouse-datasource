@@ -21,7 +21,10 @@ export interface CHConfig extends DataSourceJsonData {
   defaultDatabase?: string;
   defaultTable?: string;
 
+  connMaxLifetime?: string;
   dialTimeout?: string;
+  maxIdleConns?: string;
+  maxOpenConns?: string;
   queryTimeout?: string;
   validateSql?: boolean;
 
@@ -32,7 +35,7 @@ export interface CHConfig extends DataSourceJsonData {
 
   httpHeaders?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
-  
+
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;
 }
@@ -56,7 +59,6 @@ export interface CHCustomSetting {
   setting: string;
   value: string;
 }
-
 
 export interface CHLogsConfig {
   defaultDatabase?: string;

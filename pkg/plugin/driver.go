@@ -55,6 +55,29 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
+// getPDCDialContext returns a dialer function for creating a connection to PDC if a secure SOCKS proxy is enabled.
+func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Conn, error), error) {
+	p := sdkproxy.New(settings.ProxyOptions)
+
+	if !p.SecureSocksProxyEnabled() {
+		return nil, nil
+	}
+
+	dialer, err := p.NewSecureSocksProxyContextDialer()
+	if err != nil {
+		return nil, err
+	}
+
+	contextDialer, ok := dialer.(proxy.ContextDialer)
+	if !ok {
+		return nil, errors.New("unable to cast SOCKS proxy dialer to context proxy dialer")
+	}
+
+	return func(ctx context.Context, addr string) (net.Conn, error) {
+		return contextDialer.DialContext(ctx, "tcp", addr)
+	}, nil
+}
+
 func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
 	version := backend.UserAgentFromContext(ctx).GrafanaVersion()
 
@@ -107,6 +130,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	if err != nil {
 		return nil, err
 	}
+
 	var tlsConfig *tls.Config
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err = getTLSConfig(settings)
@@ -118,6 +142,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 			InsecureSkipVerify: settings.InsecureSkipVerify,
 		}
 	}
+
 	t, err := strconv.Atoi(settings.DialTimeout)
 	if err != nil {
 		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout)))
@@ -126,24 +151,23 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	if err != nil {
 		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout)))
 	}
+
 	protocol := clickhouse.Native
 	if settings.Protocol == "http" {
 		protocol = clickhouse.HTTP
 	}
+
 	compression := clickhouse.CompressionLZ4
 	if protocol == clickhouse.HTTP {
 		compression = clickhouse.CompressionGZIP
 	}
+
 	customSettings := make(clickhouse.Settings)
 	if settings.CustomSettings != nil {
 		for _, setting := range settings.CustomSettings {
 			customSettings[setting.Setting] = setting.Value
 		}
 	}
-
-	timeout := time.Duration(t)
-	ctx, cancel := context.WithTimeout(context.Background(), timeout*time.Second)
-	defer cancel()
 
 	httpHeaders, err := extractForwardedHeadersFromMessage(message)
 	if err != nil {
@@ -156,64 +180,74 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	}
 
 	opts := &clickhouse.Options{
+		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
+		Auth: clickhouse.Auth{
+			Database: settings.DefaultDatabase,
+			Password: settings.Password,
+			Username: settings.Username,
+		},
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
-		},
-		TLS:         tlsConfig,
-		Addr:        []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
-		HttpUrlPath: settings.Path,
-		HttpHeaders: httpHeaders,
-		Auth: clickhouse.Auth{
-			Username: settings.Username,
-			Password: settings.Password,
-			Database: settings.DefaultDatabase,
 		},
 		Compression: &clickhouse.Compression{
 			Method: compression,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
-		ReadTimeout: time.Duration(qt) * time.Second,
+		HttpHeaders: httpHeaders,
+		HttpUrlPath: settings.Path,
 		Protocol:    protocol,
+		ReadTimeout: time.Duration(qt) * time.Second,
 		Settings:    customSettings,
+		TLS:         tlsConfig,
 	}
 
-	p := sdkproxy.New(settings.ProxyOptions)
-
-	if p.SecureSocksProxyEnabled() {
-		dialer, err := p.NewSecureSocksProxyContextDialer()
-		if err != nil {
-			return nil, err
-		}
-		contextDialer, ok := dialer.(proxy.ContextDialer)
-		if !ok {
-			return nil, errors.New("unable to cast socks proxy dialer to context proxy dialer")
-		}
-		opts.DialContext = func(ctx context.Context, addr string) (net.Conn, error) {
-			return contextDialer.DialContext(ctx, "tcp", addr)
-		}
+	// dialCtx is used to create a connection to PDC, if it is enabled
+	dialCtx, err := getPDCDialContext(settings)
+	if err != nil {
+		return nil, err
 	}
+	if dialCtx != nil {
+		opts.DialContext = dialCtx
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(t)*time.Second)
+	defer cancel()
 
 	db := clickhouse.OpenDB(opts)
 
-	chErr := make(chan error, 1)
-	go func() {
-		err = db.PingContext(ctx)
-		chErr <- err
-	}()
+	// Set connection pool settings
+	if i, err := strconv.Atoi(settings.ConnMaxLifetime); err == nil {
+		db.SetConnMaxLifetime(time.Duration(i) * time.Minute)
+	}
+	if i, err := strconv.Atoi(settings.MaxIdleConns); err == nil {
+		db.SetMaxIdleConns(i)
+	}
+	if i, err := strconv.Atoi(settings.MaxOpenConns); err == nil {
+		db.SetMaxOpenConns(i)
+	}
 
 	select {
-	case err := <-chErr:
-		if err != nil {
-			// sql ds will ping again and show error
-			if exception, ok := err.(*clickhouse.Exception); ok {
-				log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-			} else {
-				log.DefaultLogger.Error(err.Error())
-			}
-			return db, nil
+	case <-ctx.Done():
+		return nil, fmt.Errorf("the operation was cancelled before starting: %w", ctx.Err())
+	default:
+		// proceed
+	}
+
+	// `sqlds` normally calls `db.PingContext()` to check if the connection is alive,
+	// however, as ClickHouse returns its own non-standard `Exception` type, we need
+	// to handle it here so that we can log the error code, message and stack trace
+	if err := db.PingContext(ctx); err != nil {
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
 		}
-	case <-time.After(timeout * time.Second):
-		return db, errors.New("connection timed out")
+
+		if exception, ok := err.(*clickhouse.Exception); ok {
+			log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
+		} else {
+			log.DefaultLogger.Error(err.Error())
+		}
+
+		return nil, err
 	}
 
 	return db, settings.isValid()
@@ -267,40 +301,65 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
 }
 
-// MutateResponse For any view other than traces we convert FieldTypeNullableJSON to string
+// MutateResponse converts fields of type FieldTypeNullableJSON to string,
+// except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
-		if frame.Meta.PreferredVisualization != data.VisTypeTrace &&
-			frame.Meta.PreferredVisualization != data.VisTypeTable &&
-			frame.Meta.PreferredVisualization != data.VisTypeLogs {
-			var fields []*data.Field
-			for _, field := range frame.Fields {
-				values := make([]*string, field.Len())
-				if field.Type() == data.FieldTypeNullableJSON {
-					newField := data.NewField(field.Name, field.Labels, values)
-					newField.SetConfig(field.Config)
-					for i := 0; i < field.Len(); i++ {
-						val := field.At(i).(*json.RawMessage)
-						if val == nil {
-							newField.Set(i, nil)
-						} else {
-							bytes, err := val.MarshalJSON()
-							if err != nil {
-								return res, err
-							}
-							sVal := string(bytes)
-							newField.Set(i, &sVal)
-						}
-					}
-					fields = append(fields, newField)
-				} else {
-					fields = append(fields, field)
-				}
+		if shouldConvertFields(frame.Meta.PreferredVisualization) {
+			if err := convertNullableJSONFields(frame); err != nil {
+				return res, err
 			}
-			frame.Fields = fields
 		}
 	}
 	return res, nil
+}
+
+// shouldConvertFields determines whether field conversion is needed based on visualization type.
+func shouldConvertFields(visType data.VisType) bool {
+	return visType != data.VisTypeTrace && visType != data.VisTypeTable && visType != data.VisTypeLogs
+}
+
+// convertNullableJSONFields converts all FieldTypeNullableJSON fields in the given frame to string.
+func convertNullableJSONFields(frame *data.Frame) error {
+	var convertedFields []*data.Field
+
+	for _, field := range frame.Fields {
+		if field.Type() == data.FieldTypeNullableJSON {
+			newField, err := convertFieldToString(field)
+			if err != nil {
+				return err
+			}
+			convertedFields = append(convertedFields, newField)
+		} else {
+			convertedFields = append(convertedFields, field)
+		}
+	}
+
+	frame.Fields = convertedFields
+	return nil
+}
+
+// convertFieldToString creates a new field where JSON values are marshaled into string representations.
+func convertFieldToString(field *data.Field) (*data.Field, error) {
+	values := make([]*string, field.Len())
+	newField := data.NewField(field.Name, field.Labels, values)
+	newField.SetConfig(field.Config)
+
+	for i := 0; i < field.Len(); i++ {
+		val, _ := field.At(i).(*json.RawMessage)
+		if val == nil {
+			newField.Set(i, nil)
+		} else {
+			bytes, err := val.MarshalJSON()
+			if err != nil {
+				return nil, err
+			}
+			sVal := string(bytes)
+			newField.Set(i, &sVal)
+		}
+	}
+
+	return newField, nil
 }
 
 func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {

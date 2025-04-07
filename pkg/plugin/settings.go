@@ -34,8 +34,11 @@ type Settings struct {
 
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 
-	DialTimeout  string `json:"dialTimeout,omitempty"`
-	QueryTimeout string `json:"queryTimeout,omitempty"`
+	ConnMaxLifetime string `json:"connMaxLifetime,omitempty"`
+	DialTimeout     string `json:"dialTimeout,omitempty"`
+	QueryTimeout    string `json:"queryTimeout,omitempty"`
+	MaxIdleConns    string `json:"maxIdleConns,omitempty"`
+	MaxOpenConns    string `json:"maxOpenConns,omitempty"`
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
@@ -181,12 +184,24 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 	}
 
+	// Set default values
 	if strings.TrimSpace(settings.DialTimeout) == "" {
 		settings.DialTimeout = "10"
 	}
 	if strings.TrimSpace(settings.QueryTimeout) == "" {
 		settings.QueryTimeout = "60"
 	}
+	if strings.TrimSpace(settings.ConnMaxLifetime) == "" {
+		settings.ConnMaxLifetime = "5"
+	}
+	if strings.TrimSpace(settings.MaxIdleConns) == "" {
+		settings.MaxIdleConns = "25"
+	}
+	if strings.TrimSpace(settings.MaxOpenConns) == "" {
+		settings.MaxOpenConns = "50"
+	}
+
+	// Load secure settings
 	password, ok := config.DecryptedSecureJSONData["password"]
 	if ok {
 		settings.Password = password
