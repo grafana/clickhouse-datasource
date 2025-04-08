@@ -32,7 +32,7 @@ interface LogsQueryBuilderState {
   timeColumn?: SelectedColumn;
   logLevelColumn?: SelectedColumn;
   messageColumn?: SelectedColumn;
-  labelsColumn?: SelectedColumn;
+  labelsColumns: SelectedColumn[];
   // liveView: boolean;
   orderBy: OrderBy[];
   limit: number;
@@ -78,8 +78,9 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     if (next.messageColumn) {
       nextColumns.push(next.messageColumn);
     }
-    if (next.labelsColumn) {
-      nextColumns.push(next.labelsColumn);
+
+    for (const c of next.labelsColumns) {
+      nextColumns.push({ ...c, mapForLabels: true })
     }
 
     builderOptionsDispatch(setOptions({
@@ -161,16 +162,13 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           label={labels.logMessageColumn.label}
           tooltip={labels.logMessageColumn.tooltip}
         />
-        <ColumnSelect
+        <ColumnsEditor
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
-          selectedColumn={builderState.labelsColumn}
-          invalid={!builderState.labelsColumn}
-          onColumnChange={onOptionChange('labelsColumn')}
-          columnHint={ColumnHint.LogLabels}
+          selectedColumns={builderState.labelsColumns}
+          onSelectedColumnsChange={onOptionChange('labelsColumns')}
           label={labels.logLabelsColumn.label}
           tooltip={labels.logLabelsColumn.tooltip}
-          inline
         />
         {/* <Switch
           value={builderState.liveView}

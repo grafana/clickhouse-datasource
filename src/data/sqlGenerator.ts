@@ -222,7 +222,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
  */
 const generateLogsQuery = (_options: QueryBuilderOptions): string => {
   // Copy columns so column aliases can be safely mutated
-  const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) };
+  const options = { ..._options, columns: _options.columns?.map(c => ({ ...c })) ?? [] };
   const { database, table } = options;
 
   const queryParts: string[] = [];
@@ -250,10 +250,20 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
     selectParts.push(getColumnIdentifier(logLevel));
   }
 
-  const logLabels = getColumnByHint(options, ColumnHint.LogLabels);
-  if (logLabels !== undefined) {
-    logLabels.alias = logColumnHintsToAlias.get(ColumnHint.LogLabels);
-    selectParts.push(getColumnIdentifier(logLabels));
+  const logLabelsCols = options.columns.filter(c => c.mapForLabels);
+  if (0 < logLabelsCols.length) {
+    const mapExprs = [];
+    for (const col of logLabelsCols) {
+      const prefix = new Map<ColumnHint | undefined, string>([
+        [ColumnHint.LogAttributes, 'attr'],
+        [ColumnHint.LogResourceAttributes, 'res'],
+        [ColumnHint.LogScopeAttributes, 'span']
+      ]).get(col.hint) ?? col.name;
+      const c = escapeIdentifier(col.name);
+      const mapExpr = `mapApply((k, v) -> ('${prefix}.' || k,  v), ${c})`
+      mapExprs.push(mapExpr);
+    }
+    selectParts.push(`mapConcat(${mapExprs.join(',')}) as ${escapeIdentifier(LABELS_ALIAS)}`);
   }
 
   const traceId = getColumnByHint(options, ColumnHint.TraceId);
@@ -797,9 +807,9 @@ const logAliasToColumnHintsEntries: ReadonlyArray<[string, ColumnHint]> = [
   ['timestamp', ColumnHint.Time],
   ['body', ColumnHint.LogMessage],
   ['level', ColumnHint.LogLevel],
-  ['labels', ColumnHint.LogLabels],
   ['traceID', ColumnHint.TraceId],
 ];
+export const LABELS_ALIAS = 'labels';
 export const logAliasToColumnHints: Map<string, ColumnHint> = new Map(logAliasToColumnHintsEntries);
 export const logColumnHintsToAlias: Map<ColumnHint, string> = new Map(logAliasToColumnHintsEntries.map(e => [e[1], e[0]]));
 
