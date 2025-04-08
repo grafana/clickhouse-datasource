@@ -494,6 +494,13 @@ export class Datasource
     traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
     traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
     traceConfig.eventsColumnPrefix && result.set(ColumnHint.TraceEventsPrefix, traceConfig.eventsColumnPrefix);
+    traceConfig.linksColumnPrefix && result.set(ColumnHint.TraceLinksPrefix, traceConfig.linksColumnPrefix);
+    traceConfig.kindColumn && result.set(ColumnHint.TraceKind, traceConfig.kindColumn);
+    traceConfig.statusCodeColumn && result.set(ColumnHint.TraceStatusCode, traceConfig.statusCodeColumn);
+    traceConfig.statusMessageColumn && result.set(ColumnHint.TraceStatusMessage, traceConfig.statusMessageColumn);
+    traceConfig.instrumentationLibraryNameColumn && result.set(ColumnHint.TraceInstrumentationLibraryName, traceConfig.instrumentationLibraryNameColumn);
+    traceConfig.instrumentationLibraryVersionColumn && result.set(ColumnHint.TraceInstrumentationLibraryVersion, traceConfig.instrumentationLibraryVersionColumn);
+    traceConfig.stateColumn && result.set(ColumnHint.TraceState, traceConfig.stateColumn);
 
     return result;
   }
@@ -584,7 +591,7 @@ export class Datasource
 
     return columns;
   }
-  
+
   /**
    * Fetches column suggestions from the table schema.
    */
