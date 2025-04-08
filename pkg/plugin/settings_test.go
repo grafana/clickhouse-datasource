@@ -17,6 +17,15 @@ import (
 
 func TestLoadSettings(t *testing.T) {
 	t.Run("should parse settings correctly", func(t *testing.T) {
+
+		ctx := context.Background()
+		ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+			"GF_SQL_ROW_LIMIT":                         "1000000",
+			"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+			"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+			"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+		}))
+
 		type args struct {
 			config backend.DataSourceInstanceSettings
 		}
@@ -25,6 +34,7 @@ func TestLoadSettings(t *testing.T) {
 			args         args
 			wantSettings Settings
 			wantErr      error
+			testCtx      context.Context
 		}{
 			{
 				name: "should parse and set all json fields correctly",
@@ -85,8 +95,10 @@ func TestLoadSettings(t *testing.T) {
 							KeepAlive: proxy.DefaultTimeoutOptions.KeepAlive,
 						},
 					},
+					RowLimit: 1000000,
 				},
 				wantErr: nil,
+				testCtx: ctx,
 			},
 			{
 				name: "should convert string values to the correct type",
@@ -109,8 +121,10 @@ func TestLoadSettings(t *testing.T) {
 					MaxOpenConns:       "50",
 					QueryTimeout:       "60",
 					ProxyOptions:       nil,
+					RowLimit:           1000000,
 				},
 				wantErr: nil,
+				testCtx: ctx,
 			},
 			{
 				name: "should parse v3 config fields into new fields",
@@ -128,13 +142,15 @@ func TestLoadSettings(t *testing.T) {
 					MaxIdleConns:    "25",
 					MaxOpenConns:    "50",
 					QueryTimeout:    "60",
+					RowLimit:        1000000,
 				},
 				wantErr: nil,
+				testCtx: ctx,
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotSettings, err := LoadSettings(context.Background(), tt.args.config)
+				gotSettings, err := LoadSettings(tt.testCtx, tt.args.config)
 				assert.Equal(t, tt.wantErr, err)
 				if !reflect.DeepEqual(gotSettings, tt.wantSettings) {
 					t.Errorf("LoadSettings() = %v, want %v", gotSettings, tt.wantSettings)
@@ -143,6 +159,14 @@ func TestLoadSettings(t *testing.T) {
 		}
 	})
 	t.Run("should capture invalid settings", func(t *testing.T) {
+		ctx := context.Background()
+		ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+			"GF_SQL_ROW_LIMIT":                         "1000000",
+			"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+			"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+			"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+		}))
+
 		tests := []struct {
 			jsonData    string
 			password    string
@@ -155,7 +179,7 @@ func TestLoadSettings(t *testing.T) {
 		}
 		for i, tc := range tests {
 			t.Run(fmt.Sprintf("[%v/%v] %s", i+1, len(tests), tc.description), func(t *testing.T) {
-				_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+				_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
 					JSONData:                []byte(tc.jsonData),
 					DecryptedSecureJSONData: map[string]string{"password": tc.password},
 				})

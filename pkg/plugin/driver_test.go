@@ -138,18 +138,25 @@ func TestConnect(t *testing.T) {
 	queryTimeoutString := "3600"
 	path := "custom-path"
 	clickhouse := plugin.Clickhouse{}
+	ctx := context.Background()
+	ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "path": "%s", "username": "%s", "secure": %s, "queryTimeout": "%s"}`, host, port, path, username, ssl, queryTimeoutString)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
+		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 	t.Run("should not error when valid settings passed - with query timeout as number", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
+		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -161,11 +168,18 @@ func TestHTTPConnect(t *testing.T) {
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
 	ssl := getEnv("CLICKHOUSE_SSL", "false")
 	clickhouse := plugin.Clickhouse{}
+	ctx := context.Background()
+	ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
 	t.Run("should not error when valid settings passed", func(t *testing.T) {
 		secure := map[string]string{}
 		secure["password"] = password
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
-		_, err := clickhouse.Connect(context.Background(), settings, json.RawMessage{})
+		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
 }
@@ -1189,6 +1203,14 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	secure := map[string]string{}
 	secure["password"] = password
 
+	ctx := context.Background()
+	ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+
 	proxyHandlerGenerator := func(t *testing.T, expectedHeaders map[string]string) http.HandlerFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			for k, v := range expectedHeaders {
@@ -1218,7 +1240,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	t.Run("should not forward http headers", func(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": false}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": ""})
-		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		dsInstance, err := plugin.NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
 		ds, ok := dsInstance.(*sqlds.SQLDatasource)
@@ -1226,7 +1248,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 
 		// We test that the X-Test header is absent
 		req.PluginContext.DataSourceInstanceSettings = &settings
-		_, err = ds.QueryData(context.Background(), req)
+
+		_, err = ds.QueryData(ctx, req)
 
 		assert.Equal(t, nil, err)
 	})
@@ -1234,7 +1257,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	t.Run("should forward http headers", func(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": ""})
-		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		dsInstance, err := plugin.NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
 		ds, ok := dsInstance.(*sqlds.SQLDatasource)
@@ -1243,7 +1266,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		// We test that the X-Test header exists
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Hello World!"})
 		req.PluginContext.DataSourceInstanceSettings = &settings
-		_, err = ds.QueryData(context.Background(), req)
+		_, err = ds.QueryData(ctx, req)
 
 		assert.Equal(t, nil, err)
 	})
@@ -1251,7 +1274,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	t.Run("should forward http headers alongside custom http headers", func(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true, "httpHeaders": [{ "name": "custom-test-header", "value": "value-1", "secure": false}]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1"})
-		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		dsInstance, err := plugin.NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
 		ds, ok := dsInstance.(*sqlds.SQLDatasource)
@@ -1260,7 +1283,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		// We test that the X-Test header exists
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1", "X-Test": "Hello World!"})
 		req.PluginContext.DataSourceInstanceSettings = &settings
-		_, err = ds.QueryData(context.Background(), req)
+		_, err = ds.QueryData(ctx, req)
 
 		assert.Equal(t, nil, err)
 	})
@@ -1268,7 +1291,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	t.Run("should override forward headers with custom http headers", func(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true, "httpHeaders": [{ "name": "X-Test", "value": "Override", "secure": false}]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
-		dsInstance, err := plugin.NewDatasource(context.Background(), settings)
+		dsInstance, err := plugin.NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
 		ds, ok := dsInstance.(*sqlds.SQLDatasource)
@@ -1277,7 +1300,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		// We test that the X-Test header exists
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
 		req.PluginContext.DataSourceInstanceSettings = &settings
-		_, err = ds.QueryData(context.Background(), req)
+		_, err = ds.QueryData(ctx, req)
 
 		assert.Equal(t, nil, err)
 	})
