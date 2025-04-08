@@ -20,7 +20,10 @@ describe('useTraceDefaultsOnMount', () => {
       meta: {
         otelEnabled: expect.anything(),
         otelVersion: undefined,
-        traceDurationUnit: expect.anything()
+        traceDurationUnit: expect.anything(),
+        flattenNested: expect.anything(),
+        traceEventsColumnPrefix: expect.anything(),
+        traceLinksColumnPrefix: expect.anything(),
       }
     };
 
@@ -77,7 +80,10 @@ describe('useOtelColumns', () => {
     const expectedOptions = {
       columns,
       meta: {
-        traceDurationUnit: expect.anything()
+        traceDurationUnit: expect.anything(),
+        flattenNested: expect.anything(),
+        traceEventsColumnPrefix: expect.anything(),
+        traceLinksColumnPrefix: expect.anything(),
       }
     };
 

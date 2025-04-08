@@ -92,7 +92,16 @@ export interface CHTracesConfig {
   startTimeColumn?: string;
   tagsColumn?: string;
   serviceTagsColumn?: string;
-  eventsColumnPrefix?: string;
+  kindColumn?: string;
+  statusCodeColumn?: string;
+  statusMessageColumn?: string;
+  stateColumn?: string;
+  instrumentationLibraryNameColumn?: string;
+  instrumentationLibraryVersionColumn?: string;
+
+  flattenNested?: boolean;
+  traceEventsColumnPrefix?: string;
+  traceLinksColumnPrefix?: string;
 }
 
 export interface AliasTableEntry {

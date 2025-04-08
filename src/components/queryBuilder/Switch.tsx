@@ -7,12 +7,13 @@ interface SwitchProps {
   onChange: (value: boolean) => void;
   label: string;
   tooltip: string;
+  disabled?: boolean;
   inline?: boolean;
   wide?: boolean;
 }
 
 export const Switch = (props: SwitchProps) => {
-  const { value, onChange, label, tooltip, inline, wide } = props;
+  const { value, onChange, label, tooltip, disabled, inline, wide } = props;
 
   const theme = useTheme();
   const switchContainerStyle: React.CSSProperties = {
@@ -31,6 +32,7 @@ export const Switch = (props: SwitchProps) => {
       </InlineFormLabel>
       <div style={switchContainerStyle}>
         <GrafanaSwitch
+          disabled={disabled}
           className="gf-form"
           value={value}
           onChange={e => onChange(e.currentTarget.checked)}
