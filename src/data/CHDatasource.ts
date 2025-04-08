@@ -35,6 +35,7 @@ import {
   ColumnHint,
   TimeUnit,
   SelectedColumn,
+  SqlFunction,
 } from 'types/queryBuilder';
 import { AdHocFilter } from './adHocFilter';
 import { cloneDeep, isEmpty, isString } from 'lodash';
@@ -610,6 +611,39 @@ export class Datasource
     );
 
     return [...columns, ...results.flat()];
+  }
+
+  /**
+   * Fetches SQL functions from server.
+   */
+  async fetchSqlFunctions(): Promise<SqlFunction[]> {
+    const rawSql = `
+      SELECT
+        name, is_aggregate, case_insensitive, alias_to, origin, description,
+        syntax, arguments, returned_value, examples, categories
+      FROM system.functions
+      LIMIT 10000
+    `;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const view = new DataFrameView(frame);
+    const sqlFunctions: SqlFunction[] = view.map(item => ({
+      name: String(item[0]),
+      isAggregate: Boolean(item[1]),
+      caseInsensitive: Boolean(item[2]),
+      aliasTo: String(item[3]),
+      origin: String(item[4]),
+      description: String(item[5]),
+      syntax: String(item[6]),
+      arguments: String(item[7]),
+      returnedValue: String(item[8]),
+      examples: String(item[9]),
+      categories: String(item[10]),
+    }));
+
+    return sqlFunctions;
   }
 
   /**
