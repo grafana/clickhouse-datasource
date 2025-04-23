@@ -546,7 +546,7 @@ export class Datasource
    */
   async fetchPathsForJSONColumns(database: string | undefined, table: string, jsonColumnName: string): Promise<TableColumn[]> {
     const prefix = Boolean(database) ? `"${database}".` : '';
-    const rawSql = `SELECT arrayJoin(distinctJSONPathsAndTypes(${jsonColumnName})) FROM ${prefix}"${table}"`;
+    const rawSql = `SELECT arrayJoin(distinctJSONPathsAndTypes(${jsonColumnName})) FROM ${prefix}"${table}" SETTINGS max_execution_time=10`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];

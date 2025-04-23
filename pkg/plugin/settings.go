@@ -44,6 +44,8 @@ type Settings struct {
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
 	CustomSettings        []CustomSetting   `json:"customSettings"`
 	ProxyOptions          *proxy.Options
+
+	RowLimit int64 `json:"rowLimit,omitempty"`
 }
 
 type CustomSetting struct {
@@ -234,6 +236,14 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 		settings.ProxyOptions = proxyOpts
 	}
+
+	cfg := backend.GrafanaConfigFromContext(ctx)
+	sqlCfg, err := cfg.SQL()
+	if err != nil {
+		return settings, err
+	}
+
+	settings.RowLimit = sqlCfg.RowLimit
 
 	return settings, settings.isValid()
 }
