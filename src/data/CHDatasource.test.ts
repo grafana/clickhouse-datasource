@@ -259,7 +259,7 @@ describe('ClickHouseDatasource', () => {
       ]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name"' };
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name" SETTINGS max_execution_time=10' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
@@ -275,7 +275,7 @@ describe('ClickHouseDatasource', () => {
       ]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchPathsForJSONColumns('', 'table_name', 'jsonCol');
-      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name"' };
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name" SETTINGS max_execution_time=10' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
@@ -291,7 +291,7 @@ describe('ClickHouseDatasource', () => {
       ]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
       await ds.fetchPathsForJSONColumns('', 'table.name', 'jsonCol');
-      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name"' };
+      const expected = { rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name" SETTINGS max_execution_time=10' };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })

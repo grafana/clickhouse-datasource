@@ -169,6 +169,8 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		}
 	}
 
+	customSettings["limit"] = settings.RowLimit
+
 	httpHeaders, err := extractForwardedHeadersFromMessage(message)
 	if err != nil {
 		return nil, err
