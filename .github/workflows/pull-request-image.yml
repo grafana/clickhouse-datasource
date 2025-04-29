@@ -6,10 +6,6 @@ on:
     branches:
       - main
 
-permissions:
-  pull-requests: write
-  issues: write
-
 jobs:
   build:
     name: Build and archive plugin build artifacts
@@ -19,6 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Setup Node.js environment
         uses: actions/setup-node@v4.0.3
@@ -65,6 +63,11 @@ jobs:
 
       - name: Generate Dockerfile
         shell: bash
+        env:
+          GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.number }}
         run: |
           echo "FROM grafana/grafana-oss:latest
 
@@ -78,22 +81,22 @@ jobs:
           ENV GF_DEFAULT_APP_MODE "development"
 
           # TODO: Cleanup script should remove images from closed PRs using these labels
-          LABEL gh-sha="${{ github.event.pull_request.head.sha }}"
-          LABEL gh-repo="${{ github.event.repository.name }}"
-          LABEL gh-pr-number="${{ github.event.number }}"
+          LABEL gh-sha="${PR_SHA}"
+          LABEL gh-repo="${GITHUB_REPOSITORY_NAME}"
+          LABEL gh-pr-number="${PR_NUMBER}"
 
           # Copy plugin build artifacts into the image
-          COPY . /var/lib/grafana/plugins/${{ github.event.repository.name }}/" > Dockerfile
+          COPY . /var/lib/grafana/plugins/${GITHUB_REPOSITORY_NAME}/" > Dockerfile
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1
         if: github.event.pull_request.head.repo.full_name == github.repository
         with:
           context: .
@@ -102,7 +105,7 @@ jobs:
           tags: grafana/plugin-builds:${{ github.event.pull_request.head.sha }}pre
 
       - name: Build Docker image for use with Docker save
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@14487ce63c7a62a4a324b0bfb37086795e31c6c1
         if: ${{github.event.pull_request.head.repo.full_name != github.repository}}
         with:
           context: .
@@ -123,19 +126,22 @@ jobs:
 
   add_pr_comment:
     name: Add PR comment
+    permissions:
+      pull-requests: write
+      issues: write
     runs-on: ubuntu-latest
     needs: push_to_registry
     if: github.event.pull_request.head.repo.full_name == github.repository && false
     steps:
       - name: Find previous comment (if any)
-        uses: peter-evans/find-comment@v3
+        uses: peter-evans/find-comment@3eae4d37986fb5a8592848f6a574fdf654e61f9e
         id: fc
         with:
           issue-number: ${{ github.event.number }}
           body-includes: Use the following command to run this PR with Docker
       - name: Update comment on PR
         if: steps.fc.outputs.comment-id != ''
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043
         with:
           comment-id: ${{ steps.fc.outputs.comment-id }}
           edit-mode: replace
@@ -148,7 +154,7 @@ jobs:
               ```
       - name: Add comment to PR
         if: steps.fc.outputs.comment-id == ''
-        uses: peter-evans/create-or-update-comment@v4
+        uses: peter-evans/create-or-update-comment@71345be0265236311c031f5c7866368bd1eff043
         with:
           issue-number: ${{ github.event.number }}
           body: |
