@@ -40,6 +40,13 @@ interface TraceQueryBuilderState {
   tagsColumn?: SelectedColumn;
   serviceTagsColumn?: SelectedColumn;
   eventsColumnPrefix?: SelectedColumn;
+  linksColumnPrefix?: SelectedColumn;
+  kindColumn?: SelectedColumn;
+  statusCodeColumn?: SelectedColumn;
+  statusMessageColumn?: SelectedColumn;
+  instrumentationLibraryNameColumn?: SelectedColumn;
+  instrumentationLibraryVersionColumn?: SelectedColumn;
+  stateColumn?: SelectedColumn;
   traceId: string;
   orderBy: OrderBy[];
   limit: number;
@@ -69,6 +76,13 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
     tagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceTags),
     serviceTagsColumn: getColumnByHint(builderOptions, ColumnHint.TraceServiceTags),
     eventsColumnPrefix: getColumnByHint(builderOptions, ColumnHint.TraceEventsPrefix),
+    linksColumnPrefix: getColumnByHint(builderOptions, ColumnHint.TraceLinksPrefix),
+    kindColumn: getColumnByHint(builderOptions, ColumnHint.TraceKind),
+    statusCodeColumn: getColumnByHint(builderOptions, ColumnHint.TraceStatusCode),
+    statusMessageColumn: getColumnByHint(builderOptions, ColumnHint.TraceStatusMessage),
+    instrumentationLibraryNameColumn: getColumnByHint(builderOptions, ColumnHint.TraceInstrumentationLibraryName),
+    instrumentationLibraryVersionColumn: getColumnByHint(builderOptions, ColumnHint.TraceInstrumentationLibraryVersion),
+    stateColumn: getColumnByHint(builderOptions, ColumnHint.TraceState),
     traceId: builderOptions.meta?.traceId || '',
     orderBy: builderOptions.orderBy || [],
     limit: builderOptions.limit || 0,
@@ -86,7 +100,15 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       next.durationTimeColumn,
       next.tagsColumn,
       next.serviceTagsColumn,
-      next.eventsColumnPrefix
+      next.eventsColumnPrefix,
+      next.linksColumnPrefix,
+      next.serviceTagsColumn,
+      next.kindColumn,
+      next.statusCodeColumn,
+      next.statusMessageColumn,
+      next.instrumentationLibraryNameColumn,
+      next.instrumentationLibraryVersionColumn,
+      next.stateColumn
     ].filter(c => c !== undefined) as SelectedColumn[];
 
     builderOptionsDispatch(setOptions({
@@ -101,6 +123,18 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       }
     }));
   }, builderState);
+
+  // A function to assemble custom column definitions for the prefixed Events/Links columns
+  const onColumnPrefixChange = (name: keyof TraceQueryBuilderState, columnHint: ColumnHint) => {
+    const baseOptionChange = onOptionChange(name);
+    return (name: string) => {
+      baseOptionChange({
+        name: name,
+        hint: columnHint,
+        custom: true,
+      });
+    };
+  };
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
@@ -261,12 +295,96 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
         <div className="gf-form">
-          <LabeledInput
+          <ColumnSelect
             disabled={builderState.otelEnabled}
-            label={labels.columns.eventsPrefix.label}
-            tooltip={labels.columns.eventsPrefix.tooltip}
-            value={builderState.eventsColumnPrefix?.name || ''}
-            onChange={onOptionChange('eventsColumnPrefix')}
+            allColumns={allColumns}
+            selectedColumn={builderState.kindColumn}
+            invalid={!builderState.kindColumn}
+            onColumnChange={onOptionChange('kindColumn')}
+            columnHint={ColumnHint.TraceKind}
+            label={labels.columns.kind.label}
+            tooltip={labels.columns.kind.tooltip}
+            wide
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.statusCodeColumn}
+            invalid={!builderState.statusCodeColumn}
+            onColumnChange={onOptionChange('statusCodeColumn')}
+            columnHint={ColumnHint.TraceStatusCode}
+            label={labels.columns.statusCode.label}
+            tooltip={labels.columns.statusCode.tooltip}
+            wide
+            inline
+          />
+        </div>
+        <div className="gf-form">
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.statusMessageColumn}
+            invalid={!builderState.statusMessageColumn}
+            onColumnChange={onOptionChange('statusMessageColumn')}
+            columnHint={ColumnHint.TraceStatusMessage}
+            label={labels.columns.statusMessage.label}
+            tooltip={labels.columns.statusMessage.tooltip}
+            wide
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.instrumentationLibraryNameColumn}
+            invalid={!builderState.instrumentationLibraryNameColumn}
+            onColumnChange={onOptionChange('instrumentationLibraryNameColumn')}
+            columnHint={ColumnHint.TraceInstrumentationLibraryName}
+            label={labels.columns.instrumentationLibraryName.label}
+            tooltip={labels.columns.instrumentationLibraryName.tooltip}
+            wide
+            inline
+          />
+        </div>
+        <div className="gf-form">
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.instrumentationLibraryVersionColumn}
+            invalid={!builderState.instrumentationLibraryVersionColumn}
+            onColumnChange={onOptionChange('instrumentationLibraryVersionColumn')}
+            columnHint={ColumnHint.TraceInstrumentationLibraryVersion}
+            label={labels.columns.instrumentationLibraryVersion.label}
+            tooltip={labels.columns.instrumentationLibraryVersion.tooltip}
+            wide
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.stateColumn}
+            invalid={!builderState.stateColumn}
+            onColumnChange={onOptionChange('stateColumn')}
+            columnHint={ColumnHint.TraceState}
+            label={labels.columns.state.label}
+            tooltip={labels.columns.state.tooltip}
+            wide
+            inline
+          />
+        </div>
+        <div className="gf-form">
+          <LabeledInput
+              disabled={builderState.otelEnabled}
+              label={labels.columns.eventsPrefix.label}
+              tooltip={labels.columns.eventsPrefix.tooltip}
+              value={builderState.eventsColumnPrefix?.name || ''}
+              onChange={onColumnPrefixChange('eventsColumnPrefix', ColumnHint.TraceEventsPrefix)}
+          />
+        </div>
+        <div className="gf-form">
+          <LabeledInput
+              disabled={builderState.otelEnabled}
+              label={labels.columns.linksPrefix.label}
+              tooltip={labels.columns.linksPrefix.tooltip}
+              value={builderState.linksColumnPrefix?.name || ''}
+              onChange={onColumnPrefixChange('linksColumnPrefix', ColumnHint.TraceLinksPrefix)}
           />
         </div>
       </Collapse>
