@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -21,7 +23,7 @@ jobs:
           go-version: 'stable'
 
       - name: Build backend
-        uses: magefile/mage-action@v3
+        uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b
         with:
           args: buildAll
           version: latest
@@ -38,7 +40,7 @@ jobs:
         run: yarn playwright install --with-deps
 
       - name: Install and run Docker Compose
-        uses: hoverkraft-tech/compose-action@v2.2.0
+        uses: hoverkraft-tech/compose-action@8be2d741e891ac9b8ac20825e6f3904149599925
         with:
           compose-file: './docker-compose.yml'
 
