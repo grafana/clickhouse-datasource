@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
@@ -6,12 +6,14 @@ import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHConfig } from 'types/config';
 import { CHQuery, EditorType, CHSqlQuery } from 'types/sql';
 import { styles } from 'styles';
-import { fetchSuggestions, Schema } from './suggestions';
+import { getSuggestions } from './suggestions';
 import { validate } from 'data/validate';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { QueryType } from 'types/queryBuilder';
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 import { pluginVersion } from 'utils/version';
+import { useSchemaSuggestionsProvider } from 'hooks/useSchemaSuggestionsProvider';
+import { QueryToolbox } from './QueryToolbox';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -32,6 +34,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 
 export const SqlEditor = (props: SqlEditorProps) => {
   const { query, onChange, datasource } = props;
+  const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
 
@@ -45,16 +48,11 @@ export const SqlEditor = (props: SqlEditorProps) => {
     });
   };
 
-  const schema: Schema = {
-    databases: () => datasource.fetchDatabases(),
-    tables: (db?: string) => datasource.fetchTables(db),
-    fields: (db: string, table: string) => datasource.fetchFields(db, table),
-    defaultDatabase: datasource.getDefaultDatabase(),
-  };
+  const schema = useSchemaSuggestionsProvider(datasource);
 
-  const getSuggestions: Fetcher = async (text: string, range: Range) => {
-    const suggestions = await fetchSuggestions(text, schema, range);
-    return Promise.resolve({ suggestions });
+  const _getSuggestions: Fetcher = async (text: string, range: Range, cursorPosition: number) => {
+    const suggestions = await getSuggestions(text, schema, range, cursorPosition);
+    return { suggestions };
   };
 
   const validateSql = (sql: string, model: any, me: any) => {
@@ -78,7 +76,8 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
-    const me = registerSQL('chSql', editor, getSuggestions);
+    editorRef.current = editor;
+    const me = registerSQL('sql', editor, _getSuggestions);
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
       if (datasource.settings.jsonData.validateSql) {
@@ -86,16 +85,27 @@ export const SqlEditor = (props: SqlEditorProps) => {
         validateSql(sql, editor.getModel(), me);
       }
     });
+
     editor.addAction({
       id: 'run-query',
       label: 'Run Query',
       keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 1.5,
-      run: function() {
+      run: (editor: monacoTypes.editor.IStandaloneCodeEditor) => {
+        saveChanges({ rawSql: editor.getValue() });
         props.onRunQuery();
       },
     });
+  };
+
+  const onEditorWillUnmount = () => {
+    editorRef.current = null
+  };
+  const triggerFormat = () => {
+    if (editorRef.current !== null) {
+      editorRef.current.trigger("editor", "editor.action.formatDocument", "");
+    }
   };
 
   return (
@@ -113,6 +123,11 @@ export const SqlEditor = (props: SqlEditorProps) => {
           showLineNumbers={true}
           onBlur={(sql) => saveChanges({ rawSql: sql })}
           onEditorDidMount={handleMount}
+          onEditorWillUnmount={onEditorWillUnmount}
+        />
+        <QueryToolbox
+          showTools
+          onFormatCode={triggerFormat}
         />
       </div>
     </>
