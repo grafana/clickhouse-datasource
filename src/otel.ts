@@ -15,6 +15,9 @@ export interface OtelVersion {
   traceTable: string;
   traceColumnMap: Map<ColumnHint, string>;
   traceDurationUnit: TimeUnit.Nanoseconds;
+  flattenNested: boolean;
+  traceEventsColumnPrefix: string;
+  traceLinksColumnPrefix: string;
 }
 
 const otel129: OtelVersion = {
@@ -49,9 +52,14 @@ const otel129: OtelVersion = {
     [ColumnHint.TraceTags, 'SpanAttributes'],
     [ColumnHint.TraceServiceTags, 'ResourceAttributes'],
     [ColumnHint.TraceStatusCode, 'StatusCode'],
-    [ColumnHint.TraceEventsPrefix, 'Events'],
+    [ColumnHint.TraceKind, 'SpanKind'],
+    [ColumnHint.TraceStatusMessage, 'StatusMessage'],
+    [ColumnHint.TraceState, 'TraceState'],
   ]),
+  flattenNested: false,
   traceDurationUnit: TimeUnit.Nanoseconds,
+  traceEventsColumnPrefix: 'Events',
+  traceLinksColumnPrefix: 'Links',
 };
 
 export const versions: readonly OtelVersion[] = [
