@@ -6,12 +6,13 @@ import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHConfig } from 'types/config';
 import { CHQuery, EditorType, CHSqlQuery } from 'types/sql';
 import { styles } from 'styles';
-import { fetchSuggestions, Schema } from './suggestions';
+import { getSuggestions } from './suggestions';
 import { validate } from 'data/validate';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { QueryType } from 'types/queryBuilder';
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 import { pluginVersion } from 'utils/version';
+import { useSchemaSuggestionsProvider } from 'hooks/useSchemaSuggestionsProvider';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -45,16 +46,11 @@ export const SqlEditor = (props: SqlEditorProps) => {
     });
   };
 
-  const schema: Schema = {
-    databases: () => datasource.fetchDatabases(),
-    tables: (db?: string) => datasource.fetchTables(db),
-    fields: (db: string, table: string) => datasource.fetchFields(db, table),
-    defaultDatabase: datasource.getDefaultDatabase(),
-  };
+  const schema = useSchemaSuggestionsProvider(datasource);
 
-  const getSuggestions: Fetcher = async (text: string, range: Range) => {
-    const suggestions = await fetchSuggestions(text, schema, range);
-    return Promise.resolve({ suggestions });
+  const _getSuggestions: Fetcher = async (text: string, range: Range, cursorPosition: number) => {
+    const suggestions = await getSuggestions(text, schema, range, cursorPosition);
+    return { suggestions };
   };
 
   const validateSql = (sql: string, model: any, me: any) => {
@@ -78,7 +74,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
-    const me = registerSQL('chSql', editor, getSuggestions);
+    const me = registerSQL('sql', editor, _getSuggestions);
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
       if (datasource.settings.jsonData.validateSql) {
