@@ -1,6 +1,6 @@
 name: Compatibility check
 on: [push, pull_request]
-
+ 
 jobs:
   compatibilitycheck:
     runs-on: ubuntu-latest
