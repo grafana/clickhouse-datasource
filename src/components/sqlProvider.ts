@@ -58,6 +58,13 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
   // show options outside query editor
   editor.updateOptions({ fixedOverflowWidgets: true, scrollBeyondLastLine: false });
 
+  // const registeredLang = monaco.languages.getLanguages().find((l: Lang) => l.id === lang);
+  // if (registeredLang !== undefined) {
+  //   return monaco.editor;
+  // }
+
+  // monaco.languages.register({ id: lang });
+
   // just extend sql for now so we get syntax highlighting
   monaco.languages.registerCompletionItemProvider('sql', {
     triggerCharacters: [' ', '.', '$'],
@@ -84,8 +91,6 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
       ];
     }
   });
-
-
 
   return monaco.editor;
 }
