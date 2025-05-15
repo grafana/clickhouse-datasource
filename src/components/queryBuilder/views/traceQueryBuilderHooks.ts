@@ -19,6 +19,9 @@ export const useTraceDefaultsOnMount = (datasource: Datasource, isNewQuery: bool
     const defaultDurationUnit = datasource.getDefaultTraceDurationUnit();
     const otelVersion = datasource.getTraceOtelVersion();
     const defaultColumns = datasource.getDefaultTraceColumns();
+    const defaultFlattenNested = datasource.getDefaultTraceFlattenNested();
+    const defaultEventsColumnPrefix = datasource.getDefaultTraceEventsColumnPrefix();
+    const defaultLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
 
     const nextColumns: SelectedColumn[] = [];
     for (let [hint, colName] of defaultColumns) {
@@ -32,7 +35,10 @@ export const useTraceDefaultsOnMount = (datasource: Datasource, isNewQuery: bool
       meta: {
         otelEnabled: Boolean(otelVersion),
         otelVersion,
-        traceDurationUnit: defaultDurationUnit
+        traceDurationUnit: defaultDurationUnit,
+        flattenNested: defaultFlattenNested,
+        traceEventsColumnPrefix: defaultEventsColumnPrefix,
+        traceLinksColumnPrefix: defaultLinksColumnPrefix,
       }
     }));
     didSetDefaults.current = true;
@@ -68,7 +74,10 @@ export const useOtelColumns = (otelEnabled: boolean, otelVersion: string, builde
     builderOptionsDispatch(setOptions({
       columns,
       meta: {
-        traceDurationUnit: otelConfig.traceDurationUnit
+        traceDurationUnit: otelConfig.traceDurationUnit,
+        flattenNested: otelConfig.flattenNested,
+        traceEventsColumnPrefix: otelConfig.traceEventsColumnPrefix,
+        traceLinksColumnPrefix: otelConfig.traceLinksColumnPrefix,
       }
     }));
     didSetColumns.current = true;

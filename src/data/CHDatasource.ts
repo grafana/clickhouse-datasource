@@ -494,7 +494,12 @@ export class Datasource
     traceConfig.startTimeColumn && result.set(ColumnHint.Time, traceConfig.startTimeColumn);
     traceConfig.tagsColumn && result.set(ColumnHint.TraceTags, traceConfig.tagsColumn);
     traceConfig.serviceTagsColumn && result.set(ColumnHint.TraceServiceTags, traceConfig.serviceTagsColumn);
-    traceConfig.eventsColumnPrefix && result.set(ColumnHint.TraceEventsPrefix, traceConfig.eventsColumnPrefix);
+    traceConfig.kindColumn && result.set(ColumnHint.TraceKind, traceConfig.kindColumn);
+    traceConfig.statusCodeColumn && result.set(ColumnHint.TraceStatusCode, traceConfig.statusCodeColumn);
+    traceConfig.statusMessageColumn && result.set(ColumnHint.TraceStatusMessage, traceConfig.statusMessageColumn);
+    traceConfig.instrumentationLibraryNameColumn && result.set(ColumnHint.TraceInstrumentationLibraryName, traceConfig.instrumentationLibraryNameColumn);
+    traceConfig.instrumentationLibraryVersionColumn && result.set(ColumnHint.TraceInstrumentationLibraryVersion, traceConfig.instrumentationLibraryVersionColumn);
+    traceConfig.stateColumn && result.set(ColumnHint.TraceState, traceConfig.stateColumn);
 
     return result;
   }
@@ -509,6 +514,18 @@ export class Datasource
 
   getDefaultTraceDurationUnit(): TimeUnit {
     return this.settings.jsonData.traces?.durationUnit as TimeUnit || TimeUnit.Nanoseconds;
+  }
+
+  getDefaultTraceFlattenNested(): boolean {
+    return this.settings.jsonData.traces?.flattenNested || false;
+  }
+
+  getDefaultTraceEventsColumnPrefix(): string {
+    return this.settings.jsonData.traces?.traceEventsColumnPrefix || 'Events';
+  }
+
+  getDefaultTraceLinksColumnPrefix(): string {
+    return this.settings.jsonData.traces?.traceLinksColumnPrefix || 'Links';
   }
 
   async fetchDatabases(): Promise<string[]> {
@@ -585,7 +602,7 @@ export class Datasource
 
     return columns;
   }
-  
+
   /**
    * Fetches column suggestions from the table schema.
    */
