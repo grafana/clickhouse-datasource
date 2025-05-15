@@ -12,6 +12,8 @@ interface ColumnsEditorProps {
   onSelectedColumnsChange: (selectedColumns: SelectedColumn[]) => void;
   disabled?: boolean;
   showAllOption?: boolean;
+  label?: string;
+  tooltip?: string;
 }
 
 function getCustomColumns(columnNames: string[], allColumns: readonly TableColumn[]): Array<SelectableValue<string>> {
@@ -24,7 +26,10 @@ function getCustomColumns(columnNames: string[], allColumns: readonly TableColum
 const allColumnName = '*';
 
 export const ColumnsEditor = (props: ColumnsEditorProps) => {
-  const { allColumns, selectedColumns, onSelectedColumnsChange, disabled, showAllOption } = props;
+  const {
+    allColumns, selectedColumns, onSelectedColumnsChange, disabled, showAllOption,
+    label = labels.components.ColumnsEditor.label, tooltip = labels.components.ColumnsEditor.tooltip
+  } = props;
   const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const allColumnNames = allColumns.map(c => ({ label: c.label || c.name, value: c.name }));
@@ -32,7 +37,6 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     allColumnNames.push({ label: allColumnName, value: allColumnName });
   }
   const selectedColumnNames = (selectedColumns || []).map(c => ({ label: c.alias || c.name, value: c.name }));
-  const { label, tooltip } = labels.components.ColumnsEditor;
 
   const options = [...allColumnNames, ...customColumns];
 
