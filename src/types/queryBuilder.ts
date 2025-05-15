@@ -120,6 +120,20 @@ export interface TableColumn {
   aggregatable?: boolean;
 }
 
+export interface SqlFunction {
+  name: string;
+  isAggregate: boolean;
+  caseInsensitive: boolean;
+  aliasTo: string;
+  origin: string;
+  description: string;
+  syntax: string;
+  arguments: string;
+  returnedValue: string;
+  examples: string;
+  categories: string;
+}
+
 /**
  * Some columns are used to enable certain features.
  * This enum defines the different use cases that a column may be used for in the query generator.
