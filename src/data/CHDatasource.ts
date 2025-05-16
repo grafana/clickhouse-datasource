@@ -233,6 +233,12 @@ export class Datasource
     let rawQuery = query.rawSql || '';
     // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
     const templateSrv = getTemplateSrv();
+
+    // first resolve template variables
+    rawQuery = this.applyConditionalAll(rawQuery, templateSrv.getVariables());
+    rawQuery = this.replace(rawQuery, scoped) || '';
+
+    // now apply ad-hoc filters after table references have been resolved
     if (!this.skipAdHocFilter) {
       const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
       if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && adHocFilters?.length > 0) {
@@ -243,10 +249,10 @@ export class Datasource
       rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
     }
     this.skipAdHocFilter = false;
-    rawQuery = this.applyConditionalAll(rawQuery, getTemplateSrv().getVariables());
+
     return {
       ...query,
-      rawSql: this.replace(rawQuery, scoped) || '',
+      rawSql: rawQuery,
     };
   }
 
