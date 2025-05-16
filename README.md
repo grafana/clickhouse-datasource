@@ -69,7 +69,7 @@ datasources:
     jsonData:
       defaultDatabase: database
       port: 9000
-      host: localhost
+      server: localhost
       username: username
       tlsSkipVerify: false
       # tlsAuth: <bool>
