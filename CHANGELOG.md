@@ -5,7 +5,7 @@
 ### Features
 
 - Add support for the Grafana `row_limit` [configuration setting](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#row_limit).
-- Add support for kind, status, instrumentation library, links, events and state data for traces (#1043)
+- Add support for kind, status, instrumentation library, links, events and state data for traces (#1043, #1208)
 - Cancel JSON paths query after 10s (#1206)
 - SQL Editor Suggestions (#1204)
 - Add SQL Formatter button + shortcut (#1205)
