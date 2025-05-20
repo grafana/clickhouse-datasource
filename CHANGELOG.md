@@ -1,10 +1,19 @@
 # Changelog
 
-# Unreleased
+# 4.9.0
 
 ### Features
 
 - Add support for the Grafana `row_limit` [configuration setting](https://grafana.com/docs/grafana/latest/setup-grafana/configure-grafana/#row_limit).
+- Add support for kind, status, instrumentation library, links, events and state data for traces (#1043)
+- Cancel JSON paths query after 10s (#1206)
+- SQL Editor Suggestions (#1204)
+- Add SQL Formatter button + shortcut (#1205)
+
+### Fixes
+
+- Fixed "run query" shortcut from running stale query (#1205)
+- Dependency updates
 
 ## 4.8.2
 
