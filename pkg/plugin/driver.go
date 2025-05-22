@@ -21,6 +21,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
 	"github.com/grafana/sqlds/v4"
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
@@ -249,7 +250,8 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 			log.DefaultLogger.Error(err.Error())
 		}
 
-		return nil, err
+		backend.Logger.Error("failed to create ClickHouse client", "error", err)
+		return nil, errorsource.DownstreamError(fmt.Errorf("failed to create ClickHouse client"), false)
 	}
 
 	return db, settings.isValid()
