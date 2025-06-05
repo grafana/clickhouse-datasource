@@ -37,7 +37,7 @@ export class AdHocFilter {
         return valid;
       })
       .map((f, i) => {
-        const key = f.key.includes('.') ? f.key.split('.')[1] : f.key;
+        const key = escapeKey(f.key);
         const value = escapeValueBasedOnOperator(f.value, f.operator);
         const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
@@ -56,6 +56,18 @@ export class AdHocFilter {
 
 function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
+}
+
+
+function escapeKey(s: string): string {
+  if (s.includes('.')) {
+    // Don't split if the string contains square brackets
+    if (s.includes('[') && s.includes(']')) {
+      return s;
+    }
+    return s.split('.')[1];
+  }
+  return s;
 }
 
 function escapeValueBasedOnOperator(s: string, operator: AdHocVariableFilterOperator): string {
