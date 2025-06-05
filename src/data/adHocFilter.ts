@@ -60,11 +60,16 @@ function isValid(filter: AdHocVariableFilter): boolean {
 
 
 function escapeKey(s: string): string {
-  if (s.includes('.')) {
-    // Don't split if the string contains square brackets
-    if (s.includes('[') && s.includes(']')) {
-      return s;
+  // Convert arrayElement syntax to bracket notation
+  if (s.startsWith('arrayElement(') && s.endsWith(')')) {
+    const match = s.match(/arrayElement\((.*?),\s*['"](.*?)['"]\)/);
+    if (match) {
+      const [_, array, key] = match;
+      return `${array}[\\'${key}\\']`;
     }
+  }
+
+  if (s.includes('.')) {
     return s.split('.')[1];
   }
   return s;
@@ -76,7 +81,6 @@ function escapeValueBasedOnOperator(s: string, operator: AdHocVariableFilterOper
     if (s.length > 2 && s[0] !== '(' && s[s.length - 1] !== ')') {
       s = `(${s})`
     }
-
     return s.replace(/'/g, "\\'");
   } else {
     return `\\'${s}\\'`;
