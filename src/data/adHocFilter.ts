@@ -68,11 +68,7 @@ function escapeKey(s: string): string {
       return `${array}[\\'${key}\\']`;
     }
   }
-
-  if (s.includes('.')) {
-    return s.split('.')[1];
-  }
-  return s;
+  return s.includes('.') ? s.split('.')[1] : s;
 }
 
 function escapeValueBasedOnOperator(s: string, operator: AdHocVariableFilterOperator): string {
