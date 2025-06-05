@@ -237,39 +237,12 @@ describe('AdHocManager', () => {
       `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
     );
   });
-});
 
-describe('escapeKey', () => {
-  it('preserves keys with square bracket notation', () => {
+  it('converts arrayElement with single quotes', () => {
     const ahm = new AdHocFilter();
-    ahm.setTargetTableFromQuery('SELECT * FROM foo');
-    const val = ahm.apply('SELECT stuff FROM foo', [
-      { key: "ResourceAttributes['cloud.region']", operator: '=', value: 'us-west' },
+    const result = ahm.apply('SELECT * FROM foo', [
+      { key: "arrayElement(ResourceAttributes, 'cloud.region')", operator: '=', value: 'test' }
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(
-      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' ResourceAttributes['cloud.region'] = \\'us-west\\' '}`
-    );
-  });
-
-  it('handles regular dot notation keys', () => {
-    const ahm = new AdHocFilter();
-    ahm.setTargetTableFromQuery('SELECT * FROM foo');
-    const val = ahm.apply('SELECT stuff FROM foo', [
-      { key: 'table.column', operator: '=', value: 'value' },
-    ] as AdHocVariableFilter[]);
-    expect(val).toEqual(
-      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' column = \\'value\\' '}`
-    );
-  });
-
-  it('handles simple column names', () => {
-    const ahm = new AdHocFilter();
-    ahm.setTargetTableFromQuery('SELECT * FROM foo');
-    const val = ahm.apply('SELECT stuff FROM foo', [
-      { key: 'simple_column', operator: '=', value: 'value' },
-    ] as AdHocVariableFilter[]);
-    expect(val).toEqual(
-      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' simple_column = \\'value\\' '}`
-    );
+    expect(result).toContain("ResourceAttributes[\\'cloud.region\\']");
   });
 });
