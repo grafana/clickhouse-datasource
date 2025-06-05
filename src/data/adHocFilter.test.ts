@@ -237,4 +237,12 @@ describe('AdHocManager', () => {
       `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
     );
   });
+
+  it('converts arrayElement with single quotes', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.apply('SELECT * FROM foo', [
+      { key: "arrayElement(ResourceAttributes, 'cloud.region')", operator: '=', value: 'test' }
+    ] as AdHocVariableFilter[]);
+    expect(result).toContain("ResourceAttributes[\\'cloud.region\\']");
+  });
 });
