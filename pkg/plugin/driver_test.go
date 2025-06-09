@@ -120,10 +120,22 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 	p, _ := clickhouseContainer.MappedPort(ctx, "9000")
-	os.Setenv("CLICKHOUSE_PORT", p.Port())
+	err = os.Setenv("CLICKHOUSE_PORT", p.Port())
+	if err != nil {
+		// Can't test without env setup.
+		panic(err)
+	}
 	hp, _ := clickhouseContainer.MappedPort(ctx, "8123")
-	os.Setenv("CLICKHOUSE_HTTP_PORT", hp.Port())
-	os.Setenv("CLICKHOUSE_HOST", "localhost")
+	err = os.Setenv("CLICKHOUSE_HTTP_PORT", hp.Port())
+	if err != nil {
+		// Can't test without env setup.
+		panic(err)
+	}
+	err = os.Setenv("CLICKHOUSE_HOST", "localhost")
+	if err != nil {
+		// Can't test without env setup.
+		panic(err)
+	}
 	defer clickhouseContainer.Terminate(ctx) //nolint
 	os.Exit(m.Run())
 }
