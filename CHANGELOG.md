@@ -1,5 +1,11 @@
 # Changelog
 
+# 4.9.1
+
+### Fixes
+
+- Error logging fix
+
 # 4.9.0
 
 ### Features
