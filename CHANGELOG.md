@@ -1,5 +1,11 @@
 # Changelog
 
+# 4.9.2
+
+### Chore
+
+- No change release to test GHA release pipeline.
+
 # 4.9.1
 
 ### Fixes
