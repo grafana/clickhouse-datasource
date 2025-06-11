@@ -38,8 +38,8 @@ require (
 	github.com/moby/sys/user v0.1.0 // indirect
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
-	github.com/oasdiff/yaml v0.0.0-20241210131133-6b86fb107d80 // indirect
-	github.com/oasdiff/yaml3 v0.0.0-20241210130736-a94c01f36349 // indirect
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
+	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.59.0 // indirect
@@ -67,7 +67,7 @@ require (
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/elazarl/goproxy v1.7.2
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/getkin/kin-openapi v0.129.0 // indirect
+	github.com/getkin/kin-openapi v0.131.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
