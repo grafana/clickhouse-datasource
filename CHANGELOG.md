@@ -1,5 +1,16 @@
 # Changelog
 
+# 4.10.0
+
+### Features
+
+- Ad-hoc queries: Allow to filter by values inside the map (#1265)
+
+### Fixes 
+
+- Fix ad-hoc filter application with templated target tables (#1241)
+- Dependency updates
+
 # 4.9.1
 
 ### Fixes
