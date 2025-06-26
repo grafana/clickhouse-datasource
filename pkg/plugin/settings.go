@@ -187,13 +187,11 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 	}
 
-	settings.EnableRowLimit = false
 	if jsonData["enableRowLimit"] != nil {
 		if enableRowLimitString, ok := jsonData["enableRowLimit"].(string); ok {
 			settings.EnableRowLimit, err = strconv.ParseBool(enableRowLimitString)
 			if err != nil {
 				backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "error", err)
-				settings.EnableRowLimit = false
 			}
 		} else {
 			settings.EnableRowLimit = jsonData["enableRowLimit"].(bool)
