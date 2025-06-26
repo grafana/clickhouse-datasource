@@ -251,6 +251,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		settings.ProxyOptions = proxyOpts
 	}
 
+	// This condition can be removed once the minimum supported Grafana version is 11.0.0
 	if settings.EnableRowLimit {
 		cfg := backend.GrafanaConfigFromContext(ctx)
 		sqlCfg, err := cfg.SQL()
