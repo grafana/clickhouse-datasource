@@ -13,7 +13,7 @@ import {
   CHLogsConfig,
   Protocol,
   CHTracesConfig,
-  AliasTableEntry,
+  AliasTableEntry
 } from 'types/config';
 import { gte as versionGte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from 'components/experimental/ConfigSection';
@@ -27,7 +27,7 @@ import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from 'labels';
 import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
-import { AliasTableConfig } from '../components/configEditor/AliasTableConfig';
+import {AliasTableConfig} from "../components/configEditor/AliasTableConfig";
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -144,9 +144,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         ...options.jsonData,
         logs: {
           ...options.jsonData.logs,
-          [key]: value,
-        },
-      },
+          [key]: value
+        }
+      }
     });
   };
   const onTracesConfigChange = (key: keyof CHTracesConfig, value: string | boolean) => {
@@ -157,9 +157,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         traces: {
           ...options.jsonData.traces,
           durationUnit: options.jsonData.traces?.durationUnit || TimeUnit.Nanoseconds,
-          [key]: value,
-        },
-      },
+          [key]: value
+        }
+      }
     });
   };
   const onAliasTableConfigChange = (aliasTables: AliasTableEntry[]) => {
@@ -167,8 +167,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       ...options,
       jsonData: {
         ...options.jsonData,
-        aliasTables,
-      },
+        aliasTables
+      }
     });
   };
 
@@ -176,27 +176,23 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-      options.jsonData.defaultDatabase ||
-      options.jsonData.defaultTable ||
-      options.jsonData.dialTimeout ||
-      options.jsonData.queryTimeout ||
-      options.jsonData.validateSql ||
-      options.jsonData.enableSecureSocksProxy ||
-      options.jsonData.customSettings ||
-      options.jsonData.logs ||
-      options.jsonData.traces
+    options.jsonData.defaultDatabase ||
+    options.jsonData.defaultTable ||
+    options.jsonData.dialTimeout ||
+    options.jsonData.queryTimeout ||
+    options.jsonData.validateSql ||
+    options.jsonData.enableSecureSocksProxy ||
+    options.jsonData.customSettings ||
+    options.jsonData.logs ||
+    options.jsonData.traces
   );
 
-  const defaultPort = jsonData.secure
-    ? jsonData.protocol === Protocol.Native
-      ? labels.serverPort.secureNativePort
-      : labels.serverPort.secureHttpPort
-    : jsonData.protocol === Protocol.Native
-      ? labels.serverPort.insecureNativePort
-      : labels.serverPort.insecureHttpPort;
-  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`;
+  const defaultPort = jsonData.secure ?
+  (jsonData.protocol === Protocol.Native ? labels.serverPort.secureNativePort : labels.serverPort.secureHttpPort) :
+  (jsonData.protocol === Protocol.Native ? labels.serverPort.insecureNativePort : labels.serverPort.insecureHttpPort);
+  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`
 
-  const uidWarning = !options.uid && (
+  const uidWarning = (!options.uid) && (
     <Alert title="" severity="warning" buttonContent="Close">
       <Stack>
         <div>
@@ -205,12 +201,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           {'field in its configuration. If your datasource is '}
           <a
             style={{ textDecoration: 'underline' }}
-            href="https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources"
-            target="_blank"
-            rel="noreferrer"
-          >
-            provisioned via YAML
-          </a>
+            href='https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources'
+            target='_blank'
+            rel='noreferrer'
+          >provisioned via YAML</a>
           {', please verify the UID is set. This is required to enable data linking between logs and traces.'}
         </div>
       </Stack>
@@ -256,7 +250,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             width={40}
             type="number"
             value={jsonData.port || ''}
-            onChange={(e) => onPortChange(e.currentTarget.value)}
+            onChange={e => onPortChange(e.currentTarget.value)}
             label={labels.serverPort.label}
             aria-label={labels.serverPort.label}
             placeholder={defaultPort}
@@ -280,7 +274,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           />
         </Field>
 
-        {jsonData.protocol === Protocol.Http && (
+        { jsonData.protocol === Protocol.Http &&
           <Field label={labels.path.label} description={labels.path.tooltip}>
             <Input
               value={jsonData.path || ''}
@@ -292,38 +286,45 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               placeholder={labels.path.placeholder}
             />
           </Field>
-        )}
+        }
       </ConfigSection>
 
-      {jsonData.protocol === Protocol.Http && (
+      { jsonData.protocol === Protocol.Http &&
         <HttpHeadersConfig
           headers={options.jsonData.httpHeaders}
           forwardGrafanaHeaders={options.jsonData.forwardGrafanaHeaders}
           secureFields={options.secureJsonFields}
-          onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
-          onForwardGrafanaHeadersChange={(forwardGrafanaHeaders) =>
-            onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)
-          }
+          onHttpHeadersChange={headers => onHttpHeadersChange(headers, options, onOptionsChange)}
+          onForwardGrafanaHeadersChange={forwardGrafanaHeaders => onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)}
         />
-      )}
+      }
 
       <Divider />
       <ConfigSection title="TLS / SSL Settings">
-        <Field label={labels.tlsSkipVerify.label} description={labels.tlsSkipVerify.tooltip}>
+        <Field
+          label={labels.tlsSkipVerify.label}
+          description={labels.tlsSkipVerify.tooltip}
+        >
           <Switch
             className="gf-form"
             value={jsonData.tlsSkipVerify || false}
             onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
           />
         </Field>
-        <Field label={labels.tlsClientAuth.label} description={labels.tlsClientAuth.tooltip}>
+        <Field
+          label={labels.tlsClientAuth.label}
+          description={labels.tlsClientAuth.tooltip}
+        >
           <Switch
             className="gf-form"
             value={jsonData.tlsAuth || false}
             onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
           />
         </Field>
-        <Field label={labels.tlsAuthWithCACert.label} description={labels.tlsAuthWithCACert.tooltip}>
+        <Field
+          label={labels.tlsAuthWithCACert.label}
+          description={labels.tlsAuthWithCACert.tooltip}
+        >
           <Switch
             className="gf-form"
             value={jsonData.tlsAuthWithCACert || false}
@@ -361,7 +362,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
       <Divider />
       <ConfigSection title="Credentials">
-        <Field label={labels.username.label} description={labels.username.tooltip}>
+        <Field
+          label={labels.username.label}
+          description={labels.username.tooltip}
+        >
           <Input
             name="user"
             width={40}
@@ -401,7 +405,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onDefaultDatabaseChange={onUpdateDatasourceJsonDataOption(props, 'defaultDatabase')}
           onDefaultTableChange={onUpdateDatasourceJsonDataOption(props, 'defaultTable')}
         />
-
+        
         <Divider />
         <QuerySettingsConfig
           connMaxLifetime={jsonData.connMaxLifetime}
@@ -415,51 +419,49 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onConnMaxOpenConnsChange={onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')}
           onDialTimeoutChange={onUpdateDatasourceJsonDataOption(props, 'dialTimeout')}
           onQueryTimeoutChange={onUpdateDatasourceJsonDataOption(props, 'queryTimeout')}
-          onValidateSqlChange={(e) => onSwitchToggle('validateSql', e.currentTarget.checked)}
+          onValidateSqlChange={e => onSwitchToggle('validateSql', e.currentTarget.checked)}
         />
 
         <Divider />
         <LogsConfig
           logsConfig={jsonData.logs}
-          onDefaultDatabaseChange={(db) => onLogsConfigChange('defaultDatabase', db)}
-          onDefaultTableChange={(table) => onLogsConfigChange('defaultTable', table)}
-          onOtelEnabledChange={(v) => onLogsConfigChange('otelEnabled', v)}
-          onOtelVersionChange={(v) => onLogsConfigChange('otelVersion', v)}
-          onTimeColumnChange={(c) => onLogsConfigChange('timeColumn', c)}
-          onLevelColumnChange={(c) => onLogsConfigChange('levelColumn', c)}
-          onMessageColumnChange={(c) => onLogsConfigChange('messageColumn', c)}
-          onSelectContextColumnsChange={(c) => onLogsConfigChange('selectContextColumns', c)}
-          onContextColumnsChange={(c) => onLogsConfigChange('contextColumns', c)}
+          onDefaultDatabaseChange={db => onLogsConfigChange('defaultDatabase', db)}
+          onDefaultTableChange={table => onLogsConfigChange('defaultTable', table)}
+          onOtelEnabledChange={v => onLogsConfigChange('otelEnabled', v)}
+          onOtelVersionChange={v => onLogsConfigChange('otelVersion', v)}
+          onTimeColumnChange={c => onLogsConfigChange('timeColumn', c)}
+          onLevelColumnChange={c => onLogsConfigChange('levelColumn', c)}
+          onMessageColumnChange={c => onLogsConfigChange('messageColumn', c)}
+          onSelectContextColumnsChange={c => onLogsConfigChange('selectContextColumns', c)}
+          onContextColumnsChange={c => onLogsConfigChange('contextColumns', c)}
         />
 
         <Divider />
         <TracesConfig
           tracesConfig={jsonData.traces}
-          onDefaultDatabaseChange={(db) => onTracesConfigChange('defaultDatabase', db)}
-          onDefaultTableChange={(table) => onTracesConfigChange('defaultTable', table)}
-          onOtelEnabledChange={(v) => onTracesConfigChange('otelEnabled', v)}
-          onOtelVersionChange={(v) => onTracesConfigChange('otelVersion', v)}
-          onTraceIdColumnChange={(c) => onTracesConfigChange('traceIdColumn', c)}
-          onSpanIdColumnChange={(c) => onTracesConfigChange('spanIdColumn', c)}
-          onOperationNameColumnChange={(c) => onTracesConfigChange('operationNameColumn', c)}
-          onParentSpanIdColumnChange={(c) => onTracesConfigChange('parentSpanIdColumn', c)}
-          onServiceNameColumnChange={(c) => onTracesConfigChange('serviceNameColumn', c)}
-          onDurationColumnChange={(c) => onTracesConfigChange('durationColumn', c)}
-          onDurationUnitChange={(c) => onTracesConfigChange('durationUnit', c)}
-          onStartTimeColumnChange={(c) => onTracesConfigChange('startTimeColumn', c)}
-          onTagsColumnChange={(c) => onTracesConfigChange('tagsColumn', c)}
-          onServiceTagsColumnChange={(c) => onTracesConfigChange('serviceTagsColumn', c)}
-          onKindColumnChange={(c) => onTracesConfigChange('kindColumn', c)}
-          onStatusCodeColumnChange={(c) => onTracesConfigChange('statusCodeColumn', c)}
-          onStatusMessageColumnChange={(c) => onTracesConfigChange('statusMessageColumn', c)}
-          onStateColumnChange={(c) => onTracesConfigChange('stateColumn', c)}
-          onInstrumentationLibraryNameColumnChange={(c) => onTracesConfigChange('instrumentationLibraryNameColumn', c)}
-          onInstrumentationLibraryVersionColumnChange={(c) =>
-            onTracesConfigChange('instrumentationLibraryVersionColumn', c)
-          }
-          onFlattenNestedChange={(c) => onTracesConfigChange('flattenNested', c)}
-          onEventsColumnPrefixChange={(c) => onTracesConfigChange('traceEventsColumnPrefix', c)}
-          onLinksColumnPrefixChange={(c) => onTracesConfigChange('traceLinksColumnPrefix', c)}
+          onDefaultDatabaseChange={db => onTracesConfigChange('defaultDatabase', db)}
+          onDefaultTableChange={table => onTracesConfigChange('defaultTable', table)}
+          onOtelEnabledChange={v => onTracesConfigChange('otelEnabled', v)}
+          onOtelVersionChange={v => onTracesConfigChange('otelVersion', v)}
+          onTraceIdColumnChange={c => onTracesConfigChange('traceIdColumn', c)}
+          onSpanIdColumnChange={c => onTracesConfigChange('spanIdColumn', c)}
+          onOperationNameColumnChange={c => onTracesConfigChange('operationNameColumn', c)}
+          onParentSpanIdColumnChange={c => onTracesConfigChange('parentSpanIdColumn', c)}
+          onServiceNameColumnChange={c => onTracesConfigChange('serviceNameColumn', c)}
+          onDurationColumnChange={c => onTracesConfigChange('durationColumn', c)}
+          onDurationUnitChange={c => onTracesConfigChange('durationUnit', c)}
+          onStartTimeColumnChange={c => onTracesConfigChange('startTimeColumn', c)}
+          onTagsColumnChange={c => onTracesConfigChange('tagsColumn', c)}
+          onServiceTagsColumnChange={c => onTracesConfigChange('serviceTagsColumn', c)}
+          onKindColumnChange={c => onTracesConfigChange('kindColumn', c)}
+          onStatusCodeColumnChange={c => onTracesConfigChange('statusCodeColumn', c)}
+          onStatusMessageColumnChange={c => onTracesConfigChange('statusMessageColumn', c)}
+          onStateColumnChange={c => onTracesConfigChange('stateColumn', c)}
+          onInstrumentationLibraryNameColumnChange={c => onTracesConfigChange('instrumentationLibraryNameColumn', c)}
+          onInstrumentationLibraryVersionColumnChange={c => onTracesConfigChange('instrumentationLibraryVersionColumn', c)}
+          onFlattenNestedChange={c => onTracesConfigChange('flattenNested', c)}
+          onEventsColumnPrefixChange={c => onTracesConfigChange('traceEventsColumnPrefix', c)}
+          onLinksColumnPrefixChange={c => onTracesConfigChange('traceLinksColumnPrefix', c)}
         />
 
         <Divider />
@@ -474,7 +476,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           />
         </Field>
         {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
-          <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
+          <Field
+            label={labels.secureSocksProxy.label}
+            description={labels.secureSocksProxy.tooltip}
+          >
             <Switch
               className="gf-form"
               value={jsonData.enableSecureSocksProxy || false}
@@ -485,7 +490,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <ConfigSubSection title="Custom Settings">
           {customSettings.map(({ setting, value }, i) => {
             return (
-              <Stack key={i} direction="row">
+              <Stack key={i} direction='row'>
                 <Field label={`Setting`} aria-label={`Setting`}>
                   <Input
                     value={setting}
