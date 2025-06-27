@@ -68,7 +68,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     });
   };
   const onSwitchToggle = (
-    key: keyof Pick<CHConfig, 'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders'>,
+    key: keyof Pick<
+      CHConfig,
+      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
+    >,
     value: boolean
   ) => {
     onOptionsChange({
@@ -464,6 +467,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
         <Divider />
+        <Field label={labels.enableRowLimit.label} description={labels.enableRowLimit.tooltip}>
+          <Switch
+            className="gf-form"
+            value={jsonData.enableRowLimit || false}
+            data-testid={labels.enableRowLimit.testid}
+            onChange={(e) => onSwitchToggle('enableRowLimit', e.currentTarget.checked)}
+          />
+        </Field>
         {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field
             label={labels.secureSocksProxy.label}
