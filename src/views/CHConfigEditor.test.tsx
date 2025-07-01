@@ -122,10 +122,13 @@ describe('ConfigEditor', () => {
       validateSql: true,
       customSettings: [{ setting: 'test-setting', value: 'test-value' }],
       forwardGrafanaHeaders: true,
+      enableRowLimit: true,
     };
     render(<ConfigEditor {...mockConfigEditorProps(jsonDataOverrides)} />);
     expect(screen.getByText(labels.secureSocksProxy.label)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].setting)).toBeInTheDocument();
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();
+    expect(screen.getByText(labels.enableRowLimit.label)).toBeInTheDocument();
+    expect(screen.getByTestId(labels.enableRowLimit.testid)).toBeChecked();
   });
 });

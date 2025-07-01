@@ -38,6 +38,7 @@ export interface CHConfig extends DataSourceJsonData {
 
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;
+  enableRowLimit?: boolean;
 }
 
 interface CHSecureConfigProperties {
