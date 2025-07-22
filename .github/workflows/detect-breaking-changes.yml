@@ -17,7 +17,7 @@ jobs:
       - name: Build plugin
         run: yarn build
       - name: Compatibility check
-        uses: grafana/plugin-actions/is-compatible@b788be6746403ff9bae26d5e800794f2a5620b4c
+        uses: grafana/plugin-actions/is-compatible@0edbbe7d4e8623861942236723bf2fb1d7f05e4e
         with:
           module: './src/module.ts'
           comment-pr: 'yes'
