@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/ClickHouse/clickhouse-go/v2"
 	"math/big"
 	"net"
 	"reflect"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -18,6 +18,7 @@ import (
 )
 
 type Converter struct {
+	name       string
 	convert    func(in interface{}) (interface{}, error)
 	fieldType  data.FieldType
 	matchRegex *regexp.Regexp
@@ -42,266 +43,305 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"Point":                     regexp.MustCompile(`^Point`),
 	"SimpleAggregateFunction()": regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
 	"Tuple()":                   regexp.MustCompile(`^Tuple\(.*\)`),
-	"Variant()":                 regexp.MustCompile(`^Variant\(.*\)`),
+	"Variant":                   regexp.MustCompile(`^Variant`),
 	"Dynamic":                   regexp.MustCompile(`^Dynamic`),
-	"Dynamic()":                 regexp.MustCompile(`Dynamic\(.*\)`),
 	"JSON":                      regexp.MustCompile(`^JSON`),
-	"JSON()":                    regexp.MustCompile(`^JSON\(.*\)`),
+	"Nullable(JSON)":            regexp.MustCompile(`^Nullable\(JSON`),
 }
 
-var Converters = map[string]Converter{
-	"String": {
+var Converters = []Converter{
+	{
+		name:      "String",
 		fieldType: data.FieldTypeString,
 		scanType:  reflect.PointerTo(reflect.TypeOf("")),
 	},
-	"Bool": {
+	{
+		name:      "Bool",
 		fieldType: data.FieldTypeBool,
 		scanType:  reflect.PointerTo(reflect.TypeOf(true)),
 	},
-	"Nullable(Bool)": {
+	{
+		name:      "Nullable(Bool)",
 		fieldType: data.FieldTypeNullableBool,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(true))),
 	},
-	"Float64": {
+	{
+		name:      "Float64",
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(float64(0))),
 	},
-	"Float32": {
+	{
+		name:      "Float32",
 		fieldType: data.FieldTypeFloat32,
 		scanType:  reflect.PointerTo(reflect.TypeOf(float32(0))),
 	},
-	"Nullable(Float32)": {
+	{
+		name:      "Nullable(Float32)",
 		fieldType: data.FieldTypeNullableFloat32,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(float32(0)))),
 	},
-	"Nullable(Float64)": {
+	{
+		name:      "Nullable(Float64)",
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(float64(0)))),
 	},
-	"Int64": {
+	{
+		name:      "Int64",
 		fieldType: data.FieldTypeInt64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(int64(0))),
 	},
-	"Int32": {
+	{
+		name:      "Int32",
 		fieldType: data.FieldTypeInt32,
 		scanType:  reflect.PointerTo(reflect.TypeOf(int32(0))),
 	},
-	"Int16": {
+	{
+		name:      "Int16",
 		fieldType: data.FieldTypeInt16,
 		scanType:  reflect.PointerTo(reflect.TypeOf(int16(0))),
 	},
-	"Int8": {
+	{
+		name:      "Int8",
 		fieldType: data.FieldTypeInt8,
 		scanType:  reflect.PointerTo(reflect.TypeOf(int8(0))),
 	},
-	"UInt64": {
+	{
+		name:      "UInt64",
 		fieldType: data.FieldTypeUint64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(uint64(0))),
 	},
-	"UInt32": {
+	{
+		name:      "UInt32",
 		fieldType: data.FieldTypeUint32,
 		scanType:  reflect.PointerTo(reflect.TypeOf(uint32(0))),
 	},
-	"UInt16": {
+	{
+		name:      "UInt16",
 		fieldType: data.FieldTypeUint16,
 		scanType:  reflect.PointerTo(reflect.TypeOf(uint16(0))),
 	},
-	"UInt8": {
+	{
+		name:      "UInt8",
 		fieldType: data.FieldTypeUint8,
 		scanType:  reflect.PointerTo(reflect.TypeOf(uint8(0))),
 	},
-	"Nullable(UInt64)": {
+	{
+		name:      "Nullable(UInt64)",
 		fieldType: data.FieldTypeNullableUint64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(uint64(0)))),
 	},
-	"Nullable(UInt32)": {
+	{
+		name:      "Nullable(UInt32)",
 		fieldType: data.FieldTypeNullableUint32,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(uint32(0)))),
 	},
-	"Nullable(UInt16)": {
+	{
+		name:      "Nullable(UInt16)",
 		fieldType: data.FieldTypeNullableUint16,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(uint16(0)))),
 	},
-	"Nullable(UInt8)": {
+	{
+		name:      "Nullable(UInt8)",
 		fieldType: data.FieldTypeNullableUint8,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(uint8(0)))),
 	},
-	"Nullable(Int64)": {
+	{
+		name:      "Nullable(Int64)",
 		fieldType: data.FieldTypeNullableInt64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(int64(0)))),
 	},
-	"Nullable(Int32)": {
+	{
+		name:      "Nullable(Int32)",
 		fieldType: data.FieldTypeNullableInt32,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(int32(0)))),
 	},
-	"Nullable(Int16)": {
+	{
+		name:      "Nullable(Int16)",
 		fieldType: data.FieldTypeNullableInt16,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(int16(0)))),
 	},
-	"Nullable(Int8)": {
+	{
+		name:      "Nullable(Int8)",
 		fieldType: data.FieldTypeNullableInt8,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(int8(0)))),
 	},
-	// this is in precise and in appropriate for any math, but everything goes to floats in JS anyway
-	"Int128": {
+	{
+		name:      "Int128",
 		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(big.NewInt(0))),
 	},
-	"Nullable(Int128)": {
+	{
+		name:      "Nullable(Int128)",
 		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(big.NewInt(0)))),
 	},
-	"Int256": {
+	{
+		name:      "Int256",
 		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(big.NewInt(0))),
 	},
-	"Nullable(Int256)": {
+	{
+		name:      "Nullable(Int256)",
 		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(big.NewInt(0)))),
 	},
-	"UInt128": {
+	{
+		name:      "UInt128",
 		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(big.NewInt(0))),
 	},
-	"Nullable(UInt128)": {
+	{
+		name:      "Nullable(UInt128)",
 		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(big.NewInt(0)))),
 	},
-	"UInt256": {
+	{
+		name:      "UInt256",
 		convert:   bigIntConvert,
 		fieldType: data.FieldTypeFloat64,
 		scanType:  reflect.PointerTo(reflect.TypeOf(big.NewInt(0))),
 	},
-	"Nullable(UInt256)": {
+	{
+		name:      "Nullable(UInt256)",
 		convert:   bigIntNullableConvert,
 		fieldType: data.FieldTypeNullableFloat64,
 		scanType:  reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(big.NewInt(0)))),
 	},
-	// covers DateTime with tz, DateTime64 - see regexes, Date32
-	"Date": {
+	{
+		name:       "Date",
 		fieldType:  data.FieldTypeTime,
 		matchRegex: matchRegexes["Date"],
 		scanType:   reflect.PointerTo(reflect.TypeOf(time.Time{})),
 	},
-	"Nullable(Date)": {
+	{
+		name:       "Nullable(Date)",
 		fieldType:  data.FieldTypeNullableTime,
 		matchRegex: matchRegexes["Nullable(Date)"],
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(time.Time{}))),
 	},
-	"Nullable(String)": {
+	{
+		name:       "Nullable(String)",
 		fieldType:  data.FieldTypeNullableString,
 		matchRegex: matchRegexes["Nullable(String)"],
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
 	},
-	"Decimal": {
+	{
+		name:       "Decimal",
 		convert:    decimalConvert,
 		fieldType:  data.FieldTypeFloat64,
 		matchRegex: matchRegexes["Decimal"],
 		scanType:   reflect.PointerTo(reflect.TypeOf(decimal.Decimal{})),
 	},
-	"Nullable(Decimal)": {
+	{
+		name:       "Nullable(Decimal)",
 		convert:    decimalNullConvert,
 		fieldType:  data.FieldTypeNullableFloat64,
 		matchRegex: matchRegexes["Nullable(Decimal)"],
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(decimal.Decimal{}))),
 	},
-	"Tuple()": {
+	{
+		name:       "Tuple()",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["Tuple()"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"Variant()": {
+	{
+		name:       "Variant",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
-		matchRegex: matchRegexes["Variant()"],
+		fieldType:  data.FieldTypeJSON,
+		matchRegex: matchRegexes["Variant"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"Dynamic": {
+	{
+		name:       "Dynamic",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["Dynamic"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"Dynamic()": {
+	{
+		name:       "JSON",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
-		matchRegex: matchRegexes["Dynamic()"],
+		fieldType:  data.FieldTypeJSON,
+		matchRegex: matchRegexes["JSON"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"JSON": {
+	{
+		name:       "Nullable(JSON)",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
-		matchRegex: matchRegexes["JSON"],
-		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
+		fieldType:  data.FieldTypeJSON,
+		matchRegex: matchRegexes["Nullable(JSON)"],
+		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"JSON()": {
+	{
+		name:       "Nested()",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
-		matchRegex: matchRegexes["JSON()"],
-		scanType:   reflect.TypeOf((*clickhouse.JSON)(nil)).Elem(),
-	},
-	// NestedConverter currently only supports flatten_nested=0 only which can be marshalled into []map[string]interface{}
-	"Nested()": {
-		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["Nested()"],
 		scanType:   reflect.TypeOf([]map[string]interface{}{}),
 	},
-	"Array()": {
+	{
+		name:       "Array()",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["Array()"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"Map()": {
+	{
+		name:       "Map()",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["Map()"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"FixedString()": {
+	{
+		name:       "FixedString()",
 		fieldType:  data.FieldTypeNullableString,
 		matchRegex: matchRegexes["FixedString()"],
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
 	},
-	"IP": {
+	{
+		name:       "IP",
 		convert:    ipConverter,
 		fieldType:  data.FieldTypeString,
 		matchRegex: matchRegexes["IP"],
 		scanType:   reflect.PointerTo(reflect.TypeOf(net.IP{})),
 	},
-	"Nullable(IP)": {
+	{
+		name:       "Nullable(IP)",
 		convert:    ipNullConverter,
 		fieldType:  data.FieldTypeNullableString,
 		matchRegex: matchRegexes["Nullable(IP)"],
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(net.IP{}))),
 	},
-	"SimpleAggregateFunction()": {
+	{
+		name:       "SimpleAggregateFunction()",
 		convert:    jsonConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["SimpleAggregateFunction()"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	"Point": {
+	{
+		name:       "Point",
 		convert:    pointConverter,
-		fieldType:  data.FieldTypeNullableJSON,
+		fieldType:  data.FieldTypeJSON,
 		matchRegex: matchRegexes["Point"],
 		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
 	},
-	// // This is a temporary solution to handle LowCardinality types.
-	// // We'll need to add support for LowCardinality types to `sqlutil` package.
-	"LowCardinality(String)": {
+	{
+		name:      "LowCardinality(String)",
 		fieldType: data.FieldTypeString,
 		scanType:  reflect.PointerTo(reflect.TypeOf("")),
 	},
-	"LowCardinality(Nullable(String))": {
+	{
+		name:       "LowCardinality(Nullable(String))",
 		fieldType:  data.FieldTypeNullableString,
 		matchRegex: matchRegexes["LowCardinality(Nullable)"],
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
@@ -312,8 +352,8 @@ var ClickhouseConverters = ClickHouseConverters()
 
 func ClickHouseConverters() []sqlutil.Converter {
 	var list []sqlutil.Converter
-	for name, converter := range Converters {
-		list = append(list, createConverter(name, converter))
+	for _, converter := range Converters {
+		list = append(list, createConverter(converter))
 	}
 	return list
 }
@@ -321,49 +361,56 @@ func ClickHouseConverters() []sqlutil.Converter {
 // GetConverter returns a sqlutil.Converter for the given column type.
 func GetConverter(columnType string) sqlutil.Converter {
 	// check for 'LowCardinality()' type first and get the converter for the inner type
-	if ok, innerType := extractLowCardinalityType(columnType); ok {
+	if innerType, ok := extractLowCardinalityType(columnType); ok {
 		return GetConverter(innerType)
 	}
 
-	// direct match or regex-based match in `Converters` map
-	if converter, ok := Converters[columnType]; ok {
-		return createConverter(columnType, converter)
+	// direct match by name
+	for _, converter := range Converters {
+		if converter.name == columnType {
+			return createConverter(converter)
+		}
 	}
 
 	// regex-based search through `Converters` map
 	return findConverterWithRegex(columnType)
 }
 
+const (
+	lowCardinalityPrefix = "LowCardinality("
+	lowCardinalitySuffix = ")"
+)
+
 // extractLowCardinalityType checks if the column type is a `LowCardinality()` type and returns the inner type.
-func extractLowCardinalityType(columnType string) (bool, string) {
-	if matches := matchRegexes["LowCardinality()"].FindStringSubmatch(columnType); len(matches) > 1 {
-		return true, matches[1]
+func extractLowCardinalityType(columnType string) (string, bool) {
+	if strings.HasPrefix(columnType, lowCardinalityPrefix) && strings.HasSuffix(columnType, lowCardinalitySuffix) {
+		return columnType[len(lowCardinalityPrefix) : len(columnType)-len(lowCardinalitySuffix)], true
 	}
 
-	return false, ""
+	return "", false
 }
 
 // findConverterWithRegex searches through the `Converters` map using regex matching.
 func findConverterWithRegex(columnType string) sqlutil.Converter {
-	for name, converter := range Converters {
+	for _, converter := range Converters {
 		if converter.matchRegex != nil && converter.matchRegex.MatchString(columnType) {
-			return createConverter(name, converter)
+			return createConverter(converter)
 		}
 	}
 
 	return sqlutil.Converter{}
 }
 
-func createConverter(name string, converter Converter) sqlutil.Converter {
+func createConverter(converter Converter) sqlutil.Converter {
 	convert := defaultConvert
 	if converter.convert != nil {
 		convert = converter.convert
 	}
 	return sqlutil.Converter{
-		Name:           name,
+		Name:           converter.name,
 		InputScanType:  converter.scanType,
 		InputTypeRegex: converter.matchRegex,
-		InputTypeName:  name,
+		InputTypeName:  converter.name,
 		FrameConverter: sqlutil.FrameConverter{
 			FieldType:     converter.fieldType,
 			ConverterFunc: convert,
@@ -371,17 +418,32 @@ func createConverter(name string, converter Converter) sqlutil.Converter {
 	}
 }
 
-func jsonConverter(in interface{}) (interface{}, error) {
-	if in == nil {
-		return (*string)(nil), nil
+func jsonConverter(in any) (any, error) {
+	// Unwrap `*any` to be `any`
+	if anyPtr, ok := in.(*any); ok {
+		in = *anyPtr
 	}
+
+	switch v := in.(type) {
+	case nil:
+		return (json.RawMessage)(nil), nil
+	case string:
+		return json.RawMessage(v), nil
+	case *string:
+		return json.RawMessage(*v), nil
+	case []byte:
+		return json.RawMessage(v), nil
+	case *[]byte:
+		return json.RawMessage(*v), nil
+	default:
+	}
+
 	jBytes, err := json.Marshal(in)
 	if err != nil {
 		return nil, err
 	}
 
-	rawJSON := json.RawMessage(jBytes)
-	return &rawJSON, nil
+	return json.RawMessage(jBytes), nil
 }
 
 func defaultConvert(in interface{}) (interface{}, error) {
