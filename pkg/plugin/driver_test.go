@@ -286,7 +286,7 @@ func checkFieldValue(t *testing.T, field *data.Field, expected ...interface{}) {
 			case reflect.Map, reflect.Slice:
 				jsonRaw, err := toJson(tVal)
 				assert.Nil(t, err)
-				assert.Equal(t, jsonRaw, *val.(*json.RawMessage))
+				assert.Equal(t, jsonRaw, val.(json.RawMessage))
 				return
 			}
 			assert.Equal(t, eVal, val)
@@ -700,14 +700,7 @@ var datetime, _ = time.Parse("2006-01-02 15:04:05", "2022-01-12 00:00:00")
 func TestConvertDateTime(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
-			var loc *time.Location
-			switch name {
-			case "native":
-				loc, _ = time.LoadLocation("Europe/London")
-			case "http":
-				// http sends back ClickHouse configured timezone which is UTC
-				loc = time.UTC
-			}
+			loc, _ := time.LoadLocation("Europe/London")
 			localTime := datetime.In(loc)
 			conn, close := setupTest(t, "col1 DateTime('Europe/London')", protocol, nil)
 			defer close(t)
