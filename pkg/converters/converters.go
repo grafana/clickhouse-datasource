@@ -25,6 +25,9 @@ type Converter struct {
 	scanType   reflect.Type
 }
 
+// matchRegexes is a mapping of regular expressions.
+// When adding entries, try to prevent overlap in regular expressions.
+// For example `^Date` and `^DateTime` could conflict when matching `DateTime64`
 var matchRegexes = map[string]*regexp.Regexp{
 	// for complex Arrays e.g. Array(Tuple)
 	"Array()":                   regexp.MustCompile(`^Array\(.*\)`),
@@ -49,6 +52,9 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"Nullable(JSON)":            regexp.MustCompile(`^Nullable\(JSON`),
 }
 
+// Converters defines a list of type converters.
+// When a converter is looked up by name or regex, it will be in the order they are defined below.
+// This is important for regular expressions that may overlap or conflict.
 var Converters = []Converter{
 	{
 		name:      "String",
