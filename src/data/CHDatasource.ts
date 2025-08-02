@@ -244,7 +244,6 @@ export class Datasource
         );
       }
       rawQuery = this.adHocFilter.apply(rawQuery, filters);
-      console.log('ADHOC APPLIED', rawQuery);
     }
     this.skipAdHocFilter = false;
 
