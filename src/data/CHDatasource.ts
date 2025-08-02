@@ -229,7 +229,7 @@ export class Datasource
     return frame?.fields[1]?.values.map((text, i) => ({ text, value: ids.get(i) }));
   }
 
-  applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
+  applyTemplateVariables(query: CHQuery, scoped: ScopedVars, filters: AdHocVariableFilter[] = []): CHQuery {
     let rawQuery = query.rawSql || '';
     const templateSrv = getTemplateSrv();
 
@@ -237,22 +237,14 @@ export class Datasource
     rawQuery = this.applyConditionalAll(rawQuery, templateSrv.getVariables());
     rawQuery = this.replace(rawQuery, scoped) || '';
 
-    return {
-      ...query,
-      rawSql: rawQuery,
-    };
-  }
-
-  applyAdHocFilters(query: CHQuery, adHocFilters: AdHocVariableFilter[]): CHQuery {
-    let rawQuery = query.rawSql || '';
-
     if (!this.skipAdHocFilter) {
-      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && adHocFilters?.length > 0) {
+      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters?.length > 0) {
         throw new Error(
           `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
         );
       }
-      rawQuery = this.adHocFilter.apply(rawQuery, adHocFilters);
+      rawQuery = this.adHocFilter.apply(rawQuery, filters);
+      console.log('ADHOC APPLIED', rawQuery);
     }
     this.skipAdHocFilter = false;
 
@@ -741,13 +733,13 @@ export class Datasource
       .filter((t) => t.hide !== true)
       // attach timezone information
       .map((t) => {
-        return this.applyAdHocFilters({
+        return {
           ...t,
           meta: {
             ...t?.meta,
             timezone: this.getTimezone(request),
           },
-        }, request.filters || []);
+        };
       });
 
     return super.query({
