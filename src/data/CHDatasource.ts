@@ -1,4 +1,5 @@
 import {
+  AdHocVariableFilter,
   DataFrame,
   DataFrameView,
   DataQueryRequest,
@@ -57,8 +58,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
   implements DataSourceWithSupplementaryQueriesSupport<CHQuery>,
-  DataSourceWithLogsContextSupport<CHQuery>
-{
+  DataSourceWithLogsContextSupport<CHQuery> {
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
@@ -136,7 +136,7 @@ export class Datasource
       return undefined;
     }
 
-    
+
 
     const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time);
     if (timeColumn === undefined) {
@@ -231,16 +231,22 @@ export class Datasource
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars): CHQuery {
     let rawQuery = query.rawSql || '';
-    // we want to skip applying ad hoc filters when we are getting values for ad hoc filters
     const templateSrv = getTemplateSrv();
 
-    // first resolve template variables
+    // resolve template variables
     rawQuery = this.applyConditionalAll(rawQuery, templateSrv.getVariables());
     rawQuery = this.replace(rawQuery, scoped) || '';
 
-    // now apply ad-hoc filters after table references have been resolved
+    return {
+      ...query,
+      rawSql: rawQuery,
+    };
+  }
+
+  applyAdHocFilters(query: CHQuery, adHocFilters: AdHocVariableFilter[]): CHQuery {
+    let rawQuery = query.rawSql || '';
+
     if (!this.skipAdHocFilter) {
-      const adHocFilters = (templateSrv as any)?.getAdhocFilters(this.name);
       if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && adHocFilters?.length > 0) {
         throw new Error(
           `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
@@ -301,7 +307,7 @@ export class Datasource
     const lookupByLogsAlias = logAliasToColumnHints.has(columnName) ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!) : undefined;
     const lookupByLogLabels = dataFrameHasLogLabelWithName(actionFrame, columnName) && getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
     const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
-    
+
     let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
     if (action.type === 'ADD_FILTER') {
       // we need to remove *any other EQ or NE* for the same field,
@@ -735,13 +741,13 @@ export class Datasource
       .filter((t) => t.hide !== true)
       // attach timezone information
       .map((t) => {
-        return {
+        return this.applyAdHocFilters({
           ...t,
           meta: {
             ...t?.meta,
             timezone: this.getTimezone(request),
           },
-        };
+        }, request.filters || []);
       });
 
     return super.query({
@@ -904,7 +910,7 @@ export class Datasource
         (isMapKey && (
           // entire map was selected
           f.name === mapName ||
-           // single key was selected from map
+          // single key was selected from map
           f.name === `arrayElement(${mapName}, '${keyName}')`
         ))
       ));
@@ -1013,7 +1019,7 @@ export class Datasource
   showContextToggle(row?: LogRowModel): boolean {
     return true;
   }
-  
+
   /**
    * Returns a React component that is displayed in the top portion of the log context panel
    */

@@ -137,8 +137,10 @@ describe('ClickHouseDatasource', () => {
       const ds = createInstance({});
       ds.adHocFilter = adHocFilter;
 
-      // Execute the method
-      const result = ds.applyTemplateVariables(query, {});
+      // Resolve variables
+      let result = ds.applyTemplateVariables(query, {});
+      // Apply ad-hoc filters
+      result = ds.applyAdHocFilters(result, adHocFilters);
 
       // Verify template variables were resolved before ad-hoc filters were applied
       expect(spyOnReplace).toHaveBeenCalled();
@@ -461,8 +463,8 @@ describe('ClickHouseDatasource', () => {
 
       expect(spy).toHaveBeenCalledWith({
         targets: [
-          { refId: '1', meta: { timezone: 'UTC' } },
-          { refId: '2', hide: false, meta: { timezone: 'UTC' } },
+          { refId: '1', rawSql: '', meta: { timezone: 'UTC' } },
+          { refId: '2', hide: false, rawSql: '', meta: { timezone: 'UTC' } },
         ],
         timezone: 'UTC',
       });
