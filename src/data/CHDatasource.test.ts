@@ -137,8 +137,8 @@ describe('ClickHouseDatasource', () => {
       const ds = createInstance({});
       ds.adHocFilter = adHocFilter;
 
-      // Execute the method
-      const result = ds.applyTemplateVariables(query, {});
+      // Resolve variables
+      const result = ds.applyTemplateVariables(query, {}, adHocFilters);
 
       // Verify template variables were resolved before ad-hoc filters were applied
       expect(spyOnReplace).toHaveBeenCalled();
