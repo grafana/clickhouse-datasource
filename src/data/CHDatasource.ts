@@ -238,7 +238,7 @@ export class Datasource
     rawQuery = this.replace(rawQuery, scoped) || '';
 
     if (!this.skipAdHocFilter) {
-      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters?.length > 0) {
+      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters.length > 0) {
         throw new Error(
           `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
         );
