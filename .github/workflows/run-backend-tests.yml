@@ -19,11 +19,11 @@ jobs:
       fail-fast: true
       matrix:
         clickhouse:
-          - 22.3
-          - 22.8
-          - 22.9
-          - '22.10'
-          - 22.11
+          - 24.8
+          - 25.3
+          - 25.5
+          - 25.6
+          - 25.7
           - latest
 
     steps:
