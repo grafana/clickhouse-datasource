@@ -1,4 +1,5 @@
-import { AdHocFilter, AdHocVariableFilter } from './adHocFilter';
+import { AdHocVariableFilter } from '@grafana/data';
+import { AdHocFilter } from './adHocFilter';
 
 describe('AdHocManager', () => {
   it('apply ad hoc filter with no inner query and existing WHERE', () => {
