@@ -1,6 +1,14 @@
 import { reportInteraction } from "@grafana/runtime";
 
 // Server section
+export const trackClickhouseConfigV1HostInput = () => {
+    reportInteraction('clickhouse-config-v1-host-input');
+};
+
+export const trackClickhouseConfigV1PortInput = () => {
+    reportInteraction('clickhouse-config-v1-port-input');
+};
+
 export const trackClickhouseConfigV1NativeHttpToggleClicked = () => {
     reportInteraction('clickhouse-config-v1-native-http-toggle-clicked');
 };
@@ -12,6 +20,14 @@ export const trackClickhouseConfigV1SecureConnectionToggleClicked = () => {
 // TLS/SSL Settings section
 export const trackClickhouseConfigV1SkipTLSVerifyToggleClicked = () => {
     reportInteraction('clickhouse-config-v1-skip-tls-verify-toggle-clicked');
+};
+
+export const trackClickhouseConfigV1TLSClientAuthToggleClicked = () => {
+    reportInteraction('clickhouse-config-v1-tls-client-auth-toggle-clicked');
+};
+
+export const trackClickhouseConfigV1WithCACertToggleClicked = () => {
+    reportInteraction('clickhouse-config-v1-with-ca-cert-toggle-clicked');
 };
 
 // Default DB and Table section
