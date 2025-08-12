@@ -56,8 +56,8 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const lastEditorType = useRef<EditorType>();
   if (query.editorType !== lastEditorType.current && query.editorType === EditorType.Builder) {
     builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
-    lastEditorType.current = query.editorType;
   }
+  lastEditorType.current = query.editorType;
 
   // Prevent trying to run empty query on load
   const shouldSkipChanges = useRef<boolean>(true);
