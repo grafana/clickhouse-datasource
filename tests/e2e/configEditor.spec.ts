@@ -2,7 +2,7 @@ import { expect, test } from '@grafana/plugin-e2e';
 
 const PLUGIN_UID = 'grafana-clickhouse-datasource';
 const CLICKHOUSE_DB_URL = Boolean(process.env.CI) ? 'clickhouse-server' : 'localhost';
-console.log(process.env)
+console.log("process.env.CI", process.env.CI)
 
 test.describe('Config Editor', () => {
   test('invalid credentials should return an error', async ({ createDataSourceConfigPage, page }) => {
