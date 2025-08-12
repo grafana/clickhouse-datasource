@@ -48,7 +48,11 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
           builderOptions = query.builderOptions;
           break;
         case EditorType.SQL:
-          builderOptions = getQueryOptionsFromSql(query.rawSql, query.queryType, datasource) as QueryBuilderOptions;
+          try {
+            builderOptions = getQueryOptionsFromSql(query.rawSql, query.queryType, datasource) as QueryBuilderOptions;
+          } catch (err) {
+            builderOptions = defaultCHBuilderQuery.builderOptions;
+          }
           break;
         default:
           builderOptions = defaultCHBuilderQuery.builderOptions;
