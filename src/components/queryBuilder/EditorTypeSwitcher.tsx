@@ -58,6 +58,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
           builderOptions = defaultCHBuilderQuery.builderOptions;
           break;
       }
+      
       if (editorType === EditorType.SQL) {
         onChange({
           ...query,
