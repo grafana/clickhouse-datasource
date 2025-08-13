@@ -1,4 +1,4 @@
-package converters_test
+package converters
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/clickhouse-datasource/pkg/converters"
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/paulmach/orb"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +19,7 @@ func TestDate(t *testing.T) {
 	layout := "2006-01-02T15:04:05.000Z"
 	str := "2014-11-12T11:45:26.371Z"
 	d, _ := time.Parse(layout, str)
-	sut := converters.GetConverter("Date")
+	sut := GetConverter("Date")
 	v, err := sut.FrameConverter.ConverterFunc(&d)
 	assert.Nil(t, err)
 	actual := v.(time.Time)
@@ -31,7 +31,7 @@ func TestNullableDate(t *testing.T) {
 	str := "2014-11-12T11:45:26.371Z"
 	d, _ := time.Parse(layout, str)
 	val := &d
-	sut := converters.GetConverter("Nullable(Date)")
+	sut := GetConverter("Nullable(Date)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*time.Time)
@@ -39,7 +39,7 @@ func TestNullableDate(t *testing.T) {
 }
 
 func TestNullableDateShouldBeNil(t *testing.T) {
-	sut := converters.GetConverter("Nullable(Date)")
+	sut := GetConverter("Nullable(Date)")
 	var d *time.Time
 	v, err := sut.FrameConverter.ConverterFunc(&d)
 	assert.Nil(t, err)
@@ -50,7 +50,7 @@ func TestNullableDateShouldBeNil(t *testing.T) {
 func TestNullableDecimal(t *testing.T) {
 	val := decimal.New(25, 4)
 	value := &val
-	nullableDecimal := converters.GetConverter("Nullable(Decimal(15,2))")
+	nullableDecimal := GetConverter("Nullable(Decimal(15,2))")
 	v, err := nullableDecimal.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -59,7 +59,7 @@ func TestNullableDecimal(t *testing.T) {
 }
 
 func TestNullableDecimalShouldBeNull(t *testing.T) {
-	nullableDecimal := converters.GetConverter("Nullable(Decimal(15,2))")
+	nullableDecimal := GetConverter("Nullable(Decimal(15,2))")
 	var value *decimal.Decimal
 	v, err := nullableDecimal.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
@@ -69,7 +69,7 @@ func TestNullableDecimalShouldBeNull(t *testing.T) {
 
 func TestDecimal(t *testing.T) {
 	val := decimal.New(25, 4)
-	nullableDecimal := converters.GetConverter("Decimal(15,2)")
+	nullableDecimal := GetConverter("Decimal(15,2)")
 	v, err := nullableDecimal.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -79,7 +79,7 @@ func TestDecimal(t *testing.T) {
 
 func TestNullableString(t *testing.T) {
 	var value *string
-	sut := converters.GetConverter("Nullable(String)")
+	sut := GetConverter("Nullable(String)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*string)
@@ -88,7 +88,7 @@ func TestNullableString(t *testing.T) {
 
 func TestBool(t *testing.T) {
 	value := true
-	sut := converters.GetConverter("Bool")
+	sut := GetConverter("Bool")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(bool)
@@ -97,7 +97,7 @@ func TestBool(t *testing.T) {
 
 func TestNullableBool(t *testing.T) {
 	var value *bool
-	sut := converters.GetConverter("Nullable(Bool)")
+	sut := GetConverter("Nullable(Bool)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*bool)
@@ -106,7 +106,7 @@ func TestNullableBool(t *testing.T) {
 
 func TestFloat64(t *testing.T) {
 	value := 1.1
-	sut := converters.GetConverter("Float64")
+	sut := GetConverter("Float64")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -115,7 +115,7 @@ func TestFloat64(t *testing.T) {
 
 func TestNullableFloat64(t *testing.T) {
 	var value *float64
-	sut := converters.GetConverter("Nullable(Float64)")
+	sut := GetConverter("Nullable(Float64)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -124,7 +124,7 @@ func TestNullableFloat64(t *testing.T) {
 
 func TestFloat32(t *testing.T) {
 	value := 1.1
-	sut := converters.GetConverter("Float32")
+	sut := GetConverter("Float32")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -133,7 +133,7 @@ func TestFloat32(t *testing.T) {
 
 func TestInt64(t *testing.T) {
 	value := int64(1)
-	sut := converters.GetConverter("Int64")
+	sut := GetConverter("Int64")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(int64)
@@ -142,7 +142,7 @@ func TestInt64(t *testing.T) {
 
 func TestNullableInt64(t *testing.T) {
 	var value *int64
-	sut := converters.GetConverter("Nullable(Int64)")
+	sut := GetConverter("Nullable(Int64)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*int64)
@@ -151,7 +151,7 @@ func TestNullableInt64(t *testing.T) {
 
 func TestInt32(t *testing.T) {
 	value := int32(1)
-	sut := converters.GetConverter("Int32")
+	sut := GetConverter("Int32")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(int32)
@@ -160,7 +160,7 @@ func TestInt32(t *testing.T) {
 
 func TestNullableInt32(t *testing.T) {
 	var value *int32
-	sut := converters.GetConverter("Nullable(Int32)")
+	sut := GetConverter("Nullable(Int32)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*int32)
@@ -169,7 +169,7 @@ func TestNullableInt32(t *testing.T) {
 
 func TestInt8(t *testing.T) {
 	value := int8(1)
-	sut := converters.GetConverter("Int8")
+	sut := GetConverter("Int8")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(int8)
@@ -178,7 +178,7 @@ func TestInt8(t *testing.T) {
 
 func TestNullableInt8(t *testing.T) {
 	var value *int8
-	sut := converters.GetConverter("Nullable(Int8)")
+	sut := GetConverter("Nullable(Int8)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*int8)
@@ -187,7 +187,7 @@ func TestNullableInt8(t *testing.T) {
 
 func TestInt16(t *testing.T) {
 	value := int16(1)
-	sut := converters.GetConverter("Int16")
+	sut := GetConverter("Int16")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(int16)
@@ -196,7 +196,7 @@ func TestInt16(t *testing.T) {
 
 func TestNullableInt16(t *testing.T) {
 	var value *int16
-	sut := converters.GetConverter("Nullable(Int16)")
+	sut := GetConverter("Nullable(Int16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(*int16)
@@ -205,7 +205,7 @@ func TestNullableInt16(t *testing.T) {
 
 func TestUInt8(t *testing.T) {
 	value := uint8(1)
-	sut := converters.GetConverter("UInt8")
+	sut := GetConverter("UInt8")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(uint8)
@@ -215,7 +215,7 @@ func TestUInt8(t *testing.T) {
 func TestNullableUInt8(t *testing.T) {
 	value := uint8(100)
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt8)")
+	sut := GetConverter("Nullable(UInt8)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint8)
@@ -225,7 +225,7 @@ func TestNullableUInt8(t *testing.T) {
 func TestNullableUInt8ShouldBeNil(t *testing.T) {
 	var value *uint8
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt8)")
+	sut := GetConverter("Nullable(UInt8)")
 	v, err := sut.FrameConverter.ConverterFunc(val)
 	assert.Nil(t, err)
 	actual := v.(*uint8)
@@ -235,7 +235,7 @@ func TestNullableUInt8ShouldBeNil(t *testing.T) {
 func TestUInt16(t *testing.T) {
 	value := uint16(100)
 	val := &value
-	sut := converters.GetConverter("UInt16")
+	sut := GetConverter("UInt16")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint16)
@@ -245,7 +245,7 @@ func TestUInt16(t *testing.T) {
 func TestNullableUInt16(t *testing.T) {
 	value := uint16(100)
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt16)")
+	sut := GetConverter("Nullable(UInt16)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint16)
@@ -255,7 +255,7 @@ func TestNullableUInt16(t *testing.T) {
 func TestNullableUInt16ShouldBeNil(t *testing.T) {
 	var value *uint16
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt16)")
+	sut := GetConverter("Nullable(UInt16)")
 	v, err := sut.FrameConverter.ConverterFunc(val)
 	assert.Nil(t, err)
 	actual := v.(*uint16)
@@ -265,7 +265,7 @@ func TestNullableUInt16ShouldBeNil(t *testing.T) {
 func TestUInt32(t *testing.T) {
 	value := uint32(100)
 	val := &value
-	sut := converters.GetConverter("UInt32")
+	sut := GetConverter("UInt32")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint32)
@@ -275,7 +275,7 @@ func TestUInt32(t *testing.T) {
 func TestNullableUInt32(t *testing.T) {
 	value := uint32(100)
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt32)")
+	sut := GetConverter("Nullable(UInt32)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint32)
@@ -285,7 +285,7 @@ func TestNullableUInt32(t *testing.T) {
 func TestNullableUInt32ShouldBeNil(t *testing.T) {
 	var value *uint32
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt32)")
+	sut := GetConverter("Nullable(UInt32)")
 	v, err := sut.FrameConverter.ConverterFunc(val)
 	assert.Nil(t, err)
 	actual := v.(*uint32)
@@ -295,7 +295,7 @@ func TestNullableUInt32ShouldBeNil(t *testing.T) {
 func TestUInt64(t *testing.T) {
 	value := uint64(100)
 	val := &value
-	sut := converters.GetConverter("UInt64")
+	sut := GetConverter("UInt64")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint64)
@@ -305,7 +305,7 @@ func TestUInt64(t *testing.T) {
 func TestNullableUInt64(t *testing.T) {
 	value := uint64(100)
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt64)")
+	sut := GetConverter("Nullable(UInt64)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*uint64)
@@ -315,7 +315,7 @@ func TestNullableUInt64(t *testing.T) {
 func TestNullableUInt64ShouldBeNil(t *testing.T) {
 	var value *uint64
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt64)")
+	sut := GetConverter("Nullable(UInt64)")
 	v, err := sut.FrameConverter.ConverterFunc(val)
 	assert.Nil(t, err)
 	actual := v.(*uint64)
@@ -324,7 +324,7 @@ func TestNullableUInt64ShouldBeNil(t *testing.T) {
 
 func TestInt128(t *testing.T) {
 	value := big.NewInt(128)
-	sut := converters.GetConverter("Int128")
+	sut := GetConverter("Int128")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -335,7 +335,7 @@ func TestInt128(t *testing.T) {
 func TestNullableInt128(t *testing.T) {
 	value := big.NewInt(128)
 	val := &value
-	sut := converters.GetConverter("Nullable(Int128)")
+	sut := GetConverter("Nullable(Int128)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -346,7 +346,7 @@ func TestNullableInt128(t *testing.T) {
 func TestNullableInt128ShouldBeNil(t *testing.T) {
 	var value *big.Int
 	val := &value
-	sut := converters.GetConverter("Nullable(Int128)")
+	sut := GetConverter("Nullable(Int128)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -355,7 +355,7 @@ func TestNullableInt128ShouldBeNil(t *testing.T) {
 
 func TestInt256(t *testing.T) {
 	value := big.NewInt(128)
-	sut := converters.GetConverter("Int256")
+	sut := GetConverter("Int256")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -366,7 +366,7 @@ func TestInt256(t *testing.T) {
 func TestNullableInt256(t *testing.T) {
 	value := big.NewInt(128)
 	val := &value
-	sut := converters.GetConverter("Nullable(Int256)")
+	sut := GetConverter("Nullable(Int256)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -377,7 +377,7 @@ func TestNullableInt256(t *testing.T) {
 func TestNullableInt256ShouldBeNil(t *testing.T) {
 	var value *big.Int
 	val := &value
-	sut := converters.GetConverter("Nullable(Int256)")
+	sut := GetConverter("Nullable(Int256)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -386,7 +386,7 @@ func TestNullableInt256ShouldBeNil(t *testing.T) {
 
 func TestUInt128(t *testing.T) {
 	value := big.NewInt(128)
-	sut := converters.GetConverter("UInt128")
+	sut := GetConverter("UInt128")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -397,7 +397,7 @@ func TestUInt128(t *testing.T) {
 func TestNullableUInt128(t *testing.T) {
 	value := big.NewInt(128)
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt128)")
+	sut := GetConverter("Nullable(UInt128)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -408,7 +408,7 @@ func TestNullableUInt128(t *testing.T) {
 func TestNullableUInt128ShouldBeNil(t *testing.T) {
 	var value *big.Int
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt128)")
+	sut := GetConverter("Nullable(UInt128)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -417,7 +417,7 @@ func TestNullableUInt128ShouldBeNil(t *testing.T) {
 
 func TestUInt256(t *testing.T) {
 	value := big.NewInt(128)
-	sut := converters.GetConverter("UInt256")
+	sut := GetConverter("UInt256")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	actual := v.(float64)
@@ -428,7 +428,7 @@ func TestUInt256(t *testing.T) {
 func TestNullableUInt256(t *testing.T) {
 	value := big.NewInt(128)
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt256)")
+	sut := GetConverter("Nullable(UInt256)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -439,7 +439,7 @@ func TestNullableUInt256(t *testing.T) {
 func TestNullableUInt256ShouldBeNil(t *testing.T) {
 	var value *big.Int
 	val := &value
-	sut := converters.GetConverter("Nullable(UInt256)")
+	sut := GetConverter("Nullable(UInt256)")
 	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*float64)
@@ -466,12 +466,12 @@ func TestTuple(t *testing.T) {
 		"3": uint16(3),
 		"4": uint16(4),
 	}
-	sut := converters.GetConverter("Tuple(name String, id Uint16)")
+	sut := GetConverter("Tuple(name String, id Uint16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, *v.(*json.RawMessage))
+	assert.Equal(t, msg, v.(json.RawMessage))
 }
 
 func TestNested(t *testing.T) {
@@ -483,12 +483,12 @@ func TestNested(t *testing.T) {
 			"4": uint16(4),
 		},
 	}
-	sut := converters.GetConverter("Nested(name String, id Uint16)")
+	sut := GetConverter("Nested(name String, id Uint16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, *v.(*json.RawMessage))
+	assert.Equal(t, msg, v.(json.RawMessage))
 }
 
 func TestMap(t *testing.T) {
@@ -498,17 +498,39 @@ func TestMap(t *testing.T) {
 		"3": uint16(3),
 		"4": uint16(4),
 	}
-	sut := converters.GetConverter("Map(String, Uint16)")
+	sut := GetConverter("Map(String, Uint16)")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, *v.(*json.RawMessage))
+	assert.Equal(t, msg, v.(json.RawMessage))
+}
+
+func TestJSONObject(t *testing.T) {
+	value := clickhouse.NewJSON()
+	value.SetValueAtPath("x", "1234")
+
+	sut := GetConverter("JSON")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	msg, err := toJson(value)
+	assert.Nil(t, err)
+	assert.Equal(t, msg, v.(json.RawMessage))
+}
+
+func TestJSONString(t *testing.T) {
+	jsonStr := `{"x":"1234"}`
+	value := []byte(jsonStr)
+	sut := GetConverter("JSON")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	assert.Nil(t, err)
+	assert.Equal(t, json.RawMessage(jsonStr), v.(json.RawMessage))
 }
 
 func TestNullableFixedString(t *testing.T) {
 	value := "2"
-	sut := converters.GetConverter("Nullable(FixedString(2))")
+	sut := GetConverter("Nullable(FixedString(2))")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	assert.Equal(t, value, v.(string))
@@ -516,17 +538,17 @@ func TestNullableFixedString(t *testing.T) {
 
 func TestArray(t *testing.T) {
 	value := []string{"1", "2", "3"}
-	ipConverter := converters.GetConverter("Array(String)")
+	ipConverter := GetConverter("Array(String)")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, *v.(*json.RawMessage))
+	assert.Equal(t, msg, v.(json.RawMessage))
 }
 
 func TestIPv4(t *testing.T) {
 	value := net.ParseIP("127.0.0.1")
-	ipConverter := converters.GetConverter("IPv4")
+	ipConverter := GetConverter("IPv4")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	assert.Equal(t, value.String(), v)
@@ -534,7 +556,7 @@ func TestIPv4(t *testing.T) {
 
 func TestIPv6(t *testing.T) {
 	value := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
-	ipConverter := converters.GetConverter("IPv6")
+	ipConverter := GetConverter("IPv6")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	assert.Equal(t, value.String(), v)
@@ -543,7 +565,7 @@ func TestIPv6(t *testing.T) {
 func TestNullableIPv4(t *testing.T) {
 	value := net.ParseIP("127.0.0.1")
 	val := &value
-	ipConverter := converters.GetConverter("Nullable(IPv4)")
+	ipConverter := GetConverter("Nullable(IPv4)")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*string)
@@ -552,7 +574,7 @@ func TestNullableIPv4(t *testing.T) {
 
 func TestNullableIPv4ShouldBeNull(t *testing.T) {
 	var value *net.IP
-	ipConverter := converters.GetConverter("Nullable(IPv4)")
+	ipConverter := GetConverter("Nullable(IPv4)")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	require.Nil(t, v)
@@ -561,7 +583,7 @@ func TestNullableIPv4ShouldBeNull(t *testing.T) {
 func TestNullableIPv6(t *testing.T) {
 	value := net.ParseIP("2001:44c8:129:2632:33:0:252:2")
 	val := &value
-	ipConverter := converters.GetConverter("Nullable(IPv6)")
+	ipConverter := GetConverter("Nullable(IPv6)")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
 	actual := v.(*string)
@@ -570,7 +592,7 @@ func TestNullableIPv6(t *testing.T) {
 
 func TestNullableIPv6ShouldBeNull(t *testing.T) {
 	var value *net.IP
-	ipConverter := converters.GetConverter("Nullable(IPv6)")
+	ipConverter := GetConverter("Nullable(IPv6)")
 	v, err := ipConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	require.Nil(t, v)
@@ -578,27 +600,27 @@ func TestNullableIPv6ShouldBeNull(t *testing.T) {
 
 func TestSimpleAggregateFunction(t *testing.T) {
 	value := [][]int{{1, 2, 3}, {1, 2, 3}}
-	aggConverter := converters.GetConverter("SimpleAggregateFunction()")
+	aggConverter := GetConverter("SimpleAggregateFunction()")
 	v, err := aggConverter.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, *v.(*json.RawMessage))
+	assert.Equal(t, msg, v.(json.RawMessage))
 }
 
 func TestPoint(t *testing.T) {
 	value := interface{}(interface{}(orb.Point{10, 10}))
-	sut := converters.GetConverter("Point")
+	sut := GetConverter("Point")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	msg, err := toJson(value)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, *v.(*json.RawMessage))
+	assert.Equal(t, msg, v.(json.RawMessage))
 }
 
 func TestLowCardinality(t *testing.T) {
 	value := "value"
-	sut := converters.GetConverter("LowCardinality(String)")
+	sut := GetConverter("LowCardinality(String)")
 	v, err := sut.FrameConverter.ConverterFunc(value)
 	assert.Nil(t, err)
 	assert.Equal(t, value, v)
@@ -606,8 +628,45 @@ func TestLowCardinality(t *testing.T) {
 
 func TestLowCardinalityNullable(t *testing.T) {
 	value := "value"
-	sut := converters.GetConverter("LowCardinality(Nullable(String))")
+	sut := GetConverter("LowCardinality(Nullable(String))")
 	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
 	assert.Equal(t, value, v)
+}
+
+func TestExtractLowCardinality(t *testing.T) {
+	cases := []struct {
+		inputType    string
+		expectedType string
+		expectedOk   bool
+	}{
+		{
+			inputType:    "Nullable(LowCardinality(String))",
+			expectedType: "",
+			expectedOk:   false,
+		},
+		{
+			inputType:    "String",
+			expectedType: "",
+			expectedOk:   false,
+		},
+		{
+			inputType:    "LowCardinality(String)",
+			expectedType: "String",
+			expectedOk:   true,
+		},
+		{
+			inputType:    "LowCardinality(Nullable(String))",
+			expectedType: "Nullable(String)",
+			expectedOk:   true,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.inputType, func(t *testing.T) {
+			actualType, actualOk := extractLowCardinalityType(c.inputType)
+			assert.Equal(t, c.expectedOk, actualOk)
+			assert.Equal(t, c.expectedType, actualType)
+		})
+	}
 }
