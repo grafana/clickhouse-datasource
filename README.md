@@ -270,4 +270,4 @@ names are filtered for in the dashboard.
 * Add [Annotations](https://grafana.com/docs/grafana/latest/dashboards/annotations/).
 * Configure and use [Templates and variables](https://grafana.com/docs/grafana/latest/variables/).
 * Add [Transformations](https://grafana.com/docs/grafana/latest/panels/transformations/).
-* Set up alerting; refer to [Alerts overview](https://grafana.com/docs/grafana/latest/alerting/).
+* Set up alerting; refer to [Alerts overview](https://grafana.com/docs/grafana/latest/alerting/).  
