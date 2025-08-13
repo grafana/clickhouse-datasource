@@ -5,7 +5,7 @@ services:
       context: ./.config
       args:
         grafana_image: ${GRAFANA_IMAGE:-grafana-enterprise}
-        grafana_version: ${GRAFANA_VERSION:-11.1.0}
+        grafana_version: ${GRAFANA_VERSION:-latest}
         # remove the following line when developing to have backend debugger
         development: false
     ports:
@@ -27,7 +27,7 @@ services:
       - grafana
 
   clickhouse-server:
-    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.7-alpine}
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
     container_name: clickhouse-server
     ports:
       - 8123:8123
@@ -42,11 +42,13 @@ services:
       timeout: 30s
       retries: 5
       start_period: 30s
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
     networks:
       - grafana
 
   test-data-loader:
-    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-24.7-alpine}
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
     container_name: test-data-loader
     entrypoint: ["clickhouse-client", "--host", "clickhouse-server", "--queries-file", "/dev/shm/property-prices.sql"]
     depends_on:

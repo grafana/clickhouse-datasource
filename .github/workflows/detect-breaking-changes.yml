@@ -5,7 +5,7 @@ jobs:
   compatibilitycheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           persist-credentials: false
 
@@ -17,7 +17,7 @@ jobs:
       - name: Build plugin
         run: yarn build
       - name: Compatibility check
-        uses: grafana/plugin-actions/is-compatible@0edbbe7d4e8623861942236723bf2fb1d7f05e4e
+        uses: grafana/plugin-actions/is-compatible@a8d2790586995c0112186302a0ebee61f02510a7
         with:
           module: './src/module.ts'
           comment-pr: 'yes'
