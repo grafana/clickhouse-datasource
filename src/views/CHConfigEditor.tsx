@@ -28,7 +28,7 @@ import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from 'labels';
 import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
 import {AliasTableConfig} from "../components/configEditor/AliasTableConfig";
-import { trackClickhouseConfigV1ColumnAliasTableAdded, trackClickhouseConfigV1ConnMaxLifetimeInput, trackClickhouseConfigV1CustomSettingAdded, trackClickhouseConfigV1DefaultDbInput, trackClickhouseConfigV1DefaultLogDbInput, trackClickhouseConfigV1DefaultLogTableInput, trackClickhouseConfigV1DefaultTableInput, trackClickhouseConfigV1DefaultTraceDbInput, trackClickhouseConfigV1DefaultTraceTableInput, trackClickhouseConfigV1DialTimeoutInput, trackClickhouseConfigV1DurationTimeColumnInput, trackClickhouseConfigV1DurationUnitInput, trackClickhouseConfigV1EnableRowLimitToggleClicked, trackClickhouseConfigV1EventsPrefixColumnInput, trackClickhouseConfigV1HostInput, trackClickhouseConfigV1KindColumnInput, trackClickhouseConfigV1LibraryNameColumnInput, trackClickhouseConfigV1LibraryVersionColumnInput, trackClickhouseConfigV1LinksPrefixColumnInput, trackClickhouseConfigV1LogAutoSelectColumnsInput, trackClickhouseConfigV1LogContextColumnInput, trackClickhouseConfigV1LogLevelColumnInput, trackClickhouseConfigV1LogMessageColumnInput, trackClickhouseConfigV1LogsOtelVersion, trackClickhouseConfigV1LogTimeColumnInput, trackClickhouseConfigV1MaxIdleConnsInput, trackClickhouseConfigV1MaxOpenConnsInput, trackClickhouseConfigV1NativeHttpToggleClicked, trackClickhouseConfigV1OperationNameColumnInput, trackClickhouseConfigV1ParentSpanIdColumnInput, trackClickhouseConfigV1PortInput, trackClickhouseConfigV1QueryTimeoutInput, trackClickhouseConfigV1SecureConnectionToggleClicked, trackClickhouseConfigV1ServiceNameColumnInput, trackClickhouseConfigV1ServiceTagsColumnInput, trackClickhouseConfigV1SkipTLSVerifyToggleClicked, trackClickhouseConfigV1SpanIdColumnInput, trackClickhouseConfigV1StartTimeColumnInput, trackClickhouseConfigV1StateColumnInput, trackClickhouseConfigV1StatusCodeColumnInput, trackClickhouseConfigV1StatusMessageColumnInput, trackClickhouseConfigV1TagsColumnInput, trackClickhouseConfigV1TLSClientAuthToggleClicked, trackClickhouseConfigV1TraceIdColumnInput, trackClickhouseConfigV1TracesOtelVersion, trackClickhouseConfigV1UseFlattenNeededToggleClicked, trackClickhouseConfigV1UseOtelLogsToggleClicked, trackClickhouseConfigV1UseOtelTracesToggleClicked, trackClickhouseConfigV1ValidateSQLToggleClicked, trackClickhouseConfigV1WithCACertToggleClicked } from './trackingV1';
+import * as trackingV1 from './trackingV1';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -166,7 +166,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const onAliasTableConfigChange = (aliasTables: AliasTableEntry[]) => {
     // track events when both a target table and alias table has a value
     if (aliasTables.length > 0 && aliasTables[0].targetTable && aliasTables[0].aliasTable) {
-      trackClickhouseConfigV1ColumnAliasTableAdded();
+      trackingV1.trackClickhouseConfigV1ColumnAliasTableAdded();
     }
     onOptionsChange({
       ...options,
@@ -238,7 +238,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             width={80}
             value={jsonData.host || ''}
             onChange={() => {
-              trackClickhouseConfigV1HostInput();
+              trackingV1.trackClickhouseConfigV1HostInput();
               onUpdateDatasourceJsonDataOption(props, 'host');
             }}
             label={labels.serverAddress.label}
@@ -259,7 +259,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             type="number"
             value={jsonData.port || ''}
             onChange={e => {
-              trackClickhouseConfigV1PortInput();
+              trackingV1.trackClickhouseConfigV1PortInput();
               onPortChange(e.currentTarget.value);
             }}
             label={labels.serverPort.label}
@@ -274,7 +274,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             disabledOptions={[]}
             value={jsonData.protocol || Protocol.Native}
             onChange={(e) => {
-              trackClickhouseConfigV1NativeHttpToggleClicked();
+              trackingV1.trackClickhouseConfigV1NativeHttpToggleClicked();
               onProtocolToggle(e!);
             }}
           />
@@ -285,7 +285,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.secure || false}
             onChange={(e) => {
-              trackClickhouseConfigV1SecureConnectionToggleClicked();
+              trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked();
               onSwitchToggle('secure', e.currentTarget.checked);
             }}
           />
@@ -326,7 +326,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.tlsSkipVerify || false}
             onChange={(e) => {
-              trackClickhouseConfigV1SkipTLSVerifyToggleClicked();
+              trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked();
               onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked);
             }}
           />
@@ -339,7 +339,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.tlsAuth || false}
             onChange={(e) => {
-              trackClickhouseConfigV1TLSClientAuthToggleClicked();
+              trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked();
               onTLSSettingsChange('tlsAuth', e.currentTarget.checked);
             }}
           />
@@ -352,7 +352,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.tlsAuthWithCACert || false}
             onChange={(e) => {
-              trackClickhouseConfigV1WithCACertToggleClicked();
+              trackingV1.trackClickhouseConfigV1WithCACertToggleClicked();
               onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked);
             }}
           />
@@ -429,11 +429,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           defaultDatabase={jsonData.defaultDatabase}
           defaultTable={jsonData.defaultTable}
           onDefaultDatabaseChange={() => {
-            trackClickhouseConfigV1DefaultDbInput();
+            trackingV1.trackClickhouseConfigV1DefaultDbInput();
             onUpdateDatasourceJsonDataOption(props, 'defaultDatabase');
           }}
           onDefaultTableChange={() => {
-            trackClickhouseConfigV1DefaultTableInput();
+            trackingV1.trackClickhouseConfigV1DefaultTableInput();
             onUpdateDatasourceJsonDataOption(props, 'defaultTable');
           }}
         />
@@ -447,27 +447,27 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           queryTimeout={jsonData.queryTimeout}
           validateSql={jsonData.validateSql}
           onDialTimeoutChange={() => {
-            trackClickhouseConfigV1DialTimeoutInput();
+            trackingV1.trackClickhouseConfigV1DialTimeoutInput();
             onUpdateDatasourceJsonDataOption(props, 'dialTimeout');
           }}
           onQueryTimeoutChange={() => {
-            trackClickhouseConfigV1QueryTimeoutInput();
+            trackingV1.trackClickhouseConfigV1QueryTimeoutInput();
             onUpdateDatasourceJsonDataOption(props, 'queryTimeout');
           }}
           onConnMaxLifetimeChange={() => {
-            trackClickhouseConfigV1ConnMaxLifetimeInput();
+            trackingV1.trackClickhouseConfigV1ConnMaxLifetimeInput();
             onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime');
           }}
           onConnMaxIdleConnsChange={() => {
-            trackClickhouseConfigV1MaxIdleConnsInput();
+            trackingV1.trackClickhouseConfigV1MaxIdleConnsInput();
             onUpdateDatasourceJsonDataOption(props, 'maxIdleConns');
           }}
           onConnMaxOpenConnsChange={() => {
-            trackClickhouseConfigV1MaxOpenConnsInput();
+            trackingV1.trackClickhouseConfigV1MaxOpenConnsInput();
             onUpdateDatasourceJsonDataOption(props, 'maxOpenConns');
           }}
           onValidateSqlChange={(e) => {
-            trackClickhouseConfigV1ValidateSQLToggleClicked();
+            trackingV1.trackClickhouseConfigV1ValidateSQLToggleClicked();
             onSwitchToggle('validateSql', e.currentTarget.checked);
           }}
         />
@@ -476,39 +476,39 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <LogsConfig
           logsConfig={jsonData.logs}
           onDefaultDatabaseChange={db => {
-            trackClickhouseConfigV1DefaultLogDbInput();
+            trackingV1.trackClickhouseConfigV1DefaultLogDbInput();
             onLogsConfigChange('defaultDatabase', db);
           }}
           onDefaultTableChange={table => {
-            trackClickhouseConfigV1DefaultLogTableInput();
+            trackingV1.trackClickhouseConfigV1DefaultLogTableInput();
             onLogsConfigChange('defaultTable', table);
           }}
           onOtelEnabledChange={v => {
-            trackClickhouseConfigV1UseOtelLogsToggleClicked();
+            trackingV1.trackClickhouseConfigV1UseOtelLogsToggleClicked();
             onLogsConfigChange('otelEnabled', v);
           }}
           onOtelVersionChange={v => {
-            trackClickhouseConfigV1LogsOtelVersion({version: v});
+            trackingV1.trackClickhouseConfigV1LogsOtelVersion({version: v});
             onLogsConfigChange('otelVersion', v);
           }}
           onTimeColumnChange={c => {
-            trackClickhouseConfigV1LogTimeColumnInput();
+            trackingV1.trackClickhouseConfigV1LogTimeColumnInput();
             onLogsConfigChange('timeColumn', c);
           }}
           onLevelColumnChange={c => {
-            trackClickhouseConfigV1LogLevelColumnInput();
+            trackingV1.trackClickhouseConfigV1LogLevelColumnInput();
             onLogsConfigChange('levelColumn', c);
           }}
           onMessageColumnChange={c => {
-            trackClickhouseConfigV1LogMessageColumnInput();
+            trackingV1.trackClickhouseConfigV1LogMessageColumnInput();
             onLogsConfigChange('messageColumn', c);
           }}
           onSelectContextColumnsChange={c => {
-            trackClickhouseConfigV1LogAutoSelectColumnsInput();
+            trackingV1.trackClickhouseConfigV1LogAutoSelectColumnsInput();
             onLogsConfigChange('selectContextColumns', c);
           }}
           onContextColumnsChange={c => {
-            trackClickhouseConfigV1LogContextColumnInput();
+            trackingV1.trackClickhouseConfigV1LogContextColumnInput();
             onLogsConfigChange('contextColumns', c);
           }}
         />
@@ -517,95 +517,95 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <TracesConfig
           tracesConfig={jsonData.traces}
           onDefaultDatabaseChange={db => {
-            trackClickhouseConfigV1DefaultTraceDbInput();
+            trackingV1.trackClickhouseConfigV1DefaultTraceDbInput();
             onTracesConfigChange('defaultDatabase', db);
           }}
           onDefaultTableChange={table => {
-            trackClickhouseConfigV1DefaultTraceTableInput();
+            trackingV1.trackClickhouseConfigV1DefaultTraceTableInput();
             onTracesConfigChange('defaultTable', table);
           }}
           onOtelEnabledChange={v => {
-            trackClickhouseConfigV1UseOtelTracesToggleClicked();
+            trackingV1.trackClickhouseConfigV1UseOtelTracesToggleClicked();
             onTracesConfigChange('otelEnabled', v);
           }}
           onOtelVersionChange={v => {
-            trackClickhouseConfigV1TracesOtelVersion({version: v})
+            trackingV1.trackClickhouseConfigV1TracesOtelVersion({version: v})
             onTracesConfigChange('otelVersion', v);
           }}
           onTraceIdColumnChange={c => {
-            trackClickhouseConfigV1TraceIdColumnInput();
+            trackingV1.trackClickhouseConfigV1TraceIdColumnInput();
             onTracesConfigChange('traceIdColumn', c);
           }}
           onSpanIdColumnChange={c => {
-            trackClickhouseConfigV1SpanIdColumnInput();
+            trackingV1.trackClickhouseConfigV1SpanIdColumnInput();
             onTracesConfigChange('spanIdColumn', c);
           }}
           onOperationNameColumnChange={c => {
-            trackClickhouseConfigV1OperationNameColumnInput();
+            trackingV1.trackClickhouseConfigV1OperationNameColumnInput();
             onTracesConfigChange('operationNameColumn', c);
           }}
           onParentSpanIdColumnChange={c => {
-            trackClickhouseConfigV1ParentSpanIdColumnInput();
+            trackingV1.trackClickhouseConfigV1ParentSpanIdColumnInput();
             onTracesConfigChange('parentSpanIdColumn', c);
           }}
           onServiceNameColumnChange={c => {
-            trackClickhouseConfigV1ServiceNameColumnInput();
+            trackingV1.trackClickhouseConfigV1ServiceNameColumnInput();
             onTracesConfigChange('serviceNameColumn', c);
           }}
           onDurationColumnChange={c => {
-            trackClickhouseConfigV1DurationTimeColumnInput();
+            trackingV1.trackClickhouseConfigV1DurationTimeColumnInput();
             onTracesConfigChange('durationColumn', c);
           }}
           onDurationUnitChange={c => {
-            trackClickhouseConfigV1DurationUnitInput();
+            trackingV1.trackClickhouseConfigV1DurationUnitInput();
             onTracesConfigChange('durationUnit', c);
           }}
           onStartTimeColumnChange={c => {
-            trackClickhouseConfigV1StartTimeColumnInput();
+            trackingV1.trackClickhouseConfigV1StartTimeColumnInput();
             onTracesConfigChange('startTimeColumn', c);
           }}
           onTagsColumnChange={c => {
-            trackClickhouseConfigV1TagsColumnInput();
+            trackingV1.trackClickhouseConfigV1TagsColumnInput();
             onTracesConfigChange('tagsColumn', c);
           }}
           onServiceTagsColumnChange={c => {
-            trackClickhouseConfigV1ServiceTagsColumnInput();
+            trackingV1.trackClickhouseConfigV1ServiceTagsColumnInput();
             onTracesConfigChange('serviceTagsColumn', c);
           }}
           onKindColumnChange={c => {
-            trackClickhouseConfigV1KindColumnInput();
+            trackingV1.trackClickhouseConfigV1KindColumnInput();
             onTracesConfigChange('kindColumn', c);
           }}
           onStatusCodeColumnChange={c => {
-            trackClickhouseConfigV1StatusCodeColumnInput();
+            trackingV1.trackClickhouseConfigV1StatusCodeColumnInput();
             onTracesConfigChange('statusCodeColumn', c);
           }}
           onStatusMessageColumnChange={c => {
-            trackClickhouseConfigV1StatusMessageColumnInput();
+            trackingV1.trackClickhouseConfigV1StatusMessageColumnInput();
             onTracesConfigChange('statusMessageColumn', c);
           }}
           onStateColumnChange={c => {
-            trackClickhouseConfigV1StateColumnInput();
+            trackingV1.trackClickhouseConfigV1StateColumnInput();
             onTracesConfigChange('stateColumn', c);
           }}
           onInstrumentationLibraryNameColumnChange={c => {
-            trackClickhouseConfigV1LibraryNameColumnInput();
+            trackingV1.trackClickhouseConfigV1LibraryNameColumnInput();
             onTracesConfigChange('instrumentationLibraryNameColumn', c);
           }}
           onInstrumentationLibraryVersionColumnChange={c => {
-            trackClickhouseConfigV1LibraryVersionColumnInput();
+            trackingV1.trackClickhouseConfigV1LibraryVersionColumnInput();
             onTracesConfigChange('instrumentationLibraryVersionColumn', c);
           }}
           onFlattenNestedChange={c => {
-            trackClickhouseConfigV1UseFlattenNeededToggleClicked();
+            trackingV1.trackClickhouseConfigV1UseFlattenNeededToggleClicked();
             onTracesConfigChange('flattenNested', c);
           }}
           onEventsColumnPrefixChange={c => {
-            trackClickhouseConfigV1EventsPrefixColumnInput();
+            trackingV1.trackClickhouseConfigV1EventsPrefixColumnInput();
             onTracesConfigChange('traceEventsColumnPrefix', c);
           }}
           onLinksColumnPrefixChange={c => {
-            trackClickhouseConfigV1LinksPrefixColumnInput()
+            trackingV1.trackClickhouseConfigV1LinksPrefixColumnInput()
             onTracesConfigChange('traceLinksColumnPrefix', c);
           }}
         />
@@ -619,7 +619,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             value={jsonData.enableRowLimit || false}
             data-testid={labels.enableRowLimit.testid}
             onChange={(e) => {
-              trackClickhouseConfigV1EnableRowLimitToggleClicked();
+              trackingV1.trackClickhouseConfigV1EnableRowLimitToggleClicked();
               onSwitchToggle('enableRowLimit', e.currentTarget.checked);
             }}
           />
@@ -650,7 +650,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                       setCustomSettings(newSettings);
                     }}
                     onBlur={() => {
-                      trackClickhouseConfigV1CustomSettingAdded();
+                      trackingV1.trackClickhouseConfigV1CustomSettingAdded();
                       onCustomSettingsChange(customSettings);
                     }}
                   ></Input>
