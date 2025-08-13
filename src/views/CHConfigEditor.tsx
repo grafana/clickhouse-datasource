@@ -428,13 +428,13 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <DefaultDatabaseTableConfig
           defaultDatabase={jsonData.defaultDatabase}
           defaultTable={jsonData.defaultTable}
-          onDefaultDatabaseChange={() => {
+          onDefaultDatabaseChange={(e) => {
             trackingV1.trackClickhouseConfigV1DefaultDbInput();
-            onUpdateDatasourceJsonDataOption(props, 'defaultDatabase');
+            onUpdateDatasourceJsonDataOption(props, 'defaultDatabase')(e);
           }}
-          onDefaultTableChange={() => {
+          onDefaultTableChange={(e) => {
             trackingV1.trackClickhouseConfigV1DefaultTableInput();
-            onUpdateDatasourceJsonDataOption(props, 'defaultTable');
+            onUpdateDatasourceJsonDataOption(props, 'defaultTable')(e);
           }}
         />
         
@@ -446,25 +446,25 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           maxOpenConns={jsonData.maxOpenConns}
           queryTimeout={jsonData.queryTimeout}
           validateSql={jsonData.validateSql}
-          onDialTimeoutChange={() => {
+          onDialTimeoutChange={(e) => {
             trackingV1.trackClickhouseConfigV1DialTimeoutInput();
-            onUpdateDatasourceJsonDataOption(props, 'dialTimeout');
+            onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
           }}
-          onQueryTimeoutChange={() => {
+          onQueryTimeoutChange={(e) => {
             trackingV1.trackClickhouseConfigV1QueryTimeoutInput();
-            onUpdateDatasourceJsonDataOption(props, 'queryTimeout');
+            onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
           }}
-          onConnMaxLifetimeChange={() => {
+          onConnMaxLifetimeChange={(e) => {
             trackingV1.trackClickhouseConfigV1ConnMaxLifetimeInput();
-            onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime');
+            onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e);
           }}
-          onConnMaxIdleConnsChange={() => {
+          onConnMaxIdleConnsChange={(e) => {
             trackingV1.trackClickhouseConfigV1MaxIdleConnsInput();
-            onUpdateDatasourceJsonDataOption(props, 'maxIdleConns');
+            onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e);
           }}
-          onConnMaxOpenConnsChange={() => {
+          onConnMaxOpenConnsChange={(e) => {
             trackingV1.trackClickhouseConfigV1MaxOpenConnsInput();
-            onUpdateDatasourceJsonDataOption(props, 'maxOpenConns');
+            onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e);
           }}
           onValidateSqlChange={(e) => {
             trackingV1.trackClickhouseConfigV1ValidateSQLToggleClicked();
