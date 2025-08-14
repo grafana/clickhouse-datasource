@@ -454,7 +454,7 @@ export class Datasource
   }
 
   getLogContextColumnNames(): string[] {
-    return this.settings.jsonData.logs?.contextColumns || [];
+    return this.settings.jsonData.logs?.contextColumns?.length ? this.settings.jsonData.logs?.contextColumns : [];
   }
 
   /**
