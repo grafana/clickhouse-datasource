@@ -1,6 +1,6 @@
 # Changelog
 
-# 4.10.2
+## 4.10.2
 
 ### Fixes
 
@@ -11,14 +11,14 @@
 - Fix bug where switched to logs query type errored #1341
 - Dependency updates
 
-# 4.10.1
+## 4.10.1
 
 ### Fixes
 
 - Bump grafana/plugin-actions from ff169fa386880e34ca85a49414e5a0ff84c3f7ad to b788be6746403ff9bae26d5e800794f2a5620b4c (#1286)
 - Bump cspell from 9.0.2 to 9.1.1 (#1278)
 
-# 4.10.0
+## 4.10.0
 
 ### Features
 
@@ -29,13 +29,13 @@
 - Fix ad-hoc filter application with templated target tables (#1241)
 - Dependency updates
 
-# 4.9.1
+## 4.9.1
 
 ### Fixes
 
 - Error logging fix
 
-# 4.9.0
+## 4.9.0
 
 ### Features
 
