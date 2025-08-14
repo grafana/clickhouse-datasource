@@ -1,5 +1,16 @@
 # Changelog
 
+# 4.10.2
+
+### Fixes
+
+- Fix Ad-Hoc filters for variable datasources #1330
+- Fix switching between SQL Editor and Query Builder #1337
+- Fix large JSON objects + complex JSON types #1326
+- Configuration fixes related to row limit implementation #1294
+- Fix bug where switched to logs query type errored #1341
+- Dependency updates
+
 # 4.10.1
 
 ### Fixes
