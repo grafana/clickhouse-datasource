@@ -4,6 +4,7 @@ import { CHBuilderQuery, CHQuery, EditorType } from "types/sql";
 import { Datasource } from "./CHDatasource";
 import { pluginVersion } from "utils/version";
 import { logColumnHintsToAlias } from "./sqlGenerator";
+import otel from "otel";
 
 /**
  * Returns true if the builder options contain enough information to start showing a query
@@ -164,6 +165,9 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
       // Create new query based on trace defaults
 
       const otelVersion = datasource.getTraceOtelVersion();
+      const otelConfig = otel.getVersion(otelVersion);
+      const traceEventsColumnPrefix = datasource.getDefaultTraceEventsColumnPrefix();
+      const traceLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
       const options: QueryBuilderOptions = {
         database: datasource.getDefaultTraceDatabase() || traceIdQuery.builderOptions.database || datasource.getDefaultDatabase(),
         table: datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table,
@@ -178,12 +182,22 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
           traceDurationUnit: datasource.getDefaultTraceDurationUnit(),
           otelEnabled: Boolean(otelVersion),
           otelVersion: otelVersion,
+          traceEventsColumnPrefix: traceEventsColumnPrefix,
+          traceLinksColumnPrefix: traceLinksColumnPrefix,
         }
       };
 
-      const defaultColumns = datasource.getDefaultTraceColumns();
-      for (let [hint, colName] of defaultColumns) {
-        options.columns!.push({ name: colName, hint });
+      if (otelConfig?.traceColumnMap) {
+        const columns: SelectedColumn[] = [];
+        otelConfig.traceColumnMap.forEach((name, hint) => {
+          columns.push({ name, hint });
+        });
+        options.columns = columns;
+      } else {
+        const defaultColumns = datasource.getDefaultTraceColumns();
+        for (let [hint, colName] of defaultColumns) {
+          options.columns!.push({ name: colName, hint });
+        }
       }
 
       traceIdQuery.builderOptions = options;
