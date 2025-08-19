@@ -187,6 +187,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     const getDefaultLogsDatabase = jest.spyOn(mockDatasource, 'getDefaultLogsDatabase');
     const getDefaultLogsTable = jest.spyOn(mockDatasource, 'getDefaultLogsTable');
     const getDefaultLogsColumns = jest.spyOn(mockDatasource, 'getDefaultLogsColumns');
+    const getDefaultTraceEventsColumnPrefix = jest.spyOn(mockDatasource, 'getDefaultTraceEventsColumnPrefix');
+    const getDefaultTraceLinksColumnPrefix = jest.spyOn(mockDatasource, 'getDefaultTraceLinksColumnPrefix');
 
     const builderOptions: Partial<QueryBuilderOptions> = {
       queryType: QueryType.Logs
@@ -204,6 +206,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(getDefaultLogsDatabase).not.toHaveBeenCalled();
     expect(getDefaultLogsTable).not.toHaveBeenCalled();
     expect(getDefaultLogsColumns).not.toHaveBeenCalled();
+    expect(getDefaultTraceEventsColumnPrefix).toHaveBeenCalled();
+    expect(getDefaultTraceEventsColumnPrefix).toHaveBeenCalled();
   });
 });
 
