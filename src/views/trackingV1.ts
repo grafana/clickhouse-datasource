@@ -1,33 +1,34 @@
 import { reportInteraction } from "@grafana/runtime";
+import { TimeUnit } from "types/queryBuilder";
 
 // Server section
 export const trackClickhouseConfigV1HostInput = () => {
     reportInteraction('clickhouse-config-v1-host-input');
 };
 
-export const trackClickhouseConfigV1PortInput = () => {
-    reportInteraction('clickhouse-config-v1-port-input');
+export const trackClickhouseConfigV1PortInput = (props: { port: string }) => {
+    reportInteraction('clickhouse-config-v1-port-input', props);
 };
 
-export const trackClickhouseConfigV1NativeHttpToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-native-http-toggle-clicked');
+export const trackClickhouseConfigV1NativeHttpToggleClicked = (props: { nativeHttpToggle: string}) => {
+    reportInteraction('clickhouse-config-v1-native-http-toggle-clicked', props);
 };
 
-export const trackClickhouseConfigV1SecureConnectionToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-secure-connection-toggle-clicked');
+export const trackClickhouseConfigV1SecureConnectionToggleClicked = (props: { secureConnection: boolean}) => {
+    reportInteraction('clickhouse-config-v1-secure-connection-toggle-clicked', props);
 };
 
 // TLS/SSL Settings section
-export const trackClickhouseConfigV1SkipTLSVerifyToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-skip-tls-verify-toggle-clicked');
+export const trackClickhouseConfigV1SkipTLSVerifyToggleClicked = (props: { skipTlsVerifyToggle: boolean}) => {
+    reportInteraction('clickhouse-config-v1-skip-tls-verify-toggle-clicked', props);
 };
 
-export const trackClickhouseConfigV1TLSClientAuthToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-tls-client-auth-toggle-clicked');
+export const trackClickhouseConfigV1TLSClientAuthToggleClicked = (props: { clientAuthToggle: boolean}) => {
+    reportInteraction('clickhouse-config-v1-tls-client-auth-toggle-clicked', props);
 };
 
-export const trackClickhouseConfigV1WithCACertToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-with-ca-cert-toggle-clicked');
+export const trackClickhouseConfigV1WithCACertToggleClicked = (props: { caCertToggle: boolean }) => {
+    reportInteraction('clickhouse-config-v1-with-ca-cert-toggle-clicked', props);
 };
 
 // Default DB and Table section
@@ -40,159 +41,19 @@ export const trackClickhouseConfigV1DefaultTableInput = () => {
 };
 
 // Query settings section
-export const trackClickhouseConfigV1DialTimeoutInput = () => {
-    reportInteraction('clickhouse-config-v1-dial-timeout-input');
-};
-
-export const trackClickhouseConfigV1QueryTimeoutInput = () => {
-    reportInteraction('clickhouse-config-v1-query-timeout-input');
-};
-
-export const trackClickhouseConfigV1ConnMaxLifetimeInput = () => {
-    reportInteraction('clickhouse-config-v1-conn-max-lifetime-input');
-};
-
-export const trackClickhouseConfigV1MaxIdleConnsInput = () => {
-    reportInteraction('clickhouse-config-v1-max-idle-conns-input');
-};
-
-export const trackClickhouseConfigV1MaxOpenConnsInput = () => {
-    reportInteraction('clickhouse-config-v1-max-open-conns-input');
-};
-
-export const trackClickhouseConfigV1ValidateSQLToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-validate-sql-toggle-clicked');
+export const trackClickhouseConfigV1QuerySettings = (props: { queryTimeout?: number, dialTimeout?: number, maxIdleConns?: number, maxOpenConns?: number, connMaxLifetime?: number, validateSql?: boolean }) => {
+    reportInteraction('clickhouse-config-v1-query-settings', props);
 };
 
 // Logs config section
-export const trackClickhouseConfigV1DefaultLogDbInput = () => {
-    reportInteraction('clickhouse-config-v1-default-log-db-input');
-};
-
-export const trackClickhouseConfigV1DefaultLogTableInput = () => {
-    reportInteraction('clickhouse-config-v1-default-log-table-input');
-};
-
-export const trackClickhouseConfigV1UseOtelLogsToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-use-otel-logs-toggle-clicked');
-};
-
-export const trackClickhouseConfigV1LogsOtelVersion = (props: { version: string }) => {
-    reportInteraction('clickhouse-config-v1-logs-otel-version', props);
-};
-
-export const trackClickhouseConfigV1LogTimeColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-log-time-column-input');
-};
-
-export const trackClickhouseConfigV1LogLevelColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-log-level-column-input');
-};
-
-export const trackClickhouseConfigV1LogMessageColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-log-message-column-input');
-};
-
-export const trackClickhouseConfigV1LogAutoSelectColumnsInput = () => {
-    reportInteraction('clickhouse-config-v1-log-auto-select-columns-input');
-};
-
-export const trackClickhouseConfigV1LogContextColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-log-context-column-input');
-};
+export const trackClickhouseConfigV1LogsConfig = (props: {defaultDatabase?: string, defaultTable?: string, otelEnabled?: boolean, version?: string, timeColumn?: string, levelColumn?: string, messageColumn?: string, selectContextColumns?: boolean, contextColumns?: string[] }) => {
+    reportInteraction('clickhouse-config-v1-logs-config', props);
+}
 
 // Traces config section
-export const trackClickhouseConfigV1DefaultTraceDbInput = () => {
-    reportInteraction('clickhouse-config-v1-default-trace-db-input');
-};
-
-export const trackClickhouseConfigV1DefaultTraceTableInput = () => {
-    reportInteraction('clickhouse-config-v1-default-trace-table-input');
-};
-
-export const trackClickhouseConfigV1UseOtelTracesToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-use-otel-traces-toggle-clicked');
-};
-
-export const trackClickhouseConfigV1TracesOtelVersion = (props: { version: string }) => {
-    reportInteraction('clickhouse-config-v1-traces-otel-version', props);
-};
-
-export const trackClickhouseConfigV1TraceIdColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-trace-id-column-input');
-};
-
-export const trackClickhouseConfigV1SpanIdColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-span-id-column-input');
-};
-
-export const trackClickhouseConfigV1OperationNameColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-operation-name-column-input');
-};
-
-export const trackClickhouseConfigV1ParentSpanIdColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-parent-span-id-column-input');
-};
-
-export const trackClickhouseConfigV1ServiceNameColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-service-name-column-input');
-};
-
-export const trackClickhouseConfigV1DurationTimeColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-operation-name-column-input');
-};
-
-export const trackClickhouseConfigV1DurationUnitInput = () => {
-    reportInteraction('clickhouse-config-v1-operation-name-column-input');
-};
-
-export const trackClickhouseConfigV1StartTimeColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-start-time-column-input');
-};
-
-export const trackClickhouseConfigV1TagsColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-tags-column-input');
-};
-
-export const trackClickhouseConfigV1ServiceTagsColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-service-tags-column-input');
-};
-
-export const trackClickhouseConfigV1KindColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-kind-column-input');
-};
-
-export const trackClickhouseConfigV1StatusCodeColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-status-code-column-input');
-};
-
-export const trackClickhouseConfigV1StatusMessageColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-status-message-column-input');
-};
-
-export const trackClickhouseConfigV1StateColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-state-column-input');
-};
-
-export const trackClickhouseConfigV1LibraryNameColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-library-name-column-input');
-};
-
-export const trackClickhouseConfigV1LibraryVersionColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-library-version-column-input');
-};
-
-export const trackClickhouseConfigV1UseFlattenNeededToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-use-flatten-needed-toggle-clicked');
-};
-
-export const trackClickhouseConfigV1EventsPrefixColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-events-prefix-column-input');
-};
-
-export const trackClickhouseConfigV1LinksPrefixColumnInput = () => {
-    reportInteraction('clickhouse-config-v1-links-prefix-column-input');
-};
+export const trackClickhouseConfigV1TracesConfig = (props: { defaultDatabase?: string, defaultTable?: string, otelEnabled?: boolean, version?: string, traceIdColumn?: string, spanIdColumn?: string, operationNameColumn?: string, parentSpanIdColumn?: string, serviceNameColumn?: string, durationColumn?: string, durationUnit?: TimeUnit, startTimeColumn?: string, tagsColumn?: string, serviceTagsColumn?: string, kindColumn?: string, statusCodeColumn?: string, statusMessageColumn?: string, stateColumn?: string, instrumentationLibraryNameColumn?: string, instrumentationLibraryVersionColumn?: string, flattenNested?: boolean, traceEventsColumnPrefix?: string, traceLinksColumnPrefix?: string }) => {
+    reportInteraction('clickhouse-config-v1-traces-config', props);
+}
 
 // Column Alias Tables section
 export const trackClickhouseConfigV1ColumnAliasTableAdded = () => {
@@ -200,11 +61,13 @@ export const trackClickhouseConfigV1ColumnAliasTableAdded = () => {
 };
 
 // Row limit section
+export const trackClickhouseConfigV1EnableRowLimitToggle = (props: {rowLimitEnabled: boolean}) => {
+    reportInteraction('clickhouse-config-v1-enable-row-limit-toggle', props);
+};
+
+// Custom Settings section
 export const trackClickhouseConfigV1CustomSettingAdded = () => {
     reportInteraction('clickhouse-config-v1-custom-setting-added');
 };
 
-// Custom Settings section
-export const trackClickhouseConfigV1EnableRowLimitToggleClicked = () => {
-    reportInteraction('clickhouse-config-v1-enable-row-limit-toggle-clicked');
-};
+

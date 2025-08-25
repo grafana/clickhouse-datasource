@@ -259,7 +259,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             type="number"
             value={jsonData.port || ''}
             onChange={e => {
-              trackingV1.trackClickhouseConfigV1PortInput();
+              trackingV1.trackClickhouseConfigV1PortInput({ port: e.currentTarget.value});
               onPortChange(e.currentTarget.value);
             }}
             label={labels.serverPort.label}
@@ -274,7 +274,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             disabledOptions={[]}
             value={jsonData.protocol || Protocol.Native}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1NativeHttpToggleClicked();
+              trackingV1.trackClickhouseConfigV1NativeHttpToggleClicked({ nativeHttpToggle: e});
               onProtocolToggle(e!);
             }}
           />
@@ -285,7 +285,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.secure || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked();
+              trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked({ secureConnection: e.currentTarget.checked});
               onSwitchToggle('secure', e.currentTarget.checked);
             }}
           />
@@ -326,7 +326,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.tlsSkipVerify || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked();
+              trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked({ skipTlsVerifyToggle: e.currentTarget.checked });
               onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked);
             }}
           />
@@ -339,7 +339,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.tlsAuth || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked();
+              trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked({ clientAuthToggle: e.currentTarget.checked });
               onTLSSettingsChange('tlsAuth', e.currentTarget.checked);
             }}
           />
@@ -352,7 +352,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.tlsAuthWithCACert || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1WithCACertToggleClicked();
+              trackingV1.trackClickhouseConfigV1WithCACertToggleClicked({ caCertToggle: e.currentTarget.checked });
               onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked);
             }}
           />
@@ -447,27 +447,27 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           queryTimeout={jsonData.queryTimeout}
           validateSql={jsonData.validateSql}
           onDialTimeoutChange={(e) => {
-            trackingV1.trackClickhouseConfigV1DialTimeoutInput();
+            trackingV1.trackClickhouseConfigV1QuerySettings({dialTimeout: Number(e.currentTarget.value)});
             onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
           }}
           onQueryTimeoutChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QueryTimeoutInput();
+            trackingV1.trackClickhouseConfigV1QuerySettings({queryTimeout: Number(e.currentTarget.value)});
             onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
           }}
           onConnMaxLifetimeChange={(e) => {
-            trackingV1.trackClickhouseConfigV1ConnMaxLifetimeInput();
+            trackingV1.trackClickhouseConfigV1QuerySettings({connMaxLifetime: Number(e.currentTarget.value)});
             onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e);
           }}
           onConnMaxIdleConnsChange={(e) => {
-            trackingV1.trackClickhouseConfigV1MaxIdleConnsInput();
+            trackingV1.trackClickhouseConfigV1QuerySettings({maxIdleConns: Number(e.currentTarget.value)});
             onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e);
           }}
           onConnMaxOpenConnsChange={(e) => {
-            trackingV1.trackClickhouseConfigV1MaxOpenConnsInput();
+            trackingV1.trackClickhouseConfigV1QuerySettings({maxOpenConns: Number(e.currentTarget.value)});
             onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e);
           }}
           onValidateSqlChange={(e) => {
-            trackingV1.trackClickhouseConfigV1ValidateSQLToggleClicked();
+            trackingV1.trackClickhouseConfigV1QuerySettings({validateSql: e.currentTarget.checked});
             onSwitchToggle('validateSql', e.currentTarget.checked);
           }}
         />
@@ -476,39 +476,39 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <LogsConfig
           logsConfig={jsonData.logs}
           onDefaultDatabaseChange={db => {
-            trackingV1.trackClickhouseConfigV1DefaultLogDbInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({defaultDatabase: db});
             onLogsConfigChange('defaultDatabase', db);
           }}
           onDefaultTableChange={table => {
-            trackingV1.trackClickhouseConfigV1DefaultLogTableInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({defaultTable: table});
             onLogsConfigChange('defaultTable', table);
           }}
           onOtelEnabledChange={v => {
-            trackingV1.trackClickhouseConfigV1UseOtelLogsToggleClicked();
+            trackingV1.trackClickhouseConfigV1LogsConfig({otelEnabled: v});
             onLogsConfigChange('otelEnabled', v);
           }}
           onOtelVersionChange={v => {
-            trackingV1.trackClickhouseConfigV1LogsOtelVersion({version: v});
+            trackingV1.trackClickhouseConfigV1LogsConfig({version: v});
             onLogsConfigChange('otelVersion', v);
           }}
           onTimeColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LogTimeColumnInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({timeColumn: c});
             onLogsConfigChange('timeColumn', c);
           }}
           onLevelColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LogLevelColumnInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({levelColumn: c});
             onLogsConfigChange('levelColumn', c);
           }}
           onMessageColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LogMessageColumnInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({messageColumn: c});
             onLogsConfigChange('messageColumn', c);
           }}
           onSelectContextColumnsChange={c => {
-            trackingV1.trackClickhouseConfigV1LogAutoSelectColumnsInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({selectContextColumns: c});
             onLogsConfigChange('selectContextColumns', c);
           }}
           onContextColumnsChange={c => {
-            trackingV1.trackClickhouseConfigV1LogContextColumnInput();
+            trackingV1.trackClickhouseConfigV1LogsConfig({contextColumns: c});
             onLogsConfigChange('contextColumns', c);
           }}
         />
@@ -517,95 +517,95 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <TracesConfig
           tracesConfig={jsonData.traces}
           onDefaultDatabaseChange={db => {
-            trackingV1.trackClickhouseConfigV1DefaultTraceDbInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({defaultDatabase: db});
             onTracesConfigChange('defaultDatabase', db);
           }}
           onDefaultTableChange={table => {
-            trackingV1.trackClickhouseConfigV1DefaultTraceTableInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({defaultTable: table});
             onTracesConfigChange('defaultTable', table);
           }}
           onOtelEnabledChange={v => {
-            trackingV1.trackClickhouseConfigV1UseOtelTracesToggleClicked();
+            trackingV1.trackClickhouseConfigV1TracesConfig({otelEnabled: v});
             onTracesConfigChange('otelEnabled', v);
           }}
           onOtelVersionChange={v => {
-            trackingV1.trackClickhouseConfigV1TracesOtelVersion({version: v})
+            trackingV1.trackClickhouseConfigV1TracesConfig({version: v})
             onTracesConfigChange('otelVersion', v);
           }}
           onTraceIdColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TraceIdColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({traceIdColumn: c});
             onTracesConfigChange('traceIdColumn', c);
           }}
           onSpanIdColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1SpanIdColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({spanIdColumn: c});
             onTracesConfigChange('spanIdColumn', c);
           }}
           onOperationNameColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1OperationNameColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({operationNameColumn: c});
             onTracesConfigChange('operationNameColumn', c);
           }}
           onParentSpanIdColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1ParentSpanIdColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({parentSpanIdColumn: c});
             onTracesConfigChange('parentSpanIdColumn', c);
           }}
           onServiceNameColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1ServiceNameColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({serviceNameColumn: c});
             onTracesConfigChange('serviceNameColumn', c);
           }}
           onDurationColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1DurationTimeColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({durationColumn: c});
             onTracesConfigChange('durationColumn', c);
           }}
           onDurationUnitChange={c => {
-            trackingV1.trackClickhouseConfigV1DurationUnitInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({durationUnit: c});
             onTracesConfigChange('durationUnit', c);
           }}
           onStartTimeColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1StartTimeColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({startTimeColumn: c});
             onTracesConfigChange('startTimeColumn', c);
           }}
           onTagsColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TagsColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({tagsColumn: c});
             onTracesConfigChange('tagsColumn', c);
           }}
           onServiceTagsColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1ServiceTagsColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({serviceTagsColumn: c});
             onTracesConfigChange('serviceTagsColumn', c);
           }}
           onKindColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1KindColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({kindColumn: c});
             onTracesConfigChange('kindColumn', c);
           }}
           onStatusCodeColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1StatusCodeColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({statusCodeColumn: c});
             onTracesConfigChange('statusCodeColumn', c);
           }}
           onStatusMessageColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1StatusMessageColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({statusMessageColumn: c});
             onTracesConfigChange('statusMessageColumn', c);
           }}
           onStateColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1StateColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({stateColumn: c});
             onTracesConfigChange('stateColumn', c);
           }}
           onInstrumentationLibraryNameColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LibraryNameColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({instrumentationLibraryNameColumn: c});
             onTracesConfigChange('instrumentationLibraryNameColumn', c);
           }}
           onInstrumentationLibraryVersionColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LibraryVersionColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({instrumentationLibraryVersionColumn: c});
             onTracesConfigChange('instrumentationLibraryVersionColumn', c);
           }}
           onFlattenNestedChange={c => {
-            trackingV1.trackClickhouseConfigV1UseFlattenNeededToggleClicked();
+            trackingV1.trackClickhouseConfigV1TracesConfig({flattenNested: c});
             onTracesConfigChange('flattenNested', c);
           }}
           onEventsColumnPrefixChange={c => {
-            trackingV1.trackClickhouseConfigV1EventsPrefixColumnInput();
+            trackingV1.trackClickhouseConfigV1TracesConfig({traceEventsColumnPrefix: c});
             onTracesConfigChange('traceEventsColumnPrefix', c);
           }}
           onLinksColumnPrefixChange={c => {
-            trackingV1.trackClickhouseConfigV1LinksPrefixColumnInput()
+            trackingV1.trackClickhouseConfigV1TracesConfig({traceLinksColumnPrefix: c});
             onTracesConfigChange('traceLinksColumnPrefix', c);
           }}
         />
@@ -619,7 +619,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             value={jsonData.enableRowLimit || false}
             data-testid={labels.enableRowLimit.testid}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1EnableRowLimitToggleClicked();
+              trackingV1.trackClickhouseConfigV1EnableRowLimitToggle({rowLimitEnabled: e.currentTarget.checked});
               onSwitchToggle('enableRowLimit', e.currentTarget.checked);
             }}
           />
