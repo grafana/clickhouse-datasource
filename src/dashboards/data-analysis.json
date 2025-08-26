@@ -532,6 +532,10 @@
               {
                 "id": "custom.width",
                 "value": 96
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
               }
             ]
           },
@@ -556,6 +560,10 @@
               {
                 "id": "custom.width",
                 "value": 103
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
               }
             ]
           }
@@ -584,25 +592,25 @@
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "builderOptions": {
-            "fields": [],
-            "limit": 100,
-            "mode": "list"
-          },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
             "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
           },
+          "editorType": "sql",
           "format": 1,
           "meta": {
             "builderOptions": {
-              "fields": [],
+              "columns": [],
+              "database": "",
               "limit": 100,
-              "mode": "list"
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
             }
           },
-          "queryType": "sql",
-          "rawSql": "SELECT\n    name as Name,\n    path as Path,\n    formatReadableSize(free_space) as Free,\n    formatReadableSize(total_space) as Total,\n    1 - free_space/total_space as Used\nFROM system.disks",
+          "pluginVersion": "4.10.2",
+          "queryType": "table",
+          "rawSql": "SELECT\n    name as Name,\n    path as Path,\n    free_space as Free,\n    total_space as Total,\n    1 - free_space/total_space as Used\nFROM system.disks",
           "refId": "A"
         }
       ],
@@ -1127,6 +1135,22 @@
               {
                 "id": "custom.width",
                 "value": 203
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Uncompressed size"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "bytes"
               }
             ]
           }
@@ -1150,30 +1174,35 @@
           "show": false
         },
         "showHeader": true,
-        "sortBy": []
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Uncompressed size"
+          }
+        ]
       },
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "builderOptions": {
-            "fields": [],
-            "limit": 100,
-            "mode": "list"
-          },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
             "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
           },
+          "editorType": "sql",
           "format": 1,
           "meta": {
             "builderOptions": {
-              "fields": [],
+              "columns": [],
+              "database": "",
               "limit": 100,
-              "mode": "list"
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
             }
           },
-          "queryType": "sql",
-          "rawSql": "SELECT name,\n       engine,\n       tables,\n       partitions,\n       parts,\n       formatReadableSize(bytes_on_disk)            \"disk_size\",\n       col_count,\n       total_rows,\n       formatReadableSize(data_uncompressed_bytes) as \"uncompressed_size\"\nFROM system.databases db\n         LEFT JOIN ( SELECT database,\n                            uniq(table)                   \"tables\",\n                            uniq(table, partition)        \"partitions\",\n                            count()                    AS parts,\n                            sum(bytes_on_disk)            \"bytes_on_disk\",\n                            sum(data_uncompressed_bytes) as \"data_uncompressed_bytes\",\n                            sum(rows) as total_rows,\n                            max(col_count) as \"col_count\"\n                     FROM system.parts AS parts\n                               JOIN (SELECT database, count() as col_count\n                                         FROM system.columns\n                                         WHERE database IN (${database}) AND table IN (${table})\n                                         GROUP BY database) as col_stats\n                                        ON parts.database = col_stats.database\n                     WHERE database IN (${database}) AND active AND table IN (${table})\n                     GROUP BY database) AS db_stats ON db.name = db_stats.database\nWHERE database IN (${database}) AND lower(name) != 'information_schema'\nORDER BY bytes_on_disk DESC\nLIMIT 10;",
+          "pluginVersion": "4.10.2",
+          "queryType": "table",
+          "rawSql": "SELECT name,\n       engine,\n       tables,\n       partitions,\n       parts,\n       bytes_on_disk            \"disk_size\",\n       col_count,\n       total_rows,\n       data_uncompressed_bytes as \"uncompressed_size\"\nFROM system.databases db\n         LEFT JOIN ( SELECT database,\n                            uniq(table)                   \"tables\",\n                            uniq(table, partition)        \"partitions\",\n                            count()                    AS parts,\n                            sum(bytes_on_disk)            \"bytes_on_disk\",\n                            sum(data_uncompressed_bytes) as \"data_uncompressed_bytes\",\n                            sum(rows) as total_rows,\n                            max(col_count) as \"col_count\"\n                     FROM system.parts AS parts\n                               JOIN (SELECT database, count() as col_count\n                                         FROM system.columns\n                                         WHERE database IN (${database}) AND table IN (${table})\n                                         GROUP BY database) as col_stats\n                                        ON parts.database = col_stats.database\n                     WHERE database IN (${database}) AND active AND table IN (${table})\n                     GROUP BY database) AS db_stats ON db.name = db_stats.database\nWHERE database IN (${database}) AND lower(name) != 'information_schema'\nORDER BY bytes_on_disk DESC\nLIMIT 10;",
           "refId": "A"
         }
       ],
@@ -1444,6 +1473,10 @@
               {
                 "id": "custom.width",
                 "value": 145
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
               }
             ]
           },
@@ -1500,6 +1533,10 @@
               {
                 "id": "custom.width",
                 "value": 171
+              },
+              {
+                "id": "unit",
+                "value": "bytes"
               }
             ]
           }
@@ -1526,32 +1563,32 @@
         "sortBy": [
           {
             "desc": true,
-            "displayName": "Column count"
+            "displayName": "Size on disk"
           }
         ]
       },
       "pluginVersion": "12.1.1",
       "targets": [
         {
-          "builderOptions": {
-            "fields": [],
-            "limit": 100,
-            "mode": "list"
-          },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
             "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
           },
+          "editorType": "sql",
           "format": 1,
           "meta": {
             "builderOptions": {
-              "fields": [],
+              "columns": [],
+              "database": "",
               "limit": 100,
-              "mode": "list"
+              "mode": "list",
+              "queryType": "table",
+              "table": ""
             }
           },
-          "queryType": "sql",
-          "rawSql": "SELECT name,\n       table.database,\n       engine,\n       partitions,\n       parts,\n       formatReadableSize(bytes_on_disk)            \"disk_size\",\n       col_count,\n       table_stats.total_rows,\n       formatReadableSize(data_uncompressed_bytes) as \"uncompressed_size\"\nFROM system.tables table\n         LEFT JOIN ( SELECT table,\n       database,\n       uniq(table, partition)        \"partitions\",\n       count()                    AS parts,\n       sum(bytes_on_disk)            \"bytes_on_disk\",\n       sum(data_uncompressed_bytes) as \"data_uncompressed_bytes\",\n       sum(rows)                  as total_rows,\n                            max(col_count) as col_count\nFROM system.parts as parts\n         LEFT JOIN (SELECT database, table, count() as col_count FROM system.columns GROUP BY table, database) as col_stats\n                   ON parts.table = col_stats.table AND col_stats.database = parts.database\nWHERE active\nGROUP BY table, database\n ) AS table_stats ON table.name = table_stats.table AND table.database = table_stats.database\nWHERE database IN (${database}) AND lower(name) != 'information_schema' AND table IN (${table})\nORDER BY bytes_on_disk DESC\nLIMIT 1000",
+          "pluginVersion": "4.10.2",
+          "queryType": "table",
+          "rawSql": "SELECT name,\n       table.database,\n       engine,\n       partitions,\n       parts,\n       bytes_on_disk            \"disk_size\",\n       col_count,\n       table_stats.total_rows,\n       data_uncompressed_bytes as \"uncompressed_size\"\nFROM system.tables table\n         LEFT JOIN ( SELECT table,\n       database,\n       uniq(table, partition)        \"partitions\",\n       count()                    AS parts,\n       sum(bytes_on_disk)            \"bytes_on_disk\",\n       sum(data_uncompressed_bytes) as \"data_uncompressed_bytes\",\n       sum(rows)                  as total_rows,\n                            max(col_count) as col_count\nFROM system.parts as parts\n         LEFT JOIN (SELECT database, table, count() as col_count FROM system.columns GROUP BY table, database) as col_stats\n                   ON parts.table = col_stats.table AND col_stats.database = parts.database\nWHERE active\nGROUP BY table, database\n ) AS table_stats ON table.name = table_stats.table AND table.database = table_stats.database\nWHERE database IN (${database}) AND lower(name) != 'information_schema' AND table IN (${table})\nORDER BY bytes_on_disk DESC\nLIMIT 1000",
           "refId": "A"
         }
       ],
@@ -2360,6 +2397,6 @@
   "timezone": "",
   "title": "ClickHouse - Data Analysis",
   "uid": "-B3tt7a7z",
-  "version": 2,
+  "version": 5,
   "weekStart": ""
 }
