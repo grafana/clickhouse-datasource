@@ -207,7 +207,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(getDefaultLogsTable).not.toHaveBeenCalled();
     expect(getDefaultLogsColumns).not.toHaveBeenCalled();
     expect(getDefaultTraceEventsColumnPrefix).toHaveBeenCalled();
-    expect(getDefaultTraceEventsColumnPrefix).toHaveBeenCalled();
+    expect(getDefaultTraceLinksColumnPrefix).toHaveBeenCalled();
   });
 });
 
