@@ -311,6 +311,72 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
+		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
+			var attrFields []*data.Field
+			for _, field := range frame.Fields {
+				if field.Type() != data.FieldTypeJSON {
+					continue
+				}
+
+				if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
+					attrFields = append(attrFields, field)
+				}
+			}
+
+			rowLen, err := frame.RowLen()
+			if err != nil {
+				return nil, err
+			}
+
+			allLabelsValues := make([]map[string]any, rowLen)
+
+			for _, field := range attrFields {
+				for j := 0; j < rowLen; j++ {
+					currentVal := allLabelsValues[j]
+					if currentVal == nil {
+						currentVal = make(map[string]any)
+					}
+
+					val := field.At(j).(json.RawMessage)
+					if val != nil {
+						var valMap map[string]any
+						err := json.Unmarshal(val, &valMap)
+						if err != nil {
+							return nil, err
+						}
+
+						for valMapKey, valMapValue := range valMap {
+							currentVal[fmt.Sprintf("%s.%s", field.Name, valMapKey)] = valMapValue
+						}
+
+						allLabelsValues[j] = currentVal
+					}
+				}
+			}
+
+			allLabelsValuesJSON := make([]json.RawMessage, rowLen)
+			for i, value := range allLabelsValues {
+				valueJSON, err := json.Marshal(value)
+				if err != nil {
+					return nil, err
+				}
+
+				allLabelsValuesJSON[i] = valueJSON
+			}
+			allLabels := data.NewField("labels", make(data.Labels), allLabelsValuesJSON)
+
+			filteredFields := make([]*data.Field, 0, len(frame.Fields)-len(attrFields))
+			for _, field := range frame.Fields {
+				if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
+					continue
+				}
+
+				filteredFields = append(filteredFields, field)
+			}
+			filteredFields = append(filteredFields, allLabels)
+			frame.Fields = filteredFields
+		}
+
 		if shouldConvertFields(frame.Meta.PreferredVisualization) {
 			if err := convertNullableJSONFields(frame); err != nil {
 				return res, err
