@@ -188,11 +188,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
       };
 
       if (otelConfig?.traceColumnMap) {
-        const columns: SelectedColumn[] = [];
-        otelConfig.traceColumnMap.forEach((name, hint) => {
-          columns.push({ name, hint });
-        });
-        options.columns = columns;
+        options.columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
       } else {
         const defaultColumns = datasource.getDefaultTraceColumns();
         for (let [hint, colName] of defaultColumns) {
