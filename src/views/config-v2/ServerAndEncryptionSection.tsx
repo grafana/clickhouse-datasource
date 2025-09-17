@@ -150,6 +150,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
                   onChange={(e) => onPortChange(e.currentTarget.value)}
                   label={labels.serverPort.label}
                   aria-label={labels.serverPort.label}
+                  data-testid='clickhouse-v2-config-port-input'
                   placeholder={defaultPort}
                   onBlur={(e) => trackClickhouseConfigV2PortInput({ port: e.currentTarget.value })}
                 />
