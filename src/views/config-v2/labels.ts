@@ -21,49 +21,49 @@ export default {
           tooltip: 'ClickHouse server port',
           error: 'Port is required',
         },
+        secure: {
+          label: 'Secure Connection',
+          tooltip: 'Toggle on if the connection is secure',
+        },
         path: {
           label: 'HTTP URL Path',
           tooltip: 'Additional URL path for HTTP requests',
           placeholder: 'additional-path',
         },
-        username: {
-          label: 'Username',
-          placeholder: 'default',
-          tooltip: 'ClickHouse username',
-        },
-        password: {
-          label: 'Password',
-          placeholder: 'password',
-          tooltip: 'ClickHouse password',
-        },
-        tlsSkipVerify: {
-          label: 'Skip TLS Verify',
-          tooltip: 'Skip TLS Verify',
-        },
-        tlsClientAuth: {
-          label: 'TLS Client Auth',
-          tooltip: 'TLS Client Auth',
-        },
-        tlsAuthWithCACert: {
-          label: 'With CA Cert',
-          tooltip: 'Needed for verifying self-signed TLS Certs',
-        },
-        tlsCACert: {
-          label: 'CA Cert',
-          placeholder: 'CA Cert. Begins with -----BEGIN CERTIFICATE-----',
-        },
-        tlsClientCert: {
-          label: 'Client Cert',
-          placeholder: 'Client Cert. Begins with -----BEGIN CERTIFICATE-----',
-        },
-        tlsClientKey: {
-          label: 'Client Key',
-          placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
-        },
-        secure: {
-          label: 'Secure Connection',
-          tooltip: 'Toggle on if the connection is secure',
-        },
+        // username: {
+        //   label: 'Username',
+        //   placeholder: 'default',
+        //   tooltip: 'ClickHouse username',
+        // },
+        // password: {
+        //   label: 'Password',
+        //   placeholder: 'password',
+        //   tooltip: 'ClickHouse password',
+        // },
+        // tlsSkipVerify: {
+        //   label: 'Skip TLS Verify',
+        //   tooltip: 'Skip TLS Verify',
+        // },
+        // tlsClientAuth: {
+        //   label: 'TLS Client Auth',
+        //   tooltip: 'TLS Client Auth',
+        // },
+        // tlsAuthWithCACert: {
+        //   label: 'With CA Cert',
+        //   tooltip: 'Needed for verifying self-signed TLS Certs',
+        // },
+        // tlsCACert: {
+        //   label: 'CA Cert',
+        //   placeholder: 'CA Cert. Begins with -----BEGIN CERTIFICATE-----',
+        // },
+        // tlsClientCert: {
+        //   label: 'Client Cert',
+        //   placeholder: 'Client Cert. Begins with -----BEGIN CERTIFICATE-----',
+        // },
+        // tlsClientKey: {
+        //   label: 'Client Key',
+        //   placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
+        // },
         secureSocksProxy: {
           label: 'Enable Secure Socks Proxy',
           tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',
@@ -73,21 +73,6 @@ export default {
           testid: 'data-testid enable-row-limit-switch',
           tooltip:
             'Enable using the Grafana row limit setting to limit the number of rows returned from Clickhouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
-        },
-      },
-      HttpHeadersConfig: {
-        title: 'HTTP Headers',
-        label: 'Custom HTTP Headers',
-        description: 'Add Custom HTTP headers when querying the database',
-        headerNameLabel: 'Header Name',
-        headerNamePlaceholder: 'X-Custom-Header',
-        insecureHeaderValueLabel: 'Header Value',
-        secureHeaderValueLabel: 'Secure Header Value',
-        secureLabel: 'Secure',
-        addHeaderLabel: 'Add Header',
-        forwardGrafanaHeaders: {
-          label: 'Forward Grafana HTTP Headers',
-          tooltip: 'Forward Grafana HTTP Headers to datasource.',
         },
       },
       AliasTableConfig: {

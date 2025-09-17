@@ -237,13 +237,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             name="host"
             width={80}
             value={jsonData.host || ''}
-            onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1HostInput();
-              return onUpdateDatasourceJsonDataOption(props, 'host')(e);
-            }}
+            onChange={(e) => onUpdateDatasourceJsonDataOption(props, 'host')(e)}
             label={labels.serverAddress.label}
             aria-label={labels.serverAddress.label}
             placeholder={labels.serverAddress.placeholder}
+            onBlur={trackingV1.trackClickhouseConfigV1HostInput}
           />
         </Field>
         <Field
@@ -258,13 +256,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             width={40}
             type="number"
             value={jsonData.port || ''}
-            onChange={e => {
-              trackingV1.trackClickhouseConfigV1PortInput({ port: e.currentTarget.value});
-              onPortChange(e.currentTarget.value);
-            }}
+            onChange={e => onPortChange(e.currentTarget.value)}
             label={labels.serverPort.label}
             aria-label={labels.serverPort.label}
             placeholder={defaultPort}
+            onBlur={(e) => trackingV1.trackClickhouseConfigV1PortInput({ port: e.currentTarget.value})}
           />
         </Field>
 
