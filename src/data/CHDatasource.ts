@@ -294,7 +294,7 @@ export class Datasource
     let mapKey = '';
 
     // Convert flattened/merged OTel attributes into column+path pair
-    if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes', 'SpanAttributes'].includes(columnName.split('.')[0])) {
+    if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
         const prefixIndex = columnName.indexOf('.');
         mapKey = columnName.substring(prefixIndex + 1)
         columnName = columnName.substring(0, prefixIndex);        

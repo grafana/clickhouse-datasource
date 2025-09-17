@@ -311,7 +311,7 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
-		if frame.Meta.PreferredVisualization == data.VisTypeLogs || frame.Meta.PreferredVisualization == data.VisTypeTrace {
+		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
 			err := mergeOpenTelemetryLabels(frame)
 			if err != nil {
 				return nil, err
@@ -430,7 +430,7 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 			continue
 		}
 
-		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" || field.Name == "SpanAttributes" {
+		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
 			attrFields = append(attrFields, field)
 		}
 	}
@@ -479,7 +479,7 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 
 	filteredFields := make([]*data.Field, 0, len(frame.Fields)-len(attrFields))
 	for _, field := range frame.Fields {
-		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" || field.Name == "SpanAttributes" {
+		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
 			continue
 		}
 
