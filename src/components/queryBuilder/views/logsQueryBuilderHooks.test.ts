@@ -117,8 +117,8 @@ describe('useOtelColumns', () => {
 
   it('should call builderOptionsDispatch with log context columns when auto-select is enabled', async () => {
     jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(true);
-    // Timestamp is an OTel column, but also provided as a Log Context column. It should only appear once.
-    jest.spyOn(mockDatasource, 'getLogContextColumnNames').mockReturnValue(['Timestamp', 'SampleColumn']);
+    // TimestampTime is an OTel column, but also provided as a Log Context column. It should only appear once.
+    jest.spyOn(mockDatasource, 'getLogContextColumnNames').mockReturnValue(['TimestampTime', 'SampleColumn']);
     const builderOptionsDispatch = jest.fn();
 
     let otelEnabled = false;
