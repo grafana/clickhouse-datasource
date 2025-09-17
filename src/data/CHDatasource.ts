@@ -589,8 +589,7 @@ export class Datasource
         continue;
       }
 
-      const kv = typeof kv === 'string' ? JSON.parse(x[0]) : x[0];
-
+      const kv = typeof x === 'string' ? JSON.parse(x[0]) : x[0];
       if (!kv.keys || !kv.values) {
         continue;
       }
