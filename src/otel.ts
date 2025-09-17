@@ -42,7 +42,7 @@ const otel129: OtelVersion = {
   ],
   traceTable: defaultTraceTable,
   traceColumnMap: new Map<ColumnHint, string>([
-    [ColumnHint.Time, 'TimestampTime'],
+    [ColumnHint.Time, 'Timestamp'],
     [ColumnHint.TraceId, 'TraceId'],
     [ColumnHint.TraceSpanId, 'SpanId'],
     [ColumnHint.TraceParentSpanId, 'ParentSpanId'],
