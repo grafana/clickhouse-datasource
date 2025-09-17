@@ -435,6 +435,10 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 		}
 	}
 
+	if len(attrFields) == 0 {
+		return nil
+	}
+
 	rowLen, err := frame.RowLen()
 	if err != nil {
 		return err
