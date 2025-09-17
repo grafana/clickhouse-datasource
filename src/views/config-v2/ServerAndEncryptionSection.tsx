@@ -129,7 +129,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
                     name="question-circle"
                     aria-label="More info about Protocol"
                     size="xs"
-                    className={styles.toggletipIcon}
+                    className={styles.toggleTipIcon}
                   />
                 </Toggletip>
               </div>
@@ -191,7 +191,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     gap: theme.spacing(0),
     marginRight: theme.spacing(5),
   }),
-  toggletipIcon: css({
+  toggleTipIcon: css({
     marginLeft: theme.spacing(0.5),
     padding: 0,
   }),
