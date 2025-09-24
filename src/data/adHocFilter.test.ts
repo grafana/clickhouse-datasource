@@ -246,4 +246,12 @@ describe('AdHocManager', () => {
     ] as AdHocVariableFilter[]);
     expect(result).toContain("ResourceAttributes[\\'cloud.region\\']");
   });
+
+  it('converts arrayElement with single quotes', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.apply('SELECT * FROM foo', [
+      { key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' }
+    ] as AdHocVariableFilter[]);
+    expect(result).toContain("ResourceAttributes.cloud.region");
+  });
 });

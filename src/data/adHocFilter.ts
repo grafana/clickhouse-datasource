@@ -61,6 +61,10 @@ function isValid(filter: AdHocVariableFilter): boolean {
 
 
 function escapeKey(s: string): string {
+  if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(s.split('.')[0])) {
+    return s;
+  }
+
   // Convert arrayElement syntax to bracket notation
   if (s.startsWith('arrayElement(') && s.endsWith(')')) {
     const match = s.match(/arrayElement\((.*?),\s*['"](.*?)['"]\)/);
