@@ -460,10 +460,8 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 				if err != nil {
 					return err
 				}
-
-				for valMapKey, valMapValue := range valMap {
-					currentVal[fmt.Sprintf("%s.%s", field.Name, valMapKey)] = valMapValue
-				}
+				
+				assignFlattenedPath(currentVal, field.Name, "", valMap)
 
 				allLabelsValues[j] = currentVal
 			}
@@ -493,4 +491,22 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 	frame.Fields = filteredFields
 
 	return nil
+}
+
+// assignFlattenedPath will flatten a nested map into a map with top level keys separated by dots.
+func assignFlattenedPath(flatMap map[string]any, pathPrefix, pathKey string, pathValue any) {
+	fullPath := fmt.Sprintf("%s.%s", pathPrefix, pathKey)
+	if pathKey == "" {
+		fullPath = pathPrefix
+	}
+
+	nestedMap, ok := pathValue.(map[string]any)
+	if !ok {
+		flatMap[fullPath] = pathValue
+		return
+	}
+
+	for k, v := range nestedMap {
+		assignFlattenedPath(flatMap, fullPath, k, v)
+	}
 }
