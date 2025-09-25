@@ -727,7 +727,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
     const filterParts: string[] = [];
 
     let column = filter.key;
-    let type = filter.type;
+    let type = filter.type || '';
     const hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
     if (hintedColumn) {
       column = hintedColumn.alias || hintedColumn.name;
@@ -738,8 +738,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
       continue;
     }
 
-    if (filter.mapKey) {
+    if (filter.mapKey && type.startsWith('Map')) {
       column += `['${filter.mapKey}']`;
+    } else if (filter.mapKey && type.startsWith('JSON')) {
+      const escapedJSONPaths = filter.mapKey.split('.').map(p => `\`${p}\``).join('.')
+      column += `.${escapedJSONPaths}`;
     }
 
     filterParts.push(column);
