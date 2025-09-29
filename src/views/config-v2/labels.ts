@@ -23,47 +23,47 @@ export default {
         },
         secure: {
           label: 'Secure Connection',
-          tooltip: 'Toggle on if the connection is secure',
+          description: 'Check this box to connect securely',
         },
         path: {
           label: 'HTTP URL Path',
           tooltip: 'Additional URL path for HTTP requests',
           placeholder: 'additional-path',
         },
-        // username: {
-        //   label: 'Username',
-        //   placeholder: 'default',
-        //   tooltip: 'ClickHouse username',
-        // },
-        // password: {
-        //   label: 'Password',
-        //   placeholder: 'password',
-        //   tooltip: 'ClickHouse password',
-        // },
-        // tlsSkipVerify: {
-        //   label: 'Skip TLS Verify',
-        //   tooltip: 'Skip TLS Verify',
-        // },
-        // tlsClientAuth: {
-        //   label: 'TLS Client Auth',
-        //   tooltip: 'TLS Client Auth',
-        // },
-        // tlsAuthWithCACert: {
-        //   label: 'With CA Cert',
-        //   tooltip: 'Needed for verifying self-signed TLS Certs',
-        // },
-        // tlsCACert: {
-        //   label: 'CA Cert',
-        //   placeholder: 'CA Cert. Begins with -----BEGIN CERTIFICATE-----',
-        // },
-        // tlsClientCert: {
-        //   label: 'Client Cert',
-        //   placeholder: 'Client Cert. Begins with -----BEGIN CERTIFICATE-----',
-        // },
-        // tlsClientKey: {
-        //   label: 'Client Key',
-        //   placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
-        // },
+        username: {
+          label: 'Username',
+          placeholder: 'default',
+          tooltip: 'ClickHouse username',
+        },
+        password: {
+          label: 'Password',
+          placeholder: 'password',
+          tooltip: 'ClickHouse password',
+        },
+        tlsSkipVerify: {
+          label: 'Skip TLS Verify',
+          tooltip: 'Skip TLS Verify',
+        },
+        tlsClientAuth: {
+          label: 'TLS Client Auth',
+          tooltip: 'TLS Client Auth',
+        },
+        tlsAuthWithCACert: {
+          label: 'With CA Cert',
+          tooltip: 'Needed for verifying self-signed TLS Certs',
+        },
+        tlsCACert: {
+          label: 'CA Cert',
+          placeholder: 'CA Cert. Begins with -----BEGIN CERTIFICATE-----',
+        },
+        tlsClientCert: {
+          label: 'Client Cert',
+          placeholder: 'Client Cert. Begins with -----BEGIN CERTIFICATE-----',
+        },
+        tlsClientKey: {
+          label: 'Client Key',
+          placeholder: 'Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----',
+        },
         secureSocksProxy: {
           label: 'Enable Secure Socks Proxy',
           tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',

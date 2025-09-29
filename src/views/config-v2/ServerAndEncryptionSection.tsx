@@ -1,6 +1,6 @@
 import React from "react";
 import { DataSourcePluginOptionsEditorProps, GrafanaTheme2, onUpdateDatasourceJsonDataOption } from "@grafana/data";
-import { Box, CollapsableSection, TextLink, Field, Input, Toggletip, IconButton, RadioButtonGroup, InlineField, InlineSwitch, Text, useStyles2 } from "@grafana/ui";
+import { Box, CollapsableSection, TextLink, Field, Input, Toggletip, IconButton, RadioButtonGroup, Text, useStyles2, Checkbox } from "@grafana/ui";
 import allLabels from './labels';
 import { CHConfig, CHSecureConfig, Protocol } from "types/config";
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH, PROTOCOL_OPTIONS } from "./constants";
@@ -158,7 +158,11 @@ export const ServerAndEncryptionSection = (props: Props) => {
             </div>
           </div>
             <div className={styles.secureToggle}>
-             <InlineField label={labels.secure.label} tooltip={labels.secure.tooltip}>
+              <Checkbox label={labels.secure.label} description={labels.secure.description} checked={jsonData.secure || false} onChange={(e) => {
+                trackClickhouseConfigV2SecureConnectionToggleClicked({ secureConnection: e.currentTarget.checked  });
+                onSwitchToggle('secure', e.currentTarget.checked);
+              }} />
+             {/* <InlineField label={labels.secure.label} tooltip={labels.secure.tooltip}>
                 <InlineSwitch
                 value={jsonData.secure || false}
                 onChange={(e) => {
@@ -166,7 +170,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
                   onSwitchToggle('secure', e.currentTarget.checked);
                 }}                
                 />
-            </InlineField>
+            </InlineField> */}
           </div>
           <HttpProtocolSettingsSection onSwitchToggle={onSwitchToggle} {...props} />
         </CollapsableSection>

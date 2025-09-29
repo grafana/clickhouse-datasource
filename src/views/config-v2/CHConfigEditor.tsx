@@ -7,6 +7,7 @@ import { css } from '@emotion/css';
 import { LeftSidebar } from './LeftSidebar';
 import { CONTAINER_MIN_WIDTH } from './constants';
 import { trackInfluxDBConfigV2FeedbackButtonClicked } from './tracking';
+import { RemainingConfigCode } from './RemainingConfigCode';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -44,6 +45,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             </Text>
         </div>
           <ServerAndEncryptionSection onOptionsChange={onOptionsChange} options={options} />
+          <RemainingConfigCode onOptionsChange={onOptionsChange} options={options} />
         </Box>
         <Box width="20%" flex="0 0 20%">
             {/* TODO: Right sidebar */}
