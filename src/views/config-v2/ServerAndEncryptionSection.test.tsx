@@ -67,7 +67,7 @@ describe('ServerAndEncryptionSection', () => {
     it('updates secure state on switch toggle', async () => {
         render(<ServerAndEncryptionSection {...defaultProps} />);
 
-        const secureSwitch = screen.getByRole('checkbox', { name: /toggle switch/i });
+        const secureSwitch = screen.getByRole('checkbox', { name: /secure connection/i });
         await fireEvent.click(secureSwitch);
 
         expect(onOptionsChangeMock).toHaveBeenLastCalledWith(

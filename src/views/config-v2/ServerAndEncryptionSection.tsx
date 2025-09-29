@@ -162,15 +162,6 @@ export const ServerAndEncryptionSection = (props: Props) => {
                 trackClickhouseConfigV2SecureConnectionToggleClicked({ secureConnection: e.currentTarget.checked  });
                 onSwitchToggle('secure', e.currentTarget.checked);
               }} />
-             {/* <InlineField label={labels.secure.label} tooltip={labels.secure.tooltip}>
-                <InlineSwitch
-                value={jsonData.secure || false}
-                onChange={(e) => {
-                  trackClickhouseConfigV2SecureConnectionToggleClicked({ secureConnection: e.currentTarget.checked  });
-                  onSwitchToggle('secure', e.currentTarget.checked);
-                }}                
-                />
-            </InlineField> */}
           </div>
           <HttpProtocolSettingsSection onSwitchToggle={onSwitchToggle} {...props} />
         </CollapsableSection>
