@@ -288,9 +288,17 @@ export class Datasource
       return query;
     }
 
-    const columnName = action.options.key;
+    let columnName = action.options.key || '';
     const actionFrame: DataFrame | undefined = (action as any).frame;
     const actionValue = action.options.value;
+    let mapKey = '';
+
+    // Convert flattened/merged OTel attributes into column+path pair
+    if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
+        const prefixIndex = columnName.indexOf('.');
+        mapKey = columnName.substring(prefixIndex + 1)
+        columnName = columnName.substring(0, prefixIndex);        
+    }
 
     // Find selected column by alias/name
     const lookupByAlias = query.builderOptions.columns?.find(c => c.alias === columnName); // Check all aliases first,
@@ -298,6 +306,8 @@ export class Datasource
     const lookupByLogsAlias = logAliasToColumnHints.has(columnName) ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!) : undefined;
     const lookupByLogLabels = dataFrameHasLogLabelWithName(actionFrame, columnName) && getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
     const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
+    const columnType = column ? (column.type || '') : '';
+    const hasMapKey = mapKey !== '' || Boolean(lookupByLogLabels);
 
     let nextFilters: Filter[] = (query.builderOptions.filters?.slice() || []);
     if (action.type === 'ADD_FILTER') {
@@ -310,8 +320,8 @@ export class Datasource
           (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
         ) &&
         !(
-          f.type.toLowerCase().startsWith('map') &&
-          (column && lookupByLogLabels && f.mapKey === columnName) &&
+          (f.type.startsWith('Map') || f.type.startsWith('JSON')) &&
+          (column && hasMapKey && f.mapKey === mapKey) &&
           (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals || f.operator === FilterOperator.NotEquals)
         )
       );
@@ -320,8 +330,8 @@ export class Datasource
         condition: 'AND',
         key: (column && column.hint) ? '' : columnName,
         hint: (column && column.hint) ? column.hint : undefined,
-        mapKey: lookupByLogLabels ? columnName : undefined,
-        type: lookupByLogLabels ? 'Map(String, String)' : 'string',
+        mapKey: hasMapKey ? mapKey : undefined,
+        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
         filterType: 'custom',
         operator: FilterOperator.Equals,
         value: actionValue,
@@ -343,8 +353,8 @@ export class Datasource
             (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
           ) ||
           (
-            f.type.toLowerCase().startsWith('map') &&
-            (column && lookupByLogLabels && f.mapKey === columnName) &&
+            (f.type.startsWith('Map') || f.type.startsWith('JSON')) &&
+            (column && hasMapKey && f.mapKey === mapKey) &&
             (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)
           )
         )
@@ -354,8 +364,8 @@ export class Datasource
         condition: 'AND',
         key: (column && column.hint) ? '' : columnName,
         hint: (column && column.hint) ? column.hint : undefined,
-        mapKey: lookupByLogLabels ? columnName : undefined,
-        type: lookupByLogLabels ? 'Map(String, String)' : 'string',
+        mapKey: hasMapKey ? mapKey : undefined,
+        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
         filterType: 'custom',
         operator: FilterOperator.NotEquals,
         value: actionValue,
@@ -579,7 +589,7 @@ export class Datasource
         continue;
       }
 
-      const kv = JSON.parse(x[0]);
+      const kv = typeof x[0] === 'string' ? JSON.parse(x[0]) : x[0];
       if (!kv.keys || !kv.values) {
         continue;
       }
