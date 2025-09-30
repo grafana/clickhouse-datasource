@@ -1,8 +1,8 @@
-import { Field, CertificationKey, Switch, Input, SecretInput, Button, Divider, Stack } from '@grafana/ui';
+import { Field, CertificationKey, Switch, Input, Button, Divider, Stack } from '@grafana/ui';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labels';
 import React, { ChangeEvent, useState } from 'react';
-import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption, onUpdateDatasourceSecureJsonDataOption } from '@grafana/data';
+import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
 import { AliasTableConfig } from 'components/configEditor/AliasTableConfig';
 import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatabaseTableConfig';
@@ -91,20 +91,6 @@ export const RemainingConfigCode = (props: Props) => {
         secureJsonData: {
             ...secureJsonData,
             [key]: '',
-        },
-        });
-    };
-
-    const onResetPassword = () => {
-        onOptionsChange({
-        ...options,
-        secureJsonFields: {
-            ...options.secureJsonFields,
-            password: false,
-        },
-        secureJsonData: {
-            ...options.secureJsonData,
-            password: '',
         },
         });
     };
@@ -216,35 +202,6 @@ export const RemainingConfigCode = (props: Props) => {
             />
           </>
         )}
-      </ConfigSection>
-      <ConfigSection title="Credentials">
-        <Field
-          label={labels.username.label}
-          description={labels.username.tooltip}
-        >
-          <Input
-            name="user"
-            width={40}
-            value={jsonData.username || ''}
-            onChange={onUpdateDatasourceJsonDataOption(props, 'username')}
-            label={labels.username.label}
-            aria-label={labels.username.label}
-            placeholder={labels.username.placeholder}
-          />
-        </Field>
-        <Field label={labels.password.label} description={labels.password.tooltip}>
-          <SecretInput
-            name="pwd"
-            width={40}
-            label={labels.password.label}
-            aria-label={labels.password.label}
-            placeholder={labels.password.placeholder}
-            value={secureJsonData.password || ''}
-            isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
-            onReset={onResetPassword}
-            onChange={onUpdateDatasourceSecureJsonDataOption(props, 'password')}
-          />
-        </Field>
       </ConfigSection>
        <ConfigSection
         title="Additional settings"

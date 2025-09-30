@@ -2,8 +2,6 @@ import React from 'react';
 import { Box, InlineField, LinkButton, Space, Stack, Text, useStyles2 } from '@grafana/ui';
 import { CONFIG_SECTION_HEADERS, CONFIG_SECTION_HEADERS_WITH_PDC } from './constants';
 import { css } from '@emotion/css';
-import type { GrafanaTheme2 } from '@grafana/data';
-
 interface LeftSidebarProps {
   pdcInjected: boolean;
 }
@@ -55,7 +53,7 @@ export const LeftSidebar = ({ pdcInjected }: LeftSidebarProps) => {
   );
 };
 
-const getStyles = (theme: GrafanaTheme2) => ({
+const getStyles = () => ({
   inlineField: css({
     display: 'flex',
     alignItems: 'center',
