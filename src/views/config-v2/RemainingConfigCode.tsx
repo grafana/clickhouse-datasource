@@ -1,4 +1,3 @@
-import { Field, CertificationKey, Switch, Input, Button, Divider, Stack } from '@grafana/ui';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labels';
 import React, { ChangeEvent, useState } from 'react';
@@ -13,6 +12,7 @@ import { config } from '@grafana/runtime';
 import { TimeUnit } from 'types/queryBuilder';
 import { useConfigDefaults } from 'views/CHConfigEditorHooks';
 import { gte as versionGte } from 'semver';
+import { Field, CertificationKey, Divider, Stack, Input, Button, Switch } from '@grafana/ui';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
