@@ -311,6 +311,13 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
+		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
+			err := mergeOpenTelemetryLabels(frame)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 		if shouldConvertFields(frame.Meta.PreferredVisualization) {
 			if err := convertNullableJSONFields(frame); err != nil {
 				return res, err
@@ -410,4 +417,96 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 	}
 
 	return httpHeaders, nil
+}
+
+func mergeOpenTelemetryLabels(frame *data.Frame) error {
+	var attrFields []*data.Field
+	for _, field := range frame.Fields {
+		if field.Name == "labels" {
+			return nil
+		}
+
+		if field.Type() != data.FieldTypeJSON {
+			continue
+		}
+
+		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
+			attrFields = append(attrFields, field)
+		}
+	}
+
+	if len(attrFields) == 0 {
+		return nil
+	}
+
+	rowLen, err := frame.RowLen()
+	if err != nil {
+		return err
+	}
+
+	allLabelsValues := make([]map[string]any, rowLen)
+
+	for _, field := range attrFields {
+		for j := 0; j < rowLen; j++ {
+			currentVal := allLabelsValues[j]
+			if currentVal == nil {
+				currentVal = make(map[string]any)
+			}
+
+			val := field.At(j).(json.RawMessage)
+			if val != nil {
+				var valMap map[string]any
+				err := json.Unmarshal(val, &valMap)
+				if err != nil {
+					return err
+				}
+				
+				assignFlattenedPath(currentVal, field.Name, "", valMap)
+
+				allLabelsValues[j] = currentVal
+			}
+		}
+	}
+
+	allLabelsValuesJSON := make([]json.RawMessage, rowLen)
+	for i, value := range allLabelsValues {
+		valueJSON, err := json.Marshal(value)
+		if err != nil {
+			return err
+		}
+
+		allLabelsValuesJSON[i] = valueJSON
+	}
+	allLabels := data.NewField("labels", make(data.Labels), allLabelsValuesJSON)
+
+	filteredFields := make([]*data.Field, 0, len(frame.Fields)-len(attrFields))
+	for _, field := range frame.Fields {
+		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
+			continue
+		}
+
+		filteredFields = append(filteredFields, field)
+	}
+	filteredFields = append(filteredFields, allLabels)
+	frame.Fields = filteredFields
+
+	return nil
+}
+
+// assignFlattenedPath will flatten a nested map into a map with top level keys separated by dots.
+func assignFlattenedPath(flatMap map[string]any, pathPrefix, pathKey string, pathValue any) {
+	fullPath := fmt.Sprintf("%s.%s", pathPrefix, pathKey)
+	if pathKey == "" {
+		fullPath = pathPrefix
+	}
+
+	nestedMap, ok := pathValue.(map[string]any)
+	if !ok {
+		flatMap[fullPath] = pathValue
+		return
+	}
+
+	for k, v := range nestedMap {
+		assignFlattenedPath(flatMap, fullPath, k, v)
+	}
 }

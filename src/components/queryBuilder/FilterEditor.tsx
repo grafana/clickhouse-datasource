@@ -203,6 +203,7 @@ export const FilterEditor = (props: {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter } = props;
   const [isOpen, setIsOpen] = useState(false);
   const isMapType = filter.type.startsWith('Map');
+  const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
   const mapKeyOptions = mapKeys.map(k => ({ label: k, value: k }));
   if (filter.mapKey && !mapKeys.includes(filter.mapKey)) {
@@ -214,6 +215,8 @@ export const FilterEditor = (props: {
       let label = f.label || f.name;
       if (f.type.startsWith('Map')) {
         label += '[]';
+      } else if (f.type.startsWith('JSON')) {
+        label += '{}';
       }
 
       return { label, value: f.name };
@@ -375,7 +378,7 @@ export const FilterEditor = (props: {
         allowCustomValue
         menuPlacement={'bottom'}
       />
-      { isMapType &&
+      { (isMapType || isJSONType) &&
         <Select
           value={filter.mapKey}
           placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
