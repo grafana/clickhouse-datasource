@@ -1,4 +1,4 @@
-import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
+import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labels';
 import React, { ChangeEvent, useState } from 'react';
 import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
@@ -12,34 +12,18 @@ import { config } from '@grafana/runtime';
 import { TimeUnit } from 'types/queryBuilder';
 import { useConfigDefaults } from 'views/CHConfigEditorHooks';
 import { gte as versionGte } from 'semver';
-import { Field, CertificationKey, Divider, Stack, Input, Button, Switch } from '@grafana/ui';
+import { Field, Divider, Stack, Input, Button, Switch, Box, CollapsableSection, Text } from '@grafana/ui';
+import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
 // This code will be formatted into the new design in future iterations
-export const RemainingConfigCode = (props: Props) => {
+export const AdditionalSettingsSection = (props: Props) => {
     const { options, onOptionsChange } = props;
-    const { jsonData, secureJsonFields } = options;
+    const { jsonData } = options;
     const labels = allLabels.components.Config.ConfigEditor;
-    const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
-    const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
-    const hasTLSClientCert = secureJsonFields && secureJsonFields.tlsClientCert;
-    const hasTLSClientKey = secureJsonFields && secureJsonFields.tlsClientKey;
 
     useConfigDefaults(options, onOptionsChange);
-
-    const hasAdditionalSettings = Boolean(
-        window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-        options.jsonData.defaultDatabase ||
-        options.jsonData.defaultTable ||
-        options.jsonData.dialTimeout ||
-        options.jsonData.queryTimeout ||
-        options.jsonData.validateSql ||
-        options.jsonData.enableSecureSocksProxy ||
-        options.jsonData.customSettings ||
-        options.jsonData.logs ||
-        options.jsonData.traces
-    );
 
     const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
     
@@ -58,42 +42,6 @@ export const RemainingConfigCode = (props: Props) => {
           },
         });
       };
-
-    const onTLSSettingsChange = (
-        key: keyof Pick<CHConfig, 'tlsSkipVerify' | 'tlsAuth' | 'tlsAuthWithCACert'>,
-        value: boolean
-      ) => {
-        onOptionsChange({
-          ...options,
-          jsonData: {
-            ...options.jsonData,
-            [key]: value,
-          },
-        });
-      };
-
-    const onCertificateChangeFactory = (key: keyof Omit<CHSecureConfig, 'password'>, value: string) => {
-        onOptionsChange({
-        ...options,
-        secureJsonData: {
-            ...secureJsonData,
-            [key]: value,
-        },
-        });
-    };
-    const onResetClickFactory = (key: keyof Omit<CHSecureConfig, 'password'>) => {
-        onOptionsChange({
-        ...options,
-        secureJsonFields: {
-            ...secureJsonFields,
-            [key]: false,
-        },
-        secureJsonData: {
-            ...secureJsonData,
-            [key]: '',
-        },
-        });
-    };
 
     const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
         onOptionsChange({
@@ -143,73 +91,18 @@ export const RemainingConfigCode = (props: Props) => {
     };
 
     return (
-        <div>
-            <ConfigSection title="TLS / SSL Settings">
-        <Field
-          label={labels.tlsSkipVerify.label}
-          description={labels.tlsSkipVerify.tooltip}
+       <Box
+            borderStyle="solid"
+            borderColor="weak"
+            padding={2}
+            marginBottom={4}
+            id={`${CONFIG_SECTION_HEADERS[3].id}`}
+            minWidth={CONTAINER_MIN_WIDTH}
         >
-          <Switch
-            className="gf-form"
-            value={jsonData.tlsSkipVerify || false}
-            onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
-          />
-        </Field>
-        <Field
-          label={labels.tlsClientAuth.label}
-          description={labels.tlsClientAuth.tooltip}
-        >
-          <Switch
-            className="gf-form"
-            value={jsonData.tlsAuth || false}
-            onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
-          />
-        </Field>
-        <Field
-          label={labels.tlsAuthWithCACert.label}
-          description={labels.tlsAuthWithCACert.tooltip}
-        >
-          <Switch
-            className="gf-form"
-            value={jsonData.tlsAuthWithCACert || false}
-            onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)}
-          />
-        </Field>
-        {jsonData.tlsAuthWithCACert && (
-          <CertificationKey
-            hasCert={!!hasTLSCACert}
-            onChange={(e) => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
-            placeholder={labels.tlsCACert.placeholder}
-            label={labels.tlsCACert.label}
-            onClick={() => onResetClickFactory('tlsCACert')}
-          />
-        )}
-        {jsonData.tlsAuth && (
-          <>
-            <CertificationKey
-              hasCert={!!hasTLSClientCert}
-              onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
-              placeholder={labels.tlsClientCert.placeholder}
-              label={labels.tlsClientCert.label}
-              onClick={() => onResetClickFactory('tlsClientCert')}
-            />
-            <CertificationKey
-              hasCert={!!hasTLSClientKey}
-              placeholder={labels.tlsClientKey.placeholder}
-              label={labels.tlsClientKey.label}
-              onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
-              onClick={() => onResetClickFactory('tlsClientKey')}
-            />
-          </>
-        )}
-      </ConfigSection>
-       <ConfigSection
-        title="Additional settings"
-        description="Additional settings are optional settings that can be configured for more control over your data source. This includes the default database, dial and query timeouts, SQL validation, and custom ClickHouse settings."
-        isCollapsible
-        isInitiallyOpen={hasAdditionalSettings}
-      >
-        <Divider />
+            <CollapsableSection
+                label={<Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>}
+                isOpen={CONFIG_SECTION_HEADERS[3].isOpen}
+            >
         <DefaultDatabaseTableConfig
           defaultDatabase={jsonData.defaultDatabase}
           defaultTable={jsonData.defaultTable}
@@ -342,7 +235,7 @@ export const RemainingConfigCode = (props: Props) => {
             Add custom setting
           </Button>
         </ConfigSubSection>
-      </ConfigSection>
-        </div>
+        </CollapsableSection>
+      </Box>
     )
 };

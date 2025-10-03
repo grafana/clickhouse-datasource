@@ -41,7 +41,6 @@ export const CredentialsSection = (props: Props) => {
         <CollapsableSection
           label={<Text variant="h3">2. {CONFIG_SECTION_HEADERS[1].label}</Text>}
           isOpen={CONFIG_SECTION_HEADERS[1].isOpen}
-          className={styles.credentialsSection}
         >
             <div className={styles.credentialsSection}>
                 <Field
@@ -51,7 +50,6 @@ export const CredentialsSection = (props: Props) => {
                 >
                 <Input
                     name="user"
-                    // width={40}
                     value={jsonData.username || ''}
                     onChange={onUpdateDatasourceJsonDataOption(props, 'username')}
                     label={labels.username.label}
@@ -62,7 +60,6 @@ export const CredentialsSection = (props: Props) => {
                 <Field label={labels.password.label} description={labels.password.tooltip}>
                 <SecretInput
                     name="pwd"
-                    // width={40}
                     label={labels.password.label}
                     aria-label={labels.password.label}
                     placeholder={labels.password.placeholder}
