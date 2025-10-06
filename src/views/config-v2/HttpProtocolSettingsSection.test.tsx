@@ -63,24 +63,27 @@ describe('HttpProtocolSettingsSection', () => {
     it('toggles Optional HTTP settings open/closed via the button (icon changes)', () => {
         render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={jest.fn()} />);
 
-        // Closed by default - angle-right icon visible
         expect(screen.getByTestId('angle-right')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
 
-        // Now open - angle-down icon visible
         expect(screen.getByTestId('angle-down')).toBeInTheDocument();
     });
 
-    it('calls onSwitchToggle with forwardGrafanaHeaders=true when toggled', () => {
+    it('calls onSwitchToggle with forwardGrafanaHeaders=true when checked', () => {
         const onSwitchToggleMock = jest.fn();
 
-        render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={onSwitchToggleMock}/>);
+        render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={onSwitchToggleMock} />);
 
         fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
-        const forwardHeadersSwitch = screen.getByRole('checkbox', { name: /toggle switch/i });
-        fireEvent.click(forwardHeadersSwitch);
+
+        const forwardHeadersCheckbox = screen.getByRole('checkbox', {
+            name: /forward grafana http headers to data source/i,
+        });
+
+        fireEvent.click(forwardHeadersCheckbox);
 
         expect(onSwitchToggleMock).toHaveBeenLastCalledWith('forwardGrafanaHeaders', true);
     });
+
 });
