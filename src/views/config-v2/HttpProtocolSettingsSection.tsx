@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
 import { Field, Input, Button, useTheme2 } from '@grafana/ui';
-import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
-import allLabels from './labels';
+import allLabels from '../../labels';
 import { CHConfig, CHSecureConfig, Protocol } from 'types/config';
 import { css } from '@emotion/css';
 import { onHttpHeadersChange } from 'views/CHConfigEditorHooks';
+import { HttpHeadersConfigV2 } from './HttpHeadersConfigV2';
 
 export interface HttpProtocolSettingsSectionProps
   extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
@@ -54,7 +54,7 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
         Optional HTTP settings
       </Button>
       {optionalHttpIsOpen && (
-        <HttpHeadersConfig
+        <HttpHeadersConfigV2
           headers={jsonData.httpHeaders}
           forwardGrafanaHeaders={jsonData.forwardGrafanaHeaders}
           secureFields={secureJsonFields}

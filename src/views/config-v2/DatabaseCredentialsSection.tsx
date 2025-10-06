@@ -1,14 +1,14 @@
-import { Box, CollapsableSection, Field, Input, SecretInput, Text, useStyles2 } from "@grafana/ui";
+import { Box, CollapsableSection, Field, Input, SecretInput, Text, TextLink, useStyles2 } from "@grafana/ui";
 import React from "react";
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from "./constants";
 import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption, onUpdateDatasourceSecureJsonDataOption } from "@grafana/data";
-import allLabels from './labels';
+import allLabels from '../../labels';
 import { CHConfig, CHSecureConfig } from "types/config";
 import { css } from "@emotion/css";
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
-export const CredentialsSection = (props: Props) => {
+export const DatabaseCredentialsSection = (props: Props) => {
     const { options, onOptionsChange } = props;
     const { jsonData, secureJsonFields } = options;
     const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
@@ -40,12 +40,23 @@ export const CredentialsSection = (props: Props) => {
         >
         <CollapsableSection
           label={<Text variant="h3">2. {CONFIG_SECTION_HEADERS[1].label}</Text>}
-          isOpen={CONFIG_SECTION_HEADERS[1].isOpen}
+          isOpen={!!CONFIG_SECTION_HEADERS[1].isOpen}
         >
             <div className={styles.credentialsSection}>
                 <Field
                     label={labels.username.label}
-                    description={labels.username.tooltip}
+                    description={
+                        <>
+                        {labels.username.tooltip}{' '}
+                        <TextLink
+                            variant="bodySmall"
+                            href="https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly"
+                            external
+                        >
+                            a read-only user
+                        </TextLink>
+                        </>
+                    }
                     required
                 >
                 <Input

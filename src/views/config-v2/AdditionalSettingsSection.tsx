@@ -1,5 +1,5 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
-import allLabels from './labels';
+import allLabels from '../../labels';
 import React, { ChangeEvent, useState } from 'react';
 import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
@@ -101,7 +101,7 @@ export const AdditionalSettingsSection = (props: Props) => {
         >
             <CollapsableSection
                 label={<Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>}
-                isOpen={CONFIG_SECTION_HEADERS[3].isOpen}
+                isOpen={!!CONFIG_SECTION_HEADERS[3].isOpen}
             >
         <DefaultDatabaseTableConfig
           defaultDatabase={jsonData.defaultDatabase}

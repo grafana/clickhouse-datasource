@@ -1,10 +1,10 @@
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-import { CredentialsSection } from './CredentialsSection';
+import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
 import { createTestProps } from './helpers';
 
-describe('CredentialsSection', () => {
+describe('DatabaseCredentialsSection', () => {
   const onOptionsChangeMock = jest.fn();
   let consoleSpy: jest.SpyInstance;
 
@@ -32,14 +32,14 @@ describe('CredentialsSection', () => {
   });
 
   it('renders username and password fields', () => {
-    render(<CredentialsSection {...defaultProps} />);
+    render(<DatabaseCredentialsSection {...defaultProps} />);
 
     expect(screen.getByLabelText(/username/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
   });
 
   it('calls onOptionsChange when username is changed', () => {
-    render(<CredentialsSection {...defaultProps} />);
+    render(<DatabaseCredentialsSection {...defaultProps} />);
 
     const usernameInput = screen.getByLabelText(/username/i);
     fireEvent.change(usernameInput, { target: { value: 'alice' } });
@@ -50,7 +50,7 @@ describe('CredentialsSection', () => {
   });
 
   it('calls onOptionsChange when password is changed', () => {
-    render(<CredentialsSection {...defaultProps} />);
+    render(<DatabaseCredentialsSection {...defaultProps} />);
 
     const passwordInput = screen.getByLabelText(/password/i);
     fireEvent.change(passwordInput, { target: { value: 's3cret' } });
@@ -79,7 +79,7 @@ describe('CredentialsSection', () => {
       },
     });
 
-    render(<CredentialsSection {...configuredProps} />);
+    render(<DatabaseCredentialsSection {...configuredProps} />);
 
     const resetButton = screen.getByRole('button', { name: /reset/i });
     fireEvent.click(resetButton);

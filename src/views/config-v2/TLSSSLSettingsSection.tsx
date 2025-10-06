@@ -1,9 +1,9 @@
 import { DataSourcePluginOptionsEditorProps } from "@grafana/data";
-import { Box, CollapsableSection, CertificationKey, Switch, Text, useStyles2, InlineField } from "@grafana/ui";
+import { Box, CollapsableSection, CertificationKey, Switch, Text, useStyles2, InlineField, Checkbox, Stack } from "@grafana/ui";
 import React from "react";
 import { CHConfig, CHSecureConfig } from "types/config";
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from "./constants";
-import allLabels from './labels';
+import allLabels from '../../labels';
 import { css } from "@emotion/css";
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
@@ -65,83 +65,68 @@ export const TLSSSLSettingsSection = (props: Props) => {
         >
             <CollapsableSection
                 label={<Text variant="h3">3. {CONFIG_SECTION_HEADERS[2].label}</Text>}
-                isOpen={CONFIG_SECTION_HEADERS[2].isOpen}
+                isOpen={!!(jsonData.tlsSkipVerify || jsonData.tlsAuth || jsonData.tlsAuthWithCACert)}
             >
-                <div className={styles.tlsToggleRow}>
-                    <InlineField
-                        label={labels.tlsSkipVerify.label}
-                        labelWidth={15}
-                        className={styles.tlsToggleSwitch}
-                    >
-                        <Switch
-                            value={jsonData.tlsSkipVerify || false}
-                            onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)}
-                        />
-                    </InlineField>
-                    <InlineField
-                        label={labels.tlsClientAuth.label}
-                        labelWidth={15}
-                        className={styles.tlsToggleSwitch}
-                    >
-                        <Switch
-                            value={jsonData.tlsAuth || false}
-                            onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)}
-                        />
-                    </InlineField>
-                    <InlineField
-                        label={labels.tlsAuthWithCACert.label}
-                        labelWidth={15}
-                        className={styles.tlsToggleSwitch}
-                    >
-                        <Switch
-                            value={jsonData.tlsAuthWithCACert || false}
-                            onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)}
-                        />
-                    </InlineField>
+                <Text variant="body" color="secondary">
+                    TLS/SSL certificates are used to prove identity and encrypt traffic between Grafana and ClickHouse.
+                </Text>
+                <div className={styles.contentSection}>
+                    <Stack direction={(jsonData.tlsAuth || jsonData.tlsAuthWithCACert) ? "column" : "row"} gap={3} alignItems="flex-start">
+                        <Checkbox className={css({ margin: 0 })} label={labels.tlsSkipVerify.label} value={jsonData.tlsSkipVerify || false} onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)} />
+                        <Checkbox className={css({ margin: 0 })} label={labels.tlsClientAuth.label} value={jsonData.tlsAuth || false} onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)} />
+                            <div className={styles.certsSection}>
+                                {jsonData.tlsAuth && (
+                                <>
+                                    <CertificationKey
+                                        hasCert={!!hasTLSClientCert}
+                                        onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
+                                        placeholder={labels.tlsClientCert.placeholder}
+                                        label={labels.tlsClientCert.label}
+                                        onClick={() => onResetClickFactory('tlsClientCert')}
+                                        data-testid="tls-client-cert"
+                                    />
+                                    <CertificationKey
+                                        hasCert={!!hasTLSClientKey}
+                                        placeholder={labels.tlsClientKey.placeholder}
+                                        label={labels.tlsClientKey.label}
+                                        onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
+                                        onClick={() => onResetClickFactory('tlsClientKey')}
+                                        data-testid="tls-client-key"
+                                    />
+                                </>
+                                )}
+                            </div>
+                        <Checkbox label={labels.tlsAuthWithCACert.label} value={jsonData.tlsAuthWithCACert|| false} onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)} />
+                        <div className={styles.certsSection}>
+                            {jsonData.tlsAuthWithCACert && (
+                            <CertificationKey
+                                hasCert={!!hasTLSCACert}
+                                onChange={(e) => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
+                                placeholder={labels.tlsCACert.placeholder}
+                                label={labels.tlsCACert.label}
+                                onClick={() => onResetClickFactory('tlsCACert')}
+                                data-testid="tls-ca-cert"
+                            />
+                            )}
+                        </div>
+                    </Stack>
                 </div>
-                {jsonData.tlsAuth && (
-                <>
-                    <CertificationKey
-                    hasCert={!!hasTLSClientCert}
-                    onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
-                    placeholder={labels.tlsClientCert.placeholder}
-                    label={labels.tlsClientCert.label}
-                    onClick={() => onResetClickFactory('tlsClientCert')}
-                    />
-                    <CertificationKey
-                    hasCert={!!hasTLSClientKey}
-                    placeholder={labels.tlsClientKey.placeholder}
-                    label={labels.tlsClientKey.label}
-                    onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
-                    onClick={() => onResetClickFactory('tlsClientKey')}
-                    />
-                </>
-                )}
-                {jsonData.tlsAuthWithCACert && (
-                    <CertificationKey
-                        hasCert={!!hasTLSCACert}
-                        onChange={(e) => onCertificateChangeFactory('tlsCACert', e.currentTarget.value)}
-                        placeholder={labels.tlsCACert.placeholder}
-                        label={labels.tlsCACert.label}
-                        onClick={() => onResetClickFactory('tlsCACert')}
-                    />
-                )}
             </CollapsableSection>
         </Box>
     )
 };
 
 const getStyles = () => ({
-  tlsToggleRow: css({
-    display: 'flex',
-    // alignItems: 'space-between',
-    gap: '50px',
-    // marginBottom: '10px',
-  }),
-  tlsToggleSwitch: css({
-    display: 'flex',
-    alignItems: 'center',
-  }),
+    contentSection: css({
+        marginTop: '30px'
+    }),
+    optionsRow: css({
+        display: 'flex',
+        gap: '50px',
+    }),
+    certsSection: css({
+        marginTop: '10px',
+    })
 });
 
 

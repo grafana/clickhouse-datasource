@@ -88,8 +88,8 @@ export default {
         secureLabel: 'Secure',
         addHeaderLabel: 'Add Header',
         forwardGrafanaHeaders: {
-          label: 'Forward Grafana HTTP Headers',
-          tooltip: 'Forward Grafana HTTP Headers to datasource.',
+          label: 'Forward Grafana HTTP Headers to data source',
+          tooltip: 'Forward Grafana HTTP Headers to datas ource.',
         },
       },
       AliasTableConfig: {
