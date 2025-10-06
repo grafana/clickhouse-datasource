@@ -22,7 +22,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
-	"github.com/grafana/sqlds/v4"
+	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
 )
@@ -269,6 +269,15 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 	return macros.Macros
 }
 
+// MutateQueryError marks ClickHouse errors as downstream errors
+func (h *Clickhouse) MutateQueryError(err error) backend.ErrorWithSource {
+	var wrappedException *clickhouse.Exception
+	if errors.As(err, &wrappedException) {
+		return backend.NewErrorWithSource(err, backend.ErrorSourceDownstream)
+	}
+	return backend.NewErrorWithSource(err, backend.DefaultErrorSource)
+}
+
 func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
 	settings, err := LoadSettings(ctx, config)
 	timeout := 60
@@ -460,7 +469,7 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 				if err != nil {
 					return err
 				}
-				
+
 				assignFlattenedPath(currentVal, field.Name, "", valMap)
 
 				allLabelsValues[j] = currentVal
