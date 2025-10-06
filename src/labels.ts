@@ -89,7 +89,7 @@ export default {
         addHeaderLabel: 'Add Header',
         forwardGrafanaHeaders: {
           label: 'Forward Grafana HTTP Headers to data source',
-          tooltip: 'Forward Grafana HTTP Headers to datas ource.',
+          tooltip: 'Forward Grafana HTTP Headers to data source.',
         },
       },
       AliasTableConfig: {

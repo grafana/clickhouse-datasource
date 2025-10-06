@@ -53,12 +53,12 @@ describe('DatabaseCredentialsSection', () => {
     render(<DatabaseCredentialsSection {...defaultProps} />);
 
     const passwordInput = screen.getByLabelText(/password/i);
-    fireEvent.change(passwordInput, { target: { value: 's3cret' } });
+    fireEvent.change(passwordInput, { target: { value: 'secret' } });
 
     expect(onOptionsChangeMock).toHaveBeenCalled();
 
     const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
-    expect(lastArgs.secureJsonData?.password).toBe('s3cret');
+    expect(lastArgs.secureJsonData?.password).toBe('secret');
   });
 
   it('resets password when Reset is clicked (isConfigured=true)', () => {

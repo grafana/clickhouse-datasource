@@ -1,5 +1,5 @@
 import { DataSourcePluginOptionsEditorProps } from "@grafana/data";
-import { Box, CollapsableSection, CertificationKey, Switch, Text, useStyles2, InlineField, Checkbox, Stack } from "@grafana/ui";
+import { Box, CollapsableSection, CertificationKey, Text, useStyles2, Checkbox, Stack } from "@grafana/ui";
 import React from "react";
 import { CHConfig, CHSecureConfig } from "types/config";
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from "./constants";
