@@ -132,6 +132,11 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
       return;
     }
 
+    const spanField = frame.fields.find(field => field.name.toLowerCase() === 'spanid' || field.name.toLowerCase() === 'span_id');
+    if (!spanField) {
+      return;
+    }
+
     const traceIdQuery: CHBuilderQuery = {
       datasource: datasource,
       editorType: EditorType.Builder,
@@ -283,6 +288,21 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
       }
     });
     traceField.config.links!.push({
+      title: 'View span',
+      targetBlank: openInNewWindow,
+      url: '',
+      internal: {
+        query: traceIdQuery,
+        datasourceUid: traceIdQuery.datasource?.uid!,
+        datasourceName: traceIdQuery.datasource?.type!,
+        panelsState: {
+          trace: {
+            spanId: '${__data.fields[' + spanField.name + ']}'
+          }
+        }
+      }
+    });
+    traceField.config.links!.push({
       title: 'View logs',
       targetBlank: openInNewWindow,
       url: '',
@@ -291,7 +311,25 @@ export const transformQueryResponseWithTraceAndLogLinks = (datasource: Datasourc
         datasourceUid: traceLogsQuery.datasource?.uid!,
         datasourceName: traceLogsQuery.datasource?.type!,
       }
-    }); 
+    });
+    
+    // TODO: Didn't manage to make this work. The generated URL has "traceId":"<SpanId>" and of course it doesn't work.
+    spanField.config.links = [];
+    spanField.config.links!.push({
+      title: 'View span',
+      targetBlank: openInNewWindow,
+      url: '',
+      internal: {
+        query: traceIdQuery,
+        datasourceUid: traceIdQuery.datasource?.uid!,
+        datasourceName: traceIdQuery.datasource?.type!,
+        panelsState: {
+          trace: {
+            spanId: '${__value.raw}',
+          }
+        }
+      }
+    });
   });
 
   return res;
