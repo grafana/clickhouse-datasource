@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.11.1
+
+### Fixes
+
+- All Clickhouse errors are marked as downstream errors for Grafana
+
 ## 4.11.0
 
 ### Features
