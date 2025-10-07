@@ -39,10 +39,10 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const updateForwardGrafanaHeaders = (value: boolean) => {
     setForwardGrafanaHeaders(value);
     props.onForwardGrafanaHeadersChange(value);
-  }
+  };
 
   return (
-    <div style={{marginLeft: '20px'}}>
+    <div style={{ marginLeft: '20px' }}>
       <Field label={labels.label}>
         <>
           {headers.map((header, index) => (
@@ -52,30 +52,30 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
               value={header.value}
               secure={header.secure}
               isSecureConfigured={configuredSecureHeaders.has(header.name)}
-              onHeaderChange={header => updateHeader(index, header)}
+              onHeaderChange={(header) => updateHeader(index, header)}
               onRemove={() => removeHeader(index)}
             />
           ))}
           <Button
-              data-testid={selectors.addHeaderButton}
-              icon="plus"
-              variant="secondary"
-              size="sm"
-              onClick={addHeader}
-              className={styles.Common.smallBtn}
-            >
-              {labels.addHeaderLabel}
+            data-testid={selectors.addHeaderButton}
+            icon="plus"
+            variant="secondary"
+            size="sm"
+            onClick={addHeader}
+            className={styles.Common.smallBtn}
+          >
+            {labels.addHeaderLabel}
           </Button>
         </>
       </Field>
-      <Checkbox 
-        label={labels.forwardGrafanaHeaders.label} 
+      <Checkbox
+        label={labels.forwardGrafanaHeaders.label}
         value={forwardGrafanaHeaders}
         onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
       />
     </div>
   );
-}
+};
 
 interface HttpHeaderEditorProps {
   name: string;
@@ -99,36 +99,40 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
     onHeaderChange({
       name,
       value,
-      secure
+      secure,
     });
-  }
+  };
 
   let valueInput;
   if (secure) {
-    valueInput = <SecretInput
-      data-testid={selectors.headerValueInput}
-      label=""
-      aria-label=""
-      placeholder={labels.secureHeaderValueLabel}
-      value={value}
-      isConfigured={isSecureConfigured}
-      onReset={() => setSecureConfigured(false)}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-      onBlur={() => onUpdate()}
-    />;
+    valueInput = (
+      <SecretInput
+        data-testid={selectors.headerValueInput}
+        label=""
+        aria-label=""
+        placeholder={labels.secureHeaderValueLabel}
+        value={value}
+        isConfigured={isSecureConfigured}
+        onReset={() => setSecureConfigured(false)}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        onBlur={() => onUpdate()}
+      />
+    );
   } else {
-    valueInput = <Input
-      data-testid={selectors.headerValueInput}
-      value={value}
-      placeholder={labels.insecureHeaderValueLabel}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-      onBlur={() => onUpdate()}
-    />;
+    valueInput = (
+      <Input
+        data-testid={selectors.headerValueInput}
+        value={value}
+        placeholder={labels.insecureHeaderValueLabel}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        onBlur={() => onUpdate()}
+      />
+    );
   }
 
   const headerValueLabel = secure ? labels.secureHeaderValueLabel : labels.insecureHeaderValueLabel;
   return (
-    <div data-testid={selectors.headerEditor} style={{marginTop: '10px'}}>
+    <div data-testid={selectors.headerEditor} style={{ marginTop: '10px' }}>
       <Stack direction="row" alignItems="center" gap={1}>
         <Field label={labels.headerNameLabel} aria-label={labels.headerNameLabel}>
           <Input
@@ -141,18 +145,14 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
           />
         </Field>
         <Box grow={1}>
-            <Field label={headerValueLabel} aria-label={headerValueLabel}>
+          <Field label={headerValueLabel} aria-label={headerValueLabel}>
             {valueInput}
-            </Field>
+          </Field>
         </Box>
-        { !isSecureConfigured &&
-          <Checkbox 
-            label={labels.secureLabel}
-            value={secure}
-            onChange={e => setSecure(e.currentTarget.checked)}
-          />
-        }
-        { onRemove &&
+        {!isSecureConfigured && (
+          <Checkbox label={labels.secureLabel} value={secure} onChange={(e) => setSecure(e.currentTarget.checked)} />
+        )}
+        {onRemove && (
           <Button
             data-testid={selectors.removeHeaderButton}
             className={styles.Common.smallBtn}
@@ -161,11 +161,11 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
             icon="trash-alt"
             onClick={onRemove}
           />
-        }
+        )}
       </Stack>
     </div>
   );
-}
+};
 
 /**
  * Returns a Set of all secured headers that are configured

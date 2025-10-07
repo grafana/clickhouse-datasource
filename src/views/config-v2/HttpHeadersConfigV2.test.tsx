@@ -48,7 +48,7 @@ describe('HttpHeadersConfigV2', () => {
     expect(after).toBe(before + 1);
     expect(onHttpHeadersChange).not.toHaveBeenCalled();
   });
-  
+
   it('renders any initial headers passed in', () => {
     renderWith({
       headers: [
@@ -59,7 +59,9 @@ describe('HttpHeadersConfigV2', () => {
 
     const editors = screen.getAllByTestId(selectors.components.Config.HttpHeaderConfig.headerEditor);
     expect(editors.length).toBe(2);
-    expect(screen.getAllByTestId(selectors.components.Config.HttpHeaderConfig.headerNameInput)[0]).toHaveValue('X-Auth');
+    expect(screen.getAllByTestId(selectors.components.Config.HttpHeaderConfig.headerNameInput)[0]).toHaveValue(
+      'X-Auth'
+    );
     expect(screen.getAllByTestId(selectors.components.Config.HttpHeaderConfig.headerNameInput)[1]).toHaveValue('Foo');
   });
 

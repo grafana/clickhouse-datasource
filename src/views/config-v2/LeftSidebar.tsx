@@ -31,10 +31,8 @@ export const LeftSidebar = ({ pdcInjected }: LeftSidebarProps) => {
                     }
                   }}
                 >
-                <div className={styles.sidebarText}>
-                    <div className={styles.sidebarLabel}>
-                      {header.label}
-                    </div>
+                  <div className={styles.sidebarText}>
+                    <div className={styles.sidebarLabel}>{header.label}</div>
                     {header.isOptional && (
                       <div className={styles.sidebarOptional}>
                         <Text color="secondary" variant="bodySmall">
@@ -42,7 +40,7 @@ export const LeftSidebar = ({ pdcInjected }: LeftSidebarProps) => {
                         </Text>
                       </div>
                     )}
-                </div>                
+                  </div>
                 </LinkButton>
               </InlineField>
               <Space v={1} />
@@ -65,16 +63,15 @@ const getStyles = () => ({
     flexDirection: 'column',
   }),
   sidebarLabel: css({
-    display: 'flex', 
-    alignItems: 'center', 
+    display: 'flex',
+    alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 0, 
+    marginBottom: 0,
     lineHeight: 1,
   }),
   sidebarOptional: css({
-    marginTop: 0, 
-    marginBottom: 0, 
+    marginTop: 0,
+    marginBottom: 0,
     lineHeight: 1,
   }),
 });
-

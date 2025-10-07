@@ -60,7 +60,7 @@ describe('TLSSSLSettingsSection', () => {
       options: {
         jsonData: { tlsSkipVerify: false, tlsAuth: true, tlsAuthWithCACert: false },
         secureJsonData: {},
-        secureJsonFields: {}, 
+        secureJsonFields: {},
       },
       mocks: { onOptionsChange: onOptionsChangeMock },
     });
@@ -71,62 +71,62 @@ describe('TLSSSLSettingsSection', () => {
     expect(screen.getByText(/client key/i)).toBeInTheDocument();
   });
 
-it('updates secureJsonData.tlsClientCert when typing into Client certificate', () => {
-  const props = createTestProps({
-    options: {
-      jsonData: { tlsSkipVerify: false, tlsAuth: true, tlsAuthWithCACert: false },
-      secureJsonData: {},
-      secureJsonFields: {},
-    },
-    mocks: { onOptionsChange: onOptionsChangeMock },
+  it('updates secureJsonData.tlsClientCert when typing into Client certificate', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: { tlsSkipVerify: false, tlsAuth: true, tlsAuthWithCACert: false },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: onOptionsChangeMock },
+    });
+
+    render(<TLSSSLSettingsSection {...props} />);
+
+    const input = screen.getByPlaceholderText(/client cert\. begins with/i);
+    fireEvent.change(input, { target: { value: '---CERT---' } });
+
+    const last = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(last.secureJsonData?.tlsClientCert).toBe('---CERT---');
   });
 
-  render(<TLSSSLSettingsSection {...props} />);
+  it('updates secureJsonData.tlsClientKey when typing into Client key', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: { tlsSkipVerify: false, tlsAuth: true, tlsAuthWithCACert: false },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: onOptionsChangeMock },
+    });
 
-  const input = screen.getByPlaceholderText(/client cert\. begins with/i);
-  fireEvent.change(input, { target: { value: '---CERT---' } });
+    render(<TLSSSLSettingsSection {...props} />);
 
-  const last = onOptionsChangeMock.mock.lastCall?.[0];
-  expect(last.secureJsonData?.tlsClientCert).toBe('---CERT---');
-});
+    const input = screen.getByPlaceholderText(/client key\. begins with/i);
+    fireEvent.change(input, { target: { value: '---CERT---' } });
 
-it('updates secureJsonData.tlsClientKey when typing into Client key', () => {
-  const props = createTestProps({
-    options: {
-      jsonData: { tlsSkipVerify: false, tlsAuth: true, tlsAuthWithCACert: false },
-      secureJsonData: {},
-      secureJsonFields: {},
-    },
-    mocks: { onOptionsChange: onOptionsChangeMock },
+    const last = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(last.secureJsonData?.tlsClientKey).toBe('---CERT---');
   });
 
-  render(<TLSSSLSettingsSection {...props} />);
+  it('updates secureJsonData.tlsCACert when typing into CA cert', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: { tlsSkipVerify: false, tlsAuth: false, tlsAuthWithCACert: true },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: onOptionsChangeMock },
+    });
 
-  const input = screen.getByPlaceholderText(/client key\. begins with/i);
-  fireEvent.change(input, { target: { value: '---CERT---' } });
+    render(<TLSSSLSettingsSection {...props} />);
 
-  const last = onOptionsChangeMock.mock.lastCall?.[0];
-  expect(last.secureJsonData?.tlsClientKey).toBe('---CERT---');
-});
+    const input = screen.getByPlaceholderText(/ca cert\. begins with/i);
+    fireEvent.change(input, { target: { value: '---CERT---' } });
 
-it('updates secureJsonData.tlsCACert when typing into CA cert', () => {
-  const props = createTestProps({
-    options: {
-      jsonData: { tlsSkipVerify: false, tlsAuth: false, tlsAuthWithCACert: true },
-      secureJsonData: {},
-      secureJsonFields: {},
-    },
-    mocks: { onOptionsChange: onOptionsChangeMock },
+    const last = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(last.secureJsonData?.tlsCACert).toBe('---CERT---');
   });
-
-  render(<TLSSSLSettingsSection {...props} />);
-
-  const input = screen.getByPlaceholderText(/ca cert\. begins with/i);
-  fireEvent.change(input, { target: { value: '---CERT---' } });
-
-  const last = onOptionsChangeMock.mock.lastCall?.[0];
-  expect(last.secureJsonData?.tlsCACert).toBe('---CERT---');
-});
 
   it('shows CA certificate input when tlsAuthWithCACert is true', () => {
     const props = createTestProps({

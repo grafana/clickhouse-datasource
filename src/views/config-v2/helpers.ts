@@ -1,4 +1,4 @@
-import { Protocol } from "types/config";
+import { Protocol } from 'types/config';
 
 /**
  * Creates a set of test props for the InfluxDB V2 config page for use in tests.
@@ -9,20 +9,20 @@ export const createTestProps = (overrides: { options?: object; mocks?: object })
     access: 'proxy',
     basicAuth: false,
     basicAuthUser: '',
-    database: '', 
+    database: '',
     id: 1,
-    isDefault: false, 
+    isDefault: false,
     jsonData: {
-        version: '', 
-        host: '', 
-        port: 9000, 
-        protocol: Protocol.Native, 
-        username: ''
-    }, 
+      version: '',
+      host: '',
+      port: 9000,
+      protocol: Protocol.Native,
+      username: '',
+    },
     name: 'Clickhouse',
-    orgId: 1, 
+    orgId: 1,
     readOnly: false,
-    secureJsonFields: {}, 
+    secureJsonFields: {},
     type: 'clickhouse',
     typeLogoUrl: '',
     typeName: 'Clickhouse',
