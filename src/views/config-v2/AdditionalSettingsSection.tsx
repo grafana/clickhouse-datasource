@@ -12,7 +12,19 @@ import { config } from '@grafana/runtime';
 import { TimeUnit } from 'types/queryBuilder';
 import { useConfigDefaults } from 'views/CHConfigEditorHooks';
 import { gte as versionGte } from 'semver';
-import { Field, Divider, Stack, Input, Button, Switch, Box, CollapsableSection, Text } from '@grafana/ui';
+import {
+  Field,
+  Divider,
+  Stack,
+  Input,
+  Button,
+  Switch,
+  Box,
+  CollapsableSection,
+  Text,
+  Badge,
+  useStyles2,
+} from '@grafana/ui';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 import {
   trackClickhouseConfigV2CustomSettingClicked,
@@ -23,6 +35,7 @@ import {
   trackClickhouseConfigV2QuerySettings,
   trackClickhouseConfigV2TracesConfig,
 } from './tracking';
+import { css } from '@emotion/css';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -30,6 +43,7 @@ export const AdditionalSettingsSection = (props: Props) => {
   const { options, onOptionsChange } = props;
   const { jsonData } = options;
   const labels = allLabels.components.Config.ConfigEditor;
+  const styles = useStyles2(getStyles);
 
   useConfigDefaults(options, onOptionsChange);
 
@@ -108,7 +122,12 @@ export const AdditionalSettingsSection = (props: Props) => {
       minWidth={CONTAINER_MIN_WIDTH}
     >
       <CollapsableSection
-        label={<Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>}
+        label={
+          <>
+            <Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>
+            <Badge text="optional" color="blue" className={styles.badge} />
+          </>
+        }
         isOpen={!!CONFIG_SECTION_HEADERS[3].isOpen}
       >
         <DefaultDatabaseTableConfig
@@ -366,3 +385,9 @@ export const AdditionalSettingsSection = (props: Props) => {
     </Box>
   );
 };
+
+const getStyles = () => ({
+  badge: css({
+    marginLeft: 'auto',
+  }),
+});

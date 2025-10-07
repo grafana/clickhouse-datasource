@@ -1,5 +1,5 @@
 import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
-import { Box, CollapsableSection, CertificationKey, Text, useStyles2, Checkbox, Stack } from '@grafana/ui';
+import { Box, CollapsableSection, CertificationKey, Text, useStyles2, Checkbox, Stack, Badge } from '@grafana/ui';
 import React from 'react';
 import { CHConfig, CHSecureConfig } from 'types/config';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
@@ -69,7 +69,12 @@ export const TLSSSLSettingsSection = (props: Props) => {
       minWidth={CONTAINER_MIN_WIDTH}
     >
       <CollapsableSection
-        label={<Text variant="h3">3. {CONFIG_SECTION_HEADERS[2].label}</Text>}
+        label={
+          <>
+            <Text variant="h3">3. {CONFIG_SECTION_HEADERS[2].label}</Text>
+            <Badge text="optional" color="blue" className={styles.badge} />
+          </>
+        }
         isOpen={!!(jsonData.tlsSkipVerify || jsonData.tlsAuth || jsonData.tlsAuthWithCACert)}
       >
         <Text variant="body" color="secondary">
@@ -156,5 +161,8 @@ const getStyles = () => ({
   }),
   certsSection: css({
     marginTop: '10px',
+  }),
+  badge: css({
+    marginLeft: 'auto',
   }),
 });

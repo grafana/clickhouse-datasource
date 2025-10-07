@@ -42,7 +42,7 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   };
 
   return (
-    <div style={{ marginLeft: '20px' }}>
+    <>
       <Field label={labels.label}>
         <>
           {headers.map((header, index) => (
@@ -73,7 +73,7 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
         value={forwardGrafanaHeaders}
         onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
       />
-    </div>
+    </>
   );
 };
 
