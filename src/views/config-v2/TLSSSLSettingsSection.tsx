@@ -74,9 +74,8 @@ export const TLSSSLSettingsSection = (props: Props) => {
                     <Stack direction={(jsonData.tlsAuth || jsonData.tlsAuthWithCACert) ? "column" : "row"} gap={3} alignItems="flex-start">
                         <Checkbox className={css({ margin: 0 })} label={labels.tlsSkipVerify.label} value={jsonData.tlsSkipVerify || false} onChange={(e) => onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked)} />
                         <Checkbox className={css({ margin: 0 })} label={labels.tlsClientAuth.label} value={jsonData.tlsAuth || false} onChange={(e) => onTLSSettingsChange('tlsAuth', e.currentTarget.checked)} />
-                            <div className={styles.certsSection}>
                                 {jsonData.tlsAuth && (
-                                <>
+                                <div className={styles.certsSection}>
                                     <CertificationKey
                                         hasCert={!!hasTLSClientCert}
                                         onChange={(e) => onCertificateChangeFactory('tlsClientCert', e.currentTarget.value)}
@@ -93,9 +92,8 @@ export const TLSSSLSettingsSection = (props: Props) => {
                                         onClick={() => onResetClickFactory('tlsClientKey')}
                                         data-testid="tls-client-key"
                                     />
-                                </>
+                                </div>
                                 )}
-                            </div>
                         <Checkbox label={labels.tlsAuthWithCACert.label} value={jsonData.tlsAuthWithCACert|| false} onChange={(e) => onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked)} />
                         <div className={styles.certsSection}>
                             {jsonData.tlsAuthWithCACert && (

@@ -26,7 +26,7 @@ export default {
         },
         protocol: {
           label: 'Protocol',
-          tooltip: 'Native or HTTP for server protocol',
+          tooltip: 'Native is the default protocol',
         },
         username: {
           label: 'Username',
