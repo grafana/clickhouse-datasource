@@ -1,9 +1,9 @@
-import { DataSourceSettings } from "@grafana/data";
-import { renderHook } from "@testing-library/react";
-import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
-import { onHttpHeadersChange, useConfigDefaults } from "./CHConfigEditorHooks";
-import { pluginVersion } from "utils/version";
-import { defaultLogsTable, defaultTraceTable } from "otel";
+import { DataSourceSettings } from '@grafana/data';
+import { renderHook } from '@testing-library/react';
+import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from 'types/config';
+import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
+import { pluginVersion } from 'utils/version';
+import { defaultLogsTable, defaultTraceTable } from 'otel';
 
 describe('onHttpHeadersChange', () => {
   it('should properly sort headers into secure/plain config fields', async () => {
@@ -12,22 +12,22 @@ describe('onHttpHeadersChange', () => {
       {
         name: 'X-Existing-Auth-Header',
         value: '',
-        secure: true
+        secure: true,
       },
       {
         name: 'X-Existing-Header',
         value: 'existing value',
-        secure: false
+        secure: false,
       },
       {
         name: 'Authorization',
         value: 'secret1234',
-        secure: true
+        secure: true,
       },
       {
         name: 'X-Custom-Header',
         value: 'plain text value',
-        secure: false
+        secure: false,
       },
     ];
     const opts = {
@@ -36,17 +36,17 @@ describe('onHttpHeadersChange', () => {
           {
             name: 'X-Existing-Auth-Header',
             value: '',
-            secure: true
+            secure: true,
           },
           {
             name: 'X-Existing-Header',
             value: 'existing value',
-            secure: false
+            secure: false,
           },
-        ]
+        ],
       },
       secureJsonFields: {
-        'secureHttpHeaders.X-Existing-Auth-Header': true
+        'secureHttpHeaders.X-Existing-Auth-Header': true,
       },
     } as any as DataSourceSettings<CHConfig, CHSecureConfig>;
 
@@ -58,32 +58,32 @@ describe('onHttpHeadersChange', () => {
           {
             name: 'X-Existing-Auth-Header',
             value: '',
-            secure: true
+            secure: true,
           },
           {
             name: 'X-Existing-Header',
             value: 'existing value',
-            secure: false
+            secure: false,
           },
           {
             name: 'Authorization',
             value: '',
-            secure: true
+            secure: true,
           },
           {
             name: 'X-Custom-Header',
             value: 'plain text value',
-            secure: false
+            secure: false,
           },
-        ]
+        ],
       },
       secureJsonFields: {
         'secureHttpHeaders.X-Existing-Auth-Header': true,
-        'secureHttpHeaders.Authorization': true
+        'secureHttpHeaders.Authorization': true,
       },
       secureJsonData: {
-        'secureHttpHeaders.Authorization': 'secret1234'
-      }
+        'secureHttpHeaders.Authorization': 'secret1234',
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -97,11 +97,11 @@ describe('useConfigDefaults', () => {
     logs: {
       defaultTable: defaultLogsTable,
       selectContextColumns: true,
-      contextColumns: []
+      contextColumns: [],
     },
     traces: {
-      defaultTable: defaultTraceTable
-    }
+      defaultTable: defaultTraceTable,
+    },
   };
 
   it('should rename v3 fields to latest config names', async () => {
@@ -109,18 +109,18 @@ describe('useConfigDefaults', () => {
     const options = {
       jsonData: {
         server: 'address',
-        timeout: '8'
-      }
+        timeout: '8',
+      },
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
       jsonData: {
         ...expectedDefaults,
         host: 'address',
-        dialTimeout: '8'
-      }
+        dialTimeout: '8',
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -130,17 +130,17 @@ describe('useConfigDefaults', () => {
     const onOptionsChange = jest.fn();
     const options = {
       jsonData: {
-        server: 'address'
-      }
+        server: 'address',
+      },
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
       jsonData: {
         ...expectedDefaults,
-        host: 'address'
-      }
+        host: 'address',
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -153,18 +153,18 @@ describe('useConfigDefaults', () => {
         server: 'old',
         host: 'new',
         timeout: '6',
-        dialTimeout: '8'
-      }
+        dialTimeout: '8',
+      },
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
       jsonData: {
         ...expectedDefaults,
         host: 'new',
-        dialTimeout: '8'
-      }
+        dialTimeout: '8',
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -175,17 +175,17 @@ describe('useConfigDefaults', () => {
     const options = {
       jsonData: {
         protocol: Protocol.Native,
-      }
+      },
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
       jsonData: {
         ...expectedDefaults,
         version: pluginVersion,
         protocol: Protocol.Native,
-      }
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -197,17 +197,17 @@ describe('useConfigDefaults', () => {
       jsonData: {
         version: '3.0.0',
         protocol: Protocol.Native,
-      }
+      },
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
       jsonData: {
         ...expectedDefaults,
         version: pluginVersion,
         protocol: Protocol.Native,
-      }
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -221,15 +221,15 @@ describe('useConfigDefaults', () => {
         dialTimeout: 20,
         protocol: Protocol.Http,
         logs: {
-          defaultTable: 'not_default_logs'
+          defaultTable: 'not_default_logs',
         },
         traces: {
-          defaultTable: '' // empty
-        }
-      }
+          defaultTable: '', // empty
+        },
+      },
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
       jsonData: {
@@ -238,12 +238,12 @@ describe('useConfigDefaults', () => {
         dialTimeout: 20,
         protocol: Protocol.Http,
         logs: {
-          defaultTable: 'not_default_logs'
+          defaultTable: 'not_default_logs',
         },
         traces: {
-          defaultTable: ''
-        }
-      }
+          defaultTable: '',
+        },
+      },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -252,13 +252,13 @@ describe('useConfigDefaults', () => {
   it('should apply defaults for unset config fields', async () => {
     const onOptionsChange = jest.fn();
     const options = {
-      jsonData: {}
+      jsonData: {},
     } as any as DataSourceSettings<CHConfig>;
 
-    renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
 
     const expectedOptions = {
-      jsonData: { ...expectedDefaults }
+      jsonData: { ...expectedDefaults },
     };
     expect(onOptionsChange).toHaveBeenCalledTimes(1);
     expect(onOptionsChange).toHaveBeenCalledWith(expect.objectContaining(expectedOptions));
@@ -267,10 +267,10 @@ describe('useConfigDefaults', () => {
   it('should not call onOptionsChange after defaults are already set', async () => {
     const onOptionsChange = jest.fn();
     const options = {
-      jsonData: {}
+      jsonData: {},
     } as any as DataSourceSettings<CHConfig>;
 
-    const hook = renderHook(opts => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
+    const hook = renderHook((opts) => useConfigDefaults(opts, onOptionsChange), { initialProps: options });
     hook.rerender();
 
     expect(onOptionsChange).toHaveBeenCalledTimes(1);

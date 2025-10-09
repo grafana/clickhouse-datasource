@@ -131,7 +131,7 @@ export const FilterValueEditor = (props: {
       onFilterChange({ ...filter, value });
     };
     const dateOptions = [...standardTimeOptions];
-    if (filter.value && !standardTimeOptions.find(o => o.value === filter.value)) {
+    if (filter.value && !standardTimeOptions.find((o) => o.value === filter.value)) {
       dateOptions.push({ label: filter.value, value: filter.value });
     }
 
@@ -139,7 +139,7 @@ export const FilterValueEditor = (props: {
       <div data-testid="query-builder-filters-date-value-container">
         <Select
           value={filter.value || 'TODAY'}
-          onChange={e => onDateFilterValueChange(e.value!)}
+          onChange={(e) => onDateFilterValueChange(e.value!)}
           options={dateOptions}
           width={40}
           allowCustomValue
@@ -205,13 +205,13 @@ export const FilterEditor = (props: {
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
-  const mapKeyOptions = mapKeys.map(k => ({ label: k, value: k }));
+  const mapKeyOptions = mapKeys.map((k) => ({ label: k, value: k }));
   if (filter.mapKey && !mapKeys.includes(filter.mapKey)) {
     mapKeyOptions.push({ label: filter.mapKey, value: filter.mapKey });
   }
 
   const getFields = () => {
-    const values = (filter.restrictToFields || fieldsList).map(f => {
+    const values = (filter.restrictToFields || fieldsList).map((f) => {
       let label = f.label || f.name;
       if (f.type.startsWith('Map')) {
         label += '[]';
@@ -284,7 +284,7 @@ export const FilterEditor = (props: {
   };
   const onFilterNameChange = (fieldName: string) => {
     setIsOpen(false);
-    const matchingField = fieldsList.find(f => f.name === fieldName);
+    const matchingField = fieldsList.find((f) => f.name === fieldName);
     const filterData = {
       key: matchingField?.name || fieldName,
       type: matchingField?.type || 'String',
@@ -378,18 +378,18 @@ export const FilterEditor = (props: {
         allowCustomValue
         menuPlacement={'bottom'}
       />
-      { (isMapType || isJSONType) &&
+      {(isMapType || isJSONType) && (
         <Select
           value={filter.mapKey}
           placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
           width={40}
           className={styles.Common.inlineSelect}
           options={mapKeyOptions}
-          onChange={e => onFilterMapKeyChange(e.value!)}
+          onChange={(e) => onFilterMapKeyChange(e.value!)}
           allowCustomValue
           menuPlacement={'bottom'}
-        />  
-      }
+        />
+      )}
       <Select
         value={filter.operator}
         width={40}

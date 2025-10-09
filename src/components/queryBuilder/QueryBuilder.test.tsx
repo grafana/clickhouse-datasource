@@ -59,7 +59,7 @@ describe('QueryBuilder', () => {
           }}
           builderOptionsDispatch={() => {}}
           datasource={mockDs}
-          generatedSql=''
+          generatedSql=""
         />
       )
     );
@@ -81,14 +81,14 @@ describe('QueryBuilder', () => {
           }}
           builderOptionsDispatch={() => {}}
           datasource={mockDs}
-          generatedSql=''
+          generatedSql=""
         />
       </React.Suspense>
     );
     expect(screen.getByTestId('table-component')).toBeInTheDocument();
   });
 
-  it('renders LogsQueryBuilder when queryType is Logs', async() => {
+  it('renders LogsQueryBuilder when queryType is Logs', async () => {
     render(
       <QueryBuilder
         app={CoreApp.PanelEditor}
@@ -102,13 +102,13 @@ describe('QueryBuilder', () => {
         }}
         builderOptionsDispatch={() => {}}
         datasource={mockDs}
-        generatedSql=''
+        generatedSql=""
       />
     );
     expect(screen.getByTestId('logs-component')).toBeInTheDocument();
   });
 
-  it('renders TimeSeriesQueryBuilder when queryType is TimeSeries', async() => {
+  it('renders TimeSeriesQueryBuilder when queryType is TimeSeries', async () => {
     render(
       <QueryBuilder
         app={CoreApp.PanelEditor}
@@ -122,13 +122,15 @@ describe('QueryBuilder', () => {
         }}
         builderOptionsDispatch={() => {}}
         datasource={mockDs}
-        generatedSql=''
+        generatedSql=""
       />
     );
-    await waitFor(() => {expect(screen.getByTestId('time-series-component')).toBeInTheDocument();});
+    await waitFor(() => {
+      expect(screen.getByTestId('time-series-component')).toBeInTheDocument();
+    });
   });
 
-  it('renders TraceQueryBuilder when queryType is Traces', async() => {
+  it('renders TraceQueryBuilder when queryType is Traces', async () => {
     render(
       <QueryBuilder
         app={CoreApp.PanelEditor}
@@ -142,9 +144,11 @@ describe('QueryBuilder', () => {
         }}
         builderOptionsDispatch={() => {}}
         datasource={mockDs}
-        generatedSql=''
+        generatedSql=""
       />
     );
-    await waitFor(() => {expect(screen.getByTestId('trace-component')).toBeInTheDocument();});
+    await waitFor(() => {
+      expect(screen.getByTestId('trace-component')).toBeInTheDocument();
+    });
   });
 });

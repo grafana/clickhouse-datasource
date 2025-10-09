@@ -1,10 +1,24 @@
 import { columnFilterDateTime } from 'data/columnFilters';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import React, { useEffect, useRef } from 'react';
-import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, OrderBy, OrderByDirection, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import {
+  ColumnHint,
+  DateFilterWithoutValue,
+  Filter,
+  FilterOperator,
+  OrderBy,
+  OrderByDirection,
+  SelectedColumn,
+  TableColumn,
+} from 'types/queryBuilder';
 
 // Finds and selects a default log time column, updates when table changes
-export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: string, timeColumn: SelectedColumn | undefined, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useDefaultTimeColumn = (
+  allColumns: readonly TableColumn[],
+  table: string,
+  timeColumn: SelectedColumn | undefined,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
   const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn));
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
@@ -24,7 +38,7 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
     const timeColumn: SelectedColumn = {
       name: col.name,
       type: col.type,
-      hint: ColumnHint.Time
+      hint: ColumnHint.Time,
     };
 
     builderOptionsDispatch(setColumnByHint(timeColumn));
@@ -34,7 +48,11 @@ export const useDefaultTimeColumn = (allColumns: readonly TableColumn[], table: 
 };
 
 // Apply default filters on table change
-export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useDefaultFilters = (
+  table: string,
+  isNewQuery: boolean,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
@@ -53,19 +71,19 @@ export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOpt
         filterType: 'custom',
         key: '',
         hint: ColumnHint.Time,
-        condition: 'AND'
-      } as DateFilterWithoutValue
+        condition: 'AND',
+      } as DateFilterWithoutValue,
     ];
 
-    const defaultOrderBy: OrderBy[] = [
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true }
-    ];
-    
+    const defaultOrderBy: OrderBy[] = [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true }];
+
     lastTable.current = table;
     appliedDefaultFilters.current = true;
-    builderOptionsDispatch(setOptions({
-      filters: defaultFilters,
-      orderBy: defaultOrderBy,
-    }));
+    builderOptionsDispatch(
+      setOptions({
+        filters: defaultFilters,
+        orderBy: defaultOrderBy,
+      })
+    );
   }, [table, builderOptionsDispatch]);
 };

@@ -10,7 +10,7 @@ export enum EditorType {
 }
 
 export interface CHQueryBase extends DataQuery {
-  pluginVersion: string,
+  pluginVersion: string;
   editorType: EditorType;
   rawSql: string;
 
@@ -56,7 +56,7 @@ export const defaultCHBuilderQuery: Omit<CHBuilderQuery, 'refId'> = {
     mode: BuilderMode.List,
     columns: [],
     meta: {},
-    limit: 1000
+    limit: 1000,
   },
 };
 export const defaultCHSqlQuery: Omit<CHSqlQuery, 'refId'> = {

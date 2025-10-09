@@ -8,7 +8,7 @@ export interface ModeSwitchProps {
   onChange: (value: boolean) => void;
   label: string;
   tooltip: string;
-};
+}
 
 /**
  * Component for switching between modes. Boxes are labeled unlike regular Switch.
@@ -32,11 +32,7 @@ export const ModeSwitch = (props: ModeSwitchProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup<boolean>
-        options={options}
-        value={value}
-        onChange={v => onChange(v)}
-      />
+      <RadioButtonGroup<boolean> options={options} value={value} onChange={(v) => onChange(v)} />
     </div>
   );
-}
+};

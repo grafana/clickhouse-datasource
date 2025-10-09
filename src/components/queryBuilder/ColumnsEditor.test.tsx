@@ -9,9 +9,7 @@ describe('ColumnsEditor', () => {
     { name: 'name', type: 'string', picklistValues: [] },
     { name: 'dummy', type: 'string', picklistValues: [] },
   ];
-  const selectedColumns: SelectedColumn[] = [
-    { name: 'name' },
-  ];
+  const selectedColumns: SelectedColumn[] = [{ name: 'name' }];
 
   it('should render default value when no options passed', () => {
     const result = render(<ColumnsEditor allColumns={[]} selectedColumns={[]} onSelectedColumnsChange={() => {}} />);
@@ -20,7 +18,9 @@ describe('ColumnsEditor', () => {
   });
 
   it('should render the correct values when passed', () => {
-    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={() => {}} />);
+    const result = render(
+      <ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={() => {}} />
+    );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
 
@@ -33,7 +33,13 @@ describe('ColumnsEditor', () => {
 
   it('should call onSelectedColumnsChange when a column is selected', () => {
     const onSelectedColumnsChange = jest.fn();
-    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={onSelectedColumnsChange} />);
+    const result = render(
+      <ColumnsEditor
+        allColumns={allColumns}
+        selectedColumns={selectedColumns}
+        onSelectedColumnsChange={onSelectedColumnsChange}
+      />
+    );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
 
@@ -49,7 +55,13 @@ describe('ColumnsEditor', () => {
 
   it('should call onSelectedColumnsChange when a column is deselected', () => {
     const onSelectedColumnsChange = jest.fn();
-    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={onSelectedColumnsChange} />);
+    const result = render(
+      <ColumnsEditor
+        allColumns={allColumns}
+        selectedColumns={selectedColumns}
+        onSelectedColumnsChange={onSelectedColumnsChange}
+      />
+    );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)).toBeInTheDocument();
 
@@ -61,7 +73,13 @@ describe('ColumnsEditor', () => {
 
   it('should close when clicked outside', () => {
     const onSelectedColumnsChange = jest.fn();
-    const result = render(<ColumnsEditor allColumns={allColumns} selectedColumns={selectedColumns} onSelectedColumnsChange={onSelectedColumnsChange} />);
+    const result = render(
+      <ColumnsEditor
+        allColumns={allColumns}
+        selectedColumns={selectedColumns}
+        onSelectedColumnsChange={onSelectedColumnsChange}
+      />
+    );
     expect(onSelectedColumnsChange).toHaveBeenCalledTimes(0);
 
     const multiSelect = result.getByRole('combobox');

@@ -2,23 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 
 export default (datasource: Datasource, database: string): readonly string[] => {
-  const [tables, setTables] = useState<string[]>([]); 
-  
+  const [tables, setTables] = useState<string[]>([]);
+
   useEffect(() => {
     if (!datasource || !database) {
       return;
     }
 
     let ignore = false;
-    datasource.
-      fetchTables(database).
-      then(tables => {
+    datasource
+      .fetchTables(database)
+      .then((tables) => {
         if (ignore) {
           return;
         }
         setTables(tables);
-      }).
-      catch((ex: any) => {
+      })
+      .catch((ex: any) => {
         console.error('Failed to fetch tables for database:', database, ex);
       });
 
@@ -36,4 +36,4 @@ export default (datasource: Datasource, database: string): readonly string[] => 
   }
 
   return tables;
-}
+};

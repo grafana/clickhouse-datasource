@@ -56,10 +56,10 @@ export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
     builder_query_type_traces_search: 0,
     builder_query_type_traces_id: 0,
     builder_minimized_queries: 0,
-    builder_otel_queries: 0
+    builder_otel_queries: 0,
   };
 
-  queries.forEach(q => {
+  queries.forEach((q) => {
     if (q.editorType === EditorType.SQL) {
       c.sql_queries++;
 

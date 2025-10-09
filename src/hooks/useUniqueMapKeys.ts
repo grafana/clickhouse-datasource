@@ -2,23 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 
 export default (datasource: Datasource, mapColumn: string, database: string, table: string): readonly string[] => {
-  const [keys, setKeys] = useState<string[]>([]); 
-  
+  const [keys, setKeys] = useState<string[]>([]);
+
   useEffect(() => {
     if (!datasource || !mapColumn || !database || !table) {
       return;
     }
 
     let ignore = false;
-    datasource.
-      fetchUniqueMapKeys(mapColumn, database, table).
-      then(tables => {
+    datasource
+      .fetchUniqueMapKeys(mapColumn, database, table)
+      .then((tables) => {
         if (ignore) {
           return;
         }
         setKeys(tables);
-      }).
-      catch((ex: any) => {
+      })
+      .catch((ex: any) => {
         console.error('Failed to fetch map keys for column:', mapColumn, database, table, ex);
       });
 
@@ -38,4 +38,4 @@ export default (datasource: Datasource, mapColumn: string, database: string, tab
   }
 
   return keys;
-}
+};

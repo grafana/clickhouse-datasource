@@ -17,15 +17,11 @@ describe('OrderByEditor', () => {
     expect(result.container.firstChild).toBeNull();
   });
   it('should render component when fields passed', () => {
-    const result = render(
-      <OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={() => {}} />
-    );
+    const result = render(<OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
   });
   it('should render default add button when no orderby fields passed', () => {
-    const result = render(
-      <OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={() => {}} />
-    );
+    const result = render(<OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId('query-builder-orderby-add-button')).toBeInTheDocument();
     expect(result.queryByTestId('query-builder-orderby-item-wrapper')).not.toBeInTheDocument();
@@ -77,11 +73,7 @@ describe('OrderByEditor', () => {
   it('should add default item when add button clicked', async () => {
     const onOrderByChange = jest.fn();
     const result = render(
-      <OrderByEditor
-        orderByOptions={[testOptions[0]]}
-        orderBy={[]}
-        onOrderByChange={onOrderByChange}
-      />
+      <OrderByEditor orderByOptions={[testOptions[0]]} orderBy={[]} onOrderByChange={onOrderByChange} />
     );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByTestId('query-builder-orderby-add-button')).toBeInTheDocument();
@@ -194,7 +186,7 @@ describe('getOrderByOptions', () => {
       {
         label: 'max(field2)',
         value: 'max(field2)',
-      }
+      },
     ]);
   });
   it('should return correct label and value for aggregates with aliases', () => {
@@ -212,7 +204,7 @@ describe('getOrderByOptions', () => {
       {
         label: 'max(field1) as a',
         value: 'a',
-      }
+      },
     ]);
   });
   it('should show options from selected columns, aggregates, and groupBy', () => {
@@ -223,10 +215,8 @@ describe('getOrderByOptions', () => {
           table: 'foo',
           queryType: QueryType.Table,
           columns: [{ name: 'field1' }],
-          aggregates: [
-            { column: 'field2', aggregateType: AggregateType.Max },
-          ],
-          groupBy: ['field2']
+          aggregates: [{ column: 'field2', aggregateType: AggregateType.Max }],
+          groupBy: ['field2'],
         },
         allColumns
       )

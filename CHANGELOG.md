@@ -13,7 +13,7 @@
 - Merge OpenTelemetry resource/scope/log attributes into a unified Labels column in Logs (#1369)
 - First part of redesigned ClickHouse config page with sidebar navigation and collapsible sections (behind newClickhouseConfigPageDesign) (#1370)
 
-### Fixes 
+### Fixes
 
 - Fix ad-hoc filter application with templated target tables (#1241)
 - Fix column sorting by formatting bytes in Grafana (#1352)
@@ -44,7 +44,7 @@
 
 - Ad-hoc queries: Allow to filter by values inside the map (#1265)
 
-### Fixes 
+### Fixes
 
 - Fix ad-hoc filter application with templated target tables (#1241)
 - Dependency updates

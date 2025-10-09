@@ -5,19 +5,19 @@ import otel from 'otel';
 import selectors from 'labels';
 
 interface OtelVersionSelectProps {
-  enabled: boolean,
-  onEnabledChange: (enabled: boolean) => void,
-  selectedVersion: string,
-  onVersionChange: (version: string) => void,
-  wide?: boolean,
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  selectedVersion: string;
+  onVersionChange: (version: string) => void;
+  wide?: boolean;
 }
 
 export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   const { enabled, onEnabledChange, selectedVersion, onVersionChange, wide } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
-  const options: SelectableValue[] = otel.versions.map(v => ({
+  const options: SelectableValue[] = otel.versions.map((v) => ({
     label: v.name,
-    value: v.version
+    value: v.version,
   }));
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
         <GrafanaSwitch
           className="gf-form"
           value={enabled}
-          onChange={e => onEnabledChange(e.currentTarget.checked)}
+          onChange={(e) => onEnabledChange(e.currentTarget.checked)}
           role="checkbox"
         />
       </div>
@@ -52,7 +52,7 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
         disabled={!enabled}
         options={options}
         width={20}
-        onChange={e => onVersionChange(e.value)}
+        onChange={(e) => onVersionChange(e.value)}
         value={selectedVersion}
         menuPlacement={'bottom'}
       />

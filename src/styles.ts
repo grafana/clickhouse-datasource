@@ -57,7 +57,7 @@ export const styles = {
     `,
     inlineField: css`
       margin-left: 7px;
-    `
+    `,
   },
   FormatSelector: {
     formatSelector: css`

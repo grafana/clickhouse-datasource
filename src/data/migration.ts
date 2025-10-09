@@ -1,10 +1,10 @@
-import { ColumnHint, Filter, QueryBuilderOptions, QueryType, SelectedColumn } from "types/queryBuilder";
-import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from "types/sql";
-import { isVersionGtOrEq, pluginVersion } from "utils/version";
-import { mapGrafanaFormatToQueryType } from "./utils";
+import { ColumnHint, Filter, QueryBuilderOptions, QueryType, SelectedColumn } from 'types/queryBuilder';
+import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
+import { isVersionGtOrEq, pluginVersion } from 'utils/version';
+import { mapGrafanaFormatToQueryType } from './utils';
 
-export type AnyCHQuery = Partial<CHQuery> & {[k: string]: any};
-export type AnyQueryBuilderOptions = Partial<QueryBuilderOptions> & {[k: string]: any};
+export type AnyCHQuery = Partial<CHQuery> & { [k: string]: any };
+export type AnyQueryBuilderOptions = Partial<QueryBuilderOptions> & { [k: string]: any };
 
 /**
  * Takes a CHQuery and transforms it to the latest interface.
@@ -40,7 +40,7 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
 
     if (savedQuery?.meta?.timezone) {
       builderQuery.meta = {
-        timezone: savedQuery.meta.timezone
+        timezone: savedQuery.meta.timezone,
       };
     }
 
@@ -60,7 +60,7 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
     refId: savedQuery.refId || '',
     format: savedQuery.format,
     queryType: mapGrafanaFormatToQueryType(savedQuery.format),
-    meta: {}
+    meta: {},
   };
 
   if (savedQuery.expand) {
@@ -68,7 +68,7 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
   }
 
   if (savedQuery.meta) {
-    const meta = (savedQuery.meta as any);
+    const meta = savedQuery.meta as any;
     if (meta.timezone) {
       rawSqlQuery.meta!.timezone = meta.timezone;
     }
@@ -94,7 +94,7 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
     database: savedOptions.database || '',
     table: savedOptions.table || '',
     queryType: getV3QueryType(savedOptions),
-    columns: []
+    columns: [],
   };
 
   if (savedOptions.mode) {
@@ -106,24 +106,23 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
     mapped.columns = oldColumns.map((name: string) => ({ name }));
   }
 
-
   const timeField: string = savedOptions['timeField'];
   const timeFieldType: string = savedOptions['timeFieldType'];
   if (timeField) {
     const timeColumn: SelectedColumn = {
       name: timeField,
       type: timeFieldType,
-      hint: ColumnHint.Time
+      hint: ColumnHint.Time,
     };
 
     mapped.columns!.push(timeColumn);
   }
-  
+
   const logLevelField: string = savedOptions['logLevelField'];
   if (logLevelField) {
     const logLevelColumn: SelectedColumn = {
       name: logLevelField,
-      hint: ColumnHint.LogLevel
+      hint: ColumnHint.LogLevel,
     };
 
     mapped.columns!.push(logLevelColumn);
@@ -131,10 +130,10 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
 
   if (savedOptions['metrics'] || Array.isArray(savedOptions['metrics'])) {
     const oldAggregates: any[] = savedOptions['metrics'];
-    mapped.aggregates = oldAggregates.map(agg => ({
+    mapped.aggregates = oldAggregates.map((agg) => ({
       aggregateType: agg['aggregation'],
       column: agg['field'],
-      alias: agg['alias']
+      alias: agg['alias'],
     }));
   }
 
@@ -143,7 +142,7 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
 
     mapped.filters = oldFilters.map((filter: Filter) => {
       const result: Filter = {
-        ...filter
+        ...filter,
       };
 
       if (filter.key === timeField) {
@@ -170,7 +169,6 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
 
   return mapped;
 };
-
 
 /**
  * Checks if CHQuery is from <= v3 options.

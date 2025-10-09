@@ -20,7 +20,9 @@ describe('GroupByEditor', () => {
     const allColumns: readonly TableColumn[] = [{ name: 'a', type: 'string', picklistValues: [] }];
     const groupBy: string[] = ['b'];
     const onGroupByChange = jest.fn();
-    const result = render(<GroupByEditor allColumns={allColumns} groupBy={groupBy} onGroupByChange={onGroupByChange} />);
+    const result = render(
+      <GroupByEditor allColumns={allColumns} groupBy={groupBy} onGroupByChange={onGroupByChange} />
+    );
     expect(result.container.firstChild).not.toBeNull();
 
     const multiSelect = result.getByRole('combobox');

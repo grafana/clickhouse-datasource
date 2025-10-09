@@ -1,14 +1,30 @@
-import { Datasource } from "data/CHDatasource";
-import { columnFilterDateTime } from "data/columnFilters";
-import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from "hooks/useBuilderOptionsState";
-import { useEffect, useMemo, useRef } from "react";
-import { ColumnHint, DateFilterWithoutValue, Filter, FilterOperator, OrderBy, OrderByDirection, QueryBuilderOptions, SelectedColumn, StringFilter, TableColumn } from "types/queryBuilder";
+import { Datasource } from 'data/CHDatasource';
+import { columnFilterDateTime } from 'data/columnFilters';
+import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import { useEffect, useMemo, useRef } from 'react';
+import {
+  ColumnHint,
+  DateFilterWithoutValue,
+  Filter,
+  FilterOperator,
+  OrderBy,
+  OrderByDirection,
+  QueryBuilderOptions,
+  SelectedColumn,
+  StringFilter,
+  TableColumn,
+} from 'types/queryBuilder';
 import otel from 'otel';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
  */
-export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolean, builderOptions: QueryBuilderOptions, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useLogDefaultsOnMount = (
+  datasource: Datasource,
+  isNewQuery: boolean,
+  builderOptions: QueryBuilderOptions,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
   const didSetDefaults = useRef<boolean>(false);
   useEffect(() => {
     if (!isNewQuery || didSetDefaults.current) {
@@ -40,24 +56,38 @@ export const useLogDefaultsOnMount = (datasource: Datasource, isNewQuery: boolea
       }
     }
 
-    builderOptionsDispatch(setOptions({
-      database: defaultDb,
-      table: defaultTable || builderOptions.table,
-      columns: nextColumns,
-      meta: {
-        otelEnabled: Boolean(otelVersion),
-        otelVersion,
-      }
-    }));
+    builderOptionsDispatch(
+      setOptions({
+        database: defaultDb,
+        table: defaultTable || builderOptions.table,
+        columns: nextColumns,
+        meta: {
+          otelEnabled: Boolean(otelVersion),
+          otelVersion,
+        },
+      })
+    );
     didSetDefaults.current = true;
-  }, [builderOptions.columns, builderOptions.orderBy, builderOptions.table, builderOptionsDispatch, datasource, isNewQuery]);
+  }, [
+    builderOptions.columns,
+    builderOptions.orderBy,
+    builderOptions.table,
+    builderOptionsDispatch,
+    datasource,
+    isNewQuery,
+  ]);
 };
 
 /**
  * Sets OTEL Logs columns automatically when OTEL is enabled.
  * Does not run if OTEL is already enabled, only when it's changed.
  */
-export const useOtelColumns = (datasource: Datasource, otelEnabled: boolean, otelVersion: string, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useOtelColumns = (
+  datasource: Datasource,
+  otelEnabled: boolean,
+  otelVersion: string,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
   if (!otelEnabled) {
     didSetColumns.current = false;
@@ -100,8 +130,18 @@ export const useOtelColumns = (datasource: Datasource, otelEnabled: boolean, ote
 };
 
 // Finds and selects a default log time column, updates when table changes
-export const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonly TableColumn[], table: string, timeColumn: SelectedColumn | undefined, otelEnabled: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
-  const hasDefaultColumnConfigured = useMemo(() => Boolean(datasource.getDefaultLogsTable()) && datasource.getDefaultLogsColumns().has(ColumnHint.Time), [datasource]);
+export const useDefaultTimeColumn = (
+  datasource: Datasource,
+  allColumns: readonly TableColumn[],
+  table: string,
+  timeColumn: SelectedColumn | undefined,
+  otelEnabled: boolean,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
+  const hasDefaultColumnConfigured = useMemo(
+    () => Boolean(datasource.getDefaultLogsTable()) && datasource.getDefaultLogsColumns().has(ColumnHint.Time),
+    [datasource]
+  );
   const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn) || hasDefaultColumnConfigured);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
@@ -126,7 +166,7 @@ export const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonl
     const timeColumn: SelectedColumn = {
       name: col.name,
       type: col.type,
-      hint: ColumnHint.Time
+      hint: ColumnHint.Time,
     };
 
     builderOptionsDispatch(setColumnByHint(timeColumn));
@@ -136,7 +176,11 @@ export const useDefaultTimeColumn = (datasource: Datasource, allColumns: readonl
 };
 
 // Apply default filters/orderBy on table change
-export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>) => {
+export const useDefaultFilters = (
+  table: string,
+  isNewQuery: boolean,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
   if (table !== lastTable.current) {
@@ -155,7 +199,7 @@ export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOpt
         filterType: 'custom',
         key: '',
         hint: ColumnHint.Time,
-        condition: 'AND'
+        condition: 'AND',
       } as DateFilterWithoutValue,
       {
         type: 'string',
@@ -163,19 +207,19 @@ export const useDefaultFilters = (table: string, isNewQuery: boolean, builderOpt
         filterType: 'custom',
         key: '',
         hint: ColumnHint.LogLevel,
-        condition: 'AND'
+        condition: 'AND',
       } as StringFilter,
     ];
 
-    const defaultOrderBy: OrderBy[] = [
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true }
-    ];
-    
+    const defaultOrderBy: OrderBy[] = [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true }];
+
     lastTable.current = table;
     appliedDefaultFilters.current = true;
-    builderOptionsDispatch(setOptions({
-      filters: defaultFilters,
-      orderBy: defaultOrderBy
-    }));
+    builderOptionsDispatch(
+      setOptions({
+        filters: defaultFilters,
+        orderBy: defaultOrderBy,
+      })
+    );
   }, [table, builderOptionsDispatch]);
 };

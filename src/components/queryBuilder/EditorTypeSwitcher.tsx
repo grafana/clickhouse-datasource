@@ -58,7 +58,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
           builderOptions = defaultCHBuilderQuery.builderOptions;
           break;
       }
-      
+
       if (editorType === EditorType.SQL) {
         onChange({
           ...query,
@@ -74,7 +74,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
           editorType: EditorType.Builder,
           queryType: builderOptions.queryType,
           rawSql: generateSql(builderOptions),
-          builderOptions
+          builderOptions,
         });
       }
     }
@@ -89,7 +89,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <RadioButtonGroup options={options} value={editorType} onChange={e => onEditorTypeChange(e)} />
+      <RadioButtonGroup options={options} value={editorType} onChange={(e) => onEditorTypeChange(e)} />
       <ConfirmModal
         isOpen={confirmModalState}
         title={switcher.title}

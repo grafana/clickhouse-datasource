@@ -25,17 +25,27 @@ interface LogsConfigProps {
 
 export const LogsConfig = (props: LogsConfigProps) => {
   const {
-    onDefaultDatabaseChange, onDefaultTableChange,
-    onOtelEnabledChange, onOtelVersionChange,
-    onTimeColumnChange, onLevelColumnChange, onMessageColumnChange,
-    onSelectContextColumnsChange, onContextColumnsChange
+    onDefaultDatabaseChange,
+    onDefaultTableChange,
+    onOtelEnabledChange,
+    onOtelVersionChange,
+    onTimeColumnChange,
+    onLevelColumnChange,
+    onMessageColumnChange,
+    onSelectContextColumnsChange,
+    onContextColumnsChange,
   } = props;
   let {
-    defaultDatabase, defaultTable,
-    otelEnabled, otelVersion,
-    timeColumn, levelColumn, messageColumn,
-    selectContextColumns, contextColumns
-  } = (props.logsConfig || {});
+    defaultDatabase,
+    defaultTable,
+    otelEnabled,
+    otelVersion,
+    timeColumn,
+    levelColumn,
+    messageColumn,
+    selectContextColumns,
+    contextColumns,
+  } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
 
   const otelConfig = otel.getVersion(otelVersion);
@@ -45,46 +55,35 @@ export const LogsConfig = (props: LogsConfigProps) => {
     messageColumn = otelConfig.logColumnMap.get(ColumnHint.LogMessage);
   }
 
-  const onContextColumnsChangeTrimmed = (columns: string[]) => onContextColumnsChange(columns.map(c => c.trim()).filter(c => c));
+  const onContextColumnsChangeTrimmed = (columns: string[]) =>
+    onContextColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
 
   return (
-    <ConfigSection
-      title={labels.title}
-      description={labels.description}
-    >
+    <ConfigSection title={labels.title} description={labels.description}>
       <div id="logs-config" />
-      <Field
-        label={labels.defaultDatabase.label}
-        description={labels.defaultDatabase.description}
-      >
+      <Field label={labels.defaultDatabase.label} description={labels.defaultDatabase.description}>
         <Input
           name={labels.defaultDatabase.name}
           width={40}
           value={defaultDatabase || ''}
-          onChange={e => onDefaultDatabaseChange(e.currentTarget.value)}
+          onChange={(e) => onDefaultDatabaseChange(e.currentTarget.value)}
           label={labels.defaultDatabase.label}
           aria-label={labels.defaultDatabase.label}
           placeholder={labels.defaultDatabase.placeholder}
         />
       </Field>
-      <Field
-        label={labels.defaultTable.label}
-        description={labels.defaultTable.description}
-      >
+      <Field label={labels.defaultTable.label} description={labels.defaultTable.description}>
         <Input
           name={labels.defaultTable.name}
           width={40}
           value={defaultTable || ''}
-          onChange={e => onDefaultTableChange(e.currentTarget.value)}
+          onChange={(e) => onDefaultTableChange(e.currentTarget.value)}
           label={labels.defaultTable.label}
           aria-label={labels.defaultTable.label}
           placeholder={defaultLogsTable}
         />
       </Field>
-      <ConfigSubSection
-        title={labels.columns.title}
-        description={labels.columns.description}
-      >
+      <ConfigSubSection title={labels.columns.title} description={labels.columns.description}>
         <OtelVersionSelect
           enabled={otelEnabled || false}
           selectedVersion={otelVersion || ''}
@@ -117,11 +116,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={onMessageColumnChange}
         />
       </ConfigSubSection>
-      <br/>
-      <ConfigSubSection
-        title={labels.contextColumns.title}
-        description={labels.contextColumns.description}
-      >
+      <br />
+      <ConfigSubSection title={labels.contextColumns.title} description={labels.contextColumns.description}>
         <Switch
           label={labels.contextColumns.selectContextColumns.label}
           tooltip={labels.contextColumns.selectContextColumns.tooltip}
@@ -143,4 +139,4 @@ export const LogsConfig = (props: LogsConfigProps) => {
       </ConfigSubSection>
     </ConfigSection>
   );
-}
+};

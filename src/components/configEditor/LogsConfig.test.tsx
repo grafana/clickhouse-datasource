@@ -147,7 +147,9 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.time.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.time.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -173,7 +175,9 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.level.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.level.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -199,7 +203,9 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.message.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.message.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);

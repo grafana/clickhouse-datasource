@@ -100,11 +100,11 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const onEditorWillUnmount = () => {
-    editorRef.current = null
+    editorRef.current = null;
   };
   const triggerFormat = () => {
     if (editorRef.current !== null) {
-      editorRef.current.trigger("editor", "editor.action.formatDocument", "");
+      editorRef.current.trigger('editor', 'editor.action.formatDocument', '');
     }
   };
 
@@ -125,10 +125,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
           onEditorDidMount={handleMount}
           onEditorWillUnmount={onEditorWillUnmount}
         />
-        <QueryToolbox
-          showTools
-          onFormatCode={triggerFormat}
-        />
+        <QueryToolbox showTools onFormatCode={triggerFormat} />
       </div>
     </>
   );

@@ -10,14 +10,7 @@ describe('ModeSwitch', () => {
 
   it('should render', () => {
     const result = render(
-      <ModeSwitch
-        labelA={labelA}
-        labelB={labelB}
-        value={false}
-        onChange={() => {}}
-        label={label}
-        tooltip={tooltip}
-      />
+      <ModeSwitch labelA={labelA} labelB={labelB} value={false} onChange={() => {}} label={label} tooltip={tooltip} />
     );
 
     expect(result.container.firstChild).not.toBeNull();
@@ -26,14 +19,7 @@ describe('ModeSwitch', () => {
   it('should call onChange when mode is changed', () => {
     const onChange = jest.fn();
     const result = render(
-      <ModeSwitch
-        labelA={labelA}
-        labelB={labelB}
-        value={false}
-        onChange={onChange}
-        label={label}
-        tooltip={tooltip}
-      />
+      <ModeSwitch labelA={labelA} labelB={labelB} value={false} onChange={onChange} label={label} tooltip={tooltip} />
     );
     expect(result.container.firstChild).not.toBeNull();
 
@@ -47,14 +33,7 @@ describe('ModeSwitch', () => {
     expect(onChange).toBeCalledWith(true);
 
     result.rerender(
-      <ModeSwitch
-        labelA={labelA}
-        labelB={labelB}
-        value={true}
-        onChange={onChange}
-        label={label}
-        tooltip={tooltip}
-      />
+      <ModeSwitch labelA={labelA} labelB={labelB} value={true} onChange={onChange} label={label} tooltip={tooltip} />
     );
 
     fireEvent.click(buttonA);

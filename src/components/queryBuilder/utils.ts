@@ -36,7 +36,6 @@ import { getColumnByHint, logColumnHintsToAlias } from 'data/sqlGenerator';
 import { Datasource } from 'data/CHDatasource';
 import { tryApplyColumnHints } from 'data/utils';
 
-
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type?.toLowerCase());
 };
@@ -81,7 +80,11 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
   return isStringType(filter.type) && [FilterOperator.In, FilterOperator.NotIn].includes(filter.operator);
 };
 
-export function getQueryOptionsFromSql(sql: string, queryType?: QueryType, datasource?: Datasource): QueryBuilderOptions {
+export function getQueryOptionsFromSql(
+  sql: string,
+  queryType?: QueryType,
+  datasource?: Datasource
+): QueryBuilderOptions {
   const ast = sqlToStatement(sql);
   if (!ast) {
     throw new Error('The query is not valid SQL.');
@@ -337,21 +340,23 @@ function selectCallFunc(s: SelectedColumn): [AggregateColumn | string, string | 
   if (fields.length > 1) {
     return ['', undefined];
   }
-  if (
-    Object.values(AggregateType).includes(
-      s.expr.function.name.toLowerCase() as AggregateType
-    )
-  ) {
-    return [{
-      aggregateType: s.expr.function.name as AggregateType,
-      column: fields[0],
-      alias: s.alias?.name,
-    } as AggregateColumn, s.alias?.name];
+  if (Object.values(AggregateType).includes(s.expr.function.name.toLowerCase() as AggregateType)) {
+    return [
+      {
+        aggregateType: s.expr.function.name as AggregateType,
+        column: fields[0],
+        alias: s.alias?.name,
+      } as AggregateColumn,
+      s.alias?.name,
+    ];
   }
   return [fields[0], s.alias?.name];
 }
 
-function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): { columns: CHSelectedColumn[]; aggregates: AggregateColumn[]; } {
+function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): {
+  columns: CHSelectedColumn[];
+  aggregates: AggregateColumn[];
+} {
   if (!selectClauses) {
     return { columns: [], aggregates: [] };
   }

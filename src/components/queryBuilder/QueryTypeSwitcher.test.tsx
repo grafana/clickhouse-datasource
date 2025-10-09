@@ -13,12 +13,7 @@ const options = {
 
 describe('QueryTypeSwitcher', () => {
   it('should render with default props', () => {
-    const result = render(
-      <QueryTypeSwitcher
-        queryType={QueryType.Table}
-        onChange={() => {}}
-      />
-    );
+    const result = render(<QueryTypeSwitcher queryType={QueryType.Table} onChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
     expect(result.getByLabelText(options.Table)).toBeChecked();
     expect(result.getByLabelText(options.Logs)).not.toBeChecked();
@@ -28,12 +23,7 @@ describe('QueryTypeSwitcher', () => {
 
   it('should call onChange when a new option is selected', async () => {
     const onChange = jest.fn();
-    const result = render(
-      <QueryTypeSwitcher
-        queryType={QueryType.Table}
-        onChange={onChange}
-      />
-    );
+    const result = render(<QueryTypeSwitcher queryType={QueryType.Table} onChange={onChange} />);
     expect(result.container.firstChild).not.toBeNull();
     const timeSeriesButton = result.getByLabelText(options.TimeSeries);
     expect(timeSeriesButton).toBeInTheDocument();

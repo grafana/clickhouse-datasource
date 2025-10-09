@@ -1,17 +1,21 @@
-import { DataSourceSettings, KeyValue } from "@grafana/data";
-import { defaultLogsTable, defaultTraceTable } from "otel";
-import { useEffect, useRef } from "react";
-import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from "types/config";
-import { pluginVersion } from "utils/version";
+import { DataSourceSettings, KeyValue } from '@grafana/data';
+import { defaultLogsTable, defaultTraceTable } from 'otel';
+import { useEffect, useRef } from 'react';
+import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from 'types/config';
+import { pluginVersion } from 'utils/version';
 
 /**
  * Handles saving HTTP headers to Grafana config.
- * 
+ *
  * All header keys go to the unsecure config.
  * If the header is marked as secure, its value goes to the
  * secure json config where it is hidden.
  */
-export const onHttpHeadersChange = (headers: CHHttpHeader[], options: DataSourceSettings<CHConfig, CHSecureConfig>, onOptionsChange: (opts: DataSourceSettings<CHConfig, CHSecureConfig>) => void) => {
+export const onHttpHeadersChange = (
+  headers: CHHttpHeader[],
+  options: DataSourceSettings<CHConfig, CHSecureConfig>,
+  onOptionsChange: (opts: DataSourceSettings<CHConfig, CHSecureConfig>) => void
+) => {
   const httpHeaders: CHHttpHeader[] = [];
   const secureHttpHeaderKeys: KeyValue<boolean> = {};
   const secureHttpHeaderValues: KeyValue<string> = {};
@@ -47,23 +51,26 @@ export const onHttpHeadersChange = (headers: CHHttpHeader[], options: DataSource
     ...options,
     jsonData: {
       ...options.jsonData,
-      httpHeaders
+      httpHeaders,
     },
     secureJsonFields: {
       ...options.secureJsonFields,
-      ...secureHttpHeaderKeys
+      ...secureHttpHeaderKeys,
     },
     secureJsonData: {
       ...options.secureJsonData,
-      ...secureHttpHeaderValues
+      ...secureHttpHeaderValues,
     },
   });
-}
+};
 
 /**
  * Applies default settings and migrations to config options.
  */
-export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptionsChange: (opts: DataSourceSettings<CHConfig>) => void) => {
+export const useConfigDefaults = (
+  options: DataSourceSettings<CHConfig>,
+  onOptionsChange: (opts: DataSourceSettings<CHConfig>) => void
+) => {
   const appliedDefaults = useRef<boolean>(false);
   useEffect(() => {
     if (appliedDefaults.current) {
@@ -98,14 +105,14 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
         ...jsonData.logs,
         defaultTable: defaultLogsTable,
         selectContextColumns: true,
-        contextColumns: []
+        contextColumns: [],
       };
     }
 
     if (!jsonData.traces || jsonData.traces.defaultTable === undefined) {
       jsonData.traces = {
         ...jsonData.traces,
-        defaultTable: defaultTraceTable
+        defaultTable: defaultTraceTable,
       };
     }
 
@@ -115,4 +122,4 @@ export const useConfigDefaults = (options: DataSourceSettings<CHConfig>, onOptio
     });
     appliedDefaults.current = true;
   }, [options, onOptionsChange]);
-}
+};

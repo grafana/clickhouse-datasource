@@ -43,7 +43,7 @@ describe('EditorTypeSwitcher', () => {
           pluginVersion: '',
           refId: 'A',
           editorType: EditorType.SQL,
-          rawSql: ''
+          rawSql: '',
         }}
         onChange={() => {}}
         onRunQuery={() => {}}
@@ -57,12 +57,14 @@ describe('EditorTypeSwitcher', () => {
   it('should render Query Builder', () => {
     const result = render(
       <EditorTypeSwitcher
-        query={{
+        query={
+          {
             pluginVersion: '',
             refId: 'A',
             editorType: EditorType.Builder,
-            rawSql: ''
-        } as CHQuery}
+            rawSql: '',
+          } as CHQuery
+        }
         onChange={() => {}}
         onRunQuery={() => {}}
       />
@@ -81,11 +83,7 @@ describe('EditorTypeSwitcher', () => {
     } as unknown as CHQuery;
 
     const { getByLabelText, getByText } = render(
-      <EditorTypeSwitcher
-        query={query}
-        onChange={() => {}}
-        onRunQuery={() => {}}
-      />
+      <EditorTypeSwitcher query={query} onChange={() => {}} onRunQuery={() => {}} />
     );
 
     getByLabelText(options.QueryBuilder).click();
@@ -102,11 +100,7 @@ describe('EditorTypeSwitcher', () => {
     } as unknown as CHQuery;
 
     const { getByLabelText, getByText } = render(
-      <EditorTypeSwitcher
-        query={query}
-        onChange={() => {}}
-        onRunQuery={() => {}}
-      />
+      <EditorTypeSwitcher query={query} onChange={() => {}} onRunQuery={() => {}} />
     );
 
     getByLabelText(options.QueryBuilder).click();
@@ -115,7 +109,7 @@ describe('EditorTypeSwitcher', () => {
     expect(getByText(labels.components.EditorTypeSwitcher.switcher.body)).toBeInTheDocument();
   });
 
-    it('should fire onChange after selecting Continue', async () => {
+  it('should fire onChange after selecting Continue', async () => {
     const query = {
       refId: 'A',
       editorType: EditorType.SQL,
@@ -126,11 +120,7 @@ describe('EditorTypeSwitcher', () => {
     const onChangeMock = jest.fn();
 
     const { getByLabelText, getByText } = render(
-      <EditorTypeSwitcher
-        query={query}
-        onChange={onChangeMock}
-        onRunQuery={() => {}}
-      />
+      <EditorTypeSwitcher query={query} onChange={onChangeMock} onRunQuery={() => {}} />
     );
 
     getByLabelText(options.QueryBuilder).click();
@@ -151,11 +141,7 @@ describe('EditorTypeSwitcher', () => {
     const onChangeMock = jest.fn();
 
     const { getByLabelText, getByText } = render(
-      <EditorTypeSwitcher
-        query={query}
-        onChange={onChangeMock}
-        onRunQuery={() => {}}
-      />
+      <EditorTypeSwitcher query={query} onChange={onChangeMock} onRunQuery={() => {}} />
     );
 
     getByLabelText(options.QueryBuilder).click();

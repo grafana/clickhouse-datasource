@@ -7,7 +7,7 @@ export interface QueryTypeSwitcherProps {
   queryType: QueryType;
   onChange: (queryType: QueryType) => void;
   sqlEditor?: boolean;
-};
+}
 
 const options = [
   {

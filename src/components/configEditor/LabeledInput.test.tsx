@@ -4,13 +4,13 @@ import { LabeledInput } from './LabeledInput';
 
 describe('LabeledInput', () => {
   it('should render', () => {
-    const result = render(<LabeledInput label='test' value='test' onChange={() => {}} />);
+    const result = render(<LabeledInput label="test" value="test" onChange={() => {}} />);
     expect(result.container.firstChild).not.toBeNull();
   });
 
   it('should call onChange when input is changed', async () => {
     const onChange = jest.fn();
-    const result = render(<LabeledInput label='test' value='test' placeholder='test' onChange={onChange} />);
+    const result = render(<LabeledInput label="test" value="test" placeholder="test" onChange={onChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText('test');

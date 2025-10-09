@@ -38,7 +38,6 @@ describe('LogContextKey', () => {
       secondaryTextColor: '#bbb',
     };
 
-    
     const result = render(<LogContextKey {...props} />);
 
     expect(result.getByTestId(Components.LogsContextPanel.LogsContextKey)).toBeInTheDocument();

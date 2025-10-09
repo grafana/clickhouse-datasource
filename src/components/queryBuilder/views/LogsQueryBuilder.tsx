@@ -15,7 +15,12 @@ import { Alert, Button, InlineFormLabel, Input, VerticalGroup } from '@grafana/u
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
-import { useDefaultFilters, useDefaultTimeColumn, useLogDefaultsOnMount, useOtelColumns } from './logsQueryBuilderHooks';
+import {
+  useDefaultFilters,
+  useDefaultTimeColumn,
+  useLogDefaultsOnMount,
+  useOtelColumns,
+} from './logsQueryBuilderHooks';
 import { styles } from 'styles';
 import { Components as allSelectors } from 'selectors';
 
@@ -45,29 +50,36 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   const labels = allLabels.components.LogsQueryBuilder;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const isNewQuery = useIsNewQuery(builderOptions);
-  const builderState: LogsQueryBuilderState = useMemo(() => ({
-    otelEnabled: builderOptions.meta?.otelEnabled || false,
-    otelVersion: builderOptions.meta?.otelVersion || '',
-    timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
-    logLevelColumn: getColumnByHint(builderOptions, ColumnHint.LogLevel),
-    messageColumn: getColumnByHint(builderOptions, ColumnHint.LogMessage),
-    labelsColumn: getColumnByHint(builderOptions, ColumnHint.LogLabels),
-    selectedColumns: builderOptions.columns?.filter(c => (
-      // Only select columns that don't have their own box
-      c.hint !== ColumnHint.Time &&
-      c.hint !== ColumnHint.LogLevel &&
-      c.hint !== ColumnHint.LogMessage &&
-      c.hint !== ColumnHint.LogLabels
-    )) || [],
-    // liveView: builderOptions.meta?.liveView || false,
-    filters: builderOptions.filters || [],
-    orderBy: builderOptions.orderBy || [],
-    limit: builderOptions.limit || 0,
-    logMessageLike: builderOptions.meta?.logMessageLike || '',
-    }), [builderOptions]);
-  const [showConfigWarning, setConfigWarningOpen] = useState(datasource.getDefaultLogsColumns().size === 0 && builderOptions.columns?.length === 0);
+  const builderState: LogsQueryBuilderState = useMemo(
+    () => ({
+      otelEnabled: builderOptions.meta?.otelEnabled || false,
+      otelVersion: builderOptions.meta?.otelVersion || '',
+      timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
+      logLevelColumn: getColumnByHint(builderOptions, ColumnHint.LogLevel),
+      messageColumn: getColumnByHint(builderOptions, ColumnHint.LogMessage),
+      labelsColumn: getColumnByHint(builderOptions, ColumnHint.LogLabels),
+      selectedColumns:
+        builderOptions.columns?.filter(
+          (c) =>
+            // Only select columns that don't have their own box
+            c.hint !== ColumnHint.Time &&
+            c.hint !== ColumnHint.LogLevel &&
+            c.hint !== ColumnHint.LogMessage &&
+            c.hint !== ColumnHint.LogLabels
+        ) || [],
+      // liveView: builderOptions.meta?.liveView || false,
+      filters: builderOptions.filters || [],
+      orderBy: builderOptions.orderBy || [],
+      limit: builderOptions.limit || 0,
+      logMessageLike: builderOptions.meta?.logMessageLike || '',
+    }),
+    [builderOptions]
+  );
+  const [showConfigWarning, setConfigWarningOpen] = useState(
+    datasource.getDefaultLogsColumns().size === 0 && builderOptions.columns?.length === 0
+  );
 
-  const onOptionChange = useBuilderOptionChanges<LogsQueryBuilderState>(next => {
+  const onOptionChange = useBuilderOptionChanges<LogsQueryBuilderState>((next) => {
     const nextColumns = next.selectedColumns.slice();
     if (next.timeColumn) {
       nextColumns.push(next.timeColumn);
@@ -82,28 +94,42 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       nextColumns.push(next.labelsColumn);
     }
 
-    builderOptionsDispatch(setOptions({
-      columns: nextColumns,
-      filters: next.filters,
-      orderBy: next.orderBy,
-      limit: next.limit,
-      meta: {
-        logMessageLike: next.logMessageLike,
-      }
-    }));
+    builderOptionsDispatch(
+      setOptions({
+        columns: nextColumns,
+        filters: next.filters,
+        orderBy: next.orderBy,
+        limit: next.limit,
+        meta: {
+          logMessageLike: next.logMessageLike,
+        },
+      })
+    );
   }, builderState);
 
   useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(datasource, builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
-  useDefaultTimeColumn(datasource, allColumns, builderOptions.table, builderState.timeColumn, builderState.otelEnabled, builderOptionsDispatch);
+  useDefaultTimeColumn(
+    datasource,
+    allColumns,
+    builderOptions.table,
+    builderState.timeColumn,
+    builderState.otelEnabled,
+    builderOptionsDispatch
+  );
   useDefaultFilters(builderOptions.table, isNewQuery, builderOptionsDispatch);
-  
+
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
       <VerticalGroup>
         <div>
           {'To speed up your query building, enter your default logs configuration in your '}
-          <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}#logs-config`}>ClickHouse Data Source settings</a>
+          <a
+            style={{ textDecoration: 'underline' }}
+            href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}#logs-config`}
+          >
+            ClickHouse Data Source settings
+          </a>
         </div>
       </VerticalGroup>
     </Alert>
@@ -111,12 +137,12 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
 
   return (
     <div>
-      { configWarning }
+      {configWarning}
       <OtelVersionSelect
         enabled={builderState.otelEnabled}
-        onEnabledChange={e => builderOptionsDispatch(setOtelEnabled(e))}
+        onEnabledChange={(e) => builderOptionsDispatch(setOtelEnabled(e))}
         selectedVersion={builderState.otelVersion}
-        onVersionChange={v => builderOptionsDispatch(setOtelVersion(v))}
+        onVersionChange={(v) => builderOptionsDispatch(setOtelVersion(v))}
       />
       <ColumnsEditor
         disabled={builderState.otelEnabled}
@@ -197,12 +223,12 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       <LogMessageLikeInput logMessageLike={builderState.logMessageLike} onChange={onOptionChange('logMessageLike')} />
     </div>
   );
-}
+};
 
 interface LogMessageLikeInputProps {
   logMessageLike: string;
   onChange: (logMessageLike: string) => void;
-};
+}
 
 const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   const [input, setInput] = useState<string>('');
@@ -222,10 +248,10 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
         width={200}
         value={input}
         type="string"
-        onChange={e => setInput(e.currentTarget.value)}
+        onChange={(e) => setInput(e.currentTarget.value)}
         onBlur={() => onChange(input)}
       />
-      { logMessageLike &&
+      {logMessageLike && (
         <Button
           data-testid={allSelectors.QueryBuilder.LogsQueryBuilder.LogMessageLikeInput.input}
           variant="secondary"
@@ -236,7 +262,7 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
         >
           {clearButton}
         </Button>
-      }
+      )}
     </div>
-  )
-}
+  );
+};

@@ -41,12 +41,13 @@ describe('useColumns', () => {
 
   it('should fetch table columns', async () => {
     const mockDs = {} as Datasource;
-    mockDs.fetchColumns = jest.fn(
-      (db: string, table: string) => Promise.resolve([
+    mockDs.fetchColumns = jest.fn((db: string, table: string) =>
+      Promise.resolve([
         { name: 'a', type: 'string', picklistValues: [] },
         { name: 'b', type: 'string', picklistValues: [] },
         // { name: '*' } (an "all" column is added by the hook)
-      ]));
+      ])
+    );
 
     let result: { current: readonly TableColumn[] };
     await act(async () => {

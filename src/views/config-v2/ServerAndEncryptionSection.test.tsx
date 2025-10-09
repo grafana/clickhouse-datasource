@@ -11,15 +11,15 @@ describe('ServerAndEncryptionSection', () => {
 
   const defaultProps = createTestProps({
     options: {
-        jsonData: {
+      jsonData: {
         host: '',
         secure: false,
         protocol: Protocol.Native,
         port: undefined,
         pdcInjected: false,
-        },
-        secureJsonData: {},
-        secureJsonFields: {},
+      },
+      secureJsonData: {},
+      secureJsonFields: {},
     },
     mocks: {
       onOptionsChange: onOptionsChangeMock,
@@ -43,7 +43,7 @@ describe('ServerAndEncryptionSection', () => {
     fireEvent.change(input, { target: { value: 'clickhouse-example.com' } });
 
     expect(onOptionsChangeMock).toHaveBeenCalled();
-  }); 
+  });
 
   it('updates protocol on radio toggle', () => {
     render(<ServerAndEncryptionSection {...defaultProps} />);
@@ -64,18 +64,16 @@ describe('ServerAndEncryptionSection', () => {
     expect(onOptionsChangeMock).toHaveBeenCalled();
   });
 
-    it('updates secure state on switch toggle', async () => {
-        render(<ServerAndEncryptionSection {...defaultProps} />);
+  it('updates secure state on switch toggle', async () => {
+    render(<ServerAndEncryptionSection {...defaultProps} />);
 
-        const secureSwitch = screen.getByRole('checkbox', { name: /secure connection/i });
-        await fireEvent.click(secureSwitch);
+    const secureSwitch = screen.getByRole('checkbox', { name: /secure connection/i });
+    await fireEvent.click(secureSwitch);
 
-        expect(onOptionsChangeMock).toHaveBeenLastCalledWith(
-            expect.objectContaining({
-                jsonData: expect.objectContaining({ secure: true }),
-            })
-        );
-    });
+    expect(onOptionsChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ secure: true }),
+      })
+    );
+  });
 });
-
-

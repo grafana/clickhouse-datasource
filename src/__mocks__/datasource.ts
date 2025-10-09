@@ -46,7 +46,7 @@ export const newMockDatasource = (): Datasource => {
       },
     },
   });
-  
+
   mockDatasource.adHocFiltersStatus = 1; // most tests should skip checking the CH version. We will set ad hoc filters to enabled to avoid running the CH version check
   return mockDatasource;
 };
@@ -58,5 +58,5 @@ export const mockQuery: CHQuery = {
   rawSql: 'select * from foo',
   refId: '',
   editorType: EditorType.SQL,
-  queryType: QueryType.Table
+  queryType: QueryType.Table,
 };

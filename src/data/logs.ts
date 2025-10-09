@@ -255,11 +255,21 @@ export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
 })();
 
 export const allLogLevels = [
-  'critical', 'fatal', 'crit', 'alert', 'emerg',
-  'error', 'err', 'eror',
-  'warn', 'warning',
-  'info', 'information', 'informational',
-  'debug', 'dbug',
+  'critical',
+  'fatal',
+  'crit',
+  'alert',
+  'emerg',
+  'error',
+  'err',
+  'eror',
+  'warn',
+  'warning',
+  'info',
+  'information',
+  'informational',
+  'debug',
+  'dbug',
   'trace',
-  'unknown'
+  'unknown',
 ];

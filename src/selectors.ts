@@ -121,7 +121,7 @@ export const Components = {
       headerSecureSwitch: 'config__http-header-config__header-secure-switch',
       headerNameInput: 'config__http-header-config__header-name-input',
       headerValueInput: 'config__http-header-config__header-value-input',
-      forwardGrafanaHeadersSwitch: 'config__http-header-config__forward-grafana-headers-switch'
+      forwardGrafanaHeadersSwitch: 'config__http-header-config__forward-grafana-headers-switch',
     },
     AliasTableConfig: {
       aliasEditor: 'config__alias-table-config__alias-editor',
@@ -131,7 +131,7 @@ export const Components = {
       targetTableInput: 'config__alias-table-config__target-table-input',
       aliasDatabaseInput: 'config__alias-table-config__alias-database-input',
       aliasTableInput: 'config__alias-table-config__alias-table-input',
-    }
+    },
   },
   LogsContextPanel: {
     alert: 'logs-context-panel__alert',
@@ -142,7 +142,7 @@ export const Components = {
     LogsQueryBuilder: {
       LogMessageLikeInput: {
         input: 'query-builder__logs-query-builder__log-message-like-input__input',
-      }
+      },
     },
     AggregateEditor: {
       sectionLabel: 'query-builder__aggregate-editor__section-label',
@@ -151,18 +151,18 @@ export const Components = {
       addButton: 'query-builder__aggregate-editor__add-button',
     },
     ColumnsEditor: {
-      multiSelectWrapper: 'query-builder__columns-editor__multi-select-wrapper'
+      multiSelectWrapper: 'query-builder__columns-editor__multi-select-wrapper',
     },
     GroupByEditor: {
-      multiSelectWrapper: 'query-builder__group-by__multi-select-wrapper'
+      multiSelectWrapper: 'query-builder__group-by__multi-select-wrapper',
     },
     LimitEditor: {
-      input: 'query-builder__limit-editor__input'
+      input: 'query-builder__limit-editor__input',
     },
     TraceIdInput: {
-      input: 'query-builder__trace-id-input__input'
-    }
-  }
+      input: 'query-builder__trace-id-input__input',
+    },
+  },
 };
 export const selectors: { components: E2ESelectors<typeof Components> } = {
   components: Components,

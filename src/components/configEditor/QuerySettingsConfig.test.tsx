@@ -125,7 +125,9 @@ describe('QuerySettingsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(allLabels.components.Config.QuerySettingsConfig.connMaxLifetime.placeholder);
+    const input = result.getByPlaceholderText(
+      allLabels.components.Config.QuerySettingsConfig.connMaxLifetime.placeholder
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: '10' } });
     fireEvent.blur(input);

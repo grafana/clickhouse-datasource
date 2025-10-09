@@ -1,5 +1,16 @@
-import { ColumnHint, QueryType } from "types/queryBuilder";
-import { setAllOptions, setBuilderMinimized, setColumnByHint, setDatabase, setOptions, setOtelEnabled, setOtelVersion, setQueryType, setTable, testFuncs } from "./useBuilderOptionsState";
+import { ColumnHint, QueryType } from 'types/queryBuilder';
+import {
+  setAllOptions,
+  setBuilderMinimized,
+  setColumnByHint,
+  setDatabase,
+  setOptions,
+  setOtelEnabled,
+  setOtelVersion,
+  setQueryType,
+  setTable,
+  testFuncs,
+} from './useBuilderOptionsState';
 const { reducer, buildInitialState } = testFuncs;
 
 describe('reducer', () => {
@@ -9,8 +20,8 @@ describe('reducer', () => {
       limit: 100,
       // Include meta to verify deep merge
       meta: {
-        otelEnabled: true
-      }
+        otelEnabled: true,
+      },
     });
 
     const nextState = reducer(prevState, action);
@@ -19,12 +30,12 @@ describe('reducer', () => {
   });
   it('applies SetAllOptions action', async () => {
     const prevState = buildInitialState({
-      limit: 100
+      limit: 100,
     });
     const action = setAllOptions({
       database: 'default',
       table: 'test',
-      queryType: QueryType.Table
+      queryType: QueryType.Table,
     });
 
     const nextState = reducer(prevState, action);
@@ -33,7 +44,7 @@ describe('reducer', () => {
   });
   it('run SetQueryType action with no changes', async () => {
     const prevState = buildInitialState({
-      queryType: QueryType.TimeSeries
+      queryType: QueryType.TimeSeries,
     });
     const action = setQueryType(QueryType.TimeSeries);
 
@@ -45,7 +56,7 @@ describe('reducer', () => {
       database: 'prev_db',
       table: 'prev_table',
       queryType: QueryType.Table,
-      groupBy: ['will', 'be', 'reset']
+      groupBy: ['will', 'be', 'reset'],
     });
     const action = setQueryType(QueryType.Logs);
 
@@ -60,7 +71,7 @@ describe('reducer', () => {
       database: 'prev_db',
       table: 'prev_table',
       queryType: QueryType.Logs,
-      groupBy: ['will', 'be', 'reset']
+      groupBy: ['will', 'be', 'reset'],
     });
     const action = setDatabase('next_db');
 
@@ -75,7 +86,7 @@ describe('reducer', () => {
       database: 'prev_db',
       table: 'prev_table',
       queryType: QueryType.Logs,
-      groupBy: ['will', 'be', 'reset']
+      groupBy: ['will', 'be', 'reset'],
     });
     const action = setTable('next_table');
 
@@ -87,7 +98,7 @@ describe('reducer', () => {
   });
   it('applies SetOtelEnabled action', async () => {
     const prevState = buildInitialState({
-      limit: 50
+      limit: 50,
     });
     const action = setOtelEnabled(true);
 
@@ -97,7 +108,7 @@ describe('reducer', () => {
   });
   it('applies SetOtelVersion action', async () => {
     const prevState = buildInitialState({
-      limit: 50
+      limit: 50,
     });
     const action = setOtelVersion('0.0.1');
 
@@ -107,12 +118,7 @@ describe('reducer', () => {
   });
   it('applies SetColumnByHint action, overwrites existing column', async () => {
     const prevState = buildInitialState({
-      columns: [
-        { name: 'prev_timestamp', hint: ColumnHint.Time },
-        { name: 'a' },
-        { name: 'b' },
-        { name: 'c' },
-      ]
+      columns: [{ name: 'prev_timestamp', hint: ColumnHint.Time }, { name: 'a' }, { name: 'b' }, { name: 'c' }],
     });
     const action = setColumnByHint({ name: 'next_timestamp', hint: ColumnHint.Time });
 
@@ -133,7 +139,6 @@ describe('reducer', () => {
   });
 });
 
-
 describe('buildInitialState', () => {
   it('builds initial state using defaults', async () => {
     const state = buildInitialState();
@@ -148,8 +153,8 @@ describe('buildInitialState', () => {
       table: 'saved_table',
       limit: 50,
       meta: {
-        otelEnabled: true
-      }
+        otelEnabled: true,
+      },
     });
     expect(state).not.toBeUndefined();
     expect(state.database).toEqual('');
