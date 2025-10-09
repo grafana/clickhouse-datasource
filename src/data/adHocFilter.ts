@@ -59,7 +59,6 @@ function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
 }
 
-
 function escapeKey(s: string): string {
   if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(s.split('.')[0])) {
     return s;
@@ -80,7 +79,7 @@ function escapeValueBasedOnOperator(s: string, operator: string): string {
   if (operator === 'IN') {
     // Allow list of values without parentheses
     if (s.length > 2 && s[0] !== '(' && s[s.length - 1] !== ')') {
-      s = `(${s})`
+      s = `(${s})`;
     }
     return s.replace(/'/g, "\\'");
   } else {
@@ -97,4 +96,3 @@ function convertOperatorToClickHouseOperator(operator: string): string {
   }
   return operator;
 }
-

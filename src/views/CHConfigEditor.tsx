@@ -13,7 +13,7 @@ import {
   CHLogsConfig,
   Protocol,
   CHTracesConfig,
-  AliasTableEntry
+  AliasTableEntry,
 } from 'types/config';
 import { gte as versionGte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from 'components/experimental/ConfigSection';
@@ -27,7 +27,7 @@ import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from 'labels';
 import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
-import {AliasTableConfig} from "../components/configEditor/AliasTableConfig";
+import { AliasTableConfig } from '../components/configEditor/AliasTableConfig';
 import * as trackingV1 from './trackingV1';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
@@ -145,9 +145,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         ...options.jsonData,
         logs: {
           ...options.jsonData.logs,
-          [key]: value
-        }
-      }
+          [key]: value,
+        },
+      },
     });
   };
   const onTracesConfigChange = (key: keyof CHTracesConfig, value: string | boolean) => {
@@ -158,9 +158,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         traces: {
           ...options.jsonData.traces,
           durationUnit: options.jsonData.traces?.durationUnit || TimeUnit.Nanoseconds,
-          [key]: value
-        }
-      }
+          [key]: value,
+        },
+      },
     });
   };
   const onAliasTableConfigChange = (aliasTables: AliasTableEntry[]) => {
@@ -172,8 +172,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       ...options,
       jsonData: {
         ...options.jsonData,
-        aliasTables
-      }
+        aliasTables,
+      },
     });
   };
 
@@ -181,23 +181,27 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-    options.jsonData.defaultDatabase ||
-    options.jsonData.defaultTable ||
-    options.jsonData.dialTimeout ||
-    options.jsonData.queryTimeout ||
-    options.jsonData.validateSql ||
-    options.jsonData.enableSecureSocksProxy ||
-    options.jsonData.customSettings ||
-    options.jsonData.logs ||
-    options.jsonData.traces
+      options.jsonData.defaultDatabase ||
+      options.jsonData.defaultTable ||
+      options.jsonData.dialTimeout ||
+      options.jsonData.queryTimeout ||
+      options.jsonData.validateSql ||
+      options.jsonData.enableSecureSocksProxy ||
+      options.jsonData.customSettings ||
+      options.jsonData.logs ||
+      options.jsonData.traces
   );
 
-  const defaultPort = jsonData.secure ?
-  (jsonData.protocol === Protocol.Native ? labels.serverPort.secureNativePort : labels.serverPort.secureHttpPort) :
-  (jsonData.protocol === Protocol.Native ? labels.serverPort.insecureNativePort : labels.serverPort.insecureHttpPort);
-  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`
+  const defaultPort = jsonData.secure
+    ? jsonData.protocol === Protocol.Native
+      ? labels.serverPort.secureNativePort
+      : labels.serverPort.secureHttpPort
+    : jsonData.protocol === Protocol.Native
+      ? labels.serverPort.insecureNativePort
+      : labels.serverPort.insecureHttpPort;
+  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`;
 
-  const uidWarning = (!options.uid) && (
+  const uidWarning = !options.uid && (
     <Alert title="" severity="warning" buttonContent="Close">
       <Stack>
         <div>
@@ -206,10 +210,12 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           {'field in its configuration. If your datasource is '}
           <a
             style={{ textDecoration: 'underline' }}
-            href='https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources'
-            target='_blank'
-            rel='noreferrer'
-          >provisioned via YAML</a>
+            href="https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources"
+            target="_blank"
+            rel="noreferrer"
+          >
+            provisioned via YAML
+          </a>
           {', please verify the UID is set. This is required to enable data linking between logs and traces.'}
         </div>
       </Stack>
@@ -256,11 +262,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             width={40}
             type="number"
             value={jsonData.port || ''}
-            onChange={e => onPortChange(e.currentTarget.value)}
+            onChange={(e) => onPortChange(e.currentTarget.value)}
             label={labels.serverPort.label}
             aria-label={labels.serverPort.label}
             placeholder={defaultPort}
-            onBlur={(e) => trackingV1.trackClickhouseConfigV1PortInput({ port: e.currentTarget.value})}
+            onBlur={(e) => trackingV1.trackClickhouseConfigV1PortInput({ port: e.currentTarget.value })}
           />
         </Field>
 
@@ -270,7 +276,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             disabledOptions={[]}
             value={jsonData.protocol || Protocol.Native}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1NativeHttpToggleClicked({ nativeHttpToggle: e});
+              trackingV1.trackClickhouseConfigV1NativeHttpToggleClicked({ nativeHttpToggle: e });
               onProtocolToggle(e!);
             }}
           />
@@ -281,13 +287,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             className="gf-form"
             value={jsonData.secure || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked({ secureConnection: e.currentTarget.checked});
+              trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked({
+                secureConnection: e.currentTarget.checked,
+              });
               onSwitchToggle('secure', e.currentTarget.checked);
             }}
           />
         </Field>
 
-        { jsonData.protocol === Protocol.Http &&
+        {jsonData.protocol === Protocol.Http && (
           <Field label={labels.path.label} description={labels.path.tooltip}>
             <Input
               value={jsonData.path || ''}
@@ -299,51 +307,48 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               placeholder={labels.path.placeholder}
             />
           </Field>
-        }
+        )}
       </ConfigSection>
 
-      { jsonData.protocol === Protocol.Http &&
+      {jsonData.protocol === Protocol.Http && (
         <HttpHeadersConfig
           headers={options.jsonData.httpHeaders}
           forwardGrafanaHeaders={options.jsonData.forwardGrafanaHeaders}
           secureFields={options.secureJsonFields}
-          onHttpHeadersChange={headers => onHttpHeadersChange(headers, options, onOptionsChange)}
-          onForwardGrafanaHeadersChange={forwardGrafanaHeaders => onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)}
+          onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
+          onForwardGrafanaHeadersChange={(forwardGrafanaHeaders) =>
+            onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)
+          }
         />
-      }
+      )}
 
       <Divider />
       <ConfigSection title="TLS / SSL Settings">
-        <Field
-          label={labels.tlsSkipVerify.label}
-          description={labels.tlsSkipVerify.tooltip}
-        >
+        <Field label={labels.tlsSkipVerify.label} description={labels.tlsSkipVerify.tooltip}>
           <Switch
             className="gf-form"
             value={jsonData.tlsSkipVerify || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked({ skipTlsVerifyToggle: e.currentTarget.checked });
+              trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked({
+                skipTlsVerifyToggle: e.currentTarget.checked,
+              });
               onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked);
             }}
           />
         </Field>
-        <Field
-          label={labels.tlsClientAuth.label}
-          description={labels.tlsClientAuth.tooltip}
-        >
+        <Field label={labels.tlsClientAuth.label} description={labels.tlsClientAuth.tooltip}>
           <Switch
             className="gf-form"
             value={jsonData.tlsAuth || false}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked({ clientAuthToggle: e.currentTarget.checked });
+              trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked({
+                clientAuthToggle: e.currentTarget.checked,
+              });
               onTLSSettingsChange('tlsAuth', e.currentTarget.checked);
             }}
           />
         </Field>
-        <Field
-          label={labels.tlsAuthWithCACert.label}
-          description={labels.tlsAuthWithCACert.tooltip}
-        >
+        <Field label={labels.tlsAuthWithCACert.label} description={labels.tlsAuthWithCACert.tooltip}>
           <Switch
             className="gf-form"
             value={jsonData.tlsAuthWithCACert || false}
@@ -384,10 +389,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
       <Divider />
       <ConfigSection title="Credentials">
-        <Field
-          label={labels.username.label}
-          description={labels.username.tooltip}
-        >
+        <Field label={labels.username.label} description={labels.username.tooltip}>
           <Input
             name="user"
             width={40}
@@ -433,7 +435,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onUpdateDatasourceJsonDataOption(props, 'defaultTable')(e);
           }}
         />
-        
+
         <Divider />
         <QuerySettingsConfig
           connMaxLifetime={jsonData.connMaxLifetime}
@@ -443,27 +445,27 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           queryTimeout={jsonData.queryTimeout}
           validateSql={jsonData.validateSql}
           onDialTimeoutChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QuerySettings({dialTimeout: Number(e.currentTarget.value)});
+            trackingV1.trackClickhouseConfigV1QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
             onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
           }}
           onQueryTimeoutChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QuerySettings({queryTimeout: Number(e.currentTarget.value)});
+            trackingV1.trackClickhouseConfigV1QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
             onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
           }}
           onConnMaxLifetimeChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QuerySettings({connMaxLifetime: Number(e.currentTarget.value)});
+            trackingV1.trackClickhouseConfigV1QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });
             onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e);
           }}
           onConnMaxIdleConnsChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QuerySettings({maxIdleConns: Number(e.currentTarget.value)});
+            trackingV1.trackClickhouseConfigV1QuerySettings({ maxIdleConns: Number(e.currentTarget.value) });
             onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e);
           }}
           onConnMaxOpenConnsChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QuerySettings({maxOpenConns: Number(e.currentTarget.value)});
+            trackingV1.trackClickhouseConfigV1QuerySettings({ maxOpenConns: Number(e.currentTarget.value) });
             onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e);
           }}
           onValidateSqlChange={(e) => {
-            trackingV1.trackClickhouseConfigV1QuerySettings({validateSql: e.currentTarget.checked});
+            trackingV1.trackClickhouseConfigV1QuerySettings({ validateSql: e.currentTarget.checked });
             onSwitchToggle('validateSql', e.currentTarget.checked);
           }}
         />
@@ -471,40 +473,40 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         <LogsConfig
           logsConfig={jsonData.logs}
-          onDefaultDatabaseChange={db => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({defaultDatabase: db});
+          onDefaultDatabaseChange={(db) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ defaultDatabase: db });
             onLogsConfigChange('defaultDatabase', db);
           }}
-          onDefaultTableChange={table => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({defaultTable: table});
+          onDefaultTableChange={(table) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ defaultTable: table });
             onLogsConfigChange('defaultTable', table);
           }}
-          onOtelEnabledChange={v => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({otelEnabled: v});
+          onOtelEnabledChange={(v) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ otelEnabled: v });
             onLogsConfigChange('otelEnabled', v);
           }}
-          onOtelVersionChange={v => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({version: v});
+          onOtelVersionChange={(v) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ version: v });
             onLogsConfigChange('otelVersion', v);
           }}
-          onTimeColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({timeColumn: c});
+          onTimeColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ timeColumn: c });
             onLogsConfigChange('timeColumn', c);
           }}
-          onLevelColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({levelColumn: c});
+          onLevelColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ levelColumn: c });
             onLogsConfigChange('levelColumn', c);
           }}
-          onMessageColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({messageColumn: c});
+          onMessageColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ messageColumn: c });
             onLogsConfigChange('messageColumn', c);
           }}
-          onSelectContextColumnsChange={c => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({selectContextColumns: c});
+          onSelectContextColumnsChange={(c) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ selectContextColumns: c });
             onLogsConfigChange('selectContextColumns', c);
           }}
-          onContextColumnsChange={c => {
-            trackingV1.trackClickhouseConfigV1LogsConfig({contextColumns: c});
+          onContextColumnsChange={(c) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ contextColumns: c });
             onLogsConfigChange('contextColumns', c);
           }}
         />
@@ -512,96 +514,96 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Divider />
         <TracesConfig
           tracesConfig={jsonData.traces}
-          onDefaultDatabaseChange={db => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({defaultDatabase: db});
+          onDefaultDatabaseChange={(db) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ defaultDatabase: db });
             onTracesConfigChange('defaultDatabase', db);
           }}
-          onDefaultTableChange={table => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({defaultTable: table});
+          onDefaultTableChange={(table) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ defaultTable: table });
             onTracesConfigChange('defaultTable', table);
           }}
-          onOtelEnabledChange={v => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({otelEnabled: v});
+          onOtelEnabledChange={(v) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ otelEnabled: v });
             onTracesConfigChange('otelEnabled', v);
           }}
-          onOtelVersionChange={v => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({version: v})
+          onOtelVersionChange={(v) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ version: v });
             onTracesConfigChange('otelVersion', v);
           }}
-          onTraceIdColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({traceIdColumn: c});
+          onTraceIdColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ traceIdColumn: c });
             onTracesConfigChange('traceIdColumn', c);
           }}
-          onSpanIdColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({spanIdColumn: c});
+          onSpanIdColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ spanIdColumn: c });
             onTracesConfigChange('spanIdColumn', c);
           }}
-          onOperationNameColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({operationNameColumn: c});
+          onOperationNameColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ operationNameColumn: c });
             onTracesConfigChange('operationNameColumn', c);
           }}
-          onParentSpanIdColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({parentSpanIdColumn: c});
+          onParentSpanIdColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ parentSpanIdColumn: c });
             onTracesConfigChange('parentSpanIdColumn', c);
           }}
-          onServiceNameColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({serviceNameColumn: c});
+          onServiceNameColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ serviceNameColumn: c });
             onTracesConfigChange('serviceNameColumn', c);
           }}
-          onDurationColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({durationColumn: c});
+          onDurationColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ durationColumn: c });
             onTracesConfigChange('durationColumn', c);
           }}
-          onDurationUnitChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({durationUnit: c});
+          onDurationUnitChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ durationUnit: c });
             onTracesConfigChange('durationUnit', c);
           }}
-          onStartTimeColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({startTimeColumn: c});
+          onStartTimeColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ startTimeColumn: c });
             onTracesConfigChange('startTimeColumn', c);
           }}
-          onTagsColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({tagsColumn: c});
+          onTagsColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ tagsColumn: c });
             onTracesConfigChange('tagsColumn', c);
           }}
-          onServiceTagsColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({serviceTagsColumn: c});
+          onServiceTagsColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ serviceTagsColumn: c });
             onTracesConfigChange('serviceTagsColumn', c);
           }}
-          onKindColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({kindColumn: c});
+          onKindColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ kindColumn: c });
             onTracesConfigChange('kindColumn', c);
           }}
-          onStatusCodeColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({statusCodeColumn: c});
+          onStatusCodeColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ statusCodeColumn: c });
             onTracesConfigChange('statusCodeColumn', c);
           }}
-          onStatusMessageColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({statusMessageColumn: c});
+          onStatusMessageColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ statusMessageColumn: c });
             onTracesConfigChange('statusMessageColumn', c);
           }}
-          onStateColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({stateColumn: c});
+          onStateColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ stateColumn: c });
             onTracesConfigChange('stateColumn', c);
           }}
-          onInstrumentationLibraryNameColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({instrumentationLibraryNameColumn: c});
+          onInstrumentationLibraryNameColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ instrumentationLibraryNameColumn: c });
             onTracesConfigChange('instrumentationLibraryNameColumn', c);
           }}
-          onInstrumentationLibraryVersionColumnChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({instrumentationLibraryVersionColumn: c});
+          onInstrumentationLibraryVersionColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ instrumentationLibraryVersionColumn: c });
             onTracesConfigChange('instrumentationLibraryVersionColumn', c);
           }}
-          onFlattenNestedChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({flattenNested: c});
+          onFlattenNestedChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ flattenNested: c });
             onTracesConfigChange('flattenNested', c);
           }}
-          onEventsColumnPrefixChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({traceEventsColumnPrefix: c});
+          onEventsColumnPrefixChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ traceEventsColumnPrefix: c });
             onTracesConfigChange('traceEventsColumnPrefix', c);
           }}
-          onLinksColumnPrefixChange={c => {
-            trackingV1.trackClickhouseConfigV1TracesConfig({traceLinksColumnPrefix: c});
+          onLinksColumnPrefixChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ traceLinksColumnPrefix: c });
             onTracesConfigChange('traceLinksColumnPrefix', c);
           }}
         />
@@ -615,16 +617,13 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             value={jsonData.enableRowLimit || false}
             data-testid={labels.enableRowLimit.testid}
             onChange={(e) => {
-              trackingV1.trackClickhouseConfigV1EnableRowLimitToggle({rowLimitEnabled: e.currentTarget.checked});
+              trackingV1.trackClickhouseConfigV1EnableRowLimitToggle({ rowLimitEnabled: e.currentTarget.checked });
               onSwitchToggle('enableRowLimit', e.currentTarget.checked);
             }}
           />
         </Field>
         {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
-          <Field
-            label={labels.secureSocksProxy.label}
-            description={labels.secureSocksProxy.tooltip}
-          >
+          <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
             <Switch
               className="gf-form"
               value={jsonData.enableSecureSocksProxy || false}
@@ -635,7 +634,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <ConfigSubSection title="Custom Settings">
           {customSettings.map(({ setting, value }, i) => {
             return (
-              <Stack key={i} direction='row'>
+              <Stack key={i} direction="row">
                 <Field label={`Setting`} aria-label={`Setting`}>
                   <Input
                     value={setting}

@@ -40,12 +40,10 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   const updateForwardGrafanaHeaders = (value: boolean) => {
     setForwardGrafanaHeaders(value);
     props.onForwardGrafanaHeadersChange(value);
-  }
+  };
 
   return (
-    <ConfigSection
-      title={labels.title}
-    >
+    <ConfigSection title={labels.title}>
       <Field label={labels.label} description={labels.description}>
         <>
           {headers.map((header, index) => (
@@ -55,33 +53,33 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
               value={header.value}
               secure={header.secure}
               isSecureConfigured={configuredSecureHeaders.has(header.name)}
-              onHeaderChange={header => updateHeader(index, header)}
+              onHeaderChange={(header) => updateHeader(index, header)}
               onRemove={() => removeHeader(index)}
             />
           ))}
           <Button
-              data-testid={selectors.addHeaderButton}
-              icon="plus-circle"
-              variant="secondary"
-              size="sm"
-              onClick={addHeader}
-              className={styles.Common.smallBtn}
-            >
-              {labels.addHeaderLabel}
+            data-testid={selectors.addHeaderButton}
+            icon="plus-circle"
+            variant="secondary"
+            size="sm"
+            onClick={addHeader}
+            className={styles.Common.smallBtn}
+          >
+            {labels.addHeaderLabel}
           </Button>
         </>
       </Field>
       <Field label={labels.forwardGrafanaHeaders.label} description={labels.forwardGrafanaHeaders.tooltip}>
         <Switch
           data-testid={selectors.forwardGrafanaHeadersSwitch}
-          className={"gf-form"}
+          className={'gf-form'}
           value={forwardGrafanaHeaders}
           onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
         />
       </Field>
     </ConfigSection>
   );
-}
+};
 
 interface HttpHeaderEditorProps {
   name: string;
@@ -105,33 +103,37 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
     onHeaderChange({
       name,
       value,
-      secure
+      secure,
     });
-  }
+  };
 
   let valueInput;
   if (secure) {
-    valueInput = <SecretInput
-      data-testid={selectors.headerValueInput}
-      width={65}
-      label=""
-      aria-label=""
-      placeholder={labels.secureHeaderValueLabel}
-      value={value}
-      isConfigured={isSecureConfigured}
-      onReset={() => setSecureConfigured(false)}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-      onBlur={() => onUpdate()}
-    />;
+    valueInput = (
+      <SecretInput
+        data-testid={selectors.headerValueInput}
+        width={65}
+        label=""
+        aria-label=""
+        placeholder={labels.secureHeaderValueLabel}
+        value={value}
+        isConfigured={isSecureConfigured}
+        onReset={() => setSecureConfigured(false)}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        onBlur={() => onUpdate()}
+      />
+    );
   } else {
-    valueInput = <Input
-      data-testid={selectors.headerValueInput}
-      width={65}
-      value={value}
-      placeholder={labels.insecureHeaderValueLabel}
-      onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-      onBlur={() => onUpdate()}
-    />;
+    valueInput = (
+      <Input
+        data-testid={selectors.headerValueInput}
+        width={65}
+        value={value}
+        placeholder={labels.insecureHeaderValueLabel}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        onBlur={() => onUpdate()}
+      />
+    );
   }
 
   const headerValueLabel = secure ? labels.secureHeaderValueLabel : labels.insecureHeaderValueLabel;
@@ -151,18 +153,18 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
         <Field label={headerValueLabel} aria-label={headerValueLabel}>
           {valueInput}
         </Field>
-        { !isSecureConfigured &&
+        {!isSecureConfigured && (
           <Field label={labels.secureLabel}>
             <Switch
               data-testid={selectors.headerSecureSwitch}
               className="gf-form"
               value={secure}
-              onChange={e => setSecure(e.currentTarget.checked)}
+              onChange={(e) => setSecure(e.currentTarget.checked)}
               onBlur={() => onUpdate()}
             />
           </Field>
-        }
-        { onRemove &&
+        )}
+        {onRemove && (
           <Button
             data-testid={selectors.removeHeaderButton}
             className={styles.Common.smallBtn}
@@ -171,11 +173,11 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             icon="trash-alt"
             onClick={onRemove}
           />
-        }
+        )}
       </HorizontalGroup>
     </div>
   );
-}
+};
 
 /**
  * Returns a Set of all secured headers that are configured

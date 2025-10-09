@@ -23,7 +23,7 @@ export interface QueryBuilderOptions {
   database: string;
   table: string;
   queryType: QueryType;
-  
+
   mode?: BuilderMode; // TODO: no longer required?
 
   columns?: SelectedColumn[];
@@ -39,7 +39,7 @@ export interface QueryBuilderOptions {
   meta?: {
     /**
      * When enabled, will hide most/all of the query builder options.
-     * 
+     *
      * Intended to be used for trace ID lookups where we only care to show the visualization panel
      */
     minimized?: boolean;
@@ -67,7 +67,7 @@ export interface QueryBuilderOptions {
     // Logs & Traces
     otelEnabled?: boolean;
     otelVersion?: string;
-  }
+  };
 }
 
 export enum AggregateType {
@@ -84,7 +84,7 @@ export type AggregateColumn = {
   aggregateType: AggregateType;
   column: string;
   alias?: string;
-}
+};
 
 export interface Field {
   name: string;
@@ -252,7 +252,7 @@ export interface CommonFilterProps {
   /**
    * If provided, SQL generator will ignore "key" and instead
    * find the intended column by the hint.
-   * 
+   *
    * Note that the column MUST be present in the selected columns array in order
    * for the filter to be applied unless key is also provided.
    */

@@ -1,8 +1,8 @@
-import { SelectedColumn } from "types/queryBuilder";
-import { columnFilterDateTime, columnFilterOr, columnFilterString } from "./columnFilters";
+import { SelectedColumn } from 'types/queryBuilder';
+import { columnFilterDateTime, columnFilterOr, columnFilterString } from './columnFilters';
 
 describe('columnFilterDateTime', () => {
-  it.each<{ col: SelectedColumn, expected: boolean }>([
+  it.each<{ col: SelectedColumn; expected: boolean }>([
     { col: { name: 't', type: 'Date' }, expected: true },
     { col: { name: 't', type: 'DateTime' }, expected: true },
     { col: { name: 't', type: 'Nullable(DateTime)' }, expected: true },
@@ -22,7 +22,7 @@ describe('columnFilterDateTime', () => {
 });
 
 describe('columnFilterString', () => {
-  it.each<{ col: SelectedColumn, expected: boolean }>([
+  it.each<{ col: SelectedColumn; expected: boolean }>([
     { col: { name: 't', type: 'String' }, expected: true },
     { col: { name: 't', type: 'LowCardinality(String)' }, expected: true },
     { col: { name: 't', type: 'LowCardinality(Nullable(String))' }, expected: true },
@@ -41,31 +41,16 @@ describe('columnFilterString', () => {
 describe('columnFilterOr', () => {
   it('matches no filters using logical OR operator', () => {
     const col: SelectedColumn = { name: 't', type: 'invalid' };
-    expect(
-      columnFilterOr(col,
-        columnFilterString,
-        columnFilterDateTime,
-      )
-    ).toBe(false);
+    expect(columnFilterOr(col, columnFilterString, columnFilterDateTime)).toBe(false);
   });
 
   it('compares multiple filters using logical OR operator, matching first', () => {
     const col: SelectedColumn = { name: 't', type: 'String' };
-    expect(
-      columnFilterOr(col,
-        columnFilterString,
-        columnFilterDateTime,
-      )
-    ).toBe(true);
+    expect(columnFilterOr(col, columnFilterString, columnFilterDateTime)).toBe(true);
   });
 
   it('compares multiple filters using logical OR operator, matching last', () => {
     const col: SelectedColumn = { name: 't', type: 'String' };
-    expect(
-      columnFilterOr(col,
-        columnFilterDateTime,
-        columnFilterString,
-      )
-    ).toBe(true);
+    expect(columnFilterOr(col, columnFilterDateTime, columnFilterString)).toBe(true);
   });
 });

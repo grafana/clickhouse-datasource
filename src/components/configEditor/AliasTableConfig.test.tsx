@@ -14,35 +14,25 @@ describe('AliasTableConfig', () => {
 
   it('should not call onAliasTablesChange when entry is added', () => {
     const onAliasTablesChange = jest.fn();
-    const result = render(
-      <AliasTableConfig
-        aliasTables={[]}
-        onAliasTablesChange={onAliasTablesChange}
-      />
-    );
+    const result = render(<AliasTableConfig aliasTables={[]} onAliasTablesChange={onAliasTablesChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const addEntryButton = result.getByTestId(selectors.addEntryButton);
     expect(addEntryButton).toBeInTheDocument();
     fireEvent.click(addEntryButton);
-    
+
     expect(onAliasTablesChange).toHaveBeenCalledTimes(0);
   });
 
   it('should call onAliasTablesChange when entry is updated', () => {
     const onAliasTablesChange = jest.fn();
-    const result = render(
-      <AliasTableConfig
-		aliasTables={[]}
-		onAliasTablesChange={onAliasTablesChange}
-      />
-    );
+    const result = render(<AliasTableConfig aliasTables={[]} onAliasTablesChange={onAliasTablesChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const addEntryButton = result.getByTestId(selectors.addEntryButton);
     expect(addEntryButton).toBeInTheDocument();
     fireEvent.click(addEntryButton);
-    
+
     const aliasEditor = result.getByTestId(selectors.aliasEditor);
     expect(aliasEditor).toBeInTheDocument();
 
@@ -60,7 +50,7 @@ describe('AliasTableConfig', () => {
     expect(targetTableInput).toHaveValue('query_log');
     expect(onAliasTablesChange).toHaveBeenCalledTimes(2);
 
-	const aliasDatabaseInput = result.getByTestId(selectors.aliasDatabaseInput);
+    const aliasDatabaseInput = result.getByTestId(selectors.aliasDatabaseInput);
     expect(aliasDatabaseInput).toBeInTheDocument();
     fireEvent.change(aliasDatabaseInput, { target: { value: 'default_aliases ' } }); // with space in name
     fireEvent.blur(aliasDatabaseInput);
@@ -76,11 +66,11 @@ describe('AliasTableConfig', () => {
 
     const expected: AliasTableEntry[] = [
       {
-		targetDatabase: 'default', // without space in name
-		targetTable: 'query_log',
-		aliasDatabase: 'default_aliases', // without space in name
-		aliasTable: 'query_log_aliases',
-	  }
+        targetDatabase: 'default', // without space in name
+        targetTable: 'query_log',
+        aliasDatabase: 'default_aliases', // without space in name
+        aliasTable: 'query_log_aliases',
+      },
     ];
     expect(onAliasTablesChange).toHaveBeenCalledWith(expect.objectContaining(expected));
   });
@@ -90,14 +80,18 @@ describe('AliasTableConfig', () => {
     const result = render(
       <AliasTableConfig
         aliasTables={[
-			{
-				targetDatabase: '', targetTable: 'query_log',
-				aliasDatabase: '', aliasTable: 'query_log_aliases'
-			},
-			{
-				targetDatabase: '', targetTable: 'query_log2',
-				aliasDatabase: '', aliasTable: 'query_log2_aliases'
-			},
+          {
+            targetDatabase: '',
+            targetTable: 'query_log',
+            aliasDatabase: '',
+            aliasTable: 'query_log_aliases',
+          },
+          {
+            targetDatabase: '',
+            targetTable: 'query_log2',
+            aliasDatabase: '',
+            aliasTable: 'query_log2_aliases',
+          },
         ]}
         onAliasTablesChange={onAliasTablesChange}
       />
@@ -107,12 +101,14 @@ describe('AliasTableConfig', () => {
     const removeEntryButton = result.getAllByTestId(selectors.removeEntryButton)[0]; // Get 1st
     expect(removeEntryButton).toBeInTheDocument();
     fireEvent.click(removeEntryButton);
-    
+
     const expected: AliasTableEntry[] = [
-		{
-			targetDatabase: '', targetTable: 'query_log2',
-			aliasDatabase: '', aliasTable: 'query_log2_aliases'
-		},
+      {
+        targetDatabase: '',
+        targetTable: 'query_log2',
+        aliasDatabase: '',
+        aliasTable: 'query_log2_aliases',
+      },
     ];
     expect(onAliasTablesChange).toHaveBeenCalledTimes(1);
     expect(onAliasTablesChange).toHaveBeenCalledWith(expect.objectContaining(expected));

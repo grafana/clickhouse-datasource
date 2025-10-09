@@ -4,7 +4,6 @@ import { css } from '@emotion/css';
 import { LogContextColumn } from 'data/CHDatasource';
 import { Components } from 'selectors';
 
-
 const LogsContextPanelStyles = css`
   display: flex;
   justify-content: flex-start;
@@ -26,8 +25,15 @@ const LogsContextPanel = (props: LogContextPanelProps) => {
       <Alert data-testid={Components.LogsContextPanel.alert} title="" severity="warning">
         <Stack direction="column">
           <div>
-            {'Unable to match any context columns. Make sure your query returns at least one log context column from your '}
-            <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasourceUid)}#logs-config`}>ClickHouse Data Source settings</a>
+            {
+              'Unable to match any context columns. Make sure your query returns at least one log context column from your '
+            }
+            <a
+              style={{ textDecoration: 'underline' }}
+              href={`/connections/datasources/edit/${encodeURIComponent(datasourceUid)}#logs-config`}
+            >
+              ClickHouse Data Source settings
+            </a>
           </div>
         </Stack>
       </Alert>
@@ -48,7 +54,7 @@ const LogsContextPanel = (props: LogContextPanelProps) => {
         />
       ))}
     </div>
-  )
+  );
 };
 
 /**
@@ -56,12 +62,17 @@ const LogsContextPanel = (props: LogContextPanelProps) => {
  */
 const iconMatcher = (contextName: string): IconName => {
   contextName = contextName.toLowerCase();
-  
+
   if (contextName === 'db' || contextName === 'database' || contextName.includes('data')) {
     return 'database';
   } else if (contextName.includes('service')) {
     return 'building';
-  } else if (contextName.includes('error') || contextName.includes('warn') || contextName.includes('critical') || contextName.includes('fatal')) {
+  } else if (
+    contextName.includes('error') ||
+    contextName.includes('warn') ||
+    contextName.includes('critical') ||
+    contextName.includes('fatal')
+  ) {
     return 'exclamation-triangle';
   } else if (contextName.includes('user') || contextName.includes('admin')) {
     return 'user';
@@ -77,16 +88,18 @@ const iconMatcher = (contextName: string): IconName => {
     return 'tag-alt';
   } else if (contextName.includes('span') || contextName.includes('stack')) {
     return 'brackets-curly';
-  } if (contextName === 'host' || contextName === 'hostname' || contextName.includes('host')) {
+  }
+  if (contextName === 'host' || contextName === 'hostname' || contextName.includes('host')) {
     return 'cloud';
-  } if (contextName === 'url' || contextName.includes('url')) {
+  }
+  if (contextName === 'url' || contextName.includes('url')) {
     return 'link';
   } else if (contextName.includes('container') || contextName.includes('pod')) {
     return 'cube';
   }
 
   return 'align-left';
-}
+};
 
 interface LogContextKeyProps {
   name: string;
@@ -106,7 +119,7 @@ const LogContextKey = (props: LogContextKeyProps) => {
       justify-content: center;
       align-items: center;
       margin: 0.25em;
-      color: ${primaryTextColor}
+      color: ${primaryTextColor};
     `,
     containerLeft: css`
       display: flex;
@@ -115,7 +128,7 @@ const LogContextKey = (props: LogContextKeyProps) => {
       border-radius: 2px;
       border-top-right-radius: 0;
       border-bottom-right-radius: 0;
-  
+
       padding-top: 0.15em;
       padding-bottom: 0.15em;
       padding-left: 0.25em;
@@ -152,7 +165,7 @@ const LogContextKey = (props: LogContextKeyProps) => {
       <span className={styles.contextValue}>{value}</span>
     </div>
   );
-}
+};
 
 export default LogsContextPanel;
 

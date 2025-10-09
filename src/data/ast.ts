@@ -4,7 +4,7 @@ interface ReplacePart {
   startIndex: number;
   name: string;
   replacementName: string;
-};
+}
 type ReplaceParts = ReplacePart[];
 
 function getReplacementKey(isVariable: boolean) {
@@ -104,7 +104,7 @@ export function sqlToStatement(rawSql: string): Statement {
         return map.super().expr(e);
       }
 
-      const rf = replaceParts.find(x => e.value.startsWith(x.replacementName));
+      const rf = replaceParts.find((x) => e.value.startsWith(x.replacementName));
       if (rf) {
         const d = e.value.replace(rf.replacementName, rf.name);
         return { ...e, value: d };

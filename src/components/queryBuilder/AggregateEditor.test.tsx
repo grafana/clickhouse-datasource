@@ -13,7 +13,9 @@ describe('AggregateEditor', () => {
 
   it('should render with aggregates', () => {
     const testAggregate: AggregateColumn = { aggregateType: AggregateType.Count, column: 'foo', alias: 'f' };
-    const result = render(<AggregateEditor allColumns={[]} aggregates={[testAggregate]} onAggregatesChange={() => {}} />);
+    const result = render(
+      <AggregateEditor allColumns={[]} aggregates={[testAggregate]} onAggregatesChange={() => {}} />
+    );
     expect(result.container.firstChild).not.toBeNull();
 
     const firstAggregate = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.itemWrapper);
@@ -35,7 +37,9 @@ describe('AggregateEditor', () => {
   it('should call onAggregatesChange when remove aggregate button is clicked', async () => {
     const testAggregate: AggregateColumn = { aggregateType: AggregateType.Count, column: 'foo', alias: 'f' };
     const onAggregatesChange = jest.fn();
-    const result = render(<AggregateEditor allColumns={[]} aggregates={[testAggregate]} onAggregatesChange={onAggregatesChange} />);
+    const result = render(
+      <AggregateEditor allColumns={[]} aggregates={[testAggregate]} onAggregatesChange={onAggregatesChange} />
+    );
     expect(result.container.firstChild).not.toBeNull();
 
     const removeButton = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton);
@@ -48,7 +52,9 @@ describe('AggregateEditor', () => {
     const inputAggregate: AggregateColumn = { aggregateType: AggregateType.Count, column: 'foo', alias: 'f' };
     const expectedAggregate: AggregateColumn = { aggregateType: AggregateType.Sum, column: 'foo', alias: 'f' };
     const onAggregatesChange = jest.fn();
-    const result = render(<AggregateEditor allColumns={[]} aggregates={[inputAggregate]} onAggregatesChange={onAggregatesChange} />);
+    const result = render(
+      <AggregateEditor allColumns={[]} aggregates={[inputAggregate]} onAggregatesChange={onAggregatesChange} />
+    );
     expect(result.container.firstChild).not.toBeNull();
 
     const aggregateSelect = result.getAllByRole('combobox')[0];

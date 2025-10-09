@@ -11,7 +11,9 @@ import pluginJson from './plugin.json';
 import clickhouseVersion from '../package.json';
 
 // ConfigEditorV2 is the new design for the Clickhouse configuration page
-const configEditor = config.featureToggles['newClickhouseConfigPageDesign' as keyof FeatureToggles] ? ConfigEditorV2 : ConfigEditorV1;
+const configEditor = config.featureToggles['newClickhouseConfigPageDesign' as keyof FeatureToggles]
+  ? ConfigEditorV2
+  : ConfigEditorV1;
 
 export const plugin = new DataSourcePlugin<Datasource, CHQuery, CHConfig>(Datasource)
   .setConfigEditor(configEditor)

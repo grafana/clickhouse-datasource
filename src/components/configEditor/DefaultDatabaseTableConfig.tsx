@@ -16,10 +16,7 @@ export const DefaultDatabaseTableConfig = (props: DefaultDatabaseTableConfigProp
 
   return (
     <ConfigSection title={labels.title}>
-      <Field
-        label={labels.database.label}
-        description={labels.database.description}
-      >
+      <Field label={labels.database.label} description={labels.database.description}>
         <Input
           name={labels.database.name}
           width={40}
@@ -31,10 +28,7 @@ export const DefaultDatabaseTableConfig = (props: DefaultDatabaseTableConfigProp
           type="text"
         />
       </Field>
-      <Field
-        label={labels.table.label}
-        description={labels.table.description}
-      >
+      <Field label={labels.table.label} description={labels.table.description}>
         <Input
           name={labels.table.name}
           width={40}
@@ -48,4 +42,4 @@ export const DefaultDatabaseTableConfig = (props: DefaultDatabaseTableConfigProp
       </Field>
     </ConfigSection>
   );
-}
+};

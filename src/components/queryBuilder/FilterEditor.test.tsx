@@ -3,14 +3,31 @@ import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './FilterEditor';
 import { selectors } from 'selectors';
-import { BooleanFilter, DateFilter, Filter, FilterOperator, MultiFilter, NumberFilter, StringFilter } from 'types/queryBuilder';
+import {
+  BooleanFilter,
+  DateFilter,
+  Filter,
+  FilterOperator,
+  MultiFilter,
+  NumberFilter,
+  StringFilter,
+} from 'types/queryBuilder';
 import { mockDatasource } from '__mocks__/datasource';
 
 describe('FilterEditor', () => {
   describe('FiltersEditor', () => {
     it('renders correctly', async () => {
       const onFiltersChange = jest.fn();
-      const result = render(<FiltersEditor allColumns={[]} filters={[]} onFiltersChange={onFiltersChange} datasource={mockDatasource} database='' table='' />);
+      const result = render(
+        <FiltersEditor
+          allColumns={[]}
+          filters={[]}
+          onFiltersChange={onFiltersChange}
+          datasource={mockDatasource}
+          database=""
+          table=""
+        />
+      );
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
@@ -36,7 +53,16 @@ describe('FilterEditor', () => {
           operator: FilterOperator.IsNotNull,
         },
       ];
-      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={() => {}} datasource={mockDatasource} database='' table='' />);
+      const result = render(
+        <FiltersEditor
+          allColumns={[]}
+          filters={filters}
+          onFiltersChange={() => {}}
+          datasource={mockDatasource}
+          database=""
+          table=""
+        />
+      );
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -62,7 +88,16 @@ describe('FilterEditor', () => {
         },
       ];
       const onFiltersChange = jest.fn();
-      const result = render(<FiltersEditor allColumns={[]} filters={filters} onFiltersChange={onFiltersChange} datasource={mockDatasource} database='' table='' />);
+      const result = render(
+        <FiltersEditor
+          allColumns={[]}
+          filters={filters}
+          onFiltersChange={onFiltersChange}
+          datasource={mockDatasource}
+          database=""
+          table=""
+        />
+      );
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.queryByTestId('query-builder-filters-add-button')).not.toBeInTheDocument();
@@ -94,8 +129,8 @@ describe('FilterEditor', () => {
           onFilterChange={() => {}}
           removeFilter={() => {}}
           datasource={mockDatasource}
-          database=''
-          table='' 
+          database=""
+          table=""
         />
       );
       expect(result.container.firstChild).not.toBeNull();
@@ -119,8 +154,8 @@ describe('FilterEditor', () => {
           onFilterChange={() => {}}
           removeFilter={() => {}}
           datasource={mockDatasource}
-          database=''
-          table='' 
+          database=""
+          table=""
         />
       );
 
@@ -147,8 +182,8 @@ describe('FilterEditor', () => {
           onFilterChange={onFilterChange}
           removeFilter={() => {}}
           datasource={mockDatasource}
-          database=''
-          table=''
+          database=""
+          table=""
         />
       );
 
@@ -184,8 +219,8 @@ describe('FilterEditor', () => {
           onFilterChange={onFilterChange}
           removeFilter={() => {}}
           datasource={mockDatasource}
-          database=''
-          table=''
+          database=""
+          table=""
         />
       );
 
@@ -209,8 +244,8 @@ describe('FilterEditor', () => {
           onFilterChange={onFilterChange}
           removeFilter={() => {}}
           datasource={mockDatasource}
-          database=''
-          table=''
+          database=""
+          table=""
         />
       );
 

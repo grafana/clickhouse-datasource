@@ -9,7 +9,14 @@ describe('HttpHeadersConfig', () => {
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
   it('should render', () => {
-    const result = render(<HttpHeadersConfig headers={[]} secureFields={{}} onHttpHeadersChange={() => {}} onForwardGrafanaHeadersChange={() => {}} />);
+    const result = render(
+      <HttpHeadersConfig
+        headers={[]}
+        secureFields={{}}
+        onHttpHeadersChange={() => {}}
+        onForwardGrafanaHeadersChange={() => {}}
+      />
+    );
     expect(result.container.firstChild).not.toBeNull();
   });
 
@@ -29,7 +36,7 @@ describe('HttpHeadersConfig', () => {
     const addHeaderButton = result.getByTestId(selectors.addHeaderButton);
     expect(addHeaderButton).toBeInTheDocument();
     fireEvent.click(addHeaderButton);
-    
+
     expect(onHttpHeadersChange).toHaveBeenCalledTimes(0);
   });
 
@@ -49,7 +56,7 @@ describe('HttpHeadersConfig', () => {
     const addHeaderButton = result.getByTestId(selectors.addHeaderButton);
     expect(addHeaderButton).toBeInTheDocument();
     fireEvent.click(addHeaderButton);
-    
+
     const headerEditor = result.getByTestId(selectors.headerEditor);
     expect(headerEditor).toBeInTheDocument();
 
@@ -74,7 +81,7 @@ describe('HttpHeadersConfig', () => {
     expect(onHttpHeadersChange).toHaveBeenCalledTimes(3);
 
     const expected: CHHttpHeader[] = [
-      { name: 'x-test', value: 'test value', secure: true } // without space in name
+      { name: 'x-test', value: 'test value', secure: true }, // without space in name
     ];
     expect(onHttpHeadersChange).toHaveBeenCalledWith(expect.objectContaining(expected));
   });
@@ -86,7 +93,7 @@ describe('HttpHeadersConfig', () => {
       <HttpHeadersConfig
         headers={[
           { name: 'x-test', value: 'test value', secure: false },
-          { name: 'x-test-2', value: 'test value 2', secure: false }
+          { name: 'x-test-2', value: 'test value 2', secure: false },
         ]}
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
@@ -98,21 +105,18 @@ describe('HttpHeadersConfig', () => {
     const removeHeaderButton = result.getAllByTestId(selectors.removeHeaderButton)[0]; // Get 1st
     expect(removeHeaderButton).toBeInTheDocument();
     fireEvent.click(removeHeaderButton);
-    
-    const expected: CHHttpHeader[] = [
-      { name: 'x-test-2', value: 'test value 2', secure: false }
-    ];
+
+    const expected: CHHttpHeader[] = [{ name: 'x-test-2', value: 'test value 2', secure: false }];
     expect(onHttpHeadersChange).toHaveBeenCalledTimes(1);
     expect(onHttpHeadersChange).toHaveBeenCalledWith(expect.objectContaining(expected));
   });
 });
 
-
 describe('useConfiguredSecureHttpHeaders', () => {
   it('returns unique set of secure header keys', async () => {
     const fields: KeyValue<boolean> = {
-      'otherKey': true,
-      'otherOtherKey': false,
+      otherKey: true,
+      otherOtherKey: false,
       'secureHttpHeaders.a': true,
       'secureHttpHeaders.b': true,
       'secureHttpHeaders.c': false,
@@ -120,7 +124,7 @@ describe('useConfiguredSecureHttpHeaders', () => {
 
     const hook = renderHook(() => useConfiguredSecureHttpHeaders(fields));
     const result = hook.result.current;
-    
+
     expect(result.size).toBe(2);
     expect(result.has('a')).toBe(true);
     expect(result.has('b')).toBe(true);
@@ -130,7 +134,7 @@ describe('useConfiguredSecureHttpHeaders', () => {
 
 describe('forwardGrafanaHTTPHeaders', () => {
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
-  
+
   it('should call onForwardGrafanaHeadersChange when switch is clicked', () => {
     const onHttpHeadersChange = jest.fn();
     const onForwardGrafanaHeadersChange = jest.fn();

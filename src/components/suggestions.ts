@@ -1,11 +1,19 @@
 import { getTemplateSrv } from '@grafana/runtime';
-import { Monaco, monacoTypes } from '@grafana/ui'
+import { Monaco, monacoTypes } from '@grafana/ui';
 import { Range } from './sqlProvider';
 import { Lexer } from 'ch-parser/lexer';
 import { keywords, TokenType } from 'ch-parser/types';
 import { SqlFunction, TableColumn } from 'types/queryBuilder';
 import { pluginMacros } from 'ch-parser/pluginMacros';
-import { ClauseType, FromQueryNode, IdentifierQueryNode, parseSelectQueryNode, QueryNodeParser, QueryNodeType, SelectQueryNode } from 'ch-parser/parser';
+import {
+  ClauseType,
+  FromQueryNode,
+  IdentifierQueryNode,
+  parseSelectQueryNode,
+  QueryNodeParser,
+  QueryNodeType,
+  SelectQueryNode,
+} from 'ch-parser/parser';
 
 declare const monaco: Monaco;
 export interface Schema {
@@ -32,7 +40,7 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
     clause: ClauseType.None,
     identifiers: [],
     begin: root.token.begin,
-    end: root.token.end
+    end: root.token.end,
   };
 
   if (cursorPosition > root.token.end) {
@@ -54,7 +62,7 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
         const selectNode = node as SelectQueryNode;
         const nestedCursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
         // +1/-1 to exclude subquery parenthesis
-        if (cursorPosition >= (nestedCursorData.begin-1) && cursorPosition <= (nestedCursorData.end+1)) {
+        if (cursorPosition >= nestedCursorData.begin - 1 && cursorPosition <= nestedCursorData.end + 1) {
           return nestedCursorData;
         }
 
@@ -63,9 +71,9 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
         cursorData.end = node.token.end;
         if (node.type === QueryNodeType.From) {
           const fromNode = node as FromQueryNode;
-          const dbLen = (fromNode.database?.length || 0);
+          const dbLen = fromNode.database?.length || 0;
           const separatorLen = dbLen > 0 ? 1 : 0;
-          const tableLen = (fromNode.table?.length || 0);
+          const tableLen = fromNode.table?.length || 0;
           const extendedTokenLen = dbLen + separatorLen + tableLen;
           cursorData.end = fromNode.token.end + extendedTokenLen;
 
@@ -74,7 +82,11 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
           }
         }
 
-        if (node.token.type === TokenType.QuotedIdentifier || node.type === QueryNodeType.Identifier || (node.token.type === TokenType.BareWord && !node.token.isKeyword())) {
+        if (
+          node.token.type === TokenType.QuotedIdentifier ||
+          node.type === QueryNodeType.Identifier ||
+          (node.token.type === TokenType.BareWord && !node.token.isKeyword())
+        ) {
           if (node.type === QueryNodeType.Identifier) {
             cursorData.identifiers.push((node as IdentifierQueryNode).prefix || node.token.text);
           } else {
@@ -97,7 +109,12 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
   return cursorData;
 }
 
-export async function getSuggestions(text: string, schema: Schema, range: Range, cursorPosition: number): Promise<monacoTypes.languages.CompletionItem[]> {
+export async function getSuggestions(
+  text: string,
+  schema: Schema,
+  range: Range,
+  cursorPosition: number
+): Promise<monacoTypes.languages.CompletionItem[]> {
   const lexer = new Lexer(text);
   const tokens = [];
   while (true) {
@@ -127,7 +144,11 @@ export async function getSuggestions(text: string, schema: Schema, range: Range,
   return await getSuggestionsFromCursorData(cursorData, schema, range);
 }
 
-async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, range: Range): Promise<monacoTypes.languages.CompletionItem[]> {
+async function getSuggestionsFromCursorData(
+  data: CursorData,
+  schema: Schema,
+  range: Range
+): Promise<monacoTypes.languages.CompletionItem[]> {
   let results: monacoTypes.languages.CompletionItem[] = [];
 
   if (data.database && (data.database.includes('"') || data.database.includes('`'))) {
@@ -137,7 +158,7 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
     data.table = data.table.substring(1, data.table.length - 1);
   }
 
-  const mapping = ({
+  const mapping = {
     [ClauseType.None]: 'keyword',
     [ClauseType.With]: 'column',
     [ClauseType.Select]: 'column',
@@ -149,7 +170,7 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
     [ClauseType.OrderBy]: 'column',
     [ClauseType.Limit]: 'keyword',
     [ClauseType.Identifier]: 'column',
-  });
+  };
 
   if (data.database && !data.table) {
     mapping[ClauseType.From] = 'table';
@@ -175,10 +196,7 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
       const databases = await fetchDatabaseSuggestions(schema, range, data.prefix);
       const defaultTables = await fetchTableSuggestions(schema, range, db, data.prefix);
 
-      results = [
-        ...databases,
-        ...defaultTables,
-      ];
+      results = [...databases, ...defaultTables];
       break;
 
     case 'table':
@@ -207,7 +225,7 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
         sortText: '!!!NULL',
         kind: monaco.languages.CompletionItemKind.Keyword,
         documentation: '',
-        range
+        range,
       });
 
       const sqlFunctions = await fetchFunctionSuggestions(schema, range);
@@ -217,24 +235,22 @@ async function getSuggestionsFromCursorData(data: CursorData, schema: Schema, ra
         const database = data.database || schema.defaultDatabase || 'default';
         const columns = await fetchFieldSuggestions(schema, range, database, data.table, data.prefix);
         results.push(...columns);
-
       }
 
       break;
     case 'keyword':
-      results = Array.from(keywords).map(keyword => ({
+      results = Array.from(keywords).map((keyword) => ({
         label: keyword,
         insertText: keyword,
         kind: monaco.languages.CompletionItemKind.Keyword,
         documentation: '',
-        range
+        range,
       }));
       break;
   }
 
   return results;
 }
-
 
 async function fetchDatabaseSuggestions(schema: Schema, range: Range, prefix?: string) {
   const databases = await schema.databases();
@@ -252,10 +268,10 @@ async function fetchDatabaseSuggestions(schema: Schema, range: Range, prefix?: s
       kind: monaco.languages.CompletionItemKind.Module,
       detail: 'Database',
       documentation: 'Database',
-      insertText: quoteType ? `${val}${quoteClosed ? '' :quoteType}` : val,
+      insertText: quoteType ? `${val}${quoteClosed ? '' : quoteType}` : val,
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       range,
-    }
+    };
   });
 }
 
@@ -275,29 +291,31 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database: str
       kind: monaco.languages.CompletionItemKind.Class,
       detail: 'Table',
       documentation: 'Table',
-      insertText: quoteType ? `${val}${quoteClosed ? '' :quoteType}` : val,
+      insertText: quoteType ? `${val}${quoteClosed ? '' : quoteType}` : val,
       insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
       range,
-    }
+    };
   });
 }
 
 async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string, prefix?: string) {
   const columns = await schema.columns(db, table);
-  return columns.map(c => ({
-    label: c.label!,
-    kind: monaco.languages.CompletionItemKind.Field,
-    sortText: `!!!!${c.label}`,
-    detail: c.type,
-    documentation: c.type,
-    insertText: prefix && prefix.includes('.') ? c.name.substring(prefix?.length || 0) : c.name,
-    range,
-  })).filter(c => !prefix || c.label.startsWith(prefix));
+  return columns
+    .map((c) => ({
+      label: c.label!,
+      kind: monaco.languages.CompletionItemKind.Field,
+      sortText: `!!!!${c.label}`,
+      detail: c.type,
+      documentation: c.type,
+      insertText: prefix && prefix.includes('.') ? c.name.substring(prefix?.length || 0) : c.name,
+      range,
+    }))
+    .filter((c) => !prefix || c.label.startsWith(prefix));
 }
 
 async function fetchFunctionSuggestions(schema: Schema, range: Range) {
   const sqlFunctions = await schema.functions();
-  return sqlFunctions.map(c => ({
+  return sqlFunctions.map((c) => ({
     label: c.name,
     kind: monaco.languages.CompletionItemKind.Function,
     sortText: `${c.name}`,
@@ -318,7 +336,6 @@ async function fetchFunctionSuggestions(schema: Schema, range: Range) {
     range,
   }));
 }
-
 
 export function getVariableSuggestions(range: Range) {
   const templateSrv = getTemplateSrv();
@@ -341,17 +358,23 @@ export function getVariableSuggestions(range: Range) {
 }
 
 export function getMacroSuggestions(range: Range, prefix?: string) {
-  return pluginMacros.map(macro => {
+  return pluginMacros.map((macro) => {
     const hasPrefix = (prefix || '').includes('$');
     const nameNoPrefix = macro.name.substring(1);
 
     return {
       label: macro.name,
       detail: `(Plugin Macro) ${macro.columnType || ''}`,
-      kind: macro.isFunction ? monaco.languages.CompletionItemKind.Function : monaco.languages.CompletionItemKind.Variable,
+      kind: macro.isFunction
+        ? monaco.languages.CompletionItemKind.Function
+        : monaco.languages.CompletionItemKind.Variable,
       sortText: `!!${macro.name.substring(3)}`,
       documentation: macro.documentation + (macro.example ? '\nExample output: ' + macro.example : ''),
-      insertText: macro.isFunction ? `${hasPrefix ? nameNoPrefix : macro.name.replaceAll('$', '\\$')}(\${1})` : (hasPrefix ? nameNoPrefix : macro.name),
+      insertText: macro.isFunction
+        ? `${hasPrefix ? nameNoPrefix : macro.name.replaceAll('$', '\\$')}(\${1})`
+        : hasPrefix
+          ? nameNoPrefix
+          : macro.name,
       insertTextRules: macro.isFunction ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
       range,
     };

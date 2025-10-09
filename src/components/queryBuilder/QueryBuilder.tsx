@@ -10,7 +10,13 @@ import { DatabaseTableSelect } from 'components/queryBuilder/DatabaseTableSelect
 import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 import { styles } from 'styles';
 import { TraceQueryBuilder } from './views/TraceQueryBuilder';
-import { BuilderOptionsReducerAction, setBuilderMinimized, setDatabase, setQueryType, setTable } from 'hooks/useBuilderOptionsState';
+import {
+  BuilderOptionsReducerAction,
+  setBuilderMinimized,
+  setDatabase,
+  setQueryType,
+  setTable,
+} from 'hooks/useBuilderOptionsState';
 import TraceIdInput from './TraceIdInput';
 import { Alert, Button, VerticalGroup } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
@@ -46,23 +52,49 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
         <DatabaseTableSelect
           datasource={datasource}
-          database={builderOptions.database} onDatabaseChange={onDatabaseChange}
-          table={builderOptions.table} onTableChange={onTableChange}
+          database={builderOptions.database}
+          onDatabaseChange={onDatabaseChange}
+          table={builderOptions.table}
+          onTableChange={onTableChange}
         />
       </div>
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </div>
 
-      { builderOptions.queryType === QueryType.Table && <TableQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
-      { builderOptions.queryType === QueryType.Logs && <LogsQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
-      { builderOptions.queryType === QueryType.TimeSeries && <TimeSeriesQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
-      { builderOptions.queryType === QueryType.Traces && <TraceQueryBuilder datasource={datasource} builderOptions={builderOptions} builderOptionsDispatch={builderOptionsDispatch} /> }
+      {builderOptions.queryType === QueryType.Table && (
+        <TableQueryBuilder
+          datasource={datasource}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+        />
+      )}
+      {builderOptions.queryType === QueryType.Logs && (
+        <LogsQueryBuilder
+          datasource={datasource}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+        />
+      )}
+      {builderOptions.queryType === QueryType.TimeSeries && (
+        <TimeSeriesQueryBuilder
+          datasource={datasource}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+        />
+      )}
+      {builderOptions.queryType === QueryType.Traces && (
+        <TraceQueryBuilder
+          datasource={datasource}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+        />
+      )}
 
       <SqlPreview sql={generatedSql} />
     </div>
   );
-}
+};
 
 interface MinimizedQueryBuilder {
   builderOptions: QueryBuilderOptions;
@@ -82,33 +114,48 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
     return undefined;
   }, [builderOptions.queryType, datasource]);
   const showConfigWarning = defaultColumns?.size === 0 && builderOptions.columns?.length === 0;
-  const configQueryType = (
-    builderOptions.queryType === QueryType.Logs ? 'logs' :
-    builderOptions.queryType === QueryType.Traces ? 'trace' :
-    builderOptions.queryType
-  );
+  const configQueryType =
+    builderOptions.queryType === QueryType.Logs
+      ? 'logs'
+      : builderOptions.queryType === QueryType.Traces
+        ? 'trace'
+        : builderOptions.queryType;
 
   let traceId;
-  if (builderOptions.queryType === QueryType.Traces && builderOptions.meta?.isTraceIdMode && builderOptions.meta.traceId) {
+  if (
+    builderOptions.queryType === QueryType.Traces &&
+    builderOptions.meta?.isTraceIdMode &&
+    builderOptions.meta.traceId
+  ) {
     traceId = builderOptions.meta.traceId!;
-  } else if (builderOptions.queryType === QueryType.Logs && builderOptions.filters?.find(f => f.hint === ColumnHint.TraceId && 'value' in f)) {
-    const traceIdFilter = builderOptions.filters?.find(f => f.hint === ColumnHint.TraceId && 'value' in f) as StringFilter;
+  } else if (
+    builderOptions.queryType === QueryType.Logs &&
+    builderOptions.filters?.find((f) => f.hint === ColumnHint.TraceId && 'value' in f)
+  ) {
+    const traceIdFilter = builderOptions.filters?.find(
+      (f) => f.hint === ColumnHint.TraceId && 'value' in f
+    ) as StringFilter;
     traceId = traceIdFilter.value;
   }
 
   return (
     <div data-testid="query-editor-minimized-viewer">
-      { showConfigWarning && (
+      {showConfigWarning && (
         <Alert title="" severity="warning">
           <VerticalGroup>
             <div>
               {`To enable data linking, enter your default ${configQueryType} configuration in your `}
-              <a style={{ textDecoration: 'underline' }} href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}#${builderOptions.queryType}-config`}>ClickHouse Data Source settings</a>
+              <a
+                style={{ textDecoration: 'underline' }}
+                href={`/connections/datasources/edit/${encodeURIComponent(datasource.uid)}#${builderOptions.queryType}-config`}
+              >
+                ClickHouse Data Source settings
+              </a>
             </div>
           </VerticalGroup>
         </Alert>
       )}
-      { !traceId && (
+      {!traceId && (
         <Alert title="" severity="warning">
           <VerticalGroup>
             <div>Trace ID is empty</div>
@@ -116,7 +163,7 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
         </Alert>
       )}
 
-      {traceId && <TraceIdInput traceId={traceId} onChange={() => {}} disabled /> }
+      {traceId && <TraceIdInput traceId={traceId} onChange={() => {}} disabled />}
 
       <Button
         data-testid={allSelectors.QueryBuilder.expandBuilderButton}
@@ -131,4 +178,4 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
       </Button>
     </div>
   );
-}
+};

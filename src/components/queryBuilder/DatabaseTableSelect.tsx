@@ -9,7 +9,7 @@ import useDatabases from 'hooks/useDatabases';
 export type DatabaseSelectProps = {
   datasource: Datasource;
   database: string;
-  onDatabaseChange: (value: string) => void
+  onDatabaseChange: (value: string) => void;
 };
 
 export const DatabaseSelect = (props: DatabaseSelectProps) => {
@@ -17,7 +17,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
   const databases = useDatabases(datasource);
   const { label, tooltip, empty } = labels.components.DatabaseSelect;
 
-  const options = databases.map(d => ({ label: d, value: d }));
+  const options = databases.map((d) => ({ label: d, value: d }));
   options.push({ label: empty, value: '' }); // Allow a blank value
 
   // Add selected value to the list if it does not exist.
@@ -42,7 +42,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
         className={`width-15 ${styles.Common.inlineSelect}`}
         options={options}
         value={database}
-        onChange={e => onDatabaseChange(e.value!)}
+        onChange={(e) => onDatabaseChange(e.value!)}
         menuPlacement={'bottom'}
         allowCustomValue
       ></Select>
@@ -62,7 +62,7 @@ export const TableSelect = (props: TableSelectProps) => {
   const tables = useTables(datasource, database);
   const { label, tooltip, empty } = labels.components.TableSelect;
 
-  const options = tables.map(t => ({ label: t, value: t }));
+  const options = tables.map((t) => ({ label: t, value: t }));
   options.push({ label: empty, value: '' }); // Allow a blank value
 
   // Include saved value in case it's no longer listed
@@ -86,7 +86,7 @@ export const TableSelect = (props: TableSelectProps) => {
         className={`width-15 ${styles.Common.inlineSelect}`}
         options={options}
         value={table}
-        onChange={e => onTableChange(e.value!)}
+        onChange={(e) => onTableChange(e.value!)}
         menuPlacement={'bottom'}
         allowCustomValue
       ></Select>
@@ -97,7 +97,7 @@ export const TableSelect = (props: TableSelectProps) => {
 export type DatabaseTableSelectProps = {
   datasource: Datasource;
   database: string;
-  onDatabaseChange: (value: string) => void
+  onDatabaseChange: (value: string) => void;
   table: string;
   onTableChange: (value: string) => void;
 };
@@ -111,4 +111,4 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
       <TableSelect datasource={datasource} database={database} table={table} onTableChange={onTableChange} />
     </div>
   );
-}
+};

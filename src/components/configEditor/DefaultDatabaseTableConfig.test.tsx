@@ -5,13 +5,27 @@ import allLabels from 'labels';
 
 describe('DefaultDatabaseTableConfig', () => {
   it('should render', () => {
-    const result = render(<DefaultDatabaseTableConfig defaultDatabase='' defaultTable='' onDefaultDatabaseChange={() => {}} onDefaultTableChange={() => {}} />);
+    const result = render(
+      <DefaultDatabaseTableConfig
+        defaultDatabase=""
+        defaultTable=""
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+      />
+    );
     expect(result.container.firstChild).not.toBeNull();
   });
 
   it('should call onDefaultDatabaseChange when default database is changed', () => {
     const onDefaultDatabaseChange = jest.fn();
-    const result = render(<DefaultDatabaseTableConfig defaultDatabase='' defaultTable='' onDefaultDatabaseChange={onDefaultDatabaseChange} onDefaultTableChange={() => {}} />);
+    const result = render(
+      <DefaultDatabaseTableConfig
+        defaultDatabase=""
+        defaultTable=""
+        onDefaultDatabaseChange={onDefaultDatabaseChange}
+        onDefaultTableChange={() => {}}
+      />
+    );
     expect(result.container.firstChild).not.toBeNull();
 
     const databaseInput = result.getByLabelText(allLabels.components.Config.DefaultDatabaseTableConfig.database.label);
@@ -24,7 +38,14 @@ describe('DefaultDatabaseTableConfig', () => {
 
   it('should call onDefaultTableChange when default table is changed', () => {
     const onDefaultTableChange = jest.fn();
-    const result = render(<DefaultDatabaseTableConfig defaultDatabase='' defaultTable='' onDefaultDatabaseChange={() => {}} onDefaultTableChange={onDefaultTableChange} />);
+    const result = render(
+      <DefaultDatabaseTableConfig
+        defaultDatabase=""
+        defaultTable=""
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={onDefaultTableChange}
+      />
+    );
     expect(result.container.firstChild).not.toBeNull();
 
     const tableInput = result.getByLabelText(allLabels.components.Config.DefaultDatabaseTableConfig.table.label);
