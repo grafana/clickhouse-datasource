@@ -46,7 +46,7 @@ describe('Query Editor', () => {
           builderOptions: {
             database: '',
             table: '',
-            queryType: QueryType.Table
+            queryType: QueryType.Table,
           },
         }}
         onChange={jest.fn()}
@@ -75,14 +75,7 @@ describe('Query Editor', () => {
 
     const onChange = jest.fn();
 
-    render(
-      <CHQueryEditor
-        query={query}
-        onChange={onChange}
-        onRunQuery={jest.fn()}
-        datasource={mockDatasource}
-      />
-    );
+    render(<CHQueryEditor query={query} onChange={onChange} onRunQuery={jest.fn()} datasource={mockDatasource} />);
 
     // onChange should not be called since editorType is SQL
     expect(onChange).not.toHaveBeenCalled();

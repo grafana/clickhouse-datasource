@@ -1,5 +1,5 @@
 import { getFields, sqlToStatement } from './ast';
-import { toSql } from 'pgsql-ast-parser'
+import { toSql } from 'pgsql-ast-parser';
 
 describe('ast', () => {
   describe('getFields', () => {

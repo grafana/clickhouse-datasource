@@ -1,5 +1,5 @@
-import React from "react";
-import { TimeUnit } from "types/queryBuilder";
+import React from 'react';
+import { TimeUnit } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { InlineFormLabel, Select } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
@@ -10,7 +10,7 @@ interface DurationUnitSelectProps {
   onChange: (u: TimeUnit) => void;
   disabled?: boolean;
   inline?: boolean;
-};
+}
 
 const durationUnitOptions: ReadonlyArray<SelectableValue<TimeUnit>> = [
   { label: TimeUnit.Seconds, value: TimeUnit.Seconds },
@@ -25,14 +25,18 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
 
   return (
     <div className="gf-form">
-      <InlineFormLabel width={12} className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`} tooltip={tooltip}>
+      <InlineFormLabel
+        width={12}
+        className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`}
+        tooltip={tooltip}
+      >
         {label}
       </InlineFormLabel>
       <Select<TimeUnit>
         disabled={disabled}
         options={durationUnitOptions as Array<SelectableValue<TimeUnit>>}
         value={unit}
-        onChange={v => onChange(v.value!)}
+        onChange={(v) => onChange(v.value!)}
         width={inline ? 25 : 30}
         menuPlacement={'bottom'}
       />

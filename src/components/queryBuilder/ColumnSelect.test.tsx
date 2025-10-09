@@ -39,7 +39,7 @@ describe('ColumnSelect', () => {
   it('should call onColumnChange when a new column is selected', () => {
     const allColumns: readonly TableColumn[] = [
       { name: 'one', type: 'string', picklistValues: [] },
-      { name: 'two', type: 'string', picklistValues: [] }
+      { name: 'two', type: 'string', picklistValues: [] },
     ];
     const onColumnChange = jest.fn();
     const result = render(

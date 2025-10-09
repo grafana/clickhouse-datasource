@@ -22,9 +22,9 @@ export function LabeledInput(props: LabeledInputProps) {
         disabled={disabled}
         width={30}
         value={value}
-        onChange={e => onChange(e.currentTarget.value)}
+        onChange={(e) => onChange(e.currentTarget.value)}
         placeholder={placeholder}
       />
     </div>
-  )
+  );
 }

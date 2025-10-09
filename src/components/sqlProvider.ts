@@ -47,7 +47,7 @@ export function formatSql(rawSql: string, tabWidth = 4): string {
   const removedVariables = rawSql.replaceAll(macroPrefix, swapIdentifier);
   const formattedRaw = format(removedVariables, {
     language: 'postgresql',
-    tabWidth
+    tabWidth,
   });
 
   const formatted = formattedRaw.replaceAll(swapIdentifier, macroPrefix);
@@ -86,10 +86,10 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
       return [
         {
           range: model.getFullModelRange(),
-          text: formatSql(model.getValue(), options.tabSize)
-        }
+          text: formatSql(model.getValue(), options.tabSize),
+        },
       ];
-    }
+    },
   });
 
   return monaco.editor;

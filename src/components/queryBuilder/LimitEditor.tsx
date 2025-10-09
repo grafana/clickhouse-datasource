@@ -23,7 +23,7 @@ export const LimitEditor = (props: LimitEditorProps) => {
         value={limit}
         type="number"
         min={0}
-        onChange={e => setLimit(e.currentTarget.valueAsNumber)}
+        onChange={(e) => setLimit(e.currentTarget.valueAsNumber)}
         onBlur={() => props.onLimitChange(limit)}
       />
     </div>

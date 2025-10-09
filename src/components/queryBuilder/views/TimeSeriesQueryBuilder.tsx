@@ -1,6 +1,14 @@
 import React, { useMemo } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
-import { AggregateColumn, BuilderMode, Filter, OrderBy, QueryBuilderOptions, ColumnHint, SelectedColumn } from 'types/queryBuilder';
+import {
+  AggregateColumn,
+  BuilderMode,
+  Filter,
+  OrderBy,
+  QueryBuilderOptions,
+  ColumnHint,
+  SelectedColumn,
+} from 'types/queryBuilder';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { FiltersEditor } from '../FilterEditor';
@@ -20,8 +28,8 @@ import useIsNewQuery from 'hooks/useIsNewQuery';
 
 interface TimeSeriesQueryBuilderProps {
   datasource: Datasource;
-  builderOptions: QueryBuilderOptions,
-  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
+  builderOptions: QueryBuilderOptions;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
 }
 
 interface TimeSeriesQueryBuilderState {
@@ -40,19 +48,22 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const isNewQuery = useIsNewQuery(builderOptions);
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
-  const builderState: TimeSeriesQueryBuilderState = useMemo(() => ({
-    // TODO: do not depend on "mode"
-    isAggregateMode: builderOptions.mode === BuilderMode.Trend,
-    timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
-    selectedColumns: (builderOptions.columns || []).filter(c => c.hint !== ColumnHint.Time),
-    aggregates: builderOptions.aggregates || [],
-    groupBy: builderOptions.groupBy || [],
-    orderBy: builderOptions.orderBy || [],
-    limit: builderOptions.limit || 0,
-    filters: builderOptions.filters || [],
-  }), [builderOptions]);
+  const builderState: TimeSeriesQueryBuilderState = useMemo(
+    () => ({
+      // TODO: do not depend on "mode"
+      isAggregateMode: builderOptions.mode === BuilderMode.Trend,
+      timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
+      selectedColumns: (builderOptions.columns || []).filter((c) => c.hint !== ColumnHint.Time),
+      aggregates: builderOptions.aggregates || [],
+      groupBy: builderOptions.groupBy || [],
+      orderBy: builderOptions.orderBy || [],
+      limit: builderOptions.limit || 0,
+      filters: builderOptions.filters || [],
+    }),
+    [builderOptions]
+  );
 
-  const onOptionChange = useBuilderOptionChanges<TimeSeriesQueryBuilderState>(next => {
+  const onOptionChange = useBuilderOptionChanges<TimeSeriesQueryBuilderState>((next) => {
     let nextColumns = next.selectedColumns.slice();
     if (next.isAggregateMode) {
       nextColumns = [];
@@ -62,15 +73,17 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       nextColumns.push(next.timeColumn);
     }
 
-    builderOptionsDispatch(setOptions({
-      mode: next.isAggregateMode ? BuilderMode.Trend : BuilderMode.Aggregate,
-      columns: nextColumns,
-      aggregates: next.isAggregateMode ? next.aggregates : [],
-      groupBy: next.isAggregateMode ? next.groupBy : [],
-      filters: next.filters,
-      orderBy: next.orderBy,
-      limit: next.limit
-    }));
+    builderOptionsDispatch(
+      setOptions({
+        mode: next.isAggregateMode ? BuilderMode.Trend : BuilderMode.Aggregate,
+        columns: nextColumns,
+        aggregates: next.isAggregateMode ? next.aggregates : [],
+        groupBy: next.isAggregateMode ? next.groupBy : [],
+        filters: next.filters,
+        orderBy: next.orderBy,
+        limit: next.limit,
+      })
+    );
   }, builderState);
 
   useDefaultTimeColumn(allColumns, builderOptions.table, builderState.timeColumn, builderOptionsDispatch);
@@ -99,18 +112,26 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
         clearable={false}
       />
 
-      { builderState.isAggregateMode ? 
+      {builderState.isAggregateMode ? (
         <>
-          <AggregateEditor allColumns={allColumns} aggregates={builderState.aggregates} onAggregatesChange={onOptionChange('aggregates')} />
-          <GroupByEditor groupBy={builderState.groupBy} onGroupByChange={onOptionChange('groupBy')} allColumns={allColumns} />
+          <AggregateEditor
+            allColumns={allColumns}
+            aggregates={builderState.aggregates}
+            onAggregatesChange={onOptionChange('aggregates')}
+          />
+          <GroupByEditor
+            groupBy={builderState.groupBy}
+            onGroupByChange={onOptionChange('groupBy')}
+            allColumns={allColumns}
+          />
         </>
-        :
+      ) : (
         <ColumnsEditor
           allColumns={allColumns}
           selectedColumns={builderState.selectedColumns}
           onSelectedColumnsChange={onOptionChange('selectedColumns')}
         />
-      }
+      )}
 
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}
@@ -128,4 +149,4 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
       />
     </div>
   );
-}
+};

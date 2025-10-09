@@ -11,7 +11,9 @@ export default (datasource: Datasource, database: string, table: string): readon
     }
 
     let ignore = false;
-    datasource.fetchColumns(database, table).then(columns => {
+    datasource
+      .fetchColumns(database, table)
+      .then((columns) => {
         if (ignore) {
           return;
         }

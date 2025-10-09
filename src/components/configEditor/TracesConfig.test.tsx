@@ -7,38 +7,36 @@ import { defaultTraceTable } from 'otel';
 
 function defaultTraceConfigProps(): TraceConfigProps {
   return {
-        tracesConfig: {},
-        onDefaultDatabaseChange: () => {},
-        onDefaultTableChange: () => {},
-        onOtelEnabledChange: () => {},
-        onOtelVersionChange: () => {},
-        onTraceIdColumnChange: () => {},
-        onSpanIdColumnChange: () => {},
-        onOperationNameColumnChange: () => {},
-        onParentSpanIdColumnChange: () => {},
-        onServiceNameColumnChange: () => {},
-        onDurationColumnChange: () => {},
-        onDurationUnitChange: () => {},
-        onStartTimeColumnChange: () => {},
-        onTagsColumnChange: () => {},
-        onServiceTagsColumnChange: () => {},
-        onKindColumnChange: () => {},
-        onStatusCodeColumnChange: () => {},
-        onStatusMessageColumnChange: () => {},
-        onStateColumnChange: () => {},
-        onInstrumentationLibraryNameColumnChange: () => {},
-        onInstrumentationLibraryVersionColumnChange: () => {},
-        onFlattenNestedChange: () => {},
-        onEventsColumnPrefixChange: () => {},
-        onLinksColumnPrefixChange: () => {}
+    tracesConfig: {},
+    onDefaultDatabaseChange: () => {},
+    onDefaultTableChange: () => {},
+    onOtelEnabledChange: () => {},
+    onOtelVersionChange: () => {},
+    onTraceIdColumnChange: () => {},
+    onSpanIdColumnChange: () => {},
+    onOperationNameColumnChange: () => {},
+    onParentSpanIdColumnChange: () => {},
+    onServiceNameColumnChange: () => {},
+    onDurationColumnChange: () => {},
+    onDurationUnitChange: () => {},
+    onStartTimeColumnChange: () => {},
+    onTagsColumnChange: () => {},
+    onServiceTagsColumnChange: () => {},
+    onKindColumnChange: () => {},
+    onStatusCodeColumnChange: () => {},
+    onStatusMessageColumnChange: () => {},
+    onStateColumnChange: () => {},
+    onInstrumentationLibraryNameColumnChange: () => {},
+    onInstrumentationLibraryVersionColumnChange: () => {},
+    onFlattenNestedChange: () => {},
+    onEventsColumnPrefixChange: () => {},
+    onLinksColumnPrefixChange: () => {},
   };
 }
 
 describe('TracesConfig', () => {
   it('should render', () => {
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} />);
     expect(result.container.firstChild).not.toBeNull();
   });
 
@@ -59,9 +57,7 @@ describe('TracesConfig', () => {
 
   it('should call onDefaultTable when changed', () => {
     const onDefaultTableChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onDefaultTableChange={onDefaultTableChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onDefaultTableChange={onDefaultTableChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText(defaultTraceTable);
@@ -74,9 +70,7 @@ describe('TracesConfig', () => {
 
   it('should call onOtelEnabled when changed', async () => {
     const onOtelEnabledChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onOtelEnabledChange={onOtelEnabledChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onOtelEnabledChange={onOtelEnabledChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = (await result.findAllByRole('checkbox'))[0];
@@ -112,7 +106,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.traceId.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.traceId.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -122,12 +118,12 @@ describe('TracesConfig', () => {
 
   it('should call onSpanIdColumnChange when changed', () => {
     const onSpanIdColumnChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onSpanIdColumnChange={onSpanIdColumnChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onSpanIdColumnChange={onSpanIdColumnChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.spanId.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.spanId.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -142,7 +138,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.operationName.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.operationName.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -157,7 +155,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.parentSpanId.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.parentSpanId.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -172,7 +172,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceName.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceName.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -187,7 +189,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.durationTime.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.durationTime.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -197,9 +201,7 @@ describe('TracesConfig', () => {
 
   it('should call onDurationUnitChange when changed', () => {
     const onDurationUnitChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onDurationUnitChange={onDurationUnitChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onDurationUnitChange={onDurationUnitChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const select = result.getByRole('combobox');
@@ -217,7 +219,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.startTime.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.startTime.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -227,12 +231,12 @@ describe('TracesConfig', () => {
 
   it('should call onTagsColumnChange when changed', () => {
     const onTagsColumnChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onTagsColumnChange={onTagsColumnChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onTagsColumnChange={onTagsColumnChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.tags.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.tags.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -247,7 +251,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceTags.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.serviceTags.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -257,12 +263,12 @@ describe('TracesConfig', () => {
 
   it('should call onKindColumnChange when changed', () => {
     const onKindColumnChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onKindColumnChange={onKindColumnChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onKindColumnChange={onKindColumnChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.kind.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.kind.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -277,7 +283,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.statusCode.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.statusCode.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -292,7 +300,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.statusMessage.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.statusMessage.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -302,12 +312,12 @@ describe('TracesConfig', () => {
 
   it('should call onStateColumnChange when changed', () => {
     const onStateColumnChange = jest.fn();
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onStateColumnChange={onStateColumnChange} />
-    );
+    const result = render(<TracesConfig {...defaultTraceConfigProps()} onStateColumnChange={onStateColumnChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.state.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.state.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -318,11 +328,16 @@ describe('TracesConfig', () => {
   it('should call onInstrumentationLibraryNameColumnChange when changed', () => {
     const onInstrumentationLibraryNameColumnChange = jest.fn();
     const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onInstrumentationLibraryNameColumnChange={onInstrumentationLibraryNameColumnChange} />
+      <TracesConfig
+        {...defaultTraceConfigProps()}
+        onInstrumentationLibraryNameColumnChange={onInstrumentationLibraryNameColumnChange}
+      />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.instrumentationLibraryName.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.instrumentationLibraryName.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -333,11 +348,16 @@ describe('TracesConfig', () => {
   it('should call onInstrumentationLibraryVersionColumnChange when changed', () => {
     const onInstrumentationLibraryVersionColumnChange = jest.fn();
     const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onInstrumentationLibraryVersionColumnChange={onInstrumentationLibraryVersionColumnChange} />
+      <TracesConfig
+        {...defaultTraceConfigProps()}
+        onInstrumentationLibraryVersionColumnChange={onInstrumentationLibraryVersionColumnChange}
+      />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.instrumentationLibraryVersion.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.instrumentationLibraryVersion.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -366,7 +386,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.eventsPrefix.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.eventsPrefix.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);
@@ -381,7 +403,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByPlaceholderText(columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.linksPrefix.label));
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.TracesConfig.columns.linksPrefix.label)
+    );
     expect(input).toBeInTheDocument();
     fireEvent.change(input, { target: { value: 'changed' } });
     fireEvent.blur(input);

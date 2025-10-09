@@ -33,26 +33,31 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
   const labels = allLabels.components.TableQueryBuilder;
-  const builderState: TableQueryBuilderState = useMemo(() => ({
-    isAggregateMode: builderOptions.mode === BuilderMode.Aggregate,
-    selectedColumns: builderOptions.columns || [],
-    aggregates: builderOptions.aggregates || [],
-    groupBy: builderOptions.groupBy || [],
-    orderBy: builderOptions.orderBy || [],
-    limit: builderOptions.limit || 0,
-    filters: builderOptions.filters || [],
-  }), [builderOptions]);
+  const builderState: TableQueryBuilderState = useMemo(
+    () => ({
+      isAggregateMode: builderOptions.mode === BuilderMode.Aggregate,
+      selectedColumns: builderOptions.columns || [],
+      aggregates: builderOptions.aggregates || [],
+      groupBy: builderOptions.groupBy || [],
+      orderBy: builderOptions.orderBy || [],
+      limit: builderOptions.limit || 0,
+      filters: builderOptions.filters || [],
+    }),
+    [builderOptions]
+  );
 
-  const onOptionChange = useBuilderOptionChanges<TableQueryBuilderState>(next => {
-    builderOptionsDispatch(setOptions({
-      mode: next.isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
-      columns: next.selectedColumns,
-      aggregates: next.aggregates,
-      groupBy: next.groupBy,
-      filters: next.filters,
-      orderBy: next.orderBy,
-      limit: next.limit
-    }));
+  const onOptionChange = useBuilderOptionChanges<TableQueryBuilderState>((next) => {
+    builderOptionsDispatch(
+      setOptions({
+        mode: next.isAggregateMode ? BuilderMode.Aggregate : BuilderMode.List,
+        columns: next.selectedColumns,
+        aggregates: next.aggregates,
+        groupBy: next.groupBy,
+        filters: next.filters,
+        orderBy: next.orderBy,
+        limit: next.limit,
+      })
+    );
   }, builderState);
 
   return (
@@ -75,8 +80,16 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
 
       {builderState.isAggregateMode && (
         <>
-          <AggregateEditor allColumns={allColumns} aggregates={builderState.aggregates} onAggregatesChange={onOptionChange('aggregates')} />
-          <GroupByEditor groupBy={builderState.groupBy} onGroupByChange={onOptionChange('groupBy')} allColumns={allColumns} />
+          <AggregateEditor
+            allColumns={allColumns}
+            aggregates={builderState.aggregates}
+            onAggregatesChange={onOptionChange('aggregates')}
+          />
+          <GroupByEditor
+            groupBy={builderState.groupBy}
+            onGroupByChange={onOptionChange('groupBy')}
+            allColumns={allColumns}
+          />
         </>
       )}
 
@@ -96,4 +109,4 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
       />
     </div>
   );
-}
+};

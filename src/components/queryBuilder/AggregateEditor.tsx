@@ -8,7 +8,7 @@ import { styles } from 'styles';
 
 interface AggregateProps {
   columnOptions: Array<SelectableValue<string>>;
-  index: number,
+  index: number;
   aggregate: AggregateColumn;
   updateAggregate: (index: number, aggregate: AggregateColumn) => void;
   removeAggregate: (index: number) => void;
@@ -32,13 +32,13 @@ const Aggregate = (props: AggregateProps) => {
 
   // Add current value to aggregate functions
   const aggregateOptions = allAggregateOptions.slice();
-  if (!aggregateOptions.find(a => a.value === aggregate.aggregateType)) {
+  if (!aggregateOptions.find((a) => a.value === aggregate.aggregateType)) {
     aggregateOptions.push({ label: aggregate.aggregateType, value: aggregate.aggregateType });
   }
 
   // Add current value to column options
   const columnOptions = props.columnOptions.slice();
-  if (!columnOptions.find(c => c.value === aggregate.column)) {
+  if (!columnOptions.find((c) => c.value === aggregate.column)) {
     columnOptions.push({ label: aggregate.column, value: aggregate.column });
   }
 
@@ -49,7 +49,7 @@ const Aggregate = (props: AggregateProps) => {
         className={styles.Common.inlineSelect}
         options={aggregateOptions}
         value={aggregate.aggregateType}
-        onChange={e => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
+        onChange={(e) => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
         menuPlacement={'bottom'}
         allowCustomValue
       />
@@ -60,7 +60,7 @@ const Aggregate = (props: AggregateProps) => {
         isOpen={isOpen}
         onOpenMenu={() => setIsOpen(true)}
         onCloseMenu={() => setIsOpen(false)}
-        onChange={e => updateAggregate(index, { ...aggregate, column: e.value! })}
+        onChange={(e) => updateAggregate(index, { ...aggregate, column: e.value! })}
         value={aggregate.column}
         menuPlacement={'bottom'}
         allowCustomValue
@@ -71,8 +71,8 @@ const Aggregate = (props: AggregateProps) => {
       <Input
         width={20}
         value={alias}
-        onChange={e => setAlias(e.currentTarget.value)}
-        onBlur={e => updateAggregate(index, { ...aggregate, alias: e.currentTarget.value })}
+        onChange={(e) => setAlias(e.currentTarget.value)}
+        onBlur={(e) => updateAggregate(index, { ...aggregate, alias: e.currentTarget.value })}
         placeholder="alias"
       />
       <Button
@@ -98,7 +98,10 @@ const allColumnName = '*';
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map(c => ({ label: c.label || c.name, value: c.name }));
+  const columnOptions: Array<SelectableValue<string>> = allColumns.map((c) => ({
+    label: c.label || c.name,
+    value: c.name,
+  }));
   columnOptions.push({ label: allColumnName, value: allColumnName });
 
   const addAggregate = () => {
@@ -134,8 +137,12 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
       {aggregates.map((aggregate, index) => {
         const key = `${index}-${aggregate.column}-${aggregate.aggregateType}-${aggregate.alias}`;
         return (
-          <div className="gf-form" key={key} data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}>
-            { index === 0 ? fieldLabel : fieldSpacer }
+          <div
+            className="gf-form"
+            key={key}
+            data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}
+          >
+            {index === 0 ? fieldLabel : fieldSpacer}
             <Aggregate
               columnOptions={columnOptions}
               index={index}

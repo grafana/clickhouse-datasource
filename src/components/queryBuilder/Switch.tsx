@@ -23,7 +23,7 @@ export const Switch = (props: SwitchProps) => {
     alignItems: 'center',
   };
 
-  const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '')
+  const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
     <div className="gf-form">
@@ -35,7 +35,7 @@ export const Switch = (props: SwitchProps) => {
           disabled={disabled}
           className="gf-form"
           value={value}
-          onChange={e => onChange(e.currentTarget.checked)}
+          onChange={(e) => onChange(e.currentTarget.checked)}
         />
       </div>
     </div>

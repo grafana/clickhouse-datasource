@@ -9,7 +9,9 @@ describe('useTraceDefaultsOnMount', () => {
   it('should call builderOptionsDispatch with default trace columns', async () => {
     const builderOptionsDispatch = jest.fn();
     jest.spyOn(mockDatasource, 'getTraceOtelVersion').mockReturnValue(undefined);
-    jest.spyOn(mockDatasource, 'getDefaultTraceColumns').mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));
+    jest
+      .spyOn(mockDatasource, 'getDefaultTraceColumns')
+      .mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));
 
     renderHook(() => useTraceDefaultsOnMount(mockDatasource, true, {} as QueryBuilderOptions, builderOptionsDispatch));
 
@@ -24,7 +26,7 @@ describe('useTraceDefaultsOnMount', () => {
         flattenNested: expect.anything(),
         traceEventsColumnPrefix: expect.anything(),
         traceLinksColumnPrefix: expect.anything(),
-      }
+      },
     };
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
@@ -35,7 +37,9 @@ describe('useTraceDefaultsOnMount', () => {
     const builderOptions = {} as QueryBuilderOptions;
     const builderOptionsDispatch = jest.fn();
 
-    const hook = renderHook(() => useTraceDefaultsOnMount(mockDatasource, true, builderOptions, builderOptionsDispatch));
+    const hook = renderHook(() =>
+      useTraceDefaultsOnMount(mockDatasource, true, builderOptions, builderOptionsDispatch)
+    );
     hook.rerender();
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
@@ -44,7 +48,9 @@ describe('useTraceDefaultsOnMount', () => {
   it('should not call builderOptionsDispatch for existing query', async () => {
     const isNewQuery = false; // query already exists, is not new
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useTraceDefaultsOnMount(mockDatasource, isNewQuery, {} as QueryBuilderOptions, builderOptionsDispatch));
+    renderHook(() =>
+      useTraceDefaultsOnMount(mockDatasource, isNewQuery, {} as QueryBuilderOptions, builderOptionsDispatch)
+    );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -71,7 +77,9 @@ describe('useOtelColumns', () => {
     const builderOptionsDispatch = jest.fn();
 
     let otelEnabled = false;
-    const hook = renderHook(enabled => useOtelColumns(enabled, testOtelVersion.version, builderOptionsDispatch), { initialProps: otelEnabled });
+    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, builderOptionsDispatch), {
+      initialProps: otelEnabled,
+    });
     otelEnabled = true;
     hook.rerender(otelEnabled);
 
@@ -84,7 +92,7 @@ describe('useOtelColumns', () => {
         flattenNested: expect.anything(),
         traceEventsColumnPrefix: expect.anything(),
         traceLinksColumnPrefix: expect.anything(),
-      }
+      },
     };
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
@@ -95,7 +103,9 @@ describe('useOtelColumns', () => {
     const builderOptionsDispatch = jest.fn();
 
     let otelEnabled = false; // OTEL is off
-    const hook = renderHook(enabled => useOtelColumns(enabled, testOtelVersion.version, builderOptionsDispatch), { initialProps: otelEnabled });
+    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, builderOptionsDispatch), {
+      initialProps: otelEnabled,
+    });
     otelEnabled = true;
     hook.rerender(otelEnabled); // OTEL is on, columns are set
     hook.rerender(otelEnabled); // OTEL still on, should not set again
@@ -103,7 +113,6 @@ describe('useOtelColumns', () => {
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
   });
 });
-
 
 describe('useDefaultFilters', () => {
   it('should call builderOptionsDispatch when query is new', async () => {
@@ -150,10 +159,9 @@ describe('useDefaultFilters', () => {
     const isTraceIdMode = false;
     const isNewQuery = false;
 
-    const hook = renderHook(table =>
-      useDefaultFilters(table, isTraceIdMode, isNewQuery, builderOptionsDispatch),
-      { initialProps: tableName }
-    );
+    const hook = renderHook((table) => useDefaultFilters(table, isTraceIdMode, isNewQuery, builderOptionsDispatch), {
+      initialProps: tableName,
+    });
     hook.rerender('other_timeseries');
 
     const expectedOptions = {

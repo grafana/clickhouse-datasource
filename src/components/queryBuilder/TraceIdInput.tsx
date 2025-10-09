@@ -7,7 +7,7 @@ interface TraceIdInputProps {
   traceId: string;
   onChange: (traceId: string) => void;
   disabled?: boolean;
-};
+}
 
 const TraceIdInput = (props: TraceIdInputProps) => {
   const [inputId, setInputId] = useState<string>('');
@@ -29,11 +29,11 @@ const TraceIdInput = (props: TraceIdInputProps) => {
         value={inputId}
         disabled={disabled}
         type="string"
-        onChange={e => setInputId(e.currentTarget.value)}
+        onChange={(e) => setInputId(e.currentTarget.value)}
         onBlur={() => onChange(inputId)}
       />
     </div>
-  )
-}
+  );
+};
 
 export default TraceIdInput;

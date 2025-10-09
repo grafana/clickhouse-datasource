@@ -1,6 +1,16 @@
 import { generateSql } from 'data/sqlGenerator';
 import { getQueryOptionsFromSql, isDateTimeType, isDateType, isNumberType } from './utils';
-import { AggregateType, BuilderMode, ColumnHint, DateFilterWithoutValue, FilterOperator, MultiFilter, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import {
+  AggregateType,
+  BuilderMode,
+  ColumnHint,
+  DateFilterWithoutValue,
+  FilterOperator,
+  MultiFilter,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+} from 'types/queryBuilder';
 import { Datasource } from 'data/CHDatasource';
 import otel from 'otel';
 
@@ -161,7 +171,10 @@ describe('getQueryOptionsFromSql', () => {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+    columns: [
+      { name: 'field1', alias: undefined },
+      { name: 'field2', alias: undefined },
+    ],
     aggregates: [],
   });
 
@@ -170,7 +183,10 @@ describe('getQueryOptionsFromSql', () => {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+    columns: [
+      { name: 'field1', alias: undefined },
+      { name: 'field2', alias: undefined },
+    ],
     aggregates: [],
     limit: 20,
   });
@@ -183,7 +199,10 @@ describe('getQueryOptionsFromSql', () => {
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+      columns: [
+        { name: 'field1', alias: undefined },
+        { name: 'field2', alias: undefined },
+      ],
       aggregates: [],
       orderBy: [],
       limit: 20,
@@ -196,7 +215,10 @@ describe('getQueryOptionsFromSql', () => {
     mode: BuilderMode.List,
     database: 'db',
     table: 'foo',
-    columns: [{ name: 'field1', alias: undefined }, { name: 'field2', alias: undefined }],
+    columns: [
+      { name: 'field1', alias: undefined },
+      { name: 'field2', alias: undefined },
+    ],
     aggregates: [],
     orderBy: [{ name: 'field1', dir: OrderByDirection.ASC }],
     limit: 20,
@@ -226,7 +248,7 @@ describe('getQueryOptionsFromSql', () => {
       table: '',
       columns: [{ name: '*' }],
       aggregates: [],
-      limit: undefined
+      limit: undefined,
     },
     false
   );
@@ -238,7 +260,7 @@ describe('getQueryOptionsFromSql', () => {
     table: 'foo',
     columns: [],
     aggregates: [{ column: 'field1', aggregateType: AggregateType.Sum, alias: undefined }],
-    limit: undefined
+    limit: undefined,
   });
 
   testCondition('handles aggregation with alias', 'SELECT sum(field1) as total_records FROM "db"."foo"', {
@@ -248,7 +270,7 @@ describe('getQueryOptionsFromSql', () => {
     table: 'foo',
     columns: [],
     aggregates: [{ column: 'field1', aggregateType: AggregateType.Sum, alias: 'total_records' }],
-    limit: undefined
+    limit: undefined,
   });
 
   testCondition(
@@ -264,7 +286,7 @@ describe('getQueryOptionsFromSql', () => {
         { column: 'field1', aggregateType: AggregateType.Sum, alias: 'total_records' },
         { column: 'field2', aggregateType: AggregateType.Count, alias: 'total_records2' },
       ],
-      limit: undefined
+      limit: undefined,
     }
   );
 
@@ -300,7 +322,7 @@ describe('getQueryOptionsFromSql', () => {
         { column: 'field2', aggregateType: AggregateType.Count, alias: 'total_records2' },
       ],
       groupBy: ['field3'],
-      limit: undefined
+      limit: undefined,
     }
   );
 
@@ -312,10 +334,7 @@ describe('getQueryOptionsFromSql', () => {
       database: 'db',
       table: 'foo',
       queryType: QueryType.Table,
-      columns: [
-        { name: 'StageName' },
-        { name: 'Type' },
-      ],
+      columns: [{ name: 'StageName' }, { name: 'Type' }],
       aggregates: [
         { column: 'Id', aggregateType: AggregateType.Count, alias: 'count_of' },
         { column: 'Amount', aggregateType: AggregateType.Sum, alias: undefined },
@@ -344,9 +363,9 @@ describe('getQueryOptionsFromSql', () => {
           key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won', 'Deal Lost'],
-          type: 'string'
+          type: 'string',
         } as MultiFilter,
-      ]
+      ],
     }
   );
 
@@ -368,7 +387,7 @@ describe('getQueryOptionsFromSql', () => {
           type: 'string',
         } as MultiFilter,
       ],
-      limit: undefined
+      limit: undefined,
     }
   );
 
@@ -389,7 +408,7 @@ describe('getQueryOptionsFromSql', () => {
           type: 'datetime',
         } as DateFilterWithoutValue,
       ],
-      limit: undefined
+      limit: undefined,
     }
   );
 
@@ -410,7 +429,7 @@ describe('getQueryOptionsFromSql', () => {
           type: 'datetime',
         } as DateFilterWithoutValue,
       ],
-      limit: undefined
+      limit: undefined,
     }
   );
 
@@ -445,21 +464,25 @@ describe('getQueryOptionsFromSql', () => {
           filterType: 'custom',
           key: 'base',
           operator: FilterOperator.IsNotNull,
-          type: 'LowCardinality(String)'
+          type: 'LowCardinality(String)',
         },
       ],
     },
     false
   );
 
-  testCondition('handles parsing a column with a complex name with spaces and capital characters', 'SELECT "Complex Name" FROM "db"."foo"', {
-    queryType: QueryType.Table,
-    mode: BuilderMode.List,
-    database: 'db',
-    table: 'foo',
-    columns: [{ name: 'Complex Name', alias: undefined }],
-    aggregates: [],
-  });
+  testCondition(
+    'handles parsing a column with a complex name with spaces and capital characters',
+    'SELECT "Complex Name" FROM "db"."foo"',
+    {
+      queryType: QueryType.Table,
+      mode: BuilderMode.List,
+      database: 'db',
+      table: 'foo',
+      columns: [{ name: 'Complex Name', alias: undefined }],
+      aggregates: [],
+    }
+  );
 
   it('matches input query type', () => {
     const sql = 'SELECT test FROM "db"."foo"';
@@ -482,9 +505,12 @@ describe('getQueryOptionsFromSql', () => {
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'a', alias: 'body', hint: ColumnHint.LogMessage }, { name: 'b', alias: 'level', hint: ColumnHint.LogLevel }],
+      columns: [
+        { name: 'a', alias: 'body', hint: ColumnHint.LogMessage },
+        { name: 'b', alias: 'level', hint: ColumnHint.LogLevel },
+      ],
       aggregates: [],
-      limit: undefined
+      limit: undefined,
     };
 
     expect(getQueryOptionsFromSql(sql, QueryType.Logs)).toEqual(expectedOptions);
@@ -500,9 +526,12 @@ describe('getQueryOptionsFromSql', () => {
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'Timestamp', alias: undefined, hint: ColumnHint.Time }, { name: 'SeverityText', alias: undefined, hint: ColumnHint.LogLevel }],
+      columns: [
+        { name: 'Timestamp', alias: undefined, hint: ColumnHint.Time },
+        { name: 'SeverityText', alias: undefined, hint: ColumnHint.LogLevel },
+      ],
       aggregates: [],
-      limit: undefined
+      limit: undefined,
     };
 
     expect(getQueryOptionsFromSql(sql, QueryType.Logs, mockDs)).toEqual(expectedOptions);
@@ -510,11 +539,13 @@ describe('getQueryOptionsFromSql', () => {
 
   it('matches column hints with datasource log column names', () => {
     const mockDs = {} as Datasource;
-    mockDs.getDefaultLogsColumns = jest.fn(() => (
-      new Map([
-        [ColumnHint.Time, 'SpecialTimestamp'],
-        [ColumnHint.LogMessage, 'LogBody']
-      ])));
+    mockDs.getDefaultLogsColumns = jest.fn(
+      () =>
+        new Map([
+          [ColumnHint.Time, 'SpecialTimestamp'],
+          [ColumnHint.LogMessage, 'LogBody'],
+        ])
+    );
 
     const sql = 'SELECT "SpecialTimestamp", "LogBody" FROM "db"."foo"';
     const expectedOptions: QueryBuilderOptions = {
@@ -522,9 +553,12 @@ describe('getQueryOptionsFromSql', () => {
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'SpecialTimestamp', alias: undefined, hint: ColumnHint.Time }, { name: 'LogBody', alias: undefined, hint: ColumnHint.LogMessage }],
+      columns: [
+        { name: 'SpecialTimestamp', alias: undefined, hint: ColumnHint.Time },
+        { name: 'LogBody', alias: undefined, hint: ColumnHint.LogMessage },
+      ],
       aggregates: [],
-      limit: undefined
+      limit: undefined,
     };
 
     expect(getQueryOptionsFromSql(sql, QueryType.Logs, mockDs)).toEqual(expectedOptions);
@@ -540,9 +574,12 @@ describe('getQueryOptionsFromSql', () => {
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'StartTime', alias: undefined, hint: ColumnHint.Time }, { name: 'ServiceName', alias: undefined, hint: ColumnHint.TraceServiceName }],
+      columns: [
+        { name: 'StartTime', alias: undefined, hint: ColumnHint.Time },
+        { name: 'ServiceName', alias: undefined, hint: ColumnHint.TraceServiceName },
+      ],
       aggregates: [],
-      limit: undefined
+      limit: undefined,
     };
 
     expect(getQueryOptionsFromSql(sql, QueryType.Traces, mockDs)).toEqual(expectedOptions);
@@ -550,11 +587,13 @@ describe('getQueryOptionsFromSql', () => {
 
   it('matches column hints with datasource trace column names', () => {
     const mockDs = {} as Datasource;
-    mockDs.getDefaultTraceColumns = jest.fn(() => (
-      new Map([
-        [ColumnHint.Time, 'SpecialTimestamp'],
-        [ColumnHint.TraceId, 'CustomTraceID']
-      ])));
+    mockDs.getDefaultTraceColumns = jest.fn(
+      () =>
+        new Map([
+          [ColumnHint.Time, 'SpecialTimestamp'],
+          [ColumnHint.TraceId, 'CustomTraceID'],
+        ])
+    );
 
     const sql = 'SELECT "SpecialTimestamp", "CustomTraceID" FROM "db"."foo"';
     const expectedOptions: QueryBuilderOptions = {
@@ -562,9 +601,12 @@ describe('getQueryOptionsFromSql', () => {
       mode: BuilderMode.List,
       database: 'db',
       table: 'foo',
-      columns: [{ name: 'SpecialTimestamp', alias: undefined, hint: ColumnHint.Time }, { name: 'CustomTraceID', alias: undefined, hint: ColumnHint.TraceId }],
+      columns: [
+        { name: 'SpecialTimestamp', alias: undefined, hint: ColumnHint.Time },
+        { name: 'CustomTraceID', alias: undefined, hint: ColumnHint.TraceId },
+      ],
       aggregates: [],
-      limit: undefined
+      limit: undefined,
     };
 
     expect(getQueryOptionsFromSql(sql, QueryType.Traces, mockDs)).toEqual(expectedOptions);

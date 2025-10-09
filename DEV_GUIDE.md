@@ -78,11 +78,12 @@ update-ca-certificates
 Column hints are used within the query builder and SQL generator to enable flexible and dynamic queries.
 
 Here's an example of some column hints:
+
 ```js
-ColumnHint.Time
-ColumnHint.LogMessage
-ColumnHint.LogLevel
-ColumnHint.TraceId
+ColumnHint.Time;
+ColumnHint.LogMessage;
+ColumnHint.LogLevel;
+ColumnHint.TraceId;
 ```
 
 The easiest example is the time hint (`ColumnHint.Time`). When building a Logs query, we need to know what the primary log time column is:
@@ -108,6 +109,7 @@ const queryBuilderOptions: QueryBuilderOptions = {
   . . .
 };
 ```
+
 ```sql
 -- Final output from SQL generator
 SELECT my_time_column_on_my_table as logTime FROM logs ORDER BY logTime ASC

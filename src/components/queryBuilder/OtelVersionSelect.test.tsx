@@ -9,12 +9,7 @@ describe('OtelVersionSelect', () => {
 
   it('should render with empty properties', () => {
     const result = render(
-      <OtelVersionSelect
-        enabled={false}
-        onEnabledChange={() => {}}
-        selectedVersion=""
-        onVersionChange={() => {}}
-      />
+      <OtelVersionSelect enabled={false} onEnabledChange={() => {}} selectedVersion="" onVersionChange={() => {}} />
     );
     expect(result.container.firstChild).not.toBeNull();
   });

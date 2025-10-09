@@ -37,15 +37,9 @@ describe('useDefaultTimeColumn', () => {
     const allColumns: readonly TableColumn[] = [{ name: timeColumnName, type: 'DateTime', picklistValues: [] }];
     const timeColumn = undefined;
 
-    renderHook(table => 
-      useDefaultTimeColumn(
-        allColumns,
-        table,
-        timeColumn,
-        builderOptionsDispatch
-      ),
-      { initialProps: tableName }
-    );
+    renderHook((table) => useDefaultTimeColumn(allColumns, table, timeColumn, builderOptionsDispatch), {
+      initialProps: tableName,
+    });
 
     const expectedColumn: SelectedColumn = { name: timeColumnName, type: 'DateTime', hint: ColumnHint.Time };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
@@ -63,7 +57,7 @@ describe('useDefaultFilters', () => {
 
     const expectedOptions = {
       filters: [expect.anything()],
-      orderBy: [expect.anything()]
+      orderBy: [expect.anything()],
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
@@ -84,15 +78,14 @@ describe('useDefaultFilters', () => {
     const tableName = 'timeseries';
     const isNewQuery = false;
 
-    const hook = renderHook(table =>
-      useDefaultFilters(table, isNewQuery, builderOptionsDispatch),
-      { initialProps: tableName }
-    );
+    const hook = renderHook((table) => useDefaultFilters(table, isNewQuery, builderOptionsDispatch), {
+      initialProps: tableName,
+    });
     hook.rerender('other_timeseries');
 
     const expectedOptions = {
       filters: [expect.anything()],
-      orderBy: [expect.anything()]
+      orderBy: [expect.anything()],
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
