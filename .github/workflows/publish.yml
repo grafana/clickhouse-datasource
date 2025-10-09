@@ -12,9 +12,9 @@ on:
         required: true
         type: choice
         options:
-          - "dev"
-          - "ops"
-          - "prod"
+          - 'dev'
+          - 'ops'
+          - 'prod'
       docs-only:
         description: Only publish docs, do not publish the plugin
         default: false
@@ -38,3 +38,4 @@ jobs:
       go-version: '1.24'
       golangci-lint-version: '2.1.6'
       run-playwright: false
+      github-draft-release: false
