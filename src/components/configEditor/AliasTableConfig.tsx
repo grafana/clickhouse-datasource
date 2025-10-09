@@ -5,10 +5,7 @@ import { AliasTableEntry } from 'types/config';
 import allLabels from 'labels';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
-<<<<<<< HEAD
 import { trackClickhouseConfigV2ColumnAliasTableAdded } from 'views/config-v2/tracking';
-=======
->>>>>>> main
 
 interface AliasTablesConfigProps {
   aliasTables?: AliasTableEntry[];
