@@ -5,6 +5,7 @@ import { AliasTableEntry } from 'types/config';
 import allLabels from 'labels';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
+import { trackClickhouseConfigV2ColumnAliasTableAdded } from 'views/config-v2/tracking';
 
 interface AliasTablesConfigProps {
   aliasTables?: AliasTableEntry[];
@@ -90,7 +91,10 @@ export const AliasTableConfig = (props: AliasTablesConfigProps) => {
         icon="plus-circle"
         variant="secondary"
         size="sm"
-        onClick={addEntry}
+        onClick={() => {
+          addEntry();
+          trackClickhouseConfigV2ColumnAliasTableAdded();
+        }}
         className={styles.Common.smallBtn}
       >
         {labels.addTableLabel}

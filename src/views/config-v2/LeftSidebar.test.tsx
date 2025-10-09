@@ -43,20 +43,23 @@ describe('LeftSidebar', () => {
     });
   });
 
-  it('calls scrollIntoView when link is clicked', () => {
+  it('scrolls to the target with offset when link is clicked', () => {
     render(<LeftSidebar pdcInjected={false} />);
     const firstHeader = CONFIG_SECTION_HEADERS[0];
 
-    // add a fake target element with scrollIntoView defined
     const target = document.createElement('div');
     target.id = firstHeader.id;
-    target.scrollIntoView = jest.fn();
+    target.getBoundingClientRect = jest.fn(() => ({ top: 200 }) as any);
     document.body.appendChild(target);
+
+    Object.defineProperty(window, 'scrollY', { value: 100, writable: true });
+    const scrollToSpy = jest.spyOn(window, 'scrollTo').mockImplementation(() => {});
 
     fireEvent.click(screen.getByText(firstHeader.label));
 
-    expect(target.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+    expect(scrollToSpy).toHaveBeenCalledWith({ top: 240, behavior: 'smooth' });
 
+    scrollToSpy.mockRestore();
     document.body.removeChild(target);
   });
 });
