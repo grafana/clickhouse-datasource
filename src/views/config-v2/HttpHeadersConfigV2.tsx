@@ -108,8 +108,6 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
     valueInput = (
       <SecretInput
         data-testid={selectors.headerValueInput}
-        label=""
-        aria-label=""
         placeholder={labels.secureHeaderValueLabel}
         value={value}
         isConfigured={isSecureConfigured}
