@@ -18,7 +18,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
-	"github.com/grafana/grafana-plugin-sdk-go/build"
+	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
@@ -89,7 +89,7 @@ func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Versio
 		})
 	}
 
-	if info, err := build.GetBuildInfo(); err == nil {
+	if info, err := buildinfo.GetBuildInfo(); err == nil {
 		products = append(products, struct{ Name, Version string }{
 			Name:    "clickhouse-datasource",
 			Version: info.Version,
