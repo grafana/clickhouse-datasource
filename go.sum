@@ -120,8 +120,8 @@ github.com/grafana/otel-profiling-go v0.5.1 h1:stVPKAFZSa7eGiqbYuG25VcqYksR6iWvF
 github.com/grafana/otel-profiling-go v0.5.1/go.mod h1:ftN/t5A/4gQI19/8MoWurBEtC6gFw8Dns1sJZ9W4Tls=
 github.com/grafana/pyroscope-go/godeltaprof v0.1.9 h1:c1Us8i6eSmkW+Ez05d3co8kasnuOY813tbMN8i/a3Og=
 github.com/grafana/pyroscope-go/godeltaprof v0.1.9/go.mod h1:2+l7K7twW49Ct4wFluZD3tZ6e0SjanjcUUBPVD/UuGU=
-github.com/grafana/sqlds/v5 v5.0.0 h1:l/t5a0AQf3q7f5eb4K3/I7yuv1q1mzLcVjvVIOp/ihs=
-github.com/grafana/sqlds/v5 v5.0.0/go.mod h1:Dp5RThGrNUD7PPBEH8i9IckN7UwbMcWwxLCrfUePpUQ=
+github.com/grafana/sqlds/v5 v5.0.1 h1:/Yn+gRo7l7K49VN0u+3sUHX6wY7Qt1RxnNsMu1tVoNc=
+github.com/grafana/sqlds/v5 v5.0.1/go.mod h1:GKeTTiC+GeR1X0z3f0Iee+hZnNgN62uQpj5XVMx5Uew=
 github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 h1:QGLs/O40yoNK9vmy4rhUGBVyMf1lISBGtXRpsu/Qu/o=
 github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0/go.mod h1:hM2alZsMUni80N33RBe6J0e423LB+odMj7d3EMP9l20=
 github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.2 h1:sGm2vDRFUrQJO/Veii4h4zG2vvqG6uWNkBHSTqXOZk0=
