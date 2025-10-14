@@ -1,0 +1,128 @@
+name: Grafana Cloud E2E tests
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Daily at 09:00 UTC
+
+  # TODO: test, remove later
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  # @TODO: Remove the `build` job later
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: 'stable'
+
+      - name: Build backend
+        uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b
+        with:
+          args: buildAll
+          version: latest
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          NODE_OPTIONS: '--max_old_space_size=4096'
+
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-artifacts
+          path: dist
+
+  cloud-e2e:
+    name: Cloud E2E
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps chromium
+      
+      - name: Download GitHub artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: dist-artifacts
+          path: /tmp/dist-artifacts
+
+      - name: Move dist artifacts
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          src=$(pwd)
+
+          cd /tmp/dist-artifacts
+          # unzip the universal zip
+          unzip "${PLUGIN_ID}-${PLUGIN_VERSION}.zip" -d out
+          # Folder structure: /tmp/dist-artifacts/out/$PLUGIN_ID/plugin.json
+          cd out
+          cd "$(ls -1)"
+          mv ./* "$src/dist/"
+        env:
+          PLUGIN_ID: clickhouse-datasource
+          PLUGIN_VERSION: 4.11.1
+
+      - name: Get secrets from Vault
+        id: get-secrets
+        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        with:
+          # Secrets placed in the ci/common/<path> path in Vault
+          common_secrets: |
+            PLAYWRIGHT_GRAFANA_USERNAME=e2e:grafana-username
+            PLAYWRIGHT_GRAFANA_PASSWORD=e2e:grafana-pw
+          # Secrets placed in the ci/repo/grafana/<repo>/<path> path in Vault
+          # repo_secrets: |
+          #   ENVVAR2=test-secret:key1
+
+      - name: Install npm dependencies
+        run: |
+          if [ -f yarn.lock ]; then
+            yarn install --frozen-lockfile
+          else
+            npm ci
+          fi
+        shell: bash
+
+      - name: Wait for Grafana to start
+        uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
+        with:
+          url: "https://datasourcese2e.grafana-dev.net"
+
+      - name: Run Playwright tests
+        id: run-tests
+        run: npx playwright test --config "${PLAYWRIGHT_CONFIG}"
+        env:
+          PLAYWRIGHT_CONFIG: playwright.config.ts
+      
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
