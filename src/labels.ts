@@ -31,7 +31,7 @@ export default {
         username: {
           label: 'Username',
           placeholder: 'default',
-          tooltip: 'ClickHouse username',
+          tooltip: 'We recommend configuring',
         },
         password: {
           label: 'Password',

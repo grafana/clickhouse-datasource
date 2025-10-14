@@ -150,7 +150,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
                 />
               </Toggletip>
             </div>
-            <Field description={<div className={styles.toggleTipText}>{labels.protocol.tooltip}</div>}>
+            <Field label="" description={<div className={styles.toggleTipText}>{labels.protocol.tooltip}</div>}>
               <RadioButtonGroup<Protocol>
                 options={PROTOCOL_OPTIONS}
                 value={jsonData.protocol || Protocol.Native}
