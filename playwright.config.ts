@@ -1,3 +1,5 @@
+import { dirname } from 'path';
+
 import { defineConfig, devices } from '@playwright/test';
 import type { PluginOptions } from '@grafana/plugin-e2e';
 
@@ -42,14 +44,14 @@ export default defineConfig<PluginOptions>({
   projects: [
     {
       name: 'auth',
-      testDir: 'node_modules/@grafana/plugin-e2e/dist/auth',
+      testDir: `${dirname(require.resolve('@grafana/plugin-e2e'))}/auth`,
       testMatch: [/.*\.js/],
     },
     {
       name: 'run-tests',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: 'playwright/.auth/admin.json',
+        storageState: `playwright/.auth/${process.env.GRAFANA_ADMIN_USER || 'admin'}.json`,
       },
       dependencies: ['auth'],
     },
