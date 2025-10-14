@@ -1,0 +1,77 @@
+name: Grafana Cloud E2E tests
+
+on:
+  schedule:
+    - cron: '0 9 * * *' # Daily at 09:00 UTC
+
+  # TODO: test, remove later
+  push:
+    branches:
+      - main
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: Bench Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Get secrets from Vault
+        id: get-secrets
+        # Only execute this action in a trusted context
+        if: |
+          github.event_name != 'pull_request' || 
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        with:
+          common_secrets: |
+            PLAYWRIGHT_GRAFANA_PASSWORD=data-sources/e2e:grafana-pw
+            PLAYWRIGHT_GRAFANA_USERNAME=data-sources/e2e:grafana-username
+          repo_secrets: |
+            DS_INSTANCE_HOST=ds-instance:host
+            DS_INSTANCE_PASSWORD=ds-instance:password
+            DS_INSTANCE_PORT=ds-instance:port
+            DS_INSTANCE_USERNAME=ds-instance:username
+          export_env: false
+
+      - name: Wait for Grafana to be reachable
+        uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
+        with:
+          url: "https://datasourcese2e.grafana-dev.net/login"
+          timeout: 300  # 5 minutes
+          interval: 10  # 10 seconds
+
+      - name: Run Grafana Bench tests
+        run: |
+          set -euo pipefail 
+          docker run \
+            --rm \
+            --network=host \
+            --volume "$PWD:/tests" \
+            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v0.6.11 test \
+            --grafana-version "rrc-instant" \
+            --grafana-admin-password "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}" \
+            --grafana-admin-user "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}" \
+            --grafana-url "https://datasourcese2e.grafana-dev.net" \
+            --log-level debug \
+            --pw-execute "npm run e2e" \
+            --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
+            --test-env 'CI=true,DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }},DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }},DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }},DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }},DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e' \
+            --test-runner playwright \
+            --test-verbose
