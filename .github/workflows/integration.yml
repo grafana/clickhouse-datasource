@@ -1,4 +1,4 @@
-name: Backend unit tests
+name: Integration tests
 
 on:
   push:
@@ -34,7 +34,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v6
         with:
-          go-version: 'stable'
+          go-version-file: 'go.mod'
 
       - name: Build backend
         uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b
@@ -42,5 +42,5 @@ jobs:
           args: buildAll
           version: latest
 
-      - name: Run backend tests
-        run: CLICKHOUSE_VERSION=${{ matrix.clickhouse }} go test -v ./...
+      - name: Run integration tests
+        run: CLICKHOUSE_VERSION=${{ matrix.clickhouse }} go test -v -tags=integration ./...

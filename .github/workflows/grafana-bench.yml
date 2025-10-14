@@ -15,9 +15,9 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version-file: '.nvmrc'
           cache: 'yarn'
 
       - uses: actions/setup-go@v6
@@ -39,24 +39,25 @@ jobs:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
       - name: Install and run Docker Compose
-        uses: hoverkraft-tech/compose-action@b716db5b717cb9b81e391fe638e5aceaa2299e43
+        uses: hoverkraft-tech/compose-action@3846bcd61da338e9eaaf83e7ed0234a12b099b72
         with:
           compose-file: './docker-compose.yml'
 
       - name: Ensure Grafana is running
-        run: |
-          curl http://localhost:3000
+        uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
+        with:
+          url: http://localhost:3000
 
       - name: Run Grafana Bench tests
         run: |
-          docker run --rm \
+          docker run \
+            --rm \
             --network=host \
-            --volume="./:/home/bench/tests/" \
-            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench:v0.3.0 test \
-            --test-runner "playwright" \
-            --test-suite-base "/home/bench/tests/" \
+            --volume="./:/tests/" \
+            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v0.6.3 test \
             --grafana-url "http://localhost:3000" \
-            --pw-execute-cmd "yarn e2e" \
-            --pw-prepare-cmd "yarn install --frozen-lockfile; yarn playwright install" \
+            --log-level debug \
+            --pw-execute "yarn e2e" \
+            --pw-prepare "yarn install --frozen-lockfile; yarn playwright install" \
             --test-env-vars "CI=true" \
-            --log-level DEBUG
+            --test-runner playwright
