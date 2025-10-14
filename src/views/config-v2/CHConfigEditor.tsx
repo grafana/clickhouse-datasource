@@ -7,7 +7,9 @@ import { css } from '@emotion/css';
 import { LeftSidebar } from './LeftSidebar';
 import { CONTAINER_MIN_WIDTH } from './constants';
 import { trackInfluxDBConfigV2FeedbackButtonClicked } from './tracking';
-import { RemainingConfigCode } from './RemainingConfigCode';
+import { AdditionalSettingsSection } from './AdditionalSettingsSection';
+import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
+import { TLSSSLSettingsSection } from './TLSSSLSettingsSection';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -17,7 +19,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   return (
     <Stack justifyContent="space-between">
-      <div className={styles.hideOnSmallScreen}>
+      <div className={`${styles.hideOnSmallScreen} ${styles.leftSticky}`}>
         <Box width="100%" flex="1 1 auto">
           <LeftSidebar pdcInjected={Boolean(options?.jsonData?.pdcInjected)} />
         </Box>
@@ -45,7 +47,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           </Text>
         </div>
         <ServerAndEncryptionSection onOptionsChange={onOptionsChange} options={options} />
-        <RemainingConfigCode onOptionsChange={onOptionsChange} options={options} />
+        <DatabaseCredentialsSection onOptionsChange={onOptionsChange} options={options} />
+        <TLSSSLSettingsSection onOptionsChange={onOptionsChange} options={options} />
+        <AdditionalSettingsSection onOptionsChange={onOptionsChange} options={options} />
       </Box>
       <Box width="20%" flex="0 0 20%">
         {/* TODO: Right sidebar */}
@@ -61,6 +65,13 @@ const getStyles = (theme: GrafanaTheme2) => ({
     [theme.breakpoints.down('sm')]: {
       display: 'none',
     },
+  }),
+  leftSticky: css({
+    position: 'sticky',
+    top: '100px',
+    alignSelf: 'flex-start',
+    maxHeight: 'calc(100vh - 100px)',
+    overflowY: 'auto',
   }),
   requiredFields: css({
     marginBottom: theme.spacing(2),

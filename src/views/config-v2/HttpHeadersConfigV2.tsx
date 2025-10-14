@@ -1,6 +1,5 @@
 import React, { ChangeEvent, useMemo, useState } from 'react';
-import { ConfigSection } from 'components/experimental/ConfigSection';
-import { Input, Field, HorizontalGroup, Switch, SecretInput, Button } from '@grafana/ui';
+import { Input, Field, SecretInput, Button, Stack, Checkbox, Box } from '@grafana/ui';
 import { CHHttpHeader } from 'types/config';
 import allLabels from 'labels';
 import { styles } from 'styles';
@@ -15,7 +14,7 @@ interface HttpHeadersConfigProps {
   onForwardGrafanaHeadersChange: (v: boolean) => void;
 }
 
-export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
+export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const { secureFields, onHttpHeadersChange } = props;
   const configuredSecureHeaders = useConfiguredSecureHttpHeaders(secureFields);
   const [headers, setHeaders] = useState<CHHttpHeader[]>(props.headers || []);
@@ -43,11 +42,11 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   };
 
   return (
-    <ConfigSection title={labels.title}>
-      <Field label={labels.label} description={labels.description}>
+    <div style={{ marginLeft: '30px' }}>
+      <Field label={labels.label}>
         <>
           {headers.map((header, index) => (
-            <HttpHeaderEditor
+            <HttpHeaderEditorV2
               key={header.name + index}
               name={header.name}
               value={header.value}
@@ -59,7 +58,7 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
           ))}
           <Button
             data-testid={selectors.addHeaderButton}
-            icon="plus-circle"
+            icon="plus"
             variant="secondary"
             size="sm"
             onClick={addHeader}
@@ -69,15 +68,12 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
           </Button>
         </>
       </Field>
-      <Field label={labels.forwardGrafanaHeaders.label} description={labels.forwardGrafanaHeaders.tooltip}>
-        <Switch
-          data-testid={selectors.forwardGrafanaHeadersSwitch}
-          className={'gf-form'}
-          value={forwardGrafanaHeaders}
-          onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
-        />
-      </Field>
-    </ConfigSection>
+      <Checkbox
+        label={labels.forwardGrafanaHeaders.label}
+        value={forwardGrafanaHeaders}
+        onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
+      />
+    </div>
   );
 };
 
@@ -90,7 +86,7 @@ interface HttpHeaderEditorProps {
   onRemove?: () => void;
 }
 
-const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
+const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
   const { onHeaderChange, onRemove } = props;
   const [name, setName] = useState<string>(props.name);
   const [value, setValue] = useState<string>(props.value);
@@ -112,7 +108,6 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
     valueInput = (
       <SecretInput
         data-testid={selectors.headerValueInput}
-        width={65}
         placeholder={labels.secureHeaderValueLabel}
         value={value}
         isConfigured={isSecureConfigured}
@@ -125,7 +120,6 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
     valueInput = (
       <Input
         data-testid={selectors.headerValueInput}
-        width={65}
         value={value}
         placeholder={labels.insecureHeaderValueLabel}
         onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
@@ -136,8 +130,8 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
 
   const headerValueLabel = secure ? labels.secureHeaderValueLabel : labels.insecureHeaderValueLabel;
   return (
-    <div data-testid={selectors.headerEditor}>
-      <HorizontalGroup>
+    <div data-testid={selectors.headerEditor} style={{ marginTop: '10px' }}>
+      <Stack direction="row" alignItems="center" gap={1}>
         <Field label={labels.headerNameLabel} aria-label={labels.headerNameLabel}>
           <Input
             data-testid={selectors.headerNameInput}
@@ -148,19 +142,13 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             onBlur={() => onUpdate()}
           />
         </Field>
-        <Field label={headerValueLabel} aria-label={headerValueLabel}>
-          {valueInput}
-        </Field>
-        {!isSecureConfigured && (
-          <Field label={labels.secureLabel}>
-            <Switch
-              data-testid={selectors.headerSecureSwitch}
-              className="gf-form"
-              value={secure}
-              onChange={(e) => setSecure(e.currentTarget.checked)}
-              onBlur={() => onUpdate()}
-            />
+        <Box grow={1}>
+          <Field label={headerValueLabel} aria-label={headerValueLabel}>
+            {valueInput}
           </Field>
+        </Box>
+        {!isSecureConfigured && (
+          <Checkbox label={labels.secureLabel} value={secure} onChange={(e) => setSecure(e.currentTarget.checked)} />
         )}
         {onRemove && (
           <Button
@@ -172,7 +160,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             onClick={onRemove}
           />
         )}
-      </HorizontalGroup>
+      </Stack>
     </div>
   );
 };

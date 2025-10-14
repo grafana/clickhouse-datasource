@@ -6,7 +6,7 @@ export const trackInfluxDBConfigV2FeedbackButtonClicked = () => {
   reportInteraction('clickhouse_config_v2_feedback_button_clicked');
 };
 
-// Server section
+// Server and encryption section
 export const trackClickhouseConfigV2HostInput = () => {
   reportInteraction('clickhouse_config_v2_host_input');
 };
@@ -19,8 +19,17 @@ export const trackClickhouseConfigV2NativeHttpToggleClicked = (props: { nativeHt
   reportInteraction('clickhouse_config_v2_native_http_toggle_clicked', props);
 };
 
-export const trackClickhouseConfigV2SecureConnectionToggleClicked = (props: { secureConnection: boolean }) => {
-  reportInteraction('clickhouse_config_v2_secure_connection_toggle_clicked', props);
+export const trackClickhouseConfigV2SecureConnectionChecked = (props: { secureConnection: boolean }) => {
+  reportInteraction('clickhouse_config_v2_secure_connection_checked', props);
+};
+
+// Database credentials section
+export const trackClickhouseConfigV2DatabaseCredentialsUserInput = () => {
+  reportInteraction('clickhouse_config_v2_database_credentials_user_input');
+};
+
+export const trackClickhouseConfigV2DatabaseCredentialsPasswordInput = () => {
+  reportInteraction('clickhouse_config_v2_database_credentials_password_input');
 };
 
 // TLS/SSL Settings section
@@ -36,6 +45,7 @@ export const trackClickhouseConfigV2WithCACertToggleClicked = (props: { caCertTo
   reportInteraction('clickhouse_config_v2_with_ca_cert_toggle_clicked', props);
 };
 
+// Additional settings
 // Default DB and Table section
 export const trackClickhouseConfigV2DefaultDbInput = () => {
   reportInteraction('clickhouse_config_v2_default_db_input');
@@ -112,6 +122,6 @@ export const trackClickhouseConfigV2EnableRowLimitToggle = (props: { rowLimitEna
 };
 
 // Custom Settings section
-export const trackClickhouseConfigV2CustomSettingAdded = () => {
-  reportInteraction('clickhouse_config_v2_custom_setting_added');
+export const trackClickhouseConfigV2CustomSettingClicked = () => {
+  reportInteraction('clickhouse_config_v2_custom_setting_clicked');
 };
