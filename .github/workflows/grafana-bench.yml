@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version-file: '.nvmrc'
-          cache: 'yarn'
+          cache: 'npm'
 
       - uses: actions/setup-go@v6
         with:
@@ -31,10 +31,10 @@ jobs:
           version: latest
 
       - name: Install frontend dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Build frontend
-        run: yarn build
+        run: npm run build
         env:
           NODE_OPTIONS: '--max_old_space_size=4096'
 
@@ -57,7 +57,7 @@ jobs:
             us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v0.6.3 test \
             --grafana-url "http://localhost:3000" \
             --log-level debug \
-            --pw-execute "yarn e2e" \
-            --pw-prepare "yarn install --frozen-lockfile; yarn playwright install" \
+            --pw-execute "npm run e2e" \
+            --pw-prepare "npm ci; npx playwright install" \
             --test-env-vars "CI=true" \
             --test-runner playwright

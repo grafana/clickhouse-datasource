@@ -6,6 +6,7 @@
     "src/dashboards/**",
     "dist/**",
     "yarn.lock",
+    "package-lock.json",
     "go.sum",
     "mage_output_file.go"
   ],

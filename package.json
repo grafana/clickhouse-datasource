@@ -8,14 +8,14 @@
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
-    "e2e:report": "yarn playwright show-report",
-    "e2e:ui": "yarn playwright test --ui",
-    "e2e": "playwright test",
+    "e2e:report": "npx playwright show-report",
+    "e2e:ui": "npx playwright test --ui",
+    "e2e": "npx playwright test",
     "gen-dashboards": "node ./gen-db-dashboards",
-    "lint:fix": "yarn run lint --fix",
-    "lint": "eslint --cache --ignore-path ./.gitignore --ext .js,.jsx,.ts,.tsx .",
-    "prettier:check": "prettier --check --ignore-path .prettierignore --list-different=false --log-level=warn \"**/*.{ts,tsx,scss,md,mdx,json,js,cjs}\"",
-    "prettier:write": "prettier --ignore-path .prettierignore --list-different \"**/*.{js,ts,tsx,scss,md,mdx,json,cjs}\" --write",
+    "lint:fix": "npx eslint --cache --ignore-path ./.gitignore --ext .js,.jsx,.ts,.tsx . --fix",
+    "lint": "npx eslint --cache --ignore-path ./.gitignore --ext .js,.jsx,.ts,.tsx .",
+    "prettier:check": "npx prettier --check --ignore-path .prettierignore --list-different=false --log-level=warn \"**/*.{ts,tsx,scss,md,mdx,json,js,cjs}\"",
+    "prettier:write": "npx prettier --ignore-path .prettierignore --list-different \"**/*.{js,ts,tsx,scss,md,mdx,json,cjs}\" --write",
     "server": "docker compose up --build",
     "sign": "npx --yes @grafana/sign-plugin@latest",
     "spellcheck": "cspell -c cspell.config.json \"**/*.{ts,tsx,js,go,md,mdx,yml,yaml,json,scss,css}\"",
@@ -88,10 +88,5 @@
     "semver": "7.7.3",
     "sql-formatter": "^15.6.10",
     "tslib": "2.7.0"
-  },
-  "packageManager": "yarn@1.22.22",
-  "volta": {
-    "node": "22.17.1",
-    "yarn": "1.22.22"
   }
 }
