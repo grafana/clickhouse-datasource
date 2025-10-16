@@ -31,7 +31,7 @@ jobs:
           version: latest
 
       - name: Install frontend dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build frontend
         run: npm run build
@@ -58,6 +58,6 @@ jobs:
             --grafana-url "http://localhost:3000" \
             --log-level debug \
             --pw-execute "npm run e2e" \
-            --pw-prepare "npm ci; npx playwright install" \
+            --pw-prepare "npm install; npx playwright install" \
             --test-env-vars "CI=true" \
             --test-runner playwright
