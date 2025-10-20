@@ -23,24 +23,23 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
   const addHeader = () => setHeaders([...headers, { name: '', value: '', secure: false }]);
-const removeHeader = (index: number) => {
-  const nextHeaders: CHHttpHeader[] = [
-    ...headers.slice(0, index),
-    ...headers.slice(index + 1),
-  ];
-  setHeaders(nextHeaders);
-  onHttpHeadersChange(nextHeaders);
-};
 
-const updateHeader = (index: number, header: CHHttpHeader) => {
-  const nextHeaders: CHHttpHeader[] = [
-    ...headers.slice(0, index),
-    { ...header, name: header.name.trim() },
-    ...headers.slice(index + 1),
-  ];
-  setHeaders(nextHeaders);
-  onHttpHeadersChange(nextHeaders);
-};
+  const removeHeader = (index: number) => {
+    const nextHeaders: CHHttpHeader[] = [...headers.slice(0, index), ...headers.slice(index + 1)];
+    setHeaders(nextHeaders);
+    onHttpHeadersChange(nextHeaders);
+  };
+
+  const updateHeader = (index: number, header: CHHttpHeader) => {
+    const nextHeaders: CHHttpHeader[] = [
+      ...headers.slice(0, index),
+      { ...header, name: header.name.trim() },
+      ...headers.slice(index + 1),
+    ];
+    setHeaders(nextHeaders);
+    onHttpHeadersChange(nextHeaders);
+  };
+
   const updateForwardGrafanaHeaders = (value: boolean) => {
     setForwardGrafanaHeaders(value);
     props.onForwardGrafanaHeadersChange(value);
@@ -57,7 +56,7 @@ const updateHeader = (index: number, header: CHHttpHeader) => {
               value={header.value}
               secure={header.secure}
               isSecureConfigured={configuredSecureHeaders.has(header.name)}
-              onHeaderChange={(header) => updateHeader(index, header)}
+              onHeaderChange={(h) => updateHeader(index, h)}
               onRemove={() => removeHeader(index)}
             />
           ))}
@@ -73,9 +72,11 @@ const updateHeader = (index: number, header: CHHttpHeader) => {
           </Button>
         </>
       </Field>
+
+      {/* Use 'checked' instead of 'value' */}
       <Checkbox
         label={labels.forwardGrafanaHeaders.label}
-        value={forwardGrafanaHeaders}
+        checked={forwardGrafanaHeaders}
         onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
       />
     </div>
@@ -97,23 +98,16 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
   const [value, setValue] = useState<string>(props.value);
   const [secure, setSecure] = useState<boolean>(props.secure);
   const [isSecureConfigured, setSecureConfigured] = useState<boolean>(props.isSecureConfigured);
+
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
-  const onUpdate = () => onHeaderChange({
-    name,
-    value,
-    secure,
-  });
-    onHeaderChange({
-      name,
-      value,
-      secure,
-    });
+  const onUpdate = () => {
+    onHeaderChange({ name, value, secure });
   };
 
-
   const headerValueLabel = secure ? labels.secureHeaderValueLabel : labels.insecureHeaderValueLabel;
+
   return (
     <div data-testid={selectors.headerEditor} style={{ marginTop: '10px' }}>
       <Stack direction="row" alignItems="center" gap={1}>
@@ -124,36 +118,45 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
             disabled={isSecureConfigured}
             placeholder={labels.headerNamePlaceholder}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
-            onBlur={() => onUpdate()}
+            onBlur={onUpdate}
           />
         </Field>
-        <Box grow={1}>
+
+        {/* Avoid 'grow'; use flex prop that Box supports */}
+        <Box flex="1 1 auto">
           <Field label={headerValueLabel} aria-label={headerValueLabel}>
-   {secure ?  (
-      <SecretInput
-        data-testid={selectors.headerValueInput}
-        placeholder={labels.secureHeaderValueLabel}
-        value={value}
-        isConfigured={isSecureConfigured}
-        onReset={() => setSecureConfigured(false)}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-        onBlur={() => onUpdate()}
-      />
-    );
-  } : (
-      <Input
-        data-testid={selectors.headerValueInput}
-        value={value}
-        placeholder={labels.insecureHeaderValueLabel}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-        onBlur={() => onUpdate()}
-      />
-    )}
+            {secure ? (
+              <SecretInput
+                data-testid={selectors.headerValueInput}
+                placeholder={labels.secureHeaderValueLabel}
+                value={value}
+                isConfigured={isSecureConfigured}
+                onReset={() => setSecureConfigured(false)}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+                onBlur={onUpdate}
+              />
+            ) : (
+              <Input
+                data-testid={selectors.headerValueInput}
+                value={value}
+                placeholder={labels.insecureHeaderValueLabel}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+                onBlur={onUpdate}
+              />
+            )}
           </Field>
         </Box>
+
         {!isSecureConfigured && (
-          <Checkbox label={labels.secureLabel} value={secure} onChange={(e) => setSecure(e.currentTarget.checked)} />
+          // Use 'checked' instead of 'value'
+          <Checkbox
+            label={labels.secureLabel}
+            checked={secure}
+            onChange={(e) => setSecure(e.currentTarget.checked)}
+            data-testid={selectors.forwardGrafanaHeadersSwitch}
+          />
         )}
+
         {onRemove && (
           <Button
             data-testid={selectors.removeHeaderButton}
@@ -175,7 +178,7 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
 export const useConfiguredSecureHttpHeaders = (secureJsonFields: KeyValue<boolean>): Set<string> => {
   return useMemo(() => {
     const secureHeaders = new Set<string>();
-    for (let key in secureJsonFields) {
+    for (const key in secureJsonFields) {
       if (key.startsWith('secureHttpHeaders.') && secureJsonFields[key]) {
         secureHeaders.add(key.substring(key.indexOf('.') + 1));
       }

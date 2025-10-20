@@ -1,6 +1,6 @@
 import React, { ChangeEvent, useMemo, useState } from 'react';
 import { ConfigSection } from 'components/experimental/ConfigSection';
-import { Input, Field, HorizontalGroup, Switch, SecretInput, Button } from '@grafana/ui';
+import { Input, Field, Stack, Switch, SecretInput, Button } from '@grafana/ui';
 import { CHHttpHeader } from 'types/config';
 import allLabels from 'labels';
 import { styles } from 'styles';
@@ -137,7 +137,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
   const headerValueLabel = secure ? labels.secureHeaderValueLabel : labels.insecureHeaderValueLabel;
   return (
     <div data-testid={selectors.headerEditor}>
-      <HorizontalGroup>
+      <Stack>
         <Field label={labels.headerNameLabel} aria-label={labels.headerNameLabel}>
           <Input
             data-testid={selectors.headerNameInput}
@@ -172,7 +172,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
             onClick={onRemove}
           />
         )}
-      </HorizontalGroup>
+      </Stack>
     </div>
   );
 };

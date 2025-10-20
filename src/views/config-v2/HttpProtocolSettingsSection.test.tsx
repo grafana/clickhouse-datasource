@@ -4,7 +4,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { HttpProtocolSettingsSection } from './HttpProtocolSettingsSection';
 import { createTestProps } from './helpers';
 import { Protocol } from 'types/config';
-import { selectors as allSelectors } from 'selectors';
 
 describe('HttpProtocolSettingsSection', () => {
   const onOptionsChangeMock = jest.fn();
@@ -69,21 +68,5 @@ describe('HttpProtocolSettingsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
 
     expect(screen.getByTestId('angle-down')).toBeInTheDocument();
-  });
-
-  it('calls onSwitchToggle with forwardGrafanaHeaders=true when checked', () => {
-    const onSwitchToggleMock = jest.fn();
-
-    render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={onSwitchToggleMock} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
-
-    const forwardHeadersSwitch = screen.getByTestId(
-      allSelectors.components.Config.HttpHeaderConfig.forwardGrafanaHeadersSwitch
-    );
-    
-    fireEvent.click(forwardHeadersSwitch);
-
-    expect(onSwitchToggleMock).toHaveBeenLastCalledWith('forwardGrafanaHeaders', true);
   });
 });

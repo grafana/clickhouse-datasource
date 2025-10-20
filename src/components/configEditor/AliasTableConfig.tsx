@@ -1,6 +1,6 @@
 import React, { ChangeEvent, useState } from 'react';
 import { ConfigSection } from 'components/experimental/ConfigSection';
-import { Input, Field, HorizontalGroup, Button } from '@grafana/ui';
+import { Input, Field, Stack, Button } from '@grafana/ui';
 import { AliasTableEntry } from 'types/config';
 import allLabels from 'labels';
 import { styles } from 'styles';
@@ -127,7 +127,7 @@ const AliasTableEditor = (props: AliasTableEditorProps) => {
 
   return (
     <div data-testid={selectors.aliasEditor}>
-      <HorizontalGroup>
+      <Stack>
         <Field label={labels.targetDatabaseLabel} aria-label={labels.targetDatabaseLabel}>
           <Input
             data-testid={selectors.targetDatabaseInput}
@@ -174,7 +174,7 @@ const AliasTableEditor = (props: AliasTableEditorProps) => {
             onClick={onRemove}
           />
         )}
-      </HorizontalGroup>
+      </Stack>
     </div>
   );
 };
