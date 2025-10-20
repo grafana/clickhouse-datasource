@@ -129,7 +129,26 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
         </Field>
         <Box grow={1}>
           <Field label={headerValueLabel} aria-label={headerValueLabel}>
-            {valueInput}
+   {secure ?  (
+      <SecretInput
+        data-testid={selectors.headerValueInput}
+        placeholder={labels.secureHeaderValueLabel}
+        value={value}
+        isConfigured={isSecureConfigured}
+        onReset={() => setSecureConfigured(false)}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        onBlur={() => onUpdate()}
+      />
+    );
+  } : (
+      <Input
+        data-testid={selectors.headerValueInput}
+        value={value}
+        placeholder={labels.insecureHeaderValueLabel}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
+        onBlur={() => onUpdate()}
+      />
+    )}
           </Field>
         </Box>
         {!isSecureConfigured && (
