@@ -1,5 +1,11 @@
 # Changelog
 
+## (next)
+
+### Fixes
+
+- Improved error classification to mark all ClickHouse errors as downstream errors, including errors wrapped in HTTP response bodies and multi-error chains
+
 ## 4.11.1
 
 ### Fixes

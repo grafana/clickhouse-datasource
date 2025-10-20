@@ -2,8 +2,11 @@ package plugin
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/stretchr/testify/assert"
 )
@@ -255,5 +258,55 @@ func TestAssignFlattenedPath(t *testing.T) {
 		}
 
 		assert.Equal(t, expected, flatMap)
+	})
+}
+
+func TestContainsClickHouseException(t *testing.T) {
+	t.Run("nil error", func(t *testing.T) {
+		result := containsClickHouseException(nil)
+		assert.False(t, result)
+	})
+
+	t.Run("direct clickhouse exception", func(t *testing.T) {
+		chErr := &clickhouse.Exception{
+			Code:    60,
+			Message: "Unknown table",
+		}
+		result := containsClickHouseException(chErr)
+		assert.True(t, result)
+	})
+
+	t.Run("wrapped clickhouse exception", func(t *testing.T) {
+		chErr := &clickhouse.Exception{
+			Code:    62,
+			Message: "Syntax error",
+		}
+		wrappedErr := fmt.Errorf("query failed: %w", chErr)
+		result := containsClickHouseException(wrappedErr)
+		assert.True(t, result)
+	})
+
+	t.Run("HTTP response body with clickhouse error", func(t *testing.T) {
+		errMsg := `error querying the database: sendQuery: [HTTP 404] response body: \"Code: 60. DB::Exception: Unknown table expression identifier 'hello' in scope SELECT * FROM hello. (UNKNOWN_TABLE) (version 25.1.3.23 (official build))\n\"`
+		err := errors.New(errMsg)
+		result := containsClickHouseException(err)
+		assert.True(t, result)
+	})
+
+	t.Run("regular error without clickhouse patterns", func(t *testing.T) {
+		err := errors.New("connection timeout")
+		result := containsClickHouseException(err)
+		assert.False(t, result)
+	})
+
+	t.Run("multi-error with clickhouse exception", func(t *testing.T) {
+		chErr := &clickhouse.Exception{
+			Code:    60,
+			Message: "Unknown table",
+		}
+		regularErr := errors.New("regular error")
+		multiErr := errors.Join(regularErr, chErr)
+		result := containsClickHouseException(multiErr)
+		assert.True(t, result)
 	})
 }
