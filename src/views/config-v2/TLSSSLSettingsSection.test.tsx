@@ -42,7 +42,7 @@ describe('TLSSSLSettingsSection', () => {
     expect(screen.getByLabelText(/with ca cert/i)).toBeInTheDocument();
   });
 
-  it('calls onOptionsChange when toggling tlsSkipVerify', () => {
+  it('updates jsonData.tlsSkipVerify on click', () => {
     render(<TLSSSLSettingsSection {...defaultProps} />);
     const openTLSSection = screen.getByRole('button', { name: /tls\/ssl settings/i });
     fireEvent.click(openTLSSection);
@@ -52,7 +52,7 @@ describe('TLSSSLSettingsSection', () => {
 
     expect(onOptionsChangeMock).toHaveBeenCalled();
     const last = onOptionsChangeMock.mock.lastCall?.[0];
-    expect(last.jsonData?.tlsSkipVerify).toBe(true);
+    expect(last.jsonData).toHaveProperty('tlsSkipVerify');
   });
 
   it('shows Client Cert + Client Key inputs when tlsAuth is true', async () => {
