@@ -16,7 +16,6 @@
 ### Fixes
 
 - All Clickhouse errors are marked as downstream errors for Grafana (#1378)
-- Dependency updates
 
 ## 4.11.0
 
