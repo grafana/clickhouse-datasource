@@ -1,16 +1,21 @@
 # Changelog
 
-## (next)
+## 4.11.2
+
+### Features
+
+- Second part of redesigned ClickHouse config page (behind newClickhouseConfigPageDesign) (#1387)
 
 ### Fixes
 
-- Improved error classification to mark all ClickHouse errors as downstream errors, including errors wrapped in HTTP response bodies and multi-error chains
+- Improved error classification to mark all ClickHouse errors as downstream errors, including errors wrapped in HTTP response bodies and multi-error chains (#1405)
+- Dependency updates
 
 ## 4.11.1
 
 ### Fixes
 
-- All Clickhouse errors are marked as downstream errors for Grafana
+- All Clickhouse errors are marked as downstream errors for Grafana (#1378)
 
 ## 4.11.0
 
