@@ -271,11 +271,52 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 
 // MutateQueryError marks ClickHouse errors as downstream errors
 func (h *Clickhouse) MutateQueryError(err error) backend.ErrorWithSource {
-	var wrappedException *clickhouse.Exception
-	if errors.As(err, &wrappedException) {
+	// Check if any error in the error chain (including multi-errors) is a clickhouse.Exception
+	if containsClickHouseException(err) {
 		return backend.NewErrorWithSource(err, backend.ErrorSourceDownstream)
 	}
 	return backend.NewErrorWithSource(err, backend.DefaultErrorSource)
+}
+
+// containsClickHouseException checks if err or any error in its chain is a clickhouse.Exception
+// It also handles errors wrapped in HTTP response bodies
+func containsClickHouseException(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	// Check if the current error is directly a clickhouse.Exception
+	var wrappedException *clickhouse.Exception
+	if errors.As(err, &wrappedException) {
+		return true
+	}
+
+	errStr := err.Error()
+
+	// Look for common ClickHouse error patterns in response bodies
+	// ClickHouse errors typically contain "Code:" followed by an error code
+	if strings.Contains(errStr, "Code:") && (strings.Contains(errStr, "DB::Exception") || strings.Contains(errStr, "Exception")) {
+		// Exclude 404 errors which are connection/routing issues, not ClickHouse query errors
+		if strings.Contains(errStr, "404") && strings.Contains(strings.ToLower(errStr), "not found") {
+			return false
+		}
+		return true
+	}
+
+	// Check for multiple wrapped errors (e.g., from errors.Join)
+	type multiError interface {
+		Unwrap() []error
+	}
+
+	if u, ok := err.(multiError); ok {
+		for _, e := range u.Unwrap() {
+			if containsClickHouseException(e) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInstanceSettings) sqlds.DriverSettings {
