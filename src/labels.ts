@@ -70,12 +70,6 @@ export default {
           label: 'Enable Secure Socks Proxy',
           tooltip: 'Enable proxying the datasource connection through the secure socks proxy to a different network.',
         },
-        enableRowLimit: {
-          label: 'Enable row limit',
-          testid: 'data-testid enable-row-limit-switch',
-          tooltip:
-            'Enable using the Grafana row limit setting to limit the number of rows returned from Clickhouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
-        },
       },
       HttpHeadersConfig: {
         title: 'HTTP Headers',

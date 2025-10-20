@@ -2,7 +2,7 @@ import React, { ChangeEvent, useState } from 'react';
 import { ConfigSection } from 'components/experimental/ConfigSection';
 import { Input, Field, Stack, Button } from '@grafana/ui';
 import { AliasTableEntry } from 'types/config';
-import allLabels from 'labels';
+import allLabels from './labelsV2';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
 import { trackClickhouseConfigV2ColumnAliasTableAdded } from 'views/config-v2/tracking';

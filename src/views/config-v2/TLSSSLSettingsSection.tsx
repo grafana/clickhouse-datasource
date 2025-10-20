@@ -3,7 +3,7 @@ import { Box, CollapsableSection, CertificationKey, Text, useStyles2, Checkbox, 
 import React from 'react';
 import { CHConfig, CHSecureConfig } from 'types/config';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
-import allLabels from '../../labels';
+import allLabels from './labelsV2';
 import { css } from '@emotion/css';
 import {
   trackClickhouseConfigV2SkipTLSVerifyToggleClicked,

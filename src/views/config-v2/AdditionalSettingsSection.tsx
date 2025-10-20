@@ -1,5 +1,5 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
-import allLabels from '../../labels';
+import allLabels from './labelsV2';
 import React, { ChangeEvent, useState } from 'react';
 import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
