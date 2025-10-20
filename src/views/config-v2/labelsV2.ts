@@ -21,17 +21,17 @@ export default {
         },
         path: {
           label: 'HTTP URL Path',
-          tooltip: 'Additional URL path for HTTP requests',
+          tooltip: 'Additional URL path for HTTP requests. Default: /',
           placeholder: 'additional-path',
         },
         protocol: {
           label: 'Protocol',
-          tooltip: 'Native or HTTP for server protocol',
+          tooltip: 'Native is the default protocol',
         },
         username: {
           label: 'Username',
           placeholder: 'default',
-          tooltip: 'ClickHouse username',
+          tooltip: 'We recommend configuring',
         },
         password: {
           label: 'Password',
@@ -64,7 +64,7 @@ export default {
         },
         secure: {
           label: 'Secure Connection',
-          tooltip: 'Toggle on if the connection is secure',
+          tooltip: 'Check to connect securely with TLS',
         },
         secureSocksProxy: {
           label: 'Enable Secure Socks Proxy',
@@ -88,8 +88,8 @@ export default {
         secureLabel: 'Secure',
         addHeaderLabel: 'Add Header',
         forwardGrafanaHeaders: {
-          label: 'Forward Grafana HTTP Headers',
-          tooltip: 'Forward Grafana HTTP Headers to datasource.',
+          label: 'Forward Grafana HTTP Headers to data source',
+          tooltip: 'Forward Grafana HTTP Headers to data source.',
         },
       },
       AliasTableConfig: {
