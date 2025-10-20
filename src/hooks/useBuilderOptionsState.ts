@@ -193,8 +193,8 @@ const mergeBuilderOptionsState = (
 export const useBuilderOptionsState = (
   savedOptions: QueryBuilderOptions
 ): [QueryBuilderOptions, React.Dispatch<BuilderOptionsReducerAction>] => {
-  const [state, dispatch] = useReducer<typeof reducer, QueryBuilderOptions>(reducer, savedOptions, buildInitialState);
-  return [state as QueryBuilderOptions, dispatch];
+  const [state, dispatch] = useReducer(reducer, savedOptions, buildInitialState);
+  return [state, dispatch];
 };
 
 export const testFuncs = {

@@ -25,7 +25,7 @@
       "name": "Debug Jest test",
       "type": "node",
       "request": "launch",
-      "runtimeExecutable": "yarn",
+      "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "jest", "--runInBand", "${file}"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen",

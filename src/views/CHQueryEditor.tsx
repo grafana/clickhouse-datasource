@@ -53,7 +53,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   /**
    * Sync builder options when switching from SQL Editor to Query Builder
    */
-  const lastEditorType = useRef<EditorType>();
+  const lastEditorType = useRef<EditorType | undefined>(undefined);
   if (query.editorType !== lastEditorType.current && query.editorType === EditorType.Builder) {
     builderOptionsDispatch(setAllOptions((query as CHBuilderQuery).builderOptions || {}));
   }
