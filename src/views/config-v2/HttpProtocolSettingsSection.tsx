@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
 import { Field, Input, Button, useTheme2 } from '@grafana/ui';
-import allLabels from '../../labels';
+import allLabels from './labelsV2';
 import { CHConfig, CHSecureConfig, Protocol } from 'types/config';
 import { css } from '@emotion/css';
 import { onHttpHeadersChange } from 'views/CHConfigEditorHooks';

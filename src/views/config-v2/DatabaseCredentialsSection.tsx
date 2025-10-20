@@ -6,7 +6,7 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import allLabels from '../../labels';
+import allLabels from './labelsV2';
 import { CHConfig, CHSecureConfig } from 'types/config';
 import { css } from '@emotion/css';
 import {

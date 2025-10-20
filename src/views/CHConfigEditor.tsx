@@ -25,7 +25,7 @@ import { QuerySettingsConfig } from 'components/configEditor/QuerySettingsConfig
 import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
-import allLabels from 'labels';
+import allLabels from '../labels';
 import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
 import { AliasTableConfig } from '../components/configEditor/AliasTableConfig';
 import * as trackingV1 from './trackingV1';

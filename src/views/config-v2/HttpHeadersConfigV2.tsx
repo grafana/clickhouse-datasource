@@ -1,7 +1,7 @@
 import React, { ChangeEvent, useMemo, useState } from 'react';
 import { Input, Field, SecretInput, Button, Stack, Checkbox, Box } from '@grafana/ui';
 import { CHHttpHeader } from 'types/config';
-import allLabels from 'labels';
+import allLabels from './labelsV2';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
 import { KeyValue } from '@grafana/data';

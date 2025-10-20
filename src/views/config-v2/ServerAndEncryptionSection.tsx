@@ -13,7 +13,7 @@ import {
   useStyles2,
   Checkbox,
 } from '@grafana/ui';
-import allLabels from '../../labels';
+import allLabels from './labelsV2';
 import { CHConfig, CHSecureConfig, Protocol } from 'types/config';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH, PROTOCOL_OPTIONS } from './constants';
 import { css } from '@emotion/css';
