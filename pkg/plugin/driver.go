@@ -294,12 +294,7 @@ func containsClickHouseException(err error) bool {
 	errStr := err.Error()
 
 	// Look for common ClickHouse error patterns in response bodies
-	// ClickHouse errors typically contain "Code:" followed by an error code
-	if strings.Contains(errStr, "Code:") && (strings.Contains(errStr, "DB::Exception") || strings.Contains(errStr, "Exception")) {
-		// Exclude 404 errors which are connection/routing issues, not ClickHouse query errors
-		if strings.Contains(errStr, "404") && strings.Contains(strings.ToLower(errStr), "not found") {
-			return false
-		}
+	if strings.Contains(errStr, "DB::Exception") {
 		return true
 	}
 
