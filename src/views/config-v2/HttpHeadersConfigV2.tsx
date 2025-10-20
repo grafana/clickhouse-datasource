@@ -108,30 +108,6 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
     });
   };
 
-  let valueInput;
-  if (secure) {
-    valueInput = (
-      <SecretInput
-        data-testid={selectors.headerValueInput}
-        placeholder={labels.secureHeaderValueLabel}
-        value={value}
-        isConfigured={isSecureConfigured}
-        onReset={() => setSecureConfigured(false)}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-        onBlur={() => onUpdate()}
-      />
-    );
-  } else {
-    valueInput = (
-      <Input
-        data-testid={selectors.headerValueInput}
-        value={value}
-        placeholder={labels.insecureHeaderValueLabel}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => setValue(e.target.value)}
-        onBlur={() => onUpdate()}
-      />
-    );
-  }
 
   const headerValueLabel = secure ? labels.secureHeaderValueLabel : labels.insecureHeaderValueLabel;
   return (
