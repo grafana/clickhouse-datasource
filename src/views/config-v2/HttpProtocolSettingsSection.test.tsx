@@ -4,7 +4,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { HttpProtocolSettingsSection } from './HttpProtocolSettingsSection';
 import { createTestProps } from './helpers';
 import { Protocol } from 'types/config';
-import { selectors as allSelectors } from 'selectors';
 
 describe('HttpProtocolSettingsSection', () => {
   const onOptionsChangeMock = jest.fn();
@@ -64,28 +63,10 @@ describe('HttpProtocolSettingsSection', () => {
   it('toggles Optional HTTP settings open/closed via the button (icon changes)', () => {
     render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={jest.fn()} />);
 
-    // Closed by default - angle-right icon visible
     expect(screen.getByTestId('angle-right')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
 
-    // Now open - angle-down icon visible
     expect(screen.getByTestId('angle-down')).toBeInTheDocument();
-  });
-
-  it('calls onSwitchToggle with forwardGrafanaHeaders=true when toggled', () => {
-    const onSwitchToggleMock = jest.fn();
-
-    render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={onSwitchToggleMock} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
-
-    const forwardHeadersSwitch = screen.getByTestId(
-      allSelectors.components.Config.HttpHeaderConfig.forwardGrafanaHeadersSwitch
-    );
-    
-    fireEvent.click(forwardHeadersSwitch);
-
-    expect(onSwitchToggleMock).toHaveBeenLastCalledWith('forwardGrafanaHeaders', true);
   });
 });

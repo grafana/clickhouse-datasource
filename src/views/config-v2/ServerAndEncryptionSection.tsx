@@ -13,14 +13,15 @@ import {
   useStyles2,
   Checkbox,
 } from '@grafana/ui';
-import allLabels from './labels';
+import allLabels from './labelsV2';
 import { CHConfig, CHSecureConfig, Protocol } from 'types/config';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH, PROTOCOL_OPTIONS } from './constants';
 import { css } from '@emotion/css';
 import {
   trackClickhouseConfigV2HostInput,
+  trackClickhouseConfigV2NativeHttpToggleClicked,
   trackClickhouseConfigV2PortInput,
-  trackClickhouseConfigV2SecureConnectionToggleClicked,
+  trackClickhouseConfigV2SecureConnectionChecked,
 } from './tracking';
 import { HttpProtocolSettingsSection } from './HttpProtocolSettingsSection';
 
@@ -87,7 +88,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
     >
       <CollapsableSection
         label={<Text variant="h3">1. {CONFIG_SECTION_HEADERS[0].label}</Text>}
-        isOpen={CONFIG_SECTION_HEADERS[0].isOpen}
+        isOpen={!!CONFIG_SECTION_HEADERS[0].isOpen}
       >
         <Text variant="body" color="secondary">
           Enter the server address of your Clickhouse instance. Then select your protocol, port and security options. If
@@ -100,7 +101,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
             Grafana docs
           </TextLink>
         </Text>
-        <Field required label={labels.serverAddress.label} style={{ marginTop: '20px' }}>
+        <Field required label={labels.serverAddress.label} style={{ marginTop: '30px' }}>
           <Input
             name="host"
             value={jsonData.host || ''}
@@ -149,11 +150,14 @@ export const ServerAndEncryptionSection = (props: Props) => {
                 />
               </Toggletip>
             </div>
-            <Field label=" " description={<div className={styles.toggleTipText}>{labels.protocol.description}</div>}>
+            <Field label="" description={<div className={styles.toggleTipText}>{labels.protocol.tooltip}</div>}>
               <RadioButtonGroup<Protocol>
                 options={PROTOCOL_OPTIONS}
                 value={jsonData.protocol || Protocol.Native}
-                onChange={(e) => onProtocolToggle(e!)}
+                onChange={(e) => {
+                  trackClickhouseConfigV2NativeHttpToggleClicked({ nativeHttpToggle: e });
+                  onProtocolToggle(e!);
+                }}
               />
             </Field>
           </div>
@@ -176,10 +180,10 @@ export const ServerAndEncryptionSection = (props: Props) => {
         <div className={styles.secureToggle}>
           <Checkbox
             label={labels.secure.label}
-            description={labels.secure.description}
+            description={labels.secure.tooltip}
             checked={jsonData.secure || false}
             onChange={(e) => {
-              trackClickhouseConfigV2SecureConnectionToggleClicked({ secureConnection: e.currentTarget.checked });
+              trackClickhouseConfigV2SecureConnectionChecked({ secureConnection: e.currentTarget.checked });
               onSwitchToggle('secure', e.currentTarget.checked);
             }}
           />

@@ -9,19 +9,19 @@ export const CONTAINER_MIN_WIDTH = '450px';
 
 export const CONFIG_SECTION_HEADERS = [
   { label: 'Server and encryption', id: 'server', isOpen: true, isOptional: false },
-  { label: 'Credentials', id: 'credentials', isOpen: true, isOptional: false },
-  { label: 'TLS/SSL settings', id: 'tls', isOpen: true, isOptional: true },
-  { label: 'Additional settings', id: 'additional', isOpen: true, isOptional: true },
-  { label: 'Save & test', id: `${selectors.pages.DataSource.saveAndTest}`, isOpen: true, isOptional: null },
+  { label: 'Database credentials', id: 'credentials', isOpen: true, isOptional: false },
+  { label: 'TLS/SSL settings', id: 'tls', isOpen: false, isOptional: true },
+  { label: 'Additional settings', id: 'additional', isOpen: false, isOptional: true },
+  { label: 'Save & test', id: `${selectors.pages.DataSource.saveAndTest}`, isOpen: undefined, isOptional: null },
 ];
 
 export const CONFIG_SECTION_HEADERS_WITH_PDC = [
   { label: 'Server and encryption', id: 'server', isOpen: true, isOptional: false },
-  { label: 'Credentials', id: 'credentials', isOpen: true, isOptional: false },
-  { label: 'TLS/SSL settings', id: 'tls', isOpen: true, isOptional: true },
-  { label: 'Additional settings', id: 'additional', isOpen: true, isOptional: true },
-  { label: 'Private data source connect', id: 'pdc', isOpen: true, isOptional: true },
-  { label: 'Save & test', id: `${selectors.pages.DataSource.saveAndTest}`, isOpen: true, isOptional: null },
+  { label: 'Database credentials', id: 'credentials', isOpen: true, isOptional: false },
+  { label: 'TLS/SSL settings', id: 'tls', isOpen: false, isOptional: true },
+  { label: 'Additional settings', id: 'additional', isOpen: false, isOptional: true },
+  { label: 'Private data source connect', id: 'pdc', isOpen: false, isOptional: true },
+  { label: 'Save & test', id: `${selectors.pages.DataSource.saveAndTest}`, isOpen: undefined, isOptional: null },
 ];
 
 export const PROTOCOL_OPTIONS = [
