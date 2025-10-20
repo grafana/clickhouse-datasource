@@ -78,6 +78,11 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
+  const onUpdateLogsConfig = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
+    trackClickhouseConfigV2LogsConfig({ [key]: value });
+    onLogsConfigChange(key, value);
+  };
+
   const onTracesConfigChange = (key: keyof CHTracesConfig, value: string | boolean) => {
     onOptionsChange({
       ...options,
@@ -90,6 +95,11 @@ export const AdditionalSettingsSection = (props: Props) => {
         },
       },
     });
+  };
+
+  const onUpdateTracesConfig = (key: keyof CHTracesConfig, value: string | boolean) => {
+    trackClickhouseConfigV2TracesConfig({ [key]: value });
+    onTracesConfigChange(key, value);
   };
 
   const onAliasTableConfigChange = (aliasTables: AliasTableEntry[]) => {
@@ -151,7 +161,6 @@ export const AdditionalSettingsSection = (props: Props) => {
           queryTimeout={jsonData.queryTimeout}
           validateSql={jsonData.validateSql}
           onDialTimeoutChange={(e) => {
-            console.log('e', e);
             trackClickhouseConfigV2QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
             onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
           }}
@@ -179,139 +188,45 @@ export const AdditionalSettingsSection = (props: Props) => {
         <Divider />
         <LogsConfig
           logsConfig={jsonData.logs}
-          onDefaultDatabaseChange={(db) => {
-            trackClickhouseConfigV2LogsConfig({ defaultDatabase: db });
-            onLogsConfigChange('defaultDatabase', db);
-          }}
-          onDefaultTableChange={(table) => {
-            trackClickhouseConfigV2LogsConfig({ defaultTable: table });
-            onLogsConfigChange('defaultTable', table);
-          }}
-          onOtelEnabledChange={(v) => {
-            trackClickhouseConfigV2LogsConfig({ otelEnabled: v });
-            onLogsConfigChange('otelEnabled', v);
-          }}
-          onOtelVersionChange={(v) => {
-            trackClickhouseConfigV2LogsConfig({ version: v });
-            onLogsConfigChange('otelVersion', v);
-          }}
-          onTimeColumnChange={(c) => {
-            trackClickhouseConfigV2LogsConfig({ timeColumn: c });
-            onLogsConfigChange('timeColumn', c);
-          }}
-          onLevelColumnChange={(c) => {
-            trackClickhouseConfigV2LogsConfig({ levelColumn: c });
-            onLogsConfigChange('levelColumn', c);
-          }}
-          onMessageColumnChange={(c) => {
-            trackClickhouseConfigV2LogsConfig({ messageColumn: c });
-            onLogsConfigChange('messageColumn', c);
-          }}
-          onSelectContextColumnsChange={(c) => {
-            trackClickhouseConfigV2LogsConfig({ selectContextColumns: c });
-            onLogsConfigChange('selectContextColumns', c);
-          }}
-          onContextColumnsChange={(c) => {
-            trackClickhouseConfigV2LogsConfig({ contextColumns: c });
-            onLogsConfigChange('contextColumns', c);
-          }}
+          onDefaultDatabaseChange={(db) => onUpdateLogsConfig('defaultDatabase', db)}
+          onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
+          onOtelEnabledChange={(v) => onUpdateLogsConfig('otelEnabled', v)}
+          onOtelVersionChange={(v) => onUpdateLogsConfig('otelVersion', v)}
+          onTimeColumnChange={(c) => onUpdateLogsConfig('timeColumn', c)}
+          onLevelColumnChange={(c) => onUpdateLogsConfig('levelColumn', c)}
+          onMessageColumnChange={(c) => onUpdateLogsConfig('messageColumn', c)}
+          onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
+          onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
         />
 
         <Divider />
         <TracesConfig
           tracesConfig={jsonData.traces}
-          onDefaultDatabaseChange={(db) => {
-            trackClickhouseConfigV2TracesConfig({ defaultDatabase: db });
-            onTracesConfigChange('defaultDatabase', db);
-          }}
-          onDefaultTableChange={(table) => {
-            trackClickhouseConfigV2TracesConfig({ defaultTable: table });
-            onTracesConfigChange('defaultTable', table);
-          }}
-          onOtelEnabledChange={(v) => {
-            trackClickhouseConfigV2TracesConfig({ otelEnabled: v });
-            onTracesConfigChange('otelEnabled', v);
-          }}
-          onOtelVersionChange={(v) => {
-            trackClickhouseConfigV2TracesConfig({ version: v });
-            onTracesConfigChange('otelVersion', v);
-          }}
-          onTraceIdColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ traceIdColumn: c });
-            onTracesConfigChange('traceIdColumn', c);
-          }}
-          onSpanIdColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ spanIdColumn: c });
-            onTracesConfigChange('spanIdColumn', c);
-          }}
-          onOperationNameColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ operationNameColumn: c });
-            onTracesConfigChange('operationNameColumn', c);
-          }}
-          onParentSpanIdColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ parentSpanIdColumn: c });
-            onTracesConfigChange('parentSpanIdColumn', c);
-          }}
-          onServiceNameColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ serviceNameColumn: c });
-            onTracesConfigChange('serviceNameColumn', c);
-          }}
-          onDurationColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ durationColumn: c });
-            onTracesConfigChange('durationColumn', c);
-          }}
-          onDurationUnitChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ durationUnit: c });
-            onTracesConfigChange('durationUnit', c);
-          }}
-          onStartTimeColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ startTimeColumn: c });
-            onTracesConfigChange('startTimeColumn', c);
-          }}
-          onTagsColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ tagsColumn: c });
-            onTracesConfigChange('tagsColumn', c);
-          }}
-          onServiceTagsColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ serviceTagsColumn: c });
-            onTracesConfigChange('serviceTagsColumn', c);
-          }}
-          onKindColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ kindColumn: c });
-            onTracesConfigChange('kindColumn', c);
-          }}
-          onStatusCodeColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ statusCodeColumn: c });
-            onTracesConfigChange('statusCodeColumn', c);
-          }}
-          onStatusMessageColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ statusMessageColumn: c });
-            onTracesConfigChange('statusMessageColumn', c);
-          }}
-          onStateColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ stateColumn: c });
-            onTracesConfigChange('stateColumn', c);
-          }}
-          onInstrumentationLibraryNameColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ instrumentationLibraryNameColumn: c });
-            onTracesConfigChange('instrumentationLibraryNameColumn', c);
-          }}
-          onInstrumentationLibraryVersionColumnChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ instrumentationLibraryVersionColumn: c });
-            onTracesConfigChange('instrumentationLibraryVersionColumn', c);
-          }}
-          onFlattenNestedChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ flattenNested: c });
-            onTracesConfigChange('flattenNested', c);
-          }}
-          onEventsColumnPrefixChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ traceEventsColumnPrefix: c });
-            onTracesConfigChange('traceEventsColumnPrefix', c);
-          }}
-          onLinksColumnPrefixChange={(c) => {
-            trackClickhouseConfigV2TracesConfig({ traceLinksColumnPrefix: c });
-            onTracesConfigChange('traceLinksColumnPrefix', c);
-          }}
+          onDefaultDatabaseChange={(db) => onUpdateTracesConfig('defaultDatabase', db)}
+          onDefaultTableChange={(table) => onUpdateTracesConfig('defaultTable', table)}
+          onOtelEnabledChange={(v) => onUpdateTracesConfig('otelEnabled', v)}
+          onOtelVersionChange={(v) => onUpdateTracesConfig('otelVersion', v)}
+          onTraceIdColumnChange={(c) => onUpdateTracesConfig('traceIdColumn', c)}
+          onSpanIdColumnChange={(c) => onUpdateTracesConfig('spanIdColumn', c)}
+          onOperationNameColumnChange={(c) => onUpdateTracesConfig('operationNameColumn', c)}
+          onParentSpanIdColumnChange={(c) => onUpdateTracesConfig('parentSpanIdColumn', c)}
+          onServiceNameColumnChange={(c) => onUpdateTracesConfig('serviceNameColumn', c)}
+          onDurationColumnChange={(c) => onUpdateTracesConfig('durationColumn', c)}
+          onDurationUnitChange={(c) => onUpdateTracesConfig('durationUnit', c)}
+          onStartTimeColumnChange={(c) => onUpdateTracesConfig('startTimeColumn', c)}
+          onTagsColumnChange={(c) => onUpdateTracesConfig('tagsColumn', c)}
+          onServiceTagsColumnChange={(c) => onUpdateTracesConfig('serviceTagsColumn', c)}
+          onKindColumnChange={(c) => onUpdateTracesConfig('kindColumn', c)}
+          onStatusCodeColumnChange={(c) => onUpdateTracesConfig('statusCodeColumn', c)}
+          onStatusMessageColumnChange={(c) => onUpdateTracesConfig('statusMessageColumn', c)}
+          onStateColumnChange={(c) => onUpdateTracesConfig('stateColumn', c)}
+          onInstrumentationLibraryNameColumnChange={(c) => onUpdateTracesConfig('instrumentationLibraryNameColumn', c)}
+          onInstrumentationLibraryVersionColumnChange={(c) =>
+            onUpdateTracesConfig('instrumentationLibraryVersionColumn', c)
+          }
+          onFlattenNestedChange={(c) => onUpdateTracesConfig('flattenNested', c)}
+          onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
+          onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}
         />
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
