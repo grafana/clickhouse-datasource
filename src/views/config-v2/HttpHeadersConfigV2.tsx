@@ -100,7 +100,11 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
-  const onUpdate = () => {
+  const onUpdate = () => onHeaderChange({
+    name,
+    value,
+    secure,
+  });
     onHeaderChange({
       name,
       value,
