@@ -49,22 +49,6 @@ export const AdditionalSettingsSection = (props: Props) => {
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
 
-  const onSwitchToggle = (
-    key: keyof Pick<
-      CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
-    >,
-    value: boolean
-  ) => {
-    onOptionsChange({
-      ...options,
-      jsonData: {
-        ...options.jsonData,
-        [key]: value,
-      },
-    });
-  };
-
   const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
     onOptionsChange({
       ...options,
@@ -233,21 +217,19 @@ export const AdditionalSettingsSection = (props: Props) => {
         <Divider />
         <Field label={labels.enableRowLimit.label} description={labels.enableRowLimit.tooltip}>
           <Switch
-            className="gf-form"
             value={jsonData.enableRowLimit || false}
             data-testid={labels.enableRowLimit.testid}
             onChange={(e) => {
               trackClickhouseConfigV2EnableRowLimitToggle({ rowLimitEnabled: e.currentTarget.checked });
-              onSwitchToggle('enableRowLimit', e.currentTarget.checked);
+              onUpdateDatasourceJsonDataOption(props, 'enableRowLimit')(e);
             }}
           />
         </Field>
         {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
           <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
             <Switch
-              className="gf-form"
               value={jsonData.enableSecureSocksProxy || false}
-              onChange={(e) => onSwitchToggle('enableSecureSocksProxy', e.currentTarget.checked)}
+              onChange={(e) => onUpdateDatasourceJsonDataOption(props, 'enableSecureSocksProxy')(e)}
             />
           </Field>
         )}
