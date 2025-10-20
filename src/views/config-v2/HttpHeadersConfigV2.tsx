@@ -23,19 +23,24 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
   const addHeader = () => setHeaders([...headers, { name: '', value: '', secure: false }]);
-  const removeHeader = (index: number) => {
-    const nextHeaders: CHHttpHeader[] = headers.slice();
-    nextHeaders.splice(index, 1);
-    setHeaders(nextHeaders);
-    onHttpHeadersChange(nextHeaders);
-  };
-  const updateHeader = (index: number, header: CHHttpHeader) => {
-    const nextHeaders: CHHttpHeader[] = headers.slice();
-    header.name = header.name.trim();
-    nextHeaders[index] = header;
-    setHeaders(nextHeaders);
-    onHttpHeadersChange(nextHeaders);
-  };
+const removeHeader = (index: number) => {
+  const nextHeaders: CHHttpHeader[] = [
+    ...headers.slice(0, index),
+    ...headers.slice(index + 1),
+  ];
+  setHeaders(nextHeaders);
+  onHttpHeadersChange(nextHeaders);
+};
+
+const updateHeader = (index: number, header: CHHttpHeader) => {
+  const nextHeaders: CHHttpHeader[] = [
+    ...headers.slice(0, index),
+    { ...header, name: header.name.trim() },
+    ...headers.slice(index + 1),
+  ];
+  setHeaders(nextHeaders);
+  onHttpHeadersChange(nextHeaders);
+};
   const updateForwardGrafanaHeaders = (value: boolean) => {
     setForwardGrafanaHeaders(value);
     props.onForwardGrafanaHeadersChange(value);
