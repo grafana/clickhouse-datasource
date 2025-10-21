@@ -1,5 +1,5 @@
 import React from 'react';
-import { DataSourcePluginOptionsEditorProps, GrafanaTheme2, onUpdateDatasourceJsonDataOption } from '@grafana/data';
+import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
 import {
   Box,
   CollapsableSection,
@@ -194,7 +194,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
   );
 };
 
-const getStyles = (theme: GrafanaTheme2) => ({
+const getStyles = (theme: any) => ({
   protocolPortRow: css({
     display: 'flex',
     alignItems: 'center',

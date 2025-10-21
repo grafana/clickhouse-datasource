@@ -77,6 +77,7 @@ const Aggregate = (props: AggregateProps) => {
       />
       <Button
         data-testid={selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton}
+        aria-label="Remove aggregate item"
         className={styles.Common.smallBtn}
         variant="destructive"
         size="sm"

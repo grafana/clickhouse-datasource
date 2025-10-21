@@ -167,6 +167,7 @@ const AliasTableEditor = (props: AliasTableEditorProps) => {
         {onRemove && (
           <Button
             data-testid={selectors.removeEntryButton}
+            aria-label="Remove alias table entry"
             className={styles.Common.smallBtn}
             variant="destructive"
             size="sm"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { DataSourcePluginOptionsEditorProps, GrafanaTheme2 } from '@grafana/data';
+import { DataSourcePluginOptionsEditorProps } from '@grafana/data';
 import { Alert, Box, Stack, Text, TextLink, useStyles2 } from '@grafana/ui';
 import { CHConfig, CHSecureConfig } from 'types/config';
 import { ServerAndEncryptionSection } from './ServerAndEncryptionSection';
@@ -58,7 +58,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   );
 };
 
-const getStyles = (theme: GrafanaTheme2) => ({
+const getStyles = (theme: any) => ({
   hideOnSmallScreen: css({
     width: '250px',
     flex: '0 0 250px',
