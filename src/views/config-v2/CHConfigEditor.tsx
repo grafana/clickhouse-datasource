@@ -71,7 +71,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     top: '100px',
     alignSelf: 'flex-start',
     maxHeight: 'calc(100vh - 100px)',
-    overflow: 'hidden',
+    overflowY: 'auto',
   }),
   requiredFields: css({
     marginBottom: theme.spacing(2),

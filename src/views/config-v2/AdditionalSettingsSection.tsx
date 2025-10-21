@@ -106,19 +106,6 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
-  const onSwitchToggle = (
-    key: keyof Pick<CHConfig, 'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders'>,
-    value: boolean
-  ) => {
-    onOptionsChange({
-      ...options,
-      jsonData: {
-        ...options.jsonData,
-        [key]: value,
-      },
-    });
-  };
-
   return (
     <Box
       borderStyle="solid"
@@ -179,7 +166,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           }}
           onValidateSqlChange={(e) => {
             trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
-            onSwitchToggle('validateSql', e.currentTarget.checked);
+            onUpdateDatasourceJsonDataOption(props, 'validateSql')(e);
           }}
         />
         <Divider />
