@@ -35,7 +35,7 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   };
 
   return (
-    <div>
+    <div className="gf-form">
       <InlineFormLabel width={wide ? 12 : 8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

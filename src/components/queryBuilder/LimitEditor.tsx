@@ -13,7 +13,7 @@ export const LimitEditor = (props: LimitEditorProps) => {
   const { label, tooltip } = labels.components.LimitEditor;
 
   return (
-    <div>
+    <div className="gf-form">
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

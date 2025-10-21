@@ -113,7 +113,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
         );
       })}
 
-      <div>
+      <div className="gf-form">
         {orderBy.length === 0 ? fieldLabel : fieldSpacer}
         <Button
           data-testid="query-builder-orderby-add-button"

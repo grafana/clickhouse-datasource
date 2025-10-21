@@ -442,7 +442,7 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div>
+        <div className="gf-form">
           <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
             {label}
           </InlineFormLabel>
@@ -460,7 +460,7 @@ export const FiltersEditor = (props: {
       )}
       {filters.map((filter, index) => {
         return (
-          <div key={index}>
+          <div className="gf-form" key={index}>
             {index === 0 ? (
               <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
                 {label}
@@ -482,7 +482,7 @@ export const FiltersEditor = (props: {
         );
       })}
       {filters.length !== 0 && (
-        <div>
+        <div className="gf-form">
           <div className={`width-8 ${styles.Common.firstLabel}`}></div>
           <Button
             data-testid="query-builder-filters-inline-add-button"

@@ -180,7 +180,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           onVersionChange={(v) => builderOptionsDispatch(setOtelVersion(v))}
           wide
         />
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -205,7 +205,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -230,7 +230,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -255,7 +255,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -274,7 +274,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -299,7 +299,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -324,7 +324,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -349,7 +349,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -374,7 +374,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </div>
-        <div>
+        <div className="gf-form">
           <Switch
             disabled={builderState.otelEnabled}
             label={labels.columns.flattenNested.label}
@@ -384,7 +384,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div>
+        <div className="gf-form">
           <LabeledInput
             disabled={builderState.otelEnabled}
             label={labels.columns.eventsPrefix.label}
@@ -393,7 +393,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             onChange={onOptionChange('traceEventsColumnPrefix')}
           />
         </div>
-        <div>
+        <div className="gf-form">
           <LabeledInput
             disabled={builderState.otelEnabled}
             label={labels.columns.linksPrefix.label}

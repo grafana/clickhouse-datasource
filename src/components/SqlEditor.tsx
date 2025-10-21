@@ -110,7 +110,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   return (
     <>
-      <div className={styles.QueryEditor.queryType}>
+      <div className={'gf-form ' + styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={queryType} onChange={(queryType) => saveChanges({ queryType })} sqlEditor />
       </div>
       <div className={styles.Common.wrapper}>

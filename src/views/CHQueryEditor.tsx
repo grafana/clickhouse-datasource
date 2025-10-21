@@ -25,7 +25,7 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
   return (
     <>
-      <div className={styles.QueryEditor.queryType}>
+      <div className={'gf-form ' + styles.QueryEditor.queryType}>
         <EditorTypeSwitcher {...props} query={query} datasource={datasource} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </div>
