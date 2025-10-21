@@ -24,7 +24,7 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
   const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.durationUnit;
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel
         width={12}
         className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`}

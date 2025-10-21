@@ -14,7 +14,7 @@ export function LabeledInput(props: LabeledInputProps) {
   const { label, tooltip, placeholder, disabled, value, onChange } = props;
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={12} className="query-keyword" tooltip={tooltip || label}>
         {label}
       </InlineFormLabel>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { Combobox, ComboboxOption, InlineFormLabel } from '@grafana/ui';
 import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { styles } from 'styles';
 
@@ -37,7 +37,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     clearable,
   } = props;
   const selectedColumnName = selectedColumn?.name;
-  const columns: Array<SelectableValue<string>> = allColumns
+  const columns: Array<ComboboxOption<string>> = allColumns
     .filter(columnFilterFn || defaultFilterFn)
     .map((c) => ({ label: c.label || c.name, value: c.name }));
 
@@ -48,7 +48,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     staleOption = true;
   }
 
-  const onChange = (selected: SelectableValue<string | undefined>) => {
+  const onChange = (selected: ComboboxOption<string>) => {
     if (!selected || !selected.value) {
       onColumnChange(undefined);
       return;
@@ -71,11 +71,11 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <Select<string | undefined>
+      <Combobox<string>
         disabled={disabled}
         invalid={invalid || staleOption}
         options={columns}
@@ -83,9 +83,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
         placeholder={selectedColumnName || undefined}
         onChange={onChange}
         width={wide ? 25 : 20}
-        menuPlacement={'bottom'}
-        isClearable={clearable === undefined || clearable}
-        allowCustomValue
+        createCustomValue={true}
       />
     </div>
   );

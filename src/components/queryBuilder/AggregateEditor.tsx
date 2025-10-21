@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select, Button, Input, Stack } from '@grafana/ui';
+import { InlineFormLabel, Combobox, Button, Input, Stack, ComboboxOption } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
 import { styles } from 'styles';
 
 interface AggregateProps {
-  columnOptions: Array<SelectableValue<string>>;
+  columnOptions: Array<ComboboxOption<string>>;
   index: number;
   aggregate: AggregateColumn;
   updateAggregate: (index: number, aggregate: AggregateColumn) => void;
   removeAggregate: (index: number) => void;
 }
 
-const allAggregateOptions: Array<SelectableValue<AggregateType>> = [
+const allAggregateOptions: Array<ComboboxOption<AggregateType>> = [
   { label: 'Count', value: AggregateType.Count },
   { label: 'Sum', value: AggregateType.Sum },
   { label: 'Min', value: AggregateType.Min },
@@ -26,7 +26,6 @@ const allAggregateOptions: Array<SelectableValue<AggregateType>> = [
 
 const Aggregate = (props: AggregateProps) => {
   const { index, aggregate, updateAggregate, removeAggregate } = props;
-  const [isOpen, setIsOpen] = useState(false);
   const [alias, setAlias] = useState(aggregate.alias || '');
   const { aliasLabel } = labels.components.AggregatesEditor;
 
@@ -44,27 +43,24 @@ const Aggregate = (props: AggregateProps) => {
 
   return (
     <Stack wrap alignItems="flex-start" justifyContent="flex-start">
-      <Select
-        width={20}
-        className={styles.Common.inlineSelect}
-        options={aggregateOptions}
-        value={aggregate.aggregateType}
-        onChange={(e) => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
-        menuPlacement={'bottom'}
-        allowCustomValue
-      />
-      <Select<string>
-        width={40}
-        className={styles.Common.inlineSelect}
-        options={columnOptions}
-        isOpen={isOpen}
-        onOpenMenu={() => setIsOpen(true)}
-        onCloseMenu={() => setIsOpen(false)}
-        onChange={(e) => updateAggregate(index, { ...aggregate, column: e.value! })}
-        value={aggregate.column}
-        menuPlacement={'bottom'}
-        allowCustomValue
-      />
+      <div className={styles.Common.inlineSelect}>
+        <Combobox
+          width={20}
+          options={aggregateOptions}
+          value={aggregate.aggregateType}
+          onChange={(e) => updateAggregate(index, { ...aggregate, aggregateType: e.value! })}
+          createCustomValue={true}
+        />
+      </div>
+      <div className={styles.Common.inlineSelect}>
+        <Combobox<string>
+          width={40}
+          options={columnOptions}
+          onChange={(e) => updateAggregate(index, { ...aggregate, column: e.value! })}
+          value={aggregate.column}
+          createCustomValue={true}
+        />
+      </div>
       <InlineFormLabel width={2} className="query-keyword">
         {aliasLabel}
       </InlineFormLabel>
@@ -98,7 +94,7 @@ const allColumnName = '*';
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map((c) => ({
+  const columnOptions: Array<ComboboxOption<string>> = allColumns.map((c) => ({
     label: c.label || c.name,
     value: c.name,
   }));
@@ -137,11 +133,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
       {aggregates.map((aggregate, index) => {
         const key = `${index}-${aggregate.column}-${aggregate.aggregateType}-${aggregate.alias}`;
         return (
-          <div
-            className="gf-form"
-            key={key}
-            data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}
-          >
+          <div key={key} data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}>
             {index === 0 ? fieldLabel : fieldSpacer}
             <Aggregate
               columnOptions={columnOptions}
@@ -154,7 +146,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
         );
       })}
 
-      <div className="gf-form">
+      <div>
         {aggregates.length === 0 ? fieldLabel : fieldSpacer}
         <Button
           data-testid={selectors.components.QueryBuilder.AggregateEditor.addButton}

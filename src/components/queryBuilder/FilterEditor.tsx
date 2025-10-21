@@ -9,7 +9,6 @@ import {
   RadioButtonGroup,
   Combobox,
   ComboboxOption,
-  Select,
 } from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
@@ -374,20 +373,17 @@ export const FilterEditor = (props: {
       {index !== 0 && (
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
-      <Select
-        disabled={Boolean(filter.hint)}
-        placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
-        value={filter.key}
-        width={40}
-        className={styles.Common.inlineSelect}
-        options={getFields()}
-        isOpen={isOpen}
-        onOpenMenu={() => setIsOpen(true)}
-        onCloseMenu={() => setIsOpen(false)}
-        onChange={(e) => onFilterNameChange(e.value!)}
-        allowCustomValue
-        menuPlacement={'bottom'}
-      />
+      <div className={styles.Common.inlineSelect}>
+        <Combobox
+          disabled={Boolean(filter.hint)}
+          placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
+          value={filter.key}
+          width={40}
+          options={getFields()}
+          onChange={(e) => onFilterNameChange(e.value!)}
+          createCustomValue={true}
+        />
+      </div>
       {(isMapType || isJSONType) && (
         <div className={styles.Common.inlineSelect}>
           <Combobox
@@ -448,7 +444,7 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div className="gf-form">
+        <div>
           <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
             {label}
           </InlineFormLabel>
@@ -466,7 +462,7 @@ export const FiltersEditor = (props: {
       )}
       {filters.map((filter, index) => {
         return (
-          <div className="gf-form" key={index}>
+          <div key={index}>
             {index === 0 ? (
               <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
                 {label}
@@ -488,7 +484,7 @@ export const FiltersEditor = (props: {
         );
       })}
       {filters.length !== 0 && (
-        <div className="gf-form">
+        <div>
           <div className={`width-8 ${styles.Common.firstLabel}`}></div>
           <Button
             data-testid="query-builder-filters-inline-add-button"

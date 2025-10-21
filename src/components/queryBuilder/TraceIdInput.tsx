@@ -19,7 +19,7 @@ const TraceIdInput = (props: TraceIdInputProps) => {
   }, [traceId]);
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

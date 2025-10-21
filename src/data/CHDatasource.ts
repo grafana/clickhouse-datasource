@@ -202,6 +202,61 @@ export class Datasource
     };
   }
 
+  // REMOVE this whole method
+  // getDataProvider(type: SupplementaryQueryType, request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> | undefined { ... }
+
+  // ADD this instead:
+  getSupplementaryQueryRequest(
+    type: SupplementaryQueryType,
+    request: DataQueryRequest<CHQuery>
+  ): DataQueryRequest<CHQuery> | undefined {
+    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+      return undefined;
+    }
+
+    switch (type) {
+      case SupplementaryQueryType.LogsVolume: {
+        const logsVolumeRequest = cloneDeep(request);
+
+        // derive interval + scoped vars
+        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
+        logsVolumeRequest.interval = intervalInfo.interval;
+        logsVolumeRequest.scopedVars = {
+          ...logsVolumeRequest.scopedVars,
+          __interval: { value: intervalInfo.interval, text: intervalInfo.interval },
+        };
+        logsVolumeRequest.hideFromInspector = true;
+
+        if (intervalInfo.intervalMs !== undefined) {
+          logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
+          logsVolumeRequest.scopedVars.__interval_ms = {
+            value: intervalInfo.intervalMs,
+            text: intervalInfo.intervalMs,
+          };
+        }
+
+        // build supplementary targets
+        const targets: CHQuery[] = [];
+        for (const target of logsVolumeRequest.targets) {
+          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
+          if (supplementaryQuery) {
+            targets.push(supplementaryQuery);
+          }
+        }
+
+        if (!targets.length) {
+          return undefined;
+        }
+
+        // return a request Grafana will execute
+        return { ...logsVolumeRequest, targets };
+      }
+
+      default:
+        return undefined;
+    }
+  }
+
   getSupplementaryQuery(options: SupplementaryQueryOptions, originalQuery: CHQuery): CHQuery | undefined {
     return undefined;
   }

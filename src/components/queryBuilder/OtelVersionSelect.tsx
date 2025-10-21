@@ -36,17 +36,12 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   };
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={wide ? 12 : 8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <div style={switchContainerStyle}>
-        <GrafanaSwitch
-          className="gf-form"
-          value={enabled}
-          onChange={(e) => onEnabledChange(e.currentTarget.checked)}
-          role="checkbox"
-        />
+        <GrafanaSwitch value={enabled} onChange={(e) => onEnabledChange(e.currentTarget.checked)} role="checkbox" />
       </div>
       <Combobox
         disabled={!enabled}

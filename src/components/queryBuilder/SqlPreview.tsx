@@ -11,7 +11,7 @@ export const SqlPreview = (props: SqlPreviewProps) => {
   const { label, tooltip } = labels.components.SqlPreview;
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

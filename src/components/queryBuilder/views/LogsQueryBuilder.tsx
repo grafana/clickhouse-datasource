@@ -150,7 +150,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
       />
-      <div className="gf-form">
+      <div>
         <ColumnSelect
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
@@ -175,7 +175,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           inline
         />
       </div>
-      <div className="gf-form">
+      <div>
         <ColumnSelect
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
@@ -240,7 +240,7 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   }, [logMessageLike]);
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
