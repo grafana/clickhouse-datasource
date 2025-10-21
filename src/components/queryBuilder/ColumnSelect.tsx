@@ -30,7 +30,6 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     label,
     tooltip,
     disabled,
-    invalid,
     wide,
     inline,
   } = props;
@@ -39,11 +38,8 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     .filter(columnFilterFn || defaultFilterFn)
     .map((c) => ({ label: c.label || c.name, value: c.name }));
 
-  // Select component WILL NOT display the value if it isn't present in the options.
-  let staleOption = false;
   if (selectedColumn && !columns.find((c) => c.value === selectedColumn.name)) {
     columns.push({ label: selectedColumn.alias || selectedColumn.name, value: selectedColumn.name });
-    staleOption = true;
   }
 
   const onChange = (selected: ComboboxOption<string>) => {
@@ -69,20 +65,21 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div className="gf-form">
+    <div style={{ display: 'flex', marginBottom: '4px' }}>
       <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <Combobox<string>
-        disabled={disabled}
-        invalid={invalid || staleOption}
-        options={columns}
-        value={selectedColumnName}
-        placeholder={selectedColumnName || undefined}
-        onChange={onChange}
-        width={wide ? 25 : 20}
-        createCustomValue={true}
-      />
+      <div style={{ marginRight: '8px' }}>
+        <Combobox<string>
+          disabled={disabled}
+          options={columns}
+          value={selectedColumnName}
+          placeholder={selectedColumnName || 'Choose'}
+          onChange={onChange}
+          width={25}
+          createCustomValue={true}
+        />
+      </div>
     </div>
   );
 };

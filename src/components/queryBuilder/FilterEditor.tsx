@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import {
-  Button,
-  Stack,
-  InlineFormLabel,
-  Input,
-  MultiSelect,
-  RadioButtonGroup,
-  Combobox,
-  ComboboxOption,
-} from '@grafana/ui';
+import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Combobox, ComboboxOption } from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
@@ -367,51 +358,57 @@ export const FilterEditor = (props: {
   };
 
   return (
-    <Stack wrap alignItems="flex-start" justifyContent="flex-start">
-      {index !== 0 && (
-        <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
-      )}
-      <div className={styles.Common.inlineSelect}>
-        <Combobox
-          disabled={Boolean(filter.hint)}
-          placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
-          value={filter.key}
-          width={40}
-          options={getFields()}
-          onChange={(e) => onFilterNameChange(e.value!)}
-          createCustomValue={true}
-        />
-      </div>
-      {(isMapType || isJSONType) && (
+    <div>
+      <div style={{ display: 'flex' }}>
+        {index !== 0 && (
+          <RadioButtonGroup
+            options={conditions}
+            value={filter.condition}
+            onChange={(e) => onFilterConditionChange(e!)}
+          />
+        )}
         <div className={styles.Common.inlineSelect}>
           <Combobox
-            value={filter.mapKey}
-            placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
+            disabled={Boolean(filter.hint)}
+            placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
+            value={filter.key}
             width={40}
-            options={mapKeyOptions}
-            onChange={(e) => onFilterMapKeyChange(e.value!)}
+            options={getFields()}
+            onChange={(e) => onFilterNameChange(e.value!)}
             createCustomValue={true}
           />
         </div>
-      )}
-      <div className={styles.Common.inlineSelect}>
-        <Combobox
-          value={filter.operator}
-          width={40}
-          options={getFilterOperatorsByType(filter.type)}
-          onChange={(e) => onFilterOperatorChange(e.value!)}
+        {(isMapType || isJSONType) && (
+          <div className={styles.Common.inlineSelect}>
+            <Combobox
+              value={filter.mapKey}
+              placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
+              width={40}
+              options={mapKeyOptions}
+              onChange={(e) => onFilterMapKeyChange(e.value!)}
+              createCustomValue={true}
+            />
+          </div>
+        )}
+        <div className={styles.Common.inlineSelect}>
+          <Combobox
+            value={filter.operator}
+            width={40}
+            options={getFilterOperatorsByType(filter.type)}
+            onChange={(e) => onFilterOperatorChange(e.value!)}
+          />
+        </div>
+        <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
+        <Button
+          data-testid="query-builder-filters-remove-button"
+          icon="trash-alt"
+          variant="destructive"
+          size="sm"
+          className={styles.Common.smallBtn}
+          onClick={() => removeFilter(index)}
         />
       </div>
-      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
-      <Button
-        data-testid="query-builder-filters-remove-button"
-        icon="trash-alt"
-        variant="destructive"
-        size="sm"
-        className={styles.Common.smallBtn}
-        onClick={() => removeFilter(index)}
-      />
-    </Stack>
+    </div>
   );
 };
 
@@ -442,7 +439,7 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div className="gf-form">
+        <div style={{ display: 'flex', marginBottom: '4px' }}>
           <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
             {label}
           </InlineFormLabel>
@@ -460,7 +457,7 @@ export const FiltersEditor = (props: {
       )}
       {filters.map((filter, index) => {
         return (
-          <div className="gf-form" key={index}>
+          <div style={{ display: 'flex', marginBottom: '4px' }} key={index}>
             {index === 0 ? (
               <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
                 {label}
@@ -482,7 +479,7 @@ export const FiltersEditor = (props: {
         );
       })}
       {filters.length !== 0 && (
-        <div className="gf-form">
+        <div style={{ display: 'flex', marginBottom: '4px' }}>
           <div className={`width-8 ${styles.Common.firstLabel}`}></div>
           <Button
             data-testid="query-builder-filters-inline-add-button"

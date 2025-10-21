@@ -26,17 +26,12 @@ export const Switch = (props: SwitchProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div className="gf-form">
+    <div style={{ display: 'flex', marginBottom: '4px' }}>
       <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <div style={switchContainerStyle}>
-        <GrafanaSwitch
-          disabled={disabled}
-          className="gf-form"
-          value={value}
-          onChange={(e) => onChange(e.currentTarget.checked)}
-        />
+        <GrafanaSwitch disabled={disabled} value={value} onChange={(e) => onChange(e.currentTarget.checked)} />
       </div>
     </div>
   );

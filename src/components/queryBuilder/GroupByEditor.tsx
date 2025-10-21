@@ -24,7 +24,7 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
   };
 
   return (
-    <div className="gf-form">
+    <div>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

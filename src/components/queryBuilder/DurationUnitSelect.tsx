@@ -23,7 +23,7 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
   const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.durationUnit;
 
   return (
-    <div className="gf-form">
+    <div style={{ display: 'flex', marginBottom: '4px' }}>
       <InlineFormLabel
         width={12}
         className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`}
@@ -36,7 +36,8 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
         options={durationUnitOptions as Array<ComboboxOption<TimeUnit>>}
         value={unit}
         onChange={(v) => onChange(v.value!)}
-        width={inline ? 25 : 30}
+        width={25}
+        placeholder="Choose"
       />
     </div>
   );

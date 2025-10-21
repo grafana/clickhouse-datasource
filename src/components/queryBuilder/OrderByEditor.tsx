@@ -100,7 +100,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
       {orderBy.map((orderByItem, index) => {
         const key = `${index}-${orderByItem.name}-${orderByItem.hint || ''}-${orderByItem.dir}`;
         return (
-          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
+          <div style={{ display: 'flex' }} key={key} data-testid="query-builder-orderby-item-wrapper">
             {index === 0 ? fieldLabel : fieldSpacer}
             <OrderByItem
               columnOptions={orderByOptions}
@@ -113,7 +113,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
         );
       })}
 
-      <div className="gf-form">
+      <div style={{ display: 'flex', marginBottom: '4px' }}>
         {orderBy.length === 0 ? fieldLabel : fieldSpacer}
         <Button
           data-testid="query-builder-orderby-add-button"
@@ -122,6 +122,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
           size="sm"
           onClick={addOrderByItem}
           className={styles.Common.smallBtn}
+          style={{ margin: '4px 0 0 0' }}
         >
           {addLabel}
         </Button>

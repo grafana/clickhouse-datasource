@@ -150,61 +150,61 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
       />
-      <div className="gf-form">
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.timeColumn}
-          invalid={!builderState.timeColumn}
-          onColumnChange={onOptionChange('timeColumn')}
-          columnFilterFn={columnFilterDateTime}
-          columnHint={ColumnHint.Time}
-          label={labels.logTimeColumn.label}
-          tooltip={labels.logTimeColumn.tooltip}
-        />
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.logLevelColumn}
-          invalid={!builderState.logLevelColumn}
-          onColumnChange={onOptionChange('logLevelColumn')}
-          columnFilterFn={columnFilterString}
-          columnHint={ColumnHint.LogLevel}
-          label={labels.logLevelColumn.label}
-          tooltip={labels.logLevelColumn.tooltip}
-          inline
-        />
-      </div>
-      <div className="gf-form">
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.messageColumn}
-          invalid={!builderState.messageColumn}
-          onColumnChange={onOptionChange('messageColumn')}
-          columnFilterFn={columnFilterString}
-          columnHint={ColumnHint.LogMessage}
-          label={labels.logMessageColumn.label}
-          tooltip={labels.logMessageColumn.tooltip}
-        />
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.labelsColumn}
-          invalid={!builderState.labelsColumn}
-          onColumnChange={onOptionChange('labelsColumn')}
-          columnHint={ColumnHint.LogLabels}
-          label={labels.logLabelsColumn.label}
-          tooltip={labels.logLabelsColumn.tooltip}
-          inline
-        />
-        {/* <Switch
-          value={builderState.liveView}
-          onChange={onOptionChange('liveView')}
-          label={labels.liveView.label}
-          tooltip={labels.liveView.tooltip}
-          inline
-        /> */}
+      <div style={{ display: 'flex' }}>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.timeColumn}
+            invalid={!builderState.timeColumn}
+            onColumnChange={onOptionChange('timeColumn')}
+            columnFilterFn={columnFilterDateTime}
+            columnHint={ColumnHint.Time}
+            label={labels.logTimeColumn.label}
+            tooltip={labels.logTimeColumn.tooltip}
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.logLevelColumn}
+            invalid={!builderState.logLevelColumn}
+            onColumnChange={onOptionChange('logLevelColumn')}
+            columnFilterFn={columnFilterString}
+            columnHint={ColumnHint.LogLevel}
+            label={labels.logLevelColumn.label}
+            tooltip={labels.logLevelColumn.tooltip}
+          />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.messageColumn}
+            invalid={!builderState.messageColumn}
+            onColumnChange={onOptionChange('messageColumn')}
+            columnFilterFn={columnFilterString}
+            columnHint={ColumnHint.LogMessage}
+            label={labels.logMessageColumn.label}
+            tooltip={labels.logMessageColumn.tooltip}
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.labelsColumn}
+            invalid={!builderState.labelsColumn}
+            onColumnChange={onOptionChange('labelsColumn')}
+            columnHint={ColumnHint.LogLabels}
+            label={labels.logLabelsColumn.label}
+            tooltip={labels.logLabelsColumn.tooltip}
+          />
+          {/* <Switch
+            value={builderState.liveView}
+            onChange={onOptionChange('liveView')}
+            label={labels.liveView.label}
+            tooltip={labels.liveView.tooltip}
+            inline
+          /> */}
+        </div>
       </div>
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}
@@ -240,12 +240,12 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   }, [logMessageLike]);
 
   return (
-    <div className="gf-form">
+    <div style={{ display: 'flex', marginBottom: '4px' }}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <Input
-        width={200}
+        // width={200}
         value={input}
         type="string"
         onChange={(e) => setInput(e.currentTarget.value)}

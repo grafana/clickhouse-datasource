@@ -125,7 +125,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={onSelectContextColumnsChange}
           wide
         />
-        <div className="gf-form">
+        <div style={{ display: 'flex' }}>
           <InlineFormLabel width={12} className="query-keyword" tooltip={labels.contextColumns.columns.tooltip}>
             {labels.contextColumns.columns.label}
           </InlineFormLabel>

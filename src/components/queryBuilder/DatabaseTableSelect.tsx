@@ -106,7 +106,7 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
   const { datasource, database, onDatabaseChange, table, onTableChange } = props;
 
   return (
-    <div className="gf-form">
+    <div style={{ display: 'flex', marginBottom: '4px' }}>
       <DatabaseSelect datasource={datasource} database={database} onDatabaseChange={onDatabaseChange} />
       <TableSelect datasource={datasource} database={database} table={table} onTableChange={onTableChange} />
     </div>

@@ -49,7 +49,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   return (
     <div data-testid="query-editor-section-builder">
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <div className={styles.QueryEditor.queryType}>
         <DatabaseTableSelect
           datasource={datasource}
           database={builderOptions.database}
@@ -58,7 +58,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           onTableChange={onTableChange}
         />
       </div>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <div className={styles.QueryEditor.queryType} style={{ marginBottom: '4px' }}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </div>
 
