@@ -40,7 +40,7 @@ export class AdHocFilter {
       .map((f, i) => {
         const key = escapeKey(f.key);
         const value = escapeValueBasedOnOperator(f.value, f.operator);
-        const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
+        const condition = i !== adHocFilters.length - 1 ? 'AND' : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
       })

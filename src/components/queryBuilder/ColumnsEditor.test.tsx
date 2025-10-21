@@ -49,8 +49,8 @@ describe('ColumnsEditor', () => {
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' });
     fireEvent.keyDown(multiSelect, { key: 'Enter' });
 
-    expect(onSelectedColumnsChange).toBeCalledTimes(1);
-    expect(onSelectedColumnsChange).toBeCalledWith([expect.any(Object), expect.any(Object)]);
+    expect(onSelectedColumnsChange).toHaveBeenCalledTimes(1);
+    expect(onSelectedColumnsChange).toHaveBeenCalledWith([expect.any(Object), expect.any(Object)]);
   });
 
   it('should call onSelectedColumnsChange when a column is deselected', () => {
@@ -67,8 +67,8 @@ describe('ColumnsEditor', () => {
 
     const removeButton = result.getByTestId('times'); // find by "x" symbol
     fireEvent.click(removeButton);
-    expect(onSelectedColumnsChange).toBeCalledTimes(1);
-    expect(onSelectedColumnsChange).toBeCalledWith([]);
+    expect(onSelectedColumnsChange).toHaveBeenCalledTimes(1);
+    expect(onSelectedColumnsChange).toHaveBeenCalledWith([]);
   });
 
   it('should close when clicked outside', () => {

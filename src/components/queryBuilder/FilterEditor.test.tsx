@@ -31,9 +31,9 @@ describe('FilterEditor', () => {
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getAllByText(selectors.components.QueryEditor.QueryBuilder.WHERE.label).length).toBe(1);
       expect(result.getByTestId('query-builder-filters-add-button')).toBeInTheDocument();
-      expect(onFiltersChange).toBeCalledTimes(0);
+      expect(onFiltersChange).toHaveBeenCalledTimes(0);
       await userEvent.click(result.getByTestId('query-builder-filters-add-button'));
-      expect(onFiltersChange).toBeCalledTimes(1);
+      expect(onFiltersChange).toHaveBeenCalledTimes(1);
       expect(onFiltersChange).toHaveBeenCalledWith([defaultNewFilter]);
     });
     it('should render buttons and labels correctly', async () => {
@@ -105,10 +105,10 @@ describe('FilterEditor', () => {
       expect(result.getAllByTestId('query-builder-filters-inline-add-button').length).toBe(1);
       expect(result.getAllByTestId('query-builder-filters-remove-button').length).toBe(filters.length);
       await userEvent.click(result.getByTestId('query-builder-filters-inline-add-button'));
-      expect(onFiltersChange).toBeCalledTimes(1);
+      expect(onFiltersChange).toHaveBeenCalledTimes(1);
       expect(onFiltersChange).toHaveBeenNthCalledWith(1, [...filters, defaultNewFilter]);
       await userEvent.click(result.getAllByTestId('query-builder-filters-remove-button')[0]);
-      expect(onFiltersChange).toBeCalledTimes(2);
+      expect(onFiltersChange).toHaveBeenCalledTimes(2);
       expect(onFiltersChange).toHaveBeenNthCalledWith(2, [filters[1]]);
     });
   });

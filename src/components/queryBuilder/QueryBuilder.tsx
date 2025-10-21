@@ -18,7 +18,7 @@ import {
   setTable,
 } from 'hooks/useBuilderOptionsState';
 import TraceIdInput from './TraceIdInput';
-import { Alert, Button, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
 
@@ -142,7 +142,7 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
     <div data-testid="query-editor-minimized-viewer">
       {showConfigWarning && (
         <Alert title="" severity="warning">
-          <VerticalGroup>
+          <Stack direction="column">
             <div>
               {`To enable data linking, enter your default ${configQueryType} configuration in your `}
               <a
@@ -152,14 +152,14 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
                 ClickHouse Data Source settings
               </a>
             </div>
-          </VerticalGroup>
+          </Stack>
         </Alert>
       )}
       {!traceId && (
         <Alert title="" severity="warning">
-          <VerticalGroup>
+          <Stack>
             <div>Trace ID is empty</div>
-          </VerticalGroup>
+          </Stack>
         </Alert>
       )}
 

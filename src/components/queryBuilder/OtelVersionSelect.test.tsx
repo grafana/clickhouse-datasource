@@ -42,8 +42,8 @@ describe('OtelVersionSelect', () => {
     const toggle = result.getByRole('checkbox');
     expect(toggle).toBeInTheDocument();
     fireEvent.click(toggle);
-    expect(onEnabledChange).toBeCalledTimes(1);
-    expect(onEnabledChange).toBeCalledWith(true);
+    expect(onEnabledChange).toHaveBeenCalledTimes(1);
+    expect(onEnabledChange).toHaveBeenCalledWith(true);
   });
 
   it('should call onEnabledChange when the switch is disabled', () => {
@@ -61,8 +61,8 @@ describe('OtelVersionSelect', () => {
     const toggle = result.getByRole('checkbox');
     expect(toggle).toBeInTheDocument();
     fireEvent.click(toggle);
-    expect(onEnabledChange).toBeCalledTimes(1);
-    expect(onEnabledChange).toBeCalledWith(false);
+    expect(onEnabledChange).toHaveBeenCalledTimes(1);
+    expect(onEnabledChange).toHaveBeenCalledWith(false);
   });
 
   it('should call onVersionChange when a new version is selected', () => {
@@ -81,8 +81,8 @@ describe('OtelVersionSelect', () => {
     expect(select).toBeInTheDocument();
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.keyDown(select, { key: 'Enter' });
-    expect(onVersionChange).toBeCalledTimes(1);
-    expect(onVersionChange).toBeCalledWith(expect.any(String));
+    expect(onVersionChange).toHaveBeenCalledTimes(1);
+    expect(onVersionChange).toHaveBeenCalledWith(expect.any(String));
   });
 
   it('should disable version selection when switch is disabled', () => {

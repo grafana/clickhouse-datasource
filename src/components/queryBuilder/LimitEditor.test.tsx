@@ -19,7 +19,7 @@ describe('LimitEditor', () => {
     fireEvent.change(limitInput, { target: { value: 5 } });
     fireEvent.blur(limitInput);
     expect(limitInput).toHaveValue(5);
-    expect(onLimitChange).toBeCalledTimes(1);
-    expect(onLimitChange).toBeCalledWith(5);
+    expect(onLimitChange).toHaveBeenCalledTimes(1);
+    expect(onLimitChange).toHaveBeenCalledWith(5);
   });
 });

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { InlineFormLabel, Combobox } from '@grafana/ui';
 import { Datasource } from '../../data/CHDatasource';
 import labels from 'labels';
 import { styles } from '../../styles';
@@ -38,14 +38,14 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <Select
-        className={`width-15 ${styles.Common.inlineSelect}`}
-        options={options}
-        value={database}
-        onChange={(e) => onDatabaseChange(e.value!)}
-        menuPlacement={'bottom'}
-        allowCustomValue
-      ></Select>
+      <div className={`width-15 ${styles.Common.inlineSelect}`}>
+        <Combobox
+          options={options}
+          value={database}
+          onChange={(e) => onDatabaseChange(e.value!)}
+          createCustomValue={true}
+        ></Combobox>
+      </div>
     </>
   );
 };
@@ -82,14 +82,14 @@ export const TableSelect = (props: TableSelectProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <Select
-        className={`width-15 ${styles.Common.inlineSelect}`}
-        options={options}
-        value={table}
-        onChange={(e) => onTableChange(e.value!)}
-        menuPlacement={'bottom'}
-        allowCustomValue
-      ></Select>
+      <div className={`width-15 ${styles.Common.inlineSelect}`}>
+        <Combobox
+          options={options}
+          value={table}
+          onChange={(e) => onTableChange(e.value!)}
+          createCustomValue={true}
+        ></Combobox>
+      </div>
     </>
   );
 };

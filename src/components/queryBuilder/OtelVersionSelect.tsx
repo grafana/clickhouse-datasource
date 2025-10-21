@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select, Switch as GrafanaSwitch, useTheme } from '@grafana/ui';
+import { InlineFormLabel, Combobox, Switch as GrafanaSwitch, useTheme, ComboboxOption } from '@grafana/ui';
 import otel from 'otel';
 import selectors from 'labels';
 
@@ -15,7 +15,7 @@ interface OtelVersionSelectProps {
 export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   const { enabled, onEnabledChange, selectedVersion, onVersionChange, wide } = props;
   const { label, tooltip } = selectors.components.OtelVersionSelect;
-  const options: SelectableValue[] = otel.versions.map((v) => ({
+  const options: ComboboxOption[] = otel.versions.map((v) => ({
     label: v.name,
     value: v.version,
   }));
@@ -48,13 +48,12 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
           role="checkbox"
         />
       </div>
-      <Select
+      <Combobox
         disabled={!enabled}
         options={options}
         width={20}
         onChange={(e) => onVersionChange(e.value)}
         value={selectedVersion}
-        menuPlacement={'bottom'}
       />
     </div>
   );

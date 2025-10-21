@@ -654,7 +654,7 @@ describe('ClickHouseDatasource', () => {
             range,
           } as any)
         ).toEqual('queryLogsVolumeResponse');
-        expect(queryLogsVolumeSpy).toBeCalledTimes(1);
+        expect(queryLogsVolumeSpy).toHaveBeenCalledTimes(1);
         expect(queryLogsVolumeSpy).toHaveBeenLastCalledWith(
           datasource,
           {

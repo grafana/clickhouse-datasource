@@ -3,9 +3,9 @@ import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderByEditor, getOrderByOptions } from './OrderByEditor';
 import { AggregateType, BuilderMode, OrderByDirection, QueryType, TableColumn } from 'types/queryBuilder';
-import { SelectableValue } from '@grafana/data';
+import { ComboboxOption } from '@grafana/ui';
 
-const testOptions: Array<SelectableValue<string>> = [
+const testOptions: Array<ComboboxOption<string>> = [
   { label: 'foo', value: 'foo' },
   { label: 'bar', value: 'bar' },
   { label: 'baz', value: 'baz' },
@@ -79,10 +79,10 @@ describe('OrderByEditor', () => {
     expect(result.getByTestId('query-builder-orderby-add-button')).toBeInTheDocument();
     expect(result.queryByTestId('query-builder-orderby-item-wrapper')).not.toBeInTheDocument();
     expect(result.queryByTestId('query-builder-orderby-remove-button')).not.toBeInTheDocument();
-    expect(onOrderByChange).toBeCalledTimes(0);
+    expect(onOrderByChange).toHaveBeenCalledTimes(0);
     await userEvent.click(result.getByTestId('query-builder-orderby-add-button'));
-    expect(onOrderByChange).toBeCalledTimes(1);
-    expect(onOrderByChange).toBeCalledWith([{ name: 'foo', dir: OrderByDirection.ASC }]);
+    expect(onOrderByChange).toHaveBeenCalledTimes(1);
+    expect(onOrderByChange).toHaveBeenCalledWith([{ name: 'foo', dir: OrderByDirection.ASC }]);
   });
   it('should remove items when remove button clicked', async () => {
     const onOrderByChange = jest.fn();
@@ -97,11 +97,11 @@ describe('OrderByEditor', () => {
       />
     );
     expect(result.container.firstChild).not.toBeNull();
-    expect(onOrderByChange).toBeCalledTimes(0);
+    expect(onOrderByChange).toHaveBeenCalledTimes(0);
     await userEvent.click(result.getAllByTestId('query-builder-orderby-remove-button')[1]);
     await userEvent.click(result.getAllByTestId('query-builder-orderby-remove-button')[0]);
     await userEvent.click(result.getAllByTestId('query-builder-orderby-add-button')[0]);
-    expect(onOrderByChange).toBeCalledTimes(3);
+    expect(onOrderByChange).toHaveBeenCalledTimes(3);
     expect(onOrderByChange).toHaveBeenNthCalledWith(1, [{ name: 'foo', dir: OrderByDirection.ASC }]);
     expect(onOrderByChange).toHaveBeenNthCalledWith(2, [{ name: 'bar', dir: OrderByDirection.ASC }]);
     expect(onOrderByChange).toHaveBeenNthCalledWith(3, [

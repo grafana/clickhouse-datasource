@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, HorizontalGroup, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
+import {
+  Button,
+  Stack,
+  InlineFormLabel,
+  Input,
+  MultiSelect,
+  RadioButtonGroup,
+  Combobox,
+  ComboboxOption,
+  Select,
+} from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
@@ -16,7 +26,7 @@ const conditions: Array<SelectableValue<'AND' | 'OR'>> = [
   { value: 'AND', label: 'AND' },
   { value: 'OR', label: 'OR' },
 ];
-const filterOperators: Array<SelectableValue<FilterOperator>> = [
+const filterOperators: Array<ComboboxOption<FilterOperator>> = [
   { value: FilterOperator.WithInGrafanaTimeRange, label: 'Within dashboard time range' },
   { value: FilterOperator.OutsideGrafanaTimeRange, label: 'Outside dashboard time range' },
   { value: FilterOperator.IsAnything, label: 'IS ANYTHING' },
@@ -35,7 +45,7 @@ const filterOperators: Array<SelectableValue<FilterOperator>> = [
   { value: FilterOperator.IsNull, label: 'IS NULL' },
   { value: FilterOperator.IsNotNull, label: 'IS NOT NULL' },
 ];
-const standardTimeOptions: Array<SelectableValue<string>> = [
+const standardTimeOptions: Array<ComboboxOption<string>> = [
   { value: 'today()', label: 'TODAY' },
   { value: 'yesterday()', label: 'YESTERDAY' },
   { value: 'now()', label: 'NOW' },
@@ -137,12 +147,12 @@ export const FilterValueEditor = (props: {
 
     return (
       <div data-testid="query-builder-filters-date-value-container">
-        <Select
+        <Combobox
           value={filter.value || 'TODAY'}
           onChange={(e) => onDateFilterValueChange(e.value!)}
           options={dateOptions}
           width={40}
-          allowCustomValue
+          createCustomValue={true}
         />
       </div>
     );
@@ -156,7 +166,7 @@ export const FilterValueEditor = (props: {
     ) {
       return (
         <div data-testid="query-builder-filters-single-picklist-value-container">
-          <Select value={filter.value} onChange={(e) => onStringFilterValueChange(e.value!)} options={getOptions()} />
+          <Combobox value={filter.value} onChange={(e) => onStringFilterValueChange(e.value!)} options={getOptions()} />
         </div>
       );
     }
@@ -227,7 +237,7 @@ export const FilterEditor = (props: {
     }
     return values;
   };
-  const getFilterOperatorsByType = (type = 'string'): Array<SelectableValue<FilterOperator>> => {
+  const getFilterOperatorsByType = (type = 'string'): Array<ComboboxOption<FilterOperator>> => {
     if (utils.isBooleanType(type)) {
       return filterOperators.filter((f) => [FilterOperator.Equals, FilterOperator.NotEquals].includes(f.value!));
     } else if (utils.isNumberType(type)) {
@@ -360,7 +370,7 @@ export const FilterEditor = (props: {
   };
 
   return (
-    <HorizontalGroup wrap align="flex-start" justify="flex-start">
+    <Stack wrap alignItems="flex-start" justifyContent="flex-start">
       {index !== 0 && (
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
@@ -379,25 +389,25 @@ export const FilterEditor = (props: {
         menuPlacement={'bottom'}
       />
       {(isMapType || isJSONType) && (
-        <Select
-          value={filter.mapKey}
-          placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
-          width={40}
-          className={styles.Common.inlineSelect}
-          options={mapKeyOptions}
-          onChange={(e) => onFilterMapKeyChange(e.value!)}
-          allowCustomValue
-          menuPlacement={'bottom'}
-        />
+        <div className={styles.Common.inlineSelect}>
+          <Combobox
+            value={filter.mapKey}
+            placeholder={labels.components.FilterEditor.mapKeyPlaceholder}
+            width={40}
+            options={mapKeyOptions}
+            onChange={(e) => onFilterMapKeyChange(e.value!)}
+            createCustomValue={true}
+          />
+        </div>
       )}
-      <Select
-        value={filter.operator}
-        width={40}
-        className={styles.Common.inlineSelect}
-        options={getFilterOperatorsByType(filter.type)}
-        onChange={(e) => onFilterOperatorChange(e.value!)}
-        menuPlacement={'bottom'}
-      />
+      <div className={styles.Common.inlineSelect}>
+        <Combobox
+          value={filter.operator}
+          width={40}
+          options={getFilterOperatorsByType(filter.type)}
+          onChange={(e) => onFilterOperatorChange(e.value!)}
+        />
+      </div>
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
       <Button
         data-testid="query-builder-filters-remove-button"
@@ -407,7 +417,7 @@ export const FilterEditor = (props: {
         className={styles.Common.smallBtn}
         onClick={() => removeFilter(index)}
       />
-    </HorizontalGroup>
+    </Stack>
   );
 };
 

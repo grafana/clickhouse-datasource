@@ -1,13 +1,13 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Select } from '@grafana/ui';
+import { Button, InlineFormLabel, Combobox, ComboboxOption } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { styles } from 'styles';
 import { isAggregateQuery } from 'data/sqlGenerator';
 
 interface OrderByItemProps {
-  columnOptions: Array<SelectableValue<string>>;
+  columnOptions: Array<ComboboxOption<string>>;
   index: number;
   orderByItem: OrderBy;
   updateOrderByItem: (index: number, orderByItem: OrderBy) => void;
@@ -24,25 +24,25 @@ const OrderByItem = (props: OrderByItemProps) => {
 
   return (
     <>
-      <Select
-        disabled={Boolean(orderByItem.hint)}
-        placeholder={orderByItem.hint ? allLabels.types.ColumnHint[orderByItem.hint] : undefined}
-        value={orderByItem.hint ? undefined : orderByItem.name}
-        className={styles.Common.inlineSelect}
-        width={36}
-        options={columnOptions}
-        onChange={(e) => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
-        allowCustomValue
-        menuPlacement={'bottom'}
-      />
-      <Select<OrderByDirection>
-        value={orderByItem.dir}
-        className={styles.Common.inlineSelect}
-        width={12}
-        options={sortOptions}
-        onChange={(e) => updateOrderByItem(index, { ...orderByItem, dir: e.value! })}
-        menuPlacement={'bottom'}
-      />
+      <div className={styles.Common.inlineSelect}>
+        <Combobox
+          disabled={Boolean(orderByItem.hint)}
+          placeholder={orderByItem.hint ? allLabels.types.ColumnHint[orderByItem.hint] : undefined}
+          value={orderByItem.hint ? undefined : orderByItem.name}
+          width={36}
+          options={columnOptions}
+          onChange={(e) => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
+          createCustomValue={true}
+        />
+      </div>
+      <div className={styles.Common.inlineSelect}>
+        <Combobox<OrderByDirection>
+          value={orderByItem.dir}
+          width={12}
+          options={sortOptions}
+          onChange={(e) => updateOrderByItem(index, { ...orderByItem, dir: e.value! })}
+        />
+      </div>
       <Button
         data-testid="query-builder-orderby-remove-button"
         className={styles.Common.smallBtn}
@@ -56,7 +56,7 @@ const OrderByItem = (props: OrderByItemProps) => {
 };
 
 interface OrderByEditorProps {
-  orderByOptions: Array<SelectableValue<string>>;
+  orderByOptions: Array<ComboboxOption<string>>;
   orderBy: OrderBy[];
   onOrderByChange: (orderBy: OrderBy[]) => void;
 }
@@ -134,8 +134,8 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
 export const getOrderByOptions = (
   builder: QueryBuilderOptions,
   allColumns: readonly TableColumn[]
-): Array<SelectableValue<string>> => {
-  let allOptions: Array<SelectableValue<string>> = [];
+): Array<ComboboxOption<string>> => {
+  let allOptions: Array<ComboboxOption<string>> = [];
 
   if (isAggregateQuery(builder)) {
     builder.columns?.forEach((c) => {

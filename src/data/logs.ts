@@ -9,10 +9,10 @@ import {
   FieldType,
   LoadingState,
   LogLevel,
-  MutableDataFrame,
   ScopedVars,
   TimeRange,
   toDataFrame,
+  MutableDataFrame,
 } from '@grafana/data';
 import { from, isObservable, Observable } from 'rxjs';
 import { config } from '@grafana/runtime';
@@ -48,7 +48,7 @@ const LogLevelColor = {
 };
 
 function getThemeColor(dark: string, light: string): string {
-  return config.bootData.user.lightTheme ? light : dark;
+  return config.bootData.user.theme ? light : dark;
 }
 
 /**
@@ -89,14 +89,14 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
         observer.complete();
       },
       next: (dataQueryResponse: DataQueryResponse) => {
-        const { error } = dataQueryResponse;
-        if (error !== undefined) {
+        const { errors } = dataQueryResponse;
+        if (errors !== undefined) {
           observer.next({
             state: LoadingState.Error,
-            error,
+            errors,
             data: [],
           });
-          observer.error(error);
+          observer.error(errors);
         } else {
           rawLogsVolume = rawLogsVolume.concat(dataQueryResponse.data.map(toDataFrame));
         }
