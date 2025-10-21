@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { InlineFormLabel, Combobox, Switch as GrafanaSwitch, useTheme, ComboboxOption } from '@grafana/ui';
 import otel from 'otel';
 import selectors from 'labels';
+import { styles } from 'styles';
 
 interface OtelVersionSelectProps {
   enabled: boolean;
@@ -36,7 +37,7 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   };
 
   return (
-    <div style={{ display: 'flex' }}>
+    <div className={styles.Common.flex}>
       <InlineFormLabel width={wide ? 12 : 8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

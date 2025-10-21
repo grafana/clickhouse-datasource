@@ -150,8 +150,8 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
       />
-      <div style={{ display: 'flex' }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className={styles.Common.flex}>
+        <div className={styles.Common.flexColumn}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -175,7 +175,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
             tooltip={labels.logLevelColumn.tooltip}
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className={styles.Common.flexColumn}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -240,7 +240,7 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   }, [logMessageLike]);
 
   return (
-    <div style={{ display: 'flex', marginBottom: '4px' }}>
+    <div className={styles.Common.flexContainer}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

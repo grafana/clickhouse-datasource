@@ -9,6 +9,7 @@ import { CHLogsConfig } from 'types/config';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
+import { styles } from 'styles';
 
 interface LogsConfigProps {
   logsConfig?: CHLogsConfig;
@@ -125,7 +126,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={onSelectContextColumnsChange}
           wide
         />
-        <div style={{ display: 'flex' }}>
+        <div className={styles.Common.flex}>
           <InlineFormLabel width={12} className="query-keyword" tooltip={labels.contextColumns.columns.tooltip}>
             {labels.contextColumns.columns.label}
           </InlineFormLabel>

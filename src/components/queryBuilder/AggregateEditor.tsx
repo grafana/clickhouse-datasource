@@ -133,7 +133,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
         const key = `${index}-${aggregate.column}-${aggregate.aggregateType}-${aggregate.alias}`;
         return (
           <div
-            style={{ display: 'flex' }}
+            className={styles.Common.flex}
             key={key}
             data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}
           >
@@ -149,7 +149,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
         );
       })}
 
-      <div style={{ display: 'flex', marginBottom: '4px' }}>
+      <div className={styles.Common.flexContainer}>
         {aggregates.length === 0 ? fieldLabel : fieldSpacer}
         <Button
           data-testid={selectors.components.QueryBuilder.AggregateEditor.addButton}

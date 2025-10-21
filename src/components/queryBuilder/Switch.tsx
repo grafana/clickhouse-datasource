@@ -26,7 +26,7 @@ export const Switch = (props: SwitchProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div style={{ display: 'flex', marginBottom: '4px' }}>
+    <div className={styles.Common.flexContainer}>
       <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>

@@ -359,7 +359,7 @@ export const FilterEditor = (props: {
 
   return (
     <div>
-      <div style={{ display: 'flex' }}>
+      <div className={styles.Common.flex}>
         {index !== 0 && (
           <RadioButtonGroup
             options={conditions}
@@ -439,7 +439,7 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div style={{ display: 'flex', marginBottom: '4px' }}>
+        <div className={styles.Common.flexContainer}>
           <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
             {label}
           </InlineFormLabel>
@@ -457,7 +457,7 @@ export const FiltersEditor = (props: {
       )}
       {filters.map((filter, index) => {
         return (
-          <div style={{ display: 'flex', marginBottom: '4px' }} key={index}>
+          <div className={styles.Common.flexContainer} key={index}>
             {index === 0 ? (
               <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
                 {label}
@@ -479,7 +479,7 @@ export const FiltersEditor = (props: {
         );
       })}
       {filters.length !== 0 && (
-        <div style={{ display: 'flex', marginBottom: '4px' }}>
+        <div className={styles.Common.flexContainer}>
           <div className={`width-8 ${styles.Common.firstLabel}`}></div>
           <Button
             data-testid="query-builder-filters-inline-add-button"

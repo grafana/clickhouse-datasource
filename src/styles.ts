@@ -29,6 +29,17 @@ export const styles = {
       z-index: 100;
       color: gray;
     `,
+    flexContainer: css`
+      display: 'flex', 
+      marginBottom: '4px'
+    `,
+    flex: css`
+      display: flex;
+    `,
+    flexColumn: css`
+      display: flex;
+      flex-direction: column;
+    `,
   },
   ConfigEditor: {
     container: css`

@@ -1,5 +1,6 @@
 import React from 'react';
 import { RadioButtonGroup, InlineFormLabel } from '@grafana/ui';
+import { styles } from 'styles';
 
 export interface ModeSwitchProps {
   labelA: string;
@@ -28,7 +29,7 @@ export const ModeSwitch = (props: ModeSwitchProps) => {
   ];
 
   return (
-    <div style={{ display: 'flex', marginBottom: '4px' }}>
+    <div className={styles.Common.flexContainer}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
