@@ -32,8 +32,8 @@ export const Switch = (props: SwitchProps) => {
       </InlineFormLabel>
       <div style={switchContainerStyle}>
         <GrafanaSwitch
-          className="gf-form"
           disabled={disabled}
+          className="gf-form"
           value={value}
           onChange={(e) => onChange(e.currentTarget.checked)}
         />

@@ -155,7 +155,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
           <Field label={labels.secureLabel}>
             <Switch
               data-testid={selectors.headerSecureSwitch}
-              className={'gf-form'}
+              className="gf-form"
               value={secure}
               onChange={(e) => setSecure(e.currentTarget.checked)}
               onBlur={() => onUpdate()}

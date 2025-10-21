@@ -40,7 +40,12 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
         {label}
       </InlineFormLabel>
       <div style={switchContainerStyle}>
-        <GrafanaSwitch value={enabled} onChange={(e) => onEnabledChange(e.currentTarget.checked)} role="checkbox" />
+        <GrafanaSwitch
+          className="gf-form"
+          value={enabled}
+          onChange={(e) => onEnabledChange(e.currentTarget.checked)}
+          role="checkbox"
+        />
       </div>
       <Combobox
         disabled={!enabled}

@@ -100,7 +100,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
       {orderBy.map((orderByItem, index) => {
         const key = `${index}-${orderByItem.name}-${orderByItem.hint || ''}-${orderByItem.dir}`;
         return (
-          <div key={key} data-testid="query-builder-orderby-item-wrapper">
+          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
             {index === 0 ? fieldLabel : fieldSpacer}
             <OrderByItem
               columnOptions={orderByOptions}
