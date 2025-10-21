@@ -2,7 +2,6 @@ import React from 'react';
 import { TimeUnit } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { InlineFormLabel, Combobox, ComboboxOption } from '@grafana/ui';
-import { SelectableValue } from '@grafana/data';
 import { styles } from 'styles';
 
 interface DurationUnitSelectProps {

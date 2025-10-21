@@ -210,7 +210,6 @@ export const FilterEditor = (props: {
   table: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter } = props;
-  const [isOpen, setIsOpen] = useState(false);
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
@@ -292,7 +291,6 @@ export const FilterEditor = (props: {
     }
   };
   const onFilterNameChange = (fieldName: string) => {
-    setIsOpen(false);
     const matchingField = fieldsList.find((f) => f.name === fieldName);
     const filterData = {
       key: matchingField?.name || fieldName,

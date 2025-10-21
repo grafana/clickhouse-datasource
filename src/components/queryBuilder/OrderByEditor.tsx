@@ -1,5 +1,4 @@
 import React from 'react';
-import { SelectableValue } from '@grafana/data';
 import { Button, InlineFormLabel, Combobox, ComboboxOption } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
 import allLabels from 'labels';

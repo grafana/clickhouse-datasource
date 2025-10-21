@@ -1,5 +1,4 @@
 import React from 'react';
-import { SelectableValue } from '@grafana/data';
 import { Combobox, ComboboxOption, InlineFormLabel } from '@grafana/ui';
 import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { styles } from 'styles';
@@ -34,7 +33,6 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     invalid,
     wide,
     inline,
-    clearable,
   } = props;
   const selectedColumnName = selectedColumn?.name;
   const columns: Array<ComboboxOption<string>> = allColumns

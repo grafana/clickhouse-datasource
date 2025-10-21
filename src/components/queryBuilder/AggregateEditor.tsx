@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Combobox, Button, Input, Stack, ComboboxOption } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';

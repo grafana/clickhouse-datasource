@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { SelectableValue } from '@grafana/data';
 import { InlineFormLabel, Combobox, Switch as GrafanaSwitch, useTheme, ComboboxOption } from '@grafana/ui';
 import otel from 'otel';
 import selectors from 'labels';
