@@ -61,18 +61,12 @@ export const ServerAndEncryptionSection = (props: Props) => {
     });
   };
 
-  const onSwitchToggle = (
-    key: keyof Pick<
-      CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
-    >,
-    value: boolean
-  ) => {
+  const onSecureToggle = (value: boolean) => {
     onOptionsChange({
       ...options,
       jsonData: {
         ...options.jsonData,
-        [key]: value,
+        secure: value,
       },
     });
   };
@@ -184,11 +178,11 @@ export const ServerAndEncryptionSection = (props: Props) => {
             checked={jsonData.secure || false}
             onChange={(e) => {
               trackClickhouseConfigV2SecureConnectionChecked({ secureConnection: e.currentTarget.checked });
-              onSwitchToggle('secure', e.currentTarget.checked);
+              onSecureToggle(e.currentTarget.checked);
             }}
           />
         </div>
-        <HttpProtocolSettingsSection onSwitchToggle={onSwitchToggle} {...props} />
+        <HttpProtocolSettingsSection {...props} />
       </CollapsableSection>
     </Box>
   );

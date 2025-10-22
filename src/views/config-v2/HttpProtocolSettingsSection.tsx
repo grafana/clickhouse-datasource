@@ -7,18 +7,11 @@ import { css } from '@emotion/css';
 import { onHttpHeadersChange } from 'views/CHConfigEditorHooks';
 import { HttpHeadersConfigV2 } from './HttpHeadersConfigV2';
 
-export interface HttpProtocolSettingsSectionProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
-  onSwitchToggle: (
-    key: keyof Pick<
-      CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
-    >,
-    value: boolean
-  ) => void;
-}
+export interface HttpProtocolSettingsSectionProps
+  extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
 export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionProps) => {
-  const { options, onOptionsChange, onSwitchToggle } = props;
+  const { options, onOptionsChange } = props;
   const { jsonData, secureJsonFields } = options;
   const labels = allLabels.components.Config.ConfigEditor;
 
@@ -30,6 +23,16 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
   const styles = {
     httpSettingsSection: css({ marginTop: theme.spacing(2) }),
     httpSettingsButton: css({ marginBottom: theme.spacing(2) }),
+  };
+
+  const onForwardGrafanaHeadersToggle = (value: boolean) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        forwardGrafanaHeaders: value,
+      },
+    });
   };
 
   return jsonData.protocol === Protocol.Http ? (
@@ -58,7 +61,7 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
           forwardGrafanaHeaders={jsonData.forwardGrafanaHeaders}
           secureFields={secureJsonFields}
           onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
-          onForwardGrafanaHeadersChange={(forward) => onSwitchToggle('forwardGrafanaHeaders', forward)}
+          onForwardGrafanaHeadersChange={(forward) => onForwardGrafanaHeadersToggle(forward)}
         />
       )}
     </div>

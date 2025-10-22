@@ -46,6 +46,19 @@ export const TLSSSLSettingsSection = (props: Props) => {
     });
   };
 
+  const onTLSSettingsChange = (
+    key: keyof Pick<CHConfig, 'tlsSkipVerify' | 'tlsAuth' | 'tlsAuthWithCACert'>,
+    value: boolean
+  ) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        [key]: value,
+      },
+    });
+  };
+
   return (
     <Box
       borderStyle="solid"
@@ -79,7 +92,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
               value={jsonData.tlsSkipVerify || false}
               onChange={(e) => {
                 trackClickhouseConfigV2SkipTLSVerifyToggleClicked({ skipTlsVerifyToggle: e.currentTarget.checked });
-                onUpdateDatasourceJsonDataOption(props, 'tlsSkipVerify')(e);
+                onTLSSettingsChange('tlsSkipVerify', e.currentTarget.checked);
               }}
             />
             <Checkbox
@@ -88,7 +101,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
               value={jsonData.tlsAuth || false}
               onChange={(e) => {
                 trackClickhouseConfigV2TLSClientAuthToggleClicked({ clientAuthToggle: e.currentTarget.checked });
-                onUpdateDatasourceJsonDataOption(props, 'tlsAuth')(e);
+                onTLSSettingsChange('tlsAuth', e.currentTarget.checked);
               }}
             />
             {jsonData.tlsAuth && (
@@ -116,7 +129,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
               value={jsonData.tlsAuthWithCACert || false}
               onChange={(e) => {
                 trackClickhouseConfigV2WithCACertToggleClicked({ caCertToggle: e.currentTarget.checked });
-                onUpdateDatasourceJsonDataOption(props, 'tlsAuthWithCACert')(e);
+                onTLSSettingsChange('tlsAuthWithCACert', e.currentTarget.checked);
               }}
             />
             <div className={styles.certsSection}>
