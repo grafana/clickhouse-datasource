@@ -109,7 +109,7 @@ jobs:
             --log-level debug \
             --pw-execute "npm run e2e" \
             --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
-            --test-env-vars 'CI=true DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }} DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }} DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }} DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }}' \
+            --test-env 'CI=true,DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }},DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }},DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }},DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }},DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasource' \
             --test-runner playwright
 
       - name: Archive Playwright artifacts
@@ -118,4 +118,4 @@ jobs:
         with:
           name: playwright-report
           path: playwright-report/
-          retention-days: 30
+          retention-days: 1
