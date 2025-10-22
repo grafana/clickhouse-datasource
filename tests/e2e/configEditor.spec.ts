@@ -24,6 +24,9 @@ test.describe('Config Editor', () => {
 
     if (process.env.DS_INSTANCE_PASSWORD) {
       await page.getByPlaceholder('password').fill(process.env.DS_INSTANCE_PASSWORD);
+
+      await page.getByRole('combobox', { name: 'Private data source connect' }).click();
+      await page.getByText('datasources-pdc-network-aws-datasource').click();
     }
 
     await configPage.saveAndTest();
