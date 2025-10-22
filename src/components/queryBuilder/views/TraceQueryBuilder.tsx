@@ -181,7 +181,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           onVersionChange={(v) => builderOptionsDispatch(setOtelVersion(v))}
           wide
         />
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -205,7 +205,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -229,7 +229,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -253,7 +253,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -271,7 +271,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             onChange={onOptionChange('durationUnit')}
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -295,7 +295,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -319,7 +319,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -343,7 +343,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </div>
-        <div className={styles.Common.flexContainer}>
+        <div className={styles.Common.flex}>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}

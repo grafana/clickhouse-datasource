@@ -8,6 +8,7 @@ import { EditorType, CHQuery, defaultCHBuilderQuery } from 'types/sql';
 import { QueryBuilderOptions } from 'types/queryBuilder';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { Datasource } from 'data/CHDatasource';
+import { styles } from 'styles';
 
 interface CHEditorTypeSwitcherProps {
   query: CHQuery;
@@ -85,7 +86,7 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
     setCannotConvertModalState(false);
   };
   return (
-    <span>
+    <span className={styles.Common.flexContainer}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

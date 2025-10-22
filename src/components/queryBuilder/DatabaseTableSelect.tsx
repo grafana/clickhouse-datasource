@@ -34,7 +34,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
   }, [datasource, database, onDatabaseChange]);
 
   return (
-    <>
+    <div className={styles.Common.flex}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
@@ -46,7 +46,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
           createCustomValue={true}
         ></Combobox>
       </div>
-    </>
+    </div>
   );
 };
 

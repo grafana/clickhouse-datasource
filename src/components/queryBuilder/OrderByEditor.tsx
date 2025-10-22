@@ -122,7 +122,6 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
           size="sm"
           onClick={addOrderByItem}
           className={styles.Common.smallBtn}
-          style={{ margin: '4px 0 0 0' }}
         >
           {addLabel}
         </Button>
