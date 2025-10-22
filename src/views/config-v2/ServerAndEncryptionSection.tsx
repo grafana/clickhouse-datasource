@@ -1,5 +1,10 @@
 import React from 'react';
-import { DataSourcePluginOptionsEditorProps, GrafanaTheme2, onUpdateDatasourceJsonDataOption } from '@grafana/data';
+import {
+  DataSourcePluginOptionsEditorProps,
+  GrafanaTheme2,
+  onUpdateDatasourceJsonDataOption,
+  onUpdateDatasourceJsonDataOptionSelect,
+} from '@grafana/data';
 import {
   Box,
   CollapsableSection,
@@ -57,16 +62,6 @@ export const ServerAndEncryptionSection = (props: Props) => {
       jsonData: {
         ...options.jsonData,
         port: +port,
-      },
-    });
-  };
-
-  const onSecureToggle = (value: boolean) => {
-    onOptionsChange({
-      ...options,
-      jsonData: {
-        ...options.jsonData,
-        secure: value,
       },
     });
   };
@@ -178,7 +173,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
             checked={jsonData.secure || false}
             onChange={(e) => {
               trackClickhouseConfigV2SecureConnectionChecked({ secureConnection: e.currentTarget.checked });
-              onSecureToggle(e.currentTarget.checked);
+              onUpdateDatasourceJsonDataOptionSelect(props, 'secure')(e);
             }}
           />
         </div>

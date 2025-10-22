@@ -1,7 +1,11 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labelsV2';
 import React, { ChangeEvent, useState } from 'react';
-import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
+import {
+  DataSourcePluginOptionsEditorProps,
+  onUpdateDatasourceJsonDataOption,
+  onUpdateDatasourceJsonDataOptionSelect,
+} from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
 import { AliasTableConfig } from 'components/configEditor/AliasTableConfig';
 import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatabaseTableConfig';
@@ -106,16 +110,6 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
-  const onValidateSqlToggle = (value: boolean) => {
-    onOptionsChange({
-      ...options,
-      jsonData: {
-        ...options.jsonData,
-        validateSql: value,
-      },
-    });
-  };
-
   return (
     <Box
       borderStyle="solid"
@@ -176,7 +170,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           }}
           onValidateSqlChange={(e) => {
             trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
-            onValidateSqlToggle(e.currentTarget.checked);
+            onUpdateDatasourceJsonDataOptionSelect(props, 'validateSql')(e);
           }}
         />
         <Divider />

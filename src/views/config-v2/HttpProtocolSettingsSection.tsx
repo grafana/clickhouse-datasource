@@ -25,16 +25,6 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
     httpSettingsButton: css({ marginBottom: theme.spacing(2) }),
   };
 
-  const onForwardGrafanaHeadersToggle = (value: boolean) => {
-    onOptionsChange({
-      ...options,
-      jsonData: {
-        ...options.jsonData,
-        forwardGrafanaHeaders: value,
-      },
-    });
-  };
-
   return jsonData.protocol === Protocol.Http ? (
     <div className={styles.httpSettingsSection}>
       <Field label={labels.path.label} description={labels.path.tooltip}>
@@ -57,11 +47,12 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
       </Button>
       {optionalHttpIsOpen && (
         <HttpHeadersConfigV2
+          options={options}
+          onOptionsChange={onOptionsChange}
           headers={jsonData.httpHeaders}
           forwardGrafanaHeaders={jsonData.forwardGrafanaHeaders}
           secureFields={secureJsonFields}
           onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
-          onForwardGrafanaHeadersChange={(forward) => onForwardGrafanaHeadersToggle(forward)}
         />
       )}
     </div>

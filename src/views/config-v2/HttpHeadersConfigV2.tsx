@@ -1,17 +1,21 @@
 import React, { ChangeEvent, useMemo, useState } from 'react';
 import { Input, Field, SecretInput, Button, Stack, Checkbox, Box } from '@grafana/ui';
-import { CHHttpHeader } from 'types/config';
+import { CHConfig, CHHttpHeader, CHSecureConfig } from 'types/config';
 import allLabels from './labelsV2';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
-import { KeyValue } from '@grafana/data';
+import {
+  DataSourcePluginOptionsEditorProps,
+  KeyValue,
+  onUpdateDatasourceJsonDataOptionSelect,
+  SelectableValue,
+} from '@grafana/data';
 
-interface HttpHeadersConfigProps {
+interface HttpHeadersConfigProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
   headers?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
   secureFields: KeyValue<boolean>;
   onHttpHeadersChange: (v: CHHttpHeader[]) => void;
-  onForwardGrafanaHeadersChange: (v: boolean) => void;
 }
 
 export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
@@ -40,9 +44,9 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
     onHttpHeadersChange(nextHeaders);
   };
 
-  const updateForwardGrafanaHeaders = (value: boolean) => {
-    setForwardGrafanaHeaders(value);
-    props.onForwardGrafanaHeadersChange(value);
+  const updateForwardGrafanaHeaders = (e: React.FormEvent<HTMLInputElement> | SelectableValue<any>) => {
+    setForwardGrafanaHeaders(e.currentTarget.checked);
+    onUpdateDatasourceJsonDataOptionSelect(props, 'forwardGrafanaHeaders')(e);
   };
 
   return (
@@ -77,7 +81,7 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
       <Checkbox
         label={labels.forwardGrafanaHeaders.label}
         checked={forwardGrafanaHeaders}
-        onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
+        onChange={(e) => updateForwardGrafanaHeaders(e)}
       />
     </div>
   );
