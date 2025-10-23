@@ -3,7 +3,7 @@ import {
   DataSourcePluginOptionsEditorProps,
   GrafanaTheme2,
   onUpdateDatasourceJsonDataOption,
-  onUpdateDatasourceJsonDataOptionSelect,
+  onUpdateDatasourceJsonDataOptionChecked,
 } from '@grafana/data';
 import {
   Box,
@@ -173,7 +173,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
             checked={jsonData.secure || false}
             onChange={(e) => {
               trackClickhouseConfigV2SecureConnectionChecked({ secureConnection: e.currentTarget.checked });
-              onUpdateDatasourceJsonDataOptionSelect(props, 'secure')(e);
+              onUpdateDatasourceJsonDataOptionChecked(props, 'secure')(e);
             }}
           />
         </div>

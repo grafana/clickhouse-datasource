@@ -4,12 +4,7 @@ import { CHConfig, CHHttpHeader, CHSecureConfig } from 'types/config';
 import allLabels from './labelsV2';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
-import {
-  DataSourcePluginOptionsEditorProps,
-  KeyValue,
-  onUpdateDatasourceJsonDataOptionSelect,
-  SelectableValue,
-} from '@grafana/data';
+import { DataSourcePluginOptionsEditorProps, KeyValue, onUpdateDatasourceJsonDataOptionChecked } from '@grafana/data';
 
 interface HttpHeadersConfigProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
   headers?: CHHttpHeader[];
@@ -44,9 +39,9 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
     onHttpHeadersChange(nextHeaders);
   };
 
-  const updateForwardGrafanaHeaders = (e: React.FormEvent<HTMLInputElement> | SelectableValue<any>) => {
+  const updateForwardGrafanaHeaders = (e: React.SyntheticEvent<HTMLInputElement, Event>) => {
     setForwardGrafanaHeaders(e.currentTarget.checked);
-    onUpdateDatasourceJsonDataOptionSelect(props, 'forwardGrafanaHeaders')(e);
+    onUpdateDatasourceJsonDataOptionChecked(props, 'forwardGrafanaHeaders')(e);
   };
 
   return (
@@ -77,7 +72,6 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
         </>
       </Field>
 
-      {/* Use 'checked' instead of 'value' */}
       <Checkbox
         label={labels.forwardGrafanaHeaders.label}
         checked={forwardGrafanaHeaders}
@@ -126,7 +120,6 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
           />
         </Field>
 
-        {/* Avoid 'grow'; use flex prop that Box supports */}
         <Box flex="1 1 auto">
           <Field label={headerValueLabel} aria-label={headerValueLabel}>
             {secure ? (
@@ -152,7 +145,6 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
         </Box>
 
         {!isSecureConfigured && (
-          // Use 'checked' instead of 'value'
           <Checkbox
             label={labels.secureLabel}
             checked={secure}

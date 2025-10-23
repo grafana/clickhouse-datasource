@@ -4,6 +4,7 @@ import React, { ChangeEvent, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
+  onUpdateDatasourceJsonDataOptionChecked,
   onUpdateDatasourceJsonDataOptionSelect,
 } from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
@@ -225,7 +226,7 @@ export const AdditionalSettingsSection = (props: Props) => {
             data-testid={labels.enableRowLimit.testid}
             onChange={(e) => {
               trackClickhouseConfigV2EnableRowLimitToggle({ rowLimitEnabled: e.currentTarget.checked });
-              onUpdateDatasourceJsonDataOption(props, 'enableRowLimit')(e);
+              onUpdateDatasourceJsonDataOptionChecked(props, 'enableRowLimit')(e);
             }}
           />
         </Field>
