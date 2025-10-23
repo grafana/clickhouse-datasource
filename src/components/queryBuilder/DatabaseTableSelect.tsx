@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { InlineFormLabel, Combobox } from '@grafana/ui';
+import { InlineFormLabel, Select } from '@grafana/ui';
 import { Datasource } from '../../data/CHDatasource';
 import labels from 'labels';
 import { styles } from '../../styles';
@@ -34,19 +34,19 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
   }, [datasource, database, onDatabaseChange]);
 
   return (
-    <div className={styles.Common.flex}>
+    <>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <div className={`width-15 ${styles.Common.inlineSelect}`}>
-        <Combobox
-          options={options}
-          value={database}
-          onChange={(e) => onDatabaseChange(e.value!)}
-          createCustomValue={true}
-        ></Combobox>
-      </div>
-    </div>
+      <Select
+        className={`width-15 ${styles.Common.inlineSelect}`}
+        options={options}
+        value={database}
+        onChange={(e) => onDatabaseChange(e.value!)}
+        menuPlacement={'bottom'}
+        allowCustomValue
+      ></Select>
+    </>
   );
 };
 
@@ -82,14 +82,14 @@ export const TableSelect = (props: TableSelectProps) => {
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <div className={`width-15 ${styles.Common.inlineSelect}`}>
-        <Combobox
-          options={options}
-          value={table}
-          onChange={(e) => onTableChange(e.value!)}
-          createCustomValue={true}
-        ></Combobox>
-      </div>
+      <Select
+        className={`width-15 ${styles.Common.inlineSelect}`}
+        options={options}
+        value={table}
+        onChange={(e) => onTableChange(e.value!)}
+        menuPlacement={'bottom'}
+        allowCustomValue
+      ></Select>
     </>
   );
 };
@@ -106,7 +106,7 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
   const { datasource, database, onDatabaseChange, table, onTableChange } = props;
 
   return (
-    <div className={styles.Common.flexContainer}>
+    <div className="gf-form">
       <DatabaseSelect datasource={datasource} database={database} onDatabaseChange={onDatabaseChange} />
       <TableSelect datasource={datasource} database={database} table={table} onTableChange={onTableChange} />
     </div>

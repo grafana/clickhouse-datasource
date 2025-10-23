@@ -3,9 +3,9 @@ import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderByEditor, getOrderByOptions } from './OrderByEditor';
 import { AggregateType, BuilderMode, OrderByDirection, QueryType, TableColumn } from 'types/queryBuilder';
-import { ComboboxOption } from '@grafana/ui';
+import { SelectableValue } from '@grafana/data';
 
-const testOptions: Array<ComboboxOption<string>> = [
+const testOptions: Array<SelectableValue<string>> = [
   { label: 'foo', value: 'foo' },
   { label: 'bar', value: 'bar' },
   { label: 'baz', value: 'baz' },

@@ -1,12 +1,13 @@
 import React from 'react';
-import { Button, InlineFormLabel, Combobox, ComboboxOption } from '@grafana/ui';
+import { SelectableValue } from '@grafana/data';
+import { Button, InlineFormLabel, Select } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { styles } from 'styles';
 import { isAggregateQuery } from 'data/sqlGenerator';
 
 interface OrderByItemProps {
-  columnOptions: Array<ComboboxOption<string>>;
+  columnOptions: Array<SelectableValue<string>>;
   index: number;
   orderByItem: OrderBy;
   updateOrderByItem: (index: number, orderByItem: OrderBy) => void;
@@ -23,25 +24,25 @@ const OrderByItem = (props: OrderByItemProps) => {
 
   return (
     <>
-      <div className={styles.Common.inlineSelect}>
-        <Combobox
-          disabled={Boolean(orderByItem.hint)}
-          placeholder={orderByItem.hint ? allLabels.types.ColumnHint[orderByItem.hint] : undefined}
-          value={orderByItem.hint ? undefined : orderByItem.name}
-          width={36}
-          options={columnOptions}
-          onChange={(e) => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
-          createCustomValue={true}
-        />
-      </div>
-      <div className={styles.Common.inlineSelect}>
-        <Combobox<OrderByDirection>
-          value={orderByItem.dir}
-          width={12}
-          options={sortOptions}
-          onChange={(e) => updateOrderByItem(index, { ...orderByItem, dir: e.value! })}
-        />
-      </div>
+      <Select
+        disabled={Boolean(orderByItem.hint)}
+        placeholder={orderByItem.hint ? allLabels.types.ColumnHint[orderByItem.hint] : undefined}
+        value={orderByItem.hint ? undefined : orderByItem.name}
+        className={styles.Common.inlineSelect}
+        width={36}
+        options={columnOptions}
+        onChange={(e) => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
+        allowCustomValue
+        menuPlacement={'bottom'}
+      />
+      <Select<OrderByDirection>
+        value={orderByItem.dir}
+        className={styles.Common.inlineSelect}
+        width={12}
+        options={sortOptions}
+        onChange={(e) => updateOrderByItem(index, { ...orderByItem, dir: e.value! })}
+        menuPlacement={'bottom'}
+      />
       <Button
         data-testid="query-builder-orderby-remove-button"
         className={styles.Common.smallBtn}
@@ -55,7 +56,7 @@ const OrderByItem = (props: OrderByItemProps) => {
 };
 
 interface OrderByEditorProps {
-  orderByOptions: Array<ComboboxOption<string>>;
+  orderByOptions: Array<SelectableValue<string>>;
   orderBy: OrderBy[];
   onOrderByChange: (orderBy: OrderBy[]) => void;
 }
@@ -100,7 +101,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
       {orderBy.map((orderByItem, index) => {
         const key = `${index}-${orderByItem.name}-${orderByItem.hint || ''}-${orderByItem.dir}`;
         return (
-          <div className={styles.Common.flex} key={key} data-testid="query-builder-orderby-item-wrapper">
+          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
             {index === 0 ? fieldLabel : fieldSpacer}
             <OrderByItem
               columnOptions={orderByOptions}
@@ -113,7 +114,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
         );
       })}
 
-      <div className={styles.Common.flexContainer}>
+      <div className="gf-form">
         {orderBy.length === 0 ? fieldLabel : fieldSpacer}
         <Button
           data-testid="query-builder-orderby-add-button"
@@ -133,8 +134,8 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
 export const getOrderByOptions = (
   builder: QueryBuilderOptions,
   allColumns: readonly TableColumn[]
-): Array<ComboboxOption<string>> => {
-  let allOptions: Array<ComboboxOption<string>> = [];
+): Array<SelectableValue<string>> => {
+  let allOptions: Array<SelectableValue<string>> = [];
 
   if (isAggregateQuery(builder)) {
     builder.columns?.forEach((c) => {

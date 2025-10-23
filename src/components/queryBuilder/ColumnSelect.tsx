@@ -1,5 +1,6 @@
 import React from 'react';
-import { Combobox, ComboboxOption, InlineFormLabel } from '@grafana/ui';
+import { SelectableValue } from '@grafana/data';
+import { InlineFormLabel, Select } from '@grafana/ui';
 import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { styles } from 'styles';
 
@@ -30,19 +31,24 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
     label,
     tooltip,
     disabled,
+    invalid,
     wide,
     inline,
+    clearable,
   } = props;
   const selectedColumnName = selectedColumn?.name;
-  const columns: Array<ComboboxOption<string>> = allColumns
+  const columns: Array<SelectableValue<string>> = allColumns
     .filter(columnFilterFn || defaultFilterFn)
     .map((c) => ({ label: c.label || c.name, value: c.name }));
 
+  // Select component WILL NOT display the value if it isn't present in the options.
+  let staleOption = false;
   if (selectedColumn && !columns.find((c) => c.value === selectedColumn.name)) {
     columns.push({ label: selectedColumn.alias || selectedColumn.name, value: selectedColumn.name });
+    staleOption = true;
   }
 
-  const onChange = (selected: ComboboxOption<string>) => {
+  const onChange = (selected: SelectableValue<string | undefined>) => {
     if (!selected || !selected.value) {
       onColumnChange(undefined);
       return;
@@ -65,21 +71,22 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div className={styles.Common.flexContainer}>
+    <div className="gf-form">
       <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
-      <div style={{ marginRight: '8px' }}>
-        <Combobox<string>
-          disabled={disabled}
-          options={columns}
-          value={selectedColumnName}
-          placeholder={selectedColumnName || 'Choose'}
-          onChange={onChange}
-          width={25}
-          createCustomValue={true}
-        />
-      </div>
+      <Select<string | undefined>
+        disabled={disabled}
+        invalid={invalid || staleOption}
+        options={columns}
+        value={selectedColumnName}
+        placeholder={selectedColumnName || undefined}
+        onChange={onChange}
+        width={wide ? 25 : 20}
+        menuPlacement={'bottom'}
+        isClearable={clearable === undefined || clearable}
+        allowCustomValue
+      />
     </div>
   );
 };

@@ -1,7 +1,8 @@
 import React from 'react';
 import { TimeUnit } from 'types/queryBuilder';
 import allLabels from 'labels';
-import { InlineFormLabel, Combobox, ComboboxOption } from '@grafana/ui';
+import { InlineFormLabel, Select } from '@grafana/ui';
+import { SelectableValue } from '@grafana/data';
 import { styles } from 'styles';
 
 interface DurationUnitSelectProps {
@@ -11,7 +12,7 @@ interface DurationUnitSelectProps {
   inline?: boolean;
 }
 
-const durationUnitOptions: ReadonlyArray<ComboboxOption<TimeUnit>> = [
+const durationUnitOptions: ReadonlyArray<SelectableValue<TimeUnit>> = [
   { label: TimeUnit.Seconds, value: TimeUnit.Seconds },
   { label: TimeUnit.Milliseconds, value: TimeUnit.Milliseconds },
   { label: TimeUnit.Microseconds, value: TimeUnit.Microseconds },
@@ -23,7 +24,7 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
   const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.durationUnit;
 
   return (
-    <div className={styles.Common.flexContainer}>
+    <div className="gf-form">
       <InlineFormLabel
         width={12}
         className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`}
@@ -31,13 +32,13 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
       >
         {label}
       </InlineFormLabel>
-      <Combobox<TimeUnit>
+      <Select<TimeUnit>
         disabled={disabled}
-        options={durationUnitOptions as Array<ComboboxOption<TimeUnit>>}
+        options={durationUnitOptions as Array<SelectableValue<TimeUnit>>}
         value={unit}
         onChange={(v) => onChange(v.value!)}
-        width={25}
-        placeholder="Choose"
+        width={inline ? 25 : 30}
+        menuPlacement={'bottom'}
       />
     </div>
   );
