@@ -123,7 +123,7 @@ export const AdditionalSettingsSection = (props: Props) => {
         label={
           <>
             <Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>
-            <Badge text="optional" color="blue" className={styles.badge} />
+            <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
         isOpen={!!CONFIG_SECTION_HEADERS[3].isOpen}
