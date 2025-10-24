@@ -5,7 +5,6 @@ import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceJsonDataOptionChecked,
-  onUpdateDatasourceJsonDataOptionSelect,
 } from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
 import { AliasTableConfig } from 'components/configEditor/AliasTableConfig';
@@ -171,7 +170,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           }}
           onValidateSqlChange={(e) => {
             trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
-            onUpdateDatasourceJsonDataOptionSelect(props, 'validateSql')(e);
+            onUpdateDatasourceJsonDataOptionChecked(props, 'validateSql')(e);
           }}
         />
         <Divider />
