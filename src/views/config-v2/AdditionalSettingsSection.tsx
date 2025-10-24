@@ -1,7 +1,11 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labelsV2';
 import React, { ChangeEvent, useState } from 'react';
-import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
+import {
+  DataSourcePluginOptionsEditorProps,
+  onUpdateDatasourceJsonDataOption,
+  onUpdateDatasourceJsonDataOptionChecked,
+} from '@grafana/data';
 import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
 import { AliasTableConfig } from 'components/configEditor/AliasTableConfig';
 import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatabaseTableConfig';
@@ -119,7 +123,7 @@ export const AdditionalSettingsSection = (props: Props) => {
         label={
           <>
             <Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>
-            <Badge text="optional" color="blue" className={styles.badge} />
+            <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
         isOpen={!!CONFIG_SECTION_HEADERS[3].isOpen}
@@ -166,7 +170,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           }}
           onValidateSqlChange={(e) => {
             trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
-            onUpdateDatasourceJsonDataOption(props, 'validateSql')(e);
+            onUpdateDatasourceJsonDataOptionChecked(props, 'validateSql')(e);
           }}
         />
         <Divider />
@@ -221,7 +225,7 @@ export const AdditionalSettingsSection = (props: Props) => {
             data-testid={labels.enableRowLimit.testid}
             onChange={(e) => {
               trackClickhouseConfigV2EnableRowLimitToggle({ rowLimitEnabled: e.currentTarget.checked });
-              onUpdateDatasourceJsonDataOption(props, 'enableRowLimit')(e);
+              onUpdateDatasourceJsonDataOptionChecked(props, 'enableRowLimit')(e);
             }}
           />
         </Field>

@@ -43,7 +43,6 @@ describe('HttpProtocolSettingsSection', () => {
           ...defaultProps.options,
           jsonData: { ...defaultProps.options.jsonData, protocol: Protocol.Native },
         }}
-        onSwitchToggle={jest.fn()}
       />
     );
 
@@ -52,7 +51,7 @@ describe('HttpProtocolSettingsSection', () => {
   });
 
   it('calls onOptionsChange when HTTP path is changed', () => {
-    render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={jest.fn()} />);
+    render(<HttpProtocolSettingsSection {...defaultProps} />);
 
     const pathInput = screen.getByLabelText(/path/i);
     fireEvent.change(pathInput, { target: { value: '/api' } });
@@ -61,7 +60,7 @@ describe('HttpProtocolSettingsSection', () => {
   });
 
   it('toggles Optional HTTP settings open/closed via the button (icon changes)', () => {
-    render(<HttpProtocolSettingsSection {...defaultProps} onSwitchToggle={jest.fn()} />);
+    render(<HttpProtocolSettingsSection {...defaultProps} />);
 
     expect(screen.getByTestId('angle-right')).toBeInTheDocument();
 

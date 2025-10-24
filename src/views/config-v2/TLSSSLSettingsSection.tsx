@@ -1,4 +1,4 @@
-import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
+import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOptionChecked } from '@grafana/data';
 import { Box, CollapsableSection, CertificationKey, Text, useStyles2, Checkbox, Stack, Badge } from '@grafana/ui';
 import React from 'react';
 import { CHConfig, CHSecureConfig } from 'types/config';
@@ -59,7 +59,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
         label={
           <>
             <Text variant="h3">3. {CONFIG_SECTION_HEADERS[2].label}</Text>
-            <Badge text="optional" color="blue" className={styles.badge} />
+            <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
         isOpen={!!(jsonData.tlsSkipVerify || jsonData.tlsAuth || jsonData.tlsAuthWithCACert)}
@@ -79,7 +79,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
               value={jsonData.tlsSkipVerify || false}
               onChange={(e) => {
                 trackClickhouseConfigV2SkipTLSVerifyToggleClicked({ skipTlsVerifyToggle: e.currentTarget.checked });
-                onUpdateDatasourceJsonDataOption(props, 'tlsSkipVerify')(e);
+                onUpdateDatasourceJsonDataOptionChecked(props, 'tlsSkipVerify')(e);
               }}
             />
             <Checkbox
@@ -88,7 +88,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
               value={jsonData.tlsAuth || false}
               onChange={(e) => {
                 trackClickhouseConfigV2TLSClientAuthToggleClicked({ clientAuthToggle: e.currentTarget.checked });
-                onUpdateDatasourceJsonDataOption(props, 'tlsAuth')(e);
+                onUpdateDatasourceJsonDataOptionChecked(props, 'tlsAuth')(e);
               }}
             />
             {jsonData.tlsAuth && (
@@ -116,7 +116,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
               value={jsonData.tlsAuthWithCACert || false}
               onChange={(e) => {
                 trackClickhouseConfigV2WithCACertToggleClicked({ caCertToggle: e.currentTarget.checked });
-                onUpdateDatasourceJsonDataOption(props, 'tlsAuthWithCACert')(e);
+                onUpdateDatasourceJsonDataOptionChecked(props, 'tlsAuthWithCACert')(e);
               }}
             />
             <div className={styles.certsSection}>
