@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, HorizontalGroup, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select } from '@grafana/ui';
+import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select, Stack } from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
@@ -360,7 +360,7 @@ export const FilterEditor = (props: {
   };
 
   return (
-    <HorizontalGroup wrap align="flex-start" justify="flex-start">
+    <Stack wrap alignItems="flex-start" justifyContent="flex-start">
       {index !== 0 && (
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
@@ -407,7 +407,7 @@ export const FilterEditor = (props: {
         className={styles.Common.smallBtn}
         onClick={() => removeFilter(index)}
       />
-    </HorizontalGroup>
+    </Stack>
   );
 };
 
