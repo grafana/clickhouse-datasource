@@ -165,6 +165,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
         {onRemove && (
           <Button
             data-testid={selectors.removeHeaderButton}
+            aria-label="Remove alias table entry"
             className={styles.Common.smallBtn}
             variant="destructive"
             size="sm"

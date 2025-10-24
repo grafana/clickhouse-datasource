@@ -100,6 +100,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
                   label={labels.tlsClientCert.label}
                   onClick={() => onResetClickFactory('tlsClientCert')}
                   data-testid="tls-client-cert"
+                  useGrow={true}
                 />
                 <CertificationKey
                   hasCert={!!hasTLSClientKey}
@@ -108,6 +109,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
                   onChange={(e) => onCertificateChangeFactory('tlsClientKey', e.currentTarget.value)}
                   onClick={() => onResetClickFactory('tlsClientKey')}
                   data-testid="tls-client-key"
+                  useGrow={true}
                 />
               </div>
             )}
@@ -128,6 +130,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
                   label={labels.tlsCACert.label}
                   onClick={() => onResetClickFactory('tlsCACert')}
                   data-testid="tls-ca-cert"
+                  useGrow={true}
                 />
               )}
             </div>

@@ -45,6 +45,7 @@ const OrderByItem = (props: OrderByItemProps) => {
       />
       <Button
         data-testid="query-builder-orderby-remove-button"
+        aria-label="Remove order by item"
         className={styles.Common.smallBtn}
         variant="destructive"
         size="sm"

@@ -401,6 +401,7 @@ export const FilterEditor = (props: {
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
       <Button
         data-testid="query-builder-filters-remove-button"
+        aria-label="Remove filter"
         icon="trash-alt"
         variant="destructive"
         size="sm"
