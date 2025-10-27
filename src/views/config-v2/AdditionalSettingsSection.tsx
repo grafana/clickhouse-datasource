@@ -122,7 +122,7 @@ export const AdditionalSettingsSection = (props: Props) => {
       <CollapsableSection
         label={
           <>
-            <Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>
+            <Text variant="h3">{CONFIG_SECTION_HEADERS[3].label}</Text>
             <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }

@@ -47,7 +47,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
       minWidth={CONTAINER_MIN_WIDTH}
     >
       <CollapsableSection
-        label={<Text variant="h3">2. {CONFIG_SECTION_HEADERS[1].label}</Text>}
+        label={<Text variant="h3">{CONFIG_SECTION_HEADERS[1].label}</Text>}
         isOpen={!!CONFIG_SECTION_HEADERS[1].isOpen}
       >
         <div className={styles.credentialsSection}>
@@ -77,7 +77,10 @@ export const DatabaseCredentialsSection = (props: Props) => {
               onBlur={trackClickhouseConfigV2DatabaseCredentialsUserInput}
             />
           </Field>
-          <Field label={labels.password.label} description={labels.password.tooltip}>
+          <Field
+            label={labels.password.label}
+            description={<div style={{ marginTop: '5px' }}>{labels.password.tooltip}</div>}
+          >
             <SecretInput
               name="pwd"
               label={labels.password.label}
