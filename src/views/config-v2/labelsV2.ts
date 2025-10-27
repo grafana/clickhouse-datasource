@@ -75,7 +75,7 @@ export default {
           label: 'Enable row limit',
           testid: 'data-testid enable-row-limit-switch',
           tooltip:
-            'Enable using the Grafana row limit setting to limit the number of rows returned from ClickHåouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
+            'Enable using the Grafana row limit setting to limit the number of rows returned from ClickHouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
         },
       },
       HttpHeadersConfig: {
