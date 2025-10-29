@@ -26,8 +26,8 @@ export const LeftSidebar = ({ pdcInjected }: LeftSidebarProps) => {
                   e.preventDefault();
                   const target = document.getElementById(header.id);
                   if (target) {
-                    const y = target.getBoundingClientRect().top + window.scrollY - 60;
-                    window.scrollTo({ top: y, behavior: 'smooth' });
+                    const top = target.getBoundingClientRect().top + window.scrollY - 60;
+                    window.scrollTo({ top, behavior: 'smooth' });
                   }
                 }}
               >
