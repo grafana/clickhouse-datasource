@@ -76,7 +76,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
       minWidth={CONTAINER_MIN_WIDTH}
     >
       <CollapsableSection
-        label={<Text variant="h3">1. {CONFIG_SECTION_HEADERS[0].label}</Text>}
+        label={<Text variant="h3">{CONFIG_SECTION_HEADERS[0].label}</Text>}
         isOpen={!!CONFIG_SECTION_HEADERS[0].isOpen}
       >
         <Text variant="body" color="secondary">
@@ -160,7 +160,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
                 label={labels.serverPort.label}
                 aria-label={labels.serverPort.label}
                 data-testid="clickhouse-v2-config-port-input"
-                placeholder={defaultPort}
+                placeholder={labels.serverPort.placeholder}
                 onBlur={(e) => trackClickhouseConfigV2PortInput({ port: e.currentTarget.value })}
               />
             </Field>

@@ -6,12 +6,13 @@ export default {
       ConfigEditor: {
         serverAddress: {
           label: 'Server address',
-          placeholder: 'Server address',
+          placeholder: 'Enter server address',
           tooltip: 'ClickHouse host address',
           error: 'Server address required',
         },
         serverPort: {
           label: 'Server port',
+          placeholder: 'Enter server port',
           insecureNativePort: '9000',
           insecureHttpPort: '8123',
           secureNativePort: '9440',
@@ -30,12 +31,12 @@ export default {
         },
         username: {
           label: 'Username',
-          placeholder: 'default',
+          placeholder: 'Enter username',
           tooltip: 'We recommend configuring',
         },
         password: {
           label: 'Password',
-          placeholder: 'password',
+          placeholder: 'Enter password',
           tooltip: 'ClickHouse password',
         },
         tlsSkipVerify: {
@@ -74,7 +75,7 @@ export default {
           label: 'Enable row limit',
           testid: 'data-testid enable-row-limit-switch',
           tooltip:
-            'Enable using the Grafana row limit setting to limit the number of rows returned from Clickhouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
+            'Enable using the Grafana row limit setting to limit the number of rows returned from ClickHouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
         },
       },
       HttpHeadersConfig: {
@@ -112,13 +113,13 @@ export default {
         title: 'Default DB and table',
         database: {
           label: 'Default database',
-          description: 'the default database used by the query builder',
+          description: 'The default database used by the query builder',
           name: 'defaultDatabase',
           placeholder: 'default',
         },
         table: {
           label: 'Default table',
-          description: 'the default table used by the query builder',
+          description: 'The default table used by the query builder',
           name: 'defaultTable',
           placeholder: 'table',
         },
