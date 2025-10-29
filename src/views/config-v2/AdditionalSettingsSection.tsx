@@ -1,6 +1,6 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labelsV2';
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent, useMemo, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
@@ -110,6 +110,72 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
+  // if any of the settings in this section are set, open the section by default
+  const shouldBeOpen = useMemo(() => {
+    const anyDefaults = jsonData.defaultDatabase || jsonData.defaultTable;
+
+    const anyQuerySettings =
+      jsonData.connMaxLifetime ||
+      jsonData.dialTimeout ||
+      jsonData.maxIdleConns ||
+      jsonData.maxOpenConns ||
+      jsonData.queryTimeout ||
+      jsonData.validateSql;
+
+    const logs = jsonData.logs || {};
+    const anyLogs =
+      logs.defaultDatabase ||
+      logs.defaultTable !== 'otel_logs' ||
+      logs.otelEnabled ||
+      logs.otelVersion !== 'latest' ||
+      logs.timeColumn ||
+      logs.levelColumn ||
+      logs.messageColumn ||
+      logs.selectContextColumns ||
+      logs.contextColumns!.length > 0;
+
+    const traces = jsonData.traces || {};
+    const anyTraces =
+      traces.defaultDatabase ||
+      traces.defaultTable !== 'otel_traces' ||
+      traces.otelEnabled ||
+      traces.otelVersion !== 'latest' ||
+      traces.traceIdColumn ||
+      traces.spanIdColumn ||
+      traces.operationNameColumn ||
+      traces.parentSpanIdColumn ||
+      traces.serviceNameColumn ||
+      traces.durationColumn ||
+      traces.startTimeColumn ||
+      traces.tagsColumn ||
+      traces.serviceTagsColumn ||
+      traces.kindColumn ||
+      traces.statusCodeColumn ||
+      traces.statusMessageColumn ||
+      traces.stateColumn ||
+      traces.instrumentationLibraryNameColumn ||
+      traces.instrumentationLibraryVersionColumn ||
+      traces.flattenNested ||
+      traces.traceEventsColumnPrefix ||
+      traces.traceLinksColumnPrefix;
+
+    const anyAliasTables = Array.isArray(jsonData.aliasTables) && jsonData.aliasTables.length > 0;
+
+    const anyRowLimit = jsonData.enableRowLimit;
+    const anySecureSocks = jsonData.enableSecureSocksProxy;
+
+    return (
+      anyDefaults ||
+      anyQuerySettings ||
+      anyLogs ||
+      anyTraces ||
+      anyAliasTables ||
+      anyRowLimit ||
+      anySecureSocks ||
+      customSettings.length > 0
+    );
+  }, [jsonData, customSettings]);
+
   return (
     <Box
       borderStyle="solid"
@@ -126,7 +192,7 @@ export const AdditionalSettingsSection = (props: Props) => {
             <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
-        isOpen={!!CONFIG_SECTION_HEADERS[3].isOpen}
+        isOpen={!!shouldBeOpen}
       >
         <DefaultDatabaseTableConfig
           defaultDatabase={jsonData.defaultDatabase}
