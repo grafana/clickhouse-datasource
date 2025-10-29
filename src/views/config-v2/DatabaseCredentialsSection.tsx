@@ -79,7 +79,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
           </Field>
           <Field
             label={labels.password.label}
-            description={<div style={{ marginTop: '5px' }}>{labels.password.tooltip}</div>}
+            description={<div className={styles.passwordDescription}>{labels.password.tooltip}</div>}
           >
             <SecretInput
               name="pwd"
@@ -100,6 +100,9 @@ export const DatabaseCredentialsSection = (props: Props) => {
 };
 
 const getStyles = () => ({
+  passwordDescription: css({
+    marginTop: '5px',
+  }),
   credentialsSection: css({
     display: 'flex',
     flexWrap: 'wrap',
