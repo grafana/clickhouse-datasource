@@ -253,7 +253,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		}
 
 		backend.Logger.Error("failed to create ClickHouse client", "error", err)
-		return nil, errorsource.DownstreamError(fmt.Errorf("failed to create ClickHouse client"), false)
+    return nil, errorsource.DownstreamError(fmt.Errorf("failed to create ClickHouse client: %w", err), false)
 	}
 
 	return db, settings.isValid()
