@@ -1202,6 +1202,20 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		assert.Equal(t, nil, err)
 	}()
 
+	// Wait for proxy server to be ready
+	proxyAddr := fmt.Sprintf("%s:%s", proxyHost, proxyPort)
+	for i := 0; i < 50; i++ {
+		conn, err := net.DialTimeout("tcp", proxyAddr, 100*time.Millisecond)
+		if err == nil {
+			conn.Close()
+			break
+		}
+		if i == 49 {
+			t.Fatalf("Proxy server failed to start after 5 seconds")
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
 	secure := map[string]string{}
