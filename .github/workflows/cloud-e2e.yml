@@ -103,7 +103,7 @@ jobs:
             --network=host \
             --volume "$PWD:/tests" \
             us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v0.6.3 test \
-            --grafana-version "rrc-instant" \ 
+            --grafana-version "rrc-instant" \
             --grafana-admin-password "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}" \
             --grafana-admin-user "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}" \
             --grafana-url "https://datasourcese2e.grafana-dev.net" \
