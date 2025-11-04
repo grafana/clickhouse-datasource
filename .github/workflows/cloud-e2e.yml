@@ -84,6 +84,10 @@ jobs:
             DS_INSTANCE_USERNAME=ds-instance:username
           export_env: false
 
+      - name: report instance
+        run: |
+          echo $DS_INSTANCE_HOST:$DS_INSTANCE_PORT
+
       #- name: Install npm dependencies
       #  run: |
       #    if [ -f yarn.lock ]; then
