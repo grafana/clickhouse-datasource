@@ -86,7 +86,7 @@ jobs:
 
       - name: report instance
         run: |
-          echo $DS_INSTANCE_HOST:$DS_INSTANCE_PORT
+          echo "${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }}" "${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }}"
 
       #- name: Install npm dependencies
       #  run: |
