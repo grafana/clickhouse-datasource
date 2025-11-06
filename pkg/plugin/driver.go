@@ -27,6 +27,12 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+const (
+	headerDashboardTitle = "X-Dashboard-Title"
+	headerPanelTitle     = "X-Panel-Title"
+	headerReferer        = "Referer"
+)
+
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct{}
 
@@ -456,6 +462,7 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 		return nil, errors.New("Couldn't parse message as args")
 	}
 
+	var dashboard, pannel string
 	httpHeaders := make(map[string]string)
 	if grafanaHttpHeaders, ok := messageArgs[sqlds.HeaderKey]; ok {
 		fwdHeaders, ok := grafanaHttpHeaders.(map[string]interface{})
@@ -475,7 +482,21 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 			}
 
 			httpHeaders[k] = strings.Join(strHeadersArr, ",")
+
+			if k == headerDashboardTitle {
+				dashboard = httpHeaders[k]
+			}
+
+			if k == headerPanelTitle {
+				pannel = httpHeaders[k]
+			}
 		}
+	}
+
+	if dashboard != "" || pannel != "" {
+		httpHeaders[headerReferer] = fmt.Sprintf("Dashboard title: %q, pannel title: %q", dashboard, pannel)
+	} else {
+		httpHeaders[headerReferer] = "Explorer"
 	}
 
 	return httpHeaders, nil
