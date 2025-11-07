@@ -462,7 +462,7 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 		return nil, errors.New("Couldn't parse message as args")
 	}
 
-	var dashboard, pannel string
+	var dashboard, panel string
 	httpHeaders := make(map[string]string)
 	if grafanaHttpHeaders, ok := messageArgs[sqlds.HeaderKey]; ok {
 		fwdHeaders, ok := grafanaHttpHeaders.(map[string]interface{})
@@ -488,13 +488,13 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 			}
 
 			if k == headerPanelTitle {
-				pannel = httpHeaders[k]
+				panel = httpHeaders[k]
 			}
 		}
 	}
 
-	if dashboard != "" || pannel != "" {
-		httpHeaders[headerReferer] = fmt.Sprintf("Dashboard title: %q, pannel title: %q", dashboard, pannel)
+	if dashboard != "" || panel != "" {
+		httpHeaders[headerReferer] = fmt.Sprintf("Dashboard title: %q, panel title: %q", dashboard, panel)
 	} else {
 		httpHeaders[headerReferer] = "Explorer"
 	}
