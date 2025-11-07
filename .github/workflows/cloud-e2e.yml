@@ -19,35 +19,35 @@ permissions:
 
 jobs:
   # @TODO: Remove the `build` job later
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          persist-credentials: false
+  # build:
+  #   name: Build
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v5
+  #       with:
+  #         persist-credentials: false
 
-      - uses: actions/setup-go@v6
-        with:
-          go-version: 'stable'
+  #     - uses: actions/setup-go@v6
+  #       with:
+  #         go-version: 'stable'
 
-      - name: Build backend
-        uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b
-        with:
-          args: buildAll
-          version: latest
+  #     - name: Build backend
+  #       uses: magefile/mage-action@6f50bbb8ea47d56e62dee92392788acbc8192d0b
+  #       with:
+  #         args: buildAll
+  #         version: latest
 
-      - name: Install frontend dependencies
-        run: npm ci --no-audit --fund=false
+  #     - name: Install frontend dependencies
+  #       run: npm ci --no-audit --fund=false
 
-      - name: Build frontend
-        run: npm run build
-        env:
-          NODE_OPTIONS: '--max_old_space_size=4096'
+  #     - name: Build frontend
+  #       run: npm run build
+  #       env:
+  #         NODE_OPTIONS: '--max_old_space_size=4096'
 
   e2e:
     name: Bench Tests
-    needs: build
+    # needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
@@ -59,12 +59,6 @@ jobs:
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
-          
-      #- name: Setup Node.js environment
-      #  uses: actions/setup-node@v6
-      #  with:
-      #    node-version-file: .nvmrc
-      #    cache: 'npm'
 
       - name: Get secrets from Vault
         id: get-secrets
@@ -87,17 +81,6 @@ jobs:
       - name: report instance
         run: |
           echo "${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }}" "${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }}"
-
-      #- name: Install npm dependencies
-      #  run: |
-      #    if [ -f yarn.lock ]; then
-      #      yarn install --frozen-lockfile --non-interactive
-      #    else
-      #      npm ci --no-audit --fund=false
-      #    fi
-
-      #- name: Install Playwright Browsers
-      #  run: npx playwright install --with-deps chromium
 
       - name: Run Grafana Bench tests
         run: |
