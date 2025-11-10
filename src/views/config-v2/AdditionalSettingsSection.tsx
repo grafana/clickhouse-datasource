@@ -1,12 +1,20 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labelsV2';
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent, useMemo, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceJsonDataOptionChecked,
 } from '@grafana/data';
-import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
+import {
+  AliasTableEntry,
+  CHConfig,
+  CHCustomSetting,
+  CHLogsConfig,
+  CHSecureConfig,
+  CHTracesConfig,
+  defaultCHAdditionalSettingsConfig,
+} from 'types/config';
 import { AliasTableConfig } from 'components/configEditor/AliasTableConfig';
 import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatabaseTableConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
@@ -110,6 +118,50 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
+  const shallowSettingsCompare = (currentSettings: any, defaultSettings: any): boolean => {
+    // needed for dealing with proxy object from currentSettings
+    currentSettings = Object.assign({}, currentSettings);
+
+    const currentSettingsKeys = Object.keys(currentSettings);
+    const defaultSettingsKeys = Object.keys(defaultSettings);
+
+    if (currentSettingsKeys.length !== defaultSettingsKeys.length) {
+      return false;
+    }
+
+    for (const key of currentSettingsKeys) {
+      if (!defaultSettingsKeys.includes(key)) {
+        return false;
+      }
+      if (currentSettings[key].length === 0 && defaultSettings[key].length === 0) {
+        continue;
+      }
+      if (currentSettings[key] !== defaultSettings[key]) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const shouldBeOpen = useMemo(() => {
+    return (
+      jsonData.defaultDatabase ||
+      jsonData.defaultTable ||
+      jsonData.connMaxLifetime ||
+      jsonData.dialTimeout ||
+      jsonData.maxIdleConns ||
+      jsonData.maxOpenConns ||
+      jsonData.queryTimeout ||
+      jsonData.validateSql ||
+      !shallowSettingsCompare(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
+      !shallowSettingsCompare(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
+      (jsonData.aliasTables && jsonData.aliasTables.length > 0) ||
+      jsonData.enableRowLimit ||
+      jsonData.enableSecureSocksProxy ||
+      customSettings.length > 0
+    );
+  }, [jsonData, customSettings]);
+
   return (
     <Box
       borderStyle="solid"
@@ -122,11 +174,11 @@ export const AdditionalSettingsSection = (props: Props) => {
       <CollapsableSection
         label={
           <>
-            <Text variant="h3">4. {CONFIG_SECTION_HEADERS[3].label}</Text>
+            <Text variant="h3">{CONFIG_SECTION_HEADERS[3].label}</Text>
             <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
-        isOpen={!!CONFIG_SECTION_HEADERS[3].isOpen}
+        isOpen={!!shouldBeOpen}
       >
         <DefaultDatabaseTableConfig
           defaultDatabase={jsonData.defaultDatabase}
@@ -233,7 +285,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
             <Switch
               value={jsonData.enableSecureSocksProxy || false}
-              onChange={(e) => onUpdateDatasourceJsonDataOption(props, 'enableSecureSocksProxy')(e)}
+              onChange={(e) => onUpdateDatasourceJsonDataOptionChecked(props, 'enableSecureSocksProxy')(e)}
             />
           </Field>
         )}

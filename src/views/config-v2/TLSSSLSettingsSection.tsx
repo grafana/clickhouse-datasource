@@ -58,7 +58,7 @@ export const TLSSSLSettingsSection = (props: Props) => {
       <CollapsableSection
         label={
           <>
-            <Text variant="h3">3. {CONFIG_SECTION_HEADERS[2].label}</Text>
+            <Text variant="h3">{CONFIG_SECTION_HEADERS[2].label}</Text>
             <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
