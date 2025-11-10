@@ -1,6 +1,6 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labelsV2';
-import React, { ChangeEvent, useMemo, useState } from 'react';
+import React, { ChangeEvent, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
@@ -52,6 +52,69 @@ export const AdditionalSettingsSection = (props: Props) => {
   useConfigDefaults(options, onOptionsChange);
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
+  const ADDITONAL_SETTINGS_DEFAULTS = {
+    defaultDatabase: jsonData.defaultDatabase,
+    defaultTable: jsonData.defaultTable,
+    connMaxLifetime: jsonData.connMaxLifetime,
+    dialTimeout: jsonData.dialTimeout,
+    maxIdleConns: jsonData.maxIdleConns,
+    maxOpenConns: jsonData.maxOpenConns,
+    queryTimeout: jsonData.queryTimeout,
+    validateSql: jsonData.validateSql,
+    logs: {
+      defaultDatabase: jsonData.logs?.defaultDatabase,
+      defaultTable: jsonData.logs?.defaultTable !== 'otel_logs' ? jsonData.logs?.defaultTable : undefined,
+      otelEnabled: jsonData.logs?.otelEnabled,
+      otelVersion: jsonData.logs?.otelVersion !== 'latest' ? jsonData.logs?.otelVersion : undefined,
+      timeColumn: jsonData.logs?.timeColumn,
+      levelColumn: jsonData.logs?.levelColumn,
+      messageColumn: jsonData.logs?.messageColumn,
+      selectContextColumns: jsonData.logs?.selectContextColumns,
+      contextColumns:
+        jsonData.logs?.contextColumns && jsonData.logs?.contextColumns.length > 0
+          ? jsonData.logs?.contextColumns
+          : undefined,
+    },
+    traces: {
+      defaultDatabase: jsonData.traces?.defaultDatabase,
+      defaultTable: jsonData.traces?.defaultTable !== 'otel_traces' ? jsonData.logs?.defaultTable : undefined,
+      otelEnabled: jsonData.traces?.otelEnabled,
+      otelVersion: jsonData.traces?.otelVersion !== 'latest' ? jsonData.logs?.otelVersion : undefined,
+      traceIdColumn: jsonData.traces?.traceIdColumn,
+      spanIdColumn: jsonData.traces?.spanIdColumn,
+      operationNameColumn: jsonData.traces?.operationNameColumn,
+      parentSpanIdColumn: jsonData.traces?.parentSpanIdColumn,
+      serviceNameColumn: jsonData.traces?.serviceNameColumn,
+      durationColumn: jsonData.traces?.durationColumn,
+      startTimeColumn: jsonData.traces?.startTimeColumn,
+      tagsColumn: jsonData.traces?.tagsColumn,
+      serviceTagsColumn: jsonData.traces?.serviceTagsColumn,
+      kindColumn: jsonData.traces?.kindColumn,
+      statusCodeColumn: jsonData.traces?.statusCodeColumn,
+      statusMessageColumn: jsonData.traces?.statusMessageColumn,
+      stateColumn: jsonData.traces?.stateColumn,
+      instrumentationLibraryNameColumn: jsonData.traces?.instrumentationLibraryNameColumn,
+      instrumentationLibraryVersionColumn: jsonData.traces?.instrumentationLibraryVersionColumn,
+      flattenNested: jsonData.traces?.flattenNested,
+      traceEventsColumnPrefix: jsonData.traces?.traceEventsColumnPrefix,
+      traceLinksColumnPrefix: jsonData.traces?.traceLinksColumnPrefix,
+    },
+    aliasTables: jsonData.aliasTables && jsonData.aliasTables.length > 0 ? jsonData.aliasTables : undefined,
+    enableRowLimit: jsonData.enableRowLimit,
+    enableSecureSocksProxy: jsonData.enableSecureSocksProxy,
+  };
+
+  const hasDefinedValue = (obj: any): boolean => {
+    if (obj == null) {
+      return false;
+    }
+    if (typeof obj !== 'object') {
+      return obj !== '' && obj !== undefined && obj !== null;
+    }
+    return Object.values(obj).some((v) => hasDefinedValue(v));
+  };
+
+  const shouldBeOpen = hasDefinedValue(ADDITONAL_SETTINGS_DEFAULTS);
 
   const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
     onOptionsChange({
@@ -109,72 +172,6 @@ export const AdditionalSettingsSection = (props: Props) => {
       },
     });
   };
-
-  // if any of the settings in this section are set, open the section by default
-  const shouldBeOpen = useMemo(() => {
-    const anyDefaults = jsonData.defaultDatabase || jsonData.defaultTable;
-
-    const anyQuerySettings =
-      jsonData.connMaxLifetime ||
-      jsonData.dialTimeout ||
-      jsonData.maxIdleConns ||
-      jsonData.maxOpenConns ||
-      jsonData.queryTimeout ||
-      jsonData.validateSql;
-
-    const logs = jsonData.logs || {};
-    const anyLogs =
-      logs.defaultDatabase ||
-      logs.defaultTable !== 'otel_logs' ||
-      logs.otelEnabled ||
-      logs.otelVersion !== 'latest' ||
-      logs.timeColumn ||
-      logs.levelColumn ||
-      logs.messageColumn ||
-      logs.selectContextColumns ||
-      logs.contextColumns!.length > 0;
-
-    const traces = jsonData.traces || {};
-    const anyTraces =
-      traces.defaultDatabase ||
-      traces.defaultTable !== 'otel_traces' ||
-      traces.otelEnabled ||
-      traces.otelVersion !== 'latest' ||
-      traces.traceIdColumn ||
-      traces.spanIdColumn ||
-      traces.operationNameColumn ||
-      traces.parentSpanIdColumn ||
-      traces.serviceNameColumn ||
-      traces.durationColumn ||
-      traces.startTimeColumn ||
-      traces.tagsColumn ||
-      traces.serviceTagsColumn ||
-      traces.kindColumn ||
-      traces.statusCodeColumn ||
-      traces.statusMessageColumn ||
-      traces.stateColumn ||
-      traces.instrumentationLibraryNameColumn ||
-      traces.instrumentationLibraryVersionColumn ||
-      traces.flattenNested ||
-      traces.traceEventsColumnPrefix ||
-      traces.traceLinksColumnPrefix;
-
-    const anyAliasTables = Array.isArray(jsonData.aliasTables) && jsonData.aliasTables.length > 0;
-
-    const anyRowLimit = jsonData.enableRowLimit;
-    const anySecureSocks = jsonData.enableSecureSocksProxy;
-
-    return (
-      anyDefaults ||
-      anyQuerySettings ||
-      anyLogs ||
-      anyTraces ||
-      anyAliasTables ||
-      anyRowLimit ||
-      anySecureSocks ||
-      customSettings.length > 0
-    );
-  }, [jsonData, customSettings]);
 
   return (
     <Box

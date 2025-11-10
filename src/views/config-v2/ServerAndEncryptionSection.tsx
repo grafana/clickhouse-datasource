@@ -80,7 +80,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
         isOpen={!!CONFIG_SECTION_HEADERS[0].isOpen}
       >
         <Text variant="body" color="secondary">
-          Enter the server address of your Clickhouse instance. Then select your protocol, port and security options. If
+          Enter the server address of your ClickHouse instance. Then select your protocol, port and security options. If
           you need further guidance, visit the{' '}
           <TextLink
             href="https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/"

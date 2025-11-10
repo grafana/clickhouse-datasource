@@ -47,11 +47,11 @@ export const Components = {
       },
       DATABASE: {
         label: 'Database',
-        tooltip: 'Clickhouse database to query from',
+        tooltip: 'ClickHouse database to query from',
       },
       FROM: {
         label: 'Table',
-        tooltip: 'Clickhouse table to query from',
+        tooltip: 'ClickHouse table to query from',
       },
       SELECT: {
         label: 'Fields',
