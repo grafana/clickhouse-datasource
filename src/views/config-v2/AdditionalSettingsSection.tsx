@@ -1,12 +1,20 @@
 import { ConfigSubSection } from 'components/experimental/ConfigSection';
 import allLabels from './labelsV2';
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent, useMemo, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceJsonDataOptionChecked,
 } from '@grafana/data';
-import { AliasTableEntry, CHConfig, CHCustomSetting, CHLogsConfig, CHSecureConfig, CHTracesConfig } from 'types/config';
+import {
+  AliasTableEntry,
+  CHConfig,
+  CHCustomSetting,
+  CHLogsConfig,
+  CHSecureConfig,
+  CHTracesConfig,
+  defaultCHAdditionalSettingsConfig,
+} from 'types/config';
 import { AliasTableConfig } from 'components/configEditor/AliasTableConfig';
 import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatabaseTableConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
@@ -52,69 +60,6 @@ export const AdditionalSettingsSection = (props: Props) => {
   useConfigDefaults(options, onOptionsChange);
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
-  const ADDITIONAL_SETTINGS_DEFAULTS = {
-    defaultDatabase: jsonData.defaultDatabase,
-    defaultTable: jsonData.defaultTable,
-    connMaxLifetime: jsonData.connMaxLifetime,
-    dialTimeout: jsonData.dialTimeout,
-    maxIdleConns: jsonData.maxIdleConns,
-    maxOpenConns: jsonData.maxOpenConns,
-    queryTimeout: jsonData.queryTimeout,
-    validateSql: jsonData.validateSql,
-    logs: {
-      defaultDatabase: jsonData.logs?.defaultDatabase,
-      defaultTable: jsonData.logs?.defaultTable !== 'otel_logs' ? jsonData.logs?.defaultTable : undefined,
-      otelEnabled: jsonData.logs?.otelEnabled,
-      otelVersion: jsonData.logs?.otelVersion !== 'latest' ? jsonData.logs?.otelVersion : undefined,
-      timeColumn: jsonData.logs?.timeColumn,
-      levelColumn: jsonData.logs?.levelColumn,
-      messageColumn: jsonData.logs?.messageColumn,
-      selectContextColumns: jsonData.logs?.selectContextColumns,
-      contextColumns:
-        jsonData.logs?.contextColumns && jsonData.logs?.contextColumns.length > 0
-          ? jsonData.logs?.contextColumns
-          : undefined,
-    },
-    traces: {
-      defaultDatabase: jsonData.traces?.defaultDatabase,
-      defaultTable: jsonData.traces?.defaultTable !== 'otel_traces' ? jsonData.logs?.defaultTable : undefined,
-      otelEnabled: jsonData.traces?.otelEnabled,
-      otelVersion: jsonData.traces?.otelVersion !== 'latest' ? jsonData.logs?.otelVersion : undefined,
-      traceIdColumn: jsonData.traces?.traceIdColumn,
-      spanIdColumn: jsonData.traces?.spanIdColumn,
-      operationNameColumn: jsonData.traces?.operationNameColumn,
-      parentSpanIdColumn: jsonData.traces?.parentSpanIdColumn,
-      serviceNameColumn: jsonData.traces?.serviceNameColumn,
-      durationColumn: jsonData.traces?.durationColumn,
-      startTimeColumn: jsonData.traces?.startTimeColumn,
-      tagsColumn: jsonData.traces?.tagsColumn,
-      serviceTagsColumn: jsonData.traces?.serviceTagsColumn,
-      kindColumn: jsonData.traces?.kindColumn,
-      statusCodeColumn: jsonData.traces?.statusCodeColumn,
-      statusMessageColumn: jsonData.traces?.statusMessageColumn,
-      stateColumn: jsonData.traces?.stateColumn,
-      instrumentationLibraryNameColumn: jsonData.traces?.instrumentationLibraryNameColumn,
-      instrumentationLibraryVersionColumn: jsonData.traces?.instrumentationLibraryVersionColumn,
-      flattenNested: jsonData.traces?.flattenNested,
-      traceEventsColumnPrefix: jsonData.traces?.traceEventsColumnPrefix,
-      traceLinksColumnPrefix: jsonData.traces?.traceLinksColumnPrefix,
-    },
-    aliasTables: jsonData.aliasTables && jsonData.aliasTables.length > 0 ? jsonData.aliasTables : undefined,
-    enableRowLimit: jsonData.enableRowLimit,
-    enableSecureSocksProxy: jsonData.enableSecureSocksProxy,
-  };
-
-  const hasDefinedValue = (obj: any): boolean => {
-    if (obj == null) {
-      return false;
-    }
-    if (typeof obj !== 'object') {
-      return obj !== '' && obj !== undefined && obj !== null;
-    }
-    return Object.values(obj).some((v) => hasDefinedValue(v));
-  };
-
-  const shouldBeOpen = hasDefinedValue(ADDITIONAL_SETTINGS_DEFAULTS);
 
   const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
     onOptionsChange({
@@ -172,6 +117,50 @@ export const AdditionalSettingsSection = (props: Props) => {
       },
     });
   };
+
+  const shallowSettingsCompare = (currentSettings: any, defaultSettings: any): boolean => {
+    // needed for dealing with proxy object from currentSettings
+    currentSettings = Object.assign({}, currentSettings);
+
+    const currentSettingsKeys = Object.keys(currentSettings);
+    const defaultSettingsKeys = Object.keys(defaultSettings);
+
+    if (currentSettingsKeys.length !== defaultSettingsKeys.length) {
+      return false;
+    }
+
+    for (const key of currentSettingsKeys) {
+      if (!defaultSettingsKeys.includes(key)) {
+        return false;
+      }
+      if (currentSettings[key].length === 0 && defaultSettings[key].length === 0) {
+        continue;
+      }
+      if (currentSettings[key] !== defaultSettings[key]) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const shouldBeOpen = useMemo(() => {
+    return (
+      jsonData.defaultDatabase ||
+      jsonData.defaultTable ||
+      jsonData.connMaxLifetime ||
+      jsonData.dialTimeout ||
+      jsonData.maxIdleConns ||
+      jsonData.maxOpenConns ||
+      jsonData.queryTimeout ||
+      jsonData.validateSql ||
+      !shallowSettingsCompare(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
+      !shallowSettingsCompare(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
+      (jsonData.aliasTables && jsonData.aliasTables.length > 0) ||
+      jsonData.enableRowLimit ||
+      jsonData.enableSecureSocksProxy ||
+      customSettings.length > 0
+    );
+  }, [jsonData, customSettings]);
 
   return (
     <Box
@@ -296,7 +285,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
             <Switch
               value={jsonData.enableSecureSocksProxy || false}
-              onChange={(e) => onUpdateDatasourceJsonDataOption(props, 'enableSecureSocksProxy')(e)}
+              onChange={(e) => onUpdateDatasourceJsonDataOptionChecked(props, 'enableSecureSocksProxy')(e)}
             />
           </Field>
         )}
