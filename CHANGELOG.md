@@ -1,5 +1,12 @@
 # Changelog
 
+## 4.11.3
+
+## Fixes
+
+- Fix config UI bugs (#1409) and update design (#1422)
+- Dependency updates
+
 ## 4.11.2
 
 ### Features
