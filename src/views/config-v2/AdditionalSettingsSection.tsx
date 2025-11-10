@@ -52,7 +52,7 @@ export const AdditionalSettingsSection = (props: Props) => {
   useConfigDefaults(options, onOptionsChange);
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
-  const ADDITONAL_SETTINGS_DEFAULTS = {
+  const ADDITIONAL_SETTINGS_DEFAULTS = {
     defaultDatabase: jsonData.defaultDatabase,
     defaultTable: jsonData.defaultTable,
     connMaxLifetime: jsonData.connMaxLifetime,
@@ -114,7 +114,7 @@ export const AdditionalSettingsSection = (props: Props) => {
     return Object.values(obj).some((v) => hasDefinedValue(v));
   };
 
-  const shouldBeOpen = hasDefinedValue(ADDITONAL_SETTINGS_DEFAULTS);
+  const shouldBeOpen = hasDefinedValue(ADDITIONAL_SETTINGS_DEFAULTS);
 
   const onLogsConfigChange = (key: keyof CHLogsConfig, value: string | boolean | string[]) => {
     onOptionsChange({
