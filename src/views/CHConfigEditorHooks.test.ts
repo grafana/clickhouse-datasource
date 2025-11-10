@@ -1,9 +1,8 @@
 import { DataSourceSettings } from '@grafana/data';
 import { renderHook } from '@testing-library/react';
-import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from 'types/config';
+import { CHConfig, CHHttpHeader, CHSecureConfig, defaultCHAdditionalSettingsConfig, Protocol } from 'types/config';
 import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
 import { pluginVersion } from 'utils/version';
-import { defaultLogsTable, defaultTraceTable } from 'otel';
 
 describe('onHttpHeadersChange', () => {
   it('should properly sort headers into secure/plain config fields', async () => {
@@ -95,12 +94,12 @@ describe('useConfigDefaults', () => {
     version: pluginVersion,
     protocol: Protocol.Native,
     logs: {
-      defaultTable: defaultLogsTable,
+      defaultTable: defaultCHAdditionalSettingsConfig.logs?.defaultTable,
       selectContextColumns: true,
       contextColumns: [],
     },
     traces: {
-      defaultTable: defaultTraceTable,
+      defaultTable: defaultCHAdditionalSettingsConfig.traces?.defaultTable,
     },
   };
 

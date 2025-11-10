@@ -1,7 +1,6 @@
 import { DataSourceSettings, KeyValue } from '@grafana/data';
-import { defaultLogsTable, defaultTraceTable } from 'otel';
 import { useEffect, useRef } from 'react';
-import { CHConfig, CHHttpHeader, CHSecureConfig, Protocol } from 'types/config';
+import { CHConfig, CHHttpHeader, CHSecureConfig, defaultCHAdditionalSettingsConfig, Protocol } from 'types/config';
 import { pluginVersion } from 'utils/version';
 
 /**
@@ -103,7 +102,7 @@ export const useConfigDefaults = (
     if (!jsonData.logs || jsonData.logs.defaultTable === undefined) {
       jsonData.logs = {
         ...jsonData.logs,
-        defaultTable: defaultLogsTable,
+        defaultTable: defaultCHAdditionalSettingsConfig.logs?.defaultTable,
         selectContextColumns: true,
         contextColumns: [],
       };
@@ -112,7 +111,7 @@ export const useConfigDefaults = (
     if (!jsonData.traces || jsonData.traces.defaultTable === undefined) {
       jsonData.traces = {
         ...jsonData.traces,
-        defaultTable: defaultTraceTable,
+        defaultTable: defaultCHAdditionalSettingsConfig.traces?.defaultTable,
       };
     }
 

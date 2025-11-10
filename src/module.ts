@@ -10,7 +10,7 @@ import { analyzeQueries, trackClickhouseDashboardLoaded } from 'tracking';
 import pluginJson from './plugin.json';
 import clickhouseVersion from '../package.json';
 
-// ConfigEditorV2 is the new design for the Clickhouse configuration page
+// ConfigEditorV2 is the new design for the ClickHouse configuration page
 const configEditor = config.featureToggles['newClickhouseConfigPageDesign' as keyof FeatureToggles]
   ? ConfigEditorV2
   : ConfigEditorV1;
