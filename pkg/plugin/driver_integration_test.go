@@ -1203,17 +1203,27 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	}()
 
 	// Wait for proxy server to be ready
-	proxyAddr := fmt.Sprintf("%s:%s", proxyHost, proxyPort)
-	for i := 0; i < 50; i++ {
-		conn, err := net.DialTimeout("tcp", proxyAddr, 100*time.Millisecond)
+	proxyAddr := net.JoinHostPort(proxyHost, proxyPort)
+
+	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	d := &net.Dialer{}
+	tick := time.NewTicker(100 * time.Millisecond)
+	defer tick.Stop()
+
+	for {
+		conn, err := d.DialContext(waitCtx, "tcp", proxyAddr)
 		if err == nil {
-			conn.Close()
+			_ = conn.Close()
 			break
 		}
-		if i == 49 {
-			t.Fatalf("Proxy server failed to start after 5 seconds")
+
+		select {
+		case <-waitCtx.Done():
+			t.Fatalf("proxy server failed to start within 5s: %v", err)
+		case <-tick.C:
 		}
-		time.Sleep(100 * time.Millisecond)
 	}
 
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
