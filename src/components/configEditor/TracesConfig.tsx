@@ -3,10 +3,10 @@ import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigS
 import { Input, Field } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint, TimeUnit } from 'types/queryBuilder';
-import otel, { defaultTraceTable } from 'otel';
+import otel from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
-import { CHTracesConfig } from 'types/config';
+import { CHTracesConfig, defaultCHAdditionalSettingsConfig } from 'types/config';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
@@ -136,7 +136,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
           onChange={(e) => onDefaultTableChange(e.currentTarget.value)}
           label={labels.defaultTable.label}
           aria-label={labels.defaultTable.label}
-          placeholder={defaultTraceTable}
+          placeholder={defaultCHAdditionalSettingsConfig.traces?.defaultTable!}
         />
       </Field>
       <ConfigSubSection title={labels.columns.title} description={labels.columns.description}>
@@ -197,7 +197,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
         />
         <DurationUnitSelect
           disabled={otelEnabled}
-          unit={(durationUnit as TimeUnit) || TimeUnit.Nanoseconds}
+          unit={(durationUnit as TimeUnit) || defaultCHAdditionalSettingsConfig.traces?.durationUnit}
           onChange={onDurationUnitChange}
         />
         <LabeledInput

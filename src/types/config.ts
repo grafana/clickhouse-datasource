@@ -1,4 +1,6 @@
 import { DataSourceJsonData, KeyValue } from '@grafana/data';
+import otel, { defaultLogsTable, defaultTraceTable } from 'otel';
+import { TimeUnit } from './queryBuilder';
 
 export interface CHConfig extends DataSourceJsonData {
   /**
@@ -118,3 +120,17 @@ export enum Protocol {
   Native = 'native',
   Http = 'http',
 }
+
+export const defaultCHAdditionalSettingsConfig: Partial<CHConfig> = {
+  logs: {
+    defaultTable: defaultLogsTable,
+    otelVersion: otel.getLatestVersion().version,
+    selectContextColumns: true,
+    contextColumns: [],
+  },
+  traces: {
+    defaultTable: defaultTraceTable,
+    otelVersion: otel.getLatestVersion().version,
+    durationUnit: TimeUnit.Nanoseconds,
+  },
+};

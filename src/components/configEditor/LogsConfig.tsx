@@ -3,9 +3,9 @@ import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigS
 import { Input, Field, InlineFormLabel, TagsInput } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
-import otel, { defaultLogsTable } from 'otel';
+import otel from 'otel';
 import { LabeledInput } from './LabeledInput';
-import { CHLogsConfig } from 'types/config';
+import { CHLogsConfig, defaultCHAdditionalSettingsConfig } from 'types/config';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
@@ -80,7 +80,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={(e) => onDefaultTableChange(e.currentTarget.value)}
           label={labels.defaultTable.label}
           aria-label={labels.defaultTable.label}
-          placeholder={defaultLogsTable}
+          placeholder={defaultCHAdditionalSettingsConfig.logs?.defaultTable!}
         />
       </Field>
       <ConfigSubSection title={labels.columns.title} description={labels.columns.description}>

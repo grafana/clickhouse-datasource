@@ -28,7 +28,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <div className={styles.requiredFields}>
           <Alert
             severity="info"
-            title="You are viewing a new design for the Clickhouse configuration settings."
+            title="You are viewing a new design for the ClickHouse configuration settings."
             className={styles.alertHeight}
           >
             <>
