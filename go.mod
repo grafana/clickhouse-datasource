@@ -155,3 +155,6 @@ require (
 	gopkg.in/fsnotify/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+// Fix for ch-go dependency declaring go 1.16 but using generics (go 1.18+ feature)
+replace github.com/ClickHouse/ch-go v0.68.0 => github.com/ClickHouse/ch-go v0.68.0
