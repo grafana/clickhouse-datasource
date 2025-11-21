@@ -28,7 +28,7 @@ describe('QueryTypeSwitcher', () => {
     const timeSeriesButton = result.getByLabelText(options.TimeSeries);
     expect(timeSeriesButton).toBeInTheDocument();
     fireEvent.click(timeSeriesButton);
-    expect(onChange).toBeCalledTimes(1);
-    expect(onChange).toBeCalledWith(QueryType.TimeSeries);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(QueryType.TimeSeries);
   });
 });

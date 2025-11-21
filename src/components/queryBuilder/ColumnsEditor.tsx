@@ -79,7 +79,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
   };
 
   return (
-    <div className="gf-form">
+    <div className={styles.Common.flexContainer}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>

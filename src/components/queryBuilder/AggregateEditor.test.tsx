@@ -30,8 +30,8 @@ describe('AggregateEditor', () => {
     const addButton = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.addButton);
     expect(addButton).toBeInTheDocument();
     await userEvent.click(addButton);
-    expect(onAggregatesChange).toBeCalledTimes(1);
-    expect(onAggregatesChange).toBeCalledWith([expect.anything()]);
+    expect(onAggregatesChange).toHaveBeenCalledTimes(1);
+    expect(onAggregatesChange).toHaveBeenCalledWith([expect.anything()]);
   });
 
   it('should call onAggregatesChange when remove aggregate button is clicked', async () => {
@@ -45,7 +45,7 @@ describe('AggregateEditor', () => {
     const removeButton = result.getByTestId(selectors.components.QueryBuilder.AggregateEditor.itemRemoveButton);
     expect(removeButton).toBeInTheDocument();
     await userEvent.click(removeButton);
-    expect(onAggregatesChange).toBeCalledWith([]);
+    expect(onAggregatesChange).toHaveBeenCalledWith([]);
   });
 
   it('should call onAggregatesChange when aggregate is updated', async () => {
@@ -62,6 +62,6 @@ describe('AggregateEditor', () => {
     fireEvent.keyDown(aggregateSelect, { key: 'ArrowDown' });
     fireEvent.keyDown(aggregateSelect, { key: 'ArrowDown' });
     fireEvent.keyDown(aggregateSelect, { key: 'Enter' });
-    expect(onAggregatesChange).toBeCalledWith([expectedAggregate]);
+    expect(onAggregatesChange).toHaveBeenCalledWith([expectedAggregate]);
   });
 });
