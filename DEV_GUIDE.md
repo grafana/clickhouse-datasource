@@ -10,7 +10,7 @@ docker run -d -p 8123:8123 -p 9000:9000 --name grafana-clickhouse-server --ulimi
 
 ## clickhouse client (optional, if you want to query from the command line)
 
-docker run -it --rm --link grafana-clickhouse-server:clickhouse-server clickhouse/clickhouse-client --host clickhouse-server
+docker run -it --rm --network=container:grafana-clickhouse-server --entrypoint clickhouse-client clickhouse/clickhouse-server
 
 ## Data loading - MGBench test data
 
@@ -24,11 +24,11 @@ https://clickhouse.com/docs/en/getting-started/example-datasets/brown-benchmark/
 
 ### Load the tables from the downloaded csv files
 
-sudo cat $HOME/workspace/clickhouse/mgbench/mgbench1.csv | docker run -i --rm --link grafana-clickhouse-server:clickhouse-server clickhouse/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs1 FORMAT CSVWithNames"
+sudo cat $HOME/workspace/clickhouse/mgbench/mgbench1.csv | docker run -i --rm --network=container:grafana-clickhouse-server --entrypoint clickhouse-client clickhouse/clickhouse-server -m --query="INSERT INTO mgbench.logs1 FORMAT CSVWithNames"
 
-sudo cat $HOME/workspace/clickhouse/mgbench/mgbench2.csv | docker run -i --rm --link grafana-clickhouse-server:clickhouse-server clickhouse/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs2 FORMAT CSVWithNames"
+sudo cat $HOME/workspace/clickhouse/mgbench/mgbench2.csv | docker run -i --rm --network=container:grafana-clickhouse-server --entrypoint clickhouse-client clickhouse/clickhouse-server -m --query="INSERT INTO mgbench.logs2 FORMAT CSVWithNames"
 
-sudo cat $HOME/workspace/clickhouse/mgbench/mgbench3.csv | docker run -i --rm --link grafana-clickhouse-server:clickhouse-server clickhouse/clickhouse-client -m --host clickhouse-server --query="INSERT INTO mgbench.logs3 FORMAT CSVWithNames"
+sudo cat $HOME/workspace/clickhouse/mgbench/mgbench3.csv | docker run -i --rm --network=container:grafana-clickhouse-server --entrypoint clickhouse-client clickhouse/clickhouse-server -m --query="INSERT INTO mgbench.logs3 FORMAT CSVWithNames"
 
 ## Connect from the Plugin (minimum requirements)
 
