@@ -313,7 +313,7 @@ export class Datasource
       getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
     const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
     const columnType = column ? column.type || '' : '';
-    const hasMapKey = mapKey !== '' || Boolean(lookupByLogLabels);
+    const hasMapKey = (mapKey ||= lookupByLogLabels ? columnName : '') !== '';
 
     let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
     if (action.type === 'ADD_FILTER') {

@@ -90,8 +90,9 @@ describe('useOtelColumns', () => {
   it('should not call builderOptionsDispatch if OTEL is already enabled', async () => {
     jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
     const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [{ name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] }];
 
-    renderHook(() => useOtelColumns(mockDatasource, true, testOtelVersion.version, builderOptionsDispatch));
+    renderHook(() => useOtelColumns(mockDatasource, allColumns, true, testOtelVersion.version, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -101,7 +102,24 @@ describe('useOtelColumns', () => {
     // Should not be included, since shouldSelectLogContextColumns returns false
     jest.spyOn(mockDatasource, 'getLogContextColumnNames').mockReturnValue(['SampleColumn']);
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useOtelColumns(mockDatasource, true, testOtelVersion.version, builderOptionsDispatch));
+    const allColumns: readonly TableColumn[] = [{ name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] }];
+
+    renderHook(() => useOtelColumns(mockDatasource, allColumns, true, testOtelVersion.version, builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('should not call builderOptionsDispatch if allColumns is empty', async () => {
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    const builderOptionsDispatch = jest.fn();
+
+    let otelEnabled = false;
+    const hook = renderHook(
+      (enabled) => useOtelColumns(mockDatasource, [], enabled, testOtelVersion.version, builderOptionsDispatch),
+      { initialProps: otelEnabled }
+    );
+    otelEnabled = true;
+    hook.rerender(otelEnabled);
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -109,17 +127,20 @@ describe('useOtelColumns', () => {
   it('should call builderOptionsDispatch with columns when OTEL is toggled on', async () => {
     jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
     const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [{ name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] }];
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
     hook.rerender(otelEnabled);
 
     const columns: SelectedColumn[] = [];
-    testOtelVersion.logColumnMap.forEach((v, k) => columns.push({ name: v, hint: k }));
+    testOtelVersion.logColumnMap.forEach((v, k) => {
+      columns.push({ name: v, hint: k, type: allColumns.find((c) => c.name === v)?.type });
+    });
     const expectedOptions = { columns };
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
@@ -131,18 +152,22 @@ describe('useOtelColumns', () => {
     // Timestamp is an OTel column, but also provided as a Log Context column. It should only appear once.
     jest.spyOn(mockDatasource, 'getLogContextColumnNames').mockReturnValue(['Timestamp', 'SampleColumn']);
     const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+      { name: 'SampleColumn', type: 'String', picklistValues: [] },
+    ];
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
     hook.rerender(otelEnabled);
 
     const columns: SelectedColumn[] = [];
-    testOtelVersion.logColumnMap.forEach((v, k) => columns.push({ name: v, hint: k }));
-    columns.push({ name: 'SampleColumn' });
+    testOtelVersion.logColumnMap.forEach((v, k) => {columns.push({ name: v, hint: k, type: allColumns.find((c) => c.name === v)?.type })});
+    columns.push({ name: 'SampleColumn', type: allColumns.find((c) => c.name === 'SampleColumn')?.type });
     const expectedOptions = { columns };
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
@@ -152,10 +177,11 @@ describe('useOtelColumns', () => {
   it('should not call builderOptionsDispatch after OTEL columns are set', async () => {
     jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
     const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [{ name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] }];
 
     let otelEnabled = false; // OTEL is off
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;

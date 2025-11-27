@@ -84,6 +84,7 @@ export const useLogDefaultsOnMount = (
  */
 export const useOtelColumns = (
   datasource: Datasource,
+  allColumns: readonly TableColumn[],
   otelEnabled: boolean,
   otelVersion: string,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
@@ -94,7 +95,7 @@ export const useOtelColumns = (
   }
 
   useEffect(() => {
-    if (!otelEnabled || didSetColumns.current) {
+    if (!otelEnabled || didSetColumns.current || allColumns.length === 0) {
       return;
     }
 
@@ -107,7 +108,7 @@ export const useOtelColumns = (
     const columns: SelectedColumn[] = [];
     const includedColumns = new Set<string>();
     logColumnMap.forEach((name, hint) => {
-      columns.push({ name, hint });
+      columns.push({ name, hint, type: allColumns.find((c) => c.name === name)?.type });
       includedColumns.add(name);
     });
 
@@ -119,14 +120,14 @@ export const useOtelColumns = (
           continue;
         }
 
-        columns.push({ name: columnName });
+        columns.push({ name: columnName, type: allColumns.find((c) => c.name === columnName)?.type });
         includedColumns.add(columnName);
       }
     }
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;
-  }, [datasource, otelEnabled, otelVersion, builderOptionsDispatch]);
+  }, [datasource, allColumns, otelEnabled, otelVersion, builderOptionsDispatch]);
 };
 
 // Finds and selects a default log time column, updates when table changes
