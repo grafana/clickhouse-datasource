@@ -555,6 +555,27 @@ export class Datasource
     return this.settings.jsonData.traces?.traceLinksColumnPrefix || 'Links';
   }
 
+  /**
+   * Get the TraceId column name from traces configuration
+   * Used when creating logs filter to correlate with trace data
+   */
+  getTracesTraceIdColumn(): string | undefined {
+    const traceConfig = this.settings.jsonData.traces;
+    if (!traceConfig) {
+      return undefined;
+    }
+
+    const otelEnabled = traceConfig.otelEnabled;
+    const otelVersion = traceConfig.otelVersion;
+
+    const otelConfig = otel.getVersion(otelVersion);
+    if (otelEnabled && otelConfig) {
+      return otelConfig.traceColumnMap.get(ColumnHint.TraceId);
+    }
+
+    return traceConfig.traceIdColumn;
+  }
+
   async fetchDatabases(): Promise<string[]> {
     return this.fetchData('SHOW DATABASES');
   }
