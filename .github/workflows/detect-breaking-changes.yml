@@ -17,7 +17,7 @@ jobs:
       - name: Build plugin
         run: npm run build
       - name: Compatibility check
-        uses: grafana/plugin-actions/is-compatible@a8d2790586995c0112186302a0ebee61f02510a7
+        uses: grafana/plugin-actions/is-compatible@428421c007301a8584325e90c83e8c7f6459fbec
         with:
           module: './src/module.ts'
           comment-pr: 'yes'
