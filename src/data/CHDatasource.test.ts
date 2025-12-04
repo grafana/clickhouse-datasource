@@ -674,4 +674,39 @@ describe('ClickHouseDatasource', () => {
       });
     });
   });
+
+  describe('modifyQuery', () => {
+    const query: CHBuilderQuery = {
+      pluginVersion: '',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      builderOptions: {
+        database: 'default',
+        table: 'logs',
+        queryType: QueryType.Logs,
+        mode: BuilderMode.List,
+        columns: [{ name: 'LogAttributes', hint: ColumnHint.LogLabels, type: 'Map(String, String)' }],
+      },
+    };
+
+    let datasource: Datasource;
+    beforeEach(() => {
+      datasource = cloneDeep(mockDatasource);
+    });
+
+    it('should set mapKey to columnName for Map type LogLabels', () => {
+      const frame = {
+        fields: [{ name: 'labels', values: { get: () => ({ service_name: 'value' }), length: 1 } }],
+      } as any;
+
+      const result = datasource.modifyQuery(query, {
+        type: 'ADD_FILTER',
+        options: { key: 'service_name', value: 'my-service' },
+        frame,
+      } as any);
+
+      expect((result as CHBuilderQuery).builderOptions.filters![0].mapKey).toBe('service_name');
+    });
+  });
 });
