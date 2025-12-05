@@ -67,7 +67,7 @@ export const AdditionalSettingsSection = (props: Props) => {
       jsonData: {
         ...options.jsonData,
         logs: {
-          ...options.jsonData.logs,
+          ...(options.jsonData.logs || {}),
           [key]: value,
         },
       },
