@@ -18,7 +18,7 @@ import {
   setTable,
 } from 'hooks/useBuilderOptionsState';
 import TraceIdInput from './TraceIdInput';
-import { Alert, Button, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
 
@@ -49,7 +49,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   return (
     <div data-testid="query-editor-section-builder">
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <div className={styles.QueryEditor.queryType}>
         <DatabaseTableSelect
           datasource={datasource}
           database={builderOptions.database}
@@ -58,7 +58,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           onTableChange={onTableChange}
         />
       </div>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <div className={styles.QueryEditor.queryType} style={{ marginBottom: '4px' }}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </div>
 
@@ -142,7 +142,7 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
     <div data-testid="query-editor-minimized-viewer">
       {showConfigWarning && (
         <Alert title="" severity="warning">
-          <VerticalGroup>
+          <Stack direction="column">
             <div>
               {`To enable data linking, enter your default ${configQueryType} configuration in your `}
               <a
@@ -152,14 +152,14 @@ const MinimizedQueryViewer = (props: MinimizedQueryBuilder) => {
                 ClickHouse Data Source settings
               </a>
             </div>
-          </VerticalGroup>
+          </Stack>
         </Alert>
       )}
       {!traceId && (
         <Alert title="" severity="warning">
-          <VerticalGroup>
+          <Stack>
             <div>Trace ID is empty</div>
-          </VerticalGroup>
+          </Stack>
         </Alert>
       )}
 

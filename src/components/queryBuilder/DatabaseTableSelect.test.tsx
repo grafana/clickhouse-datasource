@@ -41,8 +41,8 @@ describe('DatabaseSelect', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    expect(onDatabaseChange).toBeCalledTimes(1);
-    expect(onDatabaseChange).toBeCalledWith(defaultDB);
+    expect(onDatabaseChange).toHaveBeenCalledTimes(1);
+    expect(onDatabaseChange).toHaveBeenCalledWith(defaultDB);
   });
 
   it('should call onDatabaseChange when a database is selected', async () => {
@@ -61,8 +61,8 @@ describe('DatabaseSelect', () => {
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' }); // "other" db, a custom value
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' }); // "default" db
     fireEvent.keyDown(multiSelect, { key: 'Enter' });
-    expect(onDatabaseChange).toBeCalledTimes(1);
-    expect(onDatabaseChange).toBeCalledWith(defaultDB);
+    expect(onDatabaseChange).toHaveBeenCalledTimes(1);
+    expect(onDatabaseChange).toHaveBeenCalledWith(defaultDB);
   });
 });
 
@@ -116,8 +116,8 @@ describe('TableSelect', () => {
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' }); // "other" table, a custom value
     fireEvent.keyDown(multiSelect, { key: 'ArrowDown' }); // test table
     fireEvent.keyDown(multiSelect, { key: 'Enter' });
-    expect(onTableChange).toBeCalledTimes(1);
-    expect(onTableChange).toBeCalledWith(testTable);
+    expect(onTableChange).toHaveBeenCalledTimes(1);
+    expect(onTableChange).toHaveBeenCalledWith(testTable);
   });
 });
 
