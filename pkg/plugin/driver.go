@@ -334,6 +334,12 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	if user := backend.UserFromContext(ctx); user != nil {
+		ctx = clickhouse.Context(ctx, clickhouse.WithSettings(map[string]any{
+			"log_comment": fmt.Sprintf("grafana_user: %s", user.Login),
+		}))
+	}
+
 	var dataQuery struct {
 		Meta struct {
 			TimeZone string `json:"timezone"`
