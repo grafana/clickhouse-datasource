@@ -233,7 +233,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
     const links = out?.data[0]?.fields[0]?.config?.links;
-    const viewLogsLink = links?.find((link) => link.title === 'View logs');
+    const viewLogsLink = links?.find((link: any) => link.title === 'View logs');
 
     const logsQuery = viewLogsLink?.internal?.query as CHBuilderQuery;
     expect(logsQuery.builderOptions.columns).toBeDefined();
