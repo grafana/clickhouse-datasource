@@ -9,7 +9,6 @@ import {
   FieldType,
   LoadingState,
   LogLevel,
-  MutableDataFrame,
   ScopedVars,
   TimeRange,
   toDataFrame,
@@ -48,7 +47,7 @@ const LogLevelColor = {
 };
 
 function getThemeColor(dark: string, light: string): string {
-  return config.bootData.user.lightTheme ? light : dark;
+  return config.bootData.user.theme ? light : dark;
 }
 
 /**
@@ -89,14 +88,14 @@ export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataS
         observer.complete();
       },
       next: (dataQueryResponse: DataQueryResponse) => {
-        const { error } = dataQueryResponse;
-        if (error !== undefined) {
+        const { errors } = dataQueryResponse;
+        if (errors !== undefined) {
           observer.next({
             state: LoadingState.Error,
-            error,
+            errors,
             data: [],
           });
-          observer.error(error);
+          observer.error(errors);
         } else {
           rawLogsVolume = rawLogsVolume.concat(dataQueryResponse.data.map(toDataFrame));
         }
@@ -131,22 +130,23 @@ export function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] 
   }
 
   const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS;
-  if (oneLevelDetected) {
-    levelFields[0].name = 'logs';
-  }
 
-  const totalLength = timeField.values.length;
   return levelFields.map((field) => {
-    const logLevel = LogLevel[field.name as keyof typeof LogLevel] || LogLevel.unknown;
-    const df = new MutableDataFrame();
-    df.addField({ name: 'Time', type: FieldType.time, values: timeField.values }, totalLength);
-    df.addField({
-      name: 'Value',
-      type: FieldType.number,
-      config: getLogVolumeFieldConfig(logLevel, oneLevelDetected),
-      values: field.values,
+    const effectiveName = oneLevelDetected && field.name === DEFAULT_LOGS_ALIAS ? 'logs' : field.name;
+
+    const logLevel = LogLevel[effectiveName as keyof typeof LogLevel] ?? LogLevel.unknown;
+
+    return toDataFrame({
+      fields: [
+        { name: 'Time', type: FieldType.time, values: timeField.values },
+        {
+          name: 'Value',
+          type: FieldType.number,
+          config: getLogVolumeFieldConfig(logLevel, oneLevelDetected),
+          values: field.values,
+        },
+      ],
     });
-    return df;
   });
 }
 

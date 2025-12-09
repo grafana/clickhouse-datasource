@@ -33,7 +33,7 @@ describe('GroupByEditor', () => {
     expect(result.queryAllByText('a').length).toBe(1); // is popup open
     fireEvent.keyDown(multiSelect, { key: 'Enter' });
     expect(result.queryAllByText('a').length).toBe(0); // is popup closed
-    expect(onGroupByChange).toBeCalledTimes(1);
-    expect(onGroupByChange).toBeCalledWith(expect.any(Object));
+    expect(onGroupByChange).toHaveBeenCalledTimes(1);
+    expect(onGroupByChange).toHaveBeenCalledWith(expect.any(Object));
   });
 });

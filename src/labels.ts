@@ -157,7 +157,7 @@ export default {
         },
         validateSql: {
           label: 'Validate SQL',
-          tooltip: 'Validate SQL in the editor.',
+          tooltip: 'Validate SQL in the editor',
         },
       },
       TracesConfig: {

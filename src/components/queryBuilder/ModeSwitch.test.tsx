@@ -29,15 +29,15 @@ describe('ModeSwitch', () => {
     expect(buttonB).toBeInTheDocument();
 
     fireEvent.click(buttonB);
-    expect(onChange).toBeCalledTimes(1);
-    expect(onChange).toBeCalledWith(true);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(true);
 
     result.rerender(
       <ModeSwitch labelA={labelA} labelB={labelB} value={true} onChange={onChange} label={label} tooltip={tooltip} />
     );
 
     fireEvent.click(buttonA);
-    expect(onChange).toBeCalledTimes(2);
-    expect(onChange).toBeCalledWith(false);
+    expect(onChange).toHaveBeenCalledTimes(2);
+    expect(onChange).toHaveBeenCalledWith(false);
   });
 });

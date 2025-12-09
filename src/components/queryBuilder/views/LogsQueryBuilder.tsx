@@ -11,7 +11,7 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
-import { Alert, Button, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, InlineFormLabel, Input, Stack } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
@@ -121,7 +121,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
 
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
-      <VerticalGroup>
+      <Stack direction="column">
         <div>
           {'To speed up your query building, enter your default logs configuration in your '}
           <a
@@ -131,7 +131,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
             ClickHouse Data Source settings
           </a>
         </div>
-      </VerticalGroup>
+      </Stack>
     </Alert>
   );
 
@@ -150,61 +150,61 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
       />
-      <div className="gf-form">
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.timeColumn}
-          invalid={!builderState.timeColumn}
-          onColumnChange={onOptionChange('timeColumn')}
-          columnFilterFn={columnFilterDateTime}
-          columnHint={ColumnHint.Time}
-          label={labels.logTimeColumn.label}
-          tooltip={labels.logTimeColumn.tooltip}
-        />
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.logLevelColumn}
-          invalid={!builderState.logLevelColumn}
-          onColumnChange={onOptionChange('logLevelColumn')}
-          columnFilterFn={columnFilterString}
-          columnHint={ColumnHint.LogLevel}
-          label={labels.logLevelColumn.label}
-          tooltip={labels.logLevelColumn.tooltip}
-          inline
-        />
-      </div>
-      <div className="gf-form">
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.messageColumn}
-          invalid={!builderState.messageColumn}
-          onColumnChange={onOptionChange('messageColumn')}
-          columnFilterFn={columnFilterString}
-          columnHint={ColumnHint.LogMessage}
-          label={labels.logMessageColumn.label}
-          tooltip={labels.logMessageColumn.tooltip}
-        />
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.labelsColumn}
-          invalid={!builderState.labelsColumn}
-          onColumnChange={onOptionChange('labelsColumn')}
-          columnHint={ColumnHint.LogLabels}
-          label={labels.logLabelsColumn.label}
-          tooltip={labels.logLabelsColumn.tooltip}
-          inline
-        />
-        {/* <Switch
-          value={builderState.liveView}
-          onChange={onOptionChange('liveView')}
-          label={labels.liveView.label}
-          tooltip={labels.liveView.tooltip}
-          inline
-        /> */}
+      <div className={styles.Common.flex}>
+        <div className={styles.Common.flexColumn}>
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.timeColumn}
+            invalid={!builderState.timeColumn}
+            onColumnChange={onOptionChange('timeColumn')}
+            columnFilterFn={columnFilterDateTime}
+            columnHint={ColumnHint.Time}
+            label={labels.logTimeColumn.label}
+            tooltip={labels.logTimeColumn.tooltip}
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.logLevelColumn}
+            invalid={!builderState.logLevelColumn}
+            onColumnChange={onOptionChange('logLevelColumn')}
+            columnFilterFn={columnFilterString}
+            columnHint={ColumnHint.LogLevel}
+            label={labels.logLevelColumn.label}
+            tooltip={labels.logLevelColumn.tooltip}
+          />
+        </div>
+        <div className={styles.Common.flexColumn}>
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.messageColumn}
+            invalid={!builderState.messageColumn}
+            onColumnChange={onOptionChange('messageColumn')}
+            columnFilterFn={columnFilterString}
+            columnHint={ColumnHint.LogMessage}
+            label={labels.logMessageColumn.label}
+            tooltip={labels.logMessageColumn.tooltip}
+          />
+          <ColumnSelect
+            disabled={builderState.otelEnabled}
+            allColumns={allColumns}
+            selectedColumn={builderState.labelsColumn}
+            invalid={!builderState.labelsColumn}
+            onColumnChange={onOptionChange('labelsColumn')}
+            columnHint={ColumnHint.LogLabels}
+            label={labels.logLabelsColumn.label}
+            tooltip={labels.logLabelsColumn.tooltip}
+          />
+          {/* <Switch
+            value={builderState.liveView}
+            onChange={onOptionChange('liveView')}
+            label={labels.liveView.label}
+            tooltip={labels.liveView.tooltip}
+            inline
+          /> */}
+        </div>
       </div>
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}
@@ -240,12 +240,12 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   }, [logMessageLike]);
 
   return (
-    <div className="gf-form">
+    <div className={styles.Common.flexContainer}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <Input
-        width={200}
+        // width={200}
         value={input}
         type="string"
         onChange={(e) => setInput(e.currentTarget.value)}
