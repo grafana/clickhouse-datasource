@@ -43,6 +43,8 @@ npm run watch
 
 ## Create a pull request
 
+Run `npm run lint` and `npm run prettier:check` to check for any style errors. PRs that have linter or prettier errors will not pass pull request CI checks. Run `npm run lint:fix` and `npm run prettier:write` to automatically fix linter or prettier errors.
+
 Once you are ready to make a pull request, please read and follow [Create a pull request](https://github.com/grafana/grafana/blob/master/contribute/create-pull-request.md).
 
 ## Build a release for the ClickHouse data source plugin
