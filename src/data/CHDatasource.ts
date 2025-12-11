@@ -234,9 +234,10 @@ export class Datasource
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars, filters: AdHocVariableFilter[] = []): CHQuery {
     let rawQuery = query.rawSql || '';
     const templateSrv = getTemplateSrv();
+    const templateSrvVariables = templateSrv.getVariables() || [];
 
     // resolve template variables
-    rawQuery = this.applyConditionalAll(rawQuery, templateSrv.getVariables());
+    rawQuery = this.applyConditionalAll(rawQuery, templateSrvVariables);
     rawQuery = this.replace(rawQuery, scoped) || '';
 
     if (!this.skipAdHocFilter) {
@@ -245,7 +246,9 @@ export class Datasource
           `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
         );
       }
-      rawQuery = this.adHocFilter.apply(rawQuery, filters);
+
+      const useJSON = Boolean(templateSrvVariables.find(v => v.name === 'clickhouse_adhoc_use_json'));
+      rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
     }
     this.skipAdHocFilter = false;
 
