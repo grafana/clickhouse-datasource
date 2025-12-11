@@ -1,5 +1,14 @@
 # Changelog
 
+## 4.11.4
+
+## Fixes
+
+- Fix view logs link in Explore and Dashboards (#1462)
+- Fix filter for map type LogLabels (#1456)
+- Temporarily disable slow JSON suggestions function (#1468)
+- Dependency updates
+
 ## 4.11.3
 
 ## Fixes
