@@ -297,7 +297,7 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe('fetchPathsForJSONColumns', () => {
+  describe.skip('fetchPathsForJSONColumns', () => {
     it('sends a correct query when database and table names are provided', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([

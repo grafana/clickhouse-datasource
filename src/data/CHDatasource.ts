@@ -673,13 +673,15 @@ export class Datasource
       picklistValues: [],
     }));
 
-    const results = await Promise.all(
-      columns
-        .filter((c) => c.type.startsWith('JSON'))
-        .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
-    );
+    return columns;
 
-    return [...columns, ...results.flat()];
+    // TODO: wait for JSON function perf improvements
+    // const results = await Promise.all(
+    //   columns
+    //     .filter((c) => c.type.startsWith('JSON'))
+    //     .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
+    // );
+    // return [...columns, ...results.flat()];
   }
 
   /**
