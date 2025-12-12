@@ -335,8 +335,9 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
 	if user := backend.UserFromContext(ctx); user != nil {
-		ctx = clickhouse.Context(ctx, clickhouse.WithSettings(map[string]any{
-			"log_comment": fmt.Sprintf("grafana_user: %s", user.Login),
+		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
+			Products: nil,
+			Comment:  []string{fmt.Sprintf("grafana_user:%s", user.Login)},
 		}))
 	}
 
