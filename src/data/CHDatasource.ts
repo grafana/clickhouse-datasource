@@ -20,26 +20,30 @@ import {
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable, map, firstValueFrom } from 'rxjs';
+import LogsContextPanel from 'components/LogsContextPanel';
+import { cloneDeep, isEmpty, isString } from 'lodash';
+import otel from 'otel';
+import { createElement as createReactElement, ReactNode } from 'react';
+import { firstValueFrom, map, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
-import { EditorType, CHQuery } from 'types/sql';
 import {
-  QueryType,
   AggregateColumn,
   AggregateType,
   BuilderMode,
+  ColumnHint,
   Filter,
   FilterOperator,
-  TableColumn,
   OrderByDirection,
   QueryBuilderOptions,
-  ColumnHint,
-  TimeUnit,
+  QueryType,
   SelectedColumn,
   SqlFunction,
+  TableColumn,
+  TimeUnit,
 } from 'types/queryBuilder';
+import { CHQuery, EditorType } from 'types/sql';
+import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
-import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
@@ -49,11 +53,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import otel from 'otel';
-import { createElement as createReactElement, ReactNode } from 'react';
 import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
-import { pluginVersion } from 'utils/version';
-import LogsContextPanel from 'components/LogsContextPanel';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -121,7 +121,10 @@ export class Datasource
     }
   }
 
-  getSupportedSupplementaryQueryTypes(): SupplementaryQueryType[] {
+  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+    if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
+      return [];
+    }
     return [SupplementaryQueryType.LogsVolume];
   }
 
@@ -228,7 +231,7 @@ export class Datasource
     }
     // convention - assume the first field is an id field
     const ids = frame?.fields[0]?.values;
-    return frame?.fields[1]?.values.map((text, i) => ({ text, value: ids.get(i) }));
+    return frame?.fields[1]?.values.map((text, i) => ({ text, value: ids[i] }));
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars, filters: AdHocVariableFilter[] = []): CHQuery {
@@ -963,7 +966,7 @@ export class Datasource
         continue;
       }
 
-      let value = field.values.get(row.rowIndex);
+      let value = field.values[row.rowIndex];
       if (value && field.type === 'other' && isMapKey) {
         value = value[keyName];
       }
