@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import allLabels from 'labels';
 import { InlineFormLabel, Input } from '@grafana/ui';
 import { selectors } from 'selectors';
+import { styles } from 'styles';
 
 interface TraceIdInputProps {
   traceId: string;
@@ -19,7 +20,7 @@ const TraceIdInput = (props: TraceIdInputProps) => {
   }, [traceId]);
 
   return (
-    <div className="gf-form">
+    <div className={styles.Common.flexContainer}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
