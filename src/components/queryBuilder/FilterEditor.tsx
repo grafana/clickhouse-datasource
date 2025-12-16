@@ -406,6 +406,7 @@ export const FilterEditor = (props: {
         size="sm"
         className={styles.Common.smallBtn}
         onClick={() => removeFilter(index)}
+        aria-label="filter-remove"
       />
     </HorizontalGroup>
   );
