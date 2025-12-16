@@ -34,15 +34,11 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
 
   const options = [...allColumnNames, ...customColumns];
 
-  useEffect(() => {
-    if (allColumns.length === 0) {
-      return;
-    }
-
+  if (allColumns.length !== 0) {
     const columnNames = selectedColumns.map((c) => c.name);
     const customColumns = getCustomColumns(columnNames, allColumns);
     setCustomColumns(customColumns);
-  }, [allColumns, selectedColumns]);
+  }
 
   const onChange = (selected: Array<SelectableValue<string>>): void => {
     setIsOpen(false);

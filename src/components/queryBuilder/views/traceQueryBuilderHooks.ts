@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
+import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 import otel from 'otel';
+import React, { useEffect, useRef } from 'react';
 import {
   ColumnHint,
   DateFilterWithoutValue,
@@ -13,7 +14,6 @@ import {
   SelectedColumn,
   StringFilter,
 } from 'types/queryBuilder';
-import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -80,9 +80,12 @@ export const useOtelColumns = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
-  if (!otelEnabled) {
-    didSetColumns.current = false;
-  }
+
+  useEffect(() => {
+    if (!otelEnabled) {
+      didSetColumns.current = false;
+    }
+  }, [otelEnabled]);
 
   useEffect(() => {
     if (!otelEnabled || didSetColumns.current) {
@@ -124,9 +127,12 @@ export const useDefaultFilters = (
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
+
+  useEffect(() => {
+    if (table !== lastTable.current) {
+      appliedDefaultFilters.current = false;
+    }
+  }, [table]);
 
   useEffect(() => {
     if (isTraceIdMode || !table || appliedDefaultFilters.current) {

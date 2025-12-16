@@ -21,9 +21,12 @@ export const useDefaultTimeColumn = (
 ) => {
   const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn));
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    didSetDefaultTime.current = false;
-  }
+
+  useEffect(() => {
+    if (table !== lastTable.current) {
+      didSetDefaultTime.current = false;
+    }
+  }, [table]);
 
   useEffect(() => {
     if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
@@ -55,9 +58,12 @@ export const useDefaultFilters = (
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
+
+  useEffect(() => {
+    if (table !== lastTable.current) {
+      appliedDefaultFilters.current = false;
+    }
+  }, [table]);
 
   useEffect(() => {
     if (!table || appliedDefaultFilters.current) {

@@ -1,6 +1,7 @@
 import { Datasource } from 'data/CHDatasource';
 import { columnFilterDateTime } from 'data/columnFilters';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import otel from 'otel';
 import { useEffect, useMemo, useRef } from 'react';
 import {
   ColumnHint,
@@ -14,7 +15,6 @@ import {
   StringFilter,
   TableColumn,
 } from 'types/queryBuilder';
-import otel from 'otel';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -90,12 +90,9 @@ export const useOtelColumns = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
-  if (!otelEnabled) {
-    didSetColumns.current = false;
-  }
 
   useEffect(() => {
-    if (!otelEnabled || didSetColumns.current || allColumns.length === 0) {
+    if (!otelEnabled || allColumns.length === 0) {
       return;
     }
 
@@ -145,14 +142,17 @@ export const useDefaultTimeColumn = (
   );
   const didSetDefaultTime = useRef<boolean>(Boolean(timeColumn) || hasDefaultColumnConfigured);
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    didSetDefaultTime.current = false;
-  }
 
-  if (Boolean(timeColumn) || otelEnabled) {
-    lastTable.current = table;
-    didSetDefaultTime.current = true;
-  }
+  useEffect(() => {
+    if (table !== lastTable.current) {
+      didSetDefaultTime.current = false;
+    }
+
+    if (Boolean(timeColumn) || otelEnabled) {
+      lastTable.current = table;
+      didSetDefaultTime.current = true;
+    }
+  }, [table, timeColumn, otelEnabled]);
 
   useEffect(() => {
     if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
@@ -184,9 +184,12 @@ export const useDefaultFilters = (
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
   const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
+
+  useEffect(() => {
+    if (table !== lastTable.current) {
+      appliedDefaultFilters.current = false;
+    }
+  }, [table]);
 
   useEffect(() => {
     if (!table || appliedDefaultFilters.current) {
