@@ -5,19 +5,19 @@ import {
   DataQueryResponse,
   SupplementaryQueryType,
   TimeRange,
-  TypedVariableModel,
   toDataFrame,
+  TypedVariableModel,
 } from '@grafana/data';
-import { DataQuery } from '@grafana/schema';
-import { Observable, of } from 'rxjs';
 import { DataSourceWithBackend } from '@grafana/runtime';
+import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
-import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
-import { ColumnHint, QueryType, BuilderMode, QueryBuilderOptions } from 'types/queryBuilder';
 import { cloneDeep } from 'lodash';
+import { Observable, of } from 'rxjs';
+import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
+import { AdHocFilter } from './adHocFilter';
 import { Datasource } from './CHDatasource';
 import * as logs from './logs';
-import { AdHocFilter } from './adHocFilter';
 
 jest.mock('./logs', () => ({
   getTimeFieldRoundingClause: jest.fn(),
@@ -515,6 +515,42 @@ describe('ClickHouseDatasource', () => {
     let datasource: Datasource;
     beforeEach(() => {
       datasource = cloneDeep(mockDatasource);
+    });
+
+    describe('getSupportedSupplementaryQueryTypes', () => {
+      it('should return LogsVolume for empty dsRequest', async () => {
+        const result = datasource.getSupportedSupplementaryQueryTypes();
+        expect(result).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should return LogsVolume when all targets use Builder editor', async () => {
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              ...query,
+              editorType: EditorType.Builder,
+            },
+          ],
+        };
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should return empty array when any target uses SQL editor', async () => {
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              ...query,
+              editorType: EditorType.SQL,
+              queryType: query.builderOptions.queryType,
+            },
+          ],
+        };
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([]);
+      });
     });
 
     describe('getSupplementaryLogsVolumeQuery', () => {
