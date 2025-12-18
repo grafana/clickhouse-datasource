@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -295,6 +296,15 @@ func containsClickHouseException(err error) bool {
 
 	// Look for common ClickHouse error patterns in response bodies
 	if strings.Contains(errStr, "DB::Exception") {
+		return true
+	}
+
+	// Catch legacy ClickHouse HTTP error format.
+	// This is more general than the above and we attempt the DB::Exception catch first
+	// as those errors also contain this pattern.
+	// We're only catching 4xx errors for now but we can expand to 5xx if needed.
+	matcher, _ := regexp.Compile(`(\[HTTP 4\d\d\])`)
+	if matcher.MatchString(errStr) {
 		return true
 	}
 
