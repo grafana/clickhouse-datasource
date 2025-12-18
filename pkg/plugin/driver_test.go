@@ -293,6 +293,13 @@ func TestContainsClickHouseException(t *testing.T) {
 		assert.True(t, result)
 	})
 
+	t.Run("HTTP response body with legacy clickhouse error", func(t *testing.T) {
+		errMsg := `error querying the database: sendQuery: [HTTP 404] response body: \"[Error] Unknown table expression identifier 'hello' in scope SELECT * FROM hello. (UNKNOWN_TABLE) (version 25.1.3.23 (official build))\n\"`
+		err := errors.New(errMsg)
+		result := containsClickHouseException(err)
+		assert.True(t, result)
+	})
+
 	t.Run("regular error without clickhouse patterns", func(t *testing.T) {
 		err := errors.New("connection timeout")
 		result := containsClickHouseException(err)
