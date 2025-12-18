@@ -253,7 +253,7 @@ describe('AdHocManager', () => {
     expect(result).toContain('ResourceAttributes.cloud.region');
   });
 
-  it('apply ad hoc filter with . in column name', () => {
+  it('should apply ad hoc filter with . in column name', () => {
     const ahm = new AdHocFilter();
     const val = ahm.apply('SELECT stuff FROM foo', [
       { key: 'TABLE.key.key2', operator: '=', value: 'val' },
