@@ -252,4 +252,51 @@ describe('AdHocManager', () => {
     ] as AdHocVariableFilter[]);
     expect(result).toContain('ResourceAttributes.cloud.region');
   });
+
+  describe('buildFilterString', () => {
+    it('builds filter string with single filter', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'key', operator: '=', value: 'val' }] as AdHocVariableFilter[]);
+      expect(result).toEqual(" key = \\'val\\' ");
+    });
+
+    it('builds filter string with multiple filters', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([
+        { key: 'key', operator: '=', value: 'val' },
+        { key: 'keyNum', operator: '=', value: '123' },
+      ] as AdHocVariableFilter[]);
+      expect(result).toEqual(" key = \\'val\\' AND keyNum = \\'123\\' ");
+    });
+
+    it('returns empty string with no filters', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([]);
+      expect(result).toEqual('');
+    });
+
+    it('builds filter string with regex operators', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'key', operator: '=~', value: 'val' }] as AdHocVariableFilter[]);
+      expect(result).toEqual(" key ILIKE \\'val\\' ");
+    });
+
+    it('builds filter string with IN operator', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([
+        { key: 'key', operator: 'IN', value: "'val1', 'val2'" },
+      ] as AdHocVariableFilter[]);
+      expect(result).toEqual(" key IN (\\'val1\\', \\'val2\\') ");
+    });
+
+    it('ignores invalid filters', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([
+        { key: 'key', operator: '=', value: 'val' },
+        { key: '', operator: '=', value: 'val' } as any,
+        { key: 'key2', operator: '=', value: 'val2' },
+      ] as AdHocVariableFilter[]);
+      expect(result).toEqual(" key = \\'val\\' AND key2 = \\'val2\\' ");
+    });
+  });
 });
