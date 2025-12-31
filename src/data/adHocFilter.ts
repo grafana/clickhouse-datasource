@@ -11,7 +11,7 @@ export class AdHocFilter {
     }
   }
 
-  apply(sql: string, adHocFilters: AdHocVariableFilter[]): string {
+  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
@@ -38,7 +38,7 @@ export class AdHocFilter {
         return valid;
       })
       .map((f, i) => {
-        const key = escapeKey(f.key);
+        const key = escapeKey(f.key, useJSON);
         const value = escapeValueBasedOnOperator(f.value, f.operator);
         const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
@@ -59,9 +59,17 @@ function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
 }
 
-function escapeKey(s: string): string {
+function escapeKey(s: string, isJSON = false): string {
   if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(s.split('.')[0])) {
-    return s;
+    if (isJSON) {
+      return s;
+    }
+
+    // Map syntax
+    const parts = s.split('.');
+    const prefix = parts.shift();
+
+    return `${prefix}[\\'${parts.join('.')}\\']`;
   }
 
   // Convert arrayElement syntax to bracket notation
