@@ -82,6 +82,7 @@ const Aggregate = (props: AggregateProps) => {
         size="sm"
         icon="trash-alt"
         onClick={() => removeAggregate(index)}
+        aria-label="aggregate-remove-item"
       />
     </HorizontalGroup>
   );
