@@ -268,6 +268,41 @@ For example, if `clickhouse_adhoc_query` is set to `SELECT DISTINCT
 machine_name FROM mgbench.logs1` you would be able to select which machine
 names are filtered for in the dashboard.
 
+#### Manual Ad Hoc Filter Placement with `$__adHocFilters`
+
+By default, ad-hoc filters are automatically applied to queries by detecting the
+target table using SQL parsing. However, for queries that use CTEs or ClickHouse-specific
+syntax like `INTERVAL` or aggregate functions with parameters, the automatic
+detection may fail. In these cases, you can manually specify where to apply
+ad-hoc filters using the `$__adHocFilters('table_name')` macro.
+
+This macro expands to the ClickHouse `additional_table_filters` setting with the
+currently active ad-hoc filters. It should be placed in the `SETTINGS` clause of
+your query.
+
+Example:
+
+```sql
+SELECT *
+FROM (
+  SELECT * FROM my_complex_table
+  WHERE complicated_condition
+) AS result
+SETTINGS $__adHocFilters('my_complex_table')
+```
+
+When ad-hoc filters are active (e.g., `status = 'active'` and `region = 'us-west'`),
+this expands to:
+
+```sql
+SELECT *
+FROM (
+  SELECT * FROM my_complex_table
+  WHERE complicated_condition
+) AS result
+SETTINGS additional_table_filters={'my_complex_table': 'status = \'active\' AND region = \'us-west\''}
+```
+
 ## Learn more
 
 - Add [Annotations](https://grafana.com/docs/grafana/latest/dashboards/annotations/).
