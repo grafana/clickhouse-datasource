@@ -269,6 +269,23 @@ describe('ClickHouseDatasource', () => {
 
       expect(values).toEqual([{ text: 'foo' }]);
     });
+
+    it('should Fetch Tag Values from Schema with . in column name', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      const frame = arrayToDataFrame([{ ['bar.fizz']: 'foo' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      const values = await ds.getTagValues({ key: 'foo.bar.fizz' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct bar.fizz from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'foo' }]);
+    });
   });
 
   describe('Conditional All', () => {

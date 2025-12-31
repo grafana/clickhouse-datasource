@@ -851,7 +851,8 @@ export class Datasource
 
   private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
     const { from } = this.getTagSource();
-    const [table, col] = key.split('.');
+    const [table, ...colParts] = key.split('.');
+    const col = colParts.join('.');
     const source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     const rawSql = `select distinct ${col} from ${source} limit 1000`;
     const frame = await this.runQuery({ rawSql });
