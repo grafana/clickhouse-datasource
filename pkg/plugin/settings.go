@@ -42,6 +42,7 @@ type Settings struct {
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	LogHeadersAsComment   bool              `json:"logHeadersAsComment,omitempty"`
 	CustomSettings        []CustomSetting   `json:"customSettings"`
 	ProxyOptions          *proxy.Options
 
@@ -184,6 +185,16 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
+		}
+	}
+	if jsonData["logHeadersAsComment"] != nil {
+		if logHeadersAsComment, ok := jsonData["logHeadersAsComment"].(string); ok {
+			settings.LogHeadersAsComment, err = strconv.ParseBool(logHeadersAsComment)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse logHeadersAsComment value: %w", err))
+			}
+		} else {
+			settings.LogHeadersAsComment = jsonData["logHeadersAsComment"].(bool)
 		}
 	}
 

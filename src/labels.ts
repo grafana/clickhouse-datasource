@@ -91,6 +91,10 @@ export default {
           label: 'Forward Grafana HTTP Headers',
           tooltip: 'Forward Grafana HTTP Headers to datasource.',
         },
+        logHeadersAsComment: {
+          label: 'Log Headers as Comment',
+          tooltip: 'Serialize Grafana HTTP headers as JSON and include them as a log comment with each query.',
+        },
       },
       AliasTableConfig: {
         title: 'Column Alias Tables',
