@@ -92,4 +92,11 @@ export const pluginMacros: PluginMacro[] = [
       'Replaced by the first parameter when the template variable in the second parameter does not select every value. Replaced by 1=1 when the template variable selects every value',
     example: 'condition or 1=1',
   },
+  {
+    name: '$__adhoc_column',
+    isFunction: false,
+    documentation:
+      'Used in ad-hoc query ($clickhouse_adhoc_query). Replaced by the current column name when fetching tag values for ad-hoc filters',
+    example: 'hostname',
+  },
 ];
