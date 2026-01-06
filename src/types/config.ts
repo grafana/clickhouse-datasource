@@ -42,6 +42,8 @@ export interface CHConfig extends DataSourceJsonData {
   enableSecureSocksProxy?: boolean;
   enableRowLimit?: boolean;
 
+  hideTableNameInAdhocFilters?: boolean;
+
   pdcInjected?: boolean;
 }
 

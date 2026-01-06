@@ -71,7 +71,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const onSwitchToggle = (
     key: keyof Pick<
       CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
+      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit' | 'hideTableNameInAdhocFilters'
     >,
     value: boolean
   ) => {
@@ -619,6 +619,16 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1EnableRowLimitToggle({ rowLimitEnabled: e.currentTarget.checked });
               onSwitchToggle('enableRowLimit', e.currentTarget.checked);
+            }}
+          />
+        </Field>
+        <Field label={labels.hideTableNameInAdhocFilters.label} description={labels.hideTableNameInAdhocFilters.tooltip}>
+          <Switch
+            className="gf-form"
+            value={jsonData.hideTableNameInAdhocFilters || false}
+            data-testid={labels.hideTableNameInAdhocFilters.testid}
+            onChange={(e) => {
+              onSwitchToggle('hideTableNameInAdhocFilters', e.currentTarget.checked);
             }}
           />
         </Field>
