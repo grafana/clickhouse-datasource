@@ -116,6 +116,20 @@ describe('HttpHeadersConfigV2', () => {
     );
   });
 
+  it('toggles "Log Headers as Comment" and calls onOptionsChange', () => {
+    renderWith({ logHeadersAsComment: false });
+
+    const logHeadersCb = screen.getByLabelText(/log headers as comment/i) as HTMLInputElement;
+    fireEvent.click(logHeadersCb);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    expect(onOptionsChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ logHeadersAsComment: true }),
+      })
+    );
+  });
+
   describe('HttpHeadersConfigV2', () => {
     const onHttpHeadersChange = jest.fn();
     const onOptionsChangeMock = jest.fn();

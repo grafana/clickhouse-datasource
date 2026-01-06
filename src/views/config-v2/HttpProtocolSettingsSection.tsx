@@ -51,6 +51,7 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
           onOptionsChange={onOptionsChange}
           headers={jsonData.httpHeaders}
           forwardGrafanaHeaders={jsonData.forwardGrafanaHeaders}
+          logHeadersAsComment={jsonData.logHeadersAsComment}
           secureFields={secureJsonFields}
           onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
         />

@@ -317,3 +317,52 @@ func TestContainsClickHouseException(t *testing.T) {
 		assert.True(t, result)
 	})
 }
+
+func TestHasAnyPrefixCaseInsensitive(t *testing.T) {
+	prefixes := []string{"X-Dashboard", "X-Panel", "X-Rule"}
+
+	t.Run("matches case-insensitive prefix", func(t *testing.T) {
+		assert.True(t, hasAnyPrefixCaseInsensitive("X-Dashboard-123", prefixes))
+		assert.True(t, hasAnyPrefixCaseInsensitive("x-dashboard-123", prefixes))
+		assert.True(t, hasAnyPrefixCaseInsensitive("X-PANEL-456", prefixes))
+	})
+
+	t.Run("does not match non-whitelisted prefix", func(t *testing.T) {
+		assert.False(t, hasAnyPrefixCaseInsensitive("X-Other-123", prefixes))
+		assert.False(t, hasAnyPrefixCaseInsensitive("X-Grafana-Id", prefixes))
+	})
+}
+
+func TestHeadersToLogComment(t *testing.T) {
+	t.Run("filters and serializes whitelisted headers", func(t *testing.T) {
+		headers := map[string]string{
+			"X-Dashboard-Id": "123",
+			"X-Panel-Id":     "456",
+			"X-Grafana-Id":   "should-be-excluded",
+			"Authorization":  "should-be-excluded",
+		}
+
+		result, err := headersToLogComment(headers)
+		assert.NoError(t, err)
+
+		var resultMap map[string]string
+		err = json.Unmarshal([]byte(result), &resultMap)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "123", resultMap["X-Dashboard-Id"])
+		assert.Equal(t, "456", resultMap["X-Panel-Id"])
+		assert.NotContains(t, resultMap, "X-Grafana-Id")
+		assert.NotContains(t, resultMap, "Authorization")
+	})
+
+	t.Run("returns empty JSON object when no whitelisted headers", func(t *testing.T) {
+		headers := map[string]string{
+			"X-Grafana-Id":  "value",
+			"Authorization": "token",
+		}
+
+		result, err := headersToLogComment(headers)
+		assert.NoError(t, err)
+		assert.Equal(t, "{}", result)
+	})
+}

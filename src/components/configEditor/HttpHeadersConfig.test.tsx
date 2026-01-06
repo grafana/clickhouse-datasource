@@ -15,6 +15,7 @@ describe('HttpHeadersConfig', () => {
         secureFields={{}}
         onHttpHeadersChange={() => {}}
         onForwardGrafanaHeadersChange={() => {}}
+        onLogHeadersAsCommentChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -29,6 +30,7 @@ describe('HttpHeadersConfig', () => {
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+        onLogHeadersAsCommentChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -49,6 +51,7 @@ describe('HttpHeadersConfig', () => {
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+        onLogHeadersAsCommentChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -98,6 +101,7 @@ describe('HttpHeadersConfig', () => {
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+        onLogHeadersAsCommentChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -144,6 +148,7 @@ describe('forwardGrafanaHTTPHeaders', () => {
         secureFields={{}}
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+        onLogHeadersAsCommentChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -153,4 +158,31 @@ describe('forwardGrafanaHTTPHeaders', () => {
     fireEvent.click(forwardGrafanaHeadersSwitch);
     expect(onForwardGrafanaHeadersChange).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('logHeadersAsComment', () => {
+  const selectors = allSelectors.components.Config.HttpHeaderConfig;
+
+  it('should call onLogHeadersAsCommentChange when switch is clicked', () => {
+    const onHttpHeadersChange = jest.fn();
+    const onForwardGrafanaHeadersChange = jest.fn();
+    const onLogHeadersAsCommentChange = jest.fn();
+    const result = render(
+      <HttpHeadersConfig
+        headers={[]}
+        secureFields={{}}
+        onHttpHeadersChange={onHttpHeadersChange}
+        onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+        onLogHeadersAsCommentChange={onLogHeadersAsCommentChange}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const logHeadersAsCommentSwitch = result.getByTestId(selectors.logHeadersAsCommentSwitch);
+    expect(logHeadersAsCommentSwitch).toBeInTheDocument();
+    fireEvent.click(logHeadersAsCommentSwitch);
+    expect(onLogHeadersAsCommentChange).toHaveBeenCalledTimes(1);
+    expect(onLogHeadersAsCommentChange).toHaveBeenCalledWith(true);
+  });
+
 });
