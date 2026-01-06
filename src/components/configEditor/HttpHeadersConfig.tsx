@@ -10,9 +10,11 @@ import { KeyValue } from '@grafana/data';
 interface HttpHeadersConfigProps {
   headers?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
+  logHeadersAsComment?: boolean;
   secureFields: KeyValue<boolean>;
   onHttpHeadersChange: (v: CHHttpHeader[]) => void;
   onForwardGrafanaHeadersChange: (v: boolean) => void;
+  onLogHeadersAsCommentChange: (v: boolean) => void;
 }
 
 export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
@@ -20,6 +22,7 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   const configuredSecureHeaders = useConfiguredSecureHttpHeaders(secureFields);
   const [headers, setHeaders] = useState<CHHttpHeader[]>(props.headers || []);
   const [forwardGrafanaHeaders, setForwardGrafanaHeaders] = useState<boolean>(props.forwardGrafanaHeaders || false);
+  const [logHeadersAsComment, setLogHeadersAsComment] = useState<boolean>(props.logHeadersAsComment || false);
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
@@ -40,6 +43,10 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   const updateForwardGrafanaHeaders = (value: boolean) => {
     setForwardGrafanaHeaders(value);
     props.onForwardGrafanaHeadersChange(value);
+  };
+  const updateLogHeadersAsComment = (value: boolean) => {
+    setLogHeadersAsComment(value);
+    props.onLogHeadersAsCommentChange(value);
   };
 
   return (
@@ -75,6 +82,14 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
           className={'gf-form'}
           value={forwardGrafanaHeaders}
           onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
+        />
+      </Field>
+      <Field label={labels.logHeadersAsComment.label} description={labels.logHeadersAsComment.tooltip}>
+        <Switch
+          data-testid={selectors.logHeadersAsCommentSwitch}
+          className={'gf-form'}
+          value={logHeadersAsComment}
+          onChange={(e) => updateLogHeadersAsComment(e.currentTarget.checked)}
         />
       </Field>
     </ConfigSection>

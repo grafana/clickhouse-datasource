@@ -71,7 +71,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const onSwitchToggle = (
     key: keyof Pick<
       CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
+      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'logHeadersAsComment' | 'enableRowLimit'
     >,
     value: boolean
   ) => {
@@ -314,10 +314,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <HttpHeadersConfig
           headers={options.jsonData.httpHeaders}
           forwardGrafanaHeaders={options.jsonData.forwardGrafanaHeaders}
+          logHeadersAsComment={options.jsonData.logHeadersAsComment}
           secureFields={options.secureJsonFields}
           onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
           onForwardGrafanaHeadersChange={(forwardGrafanaHeaders) =>
             onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)
+          }
+          onLogHeadersAsCommentChange={(logHeadersAsComment) =>
+            onSwitchToggle('logHeadersAsComment', logHeadersAsComment)
           }
         />
       )}

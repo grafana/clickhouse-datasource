@@ -9,6 +9,7 @@ import { DataSourcePluginOptionsEditorProps, KeyValue, onUpdateDatasourceJsonDat
 interface HttpHeadersConfigProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
   headers?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
+  logHeadersAsComment?: boolean;
   secureFields: KeyValue<boolean>;
   onHttpHeadersChange: (v: CHHttpHeader[]) => void;
 }
@@ -18,6 +19,7 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const configuredSecureHeaders = useConfiguredSecureHttpHeaders(secureFields);
   const [headers, setHeaders] = useState<CHHttpHeader[]>(props.headers || []);
   const [forwardGrafanaHeaders, setForwardGrafanaHeaders] = useState<boolean>(props.forwardGrafanaHeaders || false);
+  const [logHeadersAsComment, setLogHeadersAsComment] = useState<boolean>(props.logHeadersAsComment || false);
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
@@ -42,6 +44,11 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const updateForwardGrafanaHeaders = (e: React.SyntheticEvent<HTMLInputElement, Event>) => {
     setForwardGrafanaHeaders(e.currentTarget.checked);
     onUpdateDatasourceJsonDataOptionChecked(props, 'forwardGrafanaHeaders')(e);
+  };
+
+  const updateLogHeadersAsComment = (e: React.SyntheticEvent<HTMLInputElement, Event>) => {
+    setLogHeadersAsComment(e.currentTarget.checked);
+    onUpdateDatasourceJsonDataOptionChecked(props, 'logHeadersAsComment')(e);
   };
 
   return (
@@ -76,6 +83,12 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
         label={labels.forwardGrafanaHeaders.label}
         checked={forwardGrafanaHeaders}
         onChange={(e) => updateForwardGrafanaHeaders(e)}
+      />
+
+      <Checkbox
+        label={labels.logHeadersAsComment.label}
+        checked={logHeadersAsComment}
+        onChange={(e) => updateLogHeadersAsComment(e)}
       />
     </div>
   );
