@@ -270,7 +270,10 @@ describe('ClickHouseDatasource', () => {
       expect(values).toEqual([{ text: 'foo' }]);
     });
     
-    describe('Hide Table Name In AdHoc Filters', () => {
+    
+  });
+
+  describe('Hide Table Name In AdHoc Filters', () => {
     it('should return only column names when hideTableNameInAdhocFilters is true', async () => {
       jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
       const ds = cloneDeep(mockDatasource);
