@@ -313,28 +313,28 @@ describe('ClickHouseDatasource', () => {
     it('should extract table name and fetch columns when $__adhoc_column is used', async () => {
       const spyOnReplace = jest
         .spyOn(templateSrvMock, 'replace')
-        .mockImplementation(() => 'SELECT DISTINCT $__adhoc_column FROM TechJournalFull.techlog_monitoring WHERE $__timeFilter(timestamp) LIMIT 1000');
+        .mockImplementation(() => 'SELECT DISTINCT $__adhoc_column FROM database.table WHERE $__timeFilter(timestamp) LIMIT 1000');
       const ds = cloneDeep(mockDatasource);
       const columnsFrame = arrayToDataFrame([
-        { name: 'hostname', type: 'String', table: 'techlog_monitoring' },
-        { name: 'event', type: 'String', table: 'techlog_monitoring' },
-        { name: 'timestamp', type: 'DateTime64', table: 'techlog_monitoring' }
+        { name: 'hostname', type: 'String', table: 'table' },
+        { name: 'event', type: 'String', table: 'table' },
+        { name: 'timestamp', type: 'DateTime64', table: 'table' }
       ]);
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [columnsFrame] }));
 
       const keys = await ds.getTagKeys();
 
       expect(spyOnReplace).toHaveBeenCalled();
-      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database = 'TechJournalFull' AND table = 'techlog_monitoring'" };
+      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database = 'database' AND table = 'table'" };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
       );
 
       expect(keys).toEqual([
-        { text: 'techlog_monitoring.hostname' },
-        { text: 'techlog_monitoring.event' },
-        { text: 'techlog_monitoring.timestamp' }
+        { text: 'table.hostname' },
+        { text: 'table.event' },
+        { text: 'table.timestamp' }
       ]);
     });
   });
