@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -40,11 +41,12 @@ type Settings struct {
 	MaxIdleConns    string `json:"maxIdleConns,omitempty"`
 	MaxOpenConns    string `json:"maxOpenConns,omitempty"`
 
-	HttpHeaders           map[string]string `json:"-"`
-	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
-	LogHeadersAsComment   bool              `json:"logHeadersAsComment,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	HttpHeaders              map[string]string `json:"-"`
+	ForwardGrafanaHeaders    bool              `json:"forwardGrafanaHeaders,omitempty"`
+	LogHeadersAsComment      bool              `json:"logHeadersAsComment,omitempty"`
+	LogHeadersAsCommentRegex *regexp.Regexp    `json:"logHeadersAsCommentRegex,omitempty"`
+	CustomSettings           []CustomSetting   `json:"customSettings"`
+	ProxyOptions             *proxy.Options
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -196,6 +198,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		} else {
 			settings.LogHeadersAsComment = jsonData["logHeadersAsComment"].(bool)
 		}
+	}
+	if jsonData["logHeadersAsCommentRegex"] != nil {
+		if regex, ok := jsonData["logHeadersAsCommentRegex"].(string); ok {
+			settings.LogHeadersAsCommentRegex, err = regexp.Compile(regex)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse logHeadersAsCommentRegex value: %w", err))
+			}
+		}
+	}
+	if settings.LogHeadersAsComment && settings.LogHeadersAsCommentRegex == nil {
+		return settings, backend.DownstreamError(fmt.Errorf("logHeadersAsCommentRegex is required when logHeadersAsComment is true"))
 	}
 
 	if jsonData["enableRowLimit"] != nil {

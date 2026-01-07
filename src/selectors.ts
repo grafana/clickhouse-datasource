@@ -123,6 +123,7 @@ export const Components = {
       headerValueInput: 'config__http-header-config__header-value-input',
       forwardGrafanaHeadersSwitch: 'config__http-header-config__forward-grafana-headers-switch',
       logHeadersAsCommentSwitch: 'config__http-header-config__log-headers-as-comment-switch',
+      logHeadersAsCommentRegexInput: 'config__http-header-config__log-headers-as-comment-regex-input',
     },
     AliasTableConfig: {
       aliasEditor: 'config__alias-table-config__alias-editor',

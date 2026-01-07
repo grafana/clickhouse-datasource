@@ -16,6 +16,7 @@ describe('HttpHeadersConfig', () => {
         onHttpHeadersChange={() => {}}
         onForwardGrafanaHeadersChange={() => {}}
         onLogHeadersAsCommentChange={() => {}}
+        onLogHeadersAsCommentRegexChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -31,6 +32,7 @@ describe('HttpHeadersConfig', () => {
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
         onLogHeadersAsCommentChange={() => {}}
+        onLogHeadersAsCommentRegexChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -52,6 +54,7 @@ describe('HttpHeadersConfig', () => {
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
         onLogHeadersAsCommentChange={() => {}}
+        onLogHeadersAsCommentRegexChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -102,6 +105,7 @@ describe('HttpHeadersConfig', () => {
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
         onLogHeadersAsCommentChange={() => {}}
+        onLogHeadersAsCommentRegexChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -149,6 +153,7 @@ describe('forwardGrafanaHTTPHeaders', () => {
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
         onLogHeadersAsCommentChange={() => {}}
+        onLogHeadersAsCommentRegexChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -174,6 +179,7 @@ describe('logHeadersAsComment', () => {
         onHttpHeadersChange={onHttpHeadersChange}
         onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
         onLogHeadersAsCommentChange={onLogHeadersAsCommentChange}
+        onLogHeadersAsCommentRegexChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -185,4 +191,32 @@ describe('logHeadersAsComment', () => {
     expect(onLogHeadersAsCommentChange).toHaveBeenCalledWith(true);
   });
 
+  it('should call onLogHeadersAsCommentRegexChange when input is changed', () => {
+    const onHttpHeadersChange = jest.fn();
+    const onForwardGrafanaHeadersChange = jest.fn();
+    const onLogHeadersAsCommentChange = jest.fn();
+    const onLogHeadersAsCommentRegexChange = jest.fn();
+    const result = render(
+      <HttpHeadersConfig
+        headers={[]}
+        secureFields={{}}
+        logHeadersAsComment={true}
+        onHttpHeadersChange={onHttpHeadersChange}
+        onForwardGrafanaHeadersChange={onForwardGrafanaHeadersChange}
+        onLogHeadersAsCommentChange={onLogHeadersAsCommentChange}
+        onLogHeadersAsCommentRegexChange={onLogHeadersAsCommentRegexChange}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const logHeadersAsCommentRegexInput = result.getByTestId(selectors.logHeadersAsCommentRegexInput);
+    expect(logHeadersAsCommentRegexInput).toBeInTheDocument();
+    fireEvent.change(logHeadersAsCommentRegexInput, { target: { value: 'test' } });
+    expect(onLogHeadersAsCommentRegexChange).toHaveBeenCalledTimes(1);
+    expect(onLogHeadersAsCommentRegexChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target: expect.objectContaining({ value: 'test' }),
+      })
+    );
+  });
 });

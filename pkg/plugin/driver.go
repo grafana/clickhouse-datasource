@@ -30,8 +30,6 @@ import (
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct{}
 
-var headersAsLogCommentPrefixWhitelist = []string{"X-Dashboard", "X-Panel", "X-Rule"}
-
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
 func getTLSConfig(settings Settings) (*tls.Config, error) {
@@ -187,7 +185,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 	}
 
 	if settings.LogHeadersAsComment {
-		logComment, err := headersToLogComment(httpHeaders)
+		logComment, err := headersToLogComment(httpHeaders, settings.LogHeadersAsCommentRegex)
 		if err != nil {
 			backend.Logger.Warn("Failed to serialize headers as JSON", "error", err)
 		} else {
@@ -493,10 +491,11 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 }
 
 // headersToLogComment serializes the headers to a JSON string for use as a log comment.
-func headersToLogComment(headers map[string]string) (string, error) {
+func headersToLogComment(headers map[string]string, regexPattern *regexp.Regexp) (string, error) {
+	// Compile the regex pattern
 	whiteListedHeaders := make(map[string]string)
 	for k, v := range headers {
-		if hasAnyPrefixCaseInsensitive(k, headersAsLogCommentPrefixWhitelist) {
+		if regexPattern.MatchString(k) {
 			whiteListedHeaders[k] = v
 		}
 	}
@@ -505,15 +504,6 @@ func headersToLogComment(headers map[string]string) (string, error) {
 		return "", err
 	}
 	return string(headersJSON), nil
-}
-
-func hasAnyPrefixCaseInsensitive(s string, prefixes []string) bool {
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(strings.ToLower(s), strings.ToLower(prefix)) {
-			return true
-		}
-	}
-	return false
 }
 
 func mergeOpenTelemetryLabels(frame *data.Frame) error {

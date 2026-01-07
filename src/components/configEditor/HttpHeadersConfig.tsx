@@ -11,10 +11,12 @@ interface HttpHeadersConfigProps {
   headers?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
   logHeadersAsComment?: boolean;
+  logHeadersAsCommentRegex?: string;
   secureFields: KeyValue<boolean>;
   onHttpHeadersChange: (v: CHHttpHeader[]) => void;
   onForwardGrafanaHeadersChange: (v: boolean) => void;
   onLogHeadersAsCommentChange: (v: boolean) => void;
+  onLogHeadersAsCommentRegexChange: (e: ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
@@ -23,6 +25,9 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   const [headers, setHeaders] = useState<CHHttpHeader[]>(props.headers || []);
   const [forwardGrafanaHeaders, setForwardGrafanaHeaders] = useState<boolean>(props.forwardGrafanaHeaders || false);
   const [logHeadersAsComment, setLogHeadersAsComment] = useState<boolean>(props.logHeadersAsComment || false);
+  const [logHeadersAsCommentRegex, setLogHeadersAsCommentRegex] = useState<string>(
+    props.logHeadersAsCommentRegex || allLabels.components.Config.HttpHeadersConfig.logHeadersAsCommentRegex.placeholder
+  );
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
 
@@ -47,6 +52,11 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
   const updateLogHeadersAsComment = (value: boolean) => {
     setLogHeadersAsComment(value);
     props.onLogHeadersAsCommentChange(value);
+  };
+
+  const updateLogHeadersAsCommentRegex = (e: ChangeEvent<HTMLInputElement>) => {
+    setLogHeadersAsCommentRegex(e.target.value);
+    props.onLogHeadersAsCommentRegexChange(e);
   };
 
   return (
@@ -92,6 +102,19 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
           onChange={(e) => updateLogHeadersAsComment(e.currentTarget.checked)}
         />
       </Field>
+      {logHeadersAsComment && (
+        <Field
+          label={labels.logHeadersAsCommentRegex.label}
+          description={labels.logHeadersAsCommentRegex.tooltip}
+        >
+          <Input
+            data-testid={selectors.logHeadersAsCommentRegexInput}
+            value={logHeadersAsCommentRegex}
+            placeholder={labels.logHeadersAsCommentRegex.placeholder}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => updateLogHeadersAsCommentRegex(e)}
+          />
+        </Field>
+      )}
     </ConfigSection>
   );
 };
