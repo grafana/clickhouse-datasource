@@ -4,7 +4,12 @@ import { CHConfig, CHHttpHeader, CHSecureConfig } from 'types/config';
 import allLabels from './labelsV2';
 import { styles } from 'styles';
 import { selectors as allSelectors } from 'selectors';
-import { DataSourcePluginOptionsEditorProps, KeyValue, onUpdateDatasourceJsonDataOptionChecked, onUpdateDatasourceJsonDataOption } from '@grafana/data';
+import {
+  DataSourcePluginOptionsEditorProps,
+  KeyValue,
+  onUpdateDatasourceJsonDataOptionChecked,
+  onUpdateDatasourceJsonDataOption,
+} from '@grafana/data';
 
 interface HttpHeadersConfigProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
   headers?: CHHttpHeader[];
@@ -22,7 +27,8 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
   const [forwardGrafanaHeaders, setForwardGrafanaHeaders] = useState<boolean>(props.forwardGrafanaHeaders || false);
   const [logHeadersAsComment, setLogHeadersAsComment] = useState<boolean>(props.logHeadersAsComment || false);
   const [logHeadersAsCommentRegex, setLogHeadersAsCommentRegex] = useState<string>(
-    props.options.jsonData.logHeadersAsCommentRegex || allLabels.components.Config.HttpHeadersConfig.logHeadersAsCommentRegex.placeholder
+    props.options.jsonData.logHeadersAsCommentRegex ||
+      allLabels.components.Config.HttpHeadersConfig.logHeadersAsCommentRegex.placeholder
   );
   const labels = allLabels.components.Config.HttpHeadersConfig;
   const selectors = allSelectors.components.Config.HttpHeaderConfig;
@@ -101,10 +107,7 @@ export const HttpHeadersConfigV2 = (props: HttpHeadersConfigProps) => {
       />
 
       {logHeadersAsComment && (
-        <Field
-          label={labels.logHeadersAsCommentRegex.label}
-          description={labels.logHeadersAsCommentRegex.tooltip}
-        >
+        <Field label={labels.logHeadersAsCommentRegex.label} description={labels.logHeadersAsCommentRegex.tooltip}>
           <Input
             data-testid={selectors.logHeadersAsCommentRegexInput}
             value={logHeadersAsCommentRegex}

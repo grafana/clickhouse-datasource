@@ -133,7 +133,9 @@ describe('HttpHeadersConfigV2', () => {
   it('should call onLogHeadersAsCommentRegexChange when input is changed', () => {
     renderWith({ logHeadersAsComment: true, logHeadersAsCommentRegex: '' });
 
-    const logHeadersAsCommentRegexInput = screen.getByTestId(selectors.components.Config.HttpHeaderConfig.logHeadersAsCommentRegexInput);
+    const logHeadersAsCommentRegexInput = screen.getByTestId(
+      selectors.components.Config.HttpHeaderConfig.logHeadersAsCommentRegexInput
+    );
     expect(logHeadersAsCommentRegexInput).toBeInTheDocument();
     fireEvent.change(logHeadersAsCommentRegexInput, { target: { value: 'test' } });
     expect(onOptionsChangeMock).toHaveBeenCalledTimes(1);
