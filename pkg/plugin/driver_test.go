@@ -318,22 +318,9 @@ func TestContainsClickHouseException(t *testing.T) {
 	})
 }
 
-func TestHasAnyPrefixCaseInsensitive(t *testing.T) {
-	prefixes := []string{"X-Dashboard", "X-Panel", "X-Rule"}
-
-	t.Run("matches case-insensitive prefix", func(t *testing.T) {
-		assert.True(t, hasAnyPrefixCaseInsensitive("X-Dashboard-123", prefixes))
-		assert.True(t, hasAnyPrefixCaseInsensitive("x-dashboard-123", prefixes))
-		assert.True(t, hasAnyPrefixCaseInsensitive("X-PANEL-456", prefixes))
-	})
-
-	t.Run("does not match non-whitelisted prefix", func(t *testing.T) {
-		assert.False(t, hasAnyPrefixCaseInsensitive("X-Other-123", prefixes))
-		assert.False(t, hasAnyPrefixCaseInsensitive("X-Grafana-Id", prefixes))
-	})
-}
-
 func TestHeadersToLogComment(t *testing.T) {
+	regexPattern := "(?i)^(x-dashboard|x-panel|x-rule)"
+
 	t.Run("filters and serializes whitelisted headers", func(t *testing.T) {
 		headers := map[string]string{
 			"X-Dashboard-Id": "123",
@@ -342,7 +329,7 @@ func TestHeadersToLogComment(t *testing.T) {
 			"Authorization":  "should-be-excluded",
 		}
 
-		result, err := headersToLogComment(headers)
+		result, err := headersToLogComment(headers, regexPattern)
 		assert.NoError(t, err)
 
 		var resultMap map[string]string
@@ -361,8 +348,18 @@ func TestHeadersToLogComment(t *testing.T) {
 			"Authorization": "token",
 		}
 
-		result, err := headersToLogComment(headers)
+		result, err := headersToLogComment(headers, regexPattern)
 		assert.NoError(t, err)
 		assert.Equal(t, "{}", result)
+	})
+
+	t.Run("handles invalid regex pattern", func(t *testing.T) {
+		headers := map[string]string{
+			"X-Dashboard-Id": "123",
+		}
+
+		_, err := headersToLogComment(headers, "[invalid regex")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid regex pattern")
 	})
 }

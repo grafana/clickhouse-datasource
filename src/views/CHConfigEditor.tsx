@@ -315,6 +315,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           headers={options.jsonData.httpHeaders}
           forwardGrafanaHeaders={options.jsonData.forwardGrafanaHeaders}
           logHeadersAsComment={options.jsonData.logHeadersAsComment}
+          logHeadersAsCommentRegex={options.jsonData.logHeadersAsCommentRegex}
           secureFields={options.secureJsonFields}
           onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
           onForwardGrafanaHeadersChange={(forwardGrafanaHeaders) =>
@@ -323,6 +324,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onLogHeadersAsCommentChange={(logHeadersAsComment) =>
             onSwitchToggle('logHeadersAsComment', logHeadersAsComment)
           }
+          onLogHeadersAsCommentRegexChange={(e) => {
+            onUpdateDatasourceJsonDataOption(props, 'logHeadersAsCommentRegex')(e);
+          }}
         />
       )}
 
