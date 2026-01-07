@@ -103,10 +103,7 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
         />
       </Field>
       {logHeadersAsComment && (
-        <Field
-          label={labels.logHeadersAsCommentRegex.label}
-          description={labels.logHeadersAsCommentRegex.tooltip}
-        >
+        <Field label={labels.logHeadersAsCommentRegex.label} description={labels.logHeadersAsCommentRegex.tooltip}>
           <Input
             data-testid={selectors.logHeadersAsCommentRegexInput}
             value={logHeadersAsCommentRegex}
