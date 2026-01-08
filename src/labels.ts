@@ -91,6 +91,15 @@ export default {
           label: 'Forward Grafana HTTP Headers',
           tooltip: 'Forward Grafana HTTP Headers to datasource.',
         },
+        logHeadersAsComment: {
+          label: 'Log Headers as Comment',
+          tooltip: 'Serialize Grafana HTTP headers as JSON and include them as a log comment with each query.',
+        },
+        logHeadersAsCommentRegex: {
+          label: 'Header Whitelist Regex',
+          tooltip: `Regular expression to match headers that should be logged.`,
+          placeholder: '(?i)^(x-dashboard|x-panel|x-rule)',
+        },
       },
       AliasTableConfig: {
         title: 'Column Alias Tables',

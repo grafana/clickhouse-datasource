@@ -116,6 +116,36 @@ describe('HttpHeadersConfigV2', () => {
     );
   });
 
+  it('toggles "Log Headers as Comment" and calls onOptionsChange', () => {
+    renderWith({ logHeadersAsComment: false });
+
+    const logHeadersCb = screen.getByLabelText(/log headers as comment/i) as HTMLInputElement;
+    fireEvent.click(logHeadersCb);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    expect(onOptionsChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ logHeadersAsComment: true }),
+      })
+    );
+  });
+
+  it('should call onLogHeadersAsCommentRegexChange when input is changed', () => {
+    renderWith({ logHeadersAsComment: true, logHeadersAsCommentRegex: '' });
+
+    const logHeadersAsCommentRegexInput = screen.getByTestId(
+      selectors.components.Config.HttpHeaderConfig.logHeadersAsCommentRegexInput
+    );
+    expect(logHeadersAsCommentRegexInput).toBeInTheDocument();
+    fireEvent.change(logHeadersAsCommentRegexInput, { target: { value: 'test' } });
+    expect(onOptionsChangeMock).toHaveBeenCalledTimes(1);
+    expect(onOptionsChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ logHeadersAsCommentRegex: 'test' }),
+      })
+    );
+  });
+
   describe('HttpHeadersConfigV2', () => {
     const onHttpHeadersChange = jest.fn();
     const onOptionsChangeMock = jest.fn();

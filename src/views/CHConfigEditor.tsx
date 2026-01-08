@@ -71,7 +71,12 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const onSwitchToggle = (
     key: keyof Pick<
       CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit'
+      | 'secure'
+      | 'validateSql'
+      | 'enableSecureSocksProxy'
+      | 'forwardGrafanaHeaders'
+      | 'logHeadersAsComment'
+      | 'enableRowLimit'
     >,
     value: boolean
   ) => {
@@ -181,15 +186,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-      options.jsonData.defaultDatabase ||
-      options.jsonData.defaultTable ||
-      options.jsonData.dialTimeout ||
-      options.jsonData.queryTimeout ||
-      options.jsonData.validateSql ||
-      options.jsonData.enableSecureSocksProxy ||
-      options.jsonData.customSettings ||
-      options.jsonData.logs ||
-      options.jsonData.traces
+    options.jsonData.defaultDatabase ||
+    options.jsonData.defaultTable ||
+    options.jsonData.dialTimeout ||
+    options.jsonData.queryTimeout ||
+    options.jsonData.validateSql ||
+    options.jsonData.enableSecureSocksProxy ||
+    options.jsonData.customSettings ||
+    options.jsonData.logs ||
+    options.jsonData.traces
   );
 
   const defaultPort = jsonData.secure
@@ -314,11 +319,19 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <HttpHeadersConfig
           headers={options.jsonData.httpHeaders}
           forwardGrafanaHeaders={options.jsonData.forwardGrafanaHeaders}
+          logHeadersAsComment={options.jsonData.logHeadersAsComment}
+          logHeadersAsCommentRegex={options.jsonData.logHeadersAsCommentRegex}
           secureFields={options.secureJsonFields}
           onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
           onForwardGrafanaHeadersChange={(forwardGrafanaHeaders) =>
             onSwitchToggle('forwardGrafanaHeaders', forwardGrafanaHeaders)
           }
+          onLogHeadersAsCommentChange={(logHeadersAsComment) =>
+            onSwitchToggle('logHeadersAsComment', logHeadersAsComment)
+          }
+          onLogHeadersAsCommentRegexChange={(e) => {
+            onUpdateDatasourceJsonDataOption(props, 'logHeadersAsCommentRegex')(e);
+          }}
         />
       )}
 
