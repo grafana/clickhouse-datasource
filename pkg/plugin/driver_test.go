@@ -317,3 +317,85 @@ func TestContainsClickHouseException(t *testing.T) {
 		assert.True(t, result)
 	})
 }
+
+func TestFrameHasField(t *testing.T) {
+	t.Run("field exists", func(t *testing.T) {
+		frame := &data.Frame{
+			Fields: []*data.Field{
+				data.NewField("timestamp", nil, []int64{1, 2}),
+				data.NewField("body", nil, []string{"msg1", "msg2"}),
+			},
+		}
+		assert.True(t, frameHasField(frame, "body"))
+		assert.True(t, frameHasField(frame, "timestamp"))
+	})
+
+	t.Run("field does not exist", func(t *testing.T) {
+		frame := &data.Frame{
+			Fields: []*data.Field{
+				data.NewField("timestamp", nil, []int64{1, 2}),
+				data.NewField("message", nil, []string{"msg1", "msg2"}),
+			},
+		}
+		assert.False(t, frameHasField(frame, "body"))
+	})
+
+	t.Run("empty frame", func(t *testing.T) {
+		frame := &data.Frame{
+			Fields: []*data.Field{},
+		}
+		assert.False(t, frameHasField(frame, "body"))
+	})
+}
+
+func TestMutateResponseLogsFrameType(t *testing.T) {
+	clickhouse := &Clickhouse{}
+
+	t.Run("sets FrameTypeLogLines when body field exists", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{
+				PreferredVisualization: data.VisTypeLogs,
+			},
+			Fields: []*data.Field{
+				data.NewField("timestamp", nil, []int64{1, 2}),
+				data.NewField("body", nil, []string{"log message 1", "log message 2"}),
+			},
+		}
+
+		frames, err := clickhouse.MutateResponse(nil, data.Frames{frame})
+		assert.NoError(t, err)
+		assert.Equal(t, data.FrameTypeLogLines, frames[0].Meta.Type)
+	})
+
+	t.Run("does not set FrameTypeLogLines when body field is missing", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{
+				PreferredVisualization: data.VisTypeLogs,
+			},
+			Fields: []*data.Field{
+				data.NewField("timestamp", nil, []int64{1, 2}),
+				data.NewField("message", nil, []string{"log message 1", "log message 2"}),
+			},
+		}
+
+		frames, err := clickhouse.MutateResponse(nil, data.Frames{frame})
+		assert.NoError(t, err)
+		assert.Empty(t, frames[0].Meta.Type)
+	})
+
+	t.Run("does not affect non-logs visualization", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{
+				PreferredVisualization: data.VisTypeTable,
+			},
+			Fields: []*data.Field{
+				data.NewField("timestamp", nil, []int64{1, 2}),
+				data.NewField("body", nil, []string{"log message 1", "log message 2"}),
+			},
+		}
+
+		frames, err := clickhouse.MutateResponse(nil, data.Frames{frame})
+		assert.NoError(t, err)
+		assert.Empty(t, frames[0].Meta.Type)
+	})
+}

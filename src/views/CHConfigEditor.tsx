@@ -181,15 +181,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-      options.jsonData.defaultDatabase ||
-      options.jsonData.defaultTable ||
-      options.jsonData.dialTimeout ||
-      options.jsonData.queryTimeout ||
-      options.jsonData.validateSql ||
-      options.jsonData.enableSecureSocksProxy ||
-      options.jsonData.customSettings ||
-      options.jsonData.logs ||
-      options.jsonData.traces
+    options.jsonData.defaultDatabase ||
+    options.jsonData.defaultTable ||
+    options.jsonData.dialTimeout ||
+    options.jsonData.queryTimeout ||
+    options.jsonData.validateSql ||
+    options.jsonData.enableSecureSocksProxy ||
+    options.jsonData.customSettings ||
+    options.jsonData.logs ||
+    options.jsonData.traces
   );
 
   const defaultPort = jsonData.secure

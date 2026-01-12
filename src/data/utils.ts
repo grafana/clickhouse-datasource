@@ -149,7 +149,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (
     // Get the configured TraceId column name for use in both trace and logs queries
     const defaultLogsColumns = datasource.getDefaultLogsColumns();
     // Use traces config traceIdColumn if available, otherwise fallback to logs default
-    const traceIdColumnName = datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
+    const traceIdColumnName =
+      datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
 
     const traceIdQuery: CHBuilderQuery = {
       datasource: datasource,

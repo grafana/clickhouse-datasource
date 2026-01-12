@@ -371,9 +371,16 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 
 // MutateResponse converts fields of type FieldTypeNullableJSON to string,
 // except for specific visualizations (traces, tables, and logs).
+// For logs visualization, it also sets FrameTypeLogLines when a "body" field is present.
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
 	for _, frame := range res {
 		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
+			// Set FrameTypeLogLines if body field exists, so Grafana uses it as log line
+			// instead of falling back to the second string field
+			if frameHasField(frame, "body") {
+				frame.Meta.Type = data.FrameTypeLogLines
+			}
+
 			err := mergeOpenTelemetryLabels(frame)
 			if err != nil {
 				return nil, err
@@ -387,6 +394,16 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 		}
 	}
 	return res, nil
+}
+
+// frameHasField checks if a frame has a field with the given name.
+func frameHasField(frame *data.Frame, fieldName string) bool {
+	for _, field := range frame.Fields {
+		if field.Name == fieldName {
+			return true
+		}
+	}
+	return false
 }
 
 // shouldConvertFields determines whether field conversion is needed based on visualization type.
