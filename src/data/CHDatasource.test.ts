@@ -270,6 +270,46 @@ describe('ClickHouseDatasource', () => {
       expect(values).toEqual([{ text: 'foo' }]);
     });
 
+    it('should replace $__adhoc_column macro when fetching tag values', async () => {
+      const spyOnReplace = jest
+        .spyOn(templateSrvMock, 'replace')
+        .mockImplementation(() => 'SELECT DISTINCT $__adhoc_column FROM foo.bar WHERE timestamp > now() - INTERVAL 1 DAY LIMIT 1000');
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ hostname: 'server1' }, { hostname: 'server2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'hostname' });
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'SELECT DISTINCT hostname FROM foo.bar WHERE timestamp > now() - INTERVAL 1 DAY LIMIT 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'server1' }, { text: 'server2' }]);
+    });
+
+    it('should replace $__adhoc_column with time filter macro', async () => {
+      const spyOnReplace = jest
+        .spyOn(templateSrvMock, 'replace')
+        .mockImplementation(() => 'SELECT DISTINCT $__adhoc_column FROM db.table WHERE $__timeFilter(timestamp) LIMIT 500');
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ event: 'EXCP' }, { event: 'CALL' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'event' });
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'SELECT DISTINCT event FROM db.table WHERE $__timeFilter(timestamp) LIMIT 500' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'EXCP' }, { text: 'CALL' }]);
+    });
+
     it('should Fetch Tag Values from Schema with . in column name', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
       const ds = cloneDeep(mockDatasource);

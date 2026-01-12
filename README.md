@@ -268,6 +268,41 @@ For example, if `clickhouse_adhoc_query` is set to `SELECT DISTINCT
 machine_name FROM mgbench.logs1` you would be able to select which machine
 names are filtered for in the dashboard.
 
+##### Using the `$__adhoc_column` macro
+
+The `$__adhoc_column` macro allows you to write a single query template that
+works for all columns in a table. This is especially useful for large tables
+where querying all columns at once would be too expensive.
+
+The macro will be replaced with the actual column name when fetching values
+for each ad-hoc filter. You can combine it with time filter macros to limit
+the data being scanned.
+
+For example:
+```sql
+SELECT DISTINCT $__adhoc_column
+FROM database.table
+WHERE $__timeFilter(timestamp)
+LIMIT 1000
+```
+
+This query will:
+1. Extract the table name and fetch all available columns for ad-hoc filtering
+2. When a user selects a value for a specific column (e.g., `hostname`), the
+   query becomes: `SELECT DISTINCT column FROM database.table
+   WHERE $__timeFilter(timestamp) LIMIT 1000`
+3. Apply the time range from the dashboard's time picker to limit the scan
+
+You can also use other macros and ClickHouse functions:
+```sql
+SELECT DISTINCT $__adhoc_column
+FROM database.table
+WHERE $__timeFilter(timestamp)
+  AND event != ''
+ORDER BY $__adhoc_column
+LIMIT 500
+```
+
 ## Learn more
 
 - Add [Annotations](https://grafana.com/docs/grafana/latest/dashboards/annotations/).
