@@ -762,4 +762,59 @@ describe('ClickHouseDatasource', () => {
       expect((result as CHBuilderQuery).builderOptions.filters![0].mapKey).toBe('service_name');
     });
   });
+
+  describe('fetchColumnsFromTableCached', () => {
+    let datasource: Datasource;
+    beforeEach(() => {
+      datasource = cloneDeep(mockDatasource);
+      datasource.clearSchemaCache();
+    });
+
+    it('should cache schema results', async () => {
+      const mockColumns = [
+        { name: 'id', type: 'UInt64', label: 'id', picklistValues: [] },
+        { name: 'message', type: 'String', label: 'message', picklistValues: [] },
+      ];
+      const fetchSpy = jest.spyOn(datasource, 'fetchColumnsFromTable').mockResolvedValue(mockColumns);
+
+      // First call should fetch
+      const result1 = await datasource.fetchColumnsFromTableCached('test_db', 'test_table');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(result1).toEqual(mockColumns);
+
+      // Second call should use cache
+      const result2 = await datasource.fetchColumnsFromTableCached('test_db', 'test_table');
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // Still 1, not 2
+      expect(result2).toEqual(mockColumns);
+    });
+
+    it('should fetch different tables separately', async () => {
+      const mockColumns1 = [{ name: 'col1', type: 'String', label: 'col1', picklistValues: [] }];
+      const mockColumns2 = [{ name: 'col2', type: 'Int32', label: 'col2', picklistValues: [] }];
+      const fetchSpy = jest
+        .spyOn(datasource, 'fetchColumnsFromTable')
+        .mockResolvedValueOnce(mockColumns1)
+        .mockResolvedValueOnce(mockColumns2);
+
+      const result1 = await datasource.fetchColumnsFromTableCached('db', 'table1');
+      const result2 = await datasource.fetchColumnsFromTableCached('db', 'table2');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+      expect(result1).toEqual(mockColumns1);
+      expect(result2).toEqual(mockColumns2);
+    });
+
+    it('should clear cache when clearSchemaCache is called', async () => {
+      const mockColumns = [{ name: 'id', type: 'UInt64', label: 'id', picklistValues: [] }];
+      const fetchSpy = jest.spyOn(datasource, 'fetchColumnsFromTable').mockResolvedValue(mockColumns);
+
+      await datasource.fetchColumnsFromTableCached('db', 'table');
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      datasource.clearSchemaCache();
+
+      await datasource.fetchColumnsFromTableCached('db', 'table');
+      expect(fetchSpy).toHaveBeenCalledTimes(2); // Called again after cache clear
+    });
+  });
 });

@@ -78,6 +78,12 @@ export interface CHLogsConfig {
 
   selectContextColumns?: boolean;
   contextColumns?: string[];
+
+  /**
+   * When enabled, shows all available table columns in log details,
+   * even if they are not selected in the query.
+   */
+  showTableSchema?: boolean;
 }
 
 export interface CHTracesConfig {
