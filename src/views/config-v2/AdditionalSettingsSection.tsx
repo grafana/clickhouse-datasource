@@ -8,6 +8,7 @@ import {
 } from '@grafana/data';
 import {
   AliasTableEntry,
+  CHAutoTimeFilterConfig,
   CHConfig,
   CHCustomSetting,
   CHLogsConfig,
@@ -36,6 +37,7 @@ import {
   Text,
   Badge,
   useStyles2,
+  Select,
 } from '@grafana/ui';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 import {
@@ -98,6 +100,19 @@ export const AdditionalSettingsSection = (props: Props) => {
     onTracesConfigChange(key, value);
   };
 
+  const onAutoTimeFilterChange = (key: keyof CHAutoTimeFilterConfig, value: string | boolean) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        autoTimeFilter: {
+          ...(options.jsonData.autoTimeFilter || {}),
+          [key]: value,
+        },
+      },
+    });
+  };
+
   const onAliasTableConfigChange = (aliasTables: AliasTableEntry[]) => {
     onOptionsChange({
       ...options,
@@ -155,6 +170,7 @@ export const AdditionalSettingsSection = (props: Props) => {
       jsonData.validateSql ||
       !shallowSettingsCompare(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
       !shallowSettingsCompare(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
+      jsonData.autoTimeFilter?.enabled ||
       (jsonData.aliasTables && jsonData.aliasTables.length > 0) ||
       jsonData.enableRowLimit ||
       jsonData.enableSecureSocksProxy ||
@@ -238,6 +254,47 @@ export const AdditionalSettingsSection = (props: Props) => {
           onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
           onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
         />
+
+        <Divider />
+        <ConfigSubSection title="Auto Time Filter">
+          <Field
+            label="Enable auto time filter"
+            description="Automatically inject $__timeFilter() macro into SQL queries that don't have explicit time filtering"
+          >
+            <Switch
+              value={jsonData.autoTimeFilter?.enabled ?? false}
+              onChange={(e) => onAutoTimeFilterChange('enabled', e.currentTarget.checked)}
+            />
+          </Field>
+
+          {jsonData.autoTimeFilter?.enabled && (
+            <>
+              <Field
+                label="Time column"
+                description="The column name to use for time filtering (e.g., timestamp, event_time)"
+              >
+                <Input
+                  value={jsonData.autoTimeFilter?.timeColumn ?? ''}
+                  onChange={(e) => onAutoTimeFilterChange('timeColumn', e.currentTarget.value)}
+                  placeholder="e.g., timestamp, event_time"
+                  width={40}
+                />
+              </Field>
+
+              <Field label="Column type" description="DateTime for seconds precision, DateTime64 for milliseconds">
+                <Select
+                  value={jsonData.autoTimeFilter?.timeColumnType ?? 'DateTime'}
+                  options={[
+                    { label: 'DateTime (seconds)', value: 'DateTime' },
+                    { label: 'DateTime64 (milliseconds)', value: 'DateTime64' },
+                  ]}
+                  onChange={(v) => onAutoTimeFilterChange('timeColumnType', v.value!)}
+                  width={30}
+                />
+              </Field>
+            </>
+          )}
+        </ConfigSubSection>
 
         <Divider />
         <TracesConfig

@@ -32,6 +32,7 @@ export interface CHConfig extends DataSourceJsonData {
 
   logs?: CHLogsConfig;
   traces?: CHTracesConfig;
+  autoTimeFilter?: CHAutoTimeFilterConfig;
 
   aliasTables?: AliasTableEntry[];
 
@@ -84,6 +85,15 @@ export interface CHLogsConfig {
    * even if they are not selected in the query.
    */
   showTableSchema?: boolean;
+}
+
+export interface CHAutoTimeFilterConfig {
+  /** Enable automatic time filter injection for queries without explicit time filter */
+  enabled?: boolean;
+  /** The column name to use for time filtering (e.g., 'timestamp', 'event_time') */
+  timeColumn?: string;
+  /** Column type: 'DateTime' for seconds precision, 'DateTime64' for milliseconds */
+  timeColumnType?: 'DateTime' | 'DateTime64';
 }
 
 export interface CHTracesConfig {

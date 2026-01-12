@@ -4,7 +4,7 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack } from '@grafana/ui';
+import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack, Select } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -14,6 +14,7 @@ import {
   Protocol,
   CHTracesConfig,
   AliasTableEntry,
+  CHAutoTimeFilterConfig,
 } from 'types/config';
 import { gte as versionGte } from 'semver';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from 'components/experimental/ConfigSection';
@@ -176,6 +177,18 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       },
     });
   };
+  const onAutoTimeFilterChange = (key: keyof CHAutoTimeFilterConfig, value: string | boolean) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        autoTimeFilter: {
+          ...(options.jsonData.autoTimeFilter || {}),
+          [key]: value,
+        },
+      },
+    });
+  };
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
 
@@ -189,7 +202,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     options.jsonData.enableSecureSocksProxy ||
     options.jsonData.customSettings ||
     options.jsonData.logs ||
-    options.jsonData.traces
+    options.jsonData.traces ||
+    options.jsonData.autoTimeFilter?.enabled
   );
 
   const defaultPort = jsonData.secure
@@ -513,6 +527,48 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onLogsConfigChange('showTableSchema', v);
           }}
         />
+
+        <Divider />
+        <ConfigSubSection title="Auto Time Filter">
+          <Field
+            label="Enable auto time filter"
+            description="Automatically inject $__timeFilter() macro into SQL queries that don't have explicit time filtering"
+          >
+            <Switch
+              className="gf-form"
+              value={jsonData.autoTimeFilter?.enabled ?? false}
+              onChange={(e) => onAutoTimeFilterChange('enabled', e.currentTarget.checked)}
+            />
+          </Field>
+
+          {jsonData.autoTimeFilter?.enabled && (
+            <>
+              <Field
+                label="Time column"
+                description="The column name to use for time filtering (e.g., timestamp, event_time)"
+              >
+                <Input
+                  value={jsonData.autoTimeFilter?.timeColumn ?? ''}
+                  onChange={(e) => onAutoTimeFilterChange('timeColumn', e.currentTarget.value)}
+                  placeholder="e.g., timestamp, event_time"
+                  width={40}
+                />
+              </Field>
+
+              <Field label="Column type" description="DateTime for seconds precision, DateTime64 for milliseconds">
+                <Select
+                  value={jsonData.autoTimeFilter?.timeColumnType ?? 'DateTime'}
+                  options={[
+                    { label: 'DateTime (seconds)', value: 'DateTime' },
+                    { label: 'DateTime64 (milliseconds)', value: 'DateTime64' },
+                  ]}
+                  onChange={(v) => onAutoTimeFilterChange('timeColumnType', v.value!)}
+                  width={30}
+                />
+              </Field>
+            </>
+          )}
+        </ConfigSubSection>
 
         <Divider />
         <TracesConfig

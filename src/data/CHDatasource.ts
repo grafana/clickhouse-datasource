@@ -45,6 +45,7 @@ import {
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
+import { injectTimeFilter } from './autoTimeFilter';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
@@ -812,8 +813,44 @@ export class Datasource
     return localTimezoneInfo?.ianaName;
   }
 
+  /**
+   * Determines if auto time filter should be applied to a query.
+   *
+   * - SQL mode: Always apply (hasTimeFilter check happens in injectTimeFilter)
+   * - Builder Table: Apply if no WithInGrafanaTimeRange filter exists
+   * - Builder TimeSeries/Logs/Traces: Skip (already handled by hooks)
+   */
+  private shouldApplyAutoTimeFilter(query: CHQuery): boolean {
+    // SQL mode: always try to apply (injectTimeFilter handles existing filter detection)
+    if (query.editorType === EditorType.SQL) {
+      return true;
+    }
+
+    // Builder mode: check query type and existing filters
+    if (query.editorType === EditorType.Builder) {
+      const builderQuery = query as CHBuilderQuery;
+      const queryType = builderQuery.builderOptions?.queryType;
+
+      // Table queries: apply if no time range filter exists
+      if (queryType === QueryType.Table) {
+        const hasTimeRangeFilter = builderQuery.builderOptions.filters?.some(
+          (f) =>
+            f.operator === FilterOperator.WithInGrafanaTimeRange ||
+            f.operator === FilterOperator.OutsideGrafanaTimeRange
+        );
+        return !hasTimeRangeFilter;
+      }
+
+      // TimeSeries, Logs, Traces: already handled by useDefaultFilters hooks
+      return false;
+    }
+
+    return false;
+  }
+
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
     const showTableSchema = this.settings.jsonData.logs?.showTableSchema ?? true;
+    const autoTimeFilterConfig = this.settings.jsonData.autoTimeFilter;
 
     const targets = request.targets
       // filters out queries disabled in UI
@@ -821,6 +858,17 @@ export class Datasource
       // attach timezone information and preprocess SQL
       .map((t) => {
         let rawSql = t.rawSql;
+
+        // Auto time filter injection
+        if (autoTimeFilterConfig?.enabled && autoTimeFilterConfig.timeColumn && rawSql) {
+          if (this.shouldApplyAutoTimeFilter(t)) {
+            rawSql = injectTimeFilter(rawSql, {
+              enabled: true,
+              timeColumn: autoTimeFilterConfig.timeColumn,
+              timeColumnType: autoTimeFilterConfig.timeColumnType || 'DateTime',
+            });
+          }
+        }
 
         // For SQL mode Logs queries, auto-add WHERE columns to SELECT if enabled
         if (showTableSchema && t.editorType === EditorType.SQL && rawSql) {
