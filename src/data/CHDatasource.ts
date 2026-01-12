@@ -7,6 +7,7 @@ import {
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  FieldType,
   getTimeZone,
   getTimeZoneInfo,
   LogRowContextOptions,
@@ -24,7 +25,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -41,7 +42,7 @@ import {
   TableColumn,
   TimeUnit,
 } from 'types/queryBuilder';
-import { CHQuery, EditorType } from 'types/sql';
+import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
@@ -53,7 +54,14 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import {
+  appendWhereColumnsToSelect,
+  dataFrameHasLogLabelWithName,
+  extractColumnsFromSql,
+  extractTableFromSql,
+  transformQueryResponseWithTraceAndLogLinks,
+} from './utils';
+import { getSelectColumnNames } from './ast';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -66,6 +74,10 @@ export class Datasource
   skipAdHocFilter = false; // don't apply adhoc filters to the query
   adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
   adHocCHVerReq = { major: 22, minor: 7 };
+
+  // Cache for table schemas to avoid repeated DESC TABLE queries
+  private schemaCache: Map<string, TableColumn[]> = new Map();
+  private static readonly SCHEMA_CACHE_DEFAULT_DB = '_default_';
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -688,6 +700,25 @@ export class Datasource
   }
 
   /**
+   * Fetches table schema with caching to avoid repeated queries.
+   */
+  async fetchColumnsFromTableCached(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const key = `${database || Datasource.SCHEMA_CACHE_DEFAULT_DB}.${table}`;
+    if (!this.schemaCache.has(key)) {
+      const columns = await this.fetchColumnsFromTable(database, table);
+      this.schemaCache.set(key, columns);
+    }
+    return this.schemaCache.get(key) ?? [];
+  }
+
+  /**
+   * Clears the schema cache. Can be called when schema might have changed.
+   */
+  clearSchemaCache(): void {
+    this.schemaCache.clear();
+  }
+
+  /**
    * Fetches SQL functions from server.
    */
   async fetchSqlFunctions(): Promise<SqlFunction[]> {
@@ -782,13 +813,30 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    const showTableSchema = this.settings.jsonData.logs?.showTableSchema ?? true;
+
     const targets = request.targets
       // filters out queries disabled in UI
       .filter((t) => t.hide !== true)
-      // attach timezone information
+      // attach timezone information and preprocess SQL
       .map((t) => {
+        let rawSql = t.rawSql;
+
+        // For Logs queries (both SQL and Builder mode), auto-add WHERE columns to SELECT if enabled
+        if (showTableSchema && rawSql) {
+          const isLogsQuery =
+            (t.editorType === EditorType.SQL && (t as CHSqlQuery).queryType === QueryType.Logs) ||
+            (t.editorType === EditorType.Builder &&
+              (t as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs);
+
+          if (isLogsQuery) {
+            rawSql = appendWhereColumnsToSelect(rawSql);
+          }
+        }
+
         return {
           ...t,
+          rawSql,
           meta: {
             ...t?.meta,
             timezone: this.getTimezone(request),
@@ -801,7 +849,131 @@ export class Datasource
         ...request,
         targets,
       })
-      .pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
+      .pipe(
+        map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)),
+        mergeMap((res: DataQueryResponse) => from(this.addSchemaMetadataToLogFrames(res, targets, showTableSchema)))
+      );
+  }
+
+  /**
+   * Type guard to check if a query is a builder query with builderOptions.
+   */
+  private isBuilderQuery(query: CHQuery): query is CHBuilderQuery {
+    return query.editorType === EditorType.Builder && 'builderOptions' in query;
+  }
+
+  /**
+   * Extracts database, table, and selected columns info from a query.
+   * Returns null if the query should be skipped for schema metadata.
+   * Only processes Logs query type for both Builder and SQL modes.
+   */
+  private extractQueryTableInfo(
+    target: CHQuery
+  ): { database?: string; table: string; selectedColumns: Set<string> } | null {
+    if (this.isBuilderQuery(target)) {
+      if (target.builderOptions.queryType !== QueryType.Logs) {
+        return null;
+      }
+      return {
+        database: target.builderOptions.database,
+        table: target.builderOptions.table || '',
+        selectedColumns: new Set((target.builderOptions.columns || []).map((c) => c.name)),
+      };
+    }
+
+    // SQL mode: only process Logs query type
+    const sqlQuery = target as CHSqlQuery;
+    if (sqlQuery.queryType !== QueryType.Logs) {
+      return null;
+    }
+
+    // SQL mode: parse the query
+    const tableInfo = extractTableFromSql(target.rawSql);
+    if (!tableInfo?.table) {
+      return null;
+    }
+
+    // Check SELECT clause only (ignoring WHERE columns) to detect SELECT *
+    const selectOnlyColumns = getSelectColumnNames(target.rawSql);
+    if (selectOnlyColumns.size === 0) {
+      // SELECT * - all columns already visible, skip schema metadata
+      return null;
+    }
+
+    // Get all queried columns (SELECT + WHERE) for filtering
+    const selectedColumns = extractColumnsFromSql(target.rawSql);
+
+    return {
+      database: tableInfo.database || this.settings.jsonData.defaultDatabase,
+      table: tableInfo.table,
+      selectedColumns,
+    };
+  }
+
+  /**
+   * Appends schema fields to a data frame for columns not in selectedColumns.
+   * @mutates frame - Directly modifies frame.fields array
+   */
+  private appendSchemaFieldsToFrame(frame: DataFrame, schema: TableColumn[], selectedColumns: Set<string>): void {
+    // Get existing field names from the frame to avoid duplicates
+    const existingFieldNames = new Set((frame.fields || []).map((f) => f.name));
+
+    // Filter out columns that are either selected or already exist in the frame
+    const availableColumns = schema.filter(
+      (col) => !selectedColumns.has(col.name) && !existingFieldNames.has(col.name)
+    );
+    if (availableColumns.length === 0) {
+      return;
+    }
+
+    const rowCount = frame.length || frame.fields?.[0]?.values?.length || 0;
+    if (rowCount === 0 || !frame.fields) {
+      return;
+    }
+
+    for (const col of availableColumns) {
+      frame.fields.push({
+        name: col.name,
+        type: FieldType.string,
+        config: {},
+        values: Array(rowCount).fill(`not queried (${col.type})`),
+      });
+    }
+  }
+
+  /**
+   * Adds table schema metadata to log query result frames.
+   */
+  private async addSchemaMetadataToLogFrames(
+    res: DataQueryResponse,
+    targets: CHQuery[],
+    showTableSchema: boolean
+  ): Promise<DataQueryResponse> {
+    if (!showTableSchema) {
+      return res;
+    }
+
+    for (const frame of res.data) {
+      const target = targets.find((t) => t.refId === frame.refId);
+      if (!target) {
+        continue;
+      }
+
+      const queryInfo = this.extractQueryTableInfo(target);
+      if (!queryInfo?.table) {
+        continue;
+      }
+
+      try {
+        const schema = await this.fetchColumnsFromTableCached(queryInfo.database, queryInfo.table);
+        this.appendSchemaFieldsToFrame(frame, schema, queryInfo.selectedColumns);
+      } catch {
+        // Schema fetch failed - silently skip metadata enrichment
+        // This is non-critical; log panel will still display queried columns
+      }
+    }
+
+    return res;
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {

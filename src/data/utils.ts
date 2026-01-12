@@ -12,6 +12,13 @@ import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { logColumnHintsToAlias, generateSql } from './sqlGenerator';
+import {
+  canAutoAddWhereColumns,
+  getAllQueriedColumns,
+  getSelectColumnNames,
+  getTableInfo,
+  getWhereColumnNames,
+} from './ast';
 import otel from 'otel';
 
 /**
@@ -149,7 +156,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (
     // Get the configured TraceId column name for use in both trace and logs queries
     const defaultLogsColumns = datasource.getDefaultLogsColumns();
     // Use traces config traceIdColumn if available, otherwise fallback to logs default
-    const traceIdColumnName = datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
+    const traceIdColumnName =
+      datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
 
     const traceIdQuery: CHBuilderQuery = {
       datasource: datasource,
@@ -357,4 +365,132 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   const labelKeys = Object.keys(labels);
 
   return labelKeys.includes(name);
+};
+
+/**
+ * Extracts database and table name from a SQL query.
+ * Uses AST parsing with regex fallback for robustness.
+ */
+export const extractTableFromSql = (sql: string): { database?: string; table?: string } | null => {
+  // Try AST parsing first
+  try {
+    const astResult = getTableInfo(sql);
+    if (astResult?.table) {
+      return astResult;
+    }
+  } catch {
+    // AST parsing failed, fall through to regex
+  }
+
+  // Regex fallback for cases AST can't handle (e.g., ClickHouse-specific syntax)
+  const fromPattern = /\bFROM\s+(?:["'`]?(\w+)["'`]?\.)?["'`]?(\w+)["'`]?/i;
+  const match = sql.match(fromPattern);
+
+  if (match) {
+    return {
+      database: match[1] || undefined,
+      table: match[2],
+    };
+  }
+  return null;
+};
+
+/**
+ * Extracts queried column names from a SQL statement.
+ * Includes both SELECT and WHERE clause columns.
+ * Uses AST parsing with regex fallback for robustness.
+ */
+export const extractColumnsFromSql = (sql: string): Set<string> => {
+  // Try AST parsing first (includes both SELECT and WHERE columns)
+  try {
+    const astResult = getAllQueriedColumns(sql);
+    // If AST returned results, use them
+    if (astResult.size > 0) {
+      return astResult;
+    }
+    // If SELECT *, AST correctly returned empty set
+    if (sql.match(/SELECT\s+\*/i)) {
+      return astResult;
+    }
+    // AST returned empty but query might have columns - fall through to regex
+  } catch {
+    // AST parsing failed, fall through to regex
+  }
+
+  // Regex fallback (SELECT columns only, no WHERE support for edge cases)
+  const columns = new Set<string>();
+  const selectMatch = sql.match(/\bSELECT\s+([\s\S]*?)\s+FROM\b/i);
+  if (!selectMatch) {
+    return columns;
+  }
+
+  const selectPart = selectMatch[1];
+  if (selectPart.trim() === '*') {
+    return columns;
+  }
+
+  const parts = selectPart.split(',');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    const colMatch = trimmed.match(/^["'`]?(\w+)["'`]?(?:\s|$)/);
+    if (colMatch) {
+      columns.add(colMatch[1]);
+    }
+  }
+
+  return columns;
+};
+
+/**
+ * Appends WHERE clause columns to the SELECT clause if safe to do so.
+ * Skips if query has aggregate functions or GROUP BY (would cause SQL errors).
+ * Returns the original SQL if modification is not possible or not needed.
+ */
+export const appendWhereColumnsToSelect = (sql: string): string => {
+  // Check if it's safe to add columns (no aggregates, no GROUP BY)
+  try {
+    if (!canAutoAddWhereColumns(sql)) {
+      return sql;
+    }
+  } catch {
+    // AST parsing failed, return original SQL
+    return sql;
+  }
+
+  // Get columns from SELECT and WHERE
+  let selectColumns: Set<string>;
+  let whereColumns: Set<string>;
+
+  try {
+    selectColumns = getSelectColumnNames(sql);
+    whereColumns = getWhereColumnNames(sql);
+  } catch {
+    // AST parsing failed, return original SQL
+    return sql;
+  }
+
+  // If SELECT * or no WHERE columns, nothing to add
+  if (selectColumns.size === 0 || whereColumns.size === 0) {
+    return sql;
+  }
+
+  // Find WHERE columns not already in SELECT
+  const columnsToAdd = [...whereColumns].filter((col) => !selectColumns.has(col));
+  if (columnsToAdd.length === 0) {
+    return sql;
+  }
+
+  // Insert columns before FROM clause
+  // Match: SELECT ... FROM (case insensitive)
+  const fromMatch = sql.match(/(\bFROM\b)/i);
+  if (!fromMatch || fromMatch.index === undefined) {
+    return sql;
+  }
+
+  const beforeFrom = sql.substring(0, fromMatch.index).trimEnd();
+  const fromAndAfter = sql.substring(fromMatch.index);
+
+  // Add columns with comma separator
+  const newColumns = columnsToAdd.join(', ');
+  return `${beforeFrom}, ${newColumns} ${fromAndAfter}`;
 };

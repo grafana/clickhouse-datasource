@@ -21,6 +21,7 @@ interface LogsConfigProps {
   onMessageColumnChange: (v: string) => void;
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
+  onShowTableSchemaChange?: (v: boolean) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -34,6 +35,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onMessageColumnChange,
     onSelectContextColumnsChange,
     onContextColumnsChange,
+    onShowTableSchemaChange,
   } = props;
   let {
     defaultDatabase,
@@ -45,6 +47,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     messageColumn,
     selectContextColumns,
     contextColumns,
+    showTableSchema,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
 
@@ -137,6 +140,22 @@ export const LogsConfig = (props: LogsConfigProps) => {
           />
         </div>
       </ConfigSubSection>
+      {onShowTableSchemaChange && (
+        <div style={{ marginTop: 16 }}>
+          <ConfigSubSection
+            title="Log Details Schema"
+            description="Display table schema information in log details panel"
+          >
+            <Switch
+              label="Show table schema in log details"
+              tooltip="When enabled, displays all available table columns in log details, even if they are not selected in the query. Useful for discovering available fields without using SELECT *."
+              value={showTableSchema ?? true}
+              onChange={onShowTableSchemaChange}
+              wide
+            />
+          </ConfigSubSection>
+        </div>
+      )}
     </ConfigSection>
   );
 };

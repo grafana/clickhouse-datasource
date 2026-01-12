@@ -1,7 +1,10 @@
 import { ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import {
+  appendWhereColumnsToSelect,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
+  extractColumnsFromSql,
+  extractTableFromSql,
   isBuilderOptionsRunnable,
   transformQueryResponseWithTraceAndLogLinks,
   tryApplyColumnHints,
@@ -220,9 +223,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
   it('includes TraceId filter in View logs link query using configured column', async () => {
     const mockDatasource = newMockDatasource();
     // Mock that TraceId is configured
-    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(
-      new Map([[ColumnHint.TraceId, 'TraceId']])
-    );
+    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(new Map([[ColumnHint.TraceId, 'TraceId']]));
 
     const builderOptions: Partial<QueryBuilderOptions> = {
       queryType: QueryType.Traces,
@@ -239,16 +240,12 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(logsQuery.builderOptions.columns).toBeDefined();
 
     // TraceId column should be in the columns array
-    const traceIdColumn = logsQuery.builderOptions.columns?.find(
-      (c) => c.hint === ColumnHint.TraceId
-    );
+    const traceIdColumn = logsQuery.builderOptions.columns?.find((c) => c.hint === ColumnHint.TraceId);
     expect(traceIdColumn).toBeDefined();
     expect(traceIdColumn?.name).toBe('TraceId');
 
     // Filter should have the TraceId hint and column name as key
-    const traceIdFilter = logsQuery.builderOptions.filters?.find(
-      (f) => (f as any).hint === ColumnHint.TraceId
-    ) as any;
+    const traceIdFilter = logsQuery.builderOptions.filters?.find((f) => (f as any).hint === ColumnHint.TraceId) as any;
     expect(traceIdFilter).toBeDefined();
     expect(traceIdFilter.key).toBe('TraceId');
   });
@@ -309,5 +306,137 @@ describe('dataFrameHasLogLabelWithName', () => {
       ],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
+  });
+});
+
+describe('extractTableFromSql', () => {
+  it('should extract table from simple query', () => {
+    expect(extractTableFromSql('SELECT * FROM logs')).toEqual({ database: undefined, table: 'logs' });
+  });
+
+  it('should extract database and table', () => {
+    expect(extractTableFromSql('SELECT * FROM default.logs')).toEqual({ database: 'default', table: 'logs' });
+  });
+
+  it('should handle quoted identifiers', () => {
+    expect(extractTableFromSql('SELECT * FROM "my_db"."my_table"')).toEqual({ database: 'my_db', table: 'my_table' });
+    expect(extractTableFromSql("SELECT * FROM 'db'.'table'")).toEqual({ database: 'db', table: 'table' });
+    expect(extractTableFromSql('SELECT * FROM `db`.`table`')).toEqual({ database: 'db', table: 'table' });
+  });
+
+  it('should handle case insensitive FROM', () => {
+    expect(extractTableFromSql('select * from LOGS')).toEqual({ database: undefined, table: 'LOGS' });
+    expect(extractTableFromSql('SELECT * from db.logs')).toEqual({ database: 'db', table: 'logs' });
+  });
+
+  it('should return null for invalid queries', () => {
+    expect(extractTableFromSql('INSERT INTO logs VALUES (1)')).toBeNull();
+    expect(extractTableFromSql('SELECT 1')).toBeNull();
+  });
+});
+
+describe('extractColumnsFromSql', () => {
+  it('should extract single column', () => {
+    const result = extractColumnsFromSql('SELECT message FROM logs');
+    expect(result).toEqual(new Set(['message']));
+  });
+
+  it('should extract multiple columns', () => {
+    const result = extractColumnsFromSql('SELECT timestamp, level, message FROM logs');
+    expect(result).toEqual(new Set(['timestamp', 'level', 'message']));
+  });
+
+  it('should return empty set for SELECT *', () => {
+    const result = extractColumnsFromSql('SELECT * FROM logs');
+    expect(result).toEqual(new Set());
+  });
+
+  it('should handle column aliases', () => {
+    const result = extractColumnsFromSql('SELECT timestamp AS ts, message FROM logs');
+    expect(result).toEqual(new Set(['timestamp', 'message']));
+  });
+
+  it('should handle quoted column names', () => {
+    const result = extractColumnsFromSql('SELECT "timestamp", `level` FROM logs');
+    expect(result).toEqual(new Set(['timestamp', 'level']));
+  });
+
+  it('should return empty set for invalid queries', () => {
+    const result = extractColumnsFromSql('INSERT INTO logs VALUES (1)');
+    expect(result).toEqual(new Set());
+  });
+
+  it('should include WHERE clause columns', () => {
+    const result = extractColumnsFromSql("SELECT timestamp, message FROM logs WHERE service = 'auth'");
+    expect(result).toEqual(new Set(['timestamp', 'message', 'service']));
+  });
+
+  it('should include columns from complex WHERE conditions', () => {
+    const result = extractColumnsFromSql("SELECT ts FROM logs WHERE level IN ('info', 'warn') AND region = 'us-east'");
+    expect(result).toEqual(new Set(['ts', 'level', 'region']));
+  });
+
+  it('should include WHERE columns with SELECT *', () => {
+    const result = extractColumnsFromSql("SELECT * FROM logs WHERE status = 'active'");
+    expect(result).toEqual(new Set(['status']));
+  });
+
+  it('should extract columns from functions in WHERE', () => {
+    const result = extractColumnsFromSql("SELECT a FROM t WHERE lower(name) = 'test'");
+    expect(result).toEqual(new Set(['a', 'name']));
+  });
+});
+
+describe('appendWhereColumnsToSelect', () => {
+  it('should add WHERE column to SELECT', () => {
+    const sql = "SELECT timestamp, message FROM logs WHERE service = 'auth'";
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toBe("SELECT timestamp, message, service FROM logs WHERE service = 'auth'");
+  });
+
+  it('should add multiple WHERE columns', () => {
+    const sql = "SELECT ts FROM logs WHERE level = 'error' AND region = 'us'";
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toContain('level');
+    expect(result).toContain('region');
+  });
+
+  it('should not duplicate columns already in SELECT', () => {
+    const sql = "SELECT timestamp, service FROM logs WHERE service = 'auth'";
+    const result = appendWhereColumnsToSelect(sql);
+    // service should not be added again
+    expect(result).toBe("SELECT timestamp, service FROM logs WHERE service = 'auth'");
+  });
+
+  it('should skip aggregate queries', () => {
+    const sql = "SELECT count() FROM logs WHERE service = 'auth'";
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toBe(sql); // unchanged
+  });
+
+  it('should skip GROUP BY queries', () => {
+    const sql = "SELECT service, count() FROM logs WHERE level = 'error' GROUP BY service";
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toBe(sql); // unchanged
+  });
+
+  it('should skip SELECT * queries', () => {
+    const sql = "SELECT * FROM logs WHERE service = 'auth'";
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toBe(sql); // unchanged (all columns already selected)
+  });
+
+  it('should handle queries without WHERE clause', () => {
+    const sql = 'SELECT timestamp, message FROM logs';
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toBe(sql); // unchanged
+  });
+
+  it('should handle complex WHERE conditions', () => {
+    const sql = "SELECT a FROM t WHERE b = 1 AND c IN ('x', 'y') OR d > 10";
+    const result = appendWhereColumnsToSelect(sql);
+    expect(result).toContain('b');
+    expect(result).toContain('c');
+    expect(result).toContain('d');
   });
 });
