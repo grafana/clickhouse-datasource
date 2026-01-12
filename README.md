@@ -289,7 +289,7 @@ LIMIT 1000
 This query will:
 1. Extract the table name and fetch all available columns for ad-hoc filtering
 2. When a user selects a value for a specific column (e.g., `hostname`), the
-   query becomes: `SELECT DISTINCT hostname FROM TechJournalFull.techlog_monitoring
+   query becomes: `SELECT DISTINCT column FROM database.table
    WHERE $__timeFilter(timestamp) LIMIT 1000`
 3. Apply the time range from the dashboard's time picker to limit the scan
 
