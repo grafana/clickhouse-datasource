@@ -12,10 +12,29 @@ jobs:
   ci:
     name: CI
     uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v5.1.0
+    if: github.ref != 'refs/heads/main'
     permissions:
       contents: read
       id-token: write
     with:
-      go-version: "1.24"
-      golangci-lint-version: "2.1.6"
+      go-version: '1.24'
+      golangci-lint-version: '2.1.6'
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+
+  publish-latest-to-catalog:
+    name: Publish `main` to Dev Catalog
+    if: github.ref == 'refs/heads/main'
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@main # zizmor: ignore[unpinned-uses]
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    with:
+      disable-docs-publishing: true
+      disable-github-release: true
+      environment: 'dev'
+      go-version: '1.24'
+      golangci-lint-version: '2.1.6'
+      plugin-version-suffix: ${{ github.sha }}
+      run-playwright: false
+      scopes: grafana_cloud_instance_datasourcese2e
