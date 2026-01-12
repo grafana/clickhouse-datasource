@@ -20,26 +20,30 @@ import {
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable, map, firstValueFrom } from 'rxjs';
+import LogsContextPanel from 'components/LogsContextPanel';
+import { cloneDeep, isEmpty, isString } from 'lodash';
+import otel from 'otel';
+import { createElement as createReactElement, ReactNode } from 'react';
+import { firstValueFrom, map, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
-import { EditorType, CHQuery } from 'types/sql';
 import {
-  QueryType,
   AggregateColumn,
   AggregateType,
   BuilderMode,
+  ColumnHint,
   Filter,
   FilterOperator,
-  TableColumn,
   OrderByDirection,
   QueryBuilderOptions,
-  ColumnHint,
-  TimeUnit,
+  QueryType,
   SelectedColumn,
   SqlFunction,
+  TableColumn,
+  TimeUnit,
 } from 'types/queryBuilder';
+import { CHQuery, EditorType } from 'types/sql';
+import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
-import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
@@ -49,11 +53,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import otel from 'otel';
-import { createElement as createReactElement, ReactNode } from 'react';
 import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
-import { pluginVersion } from 'utils/version';
-import LogsContextPanel from 'components/LogsContextPanel';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -121,7 +121,10 @@ export class Datasource
     }
   }
 
-  getSupportedSupplementaryQueryTypes(): SupplementaryQueryType[] {
+  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+    if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
+      return [];
+    }
     return [SupplementaryQueryType.LogsVolume];
   }
 
@@ -699,13 +702,15 @@ export class Datasource
       picklistValues: [],
     }));
 
-    const results = await Promise.all(
-      columns
-        .filter((c) => c.type.startsWith('JSON'))
-        .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
-    );
+    return columns;
 
-    return [...columns, ...results.flat()];
+    // TODO: wait for JSON function perf improvements
+    // const results = await Promise.all(
+    //   columns
+    //     .filter((c) => c.type.startsWith('JSON'))
+    //     .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
+    // );
+    // return [...columns, ...results.flat()];
   }
 
   /**
@@ -872,7 +877,8 @@ export class Datasource
 
   private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
     const { from } = this.getTagSource();
-    const [table, col] = key.split('.');
+    const [table, ...colParts] = key.split('.');
+    const col = colParts.join('.');
     const source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     const rawSql = `select distinct ${col} from ${source} limit 1000`;
     const frame = await this.runQuery({ rawSql });

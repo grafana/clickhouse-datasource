@@ -299,4 +299,11 @@ describe('AdHocManager', () => {
       expect(result).toEqual(" key = \\'val\\' AND key2 = \\'val2\\' ");
     });
   });
+  it('should apply ad hoc filter with . in column name', () => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply('SELECT stuff FROM foo', [
+      { key: 'TABLE.key.key2', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(`SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key.key2 = \\'val\\' '}`);
+  });
 });

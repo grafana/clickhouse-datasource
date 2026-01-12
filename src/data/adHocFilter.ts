@@ -83,7 +83,7 @@ function escapeKey(s: string): string {
       return `${array}[\\'${key}\\']`;
     }
   }
-  return s.includes('.') ? s.split('.')[1] : s;
+  return s.includes('.') ? s.split('.').slice(1).join('.') : s;
 }
 
 function escapeValueBasedOnOperator(s: string, operator: string): string {
