@@ -50,6 +50,8 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"Dynamic":                   regexp.MustCompile(`^Dynamic`),
 	"JSON":                      regexp.MustCompile(`^JSON`),
 	"Nullable(JSON)":            regexp.MustCompile(`^Nullable\(JSON`),
+	"Enum":                      regexp.MustCompile(`^Enum(8|16)\(.*\)`),
+	"Nullable(Enum)":            regexp.MustCompile(`^Nullable\(Enum(8|16)\(.*\)\)`),
 }
 
 // Converters defines a list of type converters.
@@ -60,6 +62,18 @@ var Converters = []Converter{
 		name:      "String",
 		fieldType: data.FieldTypeString,
 		scanType:  reflect.PointerTo(reflect.TypeOf("")),
+	},
+	{
+		name:       "Enum",
+		fieldType:  data.FieldTypeString,
+		matchRegex: matchRegexes["Enum"],
+		scanType:   reflect.PointerTo(reflect.TypeOf("")),
+	},
+	{
+		name:       "Nullable(Enum)",
+		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["Nullable(Enum)"],
+		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
 	},
 	{
 		name:      "Bool",
