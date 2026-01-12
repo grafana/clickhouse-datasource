@@ -864,19 +864,12 @@ export class Datasource
     const { from } = this.getTagSource();
     const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
 
-    let col: string;
-    let source: string;
+    const [table, ...colParts] = key.split('.');
+    const col = colParts.join('.');
+    let source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
 
-    if (hideTableName) {
-      // When table names are hidden, key is just the column name
-      // Use the 'from' source directly
-      col = key;
-      source = from || '';
-    } else {
-      // Original behavior: key format is "table.column"
-      const [table, column] = key.split('.');
-      col = column;
-      source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
+    if (hideTableName && from) {
+      source = from;
     }
 
     const rawSql = `select distinct ${col} from ${source} limit 1000`;
