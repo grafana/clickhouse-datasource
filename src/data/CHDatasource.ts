@@ -248,7 +248,16 @@ export class Datasource
           `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
         );
       }
-      rawQuery = this.adHocFilter.apply(rawQuery, filters);
+      // Check if query contains $__adHocFilters macro
+      const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
+
+      // Apply $__adHocFilters macro before automatic filter application
+      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters);
+
+      // Only apply automatic filters if the macro was not used
+      if (!hasMacro) {
+        rawQuery = this.adHocFilter.apply(rawQuery, filters);
+      }
     }
     this.skipAdHocFilter = false;
 
@@ -285,6 +294,23 @@ export class Datasource
       macroIndex = rawQuery.lastIndexOf(macro);
     }
     return rawQuery;
+  }
+
+  applyAdHocFiltersMacro(rawQuery: string, filters: AdHocVariableFilter[]): string {
+    if (!rawQuery) {
+      return rawQuery;
+    }
+
+    // Match $__adHocFilters('table_name') or $__adHocFilters("table_name")
+    const regex = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/g;
+
+    return rawQuery.replace(regex, (match, tableName) => {
+      const filterStr = this.adHocFilter.buildFilterString(filters);
+      if (filterStr === '') {
+        return 'additional_table_filters={}';
+      }
+      return `additional_table_filters={'${tableName}': '${filterStr}'}`;
+    });
   }
 
   // Support filtering by field value in Explore

@@ -92,4 +92,11 @@ export const pluginMacros: PluginMacro[] = [
       'Replaced by the first parameter when the template variable in the second parameter does not select every value. Replaced by 1=1 when the template variable selects every value',
     example: 'condition or 1=1',
   },
+  {
+    name: '$__adHocFilters',
+    isFunction: true,
+    documentation:
+      'Manually applies ad-hoc filters to a specific table. Useful for complex queries where automatic filter detection fails. Use in SETTINGS clause to specify the target table for ad-hoc filters',
+    example: "additional_table_filters={'table_name': 'column = \\'value\\' AND column2 = \\'value2\\'}",
+  },
 ];
