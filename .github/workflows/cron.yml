@@ -14,7 +14,7 @@ permissions:
 jobs:
   bench-tests:
     name: Run E2E Tests with Grafana Bench
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     
     # ensure job never runs on forks
