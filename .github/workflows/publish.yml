@@ -29,11 +29,12 @@ jobs:
       matrix:
         environment: [dev, ops, prod]
     name: CD
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@main # zizmor: ignore[unpinned-uses]
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
     permissions:
       contents: write
       id-token: write
       attestations: write
+      pull-requests: read
     with:
       branch: ${{ github.event.inputs.branch }}
       environment: ${{ matrix.environment }}
