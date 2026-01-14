@@ -148,6 +148,85 @@ describe('ClickHouseDatasource', () => {
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
     });
+
+    it('should expand $__adHocFilters macro with single quotes', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters('my_table')",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      const adHocFilters = [
+        { key: 'key', operator: '=', value: 'val' },
+        { key: 'keyNum', operator: '=', value: '123' },
+      ];
+
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, adHocFilters);
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'my_table': ' key = \\'val\\' AND keyNum = \\'123\\' '}"
+      );
+    });
+
+    it('should expand $__adHocFilters macro with double quotes', async () => {
+      const query = {
+        rawSql: 'SELECT * FROM complex_table settings $__adHocFilters("my_table")',
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      const adHocFilters = [{ key: 'key', operator: '=', value: 'val' }];
+
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, adHocFilters);
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'my_table': ' key = \\'val\\' '}"
+      );
+    });
+
+    it('should expand $__adHocFilters macro to empty object when no filters are present', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters('my_table')",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, []);
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(result.rawSql).toEqual('SELECT * FROM complex_table settings additional_table_filters={}');
+    });
+
+    it('should handle $__adHocFilters macro with spaces', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters(  'my_table'  )",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      const adHocFilters = [{ key: 'key', operator: '=', value: 'val' }];
+
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, adHocFilters);
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'my_table': ' key = \\'val\\' '}"
+      );
+    });
   });
 
   describe('Tag Keys', () => {
