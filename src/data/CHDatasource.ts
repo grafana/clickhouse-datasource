@@ -890,12 +890,18 @@ export class Datasource
     const { from } = this.getTagSource();
     const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
 
-    const [table, ...colParts] = key.split('.');
-    const col = colParts.join('.');
-    let source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
+    let col: string;
+    let source: string;
 
     if (hideTableName && from) {
+      // When hideTableNameInAdhocFilters is true, key is just the column name (e.g., 'bar')
+      col = key;
       source = from;
+    } else {
+      // When hideTableNameInAdhocFilters is false, key is 'table.column' format (e.g., 'foo.bar')
+      const [table, ...colParts] = key.split('.');
+      col = colParts.join('.');
+      source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     }
 
     const rawSql = `select distinct ${col} from ${source} limit 1000`;

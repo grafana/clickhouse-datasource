@@ -437,6 +437,43 @@ describe('ClickHouseDatasource', () => {
 
       expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
     });
+
+    it('should handle nested column names with dots when hideTableNameInAdhocFilters is true', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const frame = arrayToDataFrame([{ 'nested.field': 'value1' }, { 'nested.field': 'value2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'nested.field' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct nested.field from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+
+    it('should handle nested column names with dots when hideTableNameInAdhocFilters is false', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const frame = arrayToDataFrame([{ 'nested.field': 'value1' }, { 'nested.field': 'value2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'foo.nested.field' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct nested.field from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
   });
 
   describe('Conditional All', () => {
