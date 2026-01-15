@@ -16,52 +16,69 @@ jobs:
     name: Run E2E Tests with Grafana Bench
     runs-on: ubuntu-24.04
     timeout-minutes: 60
-    
+
     # ensure job never runs on forks
     if: ${{ github.event_name != 'schedule' || github.repository_owner == 'grafana' }}
 
+    # this job needs OIDC to fetch Vault secrets
     permissions:
       contents: read
       id-token: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
+          # Avoid leaving a token in the repo checkout; prefer explicit auth for publishing steps
           persist-credentials: false
 
       - name: Get secrets from Vault
         id: get-secrets
         uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
         with:
+          # Grafana auth (used by @grafana/plugin-e2e)
+          # + Prometheus creds for Bench metrics reporting
           common_secrets: |
             PLAYWRIGHT_GRAFANA_PASSWORD=data-sources/e2e:grafana-pw
             PLAYWRIGHT_GRAFANA_USERNAME=data-sources/e2e:grafana-username
+            PROMETHEUS_PASSWORD=grafana-bench:prometheus_token
+            PROMETHEUS_URL=grafana-bench:prometheus_url
+            PROMETHEUS_USER=grafana-bench:prometheus_user
+
+          # Repo-specific backend secrets (naming varies by datasource)
           repo_secrets: |
             DS_INSTANCE_HOST=ds-instance:host
             DS_INSTANCE_PASSWORD=ds-instance:password
             DS_INSTANCE_PORT=ds-instance:port
             DS_INSTANCE_USERNAME=ds-instance:username
+
+          # Keep secrets in step output; we’ll pass them to Bench explicitly
           export_env: false
 
       - name: Wait for Grafana to be reachable
         uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
         with:
+          # Use /login so “reachable” also implies the app is up
           url: "https://datasourcese2e.grafana-dev.net/login"
-          timeout: 300  # 5 minutes
-          interval: 10  # 10 seconds
+          timeout: 300 # 5 minutes
+          interval: 10 # 10 seconds
 
       - name: Run Grafana Bench tests
         run: |
-          set -euo pipefail 
+          set -euo pipefail
           docker run \
-            --rm \
+            -e PROMETHEUS_URL="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_URL }}" \
+            -e PROMETHEUS_USER="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_USER }}" \
+            -e PROMETHEUS_PASSWORD="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_PASSWORD }}" \
             --network=host \
+            --rm \
             --volume "$PWD:/tests" \
             us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v0.6.11 test \
-            --grafana-version "rrc-instant" \
             --grafana-admin-password "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}" \
             --grafana-admin-user "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}" \
             --grafana-url "https://datasourcese2e.grafana-dev.net" \
+            --grafana-version "rrc-instant" \
+            --prometheus-metrics \
+            --prometheus-strict-lint \
             --pw-execute "npm run e2e" \
             --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
             --test-env 'CI=true,DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }},DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }},DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }},DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }},DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e' \
