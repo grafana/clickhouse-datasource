@@ -7,6 +7,7 @@ import {
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  Field,
   getTimeZone,
   getTimeZoneInfo,
   LogRowContextOptions,
@@ -861,8 +862,9 @@ export class Datasource
       return frame.fields.map((f) => ({ text: f.name }));
     }
     const view = new DataFrameView(frame);
+    const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
     return view.map((item) => ({
-      text: `${item[2]}.${item[0]}`,
+      text: hideTableName ? item[0] : `${item[2]}.${item[0]}`,
     }));
   }
 
@@ -875,17 +877,7 @@ export class Datasource
     return this.fetchTagValuesFromSchema(key);
   }
 
-  private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
-    const { from } = this.getTagSource();
-    const [table, ...colParts] = key.split('.');
-    const col = colParts.join('.');
-    const source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
-    const rawSql = `select distinct ${col} from ${source} limit 1000`;
-    const frame = await this.runQuery({ rawSql });
-    if (frame.fields?.length === 0) {
-      return [];
-    }
-    const field = frame.fields[0];
+  private fieldValuesToMetricFindValues(field: Field): MetricFindValue[] {
     // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
     return field.values
       .filter((value) => value !== null)
@@ -894,16 +886,56 @@ export class Datasource
       });
   }
 
+  private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
+    const { from } = this.getTagSource();
+    const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
+
+    let col: string;
+    let source: string;
+
+    if (hideTableName && from) {
+      // When hideTableNameInAdhocFilters is true, key is just the column name (e.g., 'bar')
+      col = key;
+      source = from;
+    } else {
+      // When hideTableNameInAdhocFilters is false, key is 'table.column' format (e.g., 'foo.bar')
+      const [table, ...colParts] = key.split('.');
+      col = colParts.join('.');
+      source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
+    }
+
+    const rawSql = `select distinct ${col} from ${source} limit 1000`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const field = frame.fields[0];
+    return this.fieldValuesToMetricFindValues(field);
+  }
+
   private async fetchTagValuesFromQuery(key: string): Promise<MetricFindValue[]> {
+    const tagSource = this.getTagSource();
+
+    // Check if the query contains the $__adhoc_column macro
+    if (tagSource.source && tagSource.source.includes('$__adhoc_column')) {
+      // Replace the macro with the actual column name
+      const queryWithColumn = tagSource.source.replace(/\$__adhoc_column/g, key);
+      this.skipAdHocFilter = true;
+      const frame = await this.runQuery({ rawSql: queryWithColumn });
+
+      if (frame.fields?.length === 0) {
+        return [];
+      }
+
+      const field = frame.fields[0];
+      return this.fieldValuesToMetricFindValues(field);
+    }
+
+    // Fallback to the original behavior
     const { frame } = await this.fetchTags();
     const field = frame.fields.find((f) => f.name === key);
     if (field) {
-      // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
-      return field.values
-        .filter((value) => value !== null)
-        .map((value) => {
-          return { text: String(value) };
-        });
+      return this.fieldValuesToMetricFindValues(field);
     }
     return [];
   }
@@ -919,11 +951,44 @@ export class Datasource
     }
 
     if (tagSource.type === TagType.query) {
-      this.adHocFilter.setTargetTableFromQuery(tagSource.source);
+      // Check if the query contains the $__adhoc_column macro
+      if (tagSource.source.includes('$__adhoc_column')) {
+        // Extract table name from the query and get column list from system.columns
+        const tableName = this.extractTableNameFromQuery(tagSource.source);
+        if (tableName) {
+          this.adHocFilter.setTargetTableFromQuery(tagSource.source.replace(/\$__adhoc_column/g, '*'));
+
+          // Parse database.table format
+          const parts = tableName.split('.');
+          let query: string;
+          if (parts.length === 2) {
+            const [db, table] = parts;
+            query = `SELECT name, type, table FROM system.columns WHERE database = '${db}' AND table = '${table}'`;
+          } else {
+            query = `SELECT name, type, table FROM system.columns WHERE table = '${tableName}'`;
+          }
+          const results = await this.runQuery({ rawSql: query });
+          return { type: TagType.schema, frame: results };
+        }
+      } else {
+        this.adHocFilter.setTargetTableFromQuery(tagSource.source);
+      }
     }
 
     const results = await this.runQuery({ rawSql: tagSource.source });
     return { type: tagSource.type, frame: results };
+  }
+
+  private extractTableNameFromQuery(query: string): string | null {
+    // Try to extract table name from FROM clause
+    // Supports formats: FROM table, FROM database.table, FROM "database"."table"
+    const fromMatch = query.match(/FROM\s+(?:"?(\w+)"?\.)?"?(\w+)"?/i);
+    if (fromMatch) {
+      const database = fromMatch[1];
+      const table = fromMatch[2];
+      return database ? `${database}.${table}` : table;
+    }
+    return null;
   }
 
   private getTagSource() {
