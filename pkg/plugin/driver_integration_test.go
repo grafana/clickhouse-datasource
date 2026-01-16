@@ -1020,6 +1020,62 @@ func TestConvertEnum(t *testing.T) {
 	}
 }
 
+func TestConvertEnum8(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Enum8('WRITABLE' = 0, 'CONST' = 1, 'CHANGEABLE_IN_READONLY' = 2)", protocol, nil)
+			defer close(t)
+			insertData(t, conn, "CONST")
+			checkRows(t, conn, 1, "CONST")
+		})
+	}
+}
+
+func TestConvertNullableEnum8(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Nullable(Enum8('WRITABLE' = 0, 'CONST' = 1, 'CHANGEABLE_IN_READONLY' = 2))", protocol, nil)
+			defer close(t)
+			insertData(t, conn, "CONST")
+			val := "CONST"
+			checkRows(t, conn, 1, &val)
+		})
+	}
+}
+
+func TestConvertNullableEnum8WithNull(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Nullable(Enum8('WRITABLE' = 0, 'CONST' = 1, 'CHANGEABLE_IN_READONLY' = 2))", protocol, nil)
+			defer close(t)
+			insertData(t, conn, nil)
+			checkRows(t, conn, 1, (*string)(nil))
+		})
+	}
+}
+
+func TestConvertEnum16(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Enum16('option1' = 1000, 'option2' = 2000)", protocol, nil)
+			defer close(t)
+			insertData(t, conn, "option1")
+			checkRows(t, conn, 1, "option1")
+		})
+	}
+}
+
+func TestConvertNullableEnum16WithNull(t *testing.T) {
+	for name, protocol := range Protocols {
+		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
+			conn, close := setupTest(t, "col1 Nullable(Enum16('option1' = 1000, 'option2' = 2000))", protocol, nil)
+			defer close(t)
+			insertData(t, conn, nil)
+			checkRows(t, conn, 1, (*string)(nil))
+		})
+	}
+}
+
 func TestConvertUUID(t *testing.T) {
 	for name, protocol := range Protocols {
 		t.Run(fmt.Sprintf("using %s", name), func(t *testing.T) {
