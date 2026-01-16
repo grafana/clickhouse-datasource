@@ -17,5 +17,5 @@ jobs:
       id-token: write
     with:
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
-      go-version: "1.24"
+      go-version: "1.25"
       golangci-lint-version: "2.1.6"
