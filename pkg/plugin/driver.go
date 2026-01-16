@@ -184,6 +184,15 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 		httpHeaders[k] = v
 	}
 
+	if settings.LogHeadersAsComment {
+		logComment, err := headersToLogComment(httpHeaders, settings.LogHeadersAsCommentRegex)
+		if err != nil {
+			backend.Logger.Warn("Failed to serialize headers as JSON", "error", err)
+		} else {
+			customSettings["log_comment"] = logComment
+		}
+	}
+
 	opts := &clickhouse.Options{
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
 		Auth: clickhouse.Auth{
@@ -479,6 +488,22 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 	}
 
 	return httpHeaders, nil
+}
+
+// headersToLogComment serializes the headers to a JSON string for use as a log comment.
+func headersToLogComment(headers map[string]string, regexPattern *regexp.Regexp) (string, error) {
+	// Compile the regex pattern
+	whiteListedHeaders := make(map[string]string)
+	for k, v := range headers {
+		if regexPattern.MatchString(k) {
+			whiteListedHeaders[k] = v
+		}
+	}
+	headersJSON, err := json.Marshal(whiteListedHeaders)
+	if err != nil {
+		return "", err
+	}
+	return string(headersJSON), nil
 }
 
 func mergeOpenTelemetryLabels(frame *data.Frame) error {

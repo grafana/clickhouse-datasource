@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -315,5 +316,41 @@ func TestContainsClickHouseException(t *testing.T) {
 		multiErr := errors.Join(regularErr, chErr)
 		result := containsClickHouseException(multiErr)
 		assert.True(t, result)
+	})
+}
+
+func TestHeadersToLogComment(t *testing.T) {
+	regexPattern := "(?i)^(x-dashboard|x-panel|x-rule)"
+
+	t.Run("filters and serializes whitelisted headers", func(t *testing.T) {
+		headers := map[string]string{
+			"X-Dashboard-Id": "123",
+			"X-Panel-Id":     "456",
+			"X-Grafana-Id":   "should-be-excluded",
+			"Authorization":  "should-be-excluded",
+		}
+
+		result, err := headersToLogComment(headers, regexp.MustCompile(regexPattern))
+		assert.NoError(t, err)
+
+		var resultMap map[string]string
+		err = json.Unmarshal([]byte(result), &resultMap)
+		assert.NoError(t, err)
+
+		assert.Equal(t, "123", resultMap["X-Dashboard-Id"])
+		assert.Equal(t, "456", resultMap["X-Panel-Id"])
+		assert.NotContains(t, resultMap, "X-Grafana-Id")
+		assert.NotContains(t, resultMap, "Authorization")
+	})
+
+	t.Run("returns empty JSON object when no whitelisted headers", func(t *testing.T) {
+		headers := map[string]string{
+			"X-Grafana-Id":  "value",
+			"Authorization": "token",
+		}
+
+		result, err := headersToLogComment(headers, regexp.MustCompile(regexPattern))
+		assert.NoError(t, err)
+		assert.Equal(t, "{}", result)
 	})
 }
