@@ -24,7 +24,7 @@ jobs:
   publish-latest-to-catalog:
     name: Publish `main` to Dev Catalog
     if: github.ref == 'refs/heads/main'
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v6.0.0
     permissions:
       attestations: write
       contents: write
