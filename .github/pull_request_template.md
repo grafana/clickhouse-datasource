@@ -1,5 +1,6 @@
 <!-- Please take time to fill out the below template appropriately, deleting sections where necessary. -->
 <!-- Doing so will aid our reviewers in providing timely feedback and allow us to reach an outcome faster. Thanks! -->
+<!-- Please delete all sections that do not apply. -->
 <!-- To surface this PR in the changelog add the label: changelog -->
 <!-- If this PR is going in the changelog please make sure the title of the PR explains the feature in a user-centric way: -->
 <!-- Bad: fix state bug in hooks -->
@@ -40,10 +41,6 @@ _Provide step-by-step instructions for reviewers to test the feature._
 2.
 3.
 
-### Special notes for your reviewer
-
-_Use this section for any additional information that may help the reviewer, such as implementation decisions, areas of concern, or context that doesn't fit elsewhere._
-
 ---
 
 ## Bug Fix
@@ -76,10 +73,6 @@ _If there is no open issue, please specify the versions where the bug occurs._
 - **Grafana version**:
 - **Plugin version**:
 
-### Special notes for your reviewer
-
-_Use this section for any additional information that may help the reviewer, such as implementation decisions, areas of concern, or context that doesn't fit elsewhere._
-
 ---
 
 ## Screenshots / Videos
@@ -96,3 +89,7 @@ _Please provide screenshots or videos demonstrating the bug or the feature worki
 
 - [ ] Tests for this change have been added/updated.
 - [ ] Documentation has been added/updated (where applicable).
+
+## Special notes for your reviewer
+
+_Use this section for any additional information that may help the reviewer, such as implementation decisions, areas of concern, or context that doesn't fit elsewhere. If you'd like to request review or feedback on a specific part of your changes, please note that here._
