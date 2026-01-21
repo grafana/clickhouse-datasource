@@ -76,6 +76,12 @@ export default {
           tooltip:
             'Enable using the Grafana row limit setting to limit the number of rows returned from Clickhouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
         },
+        hideTableNameInAdhocFilters: {
+          label: 'Hide table name in ad hoc filters',
+          testid: 'data-testid hide-table-name-in-adhoc-filters-switch',
+          tooltip:
+            'Show only column names in ad hoc filter keys instead of the full "table.column" format. This simplifies the filter interface when working with schemas that have many tables. Defaults to false.',
+        },
       },
       HttpHeadersConfig: {
         title: 'HTTP Headers',

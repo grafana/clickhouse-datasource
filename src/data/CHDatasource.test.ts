@@ -367,6 +367,115 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('Hide Table Name In AdHoc Filters', () => {
+    it('should return only column names when hideTableNameInAdhocFilters is true', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'String', table: 'table' }]);
+      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([{ text: 'foo' }]);
+    });
+
+    it('should return table.column when hideTableNameInAdhocFilters is false', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'String', table: 'table' }]);
+      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([{ text: 'table.foo' }]);
+    });
+
+    it('should return table.column when hideTableNameInAdhocFilters is undefined (default)', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.hideTableNameInAdhocFilters = undefined;
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'String', table: 'table' }]);
+      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([{ text: 'table.foo' }]);
+    });
+
+    it('should fetch tag values with column name when hideTableNameInAdhocFilters is true', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const frame = arrayToDataFrame([{ bar: 'value1' }, { bar: 'value2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'bar' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct bar from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+
+    it('should fetch tag values with table.column format when hideTableNameInAdhocFilters is false', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const frame = arrayToDataFrame([{ bar: 'value1' }, { bar: 'value2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'foo.bar' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct bar from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+
+    it('should handle nested column names with dots when hideTableNameInAdhocFilters is true', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'foo');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const frame = arrayToDataFrame([{ 'nested.field': 'value1' }, { 'nested.field': 'value2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'nested.field' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct nested.field from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+
+    it('should handle nested column names with dots when hideTableNameInAdhocFilters is false', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const frame = arrayToDataFrame([{ 'nested.field': 'value1' }, { 'nested.field': 'value2' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const values = await ds.getTagValues({ key: 'foo.nested.field' });
+      expect(spyOnReplace).toHaveBeenCalled();
+      const expected = { rawSql: 'select distinct nested.field from foo limit 1000' };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+  });
+
   describe('Conditional All', () => {
     it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
       const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';
