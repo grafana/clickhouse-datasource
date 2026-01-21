@@ -45,7 +45,7 @@ describe('ServerAndEncryptionSection', () => {
     expect(onOptionsChangeMock).toHaveBeenCalled();
   });
 
-  it('updates protocol on radio toggle', () => {
+  it('updates protocol value on radio button toggle', () => {
     render(<ServerAndEncryptionSection {...defaultProps} />);
 
     const httpOption = screen.getByRole('radio', { name: /http/i });
@@ -53,6 +53,52 @@ describe('ServerAndEncryptionSection', () => {
 
     expect(onOptionsChangeMock).toHaveBeenCalled();
     expect(onOptionsChangeMock.mock.lastCall[0].jsonData.protocol).toBe(Protocol.Http);
+  });
+
+  it('renders HTTPS label instead of HTTP when secure is enabled', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: {
+          host: '',
+          secure: true,
+          protocol: Protocol.Http,
+          port: undefined,
+          pdcInjected: false,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<ServerAndEncryptionSection {...props} />);
+
+    expect(screen.getByRole('radio', { name: /https/i })).toBeInTheDocument();
+  });
+
+  it('renders HTTPS secure port description', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: {
+          host: '',
+          secure: true,
+          protocol: Protocol.Http,
+          port: undefined,
+          pdcInjected: false,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<ServerAndEncryptionSection {...props} />);
+
+    expect(screen.getByText(/default for HTTPS: 8443/i)).toBeInTheDocument();
   });
 
   it('calls onOptionsChange when server port is changed', () => {
