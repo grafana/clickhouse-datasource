@@ -22,7 +22,7 @@ jobs:
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
 
   publish-latest-to-catalog:
-    name: Publish `main` to Dev Catalog
+    name: Publish main to Dev Catalog
     if: github.ref == 'refs/heads/main'
     uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
     permissions:
@@ -38,3 +38,34 @@ jobs:
       plugin-version-suffix: ${{ github.sha }}
       run-playwright: false
       scopes: grafana_cloud_instance_datasourcese2e
+
+  trigger-argo-workflow:
+    name: Trigger Argo Workflow
+    runs-on: ubuntu-24.04
+    if: github.ref == 'refs/heads/main'
+    needs: publish-latest-to-catalog
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Read plugin ID
+        id: plugin-id
+        run: |
+          echo "PLUGIN_ID=$(jq -r .id < ./src/plugin.json)" >> $GITHUB_OUTPUT
+      - name: Read package version
+        id: package-version
+        run: |
+          echo "PACKAGE_VERSION=$(jq -r .version < ./package.json)" >> $GITHUB_OUTPUT
+      - name: Trigger workflow
+        uses: grafana/shared-workflows/actions/trigger-argo-workflow@d29b9161f1803baed4a7305c85cb5a3018bc3c3e # trigger-argo-workflow/v1.2.1
+        with:
+          instance: dev
+          namespace: grafana-datasources-cd
+          workflow_template: ${{ steps.plugin-id.outputs.PLUGIN_ID }}
+          parameters: |
+            dockertag=${{ steps.package-version.outputs.PACKAGE_VERSION }}-${{ github.sha }}
+            prCommentContext='triggered by push to main on datasource: ${{ steps.plugin-id.outputs.PLUGIN_ID }}'
+            commit_author="grafana-delivery-bot"
