@@ -641,7 +641,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
     colName.includes(' as ')
   ) {
     colName = col.name;
-  } else if (colName.includes(' ')) {
+  } else if (colName.includes(' ') || colName.includes(':')) {
     colName = escapeIdentifier(col.name);
   }
 
