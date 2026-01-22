@@ -49,7 +49,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
         ? 'HTTPS'
         : 'HTTP'
       : jsonData.secure
-        ? 'secure Native'
+        ? 'Native (secure)'
         : 'Native';
 
   const portDescription = `${labels.serverPort.tooltip} (default for ${protocolLabel}: ${defaultPort})`;
