@@ -485,6 +485,30 @@ describe('SQL Generator', () => {
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
+
+  it('generates table query with column names containing colons', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'verifications',
+      queryType: QueryType.Table,
+      columns: [
+        { name: 'verification:id', type: 'String' },
+        { name: 'my:name', type: 'String' },
+        { name: 'regular_column', type: 'String' },
+      ],
+      limit: 1000,
+      filters: [],
+      orderBy: [],
+    };
+
+    const expectedSqlParts = [
+      'SELECT "verification:id", "my:name", regular_column',
+      'FROM "default"."verifications" LIMIT 1000',
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
 });
 
 describe('isAggregateQuery', () => {
@@ -551,6 +575,10 @@ describe('getColumnIdentifier', () => {
     { input: { name: 'test with alias', alias: 'a' }, expected: `"test with alias" as "a"` },
     { input: { name: 'test_with_alias', alias: 'b' }, expected: `test_with_alias as "b"` },
     { input: { name: '"test" as a', alias: '' }, expected: `"test" as a` },
+    { input: { name: 'verification:id' }, expected: `"verification:id"` },
+    { input: { name: 'my:name' }, expected: `"my:name"` },
+    { input: { name: 'namespace:field:value' }, expected: `"namespace:field:value"` },
+    { input: { name: 'verification:id', alias: 'vid' }, expected: `"verification:id" as "vid"` },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {
