@@ -2,11 +2,16 @@ name: Plugins - CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
 
-permissions: {}
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: plugins-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   ci:
@@ -42,6 +47,7 @@ jobs:
   trigger-argo-workflow:
     name: Trigger Argo Workflow
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     if: github.ref == 'refs/heads/main'
     needs: publish-latest-to-catalog
     permissions:
@@ -51,21 +57,28 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
       - name: Read plugin ID
-        id: plugin-id
+        id: plugin
+        shell: bash
         run: |
-          echo "PLUGIN_ID=$(jq -r .id < ./src/plugin.json)" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          echo "id=$(jq -er .id ./src/plugin.json)" >> "$GITHUB_OUTPUT"
+
       - name: Read package version
-        id: package-version
+        id: pkg
+        shell: bash
         run: |
-          echo "PACKAGE_VERSION=$(jq -r .version < ./package.json)" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          echo "version=$(jq -er .version ./package.json)" >> "$GITHUB_OUTPUT"
+
       - name: Trigger workflow
         uses: grafana/shared-workflows/actions/trigger-argo-workflow@d29b9161f1803baed4a7305c85cb5a3018bc3c3e # trigger-argo-workflow/v1.2.1
         with:
           instance: ops
           namespace: grafana-datasources-cd
-          workflow_template: ${{ steps.plugin-id.outputs.PLUGIN_ID }}
+          workflow_template: ${{ steps.plugin.outputs.id }}
           parameters: |
-            dockertag=${{ steps.package-version.outputs.PACKAGE_VERSION }}-${{ github.sha }}
-            prCommentContext='triggered by push to main on datasource: ${{ steps.plugin-id.outputs.PLUGIN_ID }}'
+            dockertag=${{ steps.pkg.outputs.version }}-${{ github.sha }}
+            prCommentContext="triggered-by-push-to-main datasource=${{ steps.plugin.outputs.id }}"
             commit_author="grafana-delivery-bot"
