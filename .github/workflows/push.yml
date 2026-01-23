@@ -62,7 +62,7 @@ jobs:
       - name: Trigger workflow
         uses: grafana/shared-workflows/actions/trigger-argo-workflow@d29b9161f1803baed4a7305c85cb5a3018bc3c3e # trigger-argo-workflow/v1.2.1
         with:
-          instance: dev
+          instance: ops
           namespace: grafana-datasources-cd
           workflow_template: ${{ steps.plugin-id.outputs.PLUGIN_ID }}
           parameters: |
