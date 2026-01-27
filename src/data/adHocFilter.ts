@@ -11,6 +11,32 @@ export class AdHocFilter {
     }
   }
 
+  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+    if (!adHocFilters || adHocFilters.length === 0) {
+      return '';
+    }
+
+    const validFilters = adHocFilters.filter((filter: AdHocVariableFilter) => {
+      const valid = isValid(filter);
+      if (!valid) {
+        console.warn('Invalid adhoc filter will be ignored:', filter);
+      }
+      return valid;
+    });
+
+    const filters = validFilters
+      .map((f, i) => {
+        const key = escapeKey(f.key, useJSON);
+        const value = escapeValueBasedOnOperator(f.value, f.operator);
+        const condition = i !== validFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
+        const operator = convertOperatorToClickHouseOperator(f.operator);
+        return ` ${key} ${operator} ${value} ${condition}`;
+      })
+      .join('');
+
+    return filters;
+  }
+
   apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
@@ -29,22 +55,7 @@ export class AdHocFilter {
       return sql;
     }
 
-    const filters = adHocFilters
-      .filter((filter: AdHocVariableFilter) => {
-        const valid = isValid(filter);
-        if (!valid) {
-          console.warn('Invalid adhoc filter will be ignored:', filter);
-        }
-        return valid;
-      })
-      .map((f, i) => {
-        const key = escapeKey(f.key, useJSON);
-        const value = escapeValueBasedOnOperator(f.value, f.operator);
-        const condition = i !== adHocFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
-        const operator = convertOperatorToClickHouseOperator(f.operator);
-        return ` ${key} ${operator} ${value} ${condition}`;
-      })
-      .join('');
+    const filters = this.buildFilterString(adHocFilters, useJSON);
 
     if (filters === '') {
       return sql;
@@ -56,7 +67,7 @@ export class AdHocFilter {
 }
 
 function isValid(filter: AdHocVariableFilter): boolean {
-  return filter.key !== undefined && filter.operator !== undefined && filter.value !== undefined;
+  return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
 }
 
 function escapeKey(s: string, isJSON = false): string {
@@ -80,7 +91,7 @@ function escapeKey(s: string, isJSON = false): string {
       return `${array}[\\'${key}\\']`;
     }
   }
-  return s.includes('.') ? s.split('.')[1] : s;
+  return s.includes('.') ? s.split('.').slice(1).join('.') : s;
 }
 
 function escapeValueBasedOnOperator(s: string, operator: string): string {

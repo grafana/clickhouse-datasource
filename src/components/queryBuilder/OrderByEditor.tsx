@@ -50,6 +50,7 @@ const OrderByItem = (props: OrderByItemProps) => {
         size="sm"
         icon="trash-alt"
         onClick={() => removeOrderByItem(index)}
+        aria-label="order-by-remove-item"
       />
     </>
   );

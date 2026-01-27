@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -21,7 +22,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/grafana-plugin-sdk-go/experimental/errorsource"
 	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
 	"golang.org/x/net/proxy"
@@ -254,7 +254,7 @@ func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInsta
 
 		backend.Logger.Error("failed to create ClickHouse client")
 		backend.Logger.Debug("clickhouse client creation error", "error", err)
-		return nil, errorsource.DownstreamError(fmt.Errorf("failed to create ClickHouse client"), false)
+		return nil, backend.DownstreamError(fmt.Errorf("failed to create ClickHouse client"))
 	}
 
 	return db, settings.isValid()
@@ -299,6 +299,15 @@ func containsClickHouseException(err error) bool {
 		return true
 	}
 
+	// Catch legacy ClickHouse HTTP error format.
+	// This is more general than the above and we attempt the DB::Exception catch first
+	// as those errors also contain this pattern.
+	// We're only catching 4xx errors for now but we can expand to 5xx if needed.
+	matcher, _ := regexp.Compile(`(\[HTTP 4\d\d\])`)
+	if matcher.MatchString(errStr) {
+		return true
+	}
+
 	// Check for multiple wrapped errors (e.g., from errors.Join)
 	type multiError interface {
 		Unwrap() []error
@@ -334,6 +343,13 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	if user := backend.UserFromContext(ctx); user != nil {
+		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
+			Products: nil,
+			Comment:  []string{fmt.Sprintf("grafana_user:%s", user.Login)},
+		}))
+	}
+
 	var dataQuery struct {
 		Meta struct {
 			TimeZone string `json:"timezone"`
@@ -383,7 +399,7 @@ func convertNullableJSONFields(frame *data.Frame) error {
 	var convertedFields []*data.Field
 
 	for _, field := range frame.Fields {
-		if field.Type() == data.FieldTypeNullableJSON {
+		if field.Type() == data.FieldTypeJSON {
 			newField, err := convertFieldToString(field)
 			if err != nil {
 				return err

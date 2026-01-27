@@ -108,7 +108,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   }, builderState);
 
   useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
-  useOtelColumns(datasource, builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useOtelColumns(datasource, allColumns, builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
   useDefaultTimeColumn(
     datasource,
     allColumns,

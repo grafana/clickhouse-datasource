@@ -172,6 +172,7 @@ const AliasTableEditor = (props: AliasTableEditorProps) => {
             size="sm"
             icon="trash-alt"
             onClick={onRemove}
+            aria-label="alias-remove-entry"
           />
         )}
       </Stack>

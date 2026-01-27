@@ -29,17 +29,18 @@ jobs:
       matrix:
         environment: [dev, ops, prod]
     name: CD
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@main # zizmor: ignore[unpinned-uses]
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
     permissions:
       contents: write
       id-token: write
       attestations: write
+      pull-requests: read
     with:
       branch: ${{ github.event.inputs.branch }}
       environment: ${{ matrix.environment }}
       docs-only: ${{ fromJSON(github.event.inputs.docs-only) }}
       scopes: ${{ github.event.inputs.environment == 'cloud (recommended)' && 'grafana_cloud' || github.event.inputs.environment == 'on-prem (for emergencies fix to On Prem customers)' && 'universal' }}
-      go-version: "1.24"
+      go-version: "1.25"
       golangci-lint-version: "2.1.6"
       run-playwright: false
       github-draft-release: false

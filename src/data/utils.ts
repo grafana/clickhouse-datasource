@@ -11,7 +11,7 @@ import {
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
-import { logColumnHintsToAlias } from './sqlGenerator';
+import { logColumnHintsToAlias, generateSql } from './sqlGenerator';
 import otel from 'otel';
 
 /**
@@ -146,6 +146,11 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       return;
     }
 
+    // Get the configured TraceId column name for use in both trace and logs queries
+    const defaultLogsColumns = datasource.getDefaultLogsColumns();
+    // Use traces config traceIdColumn if available, otherwise fallback to logs default
+    const traceIdColumnName = datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
+
     const traceIdQuery: CHBuilderQuery = {
       datasource: datasource,
       editorType: EditorType.Builder,
@@ -237,7 +242,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
             type: 'string',
             operator: FilterOperator.Equals,
             filterType: 'custom',
-            key: '',
+            key: traceIdColumnName,
             hint: ColumnHint.TraceId,
             condition: 'AND',
             value: '${__value.raw}',
@@ -267,7 +272,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
             type: 'string',
             operator: FilterOperator.Equals,
             filterType: 'custom',
-            key: '',
+            key: traceIdColumnName,
             hint: ColumnHint.TraceId,
             condition: 'AND',
             value: '${__value.raw}',
@@ -280,15 +285,25 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         },
       };
 
-      const defaultColumns = datasource.getDefaultLogsColumns();
-      for (let [hint, colName] of defaultColumns) {
+      for (let [hint, colName] of defaultLogsColumns) {
         options.columns!.push({ name: colName, hint });
+      }
+
+      // Ensure TraceId column is in the array so filter can find it via hint lookup
+      if (!options.columns!.find((c) => c.hint === ColumnHint.TraceId)) {
+        options.columns!.push({ name: traceIdColumnName, hint: ColumnHint.TraceId });
       }
 
       traceLogsQuery.builderOptions = options;
     }
 
+    // Generate rawSql for Dashboard mode to preserve query through serialization
     const openInNewWindow = req.app !== CoreApp.Explore;
+    if (openInNewWindow) {
+      traceLogsQuery.rawSql = generateSql(traceLogsQuery.builderOptions || {});
+    } else {
+      traceLogsQuery.rawSql = '';
+    }
     traceField.config.links = [];
     traceField.config.links!.push({
       title: 'View trace',

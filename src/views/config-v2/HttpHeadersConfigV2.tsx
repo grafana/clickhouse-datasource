@@ -161,6 +161,7 @@ const HttpHeaderEditorV2 = (props: HttpHeaderEditorProps) => {
             size="sm"
             icon="trash-alt"
             onClick={onRemove}
+            aria-label="http-header-remove"
           />
         )}
       </Stack>

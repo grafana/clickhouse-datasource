@@ -7,6 +7,7 @@ import {
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  Field,
   getTimeZone,
   getTimeZoneInfo,
   LogRowContextOptions,
@@ -20,26 +21,30 @@ import {
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable, map, firstValueFrom } from 'rxjs';
+import LogsContextPanel from 'components/LogsContextPanel';
+import { cloneDeep, isEmpty, isString } from 'lodash';
+import otel from 'otel';
+import { createElement as createReactElement, ReactNode } from 'react';
+import { firstValueFrom, map, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
-import { EditorType, CHQuery } from 'types/sql';
 import {
-  QueryType,
   AggregateColumn,
   AggregateType,
   BuilderMode,
+  ColumnHint,
   Filter,
   FilterOperator,
-  TableColumn,
   OrderByDirection,
   QueryBuilderOptions,
-  ColumnHint,
-  TimeUnit,
+  QueryType,
   SelectedColumn,
   SqlFunction,
+  TableColumn,
+  TimeUnit,
 } from 'types/queryBuilder';
+import { CHQuery, EditorType } from 'types/sql';
+import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
-import { cloneDeep, isEmpty, isString } from 'lodash';
 import {
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
@@ -49,11 +54,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import otel from 'otel';
-import { createElement as createReactElement, ReactNode } from 'react';
 import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
-import { pluginVersion } from 'utils/version';
-import LogsContextPanel from 'components/LogsContextPanel';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -121,7 +122,10 @@ export class Datasource
     }
   }
 
-  getSupportedSupplementaryQueryTypes(): SupplementaryQueryType[] {
+  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+    if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
+      return [];
+    }
     return [SupplementaryQueryType.LogsVolume];
   }
 
@@ -248,7 +252,17 @@ export class Datasource
       }
 
       const useJSON = Boolean(templateSrvVariables.find(v => v.name === 'clickhouse_adhoc_use_json'));
-      rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
+
+      // Check if query contains $__adHocFilters macro
+      const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
+
+      // Apply $__adHocFilters macro before automatic filter application
+      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON);
+
+      // Only apply automatic filters if the macro was not used
+      if (!hasMacro) {
+        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
+      }
     }
     this.skipAdHocFilter = false;
 
@@ -287,6 +301,23 @@ export class Datasource
     return rawQuery;
   }
 
+  applyAdHocFiltersMacro(rawQuery: string, filters: AdHocVariableFilter[], useJSON = false): string {
+    if (!rawQuery) {
+      return rawQuery;
+    }
+
+    // Match $__adHocFilters('table_name') or $__adHocFilters("table_name")
+    const regex = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/g;
+
+    return rawQuery.replace(regex, (match, tableName) => {
+      const filterStr = this.adHocFilter.buildFilterString(filters, useJSON);
+      if (filterStr === '') {
+        return 'additional_table_filters={}';
+      }
+      return `additional_table_filters={'${tableName}': '${filterStr}'}`;
+    });
+  }
+
   // Support filtering by field value in Explore
   modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
     if (query.editorType !== EditorType.Builder || !action.options || !action.options.key || !action.options.value) {
@@ -316,7 +347,7 @@ export class Datasource
       getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
     const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
     const columnType = column ? column.type || '' : '';
-    const hasMapKey = mapKey !== '' || Boolean(lookupByLogLabels);
+    const hasMapKey = (mapKey ||= lookupByLogLabels ? columnName : '') !== '';
 
     let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
     if (action.type === 'ADD_FILTER') {
@@ -558,6 +589,27 @@ export class Datasource
     return this.settings.jsonData.traces?.traceLinksColumnPrefix || 'Links';
   }
 
+  /**
+   * Get the TraceId column name from traces configuration
+   * Used when creating logs filter to correlate with trace data
+   */
+  getTracesTraceIdColumn(): string | undefined {
+    const traceConfig = this.settings.jsonData.traces;
+    if (!traceConfig) {
+      return undefined;
+    }
+
+    const otelEnabled = traceConfig.otelEnabled;
+    const otelVersion = traceConfig.otelVersion;
+
+    const otelConfig = otel.getVersion(otelVersion);
+    if (otelEnabled && otelConfig) {
+      return otelConfig.traceColumnMap.get(ColumnHint.TraceId);
+    }
+
+    return traceConfig.traceIdColumn;
+  }
+
   async fetchDatabases(): Promise<string[]> {
     return this.fetchData('SHOW DATABASES');
   }
@@ -655,13 +707,15 @@ export class Datasource
       picklistValues: [],
     }));
 
-    const results = await Promise.all(
-      columns
-        .filter((c) => c.type.startsWith('JSON'))
-        .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
-    );
+    return columns;
 
-    return [...columns, ...results.flat()];
+    // TODO: wait for JSON function perf improvements
+    // const results = await Promise.all(
+    //   columns
+    //     .filter((c) => c.type.startsWith('JSON'))
+    //     .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
+    // );
+    // return [...columns, ...results.flat()];
   }
 
   /**
@@ -812,8 +866,9 @@ export class Datasource
       return frame.fields.map((f) => ({ text: f.name }));
     }
     const view = new DataFrameView(frame);
+    const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
     return view.map((item) => ({
-      text: `${item[2]}.${item[0]}`,
+      text: hideTableName ? item[0] : `${item[2]}.${item[0]}`,
     }));
   }
 
@@ -826,16 +881,7 @@ export class Datasource
     return this.fetchTagValuesFromSchema(key);
   }
 
-  private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
-    const { from } = this.getTagSource();
-    const [table, col] = key.split('.');
-    const source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
-    const rawSql = `select distinct ${col} from ${source} limit 1000`;
-    const frame = await this.runQuery({ rawSql });
-    if (frame.fields?.length === 0) {
-      return [];
-    }
-    const field = frame.fields[0];
+  private fieldValuesToMetricFindValues(field: Field): MetricFindValue[] {
     // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
     return field.values
       .filter((value) => value !== null)
@@ -844,16 +890,56 @@ export class Datasource
       });
   }
 
+  private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
+    const { from } = this.getTagSource();
+    const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
+
+    let col: string;
+    let source: string;
+
+    if (hideTableName && from) {
+      // When hideTableNameInAdhocFilters is true, key is just the column name (e.g., 'bar')
+      col = key;
+      source = from;
+    } else {
+      // When hideTableNameInAdhocFilters is false, key is 'table.column' format (e.g., 'foo.bar')
+      const [table, ...colParts] = key.split('.');
+      col = colParts.join('.');
+      source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
+    }
+
+    const rawSql = `select distinct ${col} from ${source} limit 1000`;
+    const frame = await this.runQuery({ rawSql });
+    if (frame.fields?.length === 0) {
+      return [];
+    }
+    const field = frame.fields[0];
+    return this.fieldValuesToMetricFindValues(field);
+  }
+
   private async fetchTagValuesFromQuery(key: string): Promise<MetricFindValue[]> {
+    const tagSource = this.getTagSource();
+
+    // Check if the query contains the $__adhoc_column macro
+    if (tagSource.source && tagSource.source.includes('$__adhoc_column')) {
+      // Replace the macro with the actual column name
+      const queryWithColumn = tagSource.source.replace(/\$__adhoc_column/g, key);
+      this.skipAdHocFilter = true;
+      const frame = await this.runQuery({ rawSql: queryWithColumn });
+
+      if (frame.fields?.length === 0) {
+        return [];
+      }
+
+      const field = frame.fields[0];
+      return this.fieldValuesToMetricFindValues(field);
+    }
+
+    // Fallback to the original behavior
     const { frame } = await this.fetchTags();
     const field = frame.fields.find((f) => f.name === key);
     if (field) {
-      // Convert to string to avoid https://github.com/grafana/grafana/issues/12209
-      return field.values
-        .filter((value) => value !== null)
-        .map((value) => {
-          return { text: String(value) };
-        });
+      return this.fieldValuesToMetricFindValues(field);
     }
     return [];
   }
@@ -869,11 +955,44 @@ export class Datasource
     }
 
     if (tagSource.type === TagType.query) {
-      this.adHocFilter.setTargetTableFromQuery(tagSource.source);
+      // Check if the query contains the $__adhoc_column macro
+      if (tagSource.source.includes('$__adhoc_column')) {
+        // Extract table name from the query and get column list from system.columns
+        const tableName = this.extractTableNameFromQuery(tagSource.source);
+        if (tableName) {
+          this.adHocFilter.setTargetTableFromQuery(tagSource.source.replace(/\$__adhoc_column/g, '*'));
+
+          // Parse database.table format
+          const parts = tableName.split('.');
+          let query: string;
+          if (parts.length === 2) {
+            const [db, table] = parts;
+            query = `SELECT name, type, table FROM system.columns WHERE database = '${db}' AND table = '${table}'`;
+          } else {
+            query = `SELECT name, type, table FROM system.columns WHERE table = '${tableName}'`;
+          }
+          const results = await this.runQuery({ rawSql: query });
+          return { type: TagType.schema, frame: results };
+        }
+      } else {
+        this.adHocFilter.setTargetTableFromQuery(tagSource.source);
+      }
     }
 
     const results = await this.runQuery({ rawSql: tagSource.source });
     return { type: tagSource.type, frame: results };
+  }
+
+  private extractTableNameFromQuery(query: string): string | null {
+    // Try to extract table name from FROM clause
+    // Supports formats: FROM table, FROM database.table, FROM "database"."table"
+    const fromMatch = query.match(/FROM\s+(?:"?(\w+)"?\.)?"?(\w+)"?/i);
+    if (fromMatch) {
+      const database = fromMatch[1];
+      const table = fromMatch[2];
+      return database ? `${database}.${table}` : table;
+    }
+    return null;
   }
 
   private getTagSource() {
