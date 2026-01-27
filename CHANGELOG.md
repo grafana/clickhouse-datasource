@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.13.0
+
+### Features
+
+- Support for hiding table names in ad-hoc filters (#1493)
+- Allow manual placement of ad-hoc filters (#1488)
+- Add support for Nullable(Enum8/16) column types (#1523)
+- Add dashboard variable to control AdHoc filter syntax (#1464)
+
+### Fixes
+
+- Fix generating query with column names containing colons (#1538)
+- Update config HTTPS language (#1537)
+- Dependency updates
+
 ## 4.12.0
 
 ### Features
