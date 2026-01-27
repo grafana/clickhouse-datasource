@@ -7,6 +7,7 @@
 - Support for hiding table names in ad-hoc filters (#1493)
 - Allow manual placement of ad-hoc filters (#1488)
 - Add support for Nullable(Enum8/16) column types (#1523)
+- Add dashboard variable to control AdHoc filter syntax (#1464)
 
 ### Fixes
 
