@@ -26,7 +26,7 @@ const otel129: OtelVersion = {
   specUrl: 'https://opentelemetry.io/docs/specs/otel',
   logsTable: defaultLogsTable,
   logColumnMap: new Map<ColumnHint, string>([
-    [ColumnHint.Time, 'Timestamp'],
+    [ColumnHint.Time, 'TimestampTime'],
     [ColumnHint.LogMessage, 'Body'],
     [ColumnHint.LogLevel, 'SeverityText'],
     [ColumnHint.LogLabels, 'LogAttributes'],
