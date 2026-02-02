@@ -123,7 +123,10 @@ describe('ClickHouseDatasource', () => {
       const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
 
       // Setup ad-hoc filters
-      const adHocFilters = [{ key: 'column', operator: '=', value: 'value' }];
+      const adHocFilters = [
+        { key: 'column', operator: '=', value: 'value' },
+        { key: 'column.nested', operator: '=', value: 'value2' }
+      ];
 
       // Mock getAdhocFilters to return our test filters
       jest.spyOn(templateSrvMock, 'getAdhocFilters').mockImplementation(() => adHocFilters);
@@ -143,11 +146,62 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
     });
+
+    it('should apply ad-hoc filters correctly with JSON and template variables for table names', async () => {
+      // Setup the query with template variables for table names
+      const query = {
+        rawSql: 'SELECT * FROM ${database}.${table}',
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      // Mock the ad-hoc filter
+      const adHocFilter = new AdHocFilter();
+
+      // The resolved table name after template variable substitution
+      const resolvedSql = 'SELECT * FROM test_db.test_table';
+
+      // The expected final SQL with ad-hoc filters applied
+      const sqlWithAdHocFilters = `SELECT * FROM test_db.test_table settings additional_table_filters={'test_db.test_table' : ' column = \\'value\\' '}`;
+
+      // Mock the template variable resolution
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => resolvedSql);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [{name: 'clickhouse_adhoc_use_json'}]);
+
+      // Setup ad-hoc filters
+      const adHocFilters = [
+        { key: 'column', operator: '=', value: 'value' },
+        { key: 'column.nested', operator: '=', value: 'value2' }
+      ];
+
+      // Mock getAdhocFilters to return our test filters
+      jest.spyOn(templateSrvMock, 'getAdhocFilters').mockImplementation(() => adHocFilters);
+
+      // Mock adHocFilter.apply to return our expected modified SQL
+      const applyFilterSpy = jest.spyOn(adHocFilter, 'apply').mockImplementation(() => sqlWithAdHocFilters);
+
+      // Create datasource instance with our mocked ad-hoc filter
+      const ds = createInstance({});
+      ds.adHocFilter = adHocFilter;
+
+      // Resolve variables
+      const result = ds.applyTemplateVariables(query, {}, adHocFilters);
+
+      // Verify template variables were resolved before ad-hoc filters were applied
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+
+      // Verify that apply was called with the resolved SQL
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true);
+
+      // Verify that the final query contains the ad-hoc filters
+      expect(result.rawSql).toEqual(sqlWithAdHocFilters);
+    });
+
 
     it('should expand $__adHocFilters macro with single quotes', async () => {
       const query = {
