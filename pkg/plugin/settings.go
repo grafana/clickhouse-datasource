@@ -148,10 +148,20 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 	// Deprecated: Replaced with DialTimeout for v4. Deserializes "timeout" field for old v3 configs.
 	if jsonData["timeout"] != nil {
-		settings.DialTimeout = jsonData["timeout"].(string)
+		if val, ok := jsonData["timeout"].(string); ok {
+			settings.DialTimeout = val
+		}
+		if val, ok := jsonData["timeout"].(float64); ok {
+			settings.DialTimeout = fmt.Sprintf("%d", int64(val))
+		}
 	}
 	if jsonData["dialTimeout"] != nil {
-		settings.DialTimeout = jsonData["dialTimeout"].(string)
+		if val, ok := jsonData["dialTimeout"].(string); ok {
+			settings.DialTimeout = val
+		}
+		if val, ok := jsonData["dialTimeout"].(float64); ok {
+			settings.DialTimeout = fmt.Sprintf("%d", int64(val))
+		}
 	}
 
 	if jsonData["queryTimeout"] != nil {
