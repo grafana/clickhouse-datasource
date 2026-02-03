@@ -73,7 +73,7 @@ jobs:
           echo "version=$(jq -er .version ./package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Trigger workflow
-        uses: grafana/shared-workflows/actions/trigger-argo-workflow@d29b9161f1803baed4a7305c85cb5a3018bc3c3e # trigger-argo-workflow/v1.2.1
+        uses: grafana/shared-workflows/actions/trigger-argo-workflow@ac5193564bb463032623a9a0ba23716f866f309c # trigger-argo-workflow/v1.2.1
         with:
           instance: ops
           namespace: grafana-datasources-cd
