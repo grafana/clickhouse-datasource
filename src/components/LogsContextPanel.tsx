@@ -159,7 +159,6 @@ const LogContextKey = (props: LogContextKeyProps) => {
     <div className={styles.container} data-testid={Components.LogsContextPanel.LogsContextKey}>
       <div className={styles.containerLeft}>
         <Icon name={iconMatcher(name)} size="md" />
-        <div>test</div>
         <span className={styles.contextName}>{name}</span>
       </div>
       <span className={styles.contextValue}>{value}</span>
