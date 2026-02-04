@@ -20,7 +20,7 @@ import {
 } from '@grafana/ui';
 import allLabels from './labelsV2';
 import { CHConfig, CHSecureConfig, Protocol } from 'types/config';
-import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH, PROTOCOL_OPTIONS } from './constants';
+import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 import { css } from '@emotion/css';
 import {
   trackClickhouseConfigV2HostInput,
@@ -43,8 +43,23 @@ export const ServerAndEncryptionSection = (props: Props) => {
     : jsonData.protocol === Protocol.Native
       ? labels.serverPort.insecureNativePort
       : labels.serverPort.insecureHttpPort;
-  const portDescription = `${labels.serverPort.tooltip} (default for ${jsonData.secure ? 'secure' : ''} ${jsonData.protocol}: ${defaultPort})`;
+  const protocolLabel =
+    jsonData.protocol === Protocol.Http
+      ? jsonData.secure
+        ? 'HTTPS'
+        : 'HTTP'
+      : jsonData.secure
+        ? 'Native (secure)'
+        : 'Native';
+
+  const portDescription = `${labels.serverPort.tooltip} (default for ${protocolLabel}: ${defaultPort})`;
+
   const styles = useStyles2(getStyles);
+
+  const PROTOCOL_OPTIONS = [
+    { label: 'Native', value: Protocol.Native },
+    { label: options.jsonData.secure ? 'HTTPS' : 'HTTP', value: Protocol.Http },
+  ];
 
   const onProtocolToggle = (protocol: Protocol) => {
     onOptionsChange({

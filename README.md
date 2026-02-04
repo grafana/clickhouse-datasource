@@ -255,6 +255,10 @@ Ad Hoc filters. It should be a `constant` type named `clickhouse_adhoc_query`
 and can contain: a comma delimited list of databases, just one database, or a
 database.table combination to show only columns for a single table.
 
+Ad Hoc filters also work with the Map and JSON types for OTel data.
+Map is the default, and will automatically convert the merged labels output into a usable filter.
+To have the filter logic use JSON syntax, add a dashboard variable with a `constant` type called `clickhouse_adhoc_use_json` (the variable's `value` is ignored, it just has to be present).
+
 For more information on Ad Hoc filters, check the [Grafana
 docs](https://grafana.com/docs/grafana/latest/variables/variable-types/add-ad-hoc-filters/)
 

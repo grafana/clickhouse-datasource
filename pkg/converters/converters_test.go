@@ -86,6 +86,68 @@ func TestNullableString(t *testing.T) {
 	assert.Equal(t, value, actual)
 }
 
+func TestEnum8(t *testing.T) {
+	value := "CONST"
+	sut := GetConverter("Enum8('WRITABLE' = 0, 'CONST' = 1, 'CHANGEABLE_IN_READONLY' = 2)")
+	require.NotNil(t, sut.InputScanType, "Enum8 converter should be found")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(string)
+	assert.Equal(t, value, actual)
+}
+
+func TestEnum16(t *testing.T) {
+	value := "option1"
+	sut := GetConverter("Enum16('option1' = 1000, 'option2' = 2000)")
+	require.NotNil(t, sut.InputScanType, "Enum16 converter should be found")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(string)
+	assert.Equal(t, value, actual)
+}
+
+func TestNullableEnum8(t *testing.T) {
+	value := "CONST"
+	valuePtr := &value
+	sut := GetConverter("Nullable(Enum8('WRITABLE' = 0, 'CONST' = 1, 'CHANGEABLE_IN_READONLY' = 2))")
+	require.NotNil(t, sut.InputScanType, "Nullable(Enum8) converter should be found")
+	v, err := sut.FrameConverter.ConverterFunc(&valuePtr)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, valuePtr, actual)
+}
+
+func TestNullableEnum8ShouldBeNil(t *testing.T) {
+	var value *string
+	sut := GetConverter("Nullable(Enum8('WRITABLE' = 0, 'CONST' = 1, 'CHANGEABLE_IN_READONLY' = 2))")
+	require.NotNil(t, sut.InputScanType, "Nullable(Enum8) converter should be found")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, (*string)(nil), actual)
+}
+
+func TestNullableEnum16(t *testing.T) {
+	value := "option1"
+	valuePtr := &value
+	sut := GetConverter("Nullable(Enum16('option1' = 1000, 'option2' = 2000))")
+	require.NotNil(t, sut.InputScanType, "Nullable(Enum16) converter should be found")
+	v, err := sut.FrameConverter.ConverterFunc(&valuePtr)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, valuePtr, actual)
+}
+
+func TestNullableEnum16ShouldBeNil(t *testing.T) {
+	var value *string
+	sut := GetConverter("Nullable(Enum16('option1' = 1000, 'option2' = 2000))")
+	require.NotNil(t, sut.InputScanType, "Nullable(Enum16) converter should be found")
+	v, err := sut.FrameConverter.ConverterFunc(&value)
+	assert.Nil(t, err)
+	actual := v.(*string)
+	assert.Equal(t, (*string)(nil), actual)
+}
+
 func TestBool(t *testing.T) {
 	value := true
 	sut := GetConverter("Bool")
