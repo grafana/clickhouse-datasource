@@ -54,7 +54,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { dataFrameHasLogLabelWithName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -325,7 +325,7 @@ export class Datasource
     }
 
     let columnName = action.options.key || '';
-    const actionFrame: DataFrame | undefined = (action as any).frame;
+    // const actionFrame: DataFrame | undefined = (action as any).frame;
     const actionValue = action.options.value;
     let mapKey = '';
 
@@ -342,12 +342,9 @@ export class Datasource
     const lookupByLogsAlias = logAliasToColumnHints.has(columnName)
       ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!)
       : undefined;
-    const lookupByLogLabels =
-      dataFrameHasLogLabelWithName(actionFrame, columnName) &&
-      getColumnByHint(query.builderOptions, ColumnHint.LogLabels);
-    const column = lookupByAlias || lookupByName || lookupByLogsAlias || lookupByLogLabels;
+    const column = lookupByAlias || lookupByName || lookupByLogsAlias;
     const columnType = column ? column.type || '' : '';
-    const hasMapKey = (mapKey ||= lookupByLogLabels ? columnName : '') !== '';
+    const hasMapKey = mapKey !== '';
 
     let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
     if (action.type === 'ADD_FILTER') {
@@ -1056,7 +1053,12 @@ export class Datasource
             // entire map was selected
             (f.name === mapName ||
               // single key was selected from map
-              f.name === `arrayElement(${mapName}, '${keyName}')`))
+              f.name === `arrayElement(${mapName}, '${keyName}')`
+            )
+            || (
+              f.name === 'labels'
+            )
+          )
       );
       if (!field) {
         continue;
@@ -1064,7 +1066,12 @@ export class Datasource
 
       let value = field.values.get(row.rowIndex);
       if (value && field.type === 'other' && isMapKey) {
-        value = value[keyName];
+        // Extract merged Resource/Log Attributes from "labels"
+        if (field.name === labelsFieldName) {
+          value = value[`${mapName}.${keyName}`];
+        } else {
+          value = value[keyName];
+        }
       }
 
       if (!value) {
