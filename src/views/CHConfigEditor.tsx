@@ -71,7 +71,12 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const onSwitchToggle = (
     key: keyof Pick<
       CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit' | 'hideTableNameInAdhocFilters'
+      | 'secure'
+      | 'validateSql'
+      | 'enableSecureSocksProxy'
+      | 'forwardGrafanaHeaders'
+      | 'enableRowLimit'
+      | 'hideTableNameInAdhocFilters'
     >,
     value: boolean
   ) => {
@@ -181,15 +186,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-      options.jsonData.defaultDatabase ||
-      options.jsonData.defaultTable ||
-      options.jsonData.dialTimeout ||
-      options.jsonData.queryTimeout ||
-      options.jsonData.validateSql ||
-      options.jsonData.enableSecureSocksProxy ||
-      options.jsonData.customSettings ||
-      options.jsonData.logs ||
-      options.jsonData.traces
+    options.jsonData.defaultDatabase ||
+    options.jsonData.defaultTable ||
+    options.jsonData.dialTimeout ||
+    options.jsonData.queryTimeout ||
+    options.jsonData.validateSql ||
+    options.jsonData.enableSecureSocksProxy ||
+    options.jsonData.customSettings ||
+    options.jsonData.logs ||
+    options.jsonData.traces
   );
 
   const defaultPort = jsonData.secure
@@ -622,7 +627,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             }}
           />
         </Field>
-        <Field label={labels.hideTableNameInAdhocFilters.label} description={labels.hideTableNameInAdhocFilters.tooltip}>
+        <Field
+          label={labels.hideTableNameInAdhocFilters.label}
+          description={labels.hideTableNameInAdhocFilters.tooltip}
+        >
           <Switch
             className="gf-form"
             value={jsonData.hideTableNameInAdhocFilters || false}

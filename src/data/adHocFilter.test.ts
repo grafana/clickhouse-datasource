@@ -247,16 +247,20 @@ describe('AdHocManager', () => {
 
   it('converts Map column filter to proper filter syntax', () => {
     const ahm = new AdHocFilter();
-    const result = ahm.apply('SELECT * FROM foo', [
-      { key: "ResourceAttributes.cloud.region", operator: '=', value: 'test' },
-    ] as AdHocVariableFilter[], false);
+    const result = ahm.apply(
+      'SELECT * FROM foo',
+      [{ key: 'ResourceAttributes.cloud.region', operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      false
+    );
     expect(result).toContain("ResourceAttributes[\\\'cloud.region\\\']");
   });
   it('converts JSON column filter to proper filter syntax', () => {
     const ahm = new AdHocFilter();
-    const result = ahm.apply('SELECT * FROM foo', [
-      { key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' },
-    ] as AdHocVariableFilter[], true);
+    const result = ahm.apply(
+      'SELECT * FROM foo',
+      [{ key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      true
+    );
     expect(result).toContain('ResourceAttributes.cloud.region');
   });
 

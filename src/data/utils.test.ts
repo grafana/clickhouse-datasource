@@ -220,9 +220,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
   it('includes TraceId filter in View logs link query using configured column', async () => {
     const mockDatasource = newMockDatasource();
     // Mock that TraceId is configured
-    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(
-      new Map([[ColumnHint.TraceId, 'TraceId']])
-    );
+    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(new Map([[ColumnHint.TraceId, 'TraceId']]));
 
     const builderOptions: Partial<QueryBuilderOptions> = {
       queryType: QueryType.Traces,
@@ -239,16 +237,12 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(logsQuery.builderOptions.columns).toBeDefined();
 
     // TraceId column should be in the columns array
-    const traceIdColumn = logsQuery.builderOptions.columns?.find(
-      (c) => c.hint === ColumnHint.TraceId
-    );
+    const traceIdColumn = logsQuery.builderOptions.columns?.find((c) => c.hint === ColumnHint.TraceId);
     expect(traceIdColumn).toBeDefined();
     expect(traceIdColumn?.name).toBe('TraceId');
 
     // Filter should have the TraceId hint and column name as key
-    const traceIdFilter = logsQuery.builderOptions.filters?.find(
-      (f) => (f as any).hint === ColumnHint.TraceId
-    ) as any;
+    const traceIdFilter = logsQuery.builderOptions.filters?.find((f) => (f as any).hint === ColumnHint.TraceId) as any;
     expect(traceIdFilter).toBeDefined();
     expect(traceIdFilter.key).toBe('TraceId');
   });

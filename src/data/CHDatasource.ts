@@ -251,7 +251,7 @@ export class Datasource
         );
       }
 
-      const useJSON = Boolean(templateSrvVariables.find(v => v.name === 'clickhouse_adhoc_use_json'));
+      const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
 
       // Check if query contains $__adHocFilters macro
       const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);

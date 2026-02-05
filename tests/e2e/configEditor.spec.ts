@@ -6,7 +6,7 @@ const PLUGIN_UID = 'grafana-clickhouse-datasource';
 // Determine ClickHouse DB URL based on environment
 function resolveClickhouseUrl(env = process.env) {
   const { CI, DS_INSTANCE_HOST } = env;
-  return CI ? (DS_INSTANCE_HOST || 'clickhouse-server') : 'localhost';
+  return CI ? DS_INSTANCE_HOST || 'clickhouse-server' : 'localhost';
 }
 
 // Configure Private Data Source Connect if network name is provided

@@ -29,7 +29,8 @@ export const pluginMacros: PluginMacro[] = [
   {
     name: '$__timeFilterInt64Ms',
     isFunction: true,
-    documentation: 'Filters Int64 columns storing millisecond epoch timestamps. Generates raw integer comparisons for optimal index usage.',
+    documentation:
+      'Filters Int64 columns storing millisecond epoch timestamps. Generates raw integer comparisons for optimal index usage.',
     example: 'time >= 1415792726123 AND time <= 1447328726456',
   },
   {

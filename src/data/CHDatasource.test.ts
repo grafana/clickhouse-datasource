@@ -125,7 +125,7 @@ describe('ClickHouseDatasource', () => {
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -170,12 +170,14 @@ describe('ClickHouseDatasource', () => {
 
       // Mock the template variable resolution
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => resolvedSql);
-      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [{name: 'clickhouse_adhoc_use_json'}]);
+      const spyOnGetVars = jest
+        .spyOn(templateSrvMock, 'getVariables')
+        .mockImplementation(() => [{ name: 'clickhouse_adhoc_use_json' }]);
 
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -201,7 +203,6 @@ describe('ClickHouseDatasource', () => {
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
     });
-
 
     it('should expand $__adHocFilters macro with single quotes', async () => {
       const query = {
