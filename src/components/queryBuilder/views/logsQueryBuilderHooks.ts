@@ -47,7 +47,8 @@ export const useLogDefaultsOnMount = (
       const contextColumnNames = datasource.getLogContextColumnNames();
 
       for (let columnName of contextColumnNames) {
-        if (includedColumns.has(columnName)) {
+        // Excludes columns already added, and maps that contain the selected key (such as "ResourceAttributes['x']")
+        if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
           continue;
         }
 
@@ -116,7 +117,8 @@ export const useOtelColumns = (
       const contextColumnNames = datasource.getLogContextColumnNames();
 
       for (let columnName of contextColumnNames) {
-        if (includedColumns.has(columnName)) {
+        // Excludes columns already added, and maps that contain the selected key (such as "ResourceAttributes['x']")
+        if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
           continue;
         }
 

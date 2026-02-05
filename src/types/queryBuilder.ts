@@ -142,9 +142,12 @@ export interface SqlFunction {
 export enum ColumnHint {
   Time = 'time',
 
+  ResourceAttributes = 'resource_attributes',
+  ScopeAttributes = 'scope_attributes',
+  LogAttributes = 'log_attributes',
+
   LogLevel = 'log_level',
   LogMessage = 'log_message',
-  LogLabels = 'log_labels',
 
   TraceId = 'trace_id',
   TraceSpanId = 'trace_span_id',

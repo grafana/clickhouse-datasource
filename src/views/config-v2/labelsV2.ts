@@ -528,7 +528,6 @@ export default {
 
       [ColumnHint.LogLevel]: 'Level',
       [ColumnHint.LogMessage]: 'Message',
-      [ColumnHint.LogLabels]: 'Labels',
 
       [ColumnHint.TraceId]: 'Trace ID',
       [ColumnHint.TraceSpanId]: 'Span ID',
