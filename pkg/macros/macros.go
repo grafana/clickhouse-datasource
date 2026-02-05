@@ -75,6 +75,23 @@ func TimeFilterMs(query *sqlutil.Query, args []string) (string, error) {
 	return fmt.Sprintf("%s >= %s AND %s <= %s", column, timeToDateTime64(from), column, timeToDateTime64(to)), nil
 }
 
+// TimeFilterInt64Ms returns a time filter for Int64 columns storing millisecond timestamps.
+// This generates raw integer comparisons (without type conversions) to maintain index efficiency.
+// Use this for columns like: theStartTime Int64 (storing epoch milliseconds)
+func TimeFilterInt64Ms(query *sqlutil.Query, args []string) (string, error) {
+	if len(args) != 1 {
+		return "", backend.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlutil.ErrorBadArgumentCount, len(args)))
+	}
+
+	var (
+		column = args[0]
+		from   = query.TimeRange.From.UnixMilli()
+		to     = query.TimeRange.To.UnixMilli()
+	)
+
+	return fmt.Sprintf("%s >= %d AND %s <= %d", column, from, column, to), nil
+}
+
 func DateFilter(query *sqlutil.Query, args []string) (string, error) {
 	if len(args) != 1 {
 		return "", backend.DownstreamError(fmt.Errorf("%w: expected 1 argument, received %d", sqlutil.ErrorBadArgumentCount, len(args)))
@@ -151,16 +168,17 @@ func IsValidComparisonPredicates(comparison_predicates string) bool {
 
 // Macros is a map of all macro functions
 var Macros = map[string]sqlds.MacroFunc{
-	"fromTime":        FromTimeFilter,
-	"toTime":          ToTimeFilter,
-	"fromTime_ms":     FromTimeFilterMs,
-	"toTime_ms":       ToTimeFilterMs,
-	"timeFilter":      TimeFilter,
-	"timeFilter_ms":   TimeFilterMs,
-	"dateFilter":      DateFilter,
-	"dateTimeFilter":  DateTimeFilter,
-	"dt":              DateTimeFilter,
-	"timeInterval":    TimeInterval,
-	"timeInterval_ms": TimeIntervalMs,
-	"interval_s":      IntervalSeconds,
+	"fromTime":           FromTimeFilter,
+	"toTime":             ToTimeFilter,
+	"fromTime_ms":        FromTimeFilterMs,
+	"toTime_ms":          ToTimeFilterMs,
+	"timeFilter":         TimeFilter,
+	"timeFilter_ms":      TimeFilterMs,
+	"timeFilterInt64Ms":  TimeFilterInt64Ms,
+	"dateFilter":         DateFilter,
+	"dateTimeFilter":     DateTimeFilter,
+	"dt":                 DateTimeFilter,
+	"timeInterval":       TimeInterval,
+	"timeInterval_ms":    TimeIntervalMs,
+	"interval_s":         IntervalSeconds,
 }

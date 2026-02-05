@@ -27,6 +27,12 @@ export const pluginMacros: PluginMacro[] = [
     example: 'time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)',
   },
   {
+    name: '$__timeFilterInt64Ms',
+    isFunction: true,
+    documentation: 'Filters Int64 columns storing millisecond epoch timestamps. Generates raw integer comparisons for optimal index usage.',
+    example: 'time >= 1415792726123 AND time <= 1447328726456',
+  },
+  {
     name: '$__dateTimeFilter',
     isFunction: true,
     documentation:

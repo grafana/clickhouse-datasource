@@ -185,6 +185,20 @@ func TestMacroToTimeFilterMs(t *testing.T) {
 	}
 }
 
+func TestMacroTimeFilterInt64Ms(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	query := sqlutil.Query{
+		TimeRange: backend.TimeRange{
+			From: from,
+			To:   to,
+		},
+	}
+	got, err := TimeFilterInt64Ms(&query, []string{"theStartTime"})
+	assert.Nil(t, err)
+	assert.Equal(t, "theStartTime >= 1415792726371 AND theStartTime <= 1447328726371", got)
+}
+
 func TestMacroDateFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
@@ -262,6 +276,8 @@ func TestInterpolate(t *testing.T) {
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter with empty spaces"},
 		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms"},
 		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms with empty spaces"},
+		{input: "select * from foo where $__timeFilterInt64Ms(theStartTime)", output: "select * from foo where theStartTime >= 1415792726123 AND theStartTime <= 1447328726456", name: "clickhouse timeFilterInt64Ms"},
+		{input: "select * from foo where $__timeFilterInt64Ms(theStartTime )", output: "select * from foo where theStartTime >= 1415792726123 AND theStartTime <= 1447328726456", name: "clickhouse timeFilterInt64Ms with empty spaces"},
 		{input: "select * from foo where ( date >= $__fromTime and date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(1415792726) and date <= toDateTime(1447328726) ) limit 100", name: "clickhouse fromTime and toTime"},
 		{input: "select * from foo where ( date >= $__fromTime ) and ( date <= $__toTime ) limit 100", output: "select * from foo where ( date >= toDateTime(1415792726) ) and ( date <= toDateTime(1447328726) ) limit 100", name: "clickhouse fromTime and toTime inside a complex clauses"},
 		{input: "select * from foo where ( date >= $__fromTime_ms and date <= $__toTime_ms ) limit 100", output: "select * from foo where ( date >= fromUnixTimestamp64Milli(1415792726123) and date <= fromUnixTimestamp64Milli(1447328726456) ) limit 100", name: "clickhouse fromTime_ms and toTime_ms"},
