@@ -325,7 +325,6 @@ export class Datasource
     }
 
     let columnName = action.options.key || '';
-    // const actionFrame: DataFrame | undefined = (action as any).frame;
     const actionValue = action.options.value;
     let mapKey = '';
 
