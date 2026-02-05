@@ -3,7 +3,6 @@
     "extends": [
         "github>grafana/grafana-renovate-config//presets/automerge"
     ],
-    "minimumReleaseAge": "7 days",
     "platformAutomerge": true,
     "packageRules": [
         {
