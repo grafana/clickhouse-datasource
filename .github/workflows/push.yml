@@ -16,7 +16,7 @@ concurrency:
 jobs:
   ci:
     name: CI
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v5.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v6.1.0
     if: github.ref != 'refs/heads/main'
     permissions:
       contents: read
@@ -29,7 +29,7 @@ jobs:
   publish-latest-to-catalog:
     name: Publish main to Dev Catalog
     if: github.ref == 'refs/heads/main'
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v6.1.0
     permissions:
       attestations: write
       contents: write
