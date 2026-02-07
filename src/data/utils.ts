@@ -11,7 +11,7 @@ import {
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
-import { logColumnHintsToAlias, generateSql } from './sqlGenerator';
+import { generateSql } from './sqlGenerator';
 import otel from 'otel';
 
 /**
@@ -335,6 +335,9 @@ export const transformQueryResponseWithTraceAndLogLinks = (
   return res;
 };
 
+// The name of the dataframe field containing labels
+export const labelsFieldName = 'labels';
+
 /**
  * Returns true if the dataframe contains a log label that matches the provided name.
  *
@@ -347,8 +350,7 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
     return false;
   }
 
-  const logLabelsFieldName = logColumnHintsToAlias.get(ColumnHint.LogLabels);
-  const field = frame.fields.find((f) => f.name === logLabelsFieldName);
+  const field = frame.fields.find((f) => f.name === labelsFieldName);
   if (!field || !field.values || field.values.length < 1 || !field.values.get(0)) {
     return false;
   }

@@ -981,7 +981,7 @@ describe('ClickHouseDatasource', () => {
         table: 'logs',
         queryType: QueryType.Logs,
         mode: BuilderMode.List,
-        columns: [{ name: 'LogAttributes', hint: ColumnHint.LogLabels, type: 'Map(String, String)' }],
+        columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes, type: 'Map(String, String)' }],
       },
     };
 
@@ -990,14 +990,14 @@ describe('ClickHouseDatasource', () => {
       datasource = cloneDeep(mockDatasource);
     });
 
-    it('should set mapKey to columnName for Map type LogLabels', () => {
+    it('should correctly find merged value in log labels field', () => {
       const frame = {
-        fields: [{ name: 'labels', values: { get: () => ({ service_name: 'value' }), length: 1 } }],
+        fields: [{ name: 'labels', values: { get: () => ({ ['LogAttributes.service_name']: 'value' }), length: 1 } }],
       } as any;
 
       const result = datasource.modifyQuery(query, {
         type: 'ADD_FILTER',
-        options: { key: 'service_name', value: 'my-service' },
+        options: { key: 'LogAttributes.service_name', value: 'value' },
         frame,
       } as any);
 

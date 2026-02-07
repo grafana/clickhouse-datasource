@@ -3,13 +3,13 @@ import {
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
   isBuilderOptionsRunnable,
+  labelsFieldName,
   transformQueryResponseWithTraceAndLogLinks,
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from '@grafana/data';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
-import { logColumnHintsToAlias } from './sqlGenerator';
 
 describe('isBuilderOptionsRunnable', () => {
   it('should return false for empty builder options', () => {
@@ -255,8 +255,6 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 });
 
 describe('dataFrameHasLogLabelWithName', () => {
-  const logLabelsFieldName = logColumnHintsToAlias.get(ColumnHint.LogLabels);
-
   it('should return false for undefined dataframe', () => {
     expect(dataFrameHasLogLabelWithName(undefined, 'testLabel')).toBe(false);
   });
@@ -275,14 +273,14 @@ describe('dataFrameHasLogLabelWithName', () => {
 
   it('should return false when log labels field has no values', () => {
     const frame: DataFrame = {
-      fields: [{ name: logLabelsFieldName, values: { get: jest.fn(), length: 0 } }],
+      fields: [{ name: labelsFieldName, values: { get: jest.fn(), length: 0 } }],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
   });
 
   it('should return false when log labels field value is null', () => {
     const frame: DataFrame = {
-      fields: [{ name: logLabelsFieldName, values: { get: () => null, length: 1 } }],
+      fields: [{ name: labelsFieldName, values: { get: () => null, length: 1 } }],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
   });
@@ -291,7 +289,7 @@ describe('dataFrameHasLogLabelWithName', () => {
     const frame: DataFrame = {
       fields: [
         {
-          name: logLabelsFieldName,
+          name: labelsFieldName,
           values: { get: () => ({ testLabel: 'value', otherLabel: 'otherValue' }), length: 1 },
         },
       ],
@@ -303,7 +301,7 @@ describe('dataFrameHasLogLabelWithName', () => {
     const frame: DataFrame = {
       fields: [
         {
-          name: logLabelsFieldName,
+          name: labelsFieldName,
           values: { get: () => ({ otherLabel: 'value' }), length: 1 },
         },
       ],

@@ -391,10 +391,6 @@ export default {
         label: 'Message',
         tooltip: 'Column that contains the log message',
       },
-      logLabelsColumn: {
-        label: 'Labels',
-        tooltip: 'A column with a key/value structure for log labels',
-      },
       liveView: {
         label: 'Live View',
         tooltip: 'Enable to update logs in real time',
@@ -531,9 +527,12 @@ export default {
     ColumnHint: {
       [ColumnHint.Time]: 'Time',
 
+      [ColumnHint.ResourceAttributes]: 'Resource Attributes',
+      [ColumnHint.ScopeAttributes]: 'Scope Attributes',
+      [ColumnHint.LogAttributes]: 'Log Attributes',
+
       [ColumnHint.LogLevel]: 'Level',
       [ColumnHint.LogMessage]: 'Message',
-      [ColumnHint.LogLabels]: 'Labels',
 
       [ColumnHint.TraceId]: 'Trace ID',
       [ColumnHint.TraceSpanId]: 'Span ID',
