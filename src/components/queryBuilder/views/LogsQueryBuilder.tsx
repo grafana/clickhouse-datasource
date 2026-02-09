@@ -37,8 +37,6 @@ interface LogsQueryBuilderState {
   timeColumn?: SelectedColumn;
   logLevelColumn?: SelectedColumn;
   messageColumn?: SelectedColumn;
-  labelsColumn?: SelectedColumn;
-  // liveView: boolean;
   orderBy: OrderBy[];
   limit: number;
   filters: Filter[];
@@ -57,15 +55,13 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
       timeColumn: getColumnByHint(builderOptions, ColumnHint.Time),
       logLevelColumn: getColumnByHint(builderOptions, ColumnHint.LogLevel),
       messageColumn: getColumnByHint(builderOptions, ColumnHint.LogMessage),
-      labelsColumn: getColumnByHint(builderOptions, ColumnHint.LogLabels),
       selectedColumns:
         builderOptions.columns?.filter(
           (c) =>
             // Only select columns that don't have their own box
             c.hint !== ColumnHint.Time &&
             c.hint !== ColumnHint.LogLevel &&
-            c.hint !== ColumnHint.LogMessage &&
-            c.hint !== ColumnHint.LogLabels
+            c.hint !== ColumnHint.LogMessage
         ) || [],
       // liveView: builderOptions.meta?.liveView || false,
       filters: builderOptions.filters || [],
@@ -89,9 +85,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     }
     if (next.messageColumn) {
       nextColumns.push(next.messageColumn);
-    }
-    if (next.labelsColumn) {
-      nextColumns.push(next.labelsColumn);
     }
 
     builderOptionsDispatch(
@@ -187,24 +180,6 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           label={labels.logMessageColumn.label}
           tooltip={labels.logMessageColumn.tooltip}
         />
-        <ColumnSelect
-          disabled={builderState.otelEnabled}
-          allColumns={allColumns}
-          selectedColumn={builderState.labelsColumn}
-          invalid={!builderState.labelsColumn}
-          onColumnChange={onOptionChange('labelsColumn')}
-          columnHint={ColumnHint.LogLabels}
-          label={labels.logLabelsColumn.label}
-          tooltip={labels.logLabelsColumn.tooltip}
-          inline
-        />
-        {/* <Switch
-          value={builderState.liveView}
-          onChange={onOptionChange('liveView')}
-          label={labels.liveView.label}
-          tooltip={labels.liveView.tooltip}
-          inline
-        /> */}
       </div>
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}
