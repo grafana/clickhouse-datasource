@@ -1,7 +1,7 @@
 import { Protocol } from 'types/config';
 
 /**
- * Creates a set of test props for the InfluxDB V2 config page for use in tests.
+ * Creates a set of test props for the Clickhouse V2 config page for use in tests.
  * This function allows you to override default properties for specific test cases.
  */
 export const createTestProps = (overrides: { options?: object; mocks?: object }) => ({
