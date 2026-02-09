@@ -6,7 +6,7 @@ import { ServerAndEncryptionSection } from './ServerAndEncryptionSection';
 import { css } from '@emotion/css';
 import { LeftSidebar } from './LeftSidebar';
 import { CONTAINER_MIN_WIDTH } from './constants';
-import { trackInfluxDBConfigV2FeedbackButtonClicked } from './tracking';
+import { trackClickhouseConfigV2FeedbackButtonClicked } from './tracking';
 import { AdditionalSettingsSection } from './AdditionalSettingsSection';
 import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
 import { TLSSSLSettingsSection } from './TLSSSLSettingsSection';
@@ -35,7 +35,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               <TextLink
                 href="https://docs.google.com/forms/d/e/1FAIpQLSd5YOYxfW-CU0tQnfFA08fkymGlmZ8XcFRMniE5lScIsmdt5w/viewform"
                 external
-                onClick={trackInfluxDBConfigV2FeedbackButtonClicked}
+                onClick={trackClickhouseConfigV2FeedbackButtonClicked}
               >
                 Share your thoughts
               </TextLink>{' '}
