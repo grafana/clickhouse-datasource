@@ -339,16 +339,28 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
     selectParts.push(getColumnIdentifier(logLevel));
   }
 
-  const logLabels = getColumnByHint(options, ColumnHint.LogLabels);
-  if (logLabels !== undefined) {
-    logLabels.alias = logColumnHintsToAlias.get(ColumnHint.LogLabels);
-    selectParts.push(getColumnIdentifier(logLabels));
-  }
-
   const traceId = getColumnByHint(options, ColumnHint.TraceId);
   if (traceId !== undefined) {
     traceId.alias = logColumnHintsToAlias.get(ColumnHint.TraceId);
     selectParts.push(getColumnIdentifier(traceId));
+  }
+
+  const resourceAttributes = getColumnByHint(options, ColumnHint.ResourceAttributes);
+  if (resourceAttributes !== undefined) {
+    resourceAttributes.alias = logColumnHintsToAlias.get(ColumnHint.ResourceAttributes);
+    selectParts.push(getColumnIdentifier(resourceAttributes));
+  }
+
+  const scopeAttributes = getColumnByHint(options, ColumnHint.ScopeAttributes);
+  if (scopeAttributes !== undefined) {
+    scopeAttributes.alias = logColumnHintsToAlias.get(ColumnHint.ScopeAttributes);
+    selectParts.push(getColumnIdentifier(scopeAttributes));
+  }
+
+  const logAttributes = getColumnByHint(options, ColumnHint.LogAttributes);
+  if (logAttributes !== undefined) {
+    logAttributes.alias = logColumnHintsToAlias.get(ColumnHint.LogAttributes);
+    selectParts.push(getColumnIdentifier(logAttributes));
   }
 
   options.columns
@@ -910,7 +922,6 @@ const logAliasToColumnHintsEntries: ReadonlyArray<[string, ColumnHint]> = [
   ['timestamp', ColumnHint.Time],
   ['body', ColumnHint.LogMessage],
   ['level', ColumnHint.LogLevel],
-  ['labels', ColumnHint.LogLabels],
   ['traceID', ColumnHint.TraceId],
 ];
 export const logAliasToColumnHints: Map<string, ColumnHint> = new Map(logAliasToColumnHintsEntries);
