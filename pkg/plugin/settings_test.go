@@ -216,6 +216,69 @@ func TestLoadSettings(t *testing.T) {
 				wantErr: nil,
 				testCtx: ctx,
 			},
+			{
+				name: "should accept numeric dialTimeout and queryTimeout values",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"host": "test", "port": 443, "dialTimeout": 15, "queryTimeout": 120}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Host:            "test",
+					Port:            443,
+					ConnMaxLifetime: "5",
+					DialTimeout:     "15",
+					MaxIdleConns:    "25",
+					MaxOpenConns:    "50",
+					QueryTimeout:    "120",
+					EnableRowLimit:  false,
+				},
+				wantErr: nil,
+				testCtx: ctx,
+			},
+			{
+				name: "should accept numeric timeout value (v3 deprecated field)",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"server": "test", "port": 443, "timeout": 25}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Host:            "test",
+					Port:            443,
+					ConnMaxLifetime: "5",
+					DialTimeout:     "25",
+					MaxIdleConns:    "25",
+					MaxOpenConns:    "50",
+					QueryTimeout:    "60",
+					EnableRowLimit:  false,
+				},
+				wantErr: nil,
+				testCtx: ctx,
+			},
+			{
+				name: "should accept numeric timeout values with floating point precision",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"host": "test", "port": 443, "dialTimeout": 10.5, "queryTimeout": 60.7}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Host:            "test",
+					Port:            443,
+					ConnMaxLifetime: "5",
+					DialTimeout:     "10",
+					MaxIdleConns:    "25",
+					MaxOpenConns:    "50",
+					QueryTimeout:    "60",
+					EnableRowLimit:  false,
+				},
+				wantErr: nil,
+				testCtx: ctx,
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
