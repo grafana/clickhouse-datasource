@@ -2,7 +2,7 @@ import { reportInteraction } from '@grafana/runtime';
 import { TimeUnit } from 'types/queryBuilder';
 
 // Feedback form
-export const trackInfluxDBConfigV2FeedbackButtonClicked = () => {
+export const trackClickhouseConfigV2FeedbackButtonClicked = () => {
   reportInteraction('clickhouse_config_v2_feedback_button_clicked');
 };
 
