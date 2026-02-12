@@ -3,6 +3,8 @@ description: This document describes using templates and variables with the Clic
 labels:
 products:
   - Grafana Cloud
+  - Grafana OSS
+  - Grafana Enterprise
 keywords:
   - data source
 menuTitle: ClickHouse templates and variables

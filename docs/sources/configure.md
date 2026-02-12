@@ -3,6 +3,8 @@ description: This document outlines configuration options for the ClickHouse dat
 labels:
 products:
   - Grafana Cloud
+  - Grafana OSS
+  - Grafana Enterprise
 keywords:
   - data source
 menuTitle: Configure the ClickHouse data source

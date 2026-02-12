@@ -3,6 +3,8 @@ description: This document describes the ClickHouse query editor
 labels:
 products:
   - Grafana Cloud
+  - Grafana OSS
+  - Grafana Enterprise
 keywords:
   - data source
 menuTitle: ClickHouse query editor

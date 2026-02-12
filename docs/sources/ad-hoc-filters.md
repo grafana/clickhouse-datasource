@@ -3,6 +3,8 @@ description: This document outlines ad hoc filter options for the ClickHouse dat
 labels:
 products:
   - Grafana Cloud
+  - Grafana OSS
+  - Grafana Enterprise
 keywords:
   - data source
 menuTitle: Ad hoc filter for the ClickHouse data source
