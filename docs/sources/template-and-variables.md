@@ -13,7 +13,7 @@ weight: 20
 version: 0.1
 ---
 
-### Templates and variables
+# ClickHouse templates variables
 
 To add a new ClickHouse query variable, refer to [Add a query
 variable](https://grafana.com/docs/grafana/latest/variables/variable-types/add-query-variable/).
