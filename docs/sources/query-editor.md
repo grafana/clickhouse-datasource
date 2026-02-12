@@ -193,5 +193,5 @@ SETTINGS additional_table_filters={'my_complex_table': 'status = \'active\' AND 
 
 ## Next steps
 
-- [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/templates-and-variables/) — Use variables in dashboards and queries.
+- [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-and-variables/) — Use variables in dashboards and queries.
 - [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/) — Connection and authentication options.

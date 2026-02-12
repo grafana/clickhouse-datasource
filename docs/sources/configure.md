@@ -23,7 +23,7 @@ This document explains how to configure the ClickHouse data source.
 Before configuring the data source, ensure you have:
 
 - **Grafana permissions:** Organization administrator role.
-- **Plugin:** The ClickHouse data source plugin installed. For Grafana version compatibility, see [Requirements](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/).
+- **Plugin:** The ClickHouse data source plugin installed. For Grafana version compatibility, see [Requirements](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/#requirements).
 - **ClickHouse:** A running ClickHouse server and a user with read-only access (or the permissions described below).
 - **Network access:** The Grafana server can reach the ClickHouse server on the intended port (HTTP: 8123 or 8443 with TLS; Native: 9000 or 9440 with TLS).
 
@@ -102,7 +102,7 @@ After adding the data source, configure the following:
 
 Click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
 
-If the test fails, refer to the [ClickHouse data source troubleshooting guide](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
+If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
 ## Provision the data source
 
@@ -169,5 +169,5 @@ For more options and authentication methods, refer to the [Grafana Terraform pro
 After configuring the data source:
 
 - [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Build queries with the SQL editor or query builder.
-- [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/templates-and-variables/) — Use variables in dashboards and queries.
+- [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-and-variables/) — Use variables in dashboards and queries.
 - [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/) — Overview, supported features, and pre-built dashboards.
