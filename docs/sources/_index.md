@@ -44,7 +44,7 @@ Ad hoc filters require ClickHouse 22.7 or later (from plugin v2.0 onward).
 The following documents help you get started:
 
 - [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/)
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/editor/)
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/)
 - [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/templates-and-variables/)
 
 ## Additional features

@@ -168,6 +168,6 @@ For more options and authentication methods, refer to the [Grafana Terraform pro
 
 After configuring the data source:
 
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/editor/) — Build queries with the SQL editor or query builder.
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Build queries with the SQL editor or query builder.
 - [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/templates-and-variables/) — Use variables in dashboards and queries.
 - [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/) — Overview, supported features, and pre-built dashboards.
