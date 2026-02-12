@@ -8,109 +8,112 @@ products:
 keywords:
   - data source
 menuTitle: Configure the ClickHouse data source
-title: ClickHouse data source
+title: Configure the ClickHouse data source
 weight: 20
 version: 0.1
+last_reviewed: 2026-02-11
 ---
 
-## Configure the ClickHouse data source
+# Configure the ClickHouse data source
 
-This section explains how to safely configure a ClickHouse data source for use with Grafana, including recommended user permissions, supported connection protocols, and configuration options.
+This document explains how to configure the ClickHouse data source.
 
----
+## Before you begin
 
-### ClickHouse user and permissions
+Before configuring the data source, ensure you have:
 
-Grafana executes queries **exactly as written** and does not attempt to validate or restrict SQL statements. For this reason, we strongly recommend using a **read-only ClickHouse user** for Grafana.
+- **Grafana permissions:** Organization administrator role.
+- **Plugin:** The ClickHouse data source plugin installed. For Grafana version compatibility, see [Requirements](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/).
+- **ClickHouse:** A running ClickHouse server and a user with read-only access (or the permissions described below).
+- **Network access:** The Grafana server can reach the ClickHouse server on the intended port (HTTP: 8123 or 8443 with TLS; Native: 9000 or 9440 with TLS).
 
-A read-only user helps prevent accidental or destructive operations, such as modifying or deleting tables, while still allowing dashboards and queries to function normally.
+## ClickHouse user and permissions
 
-#### Recommended permissions
+Grafana executes queries exactly as written and does not validate or restrict SQL. Use a **read-only ClickHouse user** for this data source to avoid accidental or destructive operations (such as modifying or deleting tables) while still allowing dashboards and queries to run.
+
+If your ClickHouse administrator has already given you a read-only user and connection details, you can skip to [Add the data source](#add-the-data-source).
+
+### Recommended permissions
 
 Create a ClickHouse user with:
 
-- `readonly` permissions enabled
+- **readonly** permission enabled
 - Access limited to the databases and tables you intend to query
-- Permission to modify the `max_execution_time` setting
+- Permission to modify the **max_execution_time** setting (required by the plugin’s client)
 
-> ⚠️ Grafana does not prevent execution of non-read queries.  
-> If a user has sufficient privileges, queries such as `DROP TABLE` or `ALTER TABLE` will be executed by ClickHouse.
+{{< admonition type="warning" >}}
+Grafana does not prevent execution of non-read queries. If the ClickHouse user has sufficient privileges, statements such as `DROP TABLE` or `ALTER TABLE` will be executed by ClickHouse.
+{{< /admonition >}}
 
----
-
-#### Configuring a read-only user
+### Configure a read-only user
 
 To configure a suitable read-only user:
 
-1. Create a user or profile following the  
-   [Creating Users and Roles in ClickHouse](https://clickhouse.com/docs/en/operations/access-rights) documentation.
-2. Set `readonly = 1` for the user or profile.
-3. Allow modification of the `max_execution_time` setting, which is required by the underlying  
-   [`clickhouse-go`](https://github.com/ClickHouse/clickhouse-go/) client.
+1. Create a user or profile using [Creating users and roles in ClickHouse](https://clickhouse.com/docs/en/operations/access-rights).
+1. Set `readonly = 1` for the user or profile. For details, see [Permissions for queries (readonly)](https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly).
+1. Allow modification of the **max_execution_time** setting, which is required by the [clickhouse-go](https://github.com/ClickHouse/clickhouse-go/) client so the plugin can enforce query timeouts.
 
-If you are using a **public ClickHouse instance**, do **not** set `readonly = 2`. Instead:
+If you use a **public ClickHouse instance**, do not set `readonly = 2`. Instead:
 
 - Keep `readonly = 1`
-- Set the constraint type for `max_execution_time` to  
-  [`changeable_in_readonly`](https://clickhouse.com/docs/en/operations/settings/constraints-on-settings)
+- Set the constraint type for **max_execution_time** to [changeable_in_readonly](https://clickhouse.com/docs/en/operations/settings/constraints-on-settings)
 
-This provides the necessary flexibility without granting write access.
+## ClickHouse protocol support
 
----
+The data source supports two transport protocols: **Native** (default) and **HTTP**. Both use ClickHouse’s optimized native data formats and support the same query capabilities.
 
-### ClickHouse protocol support
+### Default ports
 
-The data source supports two transport protocols:
+| Protocol | TLS  | Port |
+|----------|------|------|
+| HTTP     | No   | 8123 |
+| HTTP     | Yes  | 8443 |
+| Native   | No   | 9000 |
+| Native   | Yes  | 9440 |
 
-- **Native** (default)
-- **HTTP**
+When you enable **Secure connection (TLS)** in Grafana, use a port that supports TLS. Grafana does not change the port automatically when TLS is enabled.
 
-Both protocols use ClickHouse’s optimized native data formats and support the same query capabilities.
+## Add the data source
 
-#### Default ports
+To add the data source:
 
-Each protocol uses different default ports, depending on whether TLS is enabled:
+1. Click **Connections** in the left-side menu.
+1. Click **Add new connection**.
+1. Type **ClickHouse** in the search bar.
+1. Select **ClickHouse**.
+1. Click **Add new data source**.
 
-| Protocol | TLS | Port |
-| -------- | --- | ---- |
-| HTTP     | No  | 8123 |
-| HTTP     | Yes | 8443 |
-| Native   | No  | 9000 |
-| Native   | Yes | 9440 |
+## Configure settings
 
-When enabling **Secure Connection (TLS)** in Grafana, ensure that the selected port supports TLS. Grafana does not automatically change ports when TLS is enabled.
+After adding the data source, configure the following:
 
----
+| Setting | Description |
+|---------|-------------|
+| **Name** | The name used to refer to the data source in panels and queries. |
+| **Default** | Toggle to make this the default data source for new panels. |
+| **Server** | The ClickHouse server host (for example, `localhost`). |
+| **Protocol** | **Native** or **HTTP**. |
+| **Port** | Port number; depends on protocol and whether TLS is enabled (see default ports above). |
+| **Secure connection** | Enable when your ClickHouse server uses TLS. |
+| **Username** | ClickHouse user name. |
+| **Password** | ClickHouse user password. |
 
-### Configure via the Grafana UI
+## Verify the connection
 
-After installing the ClickHouse plugin, add a new data source in Grafana by following  
-[Add a data source](https://grafana.com/docs/grafana/latest/datasources/add-a-data-source/).
+Click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
 
-In the configuration screen:
+If the test fails, refer to the [ClickHouse data source troubleshooting guide](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
-1. Enter the ClickHouse server address
-2. Select the protocol (Native or HTTP)
-3. Set the appropriate port
-4. Enable **Secure Connection** if TLS is required
-5. Provide the ClickHouse username and password
-6. Click **Save & test** to verify the connection
+## Provision the data source
 
----
+You can define the data source in YAML files as part of the Grafana provisioning system. For more information, refer to [Provisioning Grafana data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources).
 
-### Configure via provisioning files
-
-Grafana also supports configuring data sources using provisioning files. This is useful for automated or repeatable setups.
-
-For an overview, see  
-[Provisioning Grafana data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources).
-
-Below is an example ClickHouse data source configuration using basic authentication:
+Example ClickHouse data source configuration with basic authentication:
 
 ```yaml
 apiVersion: 1
 datasources:
-- name: ClickHouse
+  - name: ClickHouse
     type: grafana-clickhouse-datasource
     jsonData:
       host: localhost
@@ -135,3 +138,36 @@ datasources:
       # tlsClientCert: <string>
       # tlsClientKey: <string>
 ```
+
+## Provision with Terraform
+
+You can provision the ClickHouse data source using the [Grafana Terraform provider](https://registry.terraform.io/providers/grafana/grafana/latest/docs). Example with basic authentication:
+
+```hcl
+resource "grafana_data_source" "clickhouse" {
+  type = "grafana-clickhouse-datasource"
+  name = "ClickHouse"
+
+  json_data = {
+    defaultDatabase = "default"
+    port             = 9000
+    host             = "localhost"
+    protocol         = "native"
+    tlsSkipVerify    = false
+  }
+
+  secure_json_data = {
+    password = var.clickhouse_password
+  }
+}
+```
+
+For more options and authentication methods, refer to the [Grafana Terraform provider documentation](https://registry.terraform.io/providers/grafana/grafana/latest/docs/resources/data_source).
+
+## Next steps
+
+After configuring the data source:
+
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/editor/) — Build queries with the SQL editor or query builder.
+- [ClickHouse templates and variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/templates-and-variables/) — Use variables in dashboards and queries.
+- [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/) — Overview, supported features, and pre-built dashboards.
