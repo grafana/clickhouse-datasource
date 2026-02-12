@@ -60,7 +60,20 @@ After configuring the data source, you can:
 
 ## Pre-built dashboards
 
-The plugin includes pre-built dashboards for cluster, data, and query analysis. After adding the data source, open **Connections** > **Data sources** > **ClickHouse** and select the **Dashboards** tab to import them.
+The plugin includes the following pre-built dashboards:
+
+- **ClickHouse - Query Analysis** — Query performance, time distribution, top users, and memory usage.
+- **ClickHouse - Data Analysis** — Disk usage, table and database summary, parts over time, and dictionaries.
+- **ClickHouse - Cluster Analysis** — Cluster overview, merges, mutations, and replicated table delay.
+- **Simple ClickHouse OTel Dashboard** — Traces, logs, and service performance for OpenTelemetry data in ClickHouse.
+- **Advanced ClickHouse Monitoring Dashboard** — System metrics (CPU, queries/sec, IO, memory) similar to ClickHouse built-in monitoring.
+
+To import a pre-built dashboard:
+
+1. Go to **Connections** > **Data sources**.
+2. Select your ClickHouse data source.
+3. Click the **Dashboards** tab.
+4. Click **Import** next to the dashboard you want to use.
 
 ## Plugin updates
 

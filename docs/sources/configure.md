@@ -33,7 +33,7 @@ Grafana executes queries exactly as written and does not validate or restrict SQ
 
 If your ClickHouse administrator has already given you a read-only user and connection details, you can skip to [Add the data source](#add-the-data-source).
 
-### Recommended permissions
+## Recommended permissions
 
 Create a ClickHouse user with:
 
@@ -45,7 +45,7 @@ Create a ClickHouse user with:
 Grafana does not prevent execution of non-read queries. If the ClickHouse user has sufficient privileges, statements such as `DROP TABLE` or `ALTER TABLE` will be executed by ClickHouse.
 {{< /admonition >}}
 
-### Configure a read-only user
+## Configure a read-only user
 
 To configure a suitable read-only user:
 
@@ -62,7 +62,7 @@ If you use a **public ClickHouse instance**, do not set `readonly = 2`. Instead:
 
 The data source supports two transport protocols: **Native** (default) and **HTTP**. Both use ClickHouse’s optimized native data formats and support the same query capabilities.
 
-### Default ports
+## Default ports
 
 | Protocol | TLS  | Port |
 |----------|------|------|

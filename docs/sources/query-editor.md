@@ -50,11 +50,11 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 
 You can build queries using the **SQL editor** (raw SQL) or the **Query builder**. Queries can include macros for dynamic parts such as time range filters.
 
-### Time series
+## Time series
 
 For time series visualizations, your query must include a `datetime` column. Use an alias of `time` for the timestamp column. Grafana treats timestamp rows without an explicit time zone as UTC. Any column other than `time` is treated as a value column.
 
-#### Multi-line time series
+## Multi-line time series
 
 To create multi-line time series, the query must return at least 3 columns in this order:
 
@@ -71,11 +71,11 @@ GROUP BY machine_group, log_time
 ORDER BY log_time
 ```
 
-### Tables
+## Tables
 
 Table visualizations are available for any valid ClickHouse query. Select **Table** in the panel visualization options to view results in tabular form.
 
-### Visualize logs with the Logs panel
+## Visualize logs with the Logs panel
 
 To use the Logs panel, your query must return a timestamp and string values. To default to the logs visualization in Explore, set the timestamp column alias to `log_time`.
 
@@ -90,7 +90,7 @@ ORDER BY log_time
 
 When you don't have a `log_time` column, set **Format** to **Logs** to force logs rendering (available from plugin version 2.2.0).
 
-### Visualize traces with the Traces panel
+## Visualize traces with the Traces panel
 
 To use the Traces panel, your data must meet the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). Set **Format** to **Trace** when building the query (available from plugin version 2.2.0).
 
@@ -154,7 +154,7 @@ By default, the ad hoc filter drop-down lists all tables and columns from the da
 
 You can hide this variable from the dashboard; it is only used to scope the ad hoc filter options.
 
-### Use a query to populate ad hoc filters
+## Use a query to populate ad hoc filters
 
 You can set `clickhouse_adhoc_query` to a **ClickHouse query** instead of a database or table name. The query results are used to populate the ad hoc filter’s selectable values. For example, set the variable value to:
 
@@ -164,11 +164,11 @@ SELECT DISTINCT machine_name FROM mgbench.logs1
 
 Then the dashboard filter drop-down lists distinct `machine_name` values, and you can filter queries by the selected machine.
 
-### Map and JSON types (OpenTelemetry)
+## Map and JSON types (OpenTelemetry)
 
 Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is the default and turns merged labels into a filter. To use **JSON** syntax for the filter logic, add a dashboard variable of type **Constant** named `clickhouse_adhoc_use_json`. The variable’s value is ignored; it only needs to exist.
 
-### Apply ad hoc filters manually with `$__adHocFilters`
+## Apply ad hoc filters manually with `$__adHocFilters`
 
 By default, ad hoc filters are applied automatically by detecting the target table from your SQL. For queries that use CTEs, subqueries, or ClickHouse-specific syntax (for example `INTERVAL` or parameterized aggregate functions), automatic detection can fail. In those cases, use the `$__adHocFilters('table_name')` macro to specify where to apply the filters.
 

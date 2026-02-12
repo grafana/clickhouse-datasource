@@ -106,6 +106,16 @@ You can alert when a query returns no rows (for example, a health check that sho
 4. **Handle no data** — In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (e.g. a heartbeat query).
 5. **Test the query first** — Run the query in **Explore** with the ClickHouse data source and confirm it returns the expected numeric data before saving the alert rule.
 
+## Troubleshooting
+
+If alerts do not fire or evaluate as expected:
+
+- **Query returns no numeric data** — Confirm the query returns a time column and a numeric column (or a single numeric value). Test in **Explore** and check the result format.
+- **Evaluation interval** — Ensure the evaluation interval is long enough for data to be available. Avoid intervals shorter than your data resolution.
+- **No data handling** — In **Configure no data and error handling**, choose whether no data should fire the alert, resolve it, or keep the current state.
+
+For connection errors, timeouts, or other data source issues, see [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/).
+
 ## Next steps
 
 - [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Macros such as `$__timeFilter` and `$__timeInterval`.
