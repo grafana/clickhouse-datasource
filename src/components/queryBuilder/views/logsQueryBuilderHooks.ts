@@ -214,7 +214,10 @@ export const useDefaultFilters = (
       } as StringFilter,
     ];
 
-    const defaultOrderBy: OrderBy[] = [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true }];
+    const defaultOrderBy: OrderBy[] = [
+      { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
+      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true }
+    ];
 
     lastTable.current = table;
     appliedDefaultFilters.current = true;
