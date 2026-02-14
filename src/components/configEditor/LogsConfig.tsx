@@ -53,6 +53,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
 
   const otelConfig = otel.getVersion(otelVersion);
   if (otelEnabled && otelConfig) {
+    filterTimeColumn = otelConfig.logColumnMap.get(ColumnHint.FilterTime);
     timeColumn = otelConfig.logColumnMap.get(ColumnHint.Time);
     levelColumn = otelConfig.logColumnMap.get(ColumnHint.LogLevel);
     messageColumn = otelConfig.logColumnMap.get(ColumnHint.LogMessage);
