@@ -78,12 +78,12 @@ jobs:
             --rm \
             --volume "$PWD:/tests" \
             us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v1.0.0 test \
-            --service grafana \
+            --service clickhouse-datasource \
             --service-url "https://datasourcese2e.grafana-dev.net" \
             --service-version "rrc-instant" \
             --suite-path /tests \
             --suite-name "${{ github.repository }}/e2e" \
-            --run-stage ci \
+            --run-stage rrc \
             --report-output log \
             --prometheus-metrics \
             --prometheus-strict-lint \
