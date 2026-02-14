@@ -489,6 +489,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             trackingV1.trackClickhouseConfigV1LogsConfig({ version: v });
             onLogsConfigChange('otelVersion', v);
           }}
+          onFilterTimeColumnChange={(c) => {
+            trackingV1.trackClickhouseConfigV1LogsConfig({ filterTimeColumn: c });
+            onLogsConfigChange('filterTimeColumn', c);
+          }}
           onTimeColumnChange={(c) => {
             trackingV1.trackClickhouseConfigV1LogsConfig({ timeColumn: c });
             onLogsConfigChange('timeColumn', c);

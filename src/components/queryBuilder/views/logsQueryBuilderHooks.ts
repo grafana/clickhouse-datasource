@@ -201,7 +201,7 @@ export const useDefaultFilters = (
         operator: FilterOperator.WithInGrafanaTimeRange,
         filterType: 'custom',
         key: '',
-        hint: ColumnHint.Time,
+        hint: ColumnHint.FilterTime,
         condition: 'AND',
       } as DateFilterWithoutValue,
       {
