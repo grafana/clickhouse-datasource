@@ -58,6 +58,7 @@ export const trackClickhouseConfigV1LogsConfig = (props: {
   defaultTable?: string;
   otelEnabled?: boolean;
   version?: string;
+  filterTimeColumn?: string;
   timeColumn?: string;
   levelColumn?: string;
   messageColumn?: string;

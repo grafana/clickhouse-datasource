@@ -276,9 +276,13 @@ export default {
           title: 'Default columns',
           description: 'Default columns for log queries. Leave empty to disable.',
 
+          filterTime: {
+            label: 'Filter Time column',
+            tooltip: 'A lower precision column for filtering logs by timestamp',
+          },
           time: {
             label: 'Time column',
-            tooltip: 'Column for the log timestamp',
+            tooltip: 'Column for the log timestamp, used for high precision sorting',
           },
           level: {
             label: 'Log Level column',
@@ -525,6 +529,7 @@ export default {
       traces: 'Traces',
     },
     ColumnHint: {
+      [ColumnHint.FilterTime]: 'Filter Time',
       [ColumnHint.Time]: 'Time',
 
       [ColumnHint.ResourceAttributes]: 'Resource Attributes',

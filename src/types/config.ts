@@ -74,6 +74,7 @@ export interface CHLogsConfig {
   otelEnabled?: boolean;
   otelVersion?: string;
 
+  filterTimeColumn?: string;
   timeColumn?: string;
   levelColumn?: string;
   messageColumn?: string;

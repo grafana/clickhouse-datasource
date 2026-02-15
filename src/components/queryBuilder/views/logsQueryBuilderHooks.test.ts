@@ -265,7 +265,7 @@ describe('useDefaultFilters', () => {
 
     const expectedOptions = {
       filters: [expect.anything(), expect.anything()],
-      orderBy: [expect.anything()],
+      orderBy: [expect.anything(), expect.anything()],
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
@@ -293,7 +293,7 @@ describe('useDefaultFilters', () => {
 
     const expectedOptions = {
       filters: [expect.anything(), expect.anything()],
-      orderBy: [expect.anything()],
+      orderBy: [expect.anything(), expect.anything()],
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
