@@ -63,24 +63,34 @@ jobs:
           interval: 10 # 10 seconds
 
       - name: Run Grafana Bench tests
+        env:
+          PLAYWRIGHT_GRAFANA_USERNAME: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}
+          PLAYWRIGHT_GRAFANA_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}
         run: |
           set -euo pipefail
           docker run \
             -e PROMETHEUS_URL="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_URL }}" \
             -e PROMETHEUS_USER="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_USER }}" \
             -e PROMETHEUS_PASSWORD="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_PASSWORD }}" \
+            -e PLAYWRIGHT_GRAFANA_USERNAME \
+            -e PLAYWRIGHT_GRAFANA_PASSWORD \
             --network=host \
             --rm \
             --volume "$PWD:/tests" \
-            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v0.6.11 test \
-            --grafana-admin-password "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}" \
-            --grafana-admin-user "${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}" \
-            --grafana-url "https://datasourcese2e.grafana-dev.net" \
-            --grafana-version "rrc-instant" \
+            us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v1.0.0 test \
+            --service clickhouse-datasource \
+            --service-url "https://datasourcese2e.grafana-dev.net" \
+            --service-version "rrc-instant" \
+            --suite-path /tests \
+            --suite-name "${{ github.repository }}/e2e" \
+            --run-stage rrc \
+            --report-output log \
             --prometheus-metrics \
             --prometheus-strict-lint \
             --pw-execute "npm run e2e" \
             --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
+            --test-env PLAYWRIGHT_GRAFANA_USERNAME \
+            --test-env PLAYWRIGHT_GRAFANA_PASSWORD \
             --test-env 'CI=true,DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }},DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }},DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }},DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }},DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e' \
             --test-runner playwright \
             --test-verbose
