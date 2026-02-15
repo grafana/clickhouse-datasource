@@ -284,7 +284,11 @@ This macro expands to the ClickHouse `additional_table_filters` setting with the
 currently active ad-hoc filters. It should be placed in the `SETTINGS` clause of
 your query.
 
-Example:
+**Multiple tables are supported** by passing multiple table names as comma-separated
+arguments: `$__adHocFilters('table1', 'table2', 'table3')`. This will apply the same
+ad-hoc filters to all specified tables.
+
+Example (single table):
 
 ```sql
 SELECT *
@@ -295,8 +299,17 @@ FROM (
 SETTINGS $__adHocFilters('my_complex_table')
 ```
 
+Example (multiple tables):
+
+```sql
+SELECT t1.*, t2.*
+FROM table1 t1
+JOIN table2 t2 ON t1.id = t2.id
+SETTINGS $__adHocFilters('table1', 'table2')
+```
+
 When ad-hoc filters are active (e.g., `status = 'active'` and `region = 'us-west'`),
-this expands to:
+the single table example expands to:
 
 ```sql
 SELECT *
@@ -305,6 +318,15 @@ FROM (
   WHERE complicated_condition
 ) AS result
 SETTINGS additional_table_filters={'my_complex_table': 'status = \'active\' AND region = \'us-west\''}
+```
+
+And the multiple tables example expands to:
+
+```sql
+SELECT t1.*, t2.*
+FROM table1 t1
+JOIN table2 t2 ON t1.id = t2.id
+SETTINGS additional_table_filters={'table1': 'status = \'active\' AND region = \'us-west\'', 'table2': 'status = \'active\' AND region = \'us-west\''}
 ```
 
 ## Learn more
