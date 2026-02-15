@@ -118,29 +118,34 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
-  const shallowSettingsCompare = (currentSettings: any, defaultSettings: any): boolean => {
-    // needed for dealing with proxy object from currentSettings
-    currentSettings = Object.assign({}, currentSettings);
+  const areDifferent = (currentSettings?: Record<string, any>, defaultSettings?: Record<string, any>): boolean => {
+    const current = currentSettings ?? {};
+    const defaults = defaultSettings ?? {};
 
-    const currentSettingsKeys = Object.keys(currentSettings);
-    const defaultSettingsKeys = Object.keys(defaultSettings);
+    const currentKeys = Object.keys(current);
+    const defaultKeys = Object.keys(defaults);
 
-    if (currentSettingsKeys.length !== defaultSettingsKeys.length) {
-      return false;
+    if (currentKeys.length !== defaultKeys.length) {
+      return true;
     }
 
-    for (const key of currentSettingsKeys) {
-      if (!defaultSettingsKeys.includes(key)) {
-        return false;
-      }
-      if (currentSettings[key].length === 0 && defaultSettings[key].length === 0) {
+    for (const key of currentKeys) {
+      const currentValue = current[key];
+      const defaultValue = defaults[key];
+
+      if (Array.isArray(currentValue) && Array.isArray(defaultValue)) {
+        if (currentValue.length !== defaultValue.length) {
+          return true;
+        }
         continue;
       }
-      if (currentSettings[key] !== defaultSettings[key]) {
-        return false;
+
+      if (currentValue !== defaultValue) {
+        return true;
       }
     }
-    return true;
+
+    return false;
   };
 
   const shouldBeOpen = useMemo(() => {
@@ -153,8 +158,8 @@ export const AdditionalSettingsSection = (props: Props) => {
       jsonData.maxOpenConns ||
       jsonData.queryTimeout ||
       jsonData.validateSql ||
-      !shallowSettingsCompare(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
-      !shallowSettingsCompare(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
+      areDifferent(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
+      areDifferent(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
       (jsonData.aliasTables && jsonData.aliasTables.length > 0) ||
       jsonData.enableRowLimit ||
       jsonData.enableSecureSocksProxy ||
