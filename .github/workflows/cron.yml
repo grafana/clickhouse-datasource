@@ -26,14 +26,14 @@ jobs:
       id-token: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           # Avoid leaving a token in the repo checkout; prefer explicit auth for publishing steps
           persist-credentials: false
 
       - name: Get secrets from Vault
         id: get-secrets
-        uses: grafana/shared-workflows/actions/get-vault-secrets@get-vault-secrets/v1.3.0
+        uses: grafana/shared-workflows/actions/get-vault-secrets@a37de51f3d713a30a9e4b21bcdfbd38170020593 # get-vault-secrets/v1.3.0
         with:
           # Grafana auth (used by @grafana/plugin-e2e)
           # + Prometheus creds for Bench metrics reporting
@@ -55,7 +55,7 @@ jobs:
           export_env: false
 
       - name: Wait for Grafana to be reachable
-        uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
+        uses: grafana/plugin-actions/wait-for-grafana@c8ad89b7d81f8cb9967bb65e444d85f5b3d7c674 # wait-for-grafana/v1.0.2
         with:
           # Use /login so “reachable” also implies the app is up
           url: "https://datasourcese2e.grafana-dev.net/login"
