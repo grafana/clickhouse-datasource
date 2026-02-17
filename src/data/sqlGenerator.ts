@@ -245,10 +245,15 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const selectPartsSql = selectParts.join(', ');
 
   // Optimize trace ID filtering for OTel enabled trace lookups
+  const hasTraceTimestampTable = options.meta?.hasTraceTimestampTable;
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
   const otelVersion = otel.getVersion(options.meta?.otelVersion);
   const applyTraceIdOptimization =
-    hasTraceIdFilter && traceStartTime !== undefined && options.meta?.otelEnabled && otelVersion;
+    hasTraceTimestampTable &&
+    hasTraceIdFilter &&
+    traceStartTime !== undefined &&
+    options.meta?.otelEnabled &&
+    otelVersion;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
     const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
