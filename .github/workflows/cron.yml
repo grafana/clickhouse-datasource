@@ -89,8 +89,8 @@ jobs:
             --prometheus-strict-lint \
             --pw-execute "npm run e2e" \
             --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
-            --test-env PLAYWRIGHT_GRAFANA_USERNAME \
-            --test-env PLAYWRIGHT_GRAFANA_PASSWORD \
+            --test-env PLAYWRIGHT_GRAFANA_USERNAME=$PLAYWRIGHT_GRAFANA_USERNAME \
+            --test-env PLAYWRIGHT_GRAFANA_PASSWORD=$PLAYWRIGHT_GRAFANA_PASSWORD \
             --test-env 'CI=true,DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }},DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }},DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }},DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }},DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e' \
             --test-runner playwright \
             --test-verbose
