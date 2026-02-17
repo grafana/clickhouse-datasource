@@ -2,8 +2,15 @@ name: cron Jobs
 
 on:
   schedule:
-    - cron: '0 9 * * *' # Daily at 09:00 UTC
-  workflow_dispatch: # Allow manual triggering
+    - cron: "0 9 * * *" # Daily at 09:00 UTC
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit SHA or branch to check out (defaults to the branch/SHA the workflow runs on)"
+        required: false
+        default: ""
+  pull_request: # debug
+    branches: [main]
 
 defaults:
   run:
@@ -31,6 +38,7 @@ jobs:
         with:
           # Avoid leaving a token in the repo checkout; prefer explicit auth for publishing steps
           persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
 
       - name: Get secrets from Vault
         id: get-secrets
@@ -55,43 +63,51 @@ jobs:
           # Keep secrets in step output; we’ll pass them to Bench explicitly
           export_env: false
 
-      - name: Wait for Grafana to be reachable
-        uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
-        with:
-          # Use /login so “reachable” also implies the app is up
-          url: "https://datasourcese2e.grafana-dev.net/login"
-          timeout: 600 # 10 minutes
-          interval: 10 # 10 seconds
-
       - name: Run Grafana Bench tests
         env:
-          PLAYWRIGHT_GRAFANA_USERNAME: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}
-          PLAYWRIGHT_GRAFANA_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}
+          DS_INSTANCE_HOST: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }}
+          DS_INSTANCE_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }}
+          DS_INSTANCE_PORT: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }}
+          DS_INSTANCE_USERNAME: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }}
+          GRAFANA_ADMIN_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}
+          GRAFANA_ADMIN_USER: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}
+          PROMETHEUS_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_PASSWORD }}
+          PROMETHEUS_URL: ${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_URL }}
+          PROMETHEUS_USER: ${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_USER }}
         run: |
           set -euo pipefail
           docker run \
-            -e PROMETHEUS_URL="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_URL }}" \
-            -e PROMETHEUS_USER="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_USER }}" \
-            -e PROMETHEUS_PASSWORD="${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_PASSWORD }}" \
-            -e PLAYWRIGHT_GRAFANA_USERNAME \
-            -e PLAYWRIGHT_GRAFANA_PASSWORD \
             --network=host \
             --rm \
             --volume "$PWD:/tests" \
+            -e DS_INSTANCE_HOST \
+            -e DS_INSTANCE_PASSWORD \
+            -e DS_INSTANCE_PORT \
+            -e DS_INSTANCE_USERNAME \
+            -e GRAFANA_ADMIN_PASSWORD \
+            -e GRAFANA_ADMIN_USER \
+            -e PROMETHEUS_PASSWORD \
+            -e PROMETHEUS_URL \
+            -e PROMETHEUS_USER \
             us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v1.0.0 test \
-            --service clickhouse-datasource \
-            --service-url "https://datasourcese2e.grafana-dev.net" \
-            --service-version "rrc-instant" \
-            --suite-path /tests \
-            --suite-name "${{ github.repository }}/e2e" \
-            --run-stage rrc \
-            --report-output log \
             --prometheus-metrics \
             --prometheus-strict-lint \
             --pw-execute "npm run e2e" \
             --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
-            --test-env PLAYWRIGHT_GRAFANA_USERNAME=$PLAYWRIGHT_GRAFANA_USERNAME \
-            --test-env PLAYWRIGHT_GRAFANA_PASSWORD=$PLAYWRIGHT_GRAFANA_PASSWORD \
-            --test-env 'CI=true,DS_INSTANCE_HOST=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }},DS_INSTANCE_PASSWORD=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }},DS_INSTANCE_PORT=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }},DS_INSTANCE_USERNAME=${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }},DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e' \
+            --report-output log \
+            --run-stage ci \
+            --service clickhouse-datasource \
+            --service-url "https://datasourcese2e.grafana-dev.net" \
+            --service-version "rrc-instant" \
+            --suite-name "${{ github.repository }}/e2e" \
+            --suite-path /tests \
+            --test-env CI=true \
+            --test-env DS_INSTANCE_HOST \
+            --test-env DS_INSTANCE_PASSWORD \
+            --test-env DS_INSTANCE_PORT \
+            --test-env DS_INSTANCE_USERNAME \
+            --test-env DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e \
+            --test-env GRAFANA_ADMIN_PASSWORD \
+            --test-env GRAFANA_ADMIN_USER \
             --test-runner playwright \
             --test-verbose
