@@ -3,7 +3,8 @@ name: cron Jobs
 on:
   schedule:
     - cron: '0 9 * * *' # Daily at 09:00 UTC
-
+  pull_request: # debug
+    branches: [main]
 defaults:
   run:
     shell: bash
