@@ -16,6 +16,7 @@ interface LogsConfigProps {
   onDefaultTableChange: (v: string) => void;
   onOtelEnabledChange: (v: boolean) => void;
   onOtelVersionChange: (v: string) => void;
+  onFilterTimeColumnChange: (v: string) => void;
   onTimeColumnChange: (v: string) => void;
   onLevelColumnChange: (v: string) => void;
   onMessageColumnChange: (v: string) => void;
@@ -29,6 +30,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onDefaultTableChange,
     onOtelEnabledChange,
     onOtelVersionChange,
+    onFilterTimeColumnChange,
     onTimeColumnChange,
     onLevelColumnChange,
     onMessageColumnChange,
@@ -40,6 +42,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     defaultTable,
     otelEnabled,
     otelVersion,
+    filterTimeColumn,
     timeColumn,
     levelColumn,
     messageColumn,
@@ -50,6 +53,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
 
   const otelConfig = otel.getVersion(otelVersion);
   if (otelEnabled && otelConfig) {
+    filterTimeColumn = otelConfig.logColumnMap.get(ColumnHint.FilterTime);
     timeColumn = otelConfig.logColumnMap.get(ColumnHint.Time);
     levelColumn = otelConfig.logColumnMap.get(ColumnHint.LogLevel);
     messageColumn = otelConfig.logColumnMap.get(ColumnHint.LogMessage);
@@ -90,6 +94,14 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onEnabledChange={onOtelEnabledChange}
           onVersionChange={onOtelVersionChange}
           wide
+        />
+        <LabeledInput
+          disabled={otelEnabled}
+          label={labels.columns.filterTime.label}
+          placeholder={columnLabelToPlaceholder(labels.columns.filterTime.label)}
+          tooltip={labels.columns.filterTime.tooltip}
+          value={filterTimeColumn || ''}
+          onChange={onFilterTimeColumnChange}
         />
         <LabeledInput
           disabled={otelEnabled}
