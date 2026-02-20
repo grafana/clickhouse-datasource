@@ -140,7 +140,7 @@ export class Datasource
       return undefined;
     }
 
-    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.Time);
+    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.FilterTime) || getColumnByHint(query.builderOptions, ColumnHint.Time);
     if (timeColumn === undefined) {
       return undefined;
     }
@@ -150,7 +150,7 @@ export class Datasource
     columns.push({
       name: getTimeFieldRoundingClause(logsVolumeRequest.scopedVars, timeColumn.name),
       alias: TIME_FIELD_ALIAS,
-      hint: ColumnHint.Time,
+      hint: timeColumn.hint!,
     });
 
     const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
@@ -193,7 +193,7 @@ export class Datasource
       filters,
       columns,
       aggregates,
-      orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
+      orderBy: [{ name: '', hint: timeColumn.hint!, dir: OrderByDirection.ASC }],
     };
 
     const logVolumeSupplementaryQuery = generateSql(logVolumeSqlBuilderOptions);
@@ -510,6 +510,7 @@ export class Datasource
       return otelConfig.logColumnMap;
     }
 
+    logsConfig.filterTimeColumn && result.set(ColumnHint.FilterTime, logsConfig.filterTimeColumn);
     logsConfig.timeColumn && result.set(ColumnHint.Time, logsConfig.timeColumn);
     logsConfig.levelColumn && result.set(ColumnHint.LogLevel, logsConfig.levelColumn);
     logsConfig.messageColumn && result.set(ColumnHint.LogMessage, logsConfig.messageColumn);
@@ -1137,14 +1138,15 @@ export class Datasource
     const builderOptions = contextQuery.builderOptions;
     builderOptions.limit = options.limit;
 
-    if (!getColumnByHint(builderOptions, ColumnHint.Time)) {
+    const timeColumn = getColumnByHint(builderOptions, ColumnHint.FilterTime) || getColumnByHint(builderOptions, ColumnHint.Time)
+    if (!timeColumn) {
       throw new Error('Missing time column for log context');
     }
 
     builderOptions.orderBy = [];
     builderOptions.orderBy.push({
       name: '',
-      hint: ColumnHint.Time,
+      hint: timeColumn.hint!,
       dir: options.direction === LogRowContextQueryDirection.Forward ? OrderByDirection.ASC : OrderByDirection.DESC,
     });
 
@@ -1155,7 +1157,7 @@ export class Datasource
           ? FilterOperator.GreaterThanOrEqual
           : FilterOperator.LessThanOrEqual,
       filterType: 'custom',
-      hint: ColumnHint.Time,
+      hint: timeColumn.hint!,
       key: '',
       value: `fromUnixTimestamp64Nano(${row.timeEpochNs})`,
       type: 'datetime',

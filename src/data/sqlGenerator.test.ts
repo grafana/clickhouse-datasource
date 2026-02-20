@@ -271,6 +271,7 @@ describe('SQL Generator', () => {
         flattenNested: false,
         traceEventsColumnPrefix: 'Events',
         traceLinksColumnPrefix: 'Links',
+        hasTraceTimestampTable: true,
       },
       limit: 1000,
       orderBy: [],
@@ -334,6 +335,7 @@ describe('SQL Generator', () => {
         flattenNested: true,
         traceEventsColumnPrefix: 'Events',
         traceLinksColumnPrefix: 'Links',
+        hasTraceTimestampTable: true,
       },
       limit: 1000,
       orderBy: [],
@@ -389,6 +391,7 @@ describe('SQL Generator', () => {
         traceDurationUnit: TimeUnit.Nanoseconds,
         isTraceIdMode: true,
         traceId: 'abcdefg',
+        hasTraceTimestampTable: true,
       },
       limit: 1000,
       orderBy: [],
@@ -404,6 +407,52 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+      'LIMIT 1000',
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('generates an OTel trace ID query without the time range optimization when the trace timestamp table does not exist ', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: true,
+        otelVersion: 'latest',
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        hasTraceTimestampTable: false, // trace timestamp table does not exist
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+    const expectedSqlParts = [
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
+      '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
+      'multiply("Duration", 0.000001) as duration,',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
+      `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
       'LIMIT 1000',
     ];
 
