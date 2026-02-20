@@ -55,6 +55,10 @@ export interface QueryBuilderOptions {
      */
     isTraceIdMode?: boolean;
     traceId?: string;
+    /**
+     * true when the trace timestamp optimization table is detected
+     */
+    hasTraceTimestampTable?: boolean;
 
     /**
      * True if "Nested" column types should be treated as if they
