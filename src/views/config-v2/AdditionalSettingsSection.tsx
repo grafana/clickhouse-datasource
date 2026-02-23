@@ -122,7 +122,6 @@ export const AdditionalSettingsSection = (props: Props) => {
   const shouldBeOpen = useMemo(() => {
     const defaultLogs = defaultCHAdditionalSettingsConfig.logs;
     const defaultTraces = defaultCHAdditionalSettingsConfig.traces;
-
     const logs = jsonData.logs ?? defaultLogs;
     const traces = jsonData.traces ?? defaultTraces;
 
