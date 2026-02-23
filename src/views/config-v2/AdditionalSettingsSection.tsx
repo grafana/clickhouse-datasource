@@ -237,6 +237,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
           onOtelEnabledChange={(v) => onUpdateLogsConfig('otelEnabled', v)}
           onOtelVersionChange={(v) => onUpdateLogsConfig('otelVersion', v)}
+          onFilterTimeColumnChange={(c) => onUpdateLogsConfig('filterTimeColumn', c)}
           onTimeColumnChange={(c) => onUpdateLogsConfig('timeColumn', c)}
           onLevelColumnChange={(c) => onUpdateLogsConfig('levelColumn', c)}
           onMessageColumnChange={(c) => onUpdateLogsConfig('messageColumn', c)}

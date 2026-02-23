@@ -14,6 +14,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={() => {}}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
@@ -33,6 +34,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={() => {}}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
@@ -59,6 +61,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={onDefaultTableChange}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
@@ -113,6 +116,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={() => {}}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={onOtelVersionChange}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
@@ -130,6 +134,35 @@ describe('LogsConfig', () => {
     expect(onOtelVersionChange).toHaveBeenCalledWith(expect.any(String));
   });
 
+  it('should call onFilterTimeColumnChange when changed', () => {
+    const onFilterTimeColumnChange = jest.fn();
+    const result = render(
+      <LogsConfig
+        logsConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={onFilterTimeColumnChange}
+        onTimeColumnChange={() => {}}
+        onLevelColumnChange={() => {}}
+        onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(
+      columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.filterTime.label)
+    );
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: 'changed' } });
+    fireEvent.blur(input);
+    expect(onFilterTimeColumnChange).toHaveBeenCalledTimes(1);
+    expect(onFilterTimeColumnChange).toHaveBeenCalledWith('changed');
+  });
+
   it('should call onTimeColumnChange when changed', () => {
     const onTimeColumnChange = jest.fn();
     const result = render(
@@ -139,6 +172,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={() => {}}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={onTimeColumnChange}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={() => {}}
@@ -167,6 +201,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={() => {}}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={() => {}}
         onLevelColumnChange={onLevelColumnChange}
         onMessageColumnChange={() => {}}
@@ -195,6 +230,7 @@ describe('LogsConfig', () => {
         onDefaultTableChange={() => {}}
         onOtelEnabledChange={() => {}}
         onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
         onTimeColumnChange={() => {}}
         onLevelColumnChange={() => {}}
         onMessageColumnChange={onMessageColumnChange}

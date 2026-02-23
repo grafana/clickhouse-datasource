@@ -55,6 +55,10 @@ export interface QueryBuilderOptions {
      */
     isTraceIdMode?: boolean;
     traceId?: string;
+    /**
+     * true when the trace timestamp optimization table is detected
+     */
+    hasTraceTimestampTable?: boolean;
 
     /**
      * True if "Nested" column types should be treated as if they
@@ -140,6 +144,10 @@ export interface SqlFunction {
  * For example, "Time" would be used to identify the primary time column for a time series.
  */
 export enum ColumnHint {
+  /**
+   * An optional lower precision timestamp used for filtering logs.
+   */
+  FilterTime = 'filter_time',
   Time = 'time',
 
   ResourceAttributes = 'resource_attributes',

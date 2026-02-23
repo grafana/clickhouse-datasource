@@ -245,10 +245,15 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const selectPartsSql = selectParts.join(', ');
 
   // Optimize trace ID filtering for OTel enabled trace lookups
+  const hasTraceTimestampTable = options.meta?.hasTraceTimestampTable;
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
   const otelVersion = otel.getVersion(options.meta?.otelVersion);
   const applyTraceIdOptimization =
-    hasTraceIdFilter && traceStartTime !== undefined && options.meta?.otelEnabled && otelVersion;
+    hasTraceTimestampTable &&
+    hasTraceIdFilter &&
+    traceStartTime !== undefined &&
+    options.meta?.otelEnabled &&
+    otelVersion;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
     const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
@@ -318,10 +323,10 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
 
   // TODO: these columns could be a map or some other convenience function
   const selectParts: string[] = [];
-  const logTime = getColumnByHint(options, ColumnHint.Time);
+  const logTime = getColumnByHint(options, ColumnHint.Time) || getColumnByHint(options, ColumnHint.FilterTime);
   if (logTime !== undefined) {
     // Must be first column in list.
-    logTime.alias = logColumnHintsToAlias.get(ColumnHint.Time);
+    logTime.alias = logColumnHintsToAlias.get(logTime.hint!);
     selectParts.push(getColumnIdentifier(logTime));
   }
 
@@ -419,14 +424,14 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
 
   const selectParts: string[] = [];
   const selectNames = new Set<string>();
-  const timeColumn = getColumnByHint(options, ColumnHint.Time);
+  const timeColumn = getColumnByHint(options, ColumnHint.Time) || getColumnByHint(options, ColumnHint.FilterTime);
   if (timeColumn !== undefined) {
     timeColumn.alias = 'time';
     selectParts.push(getColumnIdentifier(timeColumn));
     selectNames.add(timeColumn.alias);
   }
 
-  const columnsExcludingTimeColumn = options.columns?.filter((c) => c.hint !== ColumnHint.Time);
+  const columnsExcludingTimeColumn = options.columns?.filter((c) => c.hint !== ColumnHint.Time && c.hint !== ColumnHint.FilterTime);
   columnsExcludingTimeColumn?.forEach((c) => {
     selectParts.push(getColumnIdentifier(c));
     selectNames.add(c.alias || c.name);
@@ -503,7 +508,7 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
   const queryParts: string[] = [];
   const selectParts: string[] = [];
 
-  const timeColumn = getColumnByHint(options, ColumnHint.Time);
+  const timeColumn = getColumnByHint(options, ColumnHint.Time) || getColumnByHint(options, ColumnHint.FilterTime);
   if (timeColumn !== undefined) {
     timeColumn.name = `$__timeInterval(${timeColumn.name})`;
     timeColumn.alias = 'time';
@@ -778,7 +783,15 @@ const getFilters = (options: QueryBuilderOptions): string => {
 
     let column = filter.key;
     let type = filter.type || '';
-    const hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
+    let hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
+    
+    // Fall back to Time/FilterTime if column not found
+    if (filter.hint === ColumnHint.Time && !hintedColumn) {
+      hintedColumn = getColumnByHint(options, ColumnHint.FilterTime);
+    } else if (filter.hint === ColumnHint.FilterTime && !hintedColumn) {
+      hintedColumn = getColumnByHint(options, ColumnHint.Time);
+    }
+
     if (hintedColumn) {
       column = hintedColumn.alias || hintedColumn.name;
       type = hintedColumn.type || type;
@@ -919,7 +932,8 @@ const isMultiFilter = (type: string, operator: FilterOperator): boolean =>
  * so that filters can be added properly.
  */
 const logAliasToColumnHintsEntries: ReadonlyArray<[string, ColumnHint]> = [
-  ['timestamp', ColumnHint.Time],
+  ['timestamp', ColumnHint.FilterTime],
+  ['timestamp', ColumnHint.Time], // duplicate key, last value is kept
   ['body', ColumnHint.LogMessage],
   ['level', ColumnHint.LogLevel],
   ['traceID', ColumnHint.TraceId],
