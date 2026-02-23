@@ -90,13 +90,15 @@
     "@grafana/runtime": "12.4.0-22148923374",
     "@grafana/schema": "12.4.0-22148923374",
     "@grafana/ui": "12.4.0-22148923374",
+    "es-toolkit": "^1.44.0",
     "js-sql-parser": "^1.6.0",
     "pgsql-ast-parser": "^12.0.1",
-    "semver": "^7.7.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "5.3.4",
+    "semver": "^7.7.3",
     "sql-formatter": "^15.6.12",
     "tslib": "2.8.1"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

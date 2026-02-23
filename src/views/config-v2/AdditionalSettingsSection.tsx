@@ -48,6 +48,7 @@ import {
   trackClickhouseConfigV2TracesConfig,
 } from './tracking';
 import { css } from '@emotion/css';
+import { isEqual } from 'es-toolkit/compat';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -118,51 +119,27 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
 
-  const areDifferent = (currentSettings?: Record<string, any>, defaultSettings?: Record<string, any>): boolean => {
-    const current = currentSettings ?? {};
-    const defaults = defaultSettings ?? {};
-
-    const currentKeys = Object.keys(current);
-    const defaultKeys = Object.keys(defaults);
-
-    if (currentKeys.length !== defaultKeys.length) {
-      return true;
-    }
-
-    for (const key of currentKeys) {
-      const currentValue = current[key];
-      const defaultValue = defaults[key];
-
-      if (Array.isArray(currentValue) && Array.isArray(defaultValue)) {
-        if (currentValue.length !== defaultValue.length) {
-          return true;
-        }
-        continue;
-      }
-
-      if (currentValue !== defaultValue) {
-        return true;
-      }
-    }
-
-    return false;
-  };
-
   const shouldBeOpen = useMemo(() => {
+    const defaultLogs = defaultCHAdditionalSettingsConfig.logs;
+    const defaultTraces = defaultCHAdditionalSettingsConfig.traces;
+
+    const logs = jsonData.logs ?? defaultLogs;
+    const traces = jsonData.traces ?? defaultTraces;
+
     return (
-      jsonData.defaultDatabase ||
-      jsonData.defaultTable ||
-      jsonData.connMaxLifetime ||
-      jsonData.dialTimeout ||
-      jsonData.maxIdleConns ||
-      jsonData.maxOpenConns ||
-      jsonData.queryTimeout ||
-      jsonData.validateSql ||
-      areDifferent(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
-      areDifferent(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
-      (jsonData.aliasTables && jsonData.aliasTables.length > 0) ||
-      jsonData.enableRowLimit ||
-      jsonData.enableSecureSocksProxy ||
+      !!jsonData.defaultDatabase ||
+      !!jsonData.defaultTable ||
+      !!jsonData.connMaxLifetime ||
+      !!jsonData.dialTimeout ||
+      !!jsonData.maxIdleConns ||
+      !!jsonData.maxOpenConns ||
+      !!jsonData.queryTimeout ||
+      !!jsonData.validateSql ||
+      !isEqual(logs, defaultLogs) ||
+      !isEqual(traces, defaultTraces) ||
+      (jsonData.aliasTables?.length ?? 0) > 0 ||
+      !!jsonData.enableRowLimit ||
+      !!jsonData.enableSecureSocksProxy ||
       customSettings.length > 0
     );
   }, [jsonData, customSettings]);
