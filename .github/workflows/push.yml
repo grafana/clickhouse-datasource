@@ -26,7 +26,7 @@ jobs:
       golangci-lint-version: '2.1.6'
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
 
-  publish-latest-to-catalog:
+  publish-latest-to-catalog: # for nightly e2e tests
     name: Publish main to Dev Catalog
     if: github.ref == 'refs/heads/main'
     uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
