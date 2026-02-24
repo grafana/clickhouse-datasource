@@ -1,5 +1,18 @@
 # Changelog
 
+## 4.14.0
+
+### Features
+
+- Add FilterTime hint to enable multi-timestamp log filtering/sorting (#1642)
+- Skip OTel trace time range optimization when trace timestamp table does not exist (#1663)
+
+### Fixes
+
+- Dependency updates
+- Add separate columns for Resource/Scope/Log Attributes (#1560)
+- Fix panic when configuring datasource with numeric timeout values (#1559)
+
 ## 4.13.0
 
 ### Features
