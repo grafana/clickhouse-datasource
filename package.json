@@ -86,11 +86,12 @@
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
-    "es-toolkit": "^1.44.0",
     "@grafana/data": "12.4.0",
     "@grafana/runtime": "12.4.0",
     "@grafana/schema": "12.4.0",
     "@grafana/ui": "12.4.0",
+    "@openfeature/web-sdk": "^1.7.3",
+    "es-toolkit": "^1.44.0",
     "js-sql-parser": "^1.6.0",
     "pgsql-ast-parser": "^12.0.1",
     "react": "18.3.1",
