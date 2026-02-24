@@ -8,7 +8,10 @@
     "yarn.lock",
     "package-lock.json",
     "go.sum",
-    "mage_output_file.go"
+    "mage_output_file.go",
+    "test-results/**",
+    "test_summary.json",
+    "playwright-report/**"
   ],
   "words": [
     "aggregatable",
@@ -25,6 +28,7 @@
     "dataframe",
     "DataSource",
     "DataSources",
+    "Drilldown",
     "DateTime",
     "dbug",
     "elazarl",
@@ -50,6 +54,7 @@
     "nofile",
     "nolint",
     "Nonproxy",
+    "openfeature",
     "oper",
     "otel",
     "OUTFILE",
