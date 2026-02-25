@@ -1,16 +1,31 @@
 name: cron Jobs
 
 on:
+  # Run nightly against the shared Cloud instance
   schedule:
     - cron: '0 9 * * *' # Daily at 09:00 UTC
-  workflow_dispatch: # Allow manual triggering
 
+  # Allow engineers to run Cloud E2E on-demand (useful for debugging)
+  workflow_dispatch:
+
+# Global defaults for all `run:` steps
 defaults:
   run:
     shell: bash
 
+# Baseline permissions (jobs can override/extend)
 permissions:
   contents: read
+
+# Constants you might want to tweak without hunting through the file
+env:
+  # Private Data Source Connect network name. You'll need to set this yourself.
+  # Find this on https://datasources.grafana.net/ for the provisioned datasource.
+  # If set, tests should enable/select PDC; if unset, tests should skip PDC config.
+  DS_PDC_NETWORK_NAME: datasources-pdc-network-aws-datasourcese2e
+
+  # Grafana URL for the shared Cloud instance. This should not be changed.
+  GRAFANA_URL: "https://datasourcese2e.grafana-dev.net"
 
 jobs:
   bench-tests:
@@ -18,16 +33,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
 
-    # ensure job never runs on forks
-    if: ${{ github.event_name != 'schedule' || github.repository_owner == 'grafana' }}
+    # Never run on forks — they lack the required Vault secrets regardless of trigger
+    if: ${{ github.repository_owner == 'grafana' }}
 
-    # this job needs OIDC to fetch Vault secrets
+    # This job needs OIDC to fetch Vault secrets via the shared action
     permissions:
       contents: read
       id-token: write
 
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
           # Avoid leaving a token in the repo checkout; prefer explicit auth for publishing steps
           persist-credentials: false
@@ -52,30 +68,53 @@ jobs:
             DS_INSTANCE_PORT=ds-instance:port
             DS_INSTANCE_USERNAME=ds-instance:username
 
-          # Keep secrets in step output; we’ll pass them to Bench explicitly
+          # Keep secrets in step output; we’ll pass them into the container explicitly
           export_env: false
 
       - name: Wait for Grafana to be reachable
-        uses: grafana/plugin-actions/wait-for-grafana@wait-for-grafana/v1.0.2
+        # Wait until the Cloud instance is responding before starting tests
+        uses: grafana/plugin-actions/wait-for-grafana@c8ad89b7d81f8cb9967bb65e444d85f5b3d7c674 # wait-for-grafana/v1.0.2
         with:
           # Use /login so “reachable” also implies the app is up
-          url: "https://datasourcese2e.grafana-dev.net/login"
-          timeout: 600 # 10 minutes
+          url: "${{ env.GRAFANA_URL }}/login"
+          timeout: 600 # 10 minutes (can be slow after maintenance)
           interval: 10 # 10 seconds
 
       - name: Run Grafana Bench tests
+        # Materialize secrets into step env vars so we can pass them into the container cleanly
         env:
+          # Backend connection details (tests should read DS_INSTANCE_*)
           DS_INSTANCE_HOST: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_HOST }}
           DS_INSTANCE_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PASSWORD }}
           DS_INSTANCE_PORT: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_PORT }}
           DS_INSTANCE_USERNAME: ${{ fromJSON(steps.get-secrets.outputs.secrets).DS_INSTANCE_USERNAME }}
+
+          # Grafana admin credentials used by @grafana/plugin-e2e auth/storage state
           GRAFANA_ADMIN_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_PASSWORD }}
           GRAFANA_ADMIN_USER: ${{ fromJSON(steps.get-secrets.outputs.secrets).PLAYWRIGHT_GRAFANA_USERNAME }}
+
+          # Bench Prometheus reporting credentials (for metrics + strict lint)
           PROMETHEUS_PASSWORD: ${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_PASSWORD }}
           PROMETHEUS_URL: ${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_URL }}
           PROMETHEUS_USER: ${{ fromJSON(steps.get-secrets.outputs.secrets).PROMETHEUS_USER }}
+
+          # PDC network name comes from the workflow-level env above
+          DS_PDC_NETWORK_NAME: ${{ env.DS_PDC_NETWORK_NAME }}
         run: |
           set -euo pipefail
+
+          # Run Bench in a container. Bench bootstraps Playwright deps (prepare)
+          # and executes your repo's e2e script (execute) with standardized reporting.
+          #
+          # Flags grouped by purpose:
+          #   Container setup  : --network, --rm, --volume
+          #   Backend secrets  : -e DS_INSTANCE_*
+          #   Grafana auth     : -e GRAFANA_ADMIN_*, -e GRAFANA_URL
+          #   Bench Prometheus : -e PROMETHEUS_*
+          #   PDC              : -e DS_PDC_NETWORK_NAME
+          #   Bench reporting  : --report-output, --run-stage, --service-*, --suite-*
+          #   Test env         : --test-env (forwarded into the Playwright process)
+          #   Runner           : --test-runner, --test-verbose
           docker run \
             --network=host \
             --rm \
@@ -84,20 +123,22 @@ jobs:
             -e DS_INSTANCE_PASSWORD \
             -e DS_INSTANCE_PORT \
             -e DS_INSTANCE_USERNAME \
+            -e DS_PDC_NETWORK_NAME \
             -e GRAFANA_ADMIN_PASSWORD \
             -e GRAFANA_ADMIN_USER \
+            -e GRAFANA_URL \
             -e PROMETHEUS_PASSWORD \
             -e PROMETHEUS_URL \
             -e PROMETHEUS_USER \
             us-docker.pkg.dev/grafanalabs-global/docker-grafana-bench-prod/grafana-bench-playwright:v1.0.0 test \
             --prometheus-metrics \
             --prometheus-strict-lint \
-            --pw-execute "npm run e2e" \
             --pw-prepare "npm ci --no-audit --fund=false; npx playwright install" \
+            --pw-execute "npm run e2e" \
             --report-output log \
             --run-stage ci \
-            --service clickhouse-datasource \
-            --service-url "https://datasourcese2e.grafana-dev.net" \
+            --service ${GITHUB_REPOSITORY#grafana/} \
+            --service-url ${GRAFANA_URL} \
             --service-version "rrc-fast" \
             --suite-name "${{ github.repository }}/e2e" \
             --suite-path /tests \
@@ -106,8 +147,9 @@ jobs:
             --test-env DS_INSTANCE_PASSWORD \
             --test-env DS_INSTANCE_PORT \
             --test-env DS_INSTANCE_USERNAME \
-            --test-env DS_PDC_NETWORK_NAME=datasources-pdc-network-aws-datasourcese2e \
+            --test-env DS_PDC_NETWORK_NAME \
             --test-env GRAFANA_ADMIN_PASSWORD \
             --test-env GRAFANA_ADMIN_USER \
+            --test-env GRAFANA_URL \
             --test-runner playwright \
             --test-verbose

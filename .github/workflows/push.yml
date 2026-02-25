@@ -1,14 +1,24 @@
 name: Plugins - CI
 
 on:
-  push:
-    branches: [main]
+  # Run CI on all PRs
   pull_request:
 
+  # Also run on pushes to main (used for publish + downstream automation)
+  push:
+    branches: [main]
+
+  # Allow manual re-runs from the Actions UI (useful for debugging failures)
+  workflow_dispatch:
+
+# Minimal top-level permissions; jobs can extend as needed
 permissions:
   contents: read
-  id-token: write
+  id-token: write  # Required for OIDC (Vault / shared workflows)
 
+# Prevent duplicate runs on the same ref.
+# For PRs: cancel older in-progress runs when new commits are pushed.
+# For main: do NOT cancel (publishing should complete once started).
 concurrency:
   group: plugins-ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -16,46 +26,81 @@ concurrency:
 jobs:
   ci:
     name: CI
+
     uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v5.1.0
+
+    # Only run CI job for PRs / non-main refs.
+    # Main publishing is handled by the CD workflow below.
     if: github.ref != 'refs/heads/main'
+
+    # Required for checkout + OIDC in shared workflows
     permissions:
       contents: read
       id-token: write
+
     with:
-      go-version: '1.25'
-      golangci-lint-version: '2.1.6'
+      go-version: '1.26.0'
+      golangci-lint-version: '2.10.1'
+
+      # Ensure PR builds produce unique plugin versions.
+      # For PR events, suffix with the head SHA; otherwise leave empty.
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
 
-  publish-latest-to-catalog: # for nightly e2e tests
+  publish-latest-to-catalog: # used by nightly / scheduled Cloud E2E
     name: Publish main to Dev Catalog
+
+    # Main-only: publish the latest build to the internal Plugin Catalog (dev)
     if: github.ref == 'refs/heads/main'
+
     uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
+
+    # Publishing requires write permissions + OIDC
     permissions:
       attestations: write
-      contents: write
-      id-token: write
+      contents: write      # Required to publish artifacts
+      id-token: write      # OIDC for Vault / signing
+
     with:
+      # This is a "publish latest" flow, not a full release
       disable-docs-publishing: true
       disable-github-release: true
+
+      # Target the dev catalog environment (used by Cloud E2E)
       environment: 'dev'
-      go-version: '1.25'
-      golangci-lint-version: '2.1.6'
+
+      # Keep toolchain consistent with CI job
+      go-version: '1.26.0'
+      golangci-lint-version: '2.10.1'
+
+      # Suffix artifact with commit SHA for traceability and uniqueness
       plugin-version-suffix: ${{ github.sha }}
+
+      # Avoid re-running Playwright here (CI job already covers E2E)
       run-playwright: false
+
+      # Restrict publishing scope to the Cloud E2E instance
       scopes: grafana_cloud_instance_datasourcese2e
 
   trigger-argo-workflow:
     name: Trigger Argo Workflow
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+
+    # Only trigger downstream deployment on main pushes
     if: github.ref == 'refs/heads/main'
+
+    # Ensure publishing succeeded before triggering Argo
     needs: publish-latest-to-catalog
+
     permissions:
       contents: read
-      id-token: write
+      id-token: write  # Required if trigger action relies on OIDC
+
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout
+        uses: actions/checkout@v6
         with:
+          # Avoid persisting credentials in the workspace
           persist-credentials: false
 
       - name: Read plugin ID
@@ -63,6 +108,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Extract plugin ID (used as workflow template name in Argo)
           echo "id=$(jq -er .id ./src/plugin.json)" >> "$GITHUB_OUTPUT"
 
       - name: Read package version
@@ -70,14 +116,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Extract npm package version to construct Docker tag
           echo "version=$(jq -er .version ./package.json)" >> "$GITHUB_OUTPUT"
 
       - name: Trigger workflow
         uses: grafana/shared-workflows/actions/trigger-argo-workflow@b513eb1dfd9becfa671a41e55063cdd5c0a08031 # trigger-argo-workflow/v1.2.2
         with:
+          # Target Argo instance and namespace
           instance: ops
           namespace: grafana-datasources-cd
+
+          # Use plugin ID as WorkflowTemplate name
           workflow_template: ${{ steps.plugin.outputs.id }}
+
+          # Parameters passed into the Argo workflow
           parameters: |
             dockertag=${{ steps.pkg.outputs.version }}-${{ github.sha }}
             prCommentContext="triggered-by-push-to-main datasource=${{ steps.plugin.outputs.id }}"
