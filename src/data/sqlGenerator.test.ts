@@ -735,6 +735,81 @@ describe('getOrderBy', () => {
     const expectedSql = 'hinted ASC, normal ASC, order DESC';
     expect(sql).toEqual(expectedSql);
   });
+
+  describe('when hintsToGroup is set', () => {
+    it('groups orderBy columns by hintsToGroup', () => {
+      const options = {
+        columns: [
+          { name: 'TimestampTime', hint: ColumnHint.FilterTime },
+          { name: 'Timestamp', hint: ColumnHint.Time },
+          { name: 'SeverityText', hint: ColumnHint.LogLevel },
+        ],
+        orderBy: [
+          { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC },
+          { name: '', hint: ColumnHint.LogLevel, dir: OrderByDirection.ASC },
+          { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC },
+        ],
+      } as QueryBuilderOptions;
+      const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
+      const sql = _testExports.getOrderBy(options, hintsToGroup);
+      const expectedSql = '(TimestampTime, Timestamp) DESC, SeverityText ASC';
+      expect(sql).toEqual(expectedSql);
+    });
+
+    it('does not wrap single grouped column in parentheses', () => {
+      const options = {
+        columns: [
+          { name: 'TimestampTime', hint: ColumnHint.FilterTime },
+          { name: 'Timestamp', hint: ColumnHint.Time },
+          { name: 'SeverityText', hint: ColumnHint.LogLevel },
+        ],
+        orderBy: [
+          { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC },
+          { name: '', hint: ColumnHint.LogLevel, dir: OrderByDirection.ASC },
+        ],
+      } as QueryBuilderOptions;
+      const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
+      const sql = _testExports.getOrderBy(options, hintsToGroup);
+      const expectedSql = 'TimestampTime DESC, SeverityText ASC';
+      expect(sql).toEqual(expectedSql);
+    });
+
+    it('uses direction of first grouped item for the whole group', () => {
+      const options = {
+        columns: [
+          { name: 'TimestampTime', hint: ColumnHint.FilterTime },
+          { name: 'Timestamp', hint: ColumnHint.Time },
+        ],
+        orderBy: [
+          { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC },
+          { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC },
+        ],
+      } as QueryBuilderOptions;
+      const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
+      const sql = _testExports.getOrderBy(options, hintsToGroup);
+      const expectedSql = '(TimestampTime, Timestamp) DESC';
+      expect(sql).toEqual(expectedSql);
+    });
+
+    it('inserts hint group at index of first grouped column when mixed with non-grouped columns', () => {
+      const options = {
+        columns: [
+          { name: 'SeverityText', hint: ColumnHint.LogLevel },
+          { name: 'TimestampTime', hint: ColumnHint.FilterTime },
+          { name: 'Timestamp', hint: ColumnHint.Time },
+        ],
+        orderBy: [
+          { name: '', hint: ColumnHint.LogLevel, dir: OrderByDirection.ASC },
+          { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC },
+          { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC },
+        ],
+      } as QueryBuilderOptions;
+      const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
+      const sql = _testExports.getOrderBy(options, hintsToGroup);
+      const expectedSql = 'SeverityText ASC, (TimestampTime, Timestamp) DESC';
+      expect(sql).toEqual(expectedSql);
+    });
+  });
 });
 
 describe('getLimit', () => {

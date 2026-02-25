@@ -6,6 +6,7 @@ import {
   FilterOperator,
   MultiFilter,
   NumberFilter,
+  OrderByDirection,
   QueryBuilderOptions,
   QueryType,
   SelectedColumn,
@@ -398,7 +399,8 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
     queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${options.meta!.logMessageLike}%')`);
   }
 
-  const orderBy = getOrderBy(options);
+  const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
+  const orderBy = getOrderBy(options, hintsToGroup);
   if (orderBy) {
     queryParts.push('ORDER BY');
     queryParts.push(orderBy);
@@ -733,13 +735,22 @@ const concatQueryParts = (parts: readonly string[]): string => {
 
 /**
  * Returns the order by list, excluding the "ORDER BY" keyword.
+ * If `hintsToGroup` is specified, orderBy columns with hints found in the Set will be grouped together.
+ * e.g. when `hintsToGroup` equals Set([ColumnHint.FilterTime, ColumnHint.Time]),
+ * result will be: "(TimestampTime, Timestamp) DESC, SeverityText ASC",
+ * instead of: "TimestampTime DESC, Timestamp DESC, SeverityText ASC"
  */
-const getOrderBy = (options: QueryBuilderOptions): string => {
+const getOrderBy = (options: QueryBuilderOptions, hintsToGroup?: Set<ColumnHint>): string => {
   const orderByParts: string[] = [];
+
+  const hintGroup: { columns: string[]; dir?: OrderByDirection; insertIndex?: number } = { columns: [] };
+
   if ((options.orderBy?.length || 0) > 0) {
     options.orderBy?.forEach((o) => {
       let colName = o.name;
+
       const hintedColumn = o.hint && getColumnByHint(options, o.hint);
+
       if (hintedColumn) {
         colName = hintedColumn.alias || hintedColumn.name;
       }
@@ -748,8 +759,35 @@ const getOrderBy = (options: QueryBuilderOptions): string => {
         return;
       }
 
-      orderByParts.push(`${colName} ${o.dir}`);
+      const inHintGroup = o.hint && hintsToGroup?.has(o.hint);
+
+      if (inHintGroup) {
+        if (hintGroup.insertIndex === undefined) {
+          // remember index of first column to be grouped, use that index for the whole group
+          hintGroup.insertIndex = orderByParts.length;
+        }
+
+        hintGroup.columns.push(colName);
+
+        if (!hintGroup.dir) {
+          // use the direction of first grouped item for the whole group
+          hintGroup.dir = o.dir;
+        }
+      } else {
+        orderByParts.push(`${colName} ${o.dir}`);
+      }
     });
+  }
+
+  if (hintGroup.columns.length > 0 && hintGroup.dir && hintGroup.insertIndex !== undefined) {
+    let hintGroupColumnsJoined = hintGroup.columns.join(', ');
+
+    if (hintGroup.columns.length > 1) {
+      // only wrap in () if there's more than one column in the group
+      hintGroupColumnsJoined = `(${hintGroupColumnsJoined})`;
+    }
+
+    orderByParts.splice(hintGroup.insertIndex, 0, `${hintGroupColumnsJoined} ${hintGroup.dir}`);
   }
 
   return orderByParts.join(', ');
@@ -784,7 +822,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
     let column = filter.key;
     let type = filter.type || '';
     let hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
-    
+
     // Fall back to Time/FilterTime if column not found
     if (filter.hint === ColumnHint.Time && !hintedColumn) {
       hintedColumn = getColumnByHint(options, ColumnHint.FilterTime);
