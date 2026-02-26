@@ -8,7 +8,10 @@
     "yarn.lock",
     "package-lock.json",
     "go.sum",
-    "mage_output_file.go"
+    "mage_output_file.go",
+    "test-results/**",
+    "test_summary.json",
+    "playwright-report/**"
   ],
   "words": [
     "aggregatable",
@@ -46,6 +49,7 @@
     "mgbench",
     "Milli",
     "millis",
+    "mydb",
     "networkidle",
     "nofile",
     "nolint",
@@ -89,6 +93,7 @@
     "Ulimits",
     "uuidv",
     "vectorator",
-    "WorkDir"
+    "WorkDir",
+    "varname"
   ]
 }
