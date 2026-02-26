@@ -803,6 +803,9 @@ const getFilters = (options: QueryBuilderOptions): string => {
 
     if (filter.mapKey && type.startsWith('Map')) {
       column += `['${filter.mapKey}']`;
+      // Extract the value type from Map(KeyType, ValueType)
+      const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
+      type = valueType;
     } else if (filter.mapKey && type.startsWith('JSON')) {
       const escapedJSONPaths = filter.mapKey
         .split('.')
