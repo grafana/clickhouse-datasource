@@ -118,7 +118,6 @@ export const AdditionalSettingsSection = (props: Props) => {
       },
     });
   };
-
   const shouldBeOpen = useMemo(() => {
     const defaultLogs = defaultCHAdditionalSettingsConfig.logs;
     const defaultTraces = defaultCHAdditionalSettingsConfig.traces;
