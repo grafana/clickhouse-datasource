@@ -793,6 +793,78 @@ describe('getFilters', () => {
     expect(sql).toEqual(expectedSql);
   });
 
+  it('extracts Map value type for mapKey filter with Map(String, String)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'ResourceAttributes',
+          mapKey: 'service.name',
+          operator: FilterOperator.Equals,
+          type: 'Map(String, String)',
+          value: 'my-service',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual(`( ResourceAttributes['service.name'] = 'my-service' )`);
+  });
+
+  it('extracts Map value type for mapKey filter with Map(String, UInt64)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'NumericMap',
+          mapKey: 'count',
+          operator: FilterOperator.Equals,
+          type: 'Map(String, UInt64)',
+          value: 42,
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual(`( NumericMap['count'] = 42 )`);
+  });
+
+  it('extracts Map value type for mapKey filter with Map(LowCardinality(String), String)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'SpanAttributes',
+          mapKey: 'http.method',
+          operator: FilterOperator.Like,
+          type: 'Map(LowCardinality(String), String)',
+          value: 'GET',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual(`( SpanAttributes['http.method'] LIKE '%GET%' )`);
+  });
+
+  it('extracts Map value type for mapKey filter with Map(LowCardinality(String), UInt64)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'NumericAttrs',
+          mapKey: 'retry_count',
+          operator: FilterOperator.Equals,
+          type: 'Map(LowCardinality(String), UInt64)',
+          value: 3,
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual(`( NumericAttrs['retry_count'] = 3 )`);
+  });
+
   it('returns complex filter array', () => {
     const options = {
       columns: [{ name: 'hinted', hint: ColumnHint.Time }],
