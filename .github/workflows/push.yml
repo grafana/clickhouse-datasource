@@ -81,56 +81,57 @@ jobs:
       # Restrict publishing scope to the Cloud E2E instance
       scopes: grafana_cloud_instance_datasourcese2e
 
-  trigger-argo-workflow:
-    name: Trigger Argo Workflow
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
+  # Commenting until we ensure this doesn't deploy beyond dev
+  # trigger-argo-workflow:
+  #   name: Trigger Argo Workflow
+  #   runs-on: ubuntu-24.04
+  #   timeout-minutes: 10
 
-    # Only trigger downstream deployment on main pushes
-    if: github.ref == 'refs/heads/main'
+  #   # Only trigger downstream deployment on main pushes
+  #   if: github.ref == 'refs/heads/main'
 
-    # Ensure publishing succeeded before triggering Argo
-    needs: publish-latest-to-catalog
+  #   # Ensure publishing succeeded before triggering Argo
+  #   needs: publish-latest-to-catalog
 
-    permissions:
-      contents: read
-      id-token: write  # Required if trigger action relies on OIDC
+  #   permissions:
+  #     contents: read
+  #     id-token: write  # Required if trigger action relies on OIDC
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          # Avoid persisting credentials in the workspace
-          persist-credentials: false
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v6
+  #       with:
+  #         # Avoid persisting credentials in the workspace
+  #         persist-credentials: false
 
-      - name: Read plugin ID
-        id: plugin
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Extract plugin ID (used as workflow template name in Argo)
-          echo "id=$(jq -er .id ./src/plugin.json)" >> "$GITHUB_OUTPUT"
+  #     - name: Read plugin ID
+  #       id: plugin
+  #       shell: bash
+  #       run: |
+  #         set -euo pipefail
+  #         # Extract plugin ID (used as workflow template name in Argo)
+  #         echo "id=$(jq -er .id ./src/plugin.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Read package version
-        id: pkg
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Extract npm package version to construct Docker tag
-          echo "version=$(jq -er .version ./package.json)" >> "$GITHUB_OUTPUT"
+  #     - name: Read package version
+  #       id: pkg
+  #       shell: bash
+  #       run: |
+  #         set -euo pipefail
+  #         # Extract npm package version to construct Docker tag
+  #         echo "version=$(jq -er .version ./package.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Trigger workflow
-        uses: grafana/shared-workflows/actions/trigger-argo-workflow@b513eb1dfd9becfa671a41e55063cdd5c0a08031 # trigger-argo-workflow/v1.2.2
-        with:
-          # Target Argo instance and namespace
-          instance: ops
-          namespace: grafana-datasources-cd
+  #     - name: Trigger workflow
+  #       uses: grafana/shared-workflows/actions/trigger-argo-workflow@b513eb1dfd9becfa671a41e55063cdd5c0a08031 # trigger-argo-workflow/v1.2.2
+  #       with:
+  #         # Target Argo instance and namespace
+  #         instance: ops
+  #         namespace: grafana-datasources-cd
 
-          # Use plugin ID as WorkflowTemplate name
-          workflow_template: ${{ steps.plugin.outputs.id }}
+  #         # Use plugin ID as WorkflowTemplate name
+  #         workflow_template: ${{ steps.plugin.outputs.id }}
 
-          # Parameters passed into the Argo workflow
-          parameters: |
-            dockertag=${{ steps.pkg.outputs.version }}+${{ github.sha }}
-            prCommentContext=triggered-by-push-to-main datasource=${{ steps.plugin.outputs.id }}
-            commit_author=grafana-delivery-bot
+  #         # Parameters passed into the Argo workflow
+  #         parameters: |
+  #           dockertag=${{ steps.pkg.outputs.version }}+${{ github.sha }}
+  #           prCommentContext=triggered-by-push-to-main datasource=${{ steps.plugin.outputs.id }}
+  #           commit_author=grafana-delivery-bot
