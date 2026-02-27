@@ -306,15 +306,31 @@ export class Datasource
       return rawQuery;
     }
 
-    // Match $__adHocFilters('table_name') or $__adHocFilters("table_name")
-    const regex = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/g;
+    // Match $__adHocFilters('table_name') or $__adHocFilters("table_name") or multiple tables
+    const regex = /\$__adHocFilters\s*\(([^)]+)\)/g;
 
-    return rawQuery.replace(regex, (match, tableName) => {
+    return rawQuery.replace(regex, (match, args) => {
+      // Extract all table names from comma-separated quoted strings
+      const tableNameRegex = /['"]([^'"]+)['"]/g;
+      const tableNames: string[] = [];
+      let tableMatch;
+
+      while ((tableMatch = tableNameRegex.exec(args)) !== null) {
+        tableNames.push(tableMatch[1]);
+      }
+
+      if (tableNames.length === 0) {
+        return match; // Return original if no valid table names found
+      }
+
       const filterStr = this.adHocFilter.buildFilterString(filters, useJSON);
       if (filterStr === '') {
         return 'additional_table_filters={}';
       }
-      return `additional_table_filters={'${tableName}': '${filterStr}'}`;
+
+      // Build filter entries for all tables
+      const tableFilters = tableNames.map(tableName => `'${tableName}': '${filterStr}'`).join(', ');
+      return `additional_table_filters={${tableFilters}}`;
     });
   }
 

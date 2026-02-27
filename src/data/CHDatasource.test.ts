@@ -281,6 +281,49 @@ describe('ClickHouseDatasource', () => {
         "SELECT * FROM complex_table settings additional_table_filters={'my_table': ' key = \\'val\\' '}"
       );
     });
+
+    it('should expand $__adHocFilters macro with multiple tables', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters('table1', 'table2')",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      const adHocFilters = [
+        { key: 'key', operator: '=', value: 'val' },
+        { key: 'keyNum', operator: '=', value: '123' },
+      ];
+
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, adHocFilters);
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'table1': ' key = \\'val\\' AND keyNum = \\'123\\' ', 'table2': ' key = \\'val\\' AND keyNum = \\'123\\' '}"
+      );
+    });
+
+    it('should expand $__adHocFilters macro with multiple tables using double quotes', async () => {
+      const query = {
+        rawSql: 'SELECT * FROM complex_table settings $__adHocFilters("table1", "table2", "table3")',
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      const adHocFilters = [{ key: 'key', operator: '=', value: 'val' }];
+
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, adHocFilters);
+
+      expect(spyOnReplace).toHaveBeenCalled();
+      expect(spyOnGetVars).toHaveBeenCalled();
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'table1': ' key = \\'val\\' ', 'table2': ' key = \\'val\\' ', 'table3': ' key = \\'val\\' '}"
+      );
+    });
   });
 
   describe('Tag Keys', () => {
