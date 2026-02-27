@@ -131,6 +131,6 @@ jobs:
 
           # Parameters passed into the Argo workflow
           parameters: |
-            dockertag=${{ steps.pkg.outputs.version }}-${{ github.sha }}
+            dockertag=${{ steps.pkg.outputs.version }}+${{ github.sha }}
             prCommentContext=triggered-by-push-to-main datasource=${{ steps.plugin.outputs.id }}
             commit_author=grafana-delivery-bot
