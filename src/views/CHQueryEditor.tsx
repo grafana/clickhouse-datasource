@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
@@ -10,9 +10,11 @@ import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
 import { isBuilderOptionsRunnable, mapQueryBuilderOptionsToGrafanaFormat } from 'data/utils';
-import { setAllOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { setAllOptions, setOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
+import useTables from 'hooks/useTables';
+import otel from 'otel';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -64,6 +66,37 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   if (isBuilderOptionsRunnable(builderOptions)) {
     shouldSkipChanges.current = false;
   }
+
+  // Resolve hasTraceTimestampTable for OTel trace ID queries.
+  // This runs at the CHEditorByType level (not inside TraceQueryBuilder)
+  // so it works even when the builder is minimized via deep-links.
+  const needsTraceTableCheck = Boolean(builderOptions.meta?.isTraceIdMode && builderOptions.meta?.otelEnabled);
+  const traceDb = needsTraceTableCheck ? builderOptions.database : '';
+  const traceTables = useTables(props.datasource, traceDb);
+  const hasTraceTimestampTable = useMemo(
+    () => traceTables.some((t) => t === builderOptions.table + otel.traceTimestampTableSuffix),
+    [builderOptions.table, traceTables]
+  );
+
+  useEffect(() => {
+    if (!needsTraceTableCheck || traceTables.length === 0) {
+      return;
+    }
+
+    if (hasTraceTimestampTable !== builderOptions.meta?.hasTraceTimestampTable) {
+      builderOptionsDispatch(
+        setOptions({
+          meta: { hasTraceTimestampTable },
+        })
+      );
+    }
+  }, [
+    needsTraceTableCheck,
+    traceTables,
+    hasTraceTimestampTable,
+    builderOptions.meta?.hasTraceTimestampTable,
+    builderOptionsDispatch,
+  ]);
 
   useEffect(() => {
     if (shouldSkipChanges.current || query.editorType === EditorType.SQL) {
