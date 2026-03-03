@@ -6,6 +6,7 @@
 
 - Add FilterTime hint to enable multi-timestamp log filtering/sorting (#1642)
 - Skip OTel trace time range optimization when trace timestamp table does not exist (#1663)
+- Extract `Map` value type for `mapKey` filter in `getFilters` (#1694)
 
 ### Fixes
 
