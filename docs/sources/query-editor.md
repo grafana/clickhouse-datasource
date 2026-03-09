@@ -27,11 +27,11 @@ This document explains how to use the ClickHouse query editor to build and run q
 
 The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/visualizations/explore/) when you select the ClickHouse data source, or when you add or edit a panel and select ClickHouse. It includes the following elements.
 
-| Element | Description |
-|---------|-------------|
-| **Editor type** | Switch between **SQL** (write raw SQL) and **Query builder** (build queries with drop-downs and filters). |
-| **Run Query** | Runs the current query and refreshes the panel. In the SQL editor you can also use **Ctrl+Enter** (Windows/Linux) or **Cmd+Enter** (macOS). |
-| **Query type** | Choose the result format: **Table**, **Logs**, **Time series**, or **Traces**. This sets how Grafana interprets and visualizes the results. Available in both SQL and Query builder modes. |
+| Element         | Description                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Editor type** | Switch between **SQL** (write raw SQL) and **Query builder** (build queries with drop-downs and filters).                                                                                  |
+| **Run Query**   | Runs the current query and refreshes the panel. In the SQL editor you can also use **Ctrl+Enter** (Windows/Linux) or **Cmd+Enter** (macOS).                                                |
+| **Query type**  | Choose the result format: **Table**, **Logs**, **Time series**, or **Traces**. This sets how Grafana interprets and visualizes the results. Available in both SQL and Query builder modes. |
 
 **In SQL mode:**
 
@@ -125,71 +125,22 @@ FROM test_data
 WHERE $__timeFilter(date_time)
 ```
 
-| Macro | Description | Output example |
-|-------|-------------|----------------|
-| `$__dateFilter(columnName)` | Filters by the panel date range using the given column. | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')` |
-| `$__timeFilter(columnName)` | Filters by the panel time range (seconds). | `time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)` |
-| `$__timeFilter_ms(columnName)` | Filters by the panel time range (milliseconds). | `time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)` |
-| `$__dateTimeFilter(dateColumn, timeColumn)` | Combines date and time filters for separate Date and DateTime columns. | `$__dateFilter(dateColumn) AND $__timeFilter(timeColumn)` |
-| `$__fromTime_` | Start of the panel time range as `DateTime`. | `toDateTime(1415792726)` |
-| `$__toTime_` | End of the panel time range as `DateTime`. | `toDateTime(1447328726)` |
-| `$__fromTime_ms_` | Start of the panel time range as `DateTime64(3)`. | `fromUnixTimestamp64Milli(1415792726123)` |
-| `$__toTime_ms_` | End of the panel time range as `DateTime64(3)`. | `fromUnixTimestamp64Milli(1447328726456)` |
-| `$__interval_s_` | Panel interval in seconds. | `20` |
-| `$__timeInterval(columnName)` | Interval from panel time range (seconds), for grouping. | `toStartOfInterval(toDateTime(column), INTERVAL 20 second)` |
-| `$__timeInterval_ms(columnName)` | Interval from panel time range (milliseconds), for grouping. | `toStartOfInterval(toDateTime64(column, 3), INTERVAL 20 millisecond)` |
-| `$__conditionalAll(condition, $templateVar)` | Uses the first parameter when the template variable does not select all values; otherwise `1=1`. | `condition` or `1=1` |
+| Macro                                        | Description                                                                                      | Output example                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| `$__dateFilter(columnName)`                  | Filters by the panel date range using the given column.                                          | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')`                                       |
+| `$__timeFilter(columnName)`                  | Filters by the panel time range (seconds).                                                       | `time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)`                                   |
+| `$__timeFilter_ms(columnName)`               | Filters by the panel time range (milliseconds).                                                  | `time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)` |
+| `$__dateTimeFilter(dateColumn, timeColumn)`  | Combines date and time filters for separate Date and DateTime columns.                           | `$__dateFilter(dateColumn) AND $__timeFilter(timeColumn)`                                             |
+| `$__fromTime_`                               | Start of the panel time range as `DateTime`.                                                     | `toDateTime(1415792726)`                                                                              |
+| `$__toTime_`                                 | End of the panel time range as `DateTime`.                                                       | `toDateTime(1447328726)`                                                                              |
+| `$__fromTime_ms_`                            | Start of the panel time range as `DateTime64(3)`.                                                | `fromUnixTimestamp64Milli(1415792726123)`                                                             |
+| `$__toTime_ms_`                              | End of the panel time range as `DateTime64(3)`.                                                  | `fromUnixTimestamp64Milli(1447328726456)`                                                             |
+| `$__interval_s_`                             | Panel interval in seconds.                                                                       | `20`                                                                                                  |
+| `$__timeInterval(columnName)`                | Interval from panel time range (seconds), for grouping.                                          | `toStartOfInterval(toDateTime(column), INTERVAL 20 second)`                                           |
+| `$__timeInterval_ms(columnName)`             | Interval from panel time range (milliseconds), for grouping.                                     | `toStartOfInterval(toDateTime64(column, 3), INTERVAL 20 millisecond)`                                 |
+| `$__conditionalAll(condition, $templateVar)` | Uses the first parameter when the template variable does not select all values; otherwise `1=1`. | `condition` or `1=1`                                                                                  |
 
 You can also use brace notation `{}` when the macro parameter must contain a query or other expression.
-
-## Ad hoc filters
-
-Ad hoc filters let you add key/value filters that are applied to queries that use the ClickHouse data source. You choose filter values from a drop-down in the dashboard without editing the query. Ad hoc filters are supported only with **ClickHouse 22.7 or later**. For an overview, see [Grafana ad hoc filters](https://grafana.com/docs/grafana/latest/variables/variable-types/add-ad-hoc-filters/).
-
-By default, the ad hoc filter drop-down lists all tables and columns from the data source. If you set a default database in the data source settings, only tables from that database are used. To limit which tables or columns appear (for example, to avoid slow loads), add a dashboard variable of type **Constant** named `clickhouse_adhoc_query`. Set its value to one of:
-
-- A comma-separated list of databases
-- A single database name
-- `database.table` to show only columns for one table
-
-You can hide this variable from the dashboard; it is only used to scope the ad hoc filter options.
-
-## Use a query to populate ad hoc filters
-
-You can set `clickhouse_adhoc_query` to a **ClickHouse query** instead of a database or table name. The query results are used to populate the ad hoc filter’s selectable values. For example, set the variable value to:
-
-```sql
-SELECT DISTINCT machine_name FROM mgbench.logs1
-```
-
-Then the dashboard filter drop-down lists distinct `machine_name` values, and you can filter queries by the selected machine.
-
-## Map and JSON types (OpenTelemetry)
-
-Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is the default and turns merged labels into a filter. To use **JSON** syntax for the filter logic, add a dashboard variable of type **Constant** named `clickhouse_adhoc_use_json`. The variable’s value is ignored; it only needs to exist.
-
-## Apply ad hoc filters manually with `$__adHocFilters`
-
-By default, ad hoc filters are applied automatically by detecting the target table from your SQL. For queries that use CTEs, subqueries, or ClickHouse-specific syntax (for example `INTERVAL` or parameterized aggregate functions), automatic detection can fail. In those cases, use the `$__adHocFilters('table_name')` macro to specify where to apply the filters.
-
-The macro expands to the ClickHouse `additional_table_filters` setting with the currently active ad hoc filter conditions. Place it in the **SETTINGS** clause of your query.
-
-Example:
-
-```sql
-SELECT *
-FROM (
-  SELECT * FROM my_complex_table
-  WHERE complicated_condition
-) AS result
-SETTINGS $__adHocFilters('my_complex_table')
-```
-
-When ad hoc filters are active (for example, `status = 'active'` and `region = 'us-west'`), the macro expands to:
-
-```sql
-SETTINGS additional_table_filters={'my_complex_table': 'status = \'active\' AND region = \'us-west\''}
-```
 
 ## Next steps
 

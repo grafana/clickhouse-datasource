@@ -15,13 +15,13 @@ version: 0.1
 last_reviewed: 2026-02-11
 ---
 
-# Troubleshoot ClickHouse data source issues
+## Troubleshoot ClickHouse data source issues
 
 This guide provides solutions for common errors you may encounter when configuring or using the ClickHouse data source for Grafana.
 
-## Connection Errors
+### Connection Errors
 
-## Invalid Server Host
+Invalid Server Host
 
 **Error message:** "invalid server host. Either empty or not set"
 
@@ -35,7 +35,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Invalid Port
+Invalid Port
 
 **Error message:** "invalid port"
 
@@ -50,7 +50,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Failed to Create ClickHouse Client
+Failed to Create ClickHouse Client
 
 **Error message:** "failed to create ClickHouse client"
 
@@ -67,7 +67,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Connection Timeout
+Connection Timeout
 
 **Error message:** "connection timeout" or "the operation was cancelled before starting: context deadline exceeded"
 
@@ -82,7 +82,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Operation Cancelled During Execution
+Operation Cancelled During Execution
 
 **Error message:** "the operation was cancelled during execution: context deadline exceeded"
 
@@ -97,9 +97,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Authentication Errors
+### Authentication Errors
 
-## Invalid Username
+Invalid Username
 
 **Error message:** "username is either empty or not set"
 
@@ -113,7 +113,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Invalid Password
+Invalid Password
 
 **Error message:** "password is either empty or not set"
 
@@ -127,9 +127,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## TLS/SSL Certificate Errors
+### TLS/SSL Certificate Errors
 
-## Invalid CA Certificate
+Invalid CA Certificate
 
 **Error message:** "failed to parse TLS CA PEM certificate"
 
@@ -144,7 +144,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Invalid Client Certificate
+Invalid Client Certificate
 
 **Error message:** "tls: failed to find any PEM data in certificate input"
 
@@ -160,9 +160,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Protocol Errors
+### Protocol Errors
 
-## Invalid Protocol
+Invalid Protocol
 
 **Error message:** "protocol is invalid, use native or http"
 
@@ -176,9 +176,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Configuration Parsing Errors
+### Configuration Parsing Errors
 
-## Invalid JSON Configuration
+Invalid JSON Configuration
 
 **Error message:** "could not parse json"
 
@@ -196,6 +196,7 @@ This guide provides solutions for common errors you may encounter when configuri
 ## Could Not Parse Configuration Values
 
 **Error messages:**
+
 - "could not parse port value"
 - "could not parse secure value"
 - "could not parse tlsSkipVerify value"
@@ -213,9 +214,10 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Invalid Timeout Values
+Invalid Timeout Values
 
 **Error messages:**
+
 - "invalid timeout: [value]"
 - "invalid query timeout: [value]"
 
@@ -229,9 +231,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Query Errors
+### Query Errors
 
-## ClickHouse Database Exception
+ClickHouse Database Exception
 
 **Error message:** "DB::Exception: [error details]"
 
@@ -247,15 +249,16 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Macro Argument Count Error
+Macro Argument Count Error
 
 **Error messages:**
-- "$__timeFilter: expected 1 argument, received [n]"
-- "$__timeFilter_ms: expected 1 argument, received [n]"
-- "$__dateFilter: expected 1 argument, received [n]"
-- "$__dateTimeFilter: expected 2 arguments, received [n]"
-- "$__timeInterval: expected 1 argument, received [n]"
-- "$__timeInterval_ms: expected 1 argument, received [n]"
+
+- "$\_\_timeFilter: expected 1 argument, received [n]"
+- "$\_\_timeFilter_ms: expected 1 argument, received [n]"
+- "$\_\_dateFilter: expected 1 argument, received [n]"
+- "$\_\_dateTimeFilter: expected 2 arguments, received [n]"
+- "$\_\_timeInterval: expected 1 argument, received [n]"
+- "$\_\_timeInterval_ms: expected 1 argument, received [n]"
 
 **Cause:** A Grafana macro was used with the wrong number of arguments.
 
@@ -272,7 +275,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## SQL Parse Error
+SQL Parse Error
 
 **Error message:** Parse error with line and column information
 
@@ -287,9 +290,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Ad Hoc Filter Errors
+### Ad Hoc Filter Errors
 
-## Unable to Apply Ad Hoc Filters
+Unable to Apply Ad Hoc Filters
 
 **Error message:** "Unable to apply ad hoc filters. Upgrade ClickHouse to >=22.7 or remove ad hoc filters for the dashboard."
 
@@ -303,7 +306,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Failed to Get Table from Ad Hoc Query
+Failed to Get Table from Ad Hoc Query
 
 **Error message:** "Failed to get table from adhoc query."
 
@@ -317,7 +320,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Invalid Ad Hoc Filter
+Invalid Ad Hoc Filter
 
 **Error message:** "Invalid adhoc filter will be ignored: [filter details]"
 
@@ -331,9 +334,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Log Context Errors
+### Log Context Errors
 
-## Missing Query for Log Context
+Missing Query for Log Context
 
 **Error message:** "Missing query for log context"
 
@@ -346,7 +349,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Missing Log Context Options
+Missing Log Context Options
 
 **Error message:** "Missing log context options for query"
 
@@ -359,7 +362,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Log Context Only Works for Builder Queries
+Log Context Only Works for Builder Queries
 
 **Error message:** "Log context feature only works for builder queries"
 
@@ -372,7 +375,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Missing Time Column for Log Context
+Missing Time Column for Log Context
 
 **Error message:** "Missing time column for log context"
 
@@ -385,7 +388,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Unable to Match Log Context Columns
+Unable to Match Log Context Columns
 
 **Error message:** "Unable to match any log context columns"
 
@@ -399,9 +402,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Proxy Errors
+### Proxy Errors
 
-## Unable to Cast SOCKS Proxy Dialer
+Unable to Cast SOCKS Proxy Dialer
 
 **Error message:** "unable to cast SOCKS proxy dialer to context proxy dialer"
 
@@ -416,9 +419,9 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Header Parsing Errors
+### Header Parsing Errors
 
-## Couldn't Parse Message as Args
+Couldn't Parse Message as Args
 
 **Error message:** "Couldn't parse message as args"
 
@@ -432,7 +435,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Couldn't Parse Grafana HTTP Headers
+Couldn't Parse Grafana HTTP Headers
 
 **Error message:** "Couldn't parse grafana HTTP headers"
 
@@ -446,7 +449,7 @@ This guide provides solutions for common errors you may encounter when configuri
 
 ---
 
-## Getting More Help
+### Getting More Help
 
 If you continue to experience issues after trying the solutions in this guide:
 

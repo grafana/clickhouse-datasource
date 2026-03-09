@@ -116,7 +116,7 @@ When you change the selected database, the table drop-down refreshes with tables
 
 If you enable **Include All option** for a variable, selecting **All** sets the variable value to `$__all`. A condition like `WHERE database IN (${database:singlequote})` may not behave as intended when **All** is selected.
 
-Use the **$__conditionalAll(condition, $variable)** macro so that:
+Use the **$\_\_conditionalAll(condition, $variable)** macro so that:
 
 - When the variable is **not** "All", the macro is replaced by the condition (for example, `database IN ('db1', 'db2')`).
 - When the variable **is** "All", the macro is replaced by `1=1` (no filter).
@@ -128,18 +128,18 @@ SELECT count() FROM system.tables
 WHERE $__conditionalAll(database IN (${database:singlequote}), $database)
 ```
 
-When the user selects one or more databases, the condition filters by those databases. When the user selects **All**, the condition becomes `1=1` and all databases are included.
+When the user selects one or more databases, the condition filters by those databases. When the user selects **All**, the condition becomes `1=1` and all databases are included for optimization.
 
 See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section for the full list of macros.
 
 ## Query examples
 
-| Use case | Query |
-|----------|--------|
-| List databases | `SELECT name FROM system.databases` (optionally add `WHERE name NOT IN ('INFORMATION_SCHEMA', 'information_schema')` to exclude those if present) |
-| List tables (for chosen database) | `SELECT name FROM system.tables WHERE database = ${database:singlequote}` |
-| List columns (for chosen database and table) | `SELECT name FROM system.columns WHERE database = ${database:singlequote} AND table = ${table:singlequote}` |
-| Distinct values for a column | `SELECT DISTINCT environment FROM my_app.events ORDER BY environment` |
+| Use case                                     | Query                                                                                                                                             |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| List databases                               | `SELECT name FROM system.databases` (optionally add `WHERE name NOT IN ('INFORMATION_SCHEMA', 'information_schema')` to exclude those if present) |
+| List tables (for chosen database)            | `SELECT name FROM system.tables WHERE database = ${database:singlequote}`                                                                         |
+| List columns (for chosen database and table) | `SELECT name FROM system.columns WHERE database = ${database:singlequote} AND table = ${table:singlequote}`                                       |
+| Distinct values for a column                 | `SELECT DISTINCT environment FROM my_app.events ORDER BY environment`                                                                             |
 
 Replace `my_app.events` and column names with your own database, table, and columns.
 
@@ -147,10 +147,10 @@ Replace `my_app.events` and column names with your own database, table, and colu
 
 Set **Refresh** to control when the variable’s query runs and the options update:
 
-| Option | Behavior |
-|--------|----------|
-| **On dashboard load** | Options refresh when the dashboard loads. Use for data that changes infrequently (for example, database or table lists). |
-| **On time range change** | Options refresh when the dashboard time range changes. Use only if your variable query depends on the time range. |
+| Option                   | Behavior                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| **On dashboard load**    | Options refresh when the dashboard loads. Use for data that changes infrequently (for example, database or table lists). |
+| **On time range change** | Options refresh when the dashboard time range changes. Use only if your variable query depends on the time range.        |
 
 For dashboards with many variables or heavy variable queries, **On dashboard load** is usually sufficient and avoids unnecessary load.
 
@@ -163,6 +163,55 @@ WHERE database IN (${database:singlequote})
 ```
 
 When one variable’s query uses another variable (cascading variables) and that other variable is multi-value, Grafana often substitutes only the first selected value. Ensure that the first value alone still gives a valid and useful list for the dependent variable.
+
+## Ad hoc filters
+
+Ad hoc filters let you add key/value filters that are applied to queries that use the ClickHouse data source. You choose filter values from a drop-down in the dashboard without editing the query. Ad hoc filters are supported only with **ClickHouse 22.7 or later**. For an overview, see [Grafana ad hoc filters](https://grafana.com/docs/grafana/latest/variables/variable-types/add-ad-hoc-filters/).
+
+By default, the ad hoc filter drop-down lists all tables and columns from the data source. If you set a default database in the data source settings, only tables from that database are used. To limit which tables or columns appear (for example, to avoid slow loads), add a dashboard variable of type **Constant** named `clickhouse_adhoc_query`. Set its value to one of:
+
+- A comma-separated list of databases
+- A single database name
+- `database.table` to show only columns for one table
+
+You can hide this variable from the dashboard; it is only used to scope the ad hoc filter options.
+
+## Use a query to populate ad hoc filters
+
+You can set `clickhouse_adhoc_query` to a **ClickHouse query** instead of a database or table name. The query results are used to populate the ad hoc filter’s selectable values. For example, set the variable value to:
+
+```sql
+SELECT DISTINCT machine_name FROM mgbench.logs1
+```
+
+Then the dashboard filter drop-down lists distinct `machine_name` values, and you can filter queries by the selected machine.
+
+## Map and JSON types (OpenTelemetry)
+
+Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is the default and turns merged labels into a filter. To use **JSON** syntax for the filter logic, add a dashboard variable of type **Constant** named `clickhouse_adhoc_use_json`. The variable’s value is ignored; it only needs to exist.
+
+## Apply ad hoc filters manually with `$__adHocFilters`
+
+By default, ad hoc filters are applied automatically by detecting the target table from your SQL. For queries that use CTEs, subqueries, or ClickHouse-specific syntax (for example `INTERVAL` or parameterized aggregate functions), automatic detection can fail. In those cases, use the `$__adHocFilters('table_name')` macro to specify where to apply the filters.
+
+The macro expands to the ClickHouse `additional_table_filters` setting with the currently active ad hoc filter conditions. Place it in the **SETTINGS** clause of your query.
+
+Example:
+
+```sql
+SELECT *
+FROM (
+  SELECT * FROM my_complex_table
+  WHERE complicated_condition
+) AS result
+SETTINGS $__adHocFilters('my_complex_table')
+```
+
+When ad hoc filters are active (for example, `status = 'active'` and `region = 'us-west'`), the macro expands to:
+
+```sql
+SETTINGS additional_table_filters={'my_complex_table': 'status = \'active\' AND region = \'us-west\''}
+```
 
 ## Next steps
 
