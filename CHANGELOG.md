@@ -1,5 +1,15 @@
 # Changelog
 
+## 4.14.1
+
+### Features
+
+- Extract `Map` value type for `mapKey` filter in `getFilters` (#1694)
+
+### Fixes
+
+- Dependency updates
+  
 ## 4.14.0
 
 ### Features
