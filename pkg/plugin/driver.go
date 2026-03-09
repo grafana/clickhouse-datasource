@@ -23,6 +23,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	schemas "github.com/grafana/schemads"
 	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/otel/attribute"
@@ -31,7 +32,9 @@ import (
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
-type Clickhouse struct{}
+type Clickhouse struct {
+	SchemaDatasource *schemas.SchemaDatasource
+}
 
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
@@ -351,6 +354,10 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	}
 }
 
+func (h *Clickhouse) MutateQueryDataRequest(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataRequest, error) {
+	return normalizeGrafanaSQLRequest(req), nil
+}
+
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse mutate_query", trace.WithAttributes(
 		attribute.String("db.system", "clickhouse"),
@@ -408,6 +415,67 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 		}
 	}
 	return res, nil
+}
+
+func normalizeGrafanaSQLRequest(req *backend.QueryDataRequest) *backend.QueryDataRequest {
+	if req == nil || len(req.Queries) == 0 {
+		return req
+	}
+
+	grafanaConfig := req.PluginContext.GrafanaConfig
+	queries := make([]backend.DataQuery, 0, len(req.Queries))
+	for _, q := range req.Queries {
+		var raw map[string]interface{}
+		if err := json.Unmarshal(q.JSON, &raw); err != nil {
+			queries = append(queries, q)
+			continue
+		}
+		backend.Logger.Warn("normalizeGrafanaSQLRequest", "raw", raw)
+		grafanaSql, _ := raw["grafanaSql"].(bool)
+		table, _ := raw["table"].(string)
+		backend.Logger.Warn("normalizeGrafanaSQLRequest", "table", table)
+		if !grafanaSql || table == "" {
+			queries = append(queries, q)
+			continue
+		}
+
+		if grafanaSql {
+			if grafanaConfig == nil {
+				backend.Logger.Warn("grafanaConfig is not set, skipping query")
+				continue
+			}
+			if !grafanaConfig.FeatureToggles().IsEnabled("dsAbstractionApp") {
+				backend.Logger.Warn("dsAbstractionApp is not enabled, skipping query")
+				continue
+			}
+		}
+
+		var filterStrings []string
+		if filters, ok := raw["filters"].([]interface{}); ok && len(filters) > 0 {
+			filterStrings = make([]string, 0, len(filters))
+			for _, f := range filters {
+				if fm, ok := f.(map[string]interface{}); ok {
+					if fm["value"] != nil && fm["value"] != "" {
+						filterStrings = append(filterStrings, fmt.Sprintf("%s %s %s", fm["name"], fm["operator"], fm["value"]))
+					} else if fm["values"] != nil && len(fm["values"].([]interface{})) > 0 {
+						filterStrings = append(filterStrings, fmt.Sprintf("%s %s (%s)", fm["name"], fm["operator"], strings.Join(fm["values"].([]string), ",")))
+					}
+				}
+			}
+		}
+
+		sqlQuery := fmt.Sprintf("SELECT * FROM %s", table)
+		if len(filterStrings) > 0 {
+			sqlQuery += " WHERE " + strings.Join(filterStrings, " AND ")
+		}
+		backend.Logger.Warn("normalizeGrafanaSQLRequest", "query", sqlQuery)
+		queries = append(queries, backend.DataQuery{JSON: json.RawMessage(sqlQuery)})
+	}
+	return &backend.QueryDataRequest{
+		PluginContext: req.PluginContext,
+		Headers:       req.Headers,
+		Queries:       queries,
+	}
 }
 
 // shouldConvertFields determines whether field conversion is needed based on visualization type.
