@@ -24,7 +24,6 @@ For an introduction to templating and variable types, see [Templating](https://g
 ## Before you begin
 
 - [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/).
-- Ensure your ClickHouse user has read access to the databases and tables used in your variable queries (for example, `system.databases`, `system.tables`, and your application tables).
 
 ## Create a query variable
 
