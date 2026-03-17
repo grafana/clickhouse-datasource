@@ -19,11 +19,14 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/proxy"
 )
 
@@ -127,6 +130,19 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 
 // Connect opens a sql.DB connection using datasource settings
 func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse connect",
+		trace.
+			WithAttributes(attribute.
+				String("db.system",
+					"clickhouse",
+				)))
+	defer span.End()
+
+	_ = ctx
+
 	settings, err := LoadSettings(ctx, config)
 	if err != nil {
 		return nil, err
