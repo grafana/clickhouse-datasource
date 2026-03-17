@@ -19,11 +19,15 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/proxy"
 )
 
@@ -100,6 +104,21 @@ func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Versio
 }
 
 func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, error) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse SELECT",
+		trace.
+			WithAttributes(attribute.
+				String("db.system",
+					"clickhouse",
+				), attribute.String("db.statement",
+				"SELECT version()"), attribute.String("db.operation",
+				"SELECT")))
+	defer span.End()
+
+	_ = ctx
+
 	var version struct {
 		Major uint64
 		Minor uint64
@@ -127,6 +146,23 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 
 // Connect opens a sql.DB connection using datasource settings
 func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse connect",
+		trace.
+			WithAttributes(attribute.
+				String("db.system",
+					"clickhouse",
+				), attribute.String("server.address",
+				settings.Host), attribute.Int64("server.port", settings.
+				Port), attribute.String("db.name", settings.DefaultDatabase), attribute.String("db.user", settings.
+				Username), attribute.String("network.transport",
+				settings.Protocol)))
+	defer span.End()
+
+	_ = ctx
+
 	settings, err := LoadSettings(ctx, config)
 	if err != nil {
 		return nil, err
@@ -343,6 +379,21 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse mutate_query",
+
+		trace.
+			WithAttributes(
+				attribute.
+					String("db.system",
+
+						"clickhouse"), attribute.String("refId",
+					req.RefID)))
+	defer span.End()
+	_ = ctx
+
 	if user := backend.UserFromContext(ctx); user != nil {
 		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
 			Products: nil,
@@ -372,6 +423,21 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // MutateResponse converts fields of type FieldTypeNullableJSON to string,
 // except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse mutate_response",
+
+		trace.
+			WithAttributes(attribute.
+				String(
+					"db.system",
+
+					"clickhouse")))
+	defer span.End()
+
+	_ = ctx
+
 	for _, frame := range res {
 		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
 			err := mergeOpenTelemetryLabels(frame)
