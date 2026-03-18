@@ -56,12 +56,14 @@ func (p *SchemaProvider) Schema(ctx context.Context, req *schemas.SchemaRequest)
 			Tables: make([]schemas.Table, 0),
 		},
 	}
+	columnsMap, err := p.fetchColumnsForAllTables(ctx, tableResponse.Tables, nil)
+	if err != nil {
+		return &schemas.SchemaResponse{
+			Errors: err.Error(),
+		}, nil
+	}
 	for _, table := range tableResponse.Tables {
-		columns, err := p.fetchColumnsForTable(ctx, table, nil)
-		if err != nil {
-			response.Errors = fmt.Sprintf("error fetching columns for table %s: %s", table, err.Error())
-			continue
-		}
+		columns := columnsMap[table]
 		response.FullSchema.Tables = append(response.FullSchema.Tables, schemas.Table{
 			Name:    table,
 			Columns: columns,
@@ -81,8 +83,7 @@ func (p *SchemaProvider) Tables(ctx context.Context, req *schemas.TablesRequest)
 		}, nil
 	}
 
-	// get databases
-	rows, err := ds.QueryContext(ctx, "SHOW DATABASES")
+	rows, err := ds.QueryContext(ctx, "SELECT database, name FROM system.tables ORDER BY database, name")
 	if err != nil {
 		return &schemas.TablesResponse{
 			Errors: map[string]string{
@@ -91,44 +92,21 @@ func (p *SchemaProvider) Tables(ctx context.Context, req *schemas.TablesRequest)
 		}, nil
 	}
 	defer rows.Close()
-	databases := make([]string, 0)
-	for rows.Next() {
-		var database string
-		err := rows.Scan(&database)
-		if err != nil {
-			return &schemas.TablesResponse{
-				Errors: map[string]string{
-					"A": err.Error(),
-				},
-			}, nil
-		}
-		databases = append(databases, database)
-	}
 
 	tables := make([]string, 0)
-	// get tables for each database
-	for _, database := range databases {
-		tablesRows, err := ds.QueryContext(ctx, fmt.Sprintf("SHOW TABLES FROM \"%s\"", database))
-		if err != nil {
+	for rows.Next() {
+		var database, table string
+		if err := rows.Scan(&database, &table); err != nil {
 			return &schemas.TablesResponse{
 				Errors: map[string]string{
 					"A": err.Error(),
 				},
 			}, nil
 		}
-		defer tablesRows.Close()
-		for tablesRows.Next() {
-			var table string
-			err := tablesRows.Scan(&table)
-			if err != nil {
-				return &schemas.TablesResponse{
-					Errors: map[string]string{
-						"A": err.Error(),
-					},
-				}, nil
-			}
-			tables = append(tables, fmt.Sprintf("%s.%s", database, table))
+		if database == "system" {
+			continue
 		}
+		tables = append(tables, fmt.Sprintf("%s.%s", database, table))
 	}
 	return &schemas.TablesResponse{Tables: tables}, nil
 }
@@ -138,16 +116,31 @@ func (p *SchemaProvider) Columns(ctx context.Context, req *schemas.ColumnsReques
 	columns := make(map[string][]schemas.Column)
 	errors := make(map[string]string)
 
+	tables := make([]string, 0, len(req.Tables))
 	for _, table := range req.Tables {
-		if table == "" {
-			continue
+		if table != "" {
+			tables = append(tables, table)
 		}
-		cols, err := p.fetchColumnsForTable(ctx, table, req.Headers)
-		if err != nil {
+	}
+	if len(tables) == 0 {
+		return &schemas.ColumnsResponse{Columns: columns, Errors: errors}, nil
+	}
+
+	columnsMap, err := p.fetchColumnsForAllTables(ctx, tables, req.Headers)
+	if err != nil {
+		for _, table := range tables {
 			errors[table] = err.Error()
-			continue
 		}
-		columns[table] = cols
+		return &schemas.ColumnsResponse{Columns: columns, Errors: errors}, nil
+	}
+
+	for _, table := range tables {
+		cols := columnsMap[table]
+		if len(cols) > 0 {
+			columns[table] = cols
+		} else {
+			errors[table] = "table not found or has no columns"
+		}
 	}
 
 	return &schemas.ColumnsResponse{
@@ -162,6 +155,98 @@ func splitTable(table string) (string, string) {
 		return "", parts[0]
 	}
 	return parts[0], parts[1]
+}
+
+// escapeSQLString escapes single quotes for use in SQL string literals.
+func escapeSQLString(s string) string {
+	return strings.ReplaceAll(s, "'", "''")
+}
+
+// fetchColumnsForAllTables queries system.columns once for all tables and returns columns keyed by "database.table".
+func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []string, headers map[string]string) (map[string][]schemas.Column, error) {
+	result := make(map[string][]schemas.Column)
+	if len(tables) == 0 {
+		return result, nil
+	}
+
+	var inClauses []string
+	var tableOnlyNames []string // table names requested without database (e.g. "mytable")
+	for _, table := range tables {
+		if table == "" {
+			continue
+		}
+		database, tableName := splitTable(table)
+		if database != "" {
+			inClauses = append(inClauses, fmt.Sprintf("('%s', '%s')", escapeSQLString(database), escapeSQLString(tableName)))
+		} else {
+			tableOnlyNames = append(tableOnlyNames, tableName)
+		}
+	}
+	if len(inClauses) == 0 && len(tableOnlyNames) == 0 {
+		return result, nil
+	}
+
+	var whereParts []string
+	if len(inClauses) > 0 {
+		whereParts = append(whereParts, fmt.Sprintf("(database, table) IN (%s)", strings.Join(inClauses, ", ")))
+	}
+	if len(tableOnlyNames) > 0 {
+		escaped := make([]string, len(tableOnlyNames))
+		for i, t := range tableOnlyNames {
+			escaped[i] = fmt.Sprintf("'%s'", escapeSQLString(t))
+		}
+		whereParts = append(whereParts, fmt.Sprintf("(database = currentDatabase() AND table IN (%s))", strings.Join(escaped, ", ")))
+	}
+	rawSQL := fmt.Sprintf("SELECT database, table, name, type, comment FROM system.columns WHERE %s ORDER BY database, table, position",
+		strings.Join(whereParts, " OR "))
+
+	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var currentDb string
+	if len(tableOnlyNames) > 0 {
+		if err := ds.QueryRowContext(ctx, "SELECT currentDatabase()").Scan(&currentDb); err != nil {
+			return nil, err
+		}
+	}
+
+	rows, err := ds.QueryContext(ctx, rawSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var database, tableName, name, chType, comment string
+		if err := rows.Scan(&database, &tableName, &name, &chType, &comment); err != nil {
+			return nil, err
+		}
+		tableKey := fmt.Sprintf("%s.%s", database, tableName)
+		colType, operators := mapClickHouseTypeToSchema(chType)
+		result[tableKey] = append(result[tableKey], schemas.Column{
+			Name:        name,
+			Type:        colType,
+			Operators:   operators,
+			Description: comment,
+		})
+	}
+	// Add short-form keys for tables requested without database; remove full-form key so we only have "mytable", not "db.mytable"
+	tablesSet := make(map[string]bool)
+	for _, t := range tables {
+		tablesSet[t] = true
+	}
+	for _, tableName := range tableOnlyNames {
+		preferredKey := fmt.Sprintf("%s.%s", currentDb, tableName)
+		if cols, ok := result[preferredKey]; ok && len(cols) > 0 {
+			result[tableName] = cols
+			if !tablesSet[preferredKey] {
+				delete(result, preferredKey)
+			}
+		}
+	}
+	return result, nil
 }
 
 // fetchColumnsForTable runs DESCRIBE TABLE for the given table and returns schema columns.
