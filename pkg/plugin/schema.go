@@ -291,10 +291,19 @@ func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string,
 
 // mapClickHouseTypeToSchema maps ClickHouse types to schemads ColumnType.
 func mapClickHouseTypeToSchema(chType string) (schemas.ColumnType, []schemas.Operator) {
-	// Strip parameters e.g. "Nullable(String)" -> "nullable(string)", "Decimal(10,2)" -> "decimal"
-	baseType := strings.ToLower(strings.TrimSpace(chType))
-	if idx := strings.Index(chType, "("); idx >= 0 {
-		baseType = chType[:idx]
+	trimmed := strings.TrimSpace(chType)
+	var baseType, innerType string
+	if idx := strings.Index(trimmed, "("); idx >= 0 {
+		baseType = strings.ToLower(trimmed[:idx])
+		// Extract the inner argument (everything between the first "(" and last ")")
+		inner := trimmed[idx+1:]
+		if strings.HasSuffix(inner, ")") {
+			innerType = inner[:len(inner)-1]
+		} else {
+			innerType = inner
+		}
+	} else {
+		baseType = strings.ToLower(trimmed)
 	}
 
 	switch baseType {
@@ -326,25 +335,23 @@ func mapClickHouseTypeToSchema(chType string) (schemas.ColumnType, []schemas.Ope
 		return schemas.ColumnTypeDatetime, timeRangeOperators
 	case "timestamp":
 		return schemas.ColumnTypeTimestamp, timeRangeOperators
-	case "string", "fixedstring()", "ipv6", "uuid":
+	case "string", "fixedstring", "ipv6", "uuid":
 		return schemas.ColumnTypeString, equalityOperators
 	case "decimal", "decimal32", "decimal64", "decimal128", "decimal256":
 		return schemas.ColumnTypeDecimal, numberOperators
-	case "enum":
+	case "enum", "enum8", "enum16":
 		return schemas.ColumnTypeEnum, equalityOperators
-	case "json", "dynamic", "array()", "map()", "tuple()", "variant()", "lowcardinality()", "nested()":
+	case "json", "dynamic", "array", "map", "tuple", "variant", "nested":
 		return schemas.ColumnTypeJSON, equalityOperators
-	default:
-		// Nullable(X) - recurse into inner type
-		if strings.HasPrefix(chType, "nullable(") {
-			if inner := strings.TrimPrefix(chType, "nullable("); len(inner) > 0 && strings.HasSuffix(inner, ")") {
-				return mapClickHouseTypeToSchema(inner[:len(inner)-1])
-			}
-		} else {
-			backend.Logger.Error("mapClickHouseTypeToSchema", "unknown type", chType)
+	case "nullable", "lowcardinality":
+		// Nullable(X) and LowCardinality(X) are wrappers; the logical type is the inner type
+		if innerType != "" {
+			return mapClickHouseTypeToSchema(innerType)
 		}
+	default:
+		backend.Logger.Error("mapClickHouseTypeToSchema", "unknown type", chType)
 	}
-	return schemas.ColumnTypeString, searchOperators
+	return schemas.ColumnTypeJSON, equalityOperators
 }
 
 // ColumnValues implements [schemas.ColumnValuesHandler].
