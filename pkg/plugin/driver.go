@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -354,8 +355,104 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	}
 }
 
-func (h *Clickhouse) MutateQueryDataRequest(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataRequest, error) {
-	return normalizeGrafanaSQLRequest(req), nil
+func (h *Clickhouse) MutateQueryData(ctx context.Context, req *backend.QueryDataRequest) (context.Context, *backend.QueryDataRequest) {
+	req = preprocessGrafanaSQL(req)
+	return ctx, req
+}
+
+func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
+	if req == nil || len(req.Queries) == 0 {
+		return req
+	}
+
+	// TODO: this isn't working with go feature flags, disabled temporarily
+	//grafanaConfig := req.PluginContext.GrafanaConfig
+	//grafanaSQLEnabled := grafanaConfig.FeatureToggles().IsEnabled("dsAbstractionApp")
+
+	queries := make([]backend.DataQuery, 0, len(req.Queries))
+	for _, q := range req.Queries {
+		var grafanaSQLQuery schemas.GenericQuery
+
+		if err := json.Unmarshal(q.JSON, &grafanaSQLQuery); err != nil {
+			// Cannot unmarshal query JSON, ignoring
+			queries = append(queries, q)
+			continue
+		}
+
+		if !grafanaSQLQuery.GrafanaSql {
+			// Not a Grafana SQL query, ignoring
+			queries = append(queries, q)
+			continue
+		}
+
+		// TODO: not working with go feature flags, disabled temporarily
+		//if !grafanaSQLEnabled {
+		//	// Grafana SQL abstraction is not enabled, ignoring
+		//	backend.Logger.Warn("dsAbstractionApp is not enabled, skipping query")
+		//	continue
+		//}
+
+		sqlQuery, err := buildSQLQuery(grafanaSQLQuery)
+		if err != nil {
+			backend.Logger.Error("Failed to build SQL query", "error", err.Error())
+			continue
+		}
+
+		// Build JSON with `sqlutil.Query` shape that will be used to execute the query by sqlds
+		queryJSON, err := json.Marshal(sqlutil.Query{
+			RawSQL:         sqlQuery,
+			Format:         sqlutil.FormatOptionTable, // TODO: Is this correct?
+			ConnectionArgs: json.RawMessage("{}"),
+		})
+		if err != nil {
+			backend.Logger.Error("Failed to marshal SQL query", "error", err.Error())
+			continue
+		}
+
+		q.JSON = queryJSON
+		queries = append(queries, q)
+	}
+
+	return &backend.QueryDataRequest{
+		PluginContext: req.PluginContext,
+		Headers:       req.Headers,
+		Queries:       queries,
+	}
+}
+
+func buildSQLQuery(query schemas.GenericQuery) (string, error) {
+	backend.Logger.Warn("buildSQLQuery", "query", query)
+	// TODO: we need to support the column list we want returned, not just *
+	sb := sq.Select("*").From(query.Table)
+
+	for _, filter := range query.Filters {
+		column := filter.Name
+		for _, cond := range filter.Conditions {
+			switch cond.Operator { // TODO: we need to change schemas.FilterCondition.Operator to type schemas.Operator instead of string
+			case /*schemas.OperatorEquals*/ "==":
+				sb.Where(sq.Eq{column: cond.Value})
+			case /*schemas.OperatorNotEquals*/ "!=":
+				sb.Where(sq.NotEq{column: cond.Value})
+			case /*schemas.OperatorGreaterThan*/ ">":
+				sb.Where(sq.Gt{column: cond.Value})
+			case /*schemas.OperatorGreaterThanOrEqual*/ ">=":
+				sb.Where(sq.GtOrEq{column: cond.Value})
+			case /*schemas.OperatorLessThan*/ "<":
+				sb.Where(sq.Lt{column: cond.Value})
+			case /*schemas.OperatorLessThanOrEqual*/ "<=":
+				sb.Where(sq.LtOrEq{column: cond.Value})
+			default:
+				return "", fmt.Errorf("unsupported operator: %s", cond.Operator)
+			}
+		}
+	}
+
+	sqlText, _, err := sb.ToSql()
+	if err != nil {
+		return "", err
+	}
+	backend.Logger.Warn("buildSQLQuery", "sqlText", sqlText)
+	return sqlText, nil
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
