@@ -19,11 +19,14 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/proxy"
 )
 
@@ -127,6 +130,19 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 
 // Connect opens a sql.DB connection using datasource settings
 func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse connect",
+		trace.
+			WithAttributes(attribute.
+				String("db.system",
+					"clickhouse",
+				)))
+	defer span.End()
+
+	_ = ctx
+
 	settings, err := LoadSettings(ctx, config)
 	if err != nil {
 		return nil, err
@@ -343,6 +359,21 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse mutate_query",
+
+		trace.
+			WithAttributes(
+				attribute.
+					String("db.system",
+
+						"clickhouse")))
+	defer span.End()
+
+	_ = ctx
+
 	if user := backend.UserFromContext(ctx); user != nil {
 		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
 			Products: nil,
@@ -372,6 +403,21 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // MutateResponse converts fields of type FieldTypeNullableJSON to string,
 // except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
+	ctx,
+		span := tracing.
+		DefaultTracer().Start(
+		ctx, "clickhouse mutate_response",
+
+		trace.
+			WithAttributes(attribute.
+				String(
+					"db.system",
+
+					"clickhouse")))
+	defer span.End()
+
+	_ = ctx
+
 	for _, frame := range res {
 		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
 			err := mergeOpenTelemetryLabels(frame)
