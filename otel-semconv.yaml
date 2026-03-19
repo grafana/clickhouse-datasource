@@ -124,4 +124,3 @@ spans:
           semconv_ref: https://opentelemetry.io/docs/specs/semconv/attributes-registry/network/
           description: The transport protocol used (tcp, http)
           example: tcp
-local_path: /var/folders/p1/4wdjkjn93wnb_0kv76nkc32r0000gn/T/otel-scout-625190164
