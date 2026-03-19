@@ -37,7 +37,7 @@ jobs:
           go-version-file: 'go.mod'
 
       - name: Build backend
-        uses: magefile/mage-action@96c659d5f5f2baadfca2d4d01c3b90e823770ef6
+        uses: magefile/mage-action@35e1490c70b858aec34994e5a0e2546bffba9cca
         with:
           args: buildAll
           version: latest
