@@ -2,7 +2,6 @@ import {
   arrayToDataFrame,
   CoreApp,
   DataQueryRequest,
-  DataQueryResponse,
   SupplementaryQueryType,
   TimeRange,
   toDataFrame,
@@ -12,7 +11,7 @@ import { DataSourceWithBackend } from '@grafana/runtime';
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { Observable, of } from 'rxjs';
+import { of } from 'rxjs';
 import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
@@ -912,16 +911,16 @@ describe('ClickHouseDatasource', () => {
       });
     });
 
-    describe('getDataProvider', () => {
+    describe('getSupplementaryRequest', () => {
       it('should not support LogsSample yet', async () => {
-        expect(datasource.getDataProvider(SupplementaryQueryType.LogsSample, {} as any)).toBeUndefined();
+        expect(datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, { targets: [] } as any)).toBeUndefined();
       });
 
-      it('should do nothing if there are no supplementary queries for targets', async () => {
+      it('should return undefined if there are no supplementary queries for targets', async () => {
         jest.spyOn(Datasource.prototype, 'getSupplementaryLogsVolumeQuery').mockReturnValue(undefined);
         jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1d' });
         expect(
-          datasource.getDataProvider(SupplementaryQueryType.LogsVolume, {
+          datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
             scopedVars: {
               __interval: {},
             },
@@ -930,42 +929,30 @@ describe('ClickHouseDatasource', () => {
         ).toBeUndefined();
       });
 
-      it('should call logVolumeQuery if there are supplementary log volume queries for targets', async () => {
+      it('should return a modified request with log-volume targets', async () => {
         const range = ['from', 'to'];
         const supplementaryQuery = {
           rawSql: 'supplementaryQuery',
+          refId: '',
         } as CHSqlQuery;
         jest.spyOn(Datasource.prototype, 'getSupplementaryLogsVolumeQuery').mockReturnValue(supplementaryQuery);
         jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1d' });
-        const queryLogsVolumeSpy = jest
-          .spyOn(logs, 'queryLogsVolume')
-          .mockReturnValue('queryLogsVolumeResponse' as unknown as Observable<DataQueryResponse>);
-        expect(
-          datasource.getDataProvider(SupplementaryQueryType.LogsVolume, {
-            scopedVars: {
-              __interval: {},
-            },
-            targets: ['initialTarget'],
-            range,
-          } as any)
-        ).toEqual('queryLogsVolumeResponse');
-        expect(queryLogsVolumeSpy).toBeCalledTimes(1);
-        expect(queryLogsVolumeSpy).toHaveBeenLastCalledWith(
-          datasource,
-          {
-            hideFromInspector: true,
-            interval: '1d',
-            scopedVars: {
-              __interval: {
-                text: '1d',
-                value: '1d',
-              },
-            },
-            targets: [supplementaryQuery],
-            range,
+        const result = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
+          scopedVars: {
+            __interval: {},
           },
-          { range, targets: ['initialTarget'] }
-        );
+          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          range,
+        } as any);
+        expect(result).toMatchObject({
+          hideFromInspector: true,
+          interval: '1d',
+          scopedVars: {
+            __interval: { text: '1d', value: '1d' },
+          },
+          targets: [{ ...supplementaryQuery, refId: 'log-volume-A' }],
+          range,
+        });
       });
     });
   });

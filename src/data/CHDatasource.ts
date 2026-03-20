@@ -50,7 +50,7 @@ import {
   getIntervalInfo,
   getTimeFieldRoundingClause,
   LOG_LEVEL_TO_IN_CLAUSE,
-  queryLogsVolume,
+  splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
@@ -74,52 +74,47 @@ export class Datasource
     this.adHocFilter = new AdHocFilter();
   }
 
-  getDataProvider(
+  static logVolumePrefix = 'log-volume-'
+
+  getSupplementaryRequest(
     type: SupplementaryQueryType,
     request: DataQueryRequest<CHQuery>
-  ): Observable<DataQueryResponse> | undefined {
-    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+  ): DataQueryRequest<CHQuery> | undefined {
+    if (!this.getSupportedSupplementaryQueryTypes(request).includes(type)) {
       return undefined;
     }
-    switch (type) {
-      case SupplementaryQueryType.LogsVolume:
-        const logsVolumeRequest = cloneDeep(request);
 
-        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
-        logsVolumeRequest.interval = intervalInfo.interval;
-        logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
-        logsVolumeRequest.hideFromInspector = true;
-        if (intervalInfo.intervalMs !== undefined) {
-          logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
-          logsVolumeRequest.scopedVars.__interval_ms = {
-            value: intervalInfo.intervalMs,
-            text: intervalInfo.intervalMs,
-          };
+    if (type === SupplementaryQueryType.LogsVolume) {
+      const logsVolumeRequest = cloneDeep(request);
+
+      const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
+      logsVolumeRequest.interval = intervalInfo.interval;
+      logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
+      logsVolumeRequest.hideFromInspector = true;
+      if (intervalInfo.intervalMs !== undefined) {
+        logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
+        logsVolumeRequest.scopedVars.__interval_ms = {
+          value: intervalInfo.intervalMs,
+          text: intervalInfo.intervalMs,
+        };
+      }
+
+      const targets: CHQuery[] = [];
+      logsVolumeRequest.targets.forEach((target) => {
+        const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
+        if (supplementaryQuery !== undefined) {
+          targets.push({ ...supplementaryQuery, refId: `${Datasource.logVolumePrefix}${target.refId}` });
         }
+      });
 
-        const targets: CHQuery[] = [];
-        logsVolumeRequest.targets.forEach((target) => {
-          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
-          if (supplementaryQuery !== undefined) {
-            targets.push(supplementaryQuery);
-          }
-        });
-
-        if (!targets.length) {
-          return undefined;
-        }
-
-        return queryLogsVolume(
-          this,
-          { ...logsVolumeRequest, targets },
-          {
-            range: logsVolumeRequest.range,
-            targets: logsVolumeRequest.targets,
-          }
-        );
-      default:
+      if (!targets.length) {
         return undefined;
+      }
+
+      return { ...logsVolumeRequest, targets };
     }
+
+    return undefined;
   }
 
   getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
@@ -206,7 +201,7 @@ export class Datasource
     };
   }
 
-  getSupplementaryQuery(options: SupplementaryQueryOptions, originalQuery: CHQuery): CHQuery | undefined {
+  getSupplementaryQuery(_options: SupplementaryQueryOptions, _originalQuery: CHQuery): CHQuery | undefined {
     return undefined;
   }
 
@@ -824,12 +819,22 @@ export class Datasource
         };
       });
 
+    const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));
+
     return super
       .query({
         ...request,
         targets,
       })
-      .pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
+      .pipe(
+        map((res: DataQueryResponse) => {
+          const transformed = transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          if (hasLogsVolumeTargets) {
+            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+          }
+          return transformed;
+        })
+      );
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
