@@ -823,6 +823,9 @@ const getFilters = (options: QueryBuilderOptions): string => {
     } else if (filter.operator === FilterOperator.NotLike) {
       operator = 'LIKE';
       negate = true;
+    } else if (filter.operator === FilterOperator.NotILike) {
+      operator = 'ILIKE';
+      negate = true;
     } else if (filter.operator === FilterOperator.OutsideGrafanaTimeRange) {
       operator = '';
       negate = true;
@@ -866,7 +869,12 @@ const getFilters = (options: QueryBuilderOptions): string => {
         }
       }
     } else if (isStringFilter(type, filter.operator)) {
-      if (filter.operator === FilterOperator.Like || filter.operator === FilterOperator.NotLike) {
+      if (
+        filter.operator === FilterOperator.Like ||
+        filter.operator === FilterOperator.NotLike ||
+        filter.operator === FilterOperator.ILike ||
+        filter.operator === FilterOperator.NotILike
+      ) {
         filterParts.push(`'%${filter.value || ''}%'`);
       } else {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
