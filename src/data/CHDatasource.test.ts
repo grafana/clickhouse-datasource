@@ -13,7 +13,7 @@ import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
 import { Observable, of } from 'rxjs';
-import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import { BuilderMode, ColumnHint, FilterOperator, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
 import { Datasource } from './CHDatasource';
@@ -1002,6 +1002,375 @@ describe('ClickHouseDatasource', () => {
       } as any);
 
       expect((result as CHBuilderQuery).builderOptions.filters![0].mapKey).toBe('service_name');
+    });
+
+    describe('ADD_FILTER', () => {
+      it('adds an Equals filter for the given field', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'level', value: 'info' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'level',
+          operator: FilterOperator.Equals,
+          value: 'info',
+        });
+      });
+
+      it('replaces an existing Equals filter for the same field', () => {
+        const queryWithFilter: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithFilter, {
+          type: 'ADD_FILTER',
+          options: { key: 'level', value: 'info' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        // @ts-expect-error not expecting `NullFilter`
+        expect(result.builderOptions.filters![0].value).toBe('info');
+      });
+
+      it('returns query unchanged when key is missing', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { value: 'info' },
+        } as any);
+
+        expect(result).toBe(query);
+      });
+    });
+
+    describe('ADD_FILTER_OUT', () => {
+      it('adds a NotEquals filter for the given field', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER_OUT',
+          options: { key: 'level', value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'level',
+          operator: FilterOperator.NotEquals,
+          value: 'error',
+        });
+      });
+
+      it('removes an existing Equals filter for the same field', () => {
+        const queryWithFilter: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'info' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithFilter, {
+          type: 'ADD_FILTER_OUT',
+          options: { key: 'level', value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0].operator).toBe(FilterOperator.NotEquals);
+      });
+
+      it('returns query unchanged when key is missing', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER_OUT',
+          options: { value: 'error' },
+        } as any);
+
+        expect(result).toBe(query);
+      });
+
+      it('accumulates multiple NotEquals filters for different values', () => {
+        const queryWithFilter: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'info' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithFilter, {
+          type: 'ADD_FILTER_OUT',
+          options: { key: 'level', value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(2);
+        expect(result.builderOptions.filters!.map((f) => ('value' in f ? f.value : null))).toEqual(
+          expect.arrayContaining(['info', 'error'])
+        );
+      });
+
+      it('replaces a NotEquals filter with the exact same value', () => {
+        const queryWithFilter: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'error' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithFilter, {
+          type: 'ADD_FILTER_OUT',
+          options: { key: 'level', value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0].operator).toBe(FilterOperator.NotEquals);
+        // @ts-expect-error not expecting `NullFilter`
+        expect(result.builderOptions.filters![0].value).toBe('error');
+      });
+    });
+
+    describe('ADD_STRING_FILTER', () => {
+      it('adds an ILike filter using the provided key', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_STRING_FILTER',
+          options: { key: 'Body', value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'Body',
+          operator: FilterOperator.ILike,
+          value: 'error',
+        });
+      });
+
+      it('resolves column from LogMessage hint when key is absent', () => {
+        const queryWithLogMessage: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLogMessage, {
+          type: 'ADD_STRING_FILTER',
+          options: { value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'Body',
+          operator: FilterOperator.ILike,
+          value: 'error',
+        });
+      });
+
+      it('returns query unchanged when key is absent and no LogMessage column is configured', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_STRING_FILTER',
+          options: { value: 'error' },
+        } as any);
+
+        expect(result).toBe(query);
+      });
+    });
+
+    describe('ADD_STRING_FILTER_OUT', () => {
+      it('adds a NotILike filter using the provided key', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_STRING_FILTER_OUT',
+          options: { key: 'Body', value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'Body',
+          operator: FilterOperator.NotILike,
+          value: 'error',
+        });
+      });
+
+      it('resolves column from LogMessage hint when key is absent', () => {
+        const queryWithLogMessage: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLogMessage, {
+          type: 'ADD_STRING_FILTER_OUT',
+          options: { value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'Body',
+          operator: FilterOperator.NotILike,
+          value: 'error',
+        });
+      });
+
+      it('returns query unchanged when key is absent and no LogMessage column is configured', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_STRING_FILTER_OUT',
+          options: { value: 'error' },
+        } as any);
+
+        expect(result).toBe(query);
+      });
+    });
+
+    describe('hint-matched columns via logAliasToColumnHints', () => {
+      it('ADD_FILTER uses hint and empty key when column is resolved via log alias', () => {
+        const queryWithLevel: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLevel, {
+          type: 'ADD_FILTER',
+          options: { key: 'level', value: 'info' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: '',
+          hint: ColumnHint.LogLevel,
+          operator: FilterOperator.Equals,
+          value: 'info',
+        });
+      });
+
+      it('ADD_FILTER replaces existing hint-matched filter', () => {
+        const queryWithLevel: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
+            filters: [{ condition: 'AND', key: '', hint: ColumnHint.LogLevel, type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLevel, {
+          type: 'ADD_FILTER',
+          options: { key: 'level', value: 'info' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        // @ts-expect-error not expecting `NullFilter`
+        expect(result.builderOptions.filters![0].value).toBe('info');
+      });
+    });
+
+    describe('OTel map key splitting', () => {
+      it('splits ResourceAttributes key into column + mapKey', () => {
+        const queryWithResource: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'ResourceAttributes', type: 'Map(String, String)' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithResource, {
+          type: 'ADD_FILTER',
+          options: { key: 'ResourceAttributes.service.name', value: 'my-service' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          mapKey: 'service.name',
+          type: 'Map(String, String)',
+          operator: FilterOperator.Equals,
+          value: 'my-service',
+        });
+      });
+
+      it('splits ScopeAttributes key into column + mapKey', () => {
+        const queryWithScope: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'ScopeAttributes', type: 'Map(String, String)' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithScope, {
+          type: 'ADD_FILTER',
+          options: { key: 'ScopeAttributes.version', value: '1.0' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          mapKey: 'version',
+          type: 'Map(String, String)',
+          operator: FilterOperator.Equals,
+          value: '1.0',
+        });
+      });
+
+      it('sets type to JSON for JSON-typed map column', () => {
+        const queryWithJson: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'LogAttributes', type: 'JSON' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithJson, {
+          type: 'ADD_FILTER',
+          options: { key: 'LogAttributes.request_id', value: 'abc123' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          mapKey: 'request_id',
+          type: 'JSON',
+          operator: FilterOperator.Equals,
+          value: 'abc123',
+        });
+      });
+    });
+
+    describe('ADD_STRING_FILTER with LogMessage column alias', () => {
+      it('resolves LogMessage column by alias when name differs', () => {
+        const queryWithAlias: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'log_body', alias: 'Body', hint: ColumnHint.LogMessage }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithAlias, {
+          type: 'ADD_STRING_FILTER',
+          options: { value: 'error' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'Body',
+          operator: FilterOperator.ILike,
+          value: 'error',
+        });
+      });
+    });
+
+    it('returns query unchanged for non-Builder editorType', () => {
+      const sqlQuery: CHSqlQuery = { pluginVersion: '', refId: 'A', editorType: EditorType.SQL, rawSql: 'SELECT 1' };
+      const result = datasource.modifyQuery(sqlQuery, { type: 'ADD_FILTER', options: { key: 'level', value: 'info' } } as any);
+      expect(result).toBe(sqlQuery);
+    });
+
+    it('returns query unchanged when value is missing', () => {
+      const result = datasource.modifyQuery(query, { type: 'ADD_FILTER', options: { key: 'level' } } as any);
+      expect(result).toBe(query);
     });
   });
 });
