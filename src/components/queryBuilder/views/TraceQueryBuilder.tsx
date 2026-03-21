@@ -19,8 +19,6 @@ import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { LabeledInput } from 'components/configEditor/LabeledInput';
 import { Switch } from '../Switch';
-import useTables from 'hooks/useTables';
-import otel from 'otel';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -60,11 +58,6 @@ interface TraceQueryBuilderState {
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
-  const tables = useTables(datasource, builderOptions.database);
-  const hasTraceTimestampTable = useMemo(
-    () => tables.some((t) => t === builderOptions.table + otel.traceTimestampTableSuffix),
-    [builderOptions.table, tables]
-  );
   const isNewQuery = useIsNewQuery(builderOptions);
   const [showConfigWarning, setConfigWarningOpen] = useState(
     datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0
@@ -142,7 +135,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           flattenNested: next.flattenNested,
           traceEventsColumnPrefix: next.traceEventsColumnPrefix,
           traceLinksColumnPrefix: next.traceLinksColumnPrefix,
-          hasTraceTimestampTable,
         },
       })
     );
