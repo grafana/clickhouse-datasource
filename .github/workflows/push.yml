@@ -27,7 +27,7 @@ jobs:
   ci:
     name: CI
 
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v6.1.1
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v7.0.0
 
     # Only run CI job for PRs / non-main refs.
     # Main publishing is handled by the CD workflow below.
@@ -49,7 +49,7 @@ jobs:
     # Main-only: publish the latest build to the internal Plugin Catalog (dev)
     if: github.ref == 'refs/heads/main'
 
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v5.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v7.0.0
 
     # Publishing requires write permissions + OIDC
     permissions:
