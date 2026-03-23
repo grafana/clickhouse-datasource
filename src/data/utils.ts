@@ -148,7 +148,7 @@ const traceSearchFieldConfigs: Record<string, FieldConfig> = {
  * Applies field configs to trace search result frames for better default display.
  * Trace search results are table-format frames from trace queries (non-traceIdMode).
  */
-export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): DataQueryResponse => {
+export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     if (!originalQuery) {
@@ -173,8 +173,6 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
       }
     });
   });
-
-  return res;
 };
 
 /**
