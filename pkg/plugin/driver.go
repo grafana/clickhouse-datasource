@@ -27,6 +27,17 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// grafanaHeadersKey is a context key for storing Grafana request headers
+// (dashboard UID, panel ID) so they can be injected into ClickHouse query metadata.
+type grafanaHeadersKeyType struct{}
+
+var grafanaHeadersKey = grafanaHeadersKeyType{}
+
+type grafanaHeaders struct {
+	DashboardUID string
+	PanelID      string
+}
+
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct{}
 
@@ -342,11 +353,41 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	}
 }
 
+// MutateQueryData implements sqlds.QueryDataMutator. It extracts Grafana
+// contextual headers (dashboard UID, panel ID) from the request and stores
+// them in the context so MutateQuery can include them in ClickHouse query metadata.
+func (h *Clickhouse) MutateQueryData(ctx context.Context, req *backend.QueryDataRequest) (context.Context, *backend.QueryDataRequest) {
+	headers := req.GetHTTPHeaders()
+	gh := grafanaHeaders{
+		DashboardUID: headers.Get("X-Dashboard-Uid"),
+		PanelID:      headers.Get("X-Panel-Id"),
+	}
+	if gh.DashboardUID != "" || gh.PanelID != "" {
+		ctx = context.WithValue(ctx, grafanaHeadersKey, gh)
+	}
+	return ctx, req
+}
+
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	var comments []string
+
 	if user := backend.UserFromContext(ctx); user != nil {
+		comments = append(comments, fmt.Sprintf("grafana_user:%s", user.Login))
+	}
+
+	if gh, ok := ctx.Value(grafanaHeadersKey).(grafanaHeaders); ok {
+		if gh.DashboardUID != "" {
+			comments = append(comments, fmt.Sprintf("grafana_dashboard:%s", gh.DashboardUID))
+		}
+		if gh.PanelID != "" {
+			comments = append(comments, fmt.Sprintf("grafana_panel:%s", gh.PanelID))
+		}
+	}
+
+	if len(comments) > 0 {
 		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
 			Products: nil,
-			Comment:  []string{fmt.Sprintf("grafana_user:%s", user.Login)},
+			Comment:  comments,
 		}))
 	}
 
