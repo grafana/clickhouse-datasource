@@ -1,12 +1,14 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/stretchr/testify/assert"
 )
@@ -315,5 +317,122 @@ func TestContainsClickHouseException(t *testing.T) {
 		multiErr := errors.Join(regularErr, chErr)
 		result := containsClickHouseException(multiErr)
 		assert.True(t, result)
+	})
+}
+
+func TestMutateQueryData(t *testing.T) {
+	h := &Clickhouse{}
+
+	t.Run("extracts dashboard and panel headers", func(t *testing.T) {
+		ctx := context.Background()
+		req := &backend.QueryDataRequest{
+			Headers: map[string]string{
+				"http_X-Dashboard-Uid": "dash-abc123",
+				"http_X-Panel-Id":     "42",
+			},
+		}
+
+		newCtx, _ := h.MutateQueryData(ctx, req)
+
+		gh, ok := newCtx.Value(grafanaHeadersKey).(grafanaHeaders)
+		assert.True(t, ok)
+		assert.Equal(t, "dash-abc123", gh.DashboardUID)
+		assert.Equal(t, "42", gh.PanelID)
+	})
+
+	t.Run("no headers set leaves context unchanged", func(t *testing.T) {
+		ctx := context.Background()
+		req := &backend.QueryDataRequest{
+			Headers: map[string]string{},
+		}
+
+		newCtx, _ := h.MutateQueryData(ctx, req)
+
+		_, ok := newCtx.Value(grafanaHeadersKey).(grafanaHeaders)
+		assert.False(t, ok)
+	})
+
+	t.Run("only dashboard header set", func(t *testing.T) {
+		ctx := context.Background()
+		req := &backend.QueryDataRequest{
+			Headers: map[string]string{
+				"http_X-Dashboard-Uid": "dash-only",
+			},
+		}
+
+		newCtx, _ := h.MutateQueryData(ctx, req)
+
+		gh, ok := newCtx.Value(grafanaHeadersKey).(grafanaHeaders)
+		assert.True(t, ok)
+		assert.Equal(t, "dash-only", gh.DashboardUID)
+		assert.Equal(t, "", gh.PanelID)
+	})
+
+	t.Run("only panel header set", func(t *testing.T) {
+		ctx := context.Background()
+		req := &backend.QueryDataRequest{
+			Headers: map[string]string{
+				"http_X-Panel-Id": "99",
+			},
+		}
+
+		newCtx, _ := h.MutateQueryData(ctx, req)
+
+		gh, ok := newCtx.Value(grafanaHeadersKey).(grafanaHeaders)
+		assert.True(t, ok)
+		assert.Equal(t, "", gh.DashboardUID)
+		assert.Equal(t, "99", gh.PanelID)
+	})
+
+	t.Run("nil headers does not panic", func(t *testing.T) {
+		ctx := context.Background()
+		req := &backend.QueryDataRequest{}
+
+		newCtx, newReq := h.MutateQueryData(ctx, req)
+
+		assert.NotNil(t, newCtx)
+		assert.NotNil(t, newReq)
+	})
+}
+
+func TestMutateQuery_GrafanaMetadata(t *testing.T) {
+	h := &Clickhouse{}
+
+	t.Run("includes dashboard and panel from context", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), grafanaHeadersKey, grafanaHeaders{
+			DashboardUID: "my-dashboard",
+			PanelID:      "7",
+		})
+
+		newCtx, _ := h.MutateQuery(ctx, backend.DataQuery{
+			JSON: []byte(`{}`),
+		})
+
+		// Verify the clickhouse context was set by checking the context is different
+		assert.NotEqual(t, ctx, newCtx)
+	})
+
+	t.Run("no grafana headers in context still works", func(t *testing.T) {
+		ctx := context.Background()
+
+		newCtx, _ := h.MutateQuery(ctx, backend.DataQuery{
+			JSON: []byte(`{}`),
+		})
+
+		// Without user or headers, context should be unchanged (no comments to add)
+		assert.Equal(t, ctx, newCtx)
+	})
+
+	t.Run("handles invalid JSON gracefully", func(t *testing.T) {
+		ctx := context.WithValue(context.Background(), grafanaHeadersKey, grafanaHeaders{
+			DashboardUID: "dash1",
+		})
+
+		newCtx, _ := h.MutateQuery(ctx, backend.DataQuery{
+			JSON: []byte(`invalid json`),
+		})
+
+		// Should still set clickhouse context with dashboard info even if JSON is bad
+		assert.NotEqual(t, ctx, newCtx)
 	})
 }
