@@ -236,6 +236,8 @@ export enum FilterOperator {
   GreaterThanOrEqual = '>=',
   Like = 'LIKE',
   NotLike = 'NOT LIKE',
+  ILike = 'ILIKE',
+  NotILike = 'NOT ILIKE',
   In = 'IN',
   NotIn = 'NOT IN',
   WithInGrafanaTimeRange = 'WITH IN DASHBOARD TIME RANGE',
@@ -293,7 +295,9 @@ export interface StringFilter extends CommonFilterProps {
     | FilterOperator.Equals
     | FilterOperator.NotEquals
     | FilterOperator.Like
-    | FilterOperator.NotLike;
+    | FilterOperator.NotLike
+    | FilterOperator.ILike
+    | FilterOperator.NotILike;
   value: string;
 }
 

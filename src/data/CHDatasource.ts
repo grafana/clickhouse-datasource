@@ -6,6 +6,7 @@ import {
   DataQueryResponse,
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
+  DataSourceWithQueryModificationSupport,
   DataSourceWithSupplementaryQueriesSupport,
   Field,
   getTimeZone,
@@ -58,7 +59,10 @@ import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './u
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
-  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>, DataSourceWithLogsContextSupport<CHQuery>
+  implements
+    DataSourceWithSupplementaryQueriesSupport<CHQuery>,
+    DataSourceWithLogsContextSupport<CHQuery>,
+    DataSourceWithQueryModificationSupport<CHQuery>
 {
   // This enables default annotation support for 7.2+
   annotations = {};
@@ -318,13 +322,33 @@ export class Datasource
     });
   }
 
+  getSupportedQueryModifications() {
+    return ['ADD_FILTER', 'ADD_FILTER_OUT', 'ADD_STRING_FILTER', 'ADD_STRING_FILTER_OUT']
+  }
+
   // Support filtering by field value in Explore
   modifyQuery(query: CHQuery, action: QueryFixAction): CHQuery {
-    if (query.editorType !== EditorType.Builder || !action.options || !action.options.key || !action.options.value) {
+    if (query.editorType !== EditorType.Builder || !action.options || !action.options.value) {
       return query;
     }
 
-    let columnName = action.options.key || '';
+    
+    let columnName = (() => {
+      const isStringFilterAction = action.type === 'ADD_STRING_FILTER' || action.type === 'ADD_STRING_FILTER_OUT';
+
+      if (isStringFilterAction) {
+        // has no key — resolve the column name from the log message hint.
+        const logMessageColumn = getColumnByHint(query.builderOptions, ColumnHint.LogMessage);
+        return logMessageColumn?.alias || logMessageColumn?.name || action.options.key || ''
+      }
+
+      return action.options.key || ''
+    })()
+
+    if (!columnName) {
+      return query
+    }
+
     const actionValue = action.options.value;
     let mapKey = '';
 
@@ -410,6 +434,24 @@ export class Datasource
         type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
         filterType: 'custom',
         operator: FilterOperator.NotEquals,
+        value: actionValue,
+      });
+    } else if (action.type === 'ADD_STRING_FILTER') {
+      nextFilters.push({
+        condition: 'AND',
+        key: columnName,
+        filterType: 'custom',
+        type: 'string',
+        operator: FilterOperator.ILike,
+        value: actionValue,
+      });
+    } else if (action.type === 'ADD_STRING_FILTER_OUT') {
+      nextFilters.push({
+        condition: 'AND',
+        key: columnName,
+        filterType: 'custom',
+        type: 'string',
+        operator: FilterOperator.NotILike,
         value: actionValue,
       });
     }
