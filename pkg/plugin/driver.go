@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	sq "github.com/Masterminds/squirrel"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -371,15 +370,15 @@ func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataReque
 
 	queries := make([]backend.DataQuery, 0, len(req.Queries))
 	for _, q := range req.Queries {
-		var grafanaSQLQuery schemas.GenericQuery
+		var sq schemas.Query
 
-		if err := json.Unmarshal(q.JSON, &grafanaSQLQuery); err != nil {
+		if err := json.Unmarshal(q.JSON, &sq); err != nil {
 			// Cannot unmarshal query JSON, ignoring
 			queries = append(queries, q)
 			continue
 		}
 
-		if !grafanaSQLQuery.GrafanaSql {
+		if !sq.GrafanaSql {
 			// Not a Grafana SQL query, ignoring
 			queries = append(queries, q)
 			continue
@@ -392,7 +391,7 @@ func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataReque
 		//	continue
 		//}
 
-		sqlQuery, err := buildSQLQuery(grafanaSQLQuery)
+		sqlQuery, err := sq.ToSQL(schemas.DialectClickHouse)
 		if err != nil {
 			backend.Logger.Error("Failed to build SQL query", "error", err.Error())
 			continue
@@ -418,41 +417,6 @@ func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataReque
 		Headers:       req.Headers,
 		Queries:       queries,
 	}
-}
-
-func buildSQLQuery(query schemas.GenericQuery) (string, error) {
-	backend.Logger.Warn("buildSQLQuery", "query", query)
-	// TODO: we need to support the column list we want returned, not just *
-	sb := sq.Select("*").From(query.Table)
-
-	for _, filter := range query.Filters {
-		column := filter.Name
-		for _, cond := range filter.Conditions {
-			switch cond.Operator { // TODO: we need to change schemas.FilterCondition.Operator to type schemas.Operator instead of string
-			case /*schemas.OperatorEquals*/ "==":
-				sb.Where(sq.Eq{column: cond.Value})
-			case /*schemas.OperatorNotEquals*/ "!=":
-				sb.Where(sq.NotEq{column: cond.Value})
-			case /*schemas.OperatorGreaterThan*/ ">":
-				sb.Where(sq.Gt{column: cond.Value})
-			case /*schemas.OperatorGreaterThanOrEqual*/ ">=":
-				sb.Where(sq.GtOrEq{column: cond.Value})
-			case /*schemas.OperatorLessThan*/ "<":
-				sb.Where(sq.Lt{column: cond.Value})
-			case /*schemas.OperatorLessThanOrEqual*/ "<=":
-				sb.Where(sq.LtOrEq{column: cond.Value})
-			default:
-				return "", fmt.Errorf("unsupported operator: %s", cond.Operator)
-			}
-		}
-	}
-
-	sqlText, _, err := sb.ToSql()
-	if err != nil {
-		return "", err
-	}
-	backend.Logger.Warn("buildSQLQuery", "sqlText", sqlText)
-	return sqlText, nil
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
