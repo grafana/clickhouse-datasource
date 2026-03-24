@@ -74,7 +74,8 @@ export class Datasource
     this.adHocFilter = new AdHocFilter();
   }
 
-  static logVolumePrefix = 'log-volume-'
+  static logVolumePrefix = 'log-volume-';
+  static logsSamplePrefix = 'logs-sample-';
 
   getSupplementaryRequest(
     type: SupplementaryQueryType,
@@ -114,14 +115,33 @@ export class Datasource
       return { ...logsVolumeRequest, targets };
     }
 
+    if (type === SupplementaryQueryType.LogsSample) {
+      const logsSampleRequest = cloneDeep(request);
+      logsSampleRequest.hideFromInspector = true;
+
+      const targets: CHQuery[] = [];
+      logsSampleRequest.targets.forEach((target) => {
+        const supplementaryQuery = this.getSupplementaryLogsSampleQuery(target);
+        if (supplementaryQuery !== undefined) {
+          targets.push({ ...supplementaryQuery, refId: `${Datasource.logsSamplePrefix}${target.refId}` });
+        }
+      });
+
+      if (!targets.length) {
+        return undefined;
+      }
+
+      return { ...logsSampleRequest, targets };
+    }
+
     return undefined;
   }
 
-  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+  getSupportedSupplementaryQueryTypes(dsRequest: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
     if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
       return [];
     }
-    return [SupplementaryQueryType.LogsVolume];
+    return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
   }
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
@@ -198,6 +218,61 @@ export class Datasource
       builderOptions: logVolumeSqlBuilderOptions,
       rawSql: logVolumeSupplementaryQuery,
       refId: '',
+    };
+  }
+
+  getSupplementaryLogsSampleQuery(query: CHQuery): CHQuery | undefined {
+    if (
+      query.editorType !== EditorType.Builder ||
+      !query.builderOptions.database ||
+      query.builderOptions.table !== this.getDefaultLogsTable()
+    ) {
+      return undefined;
+    }
+
+    const timeColumn =
+      getColumnByHint(query.builderOptions, ColumnHint.FilterTime) ||
+      getColumnByHint(query.builderOptions, ColumnHint.Time);
+
+    if (!timeColumn) {
+      return undefined;
+    }
+
+    const timeHint = timeColumn.hint ?? ColumnHint.Time;
+
+    const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
+      if (f.hint && !f.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
+        f.key = originalColumn?.alias || originalColumn?.name || '';
+      }
+      return { ...f };
+    });
+
+    const defaultColumns = Array.from(this.getDefaultLogsColumns(), ([hint, name]) => ({ hint, name }));
+
+    const columns = defaultColumns.length
+      ? defaultColumns
+      : (query.builderOptions.columns ?? [{ name: timeColumn.name, hint: timeHint }]);
+
+
+    const logsSampleBuilderOptions: QueryBuilderOptions = {
+      database: query.builderOptions.database,
+      table: query.builderOptions.table,
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      filters,
+      columns,
+      orderBy: [{ name: '', hint: timeHint, dir: OrderByDirection.DESC }],
+      limit: 100,
+    };
+
+    return {
+      pluginVersion,
+      editorType: EditorType.Builder,
+      builderOptions: logsSampleBuilderOptions,
+      rawSql: generateSql(logsSampleBuilderOptions),
+      refId: '',
+      format: 2, // Logs format
     };
   }
 

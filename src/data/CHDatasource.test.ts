@@ -12,7 +12,7 @@ import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
 import { of } from 'rxjs';
-import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
 import { Datasource } from './CHDatasource';
@@ -776,12 +776,13 @@ describe('ClickHouseDatasource', () => {
     });
 
     describe('getSupportedSupplementaryQueryTypes', () => {
-      it('should return LogsVolume for empty dsRequest', async () => {
-        const result = datasource.getSupportedSupplementaryQueryTypes();
-        expect(result).toEqual([SupplementaryQueryType.LogsVolume]);
+      it('should return LogsVolume and LogsSample for empty dsRequest', async () => {
+        const dsRequest = { targets: [{ editorType: EditorType.Builder }] } as DataQueryRequest<CHQuery>;
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample]);
       });
 
-      it('should return LogsVolume when all targets use Builder editor', async () => {
+      it('should return LogsVolume and LogsSample when all targets use Builder editor', async () => {
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
@@ -792,7 +793,7 @@ describe('ClickHouseDatasource', () => {
           ],
         };
         const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
-        expect(result).toEqual([SupplementaryQueryType.LogsVolume]);
+        expect(result).toEqual([SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample]);
       });
 
       it('should return empty array when any target uses SQL editor', async () => {
@@ -911,9 +912,131 @@ describe('ClickHouseDatasource', () => {
       });
     });
 
+    describe('getSupplementaryLogsSampleQuery', () => {
+      beforeEach(() => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        jest.spyOn(datasource, 'getDefaultLogsColumns').mockReturnValue(
+          new Map<ColumnHint, string>([
+            [ColumnHint.Time, 'created_at'],
+            [ColumnHint.LogLevel, 'level'],
+          ])
+        );
+      });
+
+      it('should return undefined if editorType is not Builder', () => {
+        expect(
+          datasource.getSupplementaryLogsSampleQuery({
+            ...query,
+            editorType: EditorType.SQL,
+            queryType: undefined,
+          } as any)
+        ).toBeUndefined();
+      });
+
+      it('should return undefined if database is empty', () => {
+        expect(
+          datasource.getSupplementaryLogsSampleQuery({
+            ...query,
+            builderOptions: { ...query.builderOptions, database: '' },
+          })
+        ).toBeUndefined();
+      });
+
+      it('should return undefined if table does not match default logs table', () => {
+        expect(
+          datasource.getSupplementaryLogsSampleQuery({
+            ...query,
+            builderOptions: { ...query.builderOptions, table: 'other_table' },
+          })
+        ).toBeUndefined();
+      });
+
+      it('should return undefined if no time column is found', () => {
+        expect(
+          datasource.getSupplementaryLogsSampleQuery({
+            ...query,
+            builderOptions: { ...query.builderOptions, columns: [] },
+          })
+        ).toBeUndefined();
+      });
+
+      it('should return a Logs/List query with format 2, limit 100, ordered DESC by time', () => {
+        const result = datasource.getSupplementaryLogsSampleQuery(query);
+        expect(result).toBeDefined();
+        expect(result?.format).toBe(2);
+        expect(result?.editorType).toBe(EditorType.Builder);
+        const bo = (result as CHBuilderQuery).builderOptions;
+        expect(bo.queryType).toBe(QueryType.Logs);
+        expect(bo.mode).toBe(BuilderMode.List);
+        expect(bo.limit).toBe(100);
+        expect(bo.database).toBe(query.builderOptions.database);
+        expect(bo.table).toBe(query.builderOptions.table);
+        // columns come from getDefaultLogsColumns()
+        expect(bo.columns).toEqual([
+          { hint: ColumnHint.Time, name: 'created_at' },
+          { hint: ColumnHint.LogLevel, name: 'level' },
+        ]);
+        expect(bo.orderBy).toEqual([{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC }]);
+      });
+
+      it('should copy and resolve hint-based filters from the original query', () => {
+        const hintedQuery: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            filters: [
+              {
+                hint: ColumnHint.LogLevel,
+                key: '',
+                operator: FilterOperator.Equals,
+                value: 'error',
+                type: 'string',
+                filterType: 'custom',
+                condition: 'AND'
+              },
+            ],
+          },
+        };
+        const result = datasource.getSupplementaryLogsSampleQuery(hintedQuery) as CHBuilderQuery;
+        expect(result).toBeDefined();
+        // hint-based filter key should be resolved to the actual column name
+        expect(result.builderOptions.filters![0].key).toBe('level');
+      });
+
+      it('should work for any Builder query type, not just Logs', () => {
+        const timeSeriesQuery: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            queryType: QueryType.TimeSeries,
+          },
+        };
+        const result = datasource.getSupplementaryLogsSampleQuery(timeSeriesQuery);
+        expect(result).toBeDefined();
+        expect((result as CHBuilderQuery).builderOptions.queryType).toBe(QueryType.Logs);
+      });
+    });
+
     describe('getSupplementaryRequest', () => {
-      it('should not support LogsSample yet', async () => {
-        expect(datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, { targets: [] } as any)).toBeUndefined();
+      it('should return undefined for LogsSample if no targets produce a supplementary query', () => {
+        jest.spyOn(Datasource.prototype, 'getSupplementaryLogsSampleQuery').mockReturnValue(undefined);
+        expect(
+          datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, {
+            targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          } as any)
+        ).toBeUndefined();
+      });
+
+      it('should return a modified request with logs-sample targets', () => {
+        const supplementaryQuery = { rawSql: 'SELECT * FROM logs', refId: '', format: 2 } as CHSqlQuery;
+        jest.spyOn(Datasource.prototype, 'getSupplementaryLogsSampleQuery').mockReturnValue(supplementaryQuery);
+        const result = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, {
+          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+        } as any);
+        expect(result).toMatchObject({
+          hideFromInspector: true,
+          targets: [{ ...supplementaryQuery, refId: 'logs-sample-A' }],
+        });
       });
 
       it('should return undefined if there are no supplementary queries for targets', async () => {
