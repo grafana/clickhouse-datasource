@@ -31,6 +31,7 @@ function defaultTraceConfigProps(): TraceConfigProps {
     onFlattenNestedChange: () => {},
     onEventsColumnPrefixChange: () => {},
     onLinksColumnPrefixChange: () => {},
+    onDisableTraceLinksChange: () => {},
   };
 }
 
@@ -414,5 +415,21 @@ describe('TracesConfig', () => {
     fireEvent.blur(input);
     expect(onLinksColumnPrefixChange).toHaveBeenCalledTimes(1);
     expect(onLinksColumnPrefixChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onDisableTraceLinksChange when toggled', async () => {
+    const onDisableTraceLinksChange = jest.fn();
+    const result = render(
+      <TracesConfig {...defaultTraceConfigProps()} onDisableTraceLinksChange={onDisableTraceLinksChange} />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    // disableTraceLinks is the 2nd role="switch" (index 1), after flattenNested
+    const switches = await result.findAllByRole('switch');
+    const input = switches[1];
+    expect(input).toBeInTheDocument();
+    fireEvent.click(input);
+    expect(onDisableTraceLinksChange).toHaveBeenCalledTimes(1);
+    expect(onDisableTraceLinksChange).toHaveBeenCalledWith(true);
   });
 });

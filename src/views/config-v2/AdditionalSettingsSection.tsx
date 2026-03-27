@@ -238,6 +238,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onMessageColumnChange={(c) => onUpdateLogsConfig('messageColumn', c)}
           onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
           onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
+          onDisableLogLinksChange={(v) => onUpdateLogsConfig('disableLogLinks', v)}
         />
 
         <Divider />
@@ -268,6 +269,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onFlattenNestedChange={(c) => onUpdateTracesConfig('flattenNested', c)}
           onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
           onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}
+          onDisableTraceLinksChange={(v) => onUpdateTracesConfig('disableTraceLinks', v)}
         />
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />

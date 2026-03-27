@@ -252,6 +252,42 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(traceIdFilter).toBeDefined();
     expect(traceIdFilter.key).toBe('TraceId');
   });
+
+  it('does not inject "View trace" link when disableTraceLinks is set', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.traces = { disableTraceLinks: true };
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeUndefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeDefined();
+  });
+
+  it('does not inject "View logs" link when disableLogLinks is set', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.logs = { disableLogLinks: true };
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
+  });
 });
 
 describe('dataFrameHasLogLabelWithName', () => {

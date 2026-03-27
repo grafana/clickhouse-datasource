@@ -36,6 +36,7 @@ export interface TraceConfigProps {
   onFlattenNestedChange: (v: boolean) => void;
   onEventsColumnPrefixChange: (v: string) => void;
   onLinksColumnPrefixChange: (v: string) => void;
+  onDisableTraceLinksChange: (v: boolean) => void;
 }
 
 export const TracesConfig = (props: TraceConfigProps) => {
@@ -63,6 +64,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     onFlattenNestedChange,
     onEventsColumnPrefixChange,
     onLinksColumnPrefixChange,
+    onDisableTraceLinksChange,
   } = props;
   let {
     defaultDatabase,
@@ -88,6 +90,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     flattenNested,
     traceEventsColumnPrefix,
     traceLinksColumnPrefix,
+    disableTraceLinks,
   } = (props.tracesConfig || {}) as CHTracesConfig;
   const labels = allLabels.components.Config.TracesConfig;
 
@@ -295,6 +298,13 @@ export const TracesConfig = (props: TraceConfigProps) => {
           tooltip={labels.columns.linksPrefix.tooltip}
           value={traceLinksColumnPrefix || ''}
           onChange={onLinksColumnPrefixChange}
+        />
+        <Switch
+          label={labels.columns.disableTraceLinks.label}
+          tooltip={labels.columns.disableTraceLinks.tooltip}
+          value={disableTraceLinks || false}
+          onChange={onDisableTraceLinksChange}
+          wide
         />
       </ConfigSubSection>
     </ConfigSection>

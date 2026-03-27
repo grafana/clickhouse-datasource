@@ -227,6 +227,10 @@ export default {
             label: 'Links prefix',
             tooltip: 'Prefix for the trace references column (Links.TraceId, Links.TraceState, etc.)',
           },
+          disableTraceLinks: {
+            label: 'Disable "View trace" Links',
+            tooltip: 'Disable automatic "View trace" links on trace_id fields.',
+          },
           kind: {
             label: 'Kind column',
             tooltip: 'Column for the trace kind',
@@ -283,6 +287,10 @@ export default {
             label: 'Log Message column',
             tooltip: 'Column for log message',
           },
+        },
+        disableLogLinks: {
+          label: 'Disable "View logs" Links',
+          tooltip: 'Disable automatic "View logs" links on trace_id fields.',
         },
         contextColumns: {
           title: 'Context columns',
