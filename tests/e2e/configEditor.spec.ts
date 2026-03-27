@@ -1,5 +1,6 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { Page } from '@playwright/test';
+import { CHConfig } from '../../src/types/config';
 
 const PLUGIN_UID = 'grafana-clickhouse-datasource';
 const PROVISIONING_FILE = 'clickhouse.yml';
@@ -53,7 +54,7 @@ test.describe('Config editor', () => {
       gotoDataSourceConfigPage,
       page,
     }) => {
-      const ds = await readProvisionedDataSource({ fileName: PROVISIONING_FILE });
+      const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
       await expect(page.getByPlaceholder('Server address')).toHaveValue('clickhouse-server');
     });
@@ -63,7 +64,7 @@ test.describe('Config editor', () => {
       gotoDataSourceConfigPage,
       page,
     }) => {
-      const ds = await readProvisionedDataSource({ fileName: PROVISIONING_FILE });
+      const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
       await expect(page.getByPlaceholder('9000')).toHaveValue('9000');
       await expect(page.getByRole('radio', { name: 'Native' })).toBeChecked();
@@ -78,7 +79,7 @@ test.describe('Config editor', () => {
     }) => {
       // Provisioned datasources show a read-only "Test" button (not "Save & test"),
       // since the UI cannot modify provisioned configuration.
-      const ds = await readProvisionedDataSource({ fileName: PROVISIONING_FILE });
+      const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
       await page.getByRole('button', { name: 'Test' }).click();
       await expect(page.getByText('Data source is working')).toBeVisible();

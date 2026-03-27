@@ -1,5 +1,7 @@
-import { expect, test } from '@grafana/plugin-e2e';
+import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
 import { Page } from '@playwright/test';
+import { QueryType } from '../../src/types/queryBuilder';
+import { EditorType } from '../../src/types/sql';
 
 // Matches the uid set in provisioning/datasources/clickhouse.yml
 const DATASOURCE_UID = 'clickhouse-e2e';
@@ -8,9 +10,6 @@ const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
 // Time range that fully covers the seed fixture data in tests/e2e/fixtures/seed.sql
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
-
-type QueryType = 'table' | 'logs' | 'timeseries' | 'traces';
-type EditorType = 'builder' | 'sql';
 
 interface ExploreUrlOpts {
   queryType?: QueryType;
@@ -43,6 +42,7 @@ function exploreUrl(opts: ExploreUrlOpts = {}): string {
       range: { from, to },
     },
   });
+  
   return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
 }
 
@@ -75,29 +75,24 @@ async function enterSql(page: Page, sql: string) {
 }
 
 /**
- * Register a waitForResponse listener that captures the first successful
- * /api/ds/query response containing a frames array for refId A.
- * Must be called BEFORE page.goto() / Run Query so it is already listening.
- * The body is read inside the predicate while the CDP buffer is still live.
+ * Wraps explorePage.waitForQueryDataResponse, reading the response body
+ * inside the predicate while the CDP buffer is still live.
+ *
+ * TODO: patch @grafana/plugin-e2e so waitForQueryDataResponse exposes the
+ * body directly, removing the need for this workaround.
  */
-interface QueryDataResponse {
-  results: {
-    A?: { frames?: unknown[] };
-    [key: string]: unknown;
-  };
-}
-
-async function waitForQueryResponse(page: Page) {
-  let body: QueryDataResponse | null = null;
-  const responsePromise = page.waitForResponse(async (r) => {
-    if (!r.url().includes('/api/ds/query') || !r.ok()) {
+async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
+  let body: Record<string, unknown> | null = null;
+  const responsePromise = explorePage.waitForQueryDataResponse(async (r) => {
+    if (!r.ok()) {
       return false;
     }
-    const b = await r.json().catch(() => null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const b: any = await r.json().catch(() => null);
     if (!Array.isArray(b?.results?.A?.frames)) {
       return false;
     }
-    body = b as QueryDataResponse;
+    body = b as Record<string, unknown>;
     return true;
   });
   return { responsePromise, getBody: () => body };
@@ -191,39 +186,36 @@ test.describe('Query editor', () => {
 test.describe('Query editor with fixture data', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('SQL query returns rows from fixture data', async ({ page }) => {
+  test('SQL query returns rows from fixture data', async ({ page, explorePage }) => {
     await page.goto(exploreUrl({ from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO }));
-
-    const { responsePromise, getBody } = await waitForQueryResponse(page);
-
     await enterSql(page, 'SELECT timestamp, level, message FROM e2e_test.events ORDER BY timestamp LIMIT 10');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
-    expect(getBody()?.results?.A?.frames?.length).toBeGreaterThan(0);
+    expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
   });
 
-  test('Aggregate SQL query returns a count from fixture data', async ({ page }) => {
+  test('Aggregate SQL query returns a count from fixture data', async ({ page, explorePage }) => {
     await page.goto(exploreUrl({ from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO }));
-
-    const { responsePromise, getBody } = await waitForQueryResponse(page);
-
     await enterSql(page, 'SELECT count(*) AS total FROM e2e_test.events');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
-    expect(getBody()?.results?.A?.frames?.length).toBeGreaterThan(0);
+    expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
   });
 
-  test('SQL query with WHERE filter returns matching rows', async ({ page }) => {
+  test('SQL query with WHERE filter returns matching rows', async ({ page, explorePage }) => {
     await page.goto(exploreUrl({ from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO }));
-
-    const { responsePromise, getBody } = await waitForQueryResponse(page);
-
     await enterSql(page, "SELECT timestamp, message FROM e2e_test.events WHERE level = 'error' ORDER BY timestamp");
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
-    expect(getBody()?.results?.A?.frames?.length).toBeGreaterThan(0);
+    expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
   });
 });
