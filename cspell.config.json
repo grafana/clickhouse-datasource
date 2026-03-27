@@ -43,6 +43,7 @@
     "instancemgmt",
     "lowcardinality",
     "magefile",
+    "multiquery",
     "mgbench",
     "Milli",
     "millis",
