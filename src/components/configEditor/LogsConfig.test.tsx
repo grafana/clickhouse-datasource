@@ -20,6 +20,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -40,6 +41,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -67,6 +69,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -122,6 +125,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -149,6 +153,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -178,6 +183,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -207,6 +213,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -236,6 +243,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={onMessageColumnChange}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -248,5 +256,34 @@ describe('LogsConfig', () => {
     fireEvent.blur(input);
     expect(onMessageColumnChange).toHaveBeenCalledTimes(1);
     expect(onMessageColumnChange).toHaveBeenCalledWith('changed');
+  });
+
+  it('should call onDisableLogLinksChange when toggled', async () => {
+    const onDisableLogLinksChange = jest.fn();
+    const result = render(
+      <LogsConfig
+        logsConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
+        onTimeColumnChange={() => {}}
+        onLevelColumnChange={() => {}}
+        onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
+        onDisableLogLinksChange={onDisableLogLinksChange}
+      />
+    );
+    expect(result.container.firstChild).not.toBeNull();
+
+    // disableLogLinks is the 1st role="switch" (index 0), before selectContextColumns
+    const switches = await result.findAllByRole('switch');
+    const input = switches[0];
+    expect(input).toBeInTheDocument();
+    fireEvent.click(input);
+    expect(onDisableLogLinksChange).toHaveBeenCalledTimes(1);
+    expect(onDisableLogLinksChange).toHaveBeenCalledWith(true);
   });
 });
