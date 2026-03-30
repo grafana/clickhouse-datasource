@@ -14,7 +14,7 @@ on:
 # Minimal top-level permissions; jobs can extend as needed
 permissions:
   contents: read
-  id-token: write  # Required for OIDC (Vault / shared workflows)
+  id-token: write # Required for OIDC (Vault / shared workflows)
 
 # Prevent duplicate runs on the same ref.
 # For PRs: cancel older in-progress runs when new commits are pushed.
@@ -27,7 +27,7 @@ jobs:
   ci:
     name: CI
 
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v5.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v6.1.1
 
     # Only run CI job for PRs / non-main refs.
     # Main publishing is handled by the CD workflow below.
@@ -39,9 +39,6 @@ jobs:
       id-token: write
 
     with:
-      go-version: '1.26.0'
-      golangci-lint-version: '2.10.1'
-
       # Ensure PR builds produce unique plugin versions.
       # For PR events, suffix with the head SHA; otherwise leave empty.
       plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
@@ -57,8 +54,8 @@ jobs:
     # Publishing requires write permissions + OIDC
     permissions:
       attestations: write
-      contents: write      # Required to publish artifacts
-      id-token: write      # OIDC for Vault / signing
+      contents: write # Required to publish artifacts
+      id-token: write # OIDC for Vault / signing
 
     with:
       # This is a "publish latest" flow, not a full release
@@ -66,11 +63,11 @@ jobs:
       disable-github-release: true
 
       # Target the dev catalog environment (used by Cloud E2E)
-      environment: 'dev'
+      environment: "dev"
 
       # Keep toolchain consistent with CI job
-      go-version: '1.26.0'
-      golangci-lint-version: '2.10.1'
+      go-version: "1.26.0"
+      golangci-lint-version: "2.10.1"
 
       # Suffix artifact with commit SHA for traceability and uniqueness
       plugin-version-suffix: ${{ github.sha }}
@@ -127,10 +124,10 @@ jobs:
           namespace: grafana-datasources-cd
 
           # Use plugin ID as WorkflowTemplate name
-          workflow_template: ${{ steps.plugin.outputs.id }}
+          workflow_template: ${{ steps.plugin.outputs.id }}-dev
 
           # Parameters passed into the Argo workflow
           parameters: |
-            dockertag=${{ steps.pkg.outputs.version }}-${{ github.sha }}
+            dockertag=${{ steps.pkg.outputs.version }}+${{ github.sha }}
             prCommentContext=triggered-by-push-to-main datasource=${{ steps.plugin.outputs.id }}
             commit_author=grafana-delivery-bot

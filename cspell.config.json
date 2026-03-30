@@ -57,6 +57,7 @@
     "openfeature",
     "oper",
     "otel",
+    "semconv",
     "OUTFILE",
     "paulmach",
     "pgsql",
