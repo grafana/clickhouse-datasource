@@ -12,10 +12,7 @@ import (
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	clickhousePlugin := Clickhouse{}
 	ds := sqlds.NewDatasource(&clickhousePlugin)
-	pluginSettings := clickhousePlugin.Settings(ctx, settings)
-	if pluginSettings.ForwardHeaders {
-		ds.EnableMultipleConnections = true
-	}
+	ds.EnableMultipleConnections = true
 
 	schemaProvider := NewSchemaProvider(&clickhousePlugin, settings)
 	ds.ResourceMiddleware = func(next backend.CallResourceHandler) backend.CallResourceHandler {
