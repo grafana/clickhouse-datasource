@@ -31,7 +31,7 @@ function defaultTraceConfigProps(): TraceConfigProps {
     onFlattenNestedChange: () => {},
     onEventsColumnPrefixChange: () => {},
     onLinksColumnPrefixChange: () => {},
-    onDisableTraceLinksChange: () => {},
+    onShowTraceLinksChange: () => {},
   };
 }
 
@@ -417,19 +417,19 @@ describe('TracesConfig', () => {
     expect(onLinksColumnPrefixChange).toHaveBeenCalledWith('changed');
   });
 
-  it('should call onDisableTraceLinksChange when toggled', async () => {
-    const onDisableTraceLinksChange = jest.fn();
+  it('should call onShowTraceLinksChange when toggled', async () => {
+    const onShowTraceLinksChange = jest.fn();
     const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} onDisableTraceLinksChange={onDisableTraceLinksChange} />
+      <TracesConfig {...defaultTraceConfigProps()} onShowTraceLinksChange={onShowTraceLinksChange} />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    // disableTraceLinks is the 2nd role="switch" (index 1), after flattenNested
+    // showTraceLinks is the 2nd role="switch" (index 1), after flattenNested
     const switches = await result.findAllByRole('switch');
     const input = switches[1];
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
-    expect(onDisableTraceLinksChange).toHaveBeenCalledTimes(1);
-    expect(onDisableTraceLinksChange).toHaveBeenCalledWith(true);
+    expect(onShowTraceLinksChange).toHaveBeenCalledTimes(1);
+    expect(onShowTraceLinksChange).toHaveBeenCalledWith(false);
   });
 });

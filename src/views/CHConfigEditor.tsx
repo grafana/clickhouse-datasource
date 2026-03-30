@@ -513,8 +513,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             trackingV1.trackClickhouseConfigV1LogsConfig({ contextColumns: c });
             onLogsConfigChange('contextColumns', c);
           }}
-          onDisableLogLinksChange={(v) => {
-            onLogsConfigChange('disableLogLinks', v);
+          onShowLogLinksChange={(v) => {
+            onLogsConfigChange('showLogLinks', v);
           }}
         />
 
@@ -613,8 +613,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             trackingV1.trackClickhouseConfigV1TracesConfig({ traceLinksColumnPrefix: c });
             onTracesConfigChange('traceLinksColumnPrefix', c);
           }}
-          onDisableTraceLinksChange={(v) => {
-            onTracesConfigChange('disableTraceLinks', v);
+          onShowTraceLinksChange={(v) => {
+            onTracesConfigChange('showTraceLinks', v);
           }}
         />
 

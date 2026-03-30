@@ -227,10 +227,6 @@ export default {
             label: 'Links prefix',
             tooltip: 'Prefix for the trace references column (Links.TraceId, Links.TraceState, etc.)',
           },
-          disableTraceLinks: {
-            label: 'Disable "View trace" Links',
-            tooltip: 'Disable automatic "View trace" links on trace_id fields.',
-          },
           kind: {
             label: 'Kind column',
             tooltip: 'Column for the trace kind',
@@ -255,6 +251,15 @@ export default {
             label: 'State column',
             tooltip: 'Column for the trace state',
           },
+        },
+      },
+      traceIdCorrelation: {
+        title: 'Trace ID correlation',
+        description: 'Options for showing links to correlated data.',
+
+        showTraceLinks: {
+          label: 'Show "View trace" links',
+          tooltip: 'Show "View trace" links on trace_id/traceid fields.',
         },
       },
       LogsConfig: {
@@ -288,9 +293,14 @@ export default {
             tooltip: 'Column for log message',
           },
         },
-        disableLogLinks: {
-          label: 'Disable "View logs" Links',
-          tooltip: 'Disable automatic "View logs" links on trace_id fields.',
+        traceIdCorrelation: {
+          title: 'Trace ID correlation',
+          description: 'Options for showing links to correlated data.',
+
+          showLogLinks: {
+            label: 'Show "View logs" links',
+            tooltip: 'Show "View logs" links on trace_id/traceid fields.',
+          },
         },
         contextColumns: {
           title: 'Context columns',

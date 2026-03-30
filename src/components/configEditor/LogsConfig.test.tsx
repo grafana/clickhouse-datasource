@@ -20,7 +20,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -41,7 +41,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -69,7 +69,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -125,7 +125,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -153,7 +153,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -183,7 +183,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -213,7 +213,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -243,7 +243,7 @@ describe('LogsConfig', () => {
         onMessageColumnChange={onMessageColumnChange}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={() => {}}
+        onShowLogLinksChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -258,8 +258,8 @@ describe('LogsConfig', () => {
     expect(onMessageColumnChange).toHaveBeenCalledWith('changed');
   });
 
-  it('should call onDisableLogLinksChange when toggled', async () => {
-    const onDisableLogLinksChange = jest.fn();
+  it('should call onShowLogLinksChange when toggled', async () => {
+    const onShowLogLinksChange = jest.fn();
     const result = render(
       <LogsConfig
         logsConfig={{}}
@@ -273,17 +273,17 @@ describe('LogsConfig', () => {
         onMessageColumnChange={() => {}}
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
-        onDisableLogLinksChange={onDisableLogLinksChange}
+        onShowLogLinksChange={onShowLogLinksChange}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    // disableLogLinks is the 1st role="switch" (index 0), before selectContextColumns
+    // showLogLinks is the 1st role="switch" (index 0), before selectContextColumns
     const switches = await result.findAllByRole('switch');
     const input = switches[0];
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
-    expect(onDisableLogLinksChange).toHaveBeenCalledTimes(1);
-    expect(onDisableLogLinksChange).toHaveBeenCalledWith(true);
+    expect(onShowLogLinksChange).toHaveBeenCalledTimes(1);
+    expect(onShowLogLinksChange).toHaveBeenCalledWith(false);
   });
 });

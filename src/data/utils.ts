@@ -305,7 +305,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       traceLogsQuery.rawSql = '';
     }
     traceField.config.links = [];
-    if (!datasource.settings.jsonData.traces?.disableTraceLinks) {
+    if (datasource.settings.jsonData.traces?.showTraceLinks !== false) {
       traceField.config.links!.push({
         title: 'View trace',
         targetBlank: openInNewWindow,
@@ -322,7 +322,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         },
       });
     }
-    if (!datasource.settings.jsonData.logs?.disableLogLinks) {
+    if (datasource.settings.jsonData.logs?.showLogLinks !== false) {
       traceField.config.links!.push({
         title: 'View logs',
         targetBlank: openInNewWindow,

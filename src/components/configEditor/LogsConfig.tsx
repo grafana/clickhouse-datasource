@@ -22,7 +22,7 @@ interface LogsConfigProps {
   onMessageColumnChange: (v: string) => void;
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
-  onDisableLogLinksChange: (v: boolean) => void;
+  onShowLogLinksChange: (v: boolean) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -37,7 +37,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onMessageColumnChange,
     onSelectContextColumnsChange,
     onContextColumnsChange,
-    onDisableLogLinksChange,
+    onShowLogLinksChange,
   } = props;
   let {
     defaultDatabase,
@@ -50,7 +50,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     messageColumn,
     selectContextColumns,
     contextColumns,
-    disableLogLinks,
+    showLogLinks,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
 
@@ -132,13 +132,15 @@ export const LogsConfig = (props: LogsConfigProps) => {
         />
       </ConfigSubSection>
       <br />
-      <Switch
-        label={labels.disableLogLinks.label}
-        tooltip={labels.disableLogLinks.tooltip}
-        value={disableLogLinks || false}
-        onChange={onDisableLogLinksChange}
-        wide
-      />
+      <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>
+        <Switch
+          label={labels.traceIdCorrelation.showLogLinks.label}
+          tooltip={labels.traceIdCorrelation.showLogLinks.tooltip}
+          value={showLogLinks ?? true}
+          onChange={onShowLogLinksChange}
+          wide
+        />
+      </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.contextColumns.title} description={labels.contextColumns.description}>
         <Switch
