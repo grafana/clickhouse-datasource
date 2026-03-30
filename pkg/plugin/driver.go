@@ -364,10 +364,6 @@ func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataReque
 		return req
 	}
 
-	// TODO: this isn't working with go feature flags, disabled temporarily
-	//grafanaConfig := req.PluginContext.GrafanaConfig
-	//grafanaSQLEnabled := grafanaConfig.FeatureToggles().IsEnabled("dsAbstractionApp")
-
 	queries := make([]backend.DataQuery, 0, len(req.Queries))
 	for _, q := range req.Queries {
 		var sq schemas.Query
@@ -383,13 +379,6 @@ func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataReque
 			queries = append(queries, q)
 			continue
 		}
-
-		// TODO: not working with go feature flags, disabled temporarily
-		//if !grafanaSQLEnabled {
-		//	// Grafana SQL abstraction is not enabled, ignoring
-		//	backend.Logger.Warn("dsAbstractionApp is not enabled, skipping query")
-		//	continue
-		//}
 
 		sqlQuery, err := sq.ToSQL(schemas.DialectClickHouse)
 		if err != nil {

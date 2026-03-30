@@ -32,7 +32,10 @@ var (
 		schemas.OperatorIn,
 		schemas.OperatorNotEquals,
 	}
-	searchOperators = []schemas.Operator{
+	stringOperators = []schemas.Operator{
+		schemas.OperatorEquals,
+		schemas.OperatorNotEquals,
+		schemas.OperatorIn,
 		schemas.OperatorLike,
 	}
 )
@@ -335,12 +338,14 @@ func mapClickHouseTypeToSchema(chType string) (schemas.ColumnType, []schemas.Ope
 		return schemas.ColumnTypeDatetime, timeRangeOperators
 	case "timestamp":
 		return schemas.ColumnTypeTimestamp, timeRangeOperators
-	case "string", "fixedstring", "ipv6", "uuid":
+	case "string", "fixedstring":
+		return schemas.ColumnTypeString, stringOperators
+	case "ipv6", "uuid":
 		return schemas.ColumnTypeString, equalityOperators
 	case "decimal", "decimal32", "decimal64", "decimal128", "decimal256":
 		return schemas.ColumnTypeDecimal, numberOperators
 	case "enum", "enum8", "enum16":
-		return schemas.ColumnTypeEnum, equalityOperators
+		return schemas.ColumnTypeEnum, numberOperators
 	case "json", "dynamic", "array", "map", "tuple", "variant", "nested":
 		return schemas.ColumnTypeJSON, equalityOperators
 	case "nullable", "lowcardinality":
