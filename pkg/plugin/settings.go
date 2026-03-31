@@ -30,7 +30,7 @@ type Settings struct {
 	TlsClientKey       string
 
 	Username string `json:"username,omitempty"`
-	Password string `json:"-,omitempty"`
+	Password string `json:"-,omitempty"` //nolint
 
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 

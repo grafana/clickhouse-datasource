@@ -8,7 +8,10 @@
     "yarn.lock",
     "package-lock.json",
     "go.sum",
-    "mage_output_file.go"
+    "mage_output_file.go",
+    "test-results/**",
+    "test_summary.json",
+    "playwright-report/**"
   ],
   "words": [
     "aggregatable",
@@ -25,6 +28,7 @@
     "dataframe",
     "DataSource",
     "DataSources",
+    "Drilldown",
     "DateTime",
     "dbug",
     "elazarl",
@@ -43,15 +47,19 @@
     "instancemgmt",
     "lowcardinality",
     "magefile",
+    "multiquery",
     "mgbench",
     "Milli",
     "millis",
+    "mydb",
     "networkidle",
     "nofile",
     "nolint",
     "Nonproxy",
+    "openfeature",
     "oper",
     "otel",
+    "semconv",
     "OUTFILE",
     "paulmach",
     "pgsql",
@@ -68,6 +76,7 @@
     "stagename",
     "stretchr",
     "subquery",
+    "subqueries",
     "subresource",
     "sugg",
     "supress",
@@ -89,6 +98,7 @@
     "Ulimits",
     "uuidv",
     "vectorator",
-    "WorkDir"
+    "WorkDir",
+    "varname"
   ]
 }

@@ -51,7 +51,7 @@ export default defineConfig<PluginOptions>({
       name: 'run-tests',
       use: {
         ...devices['Desktop Chrome'],
-        storageState: `playwright/.auth/${process.env.PLAYWRIGHT_GRAFANA_USERNAME || 'admin'}.json`,
+        storageState: `playwright/.auth/${process.env.GRAFANA_ADMIN_USER || 'admin'}.json`,
       },
       dependencies: ['auth'],
     },
