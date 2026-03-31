@@ -51,6 +51,7 @@
     "mgbench",
     "Milli",
     "millis",
+    "mydb",
     "networkidle",
     "nofile",
     "nolint",
@@ -75,6 +76,7 @@
     "stagename",
     "stretchr",
     "subquery",
+    "subqueries",
     "subresource",
     "sugg",
     "supress",
@@ -96,6 +98,7 @@
     "Ulimits",
     "uuidv",
     "vectorator",
-    "WorkDir"
+    "WorkDir",
+    "varname"
   ]
 }
