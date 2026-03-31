@@ -165,6 +165,11 @@ func escapeSQLString(s string) string {
 	return strings.ReplaceAll(s, "'", "''")
 }
 
+// quoteIdentifier quotes a ClickHouse identifier with backticks.
+func quoteIdentifier(s string) string {
+	return "`" + strings.ReplaceAll(s, "`", "``") + "`"
+}
+
 // fetchColumnsForAllTables queries system.columns once for all tables and returns columns keyed by "database.table".
 func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []string, headers map[string]string) (map[string][]schemas.Column, error) {
 	result := make(map[string][]schemas.Column)
@@ -390,31 +395,42 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 	response := &schemas.ColumnValuesResponse{
 		ColumnValues: make(map[string][]string),
 	}
-	for _, column := range columns {
-		rows, err := ds.QueryContext(ctx, fmt.Sprintf("SELECT DISTINCT %s FROM %s SETTINGS max_execution_time=10", column, req.Table))
-		if err != nil {
+	if len(columns) == 0 {
+		return response, nil
+	}
+
+	// Build a single UNION ALL query so all columns are fetched in one round-trip
+	// instead of one query per column.
+	parts := make([]string, len(columns))
+	for i, col := range columns {
+		parts[i] = fmt.Sprintf(
+			"SELECT '%s' AS col_name, toString(%s) AS val FROM (SELECT DISTINCT %s FROM %s SETTINGS max_execution_time=10)",
+			escapeSQLString(col), quoteIdentifier(col), quoteIdentifier(col), req.Table,
+		)
+		response.ColumnValues[col] = make([]string, 0)
+	}
+	query := strings.Join(parts, " UNION ALL ")
+
+	rows, err := ds.QueryContext(ctx, query)
+	if err != nil {
+		return &schemas.ColumnValuesResponse{
+			Errors: map[string]string{
+				req.Table: err.Error(),
+			},
+		}, nil
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var colName, value string
+		if err := rows.Scan(&colName, &value); err != nil {
 			return &schemas.ColumnValuesResponse{
 				Errors: map[string]string{
 					req.Table: err.Error(),
 				},
 			}, nil
 		}
-		defer rows.Close()
-		values := make([]string, 0)
-		for rows.Next() {
-			var value string
-			err := rows.Scan(&value)
-			if err != nil {
-				return &schemas.ColumnValuesResponse{
-					Errors: map[string]string{
-						req.Table: err.Error(),
-					},
-				}, nil
-			}
-			values = append(values, value)
-		}
-
-		response.ColumnValues[column] = values
+		response.ColumnValues[colName] = append(response.ColumnValues[colName], value)
 	}
 
 	return response, nil
