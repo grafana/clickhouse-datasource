@@ -54,16 +54,17 @@ func (p *SchemaProvider) Schema(ctx context.Context, req *schemas.SchemaRequest)
 		}, nil
 	}
 
-	response := &schemas.SchemaResponse{
-		FullSchema: &schemas.Schema{
-			Tables: make([]schemas.Table, 0),
-		},
-	}
 	columnsMap, err := p.fetchColumnsForAllTables(ctx, tableResponse.Tables, nil)
 	if err != nil {
 		return &schemas.SchemaResponse{
 			Errors: err.Error(),
 		}, nil
+	}
+
+	response := &schemas.SchemaResponse{
+		FullSchema: &schemas.Schema{
+			Tables: make([]schemas.Table, 0),
+		},
 	}
 	for _, table := range tableResponse.Tables {
 		columns := columnsMap[table]
@@ -178,7 +179,7 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 	}
 
 	var inClauses []string
-	var tableOnlyNames []string // table names requested without database (e.g. "mytable")
+	var tableOnlyNames []string // table names requested without database (e.g. "myTable")
 	for _, table := range tables {
 		if table == "" {
 			continue
@@ -240,7 +241,7 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 			Description: comment,
 		})
 	}
-	// Add short-form keys for tables requested without database; remove full-form key so we only have "mytable", not "db.mytable"
+	// Add short-form keys for tables requested without database; remove full-form key so we only have "myTable", not "db.myTable"
 	tablesSet := make(map[string]bool)
 	for _, t := range tables {
 		tablesSet[t] = true
