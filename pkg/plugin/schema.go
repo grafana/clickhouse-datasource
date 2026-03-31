@@ -95,7 +95,11 @@ func (p *SchemaProvider) Tables(ctx context.Context, req *schemas.TablesRequest)
 			},
 		}, nil
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			backend.Logger.Error("failed to close rows", "error", err)
+		}
+	}()
 
 	tables := make([]string, 0)
 	for rows.Next() {
@@ -225,7 +229,11 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			backend.Logger.Error("failed to close rows", "error", err)
+		}
+	}()
 
 	for rows.Next() {
 		var database, tableName, name, chType, comment string
@@ -270,7 +278,11 @@ func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			backend.Logger.Error("failed to close rows", "error", err)
+		}
+	}()
 	cols := make([]schemas.Column, 0)
 	if err != nil {
 		return nil, err
@@ -375,7 +387,11 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 			},
 		}, nil
 	}
-	defer ds.Close()
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 
 	columns := req.Columns
 	if len(columns) == 0 {
@@ -420,7 +436,11 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 			},
 		}, nil
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			backend.Logger.Error("failed to close rows", "error", err)
+		}
+	}()
 
 	for rows.Next() {
 		var colName, value string
