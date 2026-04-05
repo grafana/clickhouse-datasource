@@ -7,6 +7,7 @@ import {
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  dateTime,
   Field,
   getTimeZone,
   getTimeZoneInfo,
@@ -25,7 +26,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { firstValueFrom, from, lastValueFrom, map, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -58,8 +59,20 @@ import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './u
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
-  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>, DataSourceWithLogsContextSupport<CHQuery>
-{
+  implements DataSourceWithSupplementaryQueriesSupport<CHQuery>, DataSourceWithLogsContextSupport<CHQuery> {
+  private static readonly chunkRefIdSeparator = '__chunk__';
+
+  // Chunk durations grow from recent (15m) to historical (24h repeating).
+  // The small first window keeps most cached chunks stable across dashboard refreshes;
+  // only the leading 15m chunk is re-queried as "now" advances.
+  private static readonly timeRangeChunkDurationsMs = [
+    15 * 60 * 1000,      // 15 minutes
+    6 * 60 * 60 * 1000,  // 6 hours
+    6 * 60 * 60 * 1000,  // 6 hours
+    12 * 60 * 60 * 1000, // 12 hours
+    24 * 60 * 60 * 1000, // 24 hours
+  ];
+
   // This enables default annotation support for 7.2+
   annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
@@ -826,12 +839,270 @@ export class Datasource
         };
       });
 
-    return super
-      .query({
-        ...request,
-        targets,
-      })
-      .pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
+    const chunkRanges = this.getTimeRangeChunks(request.range);
+    const hasChunkedTargets = chunkRanges.length > 1 && targets.some((target) => this.shouldChunkTimeRangeTarget(target));
+    const preparedRequest = {
+      ...request,
+      targets,
+    };
+
+    if (!hasChunkedTargets) {
+      return super
+        .query(preparedRequest)
+        .pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
+    }
+
+    return from(this.queryChunked(preparedRequest, chunkRanges)).pipe(
+      map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res))
+    );
+  }
+
+  // Chunking is limited to Builder+TimeSeries to avoid breaking SQL editor queries
+  // or non-time-series panels. Supplementary logs volume queries (also Builder+TimeSeries)
+  // are chunked too, which is intentional — they benefit from the same cache alignment.
+  private shouldChunkTimeRangeTarget(target: CHQuery): boolean {
+    return target.editorType === EditorType.Builder && target.builderOptions.queryType === QueryType.TimeSeries && !target.hide;
+  }
+
+  // Cap concurrent chunk requests per panel. With Promise.all, all chunks fire simultaneously.
+  // 20 is a reasonable limit that balances cache reuse with server load. For shared clusters
+  // with strict max_concurrent_queries, consider lowering this or adding a concurrency limiter.
+  private static readonly MAX_CHUNKS = 20;
+
+  private getTimeRangeChunks(range?: DataQueryRequest<CHQuery>['range']): Array<DataQueryRequest<CHQuery>['range']> {
+    if (!range?.from || !range?.to) {
+      return range ? [range] : [];
+    }
+
+    const fromMs = range.from.valueOf();
+    const toMs = range.to.valueOf();
+
+    if (!Number.isFinite(fromMs) || !Number.isFinite(toMs) || fromMs >= toMs) {
+      return [range];
+    }
+
+    const chunks: Array<DataQueryRequest<CHQuery>['range']> = [];
+    let chunkEndMs = toMs;
+    let durationIndex = 0;
+
+    while (chunkEndMs > fromMs) {
+      // When the chunk limit is reached, let the final chunk span the remaining range
+      // so no data is lost. This prevents excessive chunk counts for very long ranges.
+      if (chunks.length >= Datasource.MAX_CHUNKS - 1) {
+        chunks.unshift({
+          ...range,
+          from: dateTime(fromMs),
+          to: dateTime(chunkEndMs),
+        });
+        break;
+      }
+
+      const durationMs =
+        Datasource.timeRangeChunkDurationsMs[
+        Math.min(durationIndex, Datasource.timeRangeChunkDurationsMs.length - 1)
+        ];
+      // When a chunk ends exactly on an alignment boundary, shift the chunk start back by one full duration so
+      // it expands farther into history instead of repeating the same aligned start.
+      const alignedStartMs =
+        Math.floor((chunkEndMs - durationMs) / durationMs) * durationMs -
+        (durationIndex > 0 && chunkEndMs % durationMs === 0 ? durationMs : 0);
+      const chunkStartMs = Math.max(fromMs, alignedStartMs);
+
+      chunks.unshift({
+        ...range,
+        from: dateTime(chunkStartMs),
+        to: dateTime(chunkEndMs),
+      });
+
+      chunkEndMs = chunkStartMs;
+      durationIndex++;
+    }
+
+    return chunks;
+  }
+
+  private async queryChunked(
+    request: DataQueryRequest<CHQuery>,
+    chunkRanges: Array<NonNullable<DataQueryRequest<CHQuery>['range']>>
+  ): Promise<DataQueryResponse> {
+    const chunkedTargets = request.targets.filter((target) => this.shouldChunkTimeRangeTarget(target));
+    const passthroughTargets = request.targets.filter((target) => !this.shouldChunkTimeRangeTarget(target));
+    const responses: DataQueryResponse[] = [];
+
+    if (passthroughTargets.length > 0) {
+      responses.push(await lastValueFrom(super.query({ ...request, targets: passthroughTargets })));
+    }
+
+    // Promise.all preserves input order, so chunkResponses[i] corresponds to chunkRanges[i].
+    // The merge logic relies on this temporal ordering for boundary-row deduplication.
+    const chunkResponses = await Promise.all(
+      chunkRanges.map((range, chunkIndex) =>
+        lastValueFrom(
+          super.query({
+            ...request,
+            requestId: request.requestId ? `${request.requestId}-chunk-${chunkIndex}` : `chunk-${chunkIndex}`,
+            range,
+            targets: chunkedTargets.map((target) => ({
+              ...target,
+              refId: this.toChunkRefId(target.refId, chunkIndex),
+            })),
+          })
+        )
+      )
+    );
+
+    if (chunkResponses.length > 0) {
+      const chunkedFrames = chunkResponses.flatMap((r) => r.data);
+      const chunkErrors = chunkResponses.flatMap((r) => r.errors ?? []);
+      responses.push({
+        ...chunkResponses[chunkResponses.length - 1],
+        data: this.mergeChunkedFrames(chunkedFrames),
+        ...(chunkErrors.length > 0 ? { errors: chunkErrors } : {}),
+      });
+    }
+
+    return this.combineQueryResponses(request.targets, responses);
+  }
+
+  private toChunkRefId(refId: string, chunkIndex: number): string {
+    return `${refId}${Datasource.chunkRefIdSeparator}${chunkIndex}`;
+  }
+
+  private getOriginalRefId(refId?: string): string | undefined {
+    if (!refId) {
+      return refId;
+    }
+    const separatorIndex = refId.indexOf(Datasource.chunkRefIdSeparator);
+    return separatorIndex === -1 ? refId : refId.slice(0, separatorIndex);
+  }
+
+  private mergeChunkedFrames(frames: DataFrame[]): DataFrame[] {
+    const groupedFrames = new Map<string, DataFrame[]>();
+
+    for (const frame of frames) {
+      const originalRefId = this.getOriginalRefId(frame.refId);
+      const signature = JSON.stringify({
+        refId: originalRefId,
+        name: frame.name,
+        fields: frame.fields.map((field) => ({
+          name: field.name,
+          type: field.type,
+          labels: this.stableSerialize(field.labels),
+        })),
+      });
+      const currentFrames = groupedFrames.get(signature) || [];
+      currentFrames.push(frame);
+      groupedFrames.set(signature, currentFrames);
+    }
+
+    return Array.from(groupedFrames.values()).map((group) => this.mergeFrameGroup(group));
+  }
+
+  /**
+   * Merges temporally ordered chunk frames into a single frame, deduplicating boundary rows.
+   * Assumes: (1) chunks are in chronological order, (2) overlap is at most one boundary row.
+   */
+  private mergeFrameGroup(frames: DataFrame[]): DataFrame {
+    const firstFrame = frames[0];
+    const mergedFields = firstFrame.fields.map((field) => ({
+      name: field.name,
+      type: field.type,
+      config: field.config,
+      labels: field.labels,
+      values: [] as unknown[],
+    }));
+
+    for (const frame of frames) {
+      const frameLength = frame.length ?? frame.fields[0]?.values.length ?? 0;
+      for (let rowIndex = 0; rowIndex < frameLength; rowIndex++) {
+        const rowValues = frame.fields.map((field) => field.values[rowIndex]);
+        const lastMergedIndex = mergedFields[0].values.length - 1;
+        const isDuplicateBoundaryRow =
+          lastMergedIndex >= 0 &&
+          this.valuesEqual(mergedFields[0].values[lastMergedIndex], rowValues[0]) &&
+          rowValues.every((value, fieldIndex) =>
+            this.valuesEqual(mergedFields[fieldIndex].values[lastMergedIndex], value)
+          );
+
+        if (!isDuplicateBoundaryRow) {
+          for (let i = 0; i < rowValues.length; i++) {
+            mergedFields[i].values.push(rowValues[i]);
+          }
+        }
+      }
+    }
+
+    return {
+      ...firstFrame,
+      refId: this.getOriginalRefId(firstFrame.refId),
+      fields: mergedFields,
+    };
+  }
+
+  /** Deterministic JSON-like serializer for plain primitives, arrays, and objects.
+   *  Does not unwrap wrapper types (e.g. `new Number(42)`) or `moment` instances. */
+  private stableSerialize(value: unknown): string {
+    if (value === undefined) {
+      return 'undefined';
+    }
+
+    if (value === null || typeof value !== 'object') {
+      return JSON.stringify(value);
+    }
+
+    if (Array.isArray(value)) {
+      return `[${value.map((item) => this.stableSerialize(item)).join(',')}]`;
+    }
+
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b));
+    return `{${entries.map(([key, v]) => `${JSON.stringify(key)}:${this.stableSerialize(v)}`).join(',')}}`;
+  }
+
+  private valuesEqual(left: unknown, right: unknown): boolean {
+    if (Object.is(left, right)) {
+      return true;
+    }
+
+    if (typeof left !== 'object' || typeof right !== 'object' || left === null || right === null) {
+      return false;
+    }
+
+    return this.stableSerialize(left) === this.stableSerialize(right);
+  }
+
+  private combineQueryResponses(
+    originalTargets: CHQuery[],
+    responses: DataQueryResponse[]
+  ): DataQueryResponse {
+    const combinedResponse = responses[0] || { data: [] };
+    const framesByRefId = new Map<string, DataFrame[]>();
+    const untrackedFrames: DataFrame[] = [];
+    const allErrors: DataQueryResponse['errors'] = [];
+
+    for (const response of responses) {
+      if (response.errors) {
+        allErrors.push(...response.errors);
+      }
+
+      for (const frame of response.data) {
+        if (!frame.refId) {
+          untrackedFrames.push(frame);
+          continue;
+        }
+
+        const groupedFrames = framesByRefId.get(frame.refId) || [];
+        groupedFrames.push(frame);
+        framesByRefId.set(frame.refId, groupedFrames);
+      }
+    }
+
+    const orderedFrames = originalTargets.flatMap((target) => framesByRefId.get(target.refId) || []);
+
+    return {
+      ...combinedResponse,
+      data: orderedFrames.concat(untrackedFrames),
+      ...(allErrors.length > 0 ? { errors: allErrors } : {}),
+    };
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
