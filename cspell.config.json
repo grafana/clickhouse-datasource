@@ -47,12 +47,15 @@
     "instancemgmt",
     "lowcardinality",
     "magefile",
+    "multiquery",
     "mgbench",
     "Milli",
     "millis",
+    "mydb",
     "networkidle",
     "nofile",
     "nolint",
+    "operationname",
     "Nonproxy",
     "openfeature",
     "oper",
@@ -65,7 +68,9 @@
     "PREWHERE",
     "proxying",
     "regexes",
+    "schemads",
     "sdkproxy",
+    "servicename",
     "shopspring",
     "singlequote",
     "slvrtrn",
@@ -74,6 +79,7 @@
     "stagename",
     "stretchr",
     "subquery",
+    "subqueries",
     "subresource",
     "sugg",
     "supress",
@@ -95,6 +101,7 @@
     "Ulimits",
     "uuidv",
     "vectorator",
-    "WorkDir"
+    "WorkDir",
+    "varname"
   ]
 }
