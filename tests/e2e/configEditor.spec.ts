@@ -15,15 +15,26 @@ async function configurePDC(page: Page, networkName: string) {
   await page.getByText(networkName).click();
 }
 
+/**
+ * Wait for the V1 config editor form to be rendered after navigating to the config page.
+ * Grafana 13.x redirects /datasources/edit/:uid → /connections/datasources/edit/:uid
+ * client-side, and async plugin loading means the form can take several seconds to appear.
+ */
+async function waitForConfigEditorReady(page: Page) {
+  await expect(page.getByPlaceholder('Server address')).toBeVisible({ timeout: 30000 });
+}
+
 test.describe('Config editor', () => {
   test.describe('rendering', () => {
     test('smoke: should render config editor', { tag: ['@plugins'] }, async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
       await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible();
     });
 
     test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
       await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible();
       await expect(page.getByPlaceholder('Server address')).toBeVisible();
       await expect(page.getByPlaceholder('9000')).toBeVisible();
@@ -33,6 +44,7 @@ test.describe('Config editor', () => {
 
     test('should render TLS / SSL Settings section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
       await expect(page.getByRole('heading', { name: 'TLS / SSL Settings' })).toBeVisible();
       // The label and description for these fields share identical text — use .first() to
       // target the visible label div, not the description span that follows it.
@@ -42,6 +54,7 @@ test.describe('Config editor', () => {
 
     test('should render Credentials section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
       await expect(page.getByRole('heading', { name: 'Credentials' })).toBeVisible();
       await expect(page.getByPlaceholder('default')).toBeVisible();
       await expect(page.getByPlaceholder('password')).toBeVisible();
@@ -66,6 +79,8 @@ test.describe('Config editor', () => {
     }) => {
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
+      // Wait for provisioned settings to populate before checking form values
+      await expect(page.getByPlaceholder('Server address')).toHaveValue('clickhouse-server');
       await expect(page.getByPlaceholder('9000')).toHaveValue('9000');
       await expect(page.getByRole('radio', { name: 'Native' })).toBeChecked();
     });
@@ -81,12 +96,15 @@ test.describe('Config editor', () => {
       // since the UI cannot modify provisioned configuration.
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
+      // Wait for provisioned settings to load before clicking Test
+      await expect(page.getByPlaceholder('Server address')).toHaveValue('clickhouse-server');
       await page.getByRole('button', { name: 'Test' }).click();
       await expect(page.getByText('Data source is working')).toBeVisible();
     });
 
     test('invalid credentials should return an error', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
       await page.getByPlaceholder('Server address').fill(resolveClickhouseUrl());
       await expect(configPage.saveAndTest()).not.toBeOK();
     });
@@ -103,6 +121,7 @@ test.describe('Config editor', () => {
       );
 
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
       await page.getByPlaceholder('Server address').fill(resolveClickhouseUrl());
       await page.getByPlaceholder('9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
       await page.getByPlaceholder('default').fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
@@ -118,6 +137,7 @@ test.describe('Config editor', () => {
 
     test('mandatory fields should show error if left empty', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await waitForConfigEditorReady(page);
 
       await page.getByPlaceholder('Server address').fill('');
       await page.keyboard.press('Tab');

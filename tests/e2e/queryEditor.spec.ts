@@ -36,7 +36,7 @@ function exploreUrl(opts: ExploreUrlOpts = {}): string {
   };
 
   const panes = JSON.stringify({
-    explore: {
+    che: {
       datasource: DATASOURCE_UID,
       queries: [query],
       range: { from, to },
@@ -44,6 +44,14 @@ function exploreUrl(opts: ExploreUrlOpts = {}): string {
   });
   
   return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
+}
+
+/**
+ * Wait for the query editor row to be visible after navigating to Explore.
+ * Grafana 13.x may take >5 s to render the query editor due to async plugin loading.
+ */
+async function waitForQueryEditorReady(page: Page) {
+  await expect(page.locator('.query-editor-row')).toBeVisible({ timeout: 30000 });
 }
 
 /**
@@ -107,6 +115,7 @@ test.describe('Query editor', () => {
   test.describe('rendering', () => {
     test('smoke: renders all query type options', { tag: ['@plugins'] }, async ({ page }) => {
       await page.goto(exploreUrl());
+      await waitForQueryEditorReady(page);
       // Query type radios are always visible regardless of editor mode
       await expect(page.getByRole('radio', { name: 'Table' })).toBeVisible();
       await expect(page.getByRole('radio', { name: 'Logs' })).toBeVisible();
@@ -116,6 +125,7 @@ test.describe('Query editor', () => {
 
     test('renders editor type switcher', async ({ page }) => {
       await page.goto(exploreUrl());
+      await waitForQueryEditorReady(page);
       // Grafana opens the editor in SQL Editor mode by default
       await expect(page.getByRole('radio', { name: 'SQL Editor' })).toBeChecked();
       await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeVisible();
@@ -126,8 +136,8 @@ test.describe('Query editor', () => {
       // The toolbar also has a "Run query" button — scope to the query editor row to
       // avoid a strict-mode violation from matching both.
       await expect(
-        page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' })
-      ).toBeVisible();
+        page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' })
+      ).toBeVisible({ timeout: 30000 });
     });
 
     test('renders SQL editor code area', async ({ page }) => {
@@ -143,7 +153,7 @@ test.describe('Query editor', () => {
       // Use a scoped locator — `label.query-keyword` is the Grafana inline form label
       // class used by the builder for all its field labels (Database, Table, etc.).
       await expect(
-        page.locator('[data-testid="query-editor-row"] label.query-keyword', { hasText: 'Database' })
+        page.locator('.query-editor-row label.query-keyword', { hasText: 'Database' })
       ).toBeVisible();
     });
 
@@ -191,7 +201,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, 'SELECT timestamp, level, message FROM e2e_test.events ORDER BY timestamp LIMIT 10');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
@@ -202,7 +212,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, 'SELECT count(*) AS total FROM e2e_test.events');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
@@ -213,7 +223,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, "SELECT timestamp, message FROM e2e_test.events WHERE level = 'error' ORDER BY timestamp");
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
