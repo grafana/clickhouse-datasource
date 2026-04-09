@@ -715,15 +715,28 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('filterQuery', () => {
+    it('returns true when hide is not set', () => {
+      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
+    });
+
+    it('returns true when hide is false', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', hide: false } as CHQuery)).toBe(true);
+    });
+
+    it('returns false when hide is true', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', hide: true } as CHQuery)).toBe(false);
+    });
+  });
+
   describe('query', () => {
-    it('filters out hidden queries', async () => {
+    it('attaches timezone metadata to targets', async () => {
       const instance = cloneDeep(mockDatasource);
-      // Datasource inherits from DataSourceWithBackend
       const spy = jest
         .spyOn(DataSourceWithBackend.prototype, 'query')
         .mockImplementation((_request) => of({ data: [toDataFrame([])] }));
       instance.query({
-        targets: [{ refId: '1' }, { refId: '2', hide: false }, { refId: '3', hide: true }] as DataQuery[],
+        targets: [{ refId: '1' }, { refId: '2', hide: false }] as DataQuery[],
         timezone: 'UTC',
       } as any);
 

@@ -851,10 +851,12 @@ export class Datasource
     return localTimezoneInfo?.ianaName;
   }
 
+  filterQuery(query: CHQuery): boolean {
+    return !query.hide;
+  }
+
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
     const targets = request.targets
-      // filters out queries disabled in UI
-      .filter((t) => t.hide !== true)
       // attach timezone information
       .map((t) => {
         return {

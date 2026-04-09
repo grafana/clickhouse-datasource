@@ -19,16 +19,22 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	schemas "github.com/grafana/schemads"
 	"github.com/grafana/sqlds/v5"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/proxy"
 )
 
 // Clickhouse defines how to connect to a Clickhouse datasource
-type Clickhouse struct{}
+type Clickhouse struct {
+	SchemaDatasource *schemas.SchemaDatasource
+}
 
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
@@ -127,6 +133,12 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 
 // Connect opens a sql.DB connection using datasource settings
 func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse connect", trace.WithAttributes(
+		attribute.String("db.system", "clickhouse"),
+	))
+
+	defer span.End()
+
 	settings, err := LoadSettings(ctx, config)
 	if err != nil {
 		return nil, err
@@ -342,7 +354,67 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	}
 }
 
+func (h *Clickhouse) MutateQueryData(ctx context.Context, req *backend.QueryDataRequest) (context.Context, *backend.QueryDataRequest) {
+	req = preprocessGrafanaSQL(req)
+	return ctx, req
+}
+
+func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
+	if req == nil || len(req.Queries) == 0 {
+		return req
+	}
+
+	queries := make([]backend.DataQuery, 0, len(req.Queries))
+	for _, q := range req.Queries {
+		var sq schemas.Query
+
+		if err := json.Unmarshal(q.JSON, &sq); err != nil {
+			// Cannot unmarshal query JSON, ignoring
+			queries = append(queries, q)
+			continue
+		}
+
+		if !sq.GrafanaSql {
+			// Not a Grafana SQL query, ignoring
+			queries = append(queries, q)
+			continue
+		}
+
+		sqlQuery, err := sq.ToSQL(schemas.DialectClickHouse)
+		if err != nil {
+			backend.Logger.Error("Failed to build SQL query", "error", err.Error())
+			continue
+		}
+
+		// Build JSON with `sqlutil.Query` shape that will be used to execute the query by sqlds
+		queryJSON, err := json.Marshal(sqlutil.Query{
+			RawSQL:         sqlQuery,
+			Format:         sqlutil.FormatOptionTable, // TODO: Is this correct?
+			ConnectionArgs: json.RawMessage("{}"),
+		})
+		if err != nil {
+			backend.Logger.Error("Failed to marshal SQL query", "error", err.Error())
+			continue
+		}
+
+		q.JSON = queryJSON
+		queries = append(queries, q)
+	}
+
+	return &backend.QueryDataRequest{
+		PluginContext: req.PluginContext,
+		Headers:       req.Headers,
+		Queries:       queries,
+	}
+}
+
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse mutate_query", trace.WithAttributes(
+		attribute.String("db.system", "clickhouse"),
+	))
+
+	defer span.End()
+
 	if user := backend.UserFromContext(ctx); user != nil {
 		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
 			Products: nil,
@@ -372,6 +444,12 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 // MutateResponse converts fields of type FieldTypeNullableJSON to string,
 // except for specific visualizations (traces, tables, and logs).
 func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.Frames, error) {
+	_, span := tracing.DefaultTracer().Start(ctx, "clickhouse mutate_response", trace.WithAttributes(
+		attribute.String("db.system", "clickhouse"),
+	))
+
+	defer span.End()
+
 	for _, frame := range res {
 		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
 			err := mergeOpenTelemetryLabels(frame)
