@@ -1,5 +1,5 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Page } from '@playwright/test';
+import { Locator, Page } from '@playwright/test';
 import { QueryType } from '../../src/types/queryBuilder';
 import { EditorType } from '../../src/types/sql';
 
@@ -16,6 +16,15 @@ interface ExploreUrlOpts {
   editorType?: EditorType;
   from?: string;
   to?: string;
+}
+
+/**
+ * Returns a locator that matches the query editor row regardless of Grafana version.
+ * Grafana < 13 uses [aria-label="Query editor row"]; Grafana >= 13 uses
+ * [data-testid="data-testid Query editor row"]. The CSS union matches whichever is present.
+ */
+function queryEditorRow(page: Page): Locator {
+  return page.locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]');
 }
 
 /**
@@ -126,7 +135,7 @@ test.describe('Query editor', () => {
       // The toolbar also has a "Run query" button — scope to the query editor row to
       // avoid a strict-mode violation from matching both.
       await expect(
-        page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' })
+        queryEditorRow(page).getByRole('button', { name: 'Run Query' })
       ).toBeVisible();
     });
 
@@ -143,7 +152,7 @@ test.describe('Query editor', () => {
       // Use a scoped locator — `label.query-keyword` is the Grafana inline form label
       // class used by the builder for all its field labels (Database, Table, etc.).
       await expect(
-        page.locator('[data-testid="query-editor-row"] label.query-keyword', { hasText: 'Database' })
+        queryEditorRow(page).locator('label.query-keyword', { hasText: 'Database' })
       ).toBeVisible();
     });
 
@@ -191,7 +200,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, 'SELECT timestamp, level, message FROM e2e_test.events ORDER BY timestamp LIMIT 10');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
+    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
@@ -202,7 +211,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, 'SELECT count(*) AS total FROM e2e_test.events');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
+    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
@@ -213,7 +222,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, "SELECT timestamp, message FROM e2e_test.events WHERE level = 'error' ORDER BY timestamp");
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await page.locator('[data-testid="query-editor-row"]').getByRole('button', { name: 'Run Query' }).click();
+    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
