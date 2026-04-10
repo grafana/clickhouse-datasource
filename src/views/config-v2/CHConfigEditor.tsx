@@ -18,7 +18,7 @@ export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CH
 export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const styles = useStyles2(getStyles);
-  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined>)[
+  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined> | undefined)?.[
     'clickHouseConfigValidation'
   ];
   const validation = useMemo(

@@ -36,7 +36,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const { jsonData, secureJsonFields } = options;
 
-  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined>)[
+  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined> | undefined)?.[
     'clickHouseConfigValidation'
   ];
   const validation = useMemo(
