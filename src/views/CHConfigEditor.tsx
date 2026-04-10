@@ -36,7 +36,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const { jsonData, secureJsonFields } = options;
 
-  const validation = useMemo(() => props.validation ?? createValidationAPI(), [props.validation]);
+  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined>)[
+    'clickHouseConfigValidation'
+  ];
+  const validation = useMemo(
+    () => (validationEnabled ? (props.validation ?? createValidationAPI()) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.validation]
+  );
   const labels = allLabels.components.Config.ConfigEditor;
   const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
   const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
@@ -57,6 +64,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   // disappear as soon as the user fills in a field, rather than waiting for
   // the next save attempt.
   useEffect(() => {
+    if (!validation) {
+      return;
+    }
     if (jsonData.host) {
       validation.clearError('host');
     }
@@ -82,7 +92,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
     });
   }, [jsonData.host, jsonData.port, validation, labels.serverAddress.error, labels.serverPort.error]);
 
-  const fieldErrors = validation.getErrors();
+  const fieldErrors = validation?.getErrors() ?? {};
 
   const onPortChange = (port: string) => {
     onOptionsChange({

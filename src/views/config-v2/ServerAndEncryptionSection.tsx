@@ -85,8 +85,6 @@ export const ServerAndEncryptionSection = (props: Props) => {
       }
       setFieldErrors(errors);
       Object.entries(errors).forEach(([field, msg]) => validation.setError(field, msg));
-      if (!errors.host) { validation.clearError('host'); }
-      if (!errors.port) { validation.clearError('port'); }
       return Object.keys(errors).length === 0;
     });
   }, [jsonData.host, jsonData.port, validation, labels.serverAddress.error, labels.serverPort.error]);

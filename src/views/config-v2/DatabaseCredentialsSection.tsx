@@ -43,7 +43,6 @@ export const DatabaseCredentialsSection = (props: Props) => {
       }
       setFieldErrors(errors);
       Object.entries(errors).forEach(([field, msg]) => validation.setError(field, msg));
-      if (!errors.username) { validation.clearError('username'); }
       return Object.keys(errors).length === 0;
     });
   }, [jsonData.username, validation, labels.username.error]);

@@ -84,7 +84,9 @@ describe('DatabaseCredentialsSection', () => {
       const validation = createMockValidation();
       render(<DatabaseCredentialsSection {...emptyProps} validation={validation} />);
 
-      await act(async () => { validation.runValidator(); });
+      await act(async () => {
+        validation.runValidator();
+      });
 
       expect(screen.getByText('Username is required')).toBeInTheDocument();
     });
@@ -93,7 +95,9 @@ describe('DatabaseCredentialsSection', () => {
       const validation = createMockValidation();
       render(<DatabaseCredentialsSection {...filledProps} validation={validation} />);
 
-      await act(async () => { validation.runValidator(); });
+      await act(async () => {
+        validation.runValidator();
+      });
 
       expect(screen.queryByText('Username is required')).not.toBeInTheDocument();
     });

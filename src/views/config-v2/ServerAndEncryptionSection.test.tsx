@@ -146,7 +146,9 @@ describe('ServerAndEncryptionSection', () => {
       const validation = createMockValidation();
       render(<ServerAndEncryptionSection {...emptyProps} validation={validation} />);
 
-      await act(async () => { validation.runValidator(); });
+      await act(async () => {
+        validation.runValidator();
+      });
 
       expect(screen.getByText('Server address required')).toBeInTheDocument();
       expect(screen.getByText('Port is required')).toBeInTheDocument();
@@ -156,7 +158,9 @@ describe('ServerAndEncryptionSection', () => {
       const validation = createMockValidation();
       render(<ServerAndEncryptionSection {...filledProps} validation={validation} />);
 
-      await act(async () => { validation.runValidator(); });
+      await act(async () => {
+        validation.runValidator();
+      });
 
       expect(screen.queryByText('Server address required')).not.toBeInTheDocument();
       expect(screen.queryByText('Port is required')).not.toBeInTheDocument();

@@ -5,7 +5,8 @@ import { pluginVersion } from 'utils/version';
 
 /**
  * Mirrors the DataSourceConfigValidationAPI interface from @grafana/data.
- * Defined locally because the type is not yet re-exported from the package index.
+ * Defined locally until this plugin updates its @grafana/data peer dependency
+ * to a version that includes DataSourceConfigValidationAPI in its exports.
  */
 export interface ValidationAPI {
   registerValidation: (validator: () => Promise<boolean> | boolean) => () => void;
