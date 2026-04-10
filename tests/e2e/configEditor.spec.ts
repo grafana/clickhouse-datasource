@@ -119,12 +119,19 @@ test.describe('Config editor', () => {
     test('mandatory fields should show error if left empty', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
 
-      await page.getByPlaceholder('Server address').fill('');
-      await page.keyboard.press('Tab');
+      // This test requires the V2 config editor (newClickhouseConfigPageDesign feature toggle).
+      // The V2 editor shows inline validation errors on blur; V1 only shows them after save.
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      test.skip(!isV2, 'Requires newClickhouseConfigPageDesign feature toggle to be enabled');
+
+      const hostInput = page.getByPlaceholder('Enter server address');
+      await hostInput.focus();
+      await hostInput.press('Tab');
       await expect(page.getByText('Server address required')).toBeVisible();
 
-      await page.getByPlaceholder('9000').fill('');
-      await page.keyboard.press('Tab');
+      const portInput = page.getByPlaceholder('Enter server port');
+      await portInput.focus();
+      await portInput.press('Tab');
       await expect(page.getByText('Port is required')).toBeVisible();
 
       await expect(configPage.saveAndTest()).not.toBeOK();
