@@ -62,17 +62,18 @@ export const ServerAndEncryptionSection = (props: Props) => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!validation) {
-      return;
-    }
-    // Clear eagerly when the user fills in a field
+    // Always clear errors eagerly when the user fills in a field, regardless of
+    // whether the ValidationAPI is available
     if (jsonData.host) {
       setFieldErrors((prev) => { const next = { ...prev }; delete next.host; return next; });
-      validation.clearError('host');
+      validation?.clearError('host');
     }
     if (jsonData.port) {
       setFieldErrors((prev) => { const next = { ...prev }; delete next.port; return next; });
-      validation.clearError('port');
+      validation?.clearError('port');
+    }
+    if (!validation) {
+      return;
     }
     return validation.registerValidation(() => {
       const errors: Record<string, string> = {};
@@ -82,7 +83,6 @@ export const ServerAndEncryptionSection = (props: Props) => {
       if (!jsonData.port) {
         errors.port = labels.serverPort.error;
       }
-      // Push errors into both local state (for display) and the shared API (for callers of isValid())
       setFieldErrors(errors);
       Object.entries(errors).forEach(([field, msg]) => validation.setError(field, msg));
       if (!errors.host) { validation.clearError('host'); }
@@ -157,9 +157,9 @@ export const ServerAndEncryptionSection = (props: Props) => {
             placeholder={labels.serverAddress.placeholder}
             onBlur={(e) => {
               trackClickhouseConfigV2HostInput();
-              if (validation && !e.currentTarget.value) {
+              if (!e.currentTarget.value) {
                 setFieldErrors((prev) => ({ ...prev, host: labels.serverAddress.error }));
-                validation.setError('host', labels.serverAddress.error);
+                validation?.setError('host', labels.serverAddress.error);
               }
             }}
           />
@@ -231,9 +231,9 @@ export const ServerAndEncryptionSection = (props: Props) => {
                 placeholder={labels.serverPort.placeholder}
                 onBlur={(e) => {
                   trackClickhouseConfigV2PortInput({ port: e.currentTarget.value });
-                  if (validation && !e.currentTarget.value) {
+                  if (!e.currentTarget.value) {
                     setFieldErrors((prev) => ({ ...prev, port: labels.serverPort.error }));
-                    validation.setError('port', labels.serverPort.error);
+                    validation?.setError('port', labels.serverPort.error);
                   }
                 }}
               />
