@@ -31,6 +31,16 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+type grafanaHeadersKeyType struct{}
+
+var grafanaHeadersKey = grafanaHeadersKeyType{}
+
+type grafanaHeaders struct {
+	DashboardUID string
+	PanelID      string
+	RuleUID      string
+}
+
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct {
 	SchemaDatasource *schemas.SchemaDatasource
@@ -125,14 +135,19 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 			version.Patch, _ = strconv.ParseUint(v, 10, 64)
 		}
 	}
-	if version.Major < major || (version.Major == major && version.Minor < minor) || (version.Major == major && version.Minor == minor && version.Patch < patch) {
+	if version.Major < major || (version.Major == major && version.Minor < minor) ||
+		(version.Major == major && version.Minor == minor && version.Patch < patch) {
 		return false, nil
 	}
 	return true, nil
 }
 
 // Connect opens a sql.DB connection using datasource settings
-func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+func (h *Clickhouse) Connect(
+	ctx context.Context,
+	config backend.DataSourceInstanceSettings,
+	message json.RawMessage,
+) (*sql.DB, error) {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse connect", trace.WithAttributes(
 		attribute.String("db.system", "clickhouse"),
 	))
@@ -354,7 +369,22 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	}
 }
 
-func (h *Clickhouse) MutateQueryData(ctx context.Context, req *backend.QueryDataRequest) (context.Context, *backend.QueryDataRequest) {
+// MutateQueryData extracts Grafana contextual headers from the request and
+// stores them in the context for ClickHouse query metadata injection.
+func (h *Clickhouse) MutateQueryData(
+	ctx context.Context,
+	req *backend.QueryDataRequest,
+) (context.Context, *backend.QueryDataRequest) {
+	headers := req.GetHTTPHeaders()
+	gh := grafanaHeaders{
+		DashboardUID: headers.Get("X-Dashboard-Uid"),
+		PanelID:      headers.Get("X-Panel-Id"),
+		RuleUID:      headers.Get("X-Rule-Uid"),
+	}
+	if gh.DashboardUID != "" || gh.PanelID != "" || gh.RuleUID != "" {
+		ctx = context.WithValue(ctx, grafanaHeadersKey, gh)
+	}
+
 	req = preprocessGrafanaSQL(req)
 	return ctx, req
 }
@@ -415,10 +445,28 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 
 	defer span.End()
 
+	comments := make([]string, 0, 4)
+
 	if user := backend.UserFromContext(ctx); user != nil {
+		comments = append(comments, "grafana_user:"+user.Login)
+	}
+
+	if gh, ok := ctx.Value(grafanaHeadersKey).(grafanaHeaders); ok {
+		if gh.DashboardUID != "" {
+			comments = append(comments, "grafana_dashboard:"+gh.DashboardUID)
+		}
+		if gh.PanelID != "" {
+			comments = append(comments, "grafana_panel:"+gh.PanelID)
+		}
+		if gh.RuleUID != "" {
+			comments = append(comments, "grafana_rule:"+gh.RuleUID)
+		}
+	}
+
+	if len(comments) > 0 {
 		ctx = clickhouse.Context(ctx, clickhouse.WithClientInfo(clickhouse.ClientInfo{
 			Products: nil,
-			Comment:  []string{fmt.Sprintf("grafana_user:%s", user.Login)},
+			Comment:  comments,
 		}))
 	}
 
