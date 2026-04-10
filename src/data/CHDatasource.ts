@@ -51,7 +51,7 @@ import {
   getIntervalInfo,
   getTimeFieldRoundingClause,
   LOG_LEVEL_TO_IN_CLAUSE,
-  queryLogsVolume,
+  splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
@@ -78,59 +78,74 @@ export class Datasource
     this.adHocFilter = new AdHocFilter();
   }
 
-  getDataProvider(
+  static logVolumePrefix = 'log-volume-';
+  static logsSamplePrefix = 'logs-sample-';
+
+  getSupplementaryRequest(
     type: SupplementaryQueryType,
     request: DataQueryRequest<CHQuery>
-  ): Observable<DataQueryResponse> | undefined {
-    if (!this.getSupportedSupplementaryQueryTypes().includes(type)) {
+  ): DataQueryRequest<CHQuery> | undefined {
+    if (!this.getSupportedSupplementaryQueryTypes(request).includes(type)) {
       return undefined;
     }
-    switch (type) {
-      case SupplementaryQueryType.LogsVolume:
-        const logsVolumeRequest = cloneDeep(request);
 
-        const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
-        logsVolumeRequest.interval = intervalInfo.interval;
-        logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
-        logsVolumeRequest.hideFromInspector = true;
-        if (intervalInfo.intervalMs !== undefined) {
-          logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
-          logsVolumeRequest.scopedVars.__interval_ms = {
-            value: intervalInfo.intervalMs,
-            text: intervalInfo.intervalMs,
-          };
+    if (type === SupplementaryQueryType.LogsVolume) {
+      const logsVolumeRequest = cloneDeep(request);
+
+      const intervalInfo = getIntervalInfo(logsVolumeRequest.scopedVars);
+      logsVolumeRequest.interval = intervalInfo.interval;
+      logsVolumeRequest.scopedVars.__interval = { value: intervalInfo.interval, text: intervalInfo.interval };
+      logsVolumeRequest.hideFromInspector = true;
+      if (intervalInfo.intervalMs !== undefined) {
+        logsVolumeRequest.intervalMs = intervalInfo.intervalMs;
+        logsVolumeRequest.scopedVars.__interval_ms = {
+          value: intervalInfo.intervalMs,
+          text: intervalInfo.intervalMs,
+        };
+      }
+
+      const targets: CHQuery[] = [];
+      logsVolumeRequest.targets.forEach((target) => {
+        const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
+        if (supplementaryQuery !== undefined) {
+          targets.push({ ...supplementaryQuery, refId: `${Datasource.logVolumePrefix}${target.refId}` });
         }
+      });
 
-        const targets: CHQuery[] = [];
-        logsVolumeRequest.targets.forEach((target) => {
-          const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
-          if (supplementaryQuery !== undefined) {
-            targets.push(supplementaryQuery);
-          }
-        });
-
-        if (!targets.length) {
-          return undefined;
-        }
-
-        return queryLogsVolume(
-          this,
-          { ...logsVolumeRequest, targets },
-          {
-            range: logsVolumeRequest.range,
-            targets: logsVolumeRequest.targets,
-          }
-        );
-      default:
+      if (!targets.length) {
         return undefined;
+      }
+
+      return { ...logsVolumeRequest, targets };
     }
+
+    if (type === SupplementaryQueryType.LogsSample) {
+      const logsSampleRequest = cloneDeep(request);
+      logsSampleRequest.hideFromInspector = true;
+
+      const targets: CHQuery[] = [];
+      logsSampleRequest.targets.forEach((target) => {
+        const supplementaryQuery = this.getSupplementaryLogsSampleQuery(target);
+        if (supplementaryQuery !== undefined) {
+          targets.push({ ...supplementaryQuery, refId: `${Datasource.logsSamplePrefix}${target.refId}` });
+        }
+      });
+
+      if (!targets.length) {
+        return undefined;
+      }
+
+      return { ...logsSampleRequest, targets };
+    }
+
+    return undefined;
   }
 
-  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+  getSupportedSupplementaryQueryTypes(dsRequest: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
     if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
       return [];
     }
-    return [SupplementaryQueryType.LogsVolume];
+    return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
   }
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
@@ -210,7 +225,62 @@ export class Datasource
     };
   }
 
-  getSupplementaryQuery(options: SupplementaryQueryOptions, originalQuery: CHQuery): CHQuery | undefined {
+  getSupplementaryLogsSampleQuery(query: CHQuery): CHQuery | undefined {
+    if (
+      query.editorType !== EditorType.Builder ||
+      !query.builderOptions.database ||
+      query.builderOptions.table !== this.getDefaultLogsTable()
+    ) {
+      return undefined;
+    }
+
+    const timeColumn =
+      getColumnByHint(query.builderOptions, ColumnHint.FilterTime) ||
+      getColumnByHint(query.builderOptions, ColumnHint.Time);
+
+    if (!timeColumn) {
+      return undefined;
+    }
+
+    const timeHint = timeColumn.hint ?? ColumnHint.Time;
+
+    const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
+      if (f.hint && !f.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
+        f.key = originalColumn?.alias || originalColumn?.name || '';
+      }
+      return { ...f };
+    });
+
+    const defaultColumns = Array.from(this.getDefaultLogsColumns(), ([hint, name]) => ({ hint, name }));
+
+    const columns = defaultColumns.length
+      ? defaultColumns
+      : (query.builderOptions.columns ?? [{ name: timeColumn.name, hint: timeHint }]);
+
+
+    const logsSampleBuilderOptions: QueryBuilderOptions = {
+      database: query.builderOptions.database,
+      table: query.builderOptions.table,
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      filters,
+      columns,
+      orderBy: [{ name: '', hint: timeHint, dir: OrderByDirection.DESC }],
+      limit: 100,
+    };
+
+    return {
+      pluginVersion,
+      editorType: EditorType.Builder,
+      builderOptions: logsSampleBuilderOptions,
+      rawSql: generateSql(logsSampleBuilderOptions),
+      refId: '',
+      format: 2, // Logs format
+    };
+  }
+
+  getSupplementaryQuery(_options: SupplementaryQueryOptions, _originalQuery: CHQuery): CHQuery | undefined {
     return undefined;
   }
 
@@ -868,12 +938,22 @@ export class Datasource
         };
       });
 
+    const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));
+
     return super
       .query({
         ...request,
         targets,
       })
-      .pipe(map((res: DataQueryResponse) => transformQueryResponseWithTraceAndLogLinks(this, request, res)));
+      .pipe(
+        map((res: DataQueryResponse) => {
+          const transformed = transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          if (hasLogsVolumeTargets) {
+            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+          }
+          return transformed;
+        })
+      );
   }
 
   private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
