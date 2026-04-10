@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { DataSourcePluginOptionsEditorProps, GrafanaTheme2 } from '@grafana/data';
 import { Alert, Box, Stack, Text, TextLink, useStyles2 } from '@grafana/ui';
+import { config } from '@grafana/runtime';
 import { CHConfig, CHSecureConfig } from 'types/config';
 import { ServerAndEncryptionSection } from './ServerAndEncryptionSection';
 import { css } from '@emotion/css';
@@ -10,12 +11,19 @@ import { trackClickhouseConfigV2FeedbackButtonClicked } from './tracking';
 import { AdditionalSettingsSection } from './AdditionalSettingsSection';
 import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
 import { TLSSSLSettingsSection } from './TLSSSLSettingsSection';
+import { createValidationAPI } from '../CHConfigEditorHooks';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
 export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const styles = useStyles2(getStyles);
+  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined>)['clickHouseConfigValidation'];
+  const validation = useMemo(
+    () => validationEnabled ? (props.validation ?? createValidationAPI()) : undefined,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.validation]
+  );
 
   return (
     <Stack justifyContent="space-between">
@@ -46,8 +54,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             Fields marked with * are required
           </Text>
         </div>
-        <ServerAndEncryptionSection onOptionsChange={onOptionsChange} options={options} />
-        <DatabaseCredentialsSection onOptionsChange={onOptionsChange} options={options} />
+        <ServerAndEncryptionSection onOptionsChange={onOptionsChange} options={options} validation={validation} />
+        <DatabaseCredentialsSection onOptionsChange={onOptionsChange} options={options} validation={validation} />
         <TLSSSLSettingsSection onOptionsChange={onOptionsChange} options={options} />
         <AdditionalSettingsSection onOptionsChange={onOptionsChange} options={options} />
       </Box>

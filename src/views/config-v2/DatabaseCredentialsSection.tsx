@@ -1,5 +1,5 @@
 import { Box, CollapsableSection, Field, Input, SecretInput, Text, TextLink, useStyles2 } from '@grafana/ui';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 import {
   DataSourcePluginOptionsEditorProps,
@@ -13,15 +13,40 @@ import {
   trackClickhouseConfigV2DatabaseCredentialsPasswordInput,
   trackClickhouseConfigV2DatabaseCredentialsUserInput,
 } from './tracking';
+import { ValidationAPI } from '../CHConfigEditorHooks';
 
-export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
+export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
+  validation?: ValidationAPI;
+}
 
 export const DatabaseCredentialsSection = (props: Props) => {
-  const { options, onOptionsChange } = props;
+  const { options, onOptionsChange, validation } = props;
   const { jsonData, secureJsonFields } = options;
   const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
   const labels = allLabels.components.Config.ConfigEditor;
   const styles = useStyles2(getStyles);
+
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!validation) {
+      return;
+    }
+    if (jsonData.username) {
+      setFieldErrors((prev) => { const next = { ...prev }; delete next.username; return next; });
+      validation.clearError('username');
+    }
+    return validation.registerValidation(() => {
+      const errors: Record<string, string> = {};
+      if (!jsonData.username) {
+        errors.username = labels.username.error;
+      }
+      setFieldErrors(errors);
+      Object.entries(errors).forEach(([field, msg]) => validation.setError(field, msg));
+      if (!errors.username) { validation.clearError('username'); }
+      return Object.keys(errors).length === 0;
+    });
+  }, [jsonData.username, validation, labels.username.error]);
 
   const onResetPassword = () => {
     onOptionsChange({
@@ -66,6 +91,8 @@ export const DatabaseCredentialsSection = (props: Props) => {
               </>
             }
             required
+            invalid={!!fieldErrors.username}
+            error={fieldErrors.username}
           >
             <Input
               name="user"

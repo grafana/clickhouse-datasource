@@ -33,6 +33,7 @@ export default {
           label: 'Username',
           placeholder: 'Enter username',
           tooltip: 'We recommend configuring',
+          error: 'Username is required',
         },
         password: {
           label: 'Password',
