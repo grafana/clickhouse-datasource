@@ -18,14 +18,13 @@ async function configurePDC(page: Page, networkName: string) {
 /**
  * Waits for the config editor to fully render, then returns true if V2
  * (newClickhouseConfigPageDesign) is active. Uses waitForSelector so it
- * handles both slow plugin initialisation and CI environments reliably —
+ * handles both slow plugin initialization and CI environments reliably —
  * unlike isVisible(), which returns immediately without waiting.
  */
 async function isV2Editor(page: Page): Promise<boolean> {
-  await page.waitForSelector(
-    '[placeholder="Enter server address"], [placeholder="Server address"]',
-    { timeout: 10000 }
-  );
+  await page.waitForSelector('[placeholder="Enter server address"], [placeholder="Server address"]', {
+    timeout: 10000,
+  });
   return page.locator('[placeholder="Enter server address"]').isVisible();
 }
 
@@ -81,7 +80,9 @@ test.describe('Config editor', () => {
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
       const isV2 = await isV2Editor(page);
-      await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toHaveValue('clickhouse-server');
+      await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toHaveValue(
+        'clickhouse-server'
+      );
     });
 
     test('should load provisioned port and protocol', async ({
@@ -133,7 +134,9 @@ test.describe('Config editor', () => {
       const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
       await page.getByPlaceholder(isV2 ? 'Enter server port' : '9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
-      await page.getByPlaceholder(isV2 ? 'Enter username' : 'default').fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
+      await page
+        .getByPlaceholder(isV2 ? 'Enter username' : 'default')
+        .fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
       await page.getByPlaceholder(isV2 ? 'Enter password' : 'password').fill(process.env.DS_INSTANCE_PASSWORD ?? '');
 
       if (process.env.DS_PDC_NETWORK_NAME) {
