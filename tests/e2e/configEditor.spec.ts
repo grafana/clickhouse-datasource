@@ -34,14 +34,22 @@ test.describe('Config editor', () => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
       // V2 renders section titles inside CollapsableSection: the toggle button gets
-      // aria-labelledby pointing to the label div, so getByRole('button') is the right selector.
-      await expect(isV2 ? page.getByRole('button', { name: 'Server and encryption' }) : page.getByRole('heading', { name: 'Server' })).toBeVisible();
+      // aria-label pointing to the label div, so getByRole('button') is the right selector.
+      await expect(
+        isV2
+          ? page.getByRole('button', { name: 'Server and encryption' })
+          : page.getByRole('heading', { name: 'Server' })
+      ).toBeVisible();
     });
 
     test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
-      await expect(isV2 ? page.getByRole('button', { name: 'Server and encryption' }) : page.getByRole('heading', { name: 'Server' })).toBeVisible();
+      await expect(
+        isV2
+          ? page.getByRole('button', { name: 'Server and encryption' })
+          : page.getByRole('heading', { name: 'Server' })
+      ).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter server port' : '9000')).toBeVisible();
       await expect(page.getByRole('radio', { name: 'Native' })).toBeVisible();
@@ -67,7 +75,11 @@ test.describe('Config editor', () => {
     test('should render Credentials section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
-      await expect(isV2 ? page.getByRole('button', { name: 'Database credentials' }) : page.getByRole('heading', { name: 'Credentials' })).toBeVisible();
+      await expect(
+        isV2
+          ? page.getByRole('button', { name: 'Database credentials' })
+          : page.getByRole('heading', { name: 'Credentials' })
+      ).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter username' : 'default')).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter password' : 'password')).toBeVisible();
     });
