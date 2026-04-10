@@ -155,7 +155,13 @@ export const ServerAndEncryptionSection = (props: Props) => {
             aria-label={labels.serverAddress.label}
             data-testid="clickhouse-v2-config-host-input"
             placeholder={labels.serverAddress.placeholder}
-            onBlur={trackClickhouseConfigV2HostInput}
+            onBlur={(e) => {
+              trackClickhouseConfigV2HostInput();
+              if (validation && !e.currentTarget.value) {
+                setFieldErrors((prev) => ({ ...prev, host: labels.serverAddress.error }));
+                validation.setError('host', labels.serverAddress.error);
+              }
+            }}
           />
         </Field>
         <div className={styles.protocolPortRow}>
@@ -223,7 +229,13 @@ export const ServerAndEncryptionSection = (props: Props) => {
                 aria-label={labels.serverPort.label}
                 data-testid="clickhouse-v2-config-port-input"
                 placeholder={labels.serverPort.placeholder}
-                onBlur={(e) => trackClickhouseConfigV2PortInput({ port: e.currentTarget.value })}
+                onBlur={(e) => {
+                  trackClickhouseConfigV2PortInput({ port: e.currentTarget.value });
+                  if (validation && !e.currentTarget.value) {
+                    setFieldErrors((prev) => ({ ...prev, port: labels.serverPort.error }));
+                    validation.setError('port', labels.serverPort.error);
+                  }
+                }}
               />
             </Field>
           </div>
