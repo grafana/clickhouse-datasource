@@ -4,6 +4,8 @@
 
 ### Features
 
+- Add LogsSample supplemental query, remove deprecated getDataProvider (#1744)
+- Add Grafana query metadata support (#1743)
 - Allow disabling logs and trace links (#1754)
 - Improve query modification (#1738)
 - Add initial support for SQL abstractions (dsAbstraction) (#1756)
