@@ -361,31 +361,35 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       traceLogsQuery.rawSql = '';
     }
     traceField.config.links = [];
-    traceField.config.links!.push({
-      title: 'View trace',
-      targetBlank: openInNewWindow,
-      url: '',
-      internal: {
-        query: traceIdQuery,
-        datasourceUid: traceIdQuery.datasource?.uid!,
-        datasourceName: traceIdQuery.datasource?.type!,
-        panelsState: {
-          trace: {
-            spanId: '${__value.raw}',
+    if (datasource.settings.jsonData.traces?.showTraceLinks !== false) {
+      traceField.config.links!.push({
+        title: 'View trace',
+        targetBlank: openInNewWindow,
+        url: '',
+        internal: {
+          query: traceIdQuery,
+          datasourceUid: traceIdQuery.datasource?.uid!,
+          datasourceName: traceIdQuery.datasource?.type!,
+          panelsState: {
+            trace: {
+              spanId: '${__value.raw}',
+            },
           },
         },
-      },
-    });
-    traceField.config.links!.push({
-      title: 'View logs',
-      targetBlank: openInNewWindow,
-      url: '',
-      internal: {
-        query: traceLogsQuery,
-        datasourceUid: traceLogsQuery.datasource?.uid!,
-        datasourceName: traceLogsQuery.datasource?.type!,
-      },
-    });
+      });
+    }
+    if (datasource.settings.jsonData.logs?.showLogLinks !== false) {
+      traceField.config.links!.push({
+        title: 'View logs',
+        targetBlank: openInNewWindow,
+        url: '',
+        internal: {
+          query: traceLogsQuery,
+          datasourceUid: traceLogsQuery.datasource?.uid!,
+          datasourceName: traceLogsQuery.datasource?.type!,
+        },
+      });
+    }
   });
 
   return res;
