@@ -1097,9 +1097,7 @@ export class Datasource
             // entire map was selected
             (f.name === mapName ||
               // single key was selected from map
-              f.name === `arrayElement(${mapName}, '${keyName}')`
-            )
-            || (
+              f.name === `arrayElement(${mapName}, '${keyName}')` ||
               f.name === 'labels'
             )
           )
