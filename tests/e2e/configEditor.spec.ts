@@ -15,18 +15,32 @@ async function configurePDC(page: Page, networkName: string) {
   await page.getByText(networkName).click();
 }
 
+/**
+ * Waits for the config editor to fully render, then returns true if V2
+ * (newClickhouseConfigPageDesign) is active. Uses waitForSelector so it
+ * handles both slow plugin initialisation and CI environments reliably —
+ * unlike isVisible(), which returns immediately without waiting.
+ */
+async function isV2Editor(page: Page): Promise<boolean> {
+  await page.waitForSelector(
+    '[placeholder="Enter server address"], [placeholder="Server address"]',
+    { timeout: 10000 }
+  );
+  return page.locator('[placeholder="Enter server address"]').isVisible();
+}
+
 test.describe('Config editor', () => {
   test.describe('rendering', () => {
     test('smoke: should render config editor', { tag: ['@plugins'] }, async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       const heading = isV2 ? 'Server and encryption' : 'Server';
       await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     });
 
     test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       await expect(page.getByRole('heading', { name: isV2 ? 'Server and encryption' : 'Server' })).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter server port' : '9000')).toBeVisible();
@@ -36,7 +50,7 @@ test.describe('Config editor', () => {
 
     test('should render TLS / SSL Settings section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       const tlsHeading = isV2 ? 'TLS/SSL settings' : 'TLS / SSL Settings';
       await expect(page.getByRole('heading', { name: tlsHeading })).toBeVisible();
       if (isV2) {
@@ -51,7 +65,7 @@ test.describe('Config editor', () => {
 
     test('should render Credentials section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       await expect(page.getByRole('heading', { name: isV2 ? 'Database credentials' : 'Credentials' })).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter username' : 'default')).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter password' : 'password')).toBeVisible();
@@ -66,7 +80,7 @@ test.describe('Config editor', () => {
     }) => {
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toHaveValue('clickhouse-server');
     });
 
@@ -77,7 +91,7 @@ test.describe('Config editor', () => {
     }) => {
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       await expect(page.getByPlaceholder(isV2 ? 'Enter server port' : '9000')).toHaveValue('9000');
       await expect(page.getByRole('radio', { name: 'Native' })).toBeChecked();
     });
@@ -99,7 +113,7 @@ test.describe('Config editor', () => {
 
     test('invalid credentials should return an error', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
       await expect(configPage.saveAndTest()).not.toBeOK();
     });
@@ -116,7 +130,7 @@ test.describe('Config editor', () => {
       );
 
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
       await page.getByPlaceholder(isV2 ? 'Enter server port' : '9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
       await page.getByPlaceholder(isV2 ? 'Enter username' : 'default').fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
@@ -135,7 +149,7 @@ test.describe('Config editor', () => {
 
       // This test requires the V2 config editor (newClickhouseConfigPageDesign feature toggle).
       // The V2 editor shows inline validation errors on blur; V1 only shows them after save.
-      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const isV2 = await isV2Editor(page);
       test.skip(!isV2, 'Requires newClickhouseConfigPageDesign feature toggle to be enabled');
 
       const hostInput = page.getByPlaceholder('Enter server address');
