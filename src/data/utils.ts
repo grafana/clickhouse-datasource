@@ -1,4 +1,4 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig } from '@grafana/data';
 import {
   ColumnHint,
   FilterOperator,
@@ -122,6 +122,60 @@ export const tryApplyColumnHints = (columns: SelectedColumn[], hintsToColumns?: 
 export const columnLabelToPlaceholder = (label: string) => label.toLowerCase().replace(/ /g, '_');
 
 /**
+ * Field config map for trace search result columns.
+ * Maps column name (lowercase) to Grafana FieldConfig for better default display.
+ */
+const traceSearchFieldConfigs: Record<string, FieldConfig> = {
+  duration: {
+    unit: 'ms',
+    displayName: 'Duration',
+  },
+  starttime: {
+    displayName: 'Start Time',
+  },
+  servicename: {
+    displayName: 'Service Name',
+  },
+  operationname: {
+    displayName: 'Operation Name',
+  },
+  traceid: {
+    displayName: 'Trace ID',
+  },
+};
+
+/**
+ * Applies field configs to trace search result frames for better default display.
+ * Trace search results are table-format frames from trace queries (non-traceIdMode).
+ */
+export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
+  res.data.forEach((frame: DataFrame) => {
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+    if (!originalQuery) {
+      return;
+    }
+
+    const isTraceSearch = originalQuery.editorType === EditorType.Builder &&
+      originalQuery.builderOptions.queryType === QueryType.Traces &&
+      !originalQuery.builderOptions.meta?.isTraceIdMode;
+
+    if (!isTraceSearch) {
+      return;
+    }
+
+    frame.fields.forEach((field) => {
+      const fieldConfig = traceSearchFieldConfigs[field.name.toLowerCase()];
+      if (fieldConfig) {
+        field.config = {
+          ...field.config,
+          ...fieldConfig,
+        };
+      }
+    });
+  });
+};
+
+/**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view
  * on the explore page with the selected trace ID.
@@ -133,6 +187,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse
 ): DataQueryResponse => {
+  applyTraceSearchFieldConfig(req, res);
+
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     if (!originalQuery) {
@@ -305,31 +361,35 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       traceLogsQuery.rawSql = '';
     }
     traceField.config.links = [];
-    traceField.config.links!.push({
-      title: 'View trace',
-      targetBlank: openInNewWindow,
-      url: '',
-      internal: {
-        query: traceIdQuery,
-        datasourceUid: traceIdQuery.datasource?.uid!,
-        datasourceName: traceIdQuery.datasource?.type!,
-        panelsState: {
-          trace: {
-            spanId: '${__value.raw}',
+    if (datasource.settings.jsonData.traces?.showTraceLinks !== false) {
+      traceField.config.links!.push({
+        title: 'View trace',
+        targetBlank: openInNewWindow,
+        url: '',
+        internal: {
+          query: traceIdQuery,
+          datasourceUid: traceIdQuery.datasource?.uid!,
+          datasourceName: traceIdQuery.datasource?.type!,
+          panelsState: {
+            trace: {
+              spanId: '${__value.raw}',
+            },
           },
         },
-      },
-    });
-    traceField.config.links!.push({
-      title: 'View logs',
-      targetBlank: openInNewWindow,
-      url: '',
-      internal: {
-        query: traceLogsQuery,
-        datasourceUid: traceLogsQuery.datasource?.uid!,
-        datasourceName: traceLogsQuery.datasource?.type!,
-      },
-    });
+      });
+    }
+    if (datasource.settings.jsonData.logs?.showLogLinks !== false) {
+      traceField.config.links!.push({
+        title: 'View logs',
+        targetBlank: openInNewWindow,
+        url: '',
+        internal: {
+          query: traceLogsQuery,
+          datasourceUid: traceLogsQuery.datasource?.uid!,
+          datasourceName: traceLogsQuery.datasource?.type!,
+        },
+      });
+    }
   });
 
   return res;

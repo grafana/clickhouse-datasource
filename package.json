@@ -26,6 +26,7 @@
   "author": "Grafana Labs",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.1",
     "@babel/core": "^7.29.0",
     "@grafana/eslint-config": "^8.2.0",
     "@grafana/plugin-e2e": "^3.3.0",
@@ -76,7 +77,7 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "5.9.3",
     "webpack": "^5.105.0",
-    "webpack-cli": "^7.0.0",
+    "webpack-cli": "^7.0.1",
     "webpack-livereload-plugin": "^3.0.2",
     "webpack-subresource-integrity": "^5.1.0",
     "webpack-virtual-modules": "^0.6.2"
@@ -86,17 +87,20 @@
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
-    "@grafana/data": "12.4.1",
-    "@grafana/runtime": "12.4.1",
-    "@grafana/schema": "12.4.1",
-    "@grafana/ui": "12.4.1",
+    "@grafana/data": "12.4.2",
+    "@grafana/runtime": "12.4.2",
+    "@grafana/schema": "12.4.2",
+    "@grafana/ui": "12.4.2",
+    "@openfeature/web-sdk": "^1.7.3",
+    "es-toolkit": "^1.45.1",
     "js-sql-parser": "^1.6.0",
     "pgsql-ast-parser": "^12.0.1",
-    "semver": "^7.7.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "5.3.4",
+    "semver": "^7.7.3",
     "sql-formatter": "^15.6.12",
     "tslib": "2.8.1"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
