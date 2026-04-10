@@ -19,21 +19,30 @@ test.describe('Config editor', () => {
   test.describe('rendering', () => {
     test('smoke: should render config editor', { tag: ['@plugins'] }, async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible();
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const heading = isV2 ? 'Server and encryption' : 'Server';
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     });
 
     test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      await expect(page.getByRole('heading', { name: 'Server' })).toBeVisible();
-      await expect(page.getByPlaceholder('Server address')).toBeVisible();
-      await expect(page.getByPlaceholder('9000')).toBeVisible();
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      await expect(page.getByRole('heading', { name: isV2 ? 'Server and encryption' : 'Server' })).toBeVisible();
+      await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toBeVisible();
+      await expect(page.getByPlaceholder(isV2 ? 'Enter server port' : '9000')).toBeVisible();
       await expect(page.getByRole('radio', { name: 'Native' })).toBeVisible();
       await expect(page.getByRole('radio', { name: 'HTTP' })).toBeVisible();
     });
 
     test('should render TLS / SSL Settings section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      await expect(page.getByRole('heading', { name: 'TLS / SSL Settings' })).toBeVisible();
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      const tlsHeading = isV2 ? 'TLS/SSL settings' : 'TLS / SSL Settings';
+      await expect(page.getByRole('heading', { name: tlsHeading })).toBeVisible();
+      if (isV2) {
+        // TLS/SSL section is collapsed by default in V2 — expand it before checking inner fields.
+        await page.getByRole('heading', { name: tlsHeading }).click();
+      }
       // The label and description for these fields share identical text — use .first() to
       // target the visible label div, not the description span that follows it.
       await expect(page.getByText('Skip TLS Verify').first()).toBeVisible();
@@ -42,9 +51,10 @@ test.describe('Config editor', () => {
 
     test('should render Credentials section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
-      await expect(page.getByRole('heading', { name: 'Credentials' })).toBeVisible();
-      await expect(page.getByPlaceholder('default')).toBeVisible();
-      await expect(page.getByPlaceholder('password')).toBeVisible();
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      await expect(page.getByRole('heading', { name: isV2 ? 'Database credentials' : 'Credentials' })).toBeVisible();
+      await expect(page.getByPlaceholder(isV2 ? 'Enter username' : 'default')).toBeVisible();
+      await expect(page.getByPlaceholder(isV2 ? 'Enter password' : 'password')).toBeVisible();
     });
   });
 
@@ -56,7 +66,8 @@ test.describe('Config editor', () => {
     }) => {
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
-      await expect(page.getByPlaceholder('Server address')).toHaveValue('clickhouse-server');
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toHaveValue('clickhouse-server');
     });
 
     test('should load provisioned port and protocol', async ({
@@ -66,7 +77,8 @@ test.describe('Config editor', () => {
     }) => {
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });
       await gotoDataSourceConfigPage(ds.uid);
-      await expect(page.getByPlaceholder('9000')).toHaveValue('9000');
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      await expect(page.getByPlaceholder(isV2 ? 'Enter server port' : '9000')).toHaveValue('9000');
       await expect(page.getByRole('radio', { name: 'Native' })).toBeChecked();
     });
   });
@@ -87,7 +99,8 @@ test.describe('Config editor', () => {
 
     test('invalid credentials should return an error', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
-      await page.getByPlaceholder('Server address').fill(resolveClickhouseUrl());
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
       await expect(configPage.saveAndTest()).not.toBeOK();
     });
 
@@ -103,10 +116,11 @@ test.describe('Config editor', () => {
       );
 
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
-      await page.getByPlaceholder('Server address').fill(resolveClickhouseUrl());
-      await page.getByPlaceholder('9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
-      await page.getByPlaceholder('default').fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
-      await page.getByPlaceholder('password').fill(process.env.DS_INSTANCE_PASSWORD ?? '');
+      const isV2 = await page.getByPlaceholder('Enter server address').isVisible();
+      await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
+      await page.getByPlaceholder(isV2 ? 'Enter server port' : '9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
+      await page.getByPlaceholder(isV2 ? 'Enter username' : 'default').fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
+      await page.getByPlaceholder(isV2 ? 'Enter password' : 'password').fill(process.env.DS_INSTANCE_PASSWORD ?? '');
 
       if (process.env.DS_PDC_NETWORK_NAME) {
         await configurePDC(page, process.env.DS_PDC_NETWORK_NAME);
