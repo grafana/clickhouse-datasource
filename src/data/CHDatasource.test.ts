@@ -11,7 +11,6 @@ import { DataSourceWithBackend } from '@grafana/runtime';
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { Observable, of } from 'rxjs';
 import { of } from 'rxjs';
 import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
