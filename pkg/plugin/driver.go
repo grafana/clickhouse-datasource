@@ -135,14 +135,19 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 			version.Patch, _ = strconv.ParseUint(v, 10, 64)
 		}
 	}
-	if version.Major < major || (version.Major == major && version.Minor < minor) || (version.Major == major && version.Minor == minor && version.Patch < patch) {
+	if version.Major < major || (version.Major == major && version.Minor < minor) ||
+		(version.Major == major && version.Minor == minor && version.Patch < patch) {
 		return false, nil
 	}
 	return true, nil
 }
 
 // Connect opens a sql.DB connection using datasource settings
-func (h *Clickhouse) Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error) {
+func (h *Clickhouse) Connect(
+	ctx context.Context,
+	config backend.DataSourceInstanceSettings,
+	message json.RawMessage,
+) (*sql.DB, error) {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse connect", trace.WithAttributes(
 		attribute.String("db.system", "clickhouse"),
 	))
@@ -366,8 +371,10 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 
 // MutateQueryData extracts Grafana contextual headers from the request and
 // stores them in the context for ClickHouse query metadata injection.
-// It also preprocesses Grafana SQL queries.
-func (h *Clickhouse) MutateQueryData(ctx context.Context, req *backend.QueryDataRequest) (context.Context, *backend.QueryDataRequest) {
+func (h *Clickhouse) MutateQueryData(
+	ctx context.Context,
+	req *backend.QueryDataRequest,
+) (context.Context, *backend.QueryDataRequest) {
 	headers := req.GetHTTPHeaders()
 	gh := grafanaHeaders{
 		DashboardUID: headers.Get("X-Dashboard-Uid"),
