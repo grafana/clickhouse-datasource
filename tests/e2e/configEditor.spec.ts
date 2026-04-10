@@ -33,14 +33,15 @@ test.describe('Config editor', () => {
     test('smoke: should render config editor', { tag: ['@plugins'] }, async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
-      const heading = isV2 ? 'Server and encryption' : 'Server';
-      await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+      // V2 renders section titles inside CollapsableSection: the toggle button gets
+      // aria-labelledby pointing to the label div, so getByRole('button') is the right selector.
+      await expect(isV2 ? page.getByRole('button', { name: 'Server and encryption' }) : page.getByRole('heading', { name: 'Server' })).toBeVisible();
     });
 
     test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
-      await expect(page.getByRole('heading', { name: isV2 ? 'Server and encryption' : 'Server' })).toBeVisible();
+      await expect(isV2 ? page.getByRole('button', { name: 'Server and encryption' }) : page.getByRole('heading', { name: 'Server' })).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address')).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter server port' : '9000')).toBeVisible();
       await expect(page.getByRole('radio', { name: 'Native' })).toBeVisible();
@@ -50,11 +51,12 @@ test.describe('Config editor', () => {
     test('should render TLS / SSL Settings section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
-      const tlsHeading = isV2 ? 'TLS/SSL settings' : 'TLS / SSL Settings';
-      await expect(page.getByRole('heading', { name: tlsHeading })).toBeVisible();
       if (isV2) {
+        await expect(page.getByRole('button', { name: 'TLS/SSL settings' })).toBeVisible();
         // TLS/SSL section is collapsed by default in V2 — expand it before checking inner fields.
-        await page.getByRole('heading', { name: tlsHeading }).click();
+        await page.getByRole('button', { name: 'TLS/SSL settings' }).click();
+      } else {
+        await expect(page.getByRole('heading', { name: 'TLS / SSL Settings' })).toBeVisible();
       }
       // The label and description for these fields share identical text — use .first() to
       // target the visible label div, not the description span that follows it.
@@ -65,7 +67,7 @@ test.describe('Config editor', () => {
     test('should render Credentials section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
-      await expect(page.getByRole('heading', { name: isV2 ? 'Database credentials' : 'Credentials' })).toBeVisible();
+      await expect(isV2 ? page.getByRole('button', { name: 'Database credentials' }) : page.getByRole('heading', { name: 'Credentials' })).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter username' : 'default')).toBeVisible();
       await expect(page.getByPlaceholder(isV2 ? 'Enter password' : 'password')).toBeVisible();
     });
