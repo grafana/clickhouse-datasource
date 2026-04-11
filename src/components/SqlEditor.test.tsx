@@ -19,8 +19,8 @@ const mockMonaco = {
     getLanguages: () => [],
     register: jest.fn(),
     setMonarchTokensProvider: jest.fn(),
-    registerCompletionItemProvider: jest.fn(),
-    registerDocumentFormattingEditProvider: jest.fn(),
+    registerCompletionItemProvider: jest.fn(() => ({ dispose: jest.fn() })),
+    registerDocumentFormattingEditProvider: jest.fn(() => ({ dispose: jest.fn() })),
   },
 };
 
