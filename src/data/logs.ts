@@ -1,182 +1,11 @@
-import { BarAlignment, DataQuery, DataSourceJsonData, GraphDrawStyle, StackingMode } from '@grafana/schema';
-import {
-  DataFrame,
-  DataQueryError,
-  DataQueryRequest,
-  DataQueryResponse,
-  DataSourceApi,
-  FieldColorModeId,
-  FieldType,
-  LoadingState,
-  LogLevel,
-  MutableDataFrame,
-  ScopedVars,
-  TimeRange,
-  toDataFrame,
-} from '@grafana/data';
-import { from, isObservable, Observable } from 'rxjs';
-import { config } from '@grafana/runtime';
-import { colors } from '@grafana/ui';
+import { DataFrame, FieldType, ScopedVars } from '@grafana/data';
 import { partition } from 'lodash';
-
-/**
- * Partially copy-pasted and adjusted to ClickHouse server-side aggregations
- * from `public/app/core/logsModel.ts` (release-9.4.3 branch)
- *
- * See https://github.com/grafana/grafana/blob/release-9.4.3/public/app/core/logsModel.ts
- */
-
-type LogsVolumeQueryOptions<T extends DataQuery> = {
-  targets: T[];
-  range: TimeRange;
-};
 
 const MILLISECOND = 1;
 const SECOND = 1000 * MILLISECOND;
 const MINUTE = 60 * SECOND;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
-
-const LogLevelColor = {
-  [LogLevel.critical]: colors[7],
-  [LogLevel.warning]: colors[1],
-  [LogLevel.error]: colors[4],
-  [LogLevel.info]: colors[0],
-  [LogLevel.debug]: colors[5],
-  [LogLevel.trace]: colors[2],
-  [LogLevel.unknown]: getThemeColor('#8e8e8e', '#bdc4cd'),
-};
-
-function getThemeColor(dark: string, light: string): string {
-  return config.bootData.user.lightTheme ? light : dark;
-}
-
-/**
- * Creates an observable, which makes requests to get logs volume and aggregates results.
- */
-export function queryLogsVolume<TQuery extends DataQuery, TOptions extends DataSourceJsonData>(
-  datasource: DataSourceApi<TQuery, TOptions>,
-  logsVolumeRequest: DataQueryRequest<TQuery>,
-  options: LogsVolumeQueryOptions<TQuery>
-): Observable<DataQueryResponse> {
-  return new Observable((observer) => {
-    let rawLogsVolume: DataFrame[] = [];
-    observer.next({
-      state: LoadingState.Loading,
-      error: undefined,
-      data: [],
-    });
-
-    const queryResponse = datasource.query(logsVolumeRequest);
-    const queryObservable = isObservable(queryResponse) ? queryResponse : from(queryResponse);
-
-    const subscription = queryObservable.subscribe({
-      complete: () => {
-        const aggregatedLogsVolume = aggregateRawLogsVolume(rawLogsVolume);
-        if (aggregatedLogsVolume[0]) {
-          aggregatedLogsVolume[0].meta = {
-            custom: {
-              targets: options.targets,
-              absoluteRange: { from: options.range.from.valueOf(), to: options.range.to.valueOf() },
-            },
-          };
-        }
-        observer.next({
-          state: LoadingState.Done,
-          error: undefined,
-          data: aggregatedLogsVolume,
-        });
-        observer.complete();
-      },
-      next: (dataQueryResponse: DataQueryResponse) => {
-        const { error } = dataQueryResponse;
-        if (error !== undefined) {
-          observer.next({
-            state: LoadingState.Error,
-            error,
-            data: [],
-          });
-          observer.error(error);
-        } else {
-          rawLogsVolume = rawLogsVolume.concat(dataQueryResponse.data.map(toDataFrame));
-        }
-      },
-      error: (error: DataQueryError) => {
-        observer.next({
-          state: LoadingState.Error,
-          error: error,
-          data: [],
-        });
-        observer.error(error);
-      },
-    });
-    return () => {
-      subscription?.unsubscribe();
-    };
-  });
-}
-
-/**
- * Take multiple data frames, sum up values and group by level.
- * Return a list of data frames, each representing single level.
- */
-export function aggregateRawLogsVolume(rawLogsVolume: DataFrame[]): DataFrame[] {
-  if (rawLogsVolume.length !== 1) {
-    return []; // we always expect a single DataFrame with all the aggregations from ClickHouse
-  }
-
-  const [[timeField], levelFields] = partition(rawLogsVolume[0].fields, (f) => f.name === TIME_FIELD_ALIAS);
-  if (timeField === undefined) {
-    return []; // should never happen if we have a DataFrame available
-  }
-
-  const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS;
-  if (oneLevelDetected) {
-    levelFields[0].name = 'logs';
-  }
-
-  const totalLength = timeField.values.length;
-  return levelFields.map((field) => {
-    const logLevel = LogLevel[field.name as keyof typeof LogLevel] || LogLevel.unknown;
-    const df = new MutableDataFrame();
-    df.addField({ name: 'Time', type: FieldType.time, values: timeField.values }, totalLength);
-    df.addField({
-      name: 'Value',
-      type: FieldType.number,
-      config: getLogVolumeFieldConfig(logLevel, oneLevelDetected),
-      values: field.values,
-    });
-    return df;
-  });
-}
-
-/**
- * Returns field configuration used to render logs volume bars
- */
-function getLogVolumeFieldConfig(level: LogLevel, oneLevelDetected: boolean) {
-  const name = oneLevelDetected && level === LogLevel.unknown ? 'logs' : level;
-  const color = LogLevelColor[level];
-  return {
-    displayNameFromDS: name,
-    color: {
-      mode: FieldColorModeId.Fixed,
-      fixedColor: color,
-    },
-    custom: {
-      drawStyle: GraphDrawStyle.Bars,
-      barAlignment: BarAlignment.Center,
-      lineColor: color,
-      pointColor: color,
-      fillColor: color,
-      lineWidth: 1,
-      fillOpacity: 100,
-      stacking: {
-        mode: StackingMode.Normal,
-        group: 'A',
-      },
-    },
-  };
-}
 
 export function getIntervalInfo(scopedVars: ScopedVars): { interval: string; intervalMs?: number } {
   if (scopedVars.__interval_ms) {
@@ -253,6 +82,38 @@ export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
     return allLevels;
   }, {} as LogLevelToInClause);
 })();
+
+export function splitLogsVolumeFrames(data: DataFrame[], logVolumePrefix: string): DataFrame[] {
+  const result: DataFrame[] = [];
+
+  for (const frame of data) {
+    if (!frame.refId?.startsWith(logVolumePrefix)) {
+      result.push(frame);
+      continue;
+    }
+
+    const [timeFields, levelFields] = partition(frame.fields, (f) => f.name === TIME_FIELD_ALIAS);
+    const timeField = timeFields[0];
+    if (!timeField || levelFields.length === 0) {
+      result.push(frame);
+      continue;
+    }
+
+    const oneLevelDetected = levelFields.length === 1 && levelFields[0].name === DEFAULT_LOGS_ALIAS;
+    for (const levelField of levelFields) {
+      const levelName = oneLevelDetected ? 'logs' : levelField.name;
+      result.push({
+        refId: frame.refId,
+        length: timeField.values.length,
+        fields: [
+          { name: 'Time', type: FieldType.time, values: timeField.values, config: {} },
+          { name: 'Value', type: FieldType.number, values: levelField.values, labels: { level: levelName }, config: {} },
+        ],
+      });
+    }
+  }
+  return result;
+}
 
 export const allLogLevels = [
   'critical',
