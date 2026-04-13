@@ -1,122 +1,7 @@
-import { aggregateRawLogsVolume, getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE } from './logs';
 import { FieldType } from '@grafana/data';
+import { getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE, splitLogsVolumeFrames } from './logs';
 
 describe('logs', () => {
-  describe('aggregateRawLogsVolume', () => {
-    const timeField = {
-      config: {},
-      name: 'Time',
-      type: 'time',
-      values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
-    };
-    it('should do nothing if we have no DataFrames available', async () => {
-      expect(aggregateRawLogsVolume([])).toEqual([]);
-    });
-    it('should do nothing if DataFrame format is invalid', async () => {
-      expect(aggregateRawLogsVolume([{ foo: 'bar' }] as any)).toEqual([]);
-    });
-    it('should produce a single DataFrame if log level field was not defined', async () => {
-      const rawDataFrame = [
-        {
-          length: 4,
-          fields: [
-            {
-              name: 'time',
-              type: FieldType.time,
-              typeInfo: {
-                frame: 'time.Time',
-              },
-              config: {},
-              values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
-              entities: {},
-            },
-            {
-              name: 'logs',
-              type: FieldType.number,
-              typeInfo: {
-                frame: 'uint64',
-              },
-              config: {},
-              values: [0, 3, 4, 10],
-              entities: {},
-            },
-          ],
-        },
-      ];
-      const dataFrames = aggregateRawLogsVolume(rawDataFrame);
-      expect(dataFrames).toHaveLength(1);
-      const [df] = dataFrames;
-
-      expect(df.fields[0]).toEqual(timeField);
-      expect(df.fields[1].config.displayNameFromDS).toEqual('logs');
-      expect(df.fields[1]).toMatchObject({
-        name: 'Value',
-        type: 'number',
-        values: [0, 3, 4, 10],
-      });
-      expect(df.fields).toHaveLength(2);
-    });
-    it('should split a single DataFrame with level into multiple DataFrames per level', async () => {
-      const rawDataFrame = [
-        {
-          length: 4,
-          fields: [
-            {
-              name: 'time',
-              type: FieldType.time,
-              typeInfo: {
-                frame: 'time.Time',
-              },
-              config: {},
-              values: [1680140003000, 1680140004000, 1680140027000, 1680140053000],
-              entities: {},
-            },
-            {
-              name: 'debug',
-              type: FieldType.number,
-              typeInfo: {
-                frame: 'uint64',
-              },
-              config: {},
-              values: [1, 0, 0, 0],
-              entities: {},
-            },
-            {
-              name: 'info',
-              type: FieldType.number,
-              typeInfo: {
-                frame: 'uint64',
-              },
-              config: {},
-              values: [0, 3, 4, 10],
-              entities: {},
-            },
-          ],
-        },
-      ];
-      const dataFrames = aggregateRawLogsVolume(rawDataFrame);
-      expect(dataFrames).toHaveLength(2);
-      const [df1, df2] = dataFrames;
-
-      expect(df1.fields[0]).toEqual(timeField);
-      expect(df1.fields[1].config.displayNameFromDS).toEqual('debug');
-      expect(df1.fields[1]).toMatchObject({
-        name: 'Value',
-        type: 'number',
-        values: [1, 0, 0, 0],
-      });
-      expect(df1.fields).toHaveLength(2);
-
-      expect(df2.fields[0]).toEqual(timeField);
-      expect(df2.fields[1].config.displayNameFromDS).toEqual('info');
-      expect(df2.fields[1]).toMatchObject({
-        name: 'Value',
-        type: 'number',
-        values: [0, 3, 4, 10],
-      });
-      expect(df2.fields).toHaveLength(2);
-    });
-  });
 
   describe('getIntervalInfo', () => {
     it('should return the default value when no interval info is provided', async () => {
@@ -219,6 +104,84 @@ describe('logs', () => {
           'created_at'
         )
       ).toEqual('toStartOfInterval("created_at", INTERVAL 1 SECOND)');
+    });
+  });
+
+  describe('splitLogsVolumeFrames', () => {
+    const prefix = 'log-volume-';
+    const times = [1000, 2000, 3000];
+    const makeFrame = (refId: string, fields: Array<{ name: string; values: number[] }>) => ({
+      refId,
+      length: times.length,
+      fields: fields.map(({ name, values }) => ({ name, type: FieldType.number, values, config: {} })),
+    });
+
+    it('passes through frames that do not match the prefix', () => {
+      const frame = makeFrame('other-query', [{ name: 'time', values: times }, { name: 'logs', values: [1, 2, 3] }]);
+      expect(splitLogsVolumeFrames([frame], prefix)).toEqual([frame]);
+    });
+
+    it('passes through a matching frame with no time field', () => {
+      const frame = makeFrame(`${prefix}1`, [{ name: 'logs', values: [1, 2, 3] }]);
+      expect(splitLogsVolumeFrames([frame], prefix)).toEqual([frame]);
+    });
+
+    it('passes through a matching frame with no level fields', () => {
+      const frame = makeFrame(`${prefix}1`, [{ name: 'time', values: times }]);
+      expect(splitLogsVolumeFrames([frame], prefix)).toEqual([frame]);
+    });
+
+    it('splits a single-level frame and labels it "logs"', () => {
+      const frame = {
+        refId: `${prefix}1`,
+        length: times.length,
+        fields: [
+          { name: 'time', type: FieldType.number, values: times, config: {} },
+          { name: 'logs', type: FieldType.number, values: [1, 2, 3], config: {} },
+        ],
+      };
+      const result = splitLogsVolumeFrames([frame], prefix);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toEqual({
+        refId: `${prefix}1`,
+        length: times.length,
+        fields: [
+          { name: 'Time', type: FieldType.time, values: times, config: {} },
+          { name: 'Value', type: FieldType.number, values: [1, 2, 3], labels: { level: 'logs' }, config: {} },
+        ],
+      });
+    });
+
+    it('splits a multi-level frame into one frame per level using field names as labels', () => {
+      const frame = {
+        refId: `${prefix}1`,
+        length: times.length,
+        fields: [
+          { name: 'time', type: FieldType.number, values: times, config: {} },
+          { name: 'error', type: FieldType.number, values: [1, 2, 3], config: {} },
+          { name: 'info', type: FieldType.number, values: [4, 5, 6], config: {} },
+        ],
+      };
+      const result = splitLogsVolumeFrames([frame], prefix);
+      expect(result).toHaveLength(2);
+      expect(result[0].fields[1].labels).toEqual({ level: 'error' });
+      expect(result[1].fields[1].labels).toEqual({ level: 'info' });
+    });
+
+    it('preserves non-volume frames alongside split volume frames', () => {
+      const nonVolume = makeFrame('other', [{ name: 'time', values: times }, { name: 'val', values: [7, 8, 9] }]);
+      const volume = {
+        refId: `${prefix}1`,
+        length: times.length,
+        fields: [
+          { name: 'time', type: FieldType.number, values: times, config: {} },
+          { name: 'logs', type: FieldType.number, values: [1, 2, 3], config: {} },
+        ],
+      };
+      const result = splitLogsVolumeFrames([nonVolume, volume], prefix);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual(nonVolume);
+      expect(result[1].refId).toBe(`${prefix}1`);
     });
   });
 

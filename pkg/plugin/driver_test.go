@@ -1,12 +1,14 @@
 package plugin
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/stretchr/testify/assert"
 )
@@ -315,5 +317,111 @@ func TestContainsClickHouseException(t *testing.T) {
 		multiErr := errors.Join(regularErr, chErr)
 		result := containsClickHouseException(multiErr)
 		assert.True(t, result)
+	})
+}
+
+func TestMutateQueryData(t *testing.T) {
+	h := &Clickhouse{}
+
+	tests := []struct {
+		name   string
+		headers map[string]string
+		want   grafanaHeaders
+		stored bool
+	}{
+		{
+			name: "all headers",
+			headers: map[string]string{
+				"http_X-Dashboard-Uid": "dash-abc123",
+				"http_X-Panel-Id":      "42",
+				"http_X-Rule-Uid":      "rule-xyz",
+			},
+			want:   grafanaHeaders{DashboardUID: "dash-abc123", PanelID: "42", RuleUID: "rule-xyz"},
+			stored: true,
+		},
+		{
+			name:    "empty headers",
+			headers: map[string]string{},
+			stored:  false,
+		},
+		{
+			name:    "only dashboard",
+			headers: map[string]string{"http_X-Dashboard-Uid": "dash-only"},
+			want:    grafanaHeaders{DashboardUID: "dash-only"},
+			stored:  true,
+		},
+		{
+			name:    "only panel",
+			headers: map[string]string{"http_X-Panel-Id": "99"},
+			want:    grafanaHeaders{PanelID: "99"},
+			stored:  true,
+		},
+		{
+			name:    "only rule",
+			headers: map[string]string{"http_X-Rule-Uid": "alert-rule-1"},
+			want:    grafanaHeaders{RuleUID: "alert-rule-1"},
+			stored:  true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &backend.QueryDataRequest{Headers: tt.headers}
+			newCtx, _ := h.MutateQueryData(t.Context(), req)
+
+			gh, ok := newCtx.Value(grafanaHeadersKey).(grafanaHeaders)
+			assert.Equal(t, tt.stored, ok)
+			if tt.stored {
+				assert.Equal(t, tt.want, gh)
+			}
+		})
+	}
+
+	t.Run("nil headers does not panic", func(t *testing.T) {
+		newCtx, newReq := h.MutateQueryData(t.Context(), &backend.QueryDataRequest{})
+		assert.NotNil(t, newCtx)
+		assert.NotNil(t, newReq)
+	})
+}
+
+func TestMutateQuery_GrafanaMetadata(t *testing.T) {
+	h := &Clickhouse{}
+
+	t.Run("includes dashboard and panel from context", func(t *testing.T) {
+		ctx := context.WithValue(t.Context(), grafanaHeadersKey, grafanaHeaders{
+			DashboardUID: "my-dashboard",
+			PanelID:      "7",
+			RuleUID:      "alert-1",
+		})
+
+		newCtx, _ := h.MutateQuery(ctx, backend.DataQuery{
+			JSON: []byte(`{}`),
+		})
+
+		assert.NotEqual(t, ctx, newCtx)
+	})
+
+	t.Run("no grafana headers in context still works", func(t *testing.T) {
+		ctx := t.Context()
+
+		newCtx, _ := h.MutateQuery(ctx, backend.DataQuery{
+			JSON: []byte(`{}`),
+		})
+
+		assert.NotNil(t, newCtx)
+		_, ok := newCtx.Value(grafanaHeadersKey).(grafanaHeaders)
+		assert.False(t, ok)
+	})
+
+	t.Run("handles invalid JSON gracefully", func(t *testing.T) {
+		ctx := context.WithValue(t.Context(), grafanaHeadersKey, grafanaHeaders{
+			DashboardUID: "dash1",
+		})
+
+		newCtx, _ := h.MutateQuery(ctx, backend.DataQuery{
+			JSON: []byte(`invalid json`),
+		})
+
+		assert.NotEqual(t, ctx, newCtx)
 	})
 }
