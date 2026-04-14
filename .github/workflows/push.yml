@@ -11,10 +11,9 @@ on:
   # Allow manual re-runs from the Actions UI (useful for debugging failures)
   workflow_dispatch:
 
-# Minimal top-level permissions; jobs can extend as needed
+# Minimal top-level permissions. Jobs that need id-token declare it themselves.
 permissions:
   contents: read
-  id-token: write # Required for OIDC (Vault / shared workflows)
 
 # Prevent duplicate runs on the same ref.
 # For PRs: cancel older in-progress runs when new commits are pushed.
@@ -33,7 +32,7 @@ jobs:
     # Main publishing is handled by the CD workflow below.
     if: github.ref != 'refs/heads/main'
 
-    # Required for checkout + OIDC in shared workflows
+    # Required for checkout + OIDC in shared workflows.
     permissions:
       contents: read
       id-token: write
