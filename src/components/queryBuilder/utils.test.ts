@@ -379,10 +379,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
     }
@@ -400,10 +402,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.In,
           value: ['Deal Won'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
       limit: undefined,
@@ -422,10 +426,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.NotIn,
           value: ['Deal Won', 'Deal Lost'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
       limit: undefined,
@@ -444,10 +450,12 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'stagename',
           operator: FilterOperator.NotIn,
           value: ['Deal Lost'],
           type: 'string',
+          condition: 'AND',
         } as MultiFilter,
       ],
       limit: undefined,
@@ -466,9 +474,11 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'createddate',
           operator: FilterOperator.WithInGrafanaTimeRange,
           type: 'datetime',
+          condition: 'AND',
         } as DateFilterWithoutValue,
       ],
       limit: undefined,
@@ -487,9 +497,11 @@ describe('getQueryOptionsFromSql', () => {
       aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
       filters: [
         {
+          filterType: 'custom',
           key: 'closedate',
           operator: FilterOperator.OutsideGrafanaTimeRange,
           type: 'datetime',
+          condition: 'AND',
         } as DateFilterWithoutValue,
       ],
       limit: undefined,
@@ -696,6 +708,30 @@ describe('getQueryOptionsFromSql', () => {
     const builderOptions = getQueryOptionsFromSql(sql);
     expect(builderOptions).not.toBeUndefined();
     expect(typeof builderOptions).not.toBe('string');
+  });
+
+  // ── Casing regression tests ──────────────────────────────────────────────
+  // Previously pgsql-ast-parser lowercased all unquoted identifiers, corrupting
+  // ClickHouse's case-sensitive column / table names. These tests verify the
+  // WASM-backed parser preserves original casing.
+
+  it('preserves original casing of unquoted column identifiers', () => {
+    const sql = 'SELECT StageName, EventType FROM "db"."foo"';
+    const opts = getQueryOptionsFromSql(sql);
+    expect(opts.columns!.map((c) => c.name)).toEqual(['StageName', 'EventType']);
+  });
+
+  it('preserves original casing of quoted column identifiers', () => {
+    const sql = 'SELECT "Timestamp", "SeverityText" FROM "db"."foo"';
+    const opts = getQueryOptionsFromSql(sql);
+    expect(opts.columns!.map((c) => c.name)).toEqual(['Timestamp', 'SeverityText']);
+  });
+
+  it('preserves casing of table and database names', () => {
+    const sql = 'SELECT name FROM "MyDB"."MyTable"';
+    const opts = getQueryOptionsFromSql(sql);
+    expect(opts.database).toBe('MyDB');
+    expect(opts.table).toBe('MyTable');
   });
 });
 
