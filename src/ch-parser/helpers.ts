@@ -132,3 +132,9 @@ export function isContinuationOctet(c: string): boolean {
   const code = c.charCodeAt(0);
   return (code & 0xc0) === 0x80;
 }
+
+/** 1-based line and column of a UTF-16 index in `text`. */
+export function offsetToLineCol(text: string, offset: number): { line: number; col: number } {
+  const lines = text.substring(0, offset).split('\n');
+  return { line: lines.length, col: lines[lines.length - 1].length + 1 };
+}
