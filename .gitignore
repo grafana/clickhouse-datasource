@@ -39,3 +39,6 @@ pkg/__debug_bin
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# ClickHouse analyzer WASM — copied from node_modules at prebuild time
+src/static/clickhouse_analyzer_bg.wasm
