@@ -6,14 +6,19 @@ import { CHQueryEditor } from './views/CHQueryEditor';
 import { CHConfig } from 'types/config';
 import { CHQuery } from 'types/sql';
 import { config, getAppEvents } from '@grafana/runtime';
+import { initAnalyzer } from 'ch-parser/analyzer';
 import { analyzeQueries, trackClickhouseDashboardLoaded } from 'tracking';
 import pluginJson from './plugin.json';
 import clickhouseVersion from '../package.json';
-
 // ConfigEditorV2 is the new design for the ClickHouse configuration page
 const configEditor = config.featureToggles['newClickhouseConfigPageDesign' as keyof FeatureToggles]
   ? ConfigEditorV2
   : ConfigEditorV1;
+
+// Pre-warm the ClickHouse analyzer WASM so it is ready before the user types.
+// validate() falls back to the synchronous ClickHouse lexer until the WASM resolves.
+// The outer gate is the per-datasource "Validate SQL" setting.
+initAnalyzer();
 
 export const plugin = new DataSourcePlugin<Datasource, CHQuery, CHConfig>(Datasource)
   .setConfigEditor(configEditor)
