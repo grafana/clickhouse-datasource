@@ -1,39 +1,47 @@
 import { getFields, getTable, sqlToStatement } from './ast';
-import { toSql } from 'pgsql-ast-parser';
 
 describe('ast', () => {
   describe('getFields', () => {
-    it('return 1 expression if statement does not have an alias', () => {
-      const stm = getFields(`select foo from bar`);
-      expect(stm.length).toBe(1);
+    it('returns 1 expression when statement has no alias', () => {
+      expect(getFields('SELECT foo FROM bar')).toHaveLength(1);
+    });
+
+    it('returns the correct field name', () => {
+      expect(getFields('SELECT foo FROM bar')).toEqual(['foo']);
+    });
+
+    it('returns alias in "name as alias" form', () => {
+      expect(getFields('SELECT a as body FROM t')).toEqual(['a as body']);
+    });
+
+    it('preserves original casing — not lowercased', () => {
+      expect(getFields('SELECT Timestamp, EventType FROM t')).toEqual(['Timestamp', 'EventType']);
+    });
+
+    it('preserves casing for quoted identifiers', () => {
+      expect(getFields('SELECT "Timestamp", "SeverityText" FROM t')).toEqual(['Timestamp', 'SeverityText']);
+    });
+
+    it('returns empty array when SQL is invalid', () => {
+      expect(getFields('not valid sql')).toEqual([]);
     });
   });
-  describe('sqlToStatement', () => {
-    it('reads the names and variables inside a macro call back as written', () => {
-      const stm = sqlToStatement(
-        'SELECT Body FROM t WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service)'
-      );
-      const where = JSON.stringify(stm.type === 'select' ? stm.where : undefined);
-      expect(where).toContain('"name":"ServiceName"');
-      expect(where).toContain('"name":"${service:singlequote}"');
-      expect(where).toContain('"name":"$service"');
-    });
 
-    it('settings parse correctly', () => {
+  describe('sqlToStatement', () => {
+    it('strips SETTINGS clause before parsing', () => {
       const sql = 'SELECT count(*) FROM foo SETTINGS setting1=stuff setting2=stuff';
       const stm = sqlToStatement(sql);
-      // this is formatted like this to match how pgsql generates its sql
-      expect(toSql.statement(stm)).toEqual('SELECT (count (*) )  FROM foo');
+      expect(stm).not.toBeNull();
+      expect(stm!.table).toBe('foo');
     });
 
-    // https://github.com/grafana/clickhouse-datasource/issues/714
-    it('does not error when brackets/macros/variables are present', () => {
+    it('does not error when brackets / macros / variables are present', () => {
       const errLog = jest.spyOn(console, 'error');
       const sql = `
         /* \${__variable} \${__variable.key} */
         SELECT
           *,
-          \$__timeInterval(timestamp),
+          $__timeInterval(timestamp),
           '{"a": 1, "b": { "c": 2, "d": [1, 2, 3] }}'::json as bracketTest
         FROM default.table
         WHERE $__timeFilter(timestamp)
@@ -47,10 +55,32 @@ describe('ast', () => {
       `;
 
       const stm = sqlToStatement(sql);
-      const astSql = toSql.statement(stm);
-      expect(errLog).toHaveBeenCalledTimes(0);
-      expect(stm).not.toEqual({});
-      expect(astSql).not.toBeFalsy();
+      expect(errLog).not.toHaveBeenCalled();
+      expect(stm).not.toBeNull();
+      expect(stm!.table).not.toBe('');
+    });
+
+    it('returns parsed columns with original casing', () => {
+      const stm = sqlToStatement('SELECT Timestamp, EventType FROM myDB.MyTable');
+      expect(stm).not.toBeNull();
+      expect(stm!.columns.map((c) => c.name)).toEqual(['Timestamp', 'EventType']);
+      expect(stm!.table).toBe('MyTable');
+      expect(stm!.database).toBe('myDB');
+    });
+
+    it('reads a macro call in WHERE as one condition, named as written', () => {
+      const stm = sqlToStatement(
+        'SELECT Body FROM t WHERE $__conditionalAll(ServiceName IN (${service:singlequote}), $service)'
+      );
+      expect(stm?.filters).toEqual([
+        { key: '$__conditionalAll', operator: 'macroCall', value: null, valueType: 'string', condition: 'AND' },
+      ]);
+    });
+
+    it('returns null for non-SELECT statements', () => {
+      // The mock (and real WASM) only parse SELECT; others return null
+      const stm = sqlToStatement('INSERT INTO t VALUES (1)');
+      expect(stm).toBeNull();
     });
   });
 

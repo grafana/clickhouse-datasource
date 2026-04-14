@@ -1,21 +1,8 @@
-import {
-  astVisitor,
-  Expr,
-  ExprBinary,
-  ExprCall,
-  ExprInteger,
-  ExprList,
-  ExprRef,
-  ExprString,
-  ExprUnary,
-  FromTable,
-  SelectedColumn,
-} from 'pgsql-ast-parser';
 import { isString } from 'lodash';
 import {
-  BooleanFilter,
   AggregateColumn,
   AggregateType,
+  BooleanFilter,
   BuilderMode,
   DateFilter,
   DateFilterWithoutValue,
@@ -24,17 +11,21 @@ import {
   MultiFilter,
   NullFilter,
   NumberFilter,
+  StringFilter,
   OrderBy,
+  OrderByDirection,
   QueryBuilderOptions,
   ColumnHint,
   SelectedColumn as CHSelectedColumn,
-  StringFilter,
   QueryType,
 } from 'types/queryBuilder';
-import { sqlToStatement } from 'data/ast';
+import { sqlToStatement, ParsedSelectQuery } from 'data/ast';
+import { ParsedColumn, ParsedFilter } from 'ch-parser/sql-parser';
 import { getColumnByHint, logColumnHintsToAlias } from 'data/sqlGenerator';
 import { Datasource } from 'data/CHDatasource';
 import { tryApplyColumnHints } from 'data/utils';
+
+// ─── Type guards (shared by both paths) ──────────────────────────────────────
 
 export const isBooleanType = (type: string): boolean => {
   return ['boolean'].includes(type?.toLowerCase());
@@ -84,52 +75,181 @@ export const isMultiFilter = (filter: Filter): filter is MultiFilter => {
   return isStringType(filter.type) && [FilterOperator.In, FilterOperator.NotIn].includes(filter.operator);
 };
 
-export function getQueryOptionsFromSql(
-  sql: string,
-  queryType?: QueryType,
-  datasource?: Datasource
-): QueryBuilderOptions {
-  const ast = sqlToStatement(sql);
-  if (!ast) {
+// ─── WASM path helpers ────────────────────────────────────────────────────────
+
+const OPERATOR_MAP: Record<string, FilterOperator> = {
+  '=': FilterOperator.Equals,
+  '!=': FilterOperator.NotEquals,
+  '<': FilterOperator.LessThan,
+  '<=': FilterOperator.LessThanOrEqual,
+  '>': FilterOperator.GreaterThan,
+  '>=': FilterOperator.GreaterThanOrEqual,
+  like: FilterOperator.Like,
+  notLike: FilterOperator.NotLike,
+  ilike: FilterOperator.ILike,
+  notILike: FilterOperator.NotILike,
+  in: FilterOperator.In,
+  notIn: FilterOperator.NotIn,
+  isNull: FilterOperator.IsNull,
+  isNotNull: FilterOperator.IsNotNull,
+  timeFilter: FilterOperator.WithInGrafanaTimeRange,
+  withinTimeRange: FilterOperator.WithInGrafanaTimeRange,
+  outsideTimeRange: FilterOperator.OutsideGrafanaTimeRange,
+};
+
+function mapOperator(op: string): FilterOperator {
+  return OPERATOR_MAP[op] ?? FilterOperator.Equals;
+}
+
+function filterType(valueType: string): string {
+  switch (valueType) {
+    case 'number':
+      return 'int';
+    case 'datetime':
+      return 'datetime';
+    case 'list':
+      return 'string';
+    default:
+      return 'string';
+  }
+}
+
+const TIME_INTERVAL_MACRO = /^\$__timeInterval(_ms)?\((.+)\)$/;
+
+function buildColumnsAndAggregates(parsed: ParsedColumn[]): {
+  columns: CHSelectedColumn[];
+  aggregates: AggregateColumn[];
+} {
+  const columns: CHSelectedColumn[] = [];
+  const aggregates: AggregateColumn[] = [];
+
+  for (const col of parsed) {
+    if (col.isAggregate) {
+      const aggType = col.aggregateType?.toLowerCase() as AggregateType | undefined;
+      if (aggType && Object.values(AggregateType).includes(aggType)) {
+        aggregates.push({
+          aggregateType: aggType,
+          column: col.aggregateColumn ?? '',
+          alias: col.alias ?? undefined,
+        });
+      }
+      continue;
+    }
+
+    const timeInterval = TIME_INTERVAL_MACRO.exec(col.name);
+    if (timeInterval) {
+      const [, ms, arg] = timeInterval;
+      // A DateTime64 type makes the builder generate $__timeInterval_ms again, not the whole-second macro.
+      const type = ms ? 'DateTime64(3)' : 'datetime';
+      columns.push({ name: arg, type, alias: col.alias ?? undefined, hint: ColumnHint.Time });
+      continue;
+    }
+
+    columns.push({ name: col.name, alias: col.alias ?? undefined });
+  }
+
+  return { columns, aggregates };
+}
+
+function buildFilters(parsed: ParsedFilter[]): Filter[] {
+  return parsed.map((f) => {
+    const operator = mapOperator(f.operator);
+    const type = filterType(f.valueType);
+    const condition = f.condition as 'AND' | 'OR';
+
+    if (operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull) {
+      return {
+        filterType: 'custom',
+        key: f.key,
+        type,
+        operator,
+        condition,
+      } as NullFilter;
+    }
+
+    if (operator === FilterOperator.WithInGrafanaTimeRange || operator === FilterOperator.OutsideGrafanaTimeRange) {
+      return {
+        filterType: 'custom',
+        key: f.key,
+        type: 'datetime',
+        operator,
+        condition,
+      } as DateFilterWithoutValue;
+    }
+
+    if (operator === FilterOperator.In || operator === FilterOperator.NotIn) {
+      const values = Array.isArray(f.value) ? f.value : f.value !== null ? [f.value] : [];
+      return {
+        filterType: 'custom',
+        key: f.key,
+        type,
+        operator,
+        condition,
+        value: values,
+      } as MultiFilter;
+    }
+
+    if (type === 'int') {
+      return {
+        filterType: 'custom',
+        key: f.key,
+        type,
+        operator,
+        condition,
+        value: f.value !== null ? Number(f.value) : 0,
+      } as NumberFilter;
+    }
+
+    return {
+      filterType: 'custom',
+      key: f.key,
+      type,
+      operator,
+      condition,
+      value: f.value ?? '',
+    } as Filter;
+  });
+}
+
+function getQueryOptionsFromSqlWasm(sql: string, queryType?: QueryType, datasource?: Datasource): QueryBuilderOptions {
+  const parsed: ParsedSelectQuery | null = sqlToStatement(sql);
+
+  if (!parsed) {
     throw new Error('The query is not valid SQL.');
   }
-  if (ast.type !== 'select') {
-    throw new Error('The query is not a select statement.');
-  }
-  if (!ast.from || ast.from.length !== 1) {
-    throw new Error(`The query has too many 'FROM' clauses.`);
-  }
-  if (ast.from[0].type !== 'table') {
+  if (!parsed.table) {
     throw new Error(`The 'FROM' clause is not a table.`);
   }
-  const fromTable = ast.from[0] as FromTable;
+  const macroCall = parsed.filters.find((f) => f.operator === 'macroCall');
+  if (macroCall) {
+    throw new Error(`The WHERE clause calls ${macroCall.key}, which the query builder cannot show.`);
+  }
 
-  const columnsAndAggregates = getAggregatesFromAst(ast.columns || null);
+  const { columns, aggregates } = buildColumnsAndAggregates(parsed.columns);
 
-  const builderOptions = {
-    database: fromTable.name.schema || '',
-    table: fromTable.name.name || '',
+  const builderOptions: QueryBuilderOptions = {
+    database: parsed.database || '',
+    table: parsed.table || '',
     queryType: queryType || QueryType.Table,
     mode: BuilderMode.List,
     columns: [],
     aggregates: [],
-  } as QueryBuilderOptions;
+  };
 
-  if (columnsAndAggregates.columns.length > 0) {
-    builderOptions.columns = columnsAndAggregates.columns || [];
+  if (columns.length > 0) {
+    builderOptions.columns = columns;
   }
 
-  // Reconstruct column hints based off of known column names / aliases
   if (queryType === QueryType.Logs) {
-    tryApplyColumnHints(builderOptions.columns!, datasource?.getDefaultLogsColumns()); // Try match default log columns
-    tryApplyColumnHints(builderOptions.columns!, logColumnHintsToAlias); // Try match Grafana aliases
+    tryApplyColumnHints(builderOptions.columns!, datasource?.getDefaultLogsColumns());
+    tryApplyColumnHints(builderOptions.columns!, logColumnHintsToAlias);
   } else if (queryType === QueryType.Traces) {
     tryApplyColumnHints(builderOptions.columns!, datasource?.getDefaultTraceColumns());
   }
 
-  if (columnsAndAggregates.aggregates.length > 0) {
+  if (aggregates.length > 0) {
     builderOptions.mode = BuilderMode.Aggregate;
-    builderOptions.aggregates = columnsAndAggregates.aggregates;
+    builderOptions.aggregates = aggregates;
   }
 
   const timeColumn = getColumnByHint(builderOptions, ColumnHint.Time);
@@ -140,269 +260,44 @@ export function getQueryOptionsFromSql(
     }
   }
 
-  if (ast.where) {
-    builderOptions.filters = getFiltersFromAst(ast.where, timeColumn?.name || '');
+  if (parsed.filters.length > 0) {
+    builderOptions.filters = buildFilters(parsed.filters);
   }
 
-  const orderBy = ast.orderBy
-    ?.map<OrderBy>((ob) => {
-      if (ob.by.type !== 'ref') {
-        return {} as OrderBy;
-      }
-      return { name: ob.by.name, dir: ob.order } as OrderBy;
-    })
-    .filter((x) => x.name);
-
-  if (orderBy && orderBy.length > 0) {
-    builderOptions.orderBy = orderBy!;
+  const orderBy: OrderBy[] = parsed.orderBy.map((ob) => ({
+    name: ob.name,
+    dir: ob.dir === 'DESC' ? OrderByDirection.DESC : OrderByDirection.ASC,
+  }));
+  if (orderBy.length > 0) {
+    builderOptions.orderBy = orderBy;
   }
 
-  builderOptions.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
+  if (typeof parsed.limit === 'number') {
+    builderOptions.limit = parsed.limit;
+  }
 
   // A trend query groups by its time column on its own, so the `GROUP BY ..., time` it generated is
   // read back without it; otherwise the next generation selects and groups by `time` twice.
   const trendTime = builderOptions.mode === BuilderMode.Trend ? timeColumn?.alias : undefined;
-  const groupBy = ast.groupBy
-    ?.map((gb) => {
-      if (gb.type !== 'ref') {
-        return '';
-      }
-      return gb.name;
-    })
-    .filter((x) => x !== '' && x !== trendTime);
-  if (groupBy && groupBy.length > 0) {
+  const groupBy = parsed.groupBy.filter((x) => x !== trendTime);
+  if (groupBy.length > 0) {
     builderOptions.groupBy = groupBy;
   }
 
   return builderOptions;
 }
 
-function getFiltersFromAst(expr: Expr, timeField: string): Filter[] {
-  const filters: Filter[] = [];
-  let i = 0;
-  let notFlag = false;
-  const visitor = astVisitor((map) => ({
-    expr: (e) => {
-      switch (e?.type) {
-        case 'binary':
-          notFlag = getBinaryFilter(e, filters, i, notFlag);
-          map.super().expr(e);
-          break;
-        case 'ref':
-          ({ i, notFlag } = getRefFilter(e, filters, i, notFlag));
-          break;
-        case 'string':
-          i = getStringFilter(filters, i, e);
-          break;
-        case 'integer':
-          i = getIntFilter(filters, i, e);
-          break;
-        case 'unary':
-          notFlag = getUnaryFilter(e, notFlag, i, filters);
-          map.super().expr(e);
-          break;
-        case 'call':
-          i = getCallFilter(e, timeField, filters, i);
-          break;
-        case 'list':
-          i = getListFilter(filters, i, e);
-          break;
-        default:
-          console.error(`${e?.type} is not supported. This is likely a bug.`);
-          break;
-      }
-    },
-  }));
-  visitor.expr(expr);
-  return filters;
+// ─── Main export ──────────────────────────────────────────────────────────────
+
+export function getQueryOptionsFromSql(
+  sql: string,
+  queryType?: QueryType,
+  datasource?: Datasource
+): QueryBuilderOptions {
+  return getQueryOptionsFromSqlWasm(sql, queryType, datasource);
 }
 
-function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean): { i: number; notFlag: boolean } {
-  const refName = e.name?.toLowerCase();
-  const isFromTime = refName === '$__fromtime' || refName === '$__fromtime_ms';
-  const isToTime = refName === '$__totime' || refName === '$__totime_ms';
-  if (isFromTime && filters[i].operator === FilterOperator.GreaterThanOrEqual) {
-    if (notFlag) {
-      filters[i].operator = FilterOperator.OutsideGrafanaTimeRange;
-      notFlag = false;
-    } else {
-      filters[i].operator = FilterOperator.WithInGrafanaTimeRange;
-    }
-    filters[i].type = 'datetime';
-    i++;
-    return { i, notFlag };
-  }
-  if (isToTime) {
-    filters.splice(i, 1);
-    return { i, notFlag };
-  }
-  if (!filters[i].key) {
-    filters[i].key = e.name;
-    // IS NULL and IS NOT NULL take no value, so the filter is complete at its column. It still needs a
-    // type, as the other converted filters have, because the filter editor reads it.
-    if (isNullFilter(filters[i])) {
-      filters[i].type = 'string';
-      i++;
-    }
-    return { i, notFlag };
-  }
-  filters[i] = { ...filters[i], value: [e.name], type: 'string' } as Filter;
-  i++;
-  return { i, notFlag };
-}
-
-function getListFilter(filters: Filter[], i: number, e: ExprList): number {
-  filters[i] = {
-    ...filters[i],
-    value: e.expressions.map((x) => {
-      const k = x as ExprString;
-      return k.value;
-    }),
-    type: 'string',
-  } as Filter;
-  i++;
-  return i;
-}
-
-function getCallFilter(e: ExprCall, timeField: string, filters: Filter[], i: number): number {
-  const val = `${e.function.name}(${e.args.map<string>((x) => (x as ExprRef).name).join(',')})`;
-  //do not add the timeFilter that is used when using time series and remove the condition
-  if (val === `$__timefilter(${timeField})`) {
-    filters.splice(i, 1);
-    return i;
-  }
-  if (val.startsWith('$__timefilter(')) {
-    filters[i] = {
-      ...filters[i],
-      key: (e.args[0] as ExprRef).name,
-      operator: FilterOperator.WithInGrafanaTimeRange,
-      type: 'datetime',
-    } as Filter;
-    i++;
-    return i;
-  }
-  filters[i] = { ...filters[i], value: val, type: 'datetime' } as Filter;
-  if (!val) {
-    i++;
-  }
-  return i;
-}
-
-function getUnaryFilter(e: ExprUnary, notFlag: boolean, i: number, filters: Filter[]): boolean {
-  if (e.op === 'NOT') {
-    return true;
-  }
-  if (i === 0) {
-    filters.unshift({} as Filter);
-  }
-  filters[i].operator = e.op as FilterOperator;
-  return notFlag;
-}
-
-function getStringFilter(filters: Filter[], i: number, e: ExprString): number {
-  if (!filters[i].key) {
-    filters[i] = { ...filters[i], key: e.value } as Filter;
-    return i;
-  }
-  const value = [FilterOperator.In, FilterOperator.NotIn].includes(filters[i].operator) ? [e.value] : e.value;
-  filters[i] = { ...filters[i], value, type: 'string' } as Filter;
-  i++;
-  return i;
-}
-
-function getIntFilter(filters: Filter[], i: number, e: ExprInteger): number {
-  if (!filters[i].key) {
-    filters[i] = { ...filters[i], key: e.value.toString() } as Filter;
-    return i;
-  }
-  filters[i] = { ...filters[i], value: e.value, type: 'int' } as Filter;
-  i++;
-  return i;
-}
-
-function getBinaryFilter(e: ExprBinary, filters: Filter[], i: number, notFlag: boolean): boolean {
-  if (e.op === 'AND' || e.op === 'OR') {
-    filters.unshift({
-      condition: e.op,
-    } as Filter);
-  } else if (Object.values(FilterOperator).find((x) => e.op === x)) {
-    if (i === 0) {
-      filters.unshift({} as Filter);
-    } else if (!filters[i]) {
-      filters.push({ condition: 'AND' } as Filter);
-    }
-
-    filters[i].operator = e.op as FilterOperator;
-    if (notFlag && filters[i].operator === FilterOperator.Like) {
-      filters[i].operator = FilterOperator.NotLike;
-      notFlag = false;
-    }
-  }
-  return notFlag;
-}
-
-function selectCallFunc(s: SelectedColumn): [AggregateColumn | string, string | undefined] {
-  if (s.expr.type !== 'call') {
-    return [{} as AggregateColumn, undefined];
-  }
-  let fields = s.expr.args.map((x) => {
-    if (x.type !== 'ref') {
-      return '';
-    }
-    return x.name;
-  });
-  if (fields.length > 1) {
-    return ['', undefined];
-  }
-  if (Object.values(AggregateType).includes(s.expr.function.name.toLowerCase() as AggregateType)) {
-    return [
-      {
-        aggregateType: s.expr.function.name as AggregateType,
-        column: fields[0],
-        alias: s.alias?.name,
-      } as AggregateColumn,
-      s.alias?.name,
-    ];
-  }
-  return [fields[0], s.alias?.name];
-}
-
-function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): {
-  columns: CHSelectedColumn[];
-  aggregates: AggregateColumn[];
-} {
-  if (!selectClauses) {
-    return { columns: [], aggregates: [] };
-  }
-
-  const columns: CHSelectedColumn[] = [];
-  const aggregates: AggregateColumn[] = [];
-
-  for (let s of selectClauses) {
-    switch (s.expr.type) {
-      case 'ref':
-        columns.push({ name: s.expr.name, alias: s.alias?.name });
-        break;
-      case 'call':
-        const [columnOrAggregate, alias] = selectCallFunc(s);
-        if (!columnOrAggregate) {
-          break;
-        }
-
-        if (isString(columnOrAggregate)) {
-          // $__timeInterval_ms buckets a DateTime64 column by milliseconds. Keeping the type makes the
-          // builder generate it again instead of $__timeInterval, which floors to whole seconds.
-          const type = s.expr.function.name.toLowerCase().endsWith('_ms') ? 'DateTime64(3)' : 'datetime';
-          columns.push({ name: columnOrAggregate, type, alias, hint: ColumnHint.Time });
-        } else {
-          aggregates.push(columnOrAggregate);
-        }
-        break;
-    }
-  }
-
-  return { columns, aggregates };
-}
+// ─── Legacy helpers (still exported for compatibility) ────────────────────────
 
 export const operMap = new Map<string, FilterOperator>([
   ['equals', FilterOperator.Equals],
@@ -412,3 +307,7 @@ export const operMap = new Map<string, FilterOperator>([
 export function getOper(v: string): FilterOperator {
   return operMap.get(v) || FilterOperator.Equals;
 }
+
+// isString re-export so existing callers of this module that imported it here
+// continue to work without modification.
+export { isString };
