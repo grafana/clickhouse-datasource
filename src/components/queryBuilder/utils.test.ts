@@ -1,5 +1,5 @@
 import { generateSql } from 'data/sqlGenerator';
-import { getQueryOptionsFromSql, isDateTimeType, isDateType, isNumberType } from './utils';
+import { getQueryOptionsFromSql, isDateTimeType, isDateType, isJsonType, isNumberType } from './utils';
 import {
   AggregateType,
   BuilderMode,
@@ -126,6 +126,25 @@ describe('isNumberType', () => {
     expect(isNumberType('boolean')).toBe(false);
     expect(isNumberType('datetime')).toBe(false);
     expect(isNumberType('Nullable')).toBe(false);
+  });
+});
+
+describe('isJsonType', () => {
+  it('returns true for JSON type', () => {
+    expect(isJsonType('JSON')).toBe(true);
+    expect(isJsonType('json')).toBe(true);
+  });
+
+  it("returns true for legacy Object('json') type", () => {
+    expect(isJsonType("Object('json')")).toBe(true);
+    expect(isJsonType("object('json')")).toBe(true);
+  });
+
+  it('returns false for non-JSON types', () => {
+    expect(isJsonType('String')).toBe(false);
+    expect(isJsonType('Map(String, String)')).toBe(false);
+    expect(isJsonType('UInt64')).toBe(false);
+    expect(isJsonType('DateTime')).toBe(false);
   });
 });
 

@@ -262,6 +262,23 @@ export const FilterEditor = (props: {
           FilterOperator.OutsideGrafanaTimeRange,
         ].includes(f.value!)
       );
+    } else if (isJSONType) {
+      // JSON sub-column values are strings; exclude IsEmpty/IsNotEmpty which are unreliable on JSON paths
+      return filterOperators.filter((f) =>
+        [
+          FilterOperator.IsAnything,
+          FilterOperator.Equals,
+          FilterOperator.NotEquals,
+          FilterOperator.Like,
+          FilterOperator.NotLike,
+          FilterOperator.ILike,
+          FilterOperator.NotILike,
+          FilterOperator.In,
+          FilterOperator.NotIn,
+          FilterOperator.IsNull,
+          FilterOperator.IsNotNull,
+        ].includes(f.value!)
+      );
     } else {
       return filterOperators.filter((f) =>
         [

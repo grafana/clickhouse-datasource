@@ -148,19 +148,26 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
   }
 
-  // TODO: for tags and serviceTags, consider the column type. They might not require mapping, they could already be JSON.
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   if (traceTags !== undefined) {
-    selectParts.push(
-      `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
-    );
+    if (traceTags.type?.toLowerCase().startsWith('json')) {
+      selectParts.push(`${escapeIdentifier(traceTags.name)} as tags`);
+    } else {
+      selectParts.push(
+        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
+      );
+    }
   }
 
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
   if (traceServiceTags !== undefined) {
-    selectParts.push(
-      `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
-    );
+    if (traceServiceTags.type?.toLowerCase().startsWith('json')) {
+      selectParts.push(`${escapeIdentifier(traceServiceTags.name)} as serviceTags`);
+    } else {
+      selectParts.push(
+        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
+      );
+    }
   }
 
   const traceStatusCode = getColumnByHint(options, ColumnHint.TraceStatusCode);
@@ -850,6 +857,8 @@ const getFilters = (options: QueryBuilderOptions): string => {
         .map((p) => `\`${p}\``)
         .join('.');
       column += `.${escapedJSONPaths}`;
+      // JSON sub-column values are strings; update type so filter value generation routes correctly
+      type = 'String';
     }
 
     filterParts.push(column);

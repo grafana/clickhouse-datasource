@@ -55,6 +55,10 @@ export const isDateTimeType = (type: string): boolean => {
 export const isStringType = (type: string): boolean => {
   return !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 };
+export const isJsonType = (type: string): boolean => {
+  const t = type?.toLowerCase() || '';
+  return t.startsWith('json') || t.startsWith("object('json')");
+};
 export const isNullFilter = (filter: Filter): filter is NullFilter => {
   return [FilterOperator.IsNull, FilterOperator.IsNotNull].includes(filter.operator);
 };
