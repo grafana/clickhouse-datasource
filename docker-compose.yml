@@ -1,30 +1,18 @@
 services:
   grafana:
-    container_name: grafana
-    build:
-      context: ./.config
-      args:
-        grafana_image: ${GRAFANA_IMAGE:-grafana-enterprise}
-        grafana_version: ${GRAFANA_VERSION:-latest}
-        # remove the following line when developing to have backend debugger
-        development: false
-    ports:
-      - 3000:3000
-    volumes:
-      - ./dist:/var/lib/grafana/plugins/grafana-clickhouse-datasource
-      - ./provisioning:/etc/grafana/provisioning
-      - .:/root/grafana-clickhouse-datasource
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:3000/login"]
-      interval: 1m30s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
-    environment:
-      - GF_LOG_LEVEL=debug
-      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=true
+    extends:
+      file: .config/docker-compose-base.yaml
+      service: grafana
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+      e2e-data-loader:
+        condition: service_completed_successfully
     networks:
       - grafana
+    environment:
+      - GF_FEATURE_TOGGLES_splashScreen=false
+      - GF_FEATURE_TOGGLES_dashboardNewLayouts=false
 
   clickhouse-server:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
@@ -47,16 +35,21 @@ services:
     networks:
       - grafana
 
-  test-data-loader:
+  e2e-data-loader:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
-    container_name: test-data-loader
-    entrypoint: ["clickhouse-client", "--host", "clickhouse-server", "--queries-file", "/dev/shm/property-prices.sql"]
+    container_name: e2e-data-loader
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        clickhouse-client --host clickhouse-server --multiquery < /data/seed.sql
     depends_on:
       clickhouse-server:
         condition: service_healthy
-    restart: on-failure
+    restart: no
     volumes:
-      - ./tests/fixtures/property-prices.sql:/dev/shm/property-prices.sql
+      - ./tests/e2e/fixtures:/data:ro
     networks:
       - grafana
 

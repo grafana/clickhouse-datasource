@@ -1,12 +1,42 @@
 # Changelog
 
+## 4.15.0
+
+### Features
+
+- Add LogsSample supplemental query, remove deprecated getDataProvider (#1744)
+- Add Grafana query metadata support (#1743)
+- Allow disabling logs and trace links (#1754)
+- Improve query modification (#1738)
+- Add initial support for SQL abstractions (dsAbstraction) (#1756)
+- Add OpenTelemetry instrumentation (#1734)
+- Add field config to trace search results for better default display (#1733)
+- Add filterQuery method to datasource (#1732)
+- Support grouping orderBy columns by their column hint values (#1695)
+- Bump Grafana minimum version to v11.6.0 (#1753)
+
+### Fixes
+
+- Fix log context field returning labels (#1737)
+- Fix additional settings config bug (#1630)
+- Dependency updates
+
+## 4.14.1
+
+### Features
+
+- Extract `Map` value type for `mapKey` filter in `getFilters` (#1694)
+
+### Fixes
+
+- Dependency updates
+  
 ## 4.14.0
 
 ### Features
 
 - Add FilterTime hint to enable multi-timestamp log filtering/sorting (#1642)
 - Skip OTel trace time range optimization when trace timestamp table does not exist (#1663)
-- Extract `Map` value type for `mapKey` filter in `getFilters` (#1694)
 
 ### Fixes
 

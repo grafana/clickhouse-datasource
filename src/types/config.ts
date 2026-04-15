@@ -81,6 +81,7 @@ export interface CHLogsConfig {
 
   selectContextColumns?: boolean;
   contextColumns?: string[];
+  showLogLinks?: boolean;
 }
 
 export interface CHTracesConfig {
@@ -110,6 +111,7 @@ export interface CHTracesConfig {
   flattenNested?: boolean;
   traceEventsColumnPrefix?: string;
   traceLinksColumnPrefix?: string;
+  showTraceLinks?: boolean;
 }
 
 export interface AliasTableEntry {

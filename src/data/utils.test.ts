@@ -1,5 +1,6 @@
 import { ColumnHint, QueryBuilderOptions, QueryType, TimeUnit } from 'types/queryBuilder';
 import {
+  applyTraceSearchFieldConfig,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
   isBuilderOptionsRunnable,
@@ -109,6 +110,116 @@ describe('columnLabelToPlaceholder', () => {
     const expected = 'expected_test_output';
     const actual = columnLabelToPlaceholder('Expected TEST output');
     expect(actual).toEqual(expected);
+  });
+});
+
+describe('applyTraceSearchFieldConfig', () => {
+  const buildTraceSearchRequestResponse = (
+    fields: Field[],
+    builderOptions: Partial<QueryBuilderOptions> = {}
+  ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
+    const inputQuery: CHBuilderQuery = {
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'default',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        ...builderOptions,
+      },
+      pluginVersion: '',
+      rawSql: '',
+    };
+
+    const request: DataQueryRequest<CHQuery> = {
+      requestId: '',
+      interval: '',
+      intervalMs: 0,
+      range: {} as any,
+      scopedVars: {} as any,
+      targets: [inputQuery],
+      timezone: '',
+      app: CoreApp.Explore,
+      startTime: 0,
+    };
+
+    const data: DataFrame[] = [{
+      fields,
+      length: 1,
+      refId: 'A',
+    }];
+    const response: DataQueryResponse = { data };
+
+    return [request, response];
+  };
+
+  it('applies field configs to trace search result fields', () => {
+    const fields: Field[] = [
+      { name: 'traceID', type: FieldType.string, config: {}, values: [] },
+      { name: 'serviceName', type: FieldType.string, config: {}, values: [] },
+      { name: 'operationName', type: FieldType.string, config: {}, values: [] },
+      { name: 'startTime', type: FieldType.time, config: {}, values: [] },
+      { name: 'duration', type: FieldType.number, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields);
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[4].config.unit).toBe('ms');
+    expect(response.data[0].fields[4].config.displayName).toBe('Duration');
+    expect(response.data[0].fields[0].config.displayName).toBe('Trace ID');
+    expect(response.data[0].fields[1].config.displayName).toBe('Service Name');
+    expect(response.data[0].fields[2].config.displayName).toBe('Operation Name');
+    expect(response.data[0].fields[3].config.displayName).toBe('Start Time');
+  });
+
+  it('does not apply field configs to trace ID mode queries', () => {
+    const fields: Field[] = [
+      { name: 'duration', type: FieldType.number, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields, {
+      meta: { isTraceIdMode: true, traceId: 'abc123' },
+    });
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config.unit).toBeUndefined();
+  });
+
+  it('does not apply field configs to non-trace queries', () => {
+    const fields: Field[] = [
+      { name: 'duration', type: FieldType.number, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields, {
+      queryType: QueryType.Table,
+    });
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config.unit).toBeUndefined();
+  });
+
+  it('preserves existing field config properties', () => {
+    const fields: Field[] = [
+      { name: 'duration', type: FieldType.number, config: { decimals: 2 }, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields);
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config.unit).toBe('ms');
+    expect(response.data[0].fields[0].config.decimals).toBe(2);
+  });
+
+  it('does not modify fields that have no matching config', () => {
+    const fields: Field[] = [
+      { name: 'customColumn', type: FieldType.string, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields);
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config).toEqual({});
   });
 });
 
@@ -371,6 +482,40 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).not.toContain('trace_id_ts');
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(false);
     });
+  it('does not inject "View trace" link when showTraceLinks is false', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.traces = { showTraceLinks: false };
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeUndefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeDefined();
+  });
+
+  it('does not inject "View logs" link when showLogLinks is false', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.logs = { showLogLinks: false };
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
   });
 });
 

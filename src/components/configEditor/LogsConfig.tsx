@@ -22,6 +22,7 @@ interface LogsConfigProps {
   onMessageColumnChange: (v: string) => void;
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
+  onShowLogLinksChange: (v: boolean) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -36,6 +37,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onMessageColumnChange,
     onSelectContextColumnsChange,
     onContextColumnsChange,
+    onShowLogLinksChange,
   } = props;
   let {
     defaultDatabase,
@@ -48,6 +50,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     messageColumn,
     selectContextColumns,
     contextColumns,
+    showLogLinks,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
 
@@ -126,6 +129,16 @@ export const LogsConfig = (props: LogsConfigProps) => {
           tooltip={labels.columns.message.tooltip}
           value={messageColumn || ''}
           onChange={onMessageColumnChange}
+        />
+      </ConfigSubSection>
+      <br />
+      <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>
+        <Switch
+          label={labels.traceIdCorrelation.showLogLinks.label}
+          tooltip={labels.traceIdCorrelation.showLogLinks.tooltip}
+          value={showLogLinks ?? true}
+          onChange={onShowLogLinksChange}
+          wide
         />
       </ConfigSubSection>
       <br />
