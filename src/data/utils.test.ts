@@ -482,6 +482,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).not.toContain('trace_id_ts');
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(false);
     });
+  });
+
   it('does not inject "View trace" link when showTraceLinks is false', async () => {
     const mockDatasource = newMockDatasource();
     mockDatasource.settings.jsonData.traces = { showTraceLinks: false };
