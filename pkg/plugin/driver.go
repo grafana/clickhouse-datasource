@@ -292,9 +292,13 @@ func (h *Clickhouse) Converters() []sqlutil.Converter {
 	return converters.ClickhouseConverters
 }
 
-// Macros returns list of macro functions convert the macros of raw query
+// Macros returns an empty macro map. ClickHouse macros are expanded upstream
+// by macropro in MutateQueryData, so by the time sqlds's own Interpolate runs
+// there is nothing left for it to find. The empty map also prevents duplicate
+// expansion via sqlutil.DefaultMacros, since macropro.DefaultMacros is
+// already merged into macros.ClickHouseMacros.
 func (h *Clickhouse) Macros() sqlds.Macros {
-	return macros.Macros
+	return sqlds.Macros{}
 }
 
 // MutateQueryError marks ClickHouse errors as downstream errors
@@ -388,6 +392,7 @@ func (h *Clickhouse) MutateQueryData(
 	injectGrafanaUserHeader(ctx, req)
 
 	req = preprocessGrafanaSQL(req)
+	req = expandMacros(req)
 	return ctx, req
 }
 
@@ -413,6 +418,73 @@ func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest)
 		return
 	}
 	req.SetHTTPHeader("X-Grafana-User", user.Login)
+}
+
+// expandMacros rewrites every query's rawSql with all $__ macros expanded.
+// Running this before sqlds's own query pipeline means macropro owns macro
+// parsing end-to-end; by the time sqlds.Interpolate runs it finds no tokens
+// and becomes a no-op.
+func expandMacros(req *backend.QueryDataRequest) *backend.QueryDataRequest {
+	if req == nil || len(req.Queries) == 0 {
+		return req
+	}
+	queries := make([]backend.DataQuery, 0, len(req.Queries))
+	for _, q := range req.Queries {
+		queries = append(queries, expandMacrosInQuery(q))
+	}
+	return &backend.QueryDataRequest{
+		PluginContext: req.PluginContext,
+		Headers:       req.Headers,
+		Queries:       queries,
+	}
+}
+
+// expandMacrosInQuery expands macros in a single query. On any error
+// (malformed JSON, missing rawSql, handler error), the query is returned
+// unchanged so downstream sqlds still gets a chance to process it. Macro
+// errors are logged so admins can diagnose misuses even when the DB
+// ultimately rejects the unexpanded query.
+func expandMacrosInQuery(q backend.DataQuery) backend.DataQuery {
+	var sqq sqlutil.Query
+	if err := json.Unmarshal(q.JSON, &sqq); err != nil {
+		return q
+	}
+	if sqq.RawSQL == "" {
+		return q
+	}
+	// TimeRange and Interval come from the backend.DataQuery envelope, not
+	// from the JSON body — populate them on the temporary sqlutil.Query so
+	// macros see the correct values.
+	sqq.TimeRange = q.TimeRange
+	sqq.Interval = q.Interval
+
+	expanded, err := macros.Interpolate(sqq.RawSQL, &sqq)
+	if err != nil {
+		backend.Logger.Error("failed to expand macros", "error", err.Error(), "refId", q.RefID)
+		return q
+	}
+	if expanded == sqq.RawSQL {
+		return q
+	}
+
+	// Write the expanded rawSql back into the original JSON without losing
+	// plugin-specific fields (meta.timezone, format, etc.) that sqlutil.Query
+	// does not know about.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(q.JSON, &raw); err != nil {
+		return q
+	}
+	newRawSQLMsg, err := json.Marshal(expanded)
+	if err != nil {
+		return q
+	}
+	raw["rawSql"] = newRawSQLMsg
+	newJSON, err := json.Marshal(raw)
+	if err != nil {
+		return q
+	}
+	q.JSON = newJSON
+	return q
 }
 
 func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
