@@ -205,17 +205,12 @@ export const transformQueryResponseWithTraceAndLogLinks = (
     // Get the configured TraceId column name for use in both trace and logs queries
     const defaultLogsColumns = datasource.getDefaultLogsColumns();
     // Use traces config traceIdColumn if available, otherwise fallback to logs default
-    const traceIdColumnName = datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
+    const traceIdColumnName =
+      datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
 
     const traceIdQuery: CHBuilderQuery = {
       datasource: datasource,
       editorType: EditorType.Builder,
-      /**
-       * Evil bug:
-       * The rawSql value might contain time filters such as $__fromTime and $__toTime.
-       * Grafana sees these time range filters as data links and will refuse to enable the traceID link if these are present.
-       * Set rawSql to empty since it gets regenerated when the panel renders anyway.
-       */
       rawSql: '',
       builderOptions: {} as QueryBuilderOptions,
       pluginVersion,
@@ -265,6 +260,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           otelVersion: otelVersion,
           traceEventsColumnPrefix: traceEventsColumnPrefix,
           traceLinksColumnPrefix: traceLinksColumnPrefix,
+          hasTraceTimestampTable: Boolean(otelVersion),
         },
       };
 
@@ -279,6 +275,11 @@ export const transformQueryResponseWithTraceAndLogLinks = (
 
       traceIdQuery.builderOptions = options;
     }
+
+    // Pre-generate rawSql so the query executes immediately when the link is opened.
+    // Trace ID queries don't contain $__fromTime/$__toTime time macros, so they're
+    // safe to include (unlike trace search queries which would break data link detection).
+    traceIdQuery.rawSql = generateSql(traceIdQuery.builderOptions);
 
     const traceLogsQuery: CHBuilderQuery = {
       datasource: datasource,
