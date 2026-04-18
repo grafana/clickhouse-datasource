@@ -556,14 +556,14 @@ describe('SQL Generator', () => {
         isTraceIdMode: true,
         traceId: 'abcdefg',
         hasTraceTimestampTable: true,
-        traceTimestampTableSuffix: '_tsindex',
+        traceTimestampTableSuffix: '_ts_index',
       },
       limit: 1000,
       orderBy: [],
     };
     const sql = generateSql(opts);
 
-    expect(sql).toContain('FROM "default"."custom_traces_tsindex"');
+    expect(sql).toContain('FROM "default"."custom_traces_ts_index"');
     expect(sql).not.toContain('custom_traces_trace_id_ts');
     expect(sql).toContain(`WITH 'abcdefg' as trace_id`);
     expect(sql).toContain('"Timestamp" >= trace_start');

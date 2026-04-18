@@ -430,10 +430,10 @@ describe('TracesConfig', () => {
 
     const input = result.getByPlaceholderText('_trace_id_ts');
     expect(input).toBeInTheDocument();
-    fireEvent.change(input, { target: { value: '_tsindex' } });
+    fireEvent.change(input, { target: { value: '_ts_index' } });
     fireEvent.blur(input);
     expect(onTraceTimestampTableSuffixChange).toHaveBeenCalledTimes(1);
-    expect(onTraceTimestampTableSuffixChange).toHaveBeenCalledWith('_tsindex');
+    expect(onTraceTimestampTableSuffixChange).toHaveBeenCalledWith('_ts_index');
   });
 
   it('should call onShowTraceLinksChange when toggled', async () => {
