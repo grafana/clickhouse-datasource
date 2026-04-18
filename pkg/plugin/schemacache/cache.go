@@ -33,7 +33,7 @@ type Cache[V any] struct {
 	entries map[string]entry[V]
 	sf      singleflight.Group
 
-	// now is overridable in tests so TTL behaviour is deterministic.
+	// now is overridable in tests so TTL behavior is deterministic.
 	now func() time.Time
 }
 

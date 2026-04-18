@@ -197,7 +197,7 @@ func TestCache_DoSingleflight(t *testing.T) {
 }
 
 func TestCache_KeyIsolation(t *testing.T) {
-	// A primitive defence-in-depth check: different keys must not collide.
+	// A primitive defense-in-depth check: different keys must not collide.
 	// If a future refactor regresses this, integration tests won't catch it.
 	c := New[string](time.Minute, 0, 10)
 	c.Set("a", "value-a")

@@ -522,7 +522,7 @@ func (p *SchemaProvider) fetchColumnValues(ctx context.Context, table string, re
 }
 
 // NewSchemaProvider builds a SchemaProvider and, if schema caching is enabled
-// in the datasource settings, initialises per-handler TTL caches. Settings
+// in the datasource settings, initializes per-handler TTL caches. Settings
 // parsing failures degrade to a cache-disabled provider so the query builder
 // still works — we never want schema introspection to be gated on cache
 // availability.

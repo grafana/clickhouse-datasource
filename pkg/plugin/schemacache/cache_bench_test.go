@@ -70,7 +70,7 @@ func BenchmarkTablesFetch_CachedConcurrent(b *testing.B) {
 	for b.Loop() {
 		// Fresh cache per outer iteration so every iteration pays the singleflight
 		// cost and we're not just measuring hot-cache hits. The singleflight
-		// behaviour — collapsing concurrent misses — is the thing under test.
+		// behavior — collapsing concurrent misses — is the thing under test.
 		c := New[[]string](time.Hour, 0, 4)
 		var wg sync.WaitGroup
 		wg.Add(panels)
