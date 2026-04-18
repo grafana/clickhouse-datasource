@@ -228,10 +228,10 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		case bool:
 			settings.EnableSchemaCache = v
 		case string:
-			if parsed, perr := strconv.ParseBool(v); perr == nil {
+			if parsed, parseErr := strconv.ParseBool(v); parseErr == nil {
 				settings.EnableSchemaCache = parsed
 			} else {
-				backend.Logger.Warn("Failed to parse enableSchemaCache value, defaulting to true", "error", perr)
+				backend.Logger.Warn("Failed to parse enableSchemaCache value, defaulting to true", "error", parseErr)
 			}
 		}
 	}
@@ -240,10 +240,10 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		case float64:
 			settings.SchemaCacheTTLSeconds = int(v)
 		case string:
-			if parsed, perr := strconv.Atoi(v); perr == nil {
+			if parsed, parseErr := strconv.Atoi(v); parseErr == nil {
 				settings.SchemaCacheTTLSeconds = parsed
 			} else {
-				backend.Logger.Warn("Failed to parse schemaCacheTTLSeconds value, using default", "error", perr)
+				backend.Logger.Warn("Failed to parse schemaCacheTTLSeconds value, using default", "error", parseErr)
 			}
 		}
 	}
