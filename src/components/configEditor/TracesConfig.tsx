@@ -3,7 +3,7 @@ import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigS
 import { Input, Field } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint, TimeUnit } from 'types/queryBuilder';
-import otel from 'otel';
+import otel, { traceTimestampTableSuffix as defaultTraceTimestampTableSuffix } from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { CHTracesConfig, defaultCHAdditionalSettingsConfig } from 'types/config';
@@ -37,6 +37,7 @@ export interface TraceConfigProps {
   onEventsColumnPrefixChange: (v: string) => void;
   onLinksColumnPrefixChange: (v: string) => void;
   onShowTraceLinksChange: (v: boolean) => void;
+  onTraceTimestampTableSuffixChange: (v: string) => void;
 }
 
 export const TracesConfig = (props: TraceConfigProps) => {
@@ -65,6 +66,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     onEventsColumnPrefixChange,
     onLinksColumnPrefixChange,
     onShowTraceLinksChange,
+    onTraceTimestampTableSuffixChange,
   } = props;
   let {
     defaultDatabase,
@@ -91,6 +93,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     traceEventsColumnPrefix,
     traceLinksColumnPrefix,
     showTraceLinks,
+    traceTimestampTableSuffix,
   } = (props.tracesConfig || {}) as CHTracesConfig;
   const labels = allLabels.components.Config.TracesConfig;
 
@@ -298,6 +301,13 @@ export const TracesConfig = (props: TraceConfigProps) => {
           tooltip={labels.columns.linksPrefix.tooltip}
           value={traceLinksColumnPrefix || ''}
           onChange={onLinksColumnPrefixChange}
+        />
+        <LabeledInput
+          label={labels.columns.traceTimestampTableSuffix.label}
+          placeholder={defaultTraceTimestampTableSuffix}
+          tooltip={labels.columns.traceTimestampTableSuffix.tooltip}
+          value={traceTimestampTableSuffix || ''}
+          onChange={onTraceTimestampTableSuffixChange}
         />
       </ConfigSubSection>
       <br/>

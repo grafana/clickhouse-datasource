@@ -616,6 +616,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           onShowTraceLinksChange={(v) => {
             onTracesConfigChange('showTraceLinks', v);
           }}
+          onTraceTimestampTableSuffixChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ traceTimestampTableSuffix: c });
+            onTracesConfigChange('traceTimestampTableSuffix', c);
+          }}
         />
 
         <Divider />

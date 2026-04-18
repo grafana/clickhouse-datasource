@@ -250,6 +250,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
           onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}
           onShowTraceLinksChange={(v) => onUpdateTracesConfig('showTraceLinks', v)}
+          onTraceTimestampTableSuffixChange={(c) => onUpdateTracesConfig('traceTimestampTableSuffix', c)}
         />
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
