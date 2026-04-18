@@ -232,6 +232,11 @@ export default {
             label: 'Links prefix',
             tooltip: 'Prefix for the trace references column (Links.TraceId, Links.TraceState, etc.)',
           },
+          traceTimestampTableSuffix: {
+            label: 'Trace timestamp table suffix',
+            tooltip:
+              'Suffix appended to the traces table name to locate a companion index keyed by TraceId with Start/End columns. When such a table exists, trace ID lookups narrow the main query to a small time window instead of scanning the whole table. Leave blank to use the OTel default (_trace_id_ts).',
+          },
           kind: {
             label: 'Kind column',
             tooltip: 'Column for the trace kind',
