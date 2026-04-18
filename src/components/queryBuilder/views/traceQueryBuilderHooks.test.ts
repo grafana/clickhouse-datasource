@@ -1,8 +1,13 @@
 import { renderHook } from '@testing-library/react';
-import { useTraceDefaultsOnMount, useOtelColumns, useDefaultFilters } from './traceQueryBuilderHooks';
+import {
+  useDefaultFilters,
+  useDefaultTraceColumnsByName,
+  useOtelColumns,
+  useTraceDefaultsOnMount,
+} from './traceQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
-import { ColumnHint, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
-import { setOptions } from 'hooks/useBuilderOptionsState';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import otel from 'otel';
 
 describe('useTraceDefaultsOnMount', () => {
@@ -170,5 +175,99 @@ describe('useDefaultFilters', () => {
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+});
+
+describe('useDefaultTraceColumnsByName', () => {
+  const traceTableColumns: readonly TableColumn[] = [
+    { name: 'trace_id', type: 'String', picklistValues: [] },
+    { name: 'span_id', type: 'String', picklistValues: [] },
+    { name: 'parent_span_id', type: 'String', picklistValues: [] },
+    { name: 'service_name', type: 'LowCardinality(String)', picklistValues: [] },
+    { name: 'span_name', type: 'String', picklistValues: [] },
+    { name: 'timestamp', type: 'DateTime64(9)', picklistValues: [] },
+    { name: 'duration_ns', type: 'UInt64', picklistValues: [] },
+  ];
+
+  it('fills every role slot from conventional column names', () => {
+    const builderOptionsDispatch = jest.fn();
+
+    renderHook(() =>
+      useDefaultTraceColumnsByName(traceTableColumns, 'traces', {}, false, builderOptionsDispatch)
+    );
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(7);
+    const expected: Array<[ColumnHint, string, string]> = [
+      [ColumnHint.TraceId, 'trace_id', 'String'],
+      [ColumnHint.TraceSpanId, 'span_id', 'String'],
+      [ColumnHint.TraceParentSpanId, 'parent_span_id', 'String'],
+      [ColumnHint.TraceServiceName, 'service_name', 'LowCardinality(String)'],
+      [ColumnHint.TraceOperationName, 'span_name', 'String'],
+      [ColumnHint.Time, 'timestamp', 'DateTime64(9)'],
+      [ColumnHint.TraceDurationTime, 'duration_ns', 'UInt64'],
+    ];
+    for (const [hint, name, type] of expected) {
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(
+        expect.objectContaining(setColumnByHint({ name, type, hint }))
+      );
+    }
+  });
+
+  it('skips slots the user has already filled', () => {
+    const builderOptionsDispatch = jest.fn();
+    const userTraceId: SelectedColumn = { name: 'myTraceId', type: 'String', hint: ColumnHint.TraceId };
+
+    renderHook(() =>
+      useDefaultTraceColumnsByName(
+        traceTableColumns,
+        'traces',
+        { traceId: userTraceId },
+        false,
+        builderOptionsDispatch
+      )
+    );
+
+    // 7 slots minus the already-filled TraceId = 6 dispatches.
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(6);
+    const traceIdDispatch = builderOptionsDispatch.mock.calls.find(
+      ([action]) => action?.payload?.column?.hint === ColumnHint.TraceId
+    );
+    expect(traceIdDispatch).toBeUndefined();
+  });
+
+  it('does nothing when OTel mode is enabled', () => {
+    const builderOptionsDispatch = jest.fn();
+    renderHook(() => useDefaultTraceColumnsByName(traceTableColumns, 'traces', {}, true, builderOptionsDispatch));
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('does nothing when allColumns is empty', () => {
+    const builderOptionsDispatch = jest.fn();
+    renderHook(() => useDefaultTraceColumnsByName([], 'traces', {}, false, builderOptionsDispatch));
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('re-runs when the table changes', () => {
+    const builderOptionsDispatch = jest.fn();
+    const hook = renderHook(
+      (table) => useDefaultTraceColumnsByName(traceTableColumns, table, {}, false, builderOptionsDispatch),
+      { initialProps: 'traces' }
+    );
+    const first = builderOptionsDispatch.mock.calls.length;
+    hook.rerender('other_traces');
+    expect(builderOptionsDispatch.mock.calls.length).toBeGreaterThan(first);
+  });
+
+  it('does not match a String column for the numeric Duration role', () => {
+    const builderOptionsDispatch = jest.fn();
+    // `duration` here is a String — heuristic must skip it, leaving the slot empty.
+    const cols: readonly TableColumn[] = [{ name: 'duration', type: 'String', picklistValues: [] }];
+
+    renderHook(() => useDefaultTraceColumnsByName(cols, 'traces', {}, false, builderOptionsDispatch));
+
+    const durationDispatch = builderOptionsDispatch.mock.calls.find(
+      ([action]) => action?.payload?.column?.hint === ColumnHint.TraceDurationTime
+    );
+    expect(durationDispatch).toBeUndefined();
   });
 });
