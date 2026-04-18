@@ -1,6 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import {
   useDefaultFilters,
+  useDefaultLogColumnsByName,
   useDefaultTimeColumn,
   useLogDefaultsOnMount,
   useOtelColumns,
@@ -252,6 +253,133 @@ describe('useDefaultTimeColumn', () => {
     const expectedColumn: SelectedColumn = { name: timeColumnName, type: 'DateTime', hint: ColumnHint.Time };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setColumnByHint(expectedColumn)));
+  });
+
+  it('prefers a conventionally-named DateTime column over the first DateTime column', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'getDefaultLogsTable').mockReturnValue(undefined);
+    const allColumns: readonly TableColumn[] = [
+      { name: 'ingested_at', type: 'DateTime', picklistValues: [] },
+      { name: 'timestamp', type: 'DateTime64(9)', picklistValues: [] },
+      { name: 'other_date', type: 'Date', picklistValues: [] },
+    ];
+
+    renderHook(() =>
+      useDefaultTimeColumn(mockDatasource, allColumns, 'logs', undefined, false, builderOptionsDispatch)
+    );
+
+    const expectedColumn: SelectedColumn = { name: 'timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time };
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setColumnByHint(expectedColumn)));
+  });
+
+  it('falls back to the first DateTime column when no name matches the heuristic', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'getDefaultLogsTable').mockReturnValue(undefined);
+    const allColumns: readonly TableColumn[] = [
+      { name: 'weird_name', type: 'DateTime', picklistValues: [] },
+      { name: 'other_name', type: 'DateTime64(3)', picklistValues: [] },
+    ];
+
+    renderHook(() =>
+      useDefaultTimeColumn(mockDatasource, allColumns, 'logs', undefined, false, builderOptionsDispatch)
+    );
+
+    const expectedColumn: SelectedColumn = { name: 'weird_name', type: 'DateTime', hint: ColumnHint.Time };
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setColumnByHint(expectedColumn)));
+  });
+});
+
+describe('useDefaultLogColumnsByName', () => {
+  it('fills the Message and Log Level slots from conventional column names', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'timestamp', type: 'DateTime', picklistValues: [] },
+      { name: 'message', type: 'String', picklistValues: [] },
+      { name: 'level', type: 'LowCardinality(String)', picklistValues: [] },
+    ];
+
+    renderHook(() =>
+      useDefaultLogColumnsByName(allColumns, 'logs', undefined, undefined, false, builderOptionsDispatch)
+    );
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(2);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(
+      expect.objectContaining(
+        setColumnByHint({ name: 'message', type: 'String', hint: ColumnHint.LogMessage })
+      )
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(
+      expect.objectContaining(
+        setColumnByHint({ name: 'level', type: 'LowCardinality(String)', hint: ColumnHint.LogLevel })
+      )
+    );
+  });
+
+  it('does not overwrite a slot that is already set by the user', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'message', type: 'String', picklistValues: [] },
+      { name: 'level', type: 'String', picklistValues: [] },
+    ];
+    const userPickedMessage: SelectedColumn = { name: 'custom_msg', type: 'String', hint: ColumnHint.LogMessage };
+
+    renderHook(() =>
+      useDefaultLogColumnsByName(allColumns, 'logs', userPickedMessage, undefined, false, builderOptionsDispatch)
+    );
+
+    // Only Log Level should be filled; Message is preserved.
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(
+      expect.objectContaining(setColumnByHint({ name: 'level', type: 'String', hint: ColumnHint.LogLevel }))
+    );
+  });
+
+  it('does nothing when OTel mode is enabled', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'Body', type: 'String', picklistValues: [] },
+      { name: 'SeverityText', type: 'LowCardinality(String)', picklistValues: [] },
+    ];
+
+    renderHook(() =>
+      useDefaultLogColumnsByName(allColumns, 'otel_logs', undefined, undefined, true, builderOptionsDispatch)
+    );
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('does nothing when the table has no matching columns', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'unrelated', type: 'String', picklistValues: [] },
+    ];
+
+    renderHook(() =>
+      useDefaultLogColumnsByName(allColumns, 'logs', undefined, undefined, false, builderOptionsDispatch)
+    );
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('re-runs on table change and fills empty slots for the new table', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'body', type: 'String', picklistValues: [] },
+      { name: 'severity', type: 'String', picklistValues: [] },
+    ];
+
+    const hook = renderHook(
+      (table) => useDefaultLogColumnsByName(allColumns, table, undefined, undefined, false, builderOptionsDispatch),
+      { initialProps: 'logs' }
+    );
+    // After the first render both slots are filled (2 dispatches). Changing the
+    // table resets the per-table guard so another run fires.
+    const initialCalls = builderOptionsDispatch.mock.calls.length;
+    expect(initialCalls).toBe(2);
+    hook.rerender('other_logs');
+    expect(builderOptionsDispatch.mock.calls.length).toBeGreaterThan(initialCalls);
   });
 });
 

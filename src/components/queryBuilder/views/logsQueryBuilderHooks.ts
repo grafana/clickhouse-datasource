@@ -1,5 +1,4 @@
 import { Datasource } from 'data/CHDatasource';
-import { columnFilterDateTime } from 'data/columnFilters';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import { useEffect, useMemo, useRef } from 'react';
 import {
@@ -15,6 +14,7 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import otel from 'otel';
+import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -161,7 +161,12 @@ export const useDefaultTimeColumn = (
       return;
     }
 
-    const col = allColumns.filter(columnFilterDateTime)[0];
+    // Prefer a DateTime column whose name matches a common timestamp convention
+    // (timestamp, event_time, created_at, ...); fall back to the first DateTime
+    // column if nothing matches. This keeps existing behaviour for schemas that
+    // use unusual names while auto-picking the right column for conventional ones.
+    const dateTimeColumns = allColumns.filter((c) => isDateTimeColumn(c));
+    const col = findColumnByNameHeuristic(dateTimeColumns, ColumnHint.Time) || dateTimeColumns[0];
     if (!col) {
       return;
     }
@@ -176,6 +181,58 @@ export const useDefaultTimeColumn = (
     lastTable.current = table;
     didSetDefaultTime.current = true;
   }, [datasource, allColumns, table, builderOptionsDispatch]);
+};
+
+/**
+ * Fills the Message and Log Level role slots from common non-OTel column names
+ * (message, body, log_message; level, severity, severity_text, ...) when:
+ *   - OTel mode is off (OTel has its own detection path),
+ *   - the current table has changed since last run, and
+ *   - the role slot is still empty (never overwrites explicit user picks).
+ *
+ * The Time role is handled separately by `useDefaultTimeColumn` so the two
+ * stay independently testable and the Time fallback behaviour is preserved.
+ */
+export const useDefaultLogColumnsByName = (
+  allColumns: readonly TableColumn[],
+  table: string,
+  messageColumn: SelectedColumn | undefined,
+  logLevelColumn: SelectedColumn | undefined,
+  otelEnabled: boolean,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
+  const lastTable = useRef<string>(table || '');
+  const didRun = useRef<boolean>(false);
+  if (table !== lastTable.current) {
+    didRun.current = false;
+  }
+
+  useEffect(() => {
+    if (otelEnabled || didRun.current || !table || allColumns.length === 0) {
+      return;
+    }
+
+    if (!messageColumn) {
+      const match = findColumnByNameHeuristic(allColumns, ColumnHint.LogMessage, isStringLikeColumn);
+      if (match) {
+        builderOptionsDispatch(
+          setColumnByHint({ name: match.name, type: match.type, hint: ColumnHint.LogMessage })
+        );
+      }
+    }
+
+    if (!logLevelColumn) {
+      const match = findColumnByNameHeuristic(allColumns, ColumnHint.LogLevel, isStringLikeColumn);
+      if (match) {
+        builderOptionsDispatch(
+          setColumnByHint({ name: match.name, type: match.type, hint: ColumnHint.LogLevel })
+        );
+      }
+    }
+
+    lastTable.current = table;
+    didRun.current = true;
+  }, [allColumns, table, messageColumn, logLevelColumn, otelEnabled, builderOptionsDispatch]);
 };
 
 // Apply default filters/orderBy on table change
