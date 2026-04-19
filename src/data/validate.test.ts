@@ -57,6 +57,28 @@ describe('Validate', () => {
     it('handles hex numbers', () => {
       expect(validate('SELECT 0xFF FROM t').valid).toBe(true);
     });
+
+    it('handles Unicode smart single quotes as string literals', () => {
+      // U+2018 … U+2019 around "hello"
+      expect(validate('SELECT \u2018hello\u2019 FROM t').valid).toBe(true);
+    });
+
+    it('handles Unicode smart double quotes as identifiers', () => {
+      // U+201C … U+201D around "name"
+      expect(validate('SELECT \u201Cname\u201D FROM t').valid).toBe(true);
+    });
+
+    it('handles Unicode minus sign (U+2212) as a minus operator', () => {
+      expect(validate('SELECT 1 \u2212 2 FROM t').valid).toBe(true);
+    });
+
+    it('handles heredoc with word-char tag', () => {
+      expect(validate("SELECT $foo$ anything goes 'here' $foo$ FROM t").valid).toBe(true);
+    });
+
+    it('handles heredoc with empty tag', () => {
+      expect(validate('SELECT $$ hello world $$ FROM t').valid).toBe(true);
+    });
   });
 
   describe('invalid SQL', () => {
@@ -102,6 +124,18 @@ describe('Validate', () => {
       const v = validate(sql);
       expect(v.valid).toBe(false);
       expect(v.error?.startCol).toBe(8); // quote starts at col 8
+    });
+
+    it('catches an unclosed Unicode smart single quote', () => {
+      const v = validate('SELECT \u2018unclosed FROM t');
+      expect(v.valid).toBe(false);
+      expect(v.error?.message).toBe('Single quoted string is not closed');
+    });
+
+    it('catches an unclosed Unicode smart double quote', () => {
+      const v = validate('SELECT \u201Cunclosed FROM t');
+      expect(v.valid).toBe(false);
+      expect(v.error?.message).toBe('Double quoted string is not closed');
     });
   });
 });

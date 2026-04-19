@@ -145,34 +145,26 @@ export class Lexer {
   }
 
   /**
-   * Parse a unicode quoted string
+   * Parse a Unicode-quoted string or identifier. The opening codepoint is at this.pos
+   * (about to be consumed by this function); closeChar is the single JS codepoint that
+   * terminates the literal. ClickHouse's C++ lexer does this at the UTF-8 byte level
+   * (looking for `E2 80 99` etc.); the JavaScript equivalent operates on BMP codepoints
+   * directly since JS strings are UTF-16 code units, not UTF-8 bytes.
    */
-  private parseUnicodeQuotedString(expectedEndByte: number, successToken: TokenType, errorToken: TokenType): Token {
-    const tokenBegin = this.pos - 3; // Account for the starting quote sequence
+  private parseUnicodeQuotedString(closeChar: string, successToken: TokenType, errorToken: TokenType): Token {
+    const tokenBegin = this.pos;
 
-    while (this.pos + 2 < this.end) {
-      const e2Pos = this.text.indexOf('\u00E2', this.pos);
-      if (e2Pos === -1 || e2Pos + 2 >= this.end) {
-        this.pos = this.end;
-        return new Token(errorToken, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
-      }
+    // Skip the opening quote
+    this.pos++;
 
-      this.pos = e2Pos;
-
-      if (
-        this.text.charCodeAt(this.pos) === 0xe2 &&
-        this.text.charCodeAt(this.pos + 1) === 0x80 &&
-        this.text.charCodeAt(this.pos + 2) === expectedEndByte
-      ) {
-        this.pos += 3; // Skip the closing quote
-        return new Token(successToken, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
-      }
-
-      this.pos++;
+    const closePos = this.text.indexOf(closeChar, this.pos);
+    if (closePos === -1) {
+      this.pos = this.end;
+      return new Token(errorToken, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
     }
 
-    this.pos = this.end;
-    return new Token(errorToken, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
+    this.pos = closePos + 1;
+    return new Token(successToken, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
   }
 
   /**
@@ -576,55 +568,61 @@ export class Lexer {
         return new Token(TokenType.Error, tokenBegin, this.pos, '\\');
       }
 
-      // Handle Unicode special cases
-      case '\u00E2': {
-        // Mathematical minus symbol in UTF-8
-        if (
-          this.pos + 2 < this.end &&
-          this.text.charCodeAt(this.pos + 1) === 0x88 &&
-          this.text.charCodeAt(this.pos + 2) === 0x92
-        ) {
-          this.pos += 3;
-          return new Token(TokenType.Minus, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
-        }
+      // Unicode special cases. ClickHouse's C++ lexer matches these via UTF-8 byte
+      // triples (E2 88 92, E2 80 98, E2 80 9C); JavaScript strings are UTF-16 code
+      // units, so we match the codepoints directly.
 
-        // Unicode quoted string
-        if (
-          this.pos + 2 < this.end &&
-          this.text.charCodeAt(this.pos) === 0xe2 &&
-          this.text.charCodeAt(this.pos + 1) === 0x80 &&
-          (this.text.charCodeAt(this.pos + 2) === 0x98 || this.text.charCodeAt(this.pos + 2) === 0x9c)
-        ) {
-          const expectedEndByte = this.text.charCodeAt(this.pos + 2) + 1;
-          const successToken =
-            this.text.charCodeAt(this.pos + 2) === 0x98 ? TokenType.StringLiteral : TokenType.QuotedIdentifier;
-          const errorToken =
-            this.text.charCodeAt(this.pos + 2) === 0x98
-              ? TokenType.ErrorSingleQuoteIsNotClosed
-              : TokenType.ErrorDoubleQuoteIsNotClosed;
+      // U+2212 MINUS SIGN — treated as a regular minus operator.
+      case '\u2212':
+        return new Token(TokenType.Minus, tokenBegin, ++this.pos, '\u2212');
 
-          this.pos += 3;
-          return this.parseUnicodeQuotedString(expectedEndByte, successToken, errorToken);
-        }
-      }
+      // U+2018 LEFT SINGLE QUOTATION MARK — opens a StringLiteral,
+      // closed by U+2019 RIGHT SINGLE QUOTATION MARK.
+      case '\u2018':
+        return this.parseUnicodeQuotedString(
+          '\u2019',
+          TokenType.StringLiteral,
+          TokenType.ErrorSingleQuoteIsNotClosed
+        );
+
+      // U+201C LEFT DOUBLE QUOTATION MARK — opens a QuotedIdentifier,
+      // closed by U+201D RIGHT DOUBLE QUOTATION MARK.
+      case '\u201C':
+        return this.parseUnicodeQuotedString(
+          '\u201D',
+          TokenType.QuotedIdentifier,
+          TokenType.ErrorDoubleQuoteIsNotClosed
+        );
     }
 
     // Handle special cases
 
     // Dollar sign and here-document
     if (currentChar === '$') {
-      // Try to parse here-doc
+      // Try to parse here-doc ($tag$...$tag$). ClickHouse requires the tag to consist
+      // solely of ASCII word characters (letters, digits, underscore). An empty tag
+      // ($$...$$) is valid by vacuous truth.
       const tokenStream = this.text.substring(this.pos);
       const heredocNameEndPosition = tokenStream.indexOf('$', 1);
 
       if (heredocNameEndPosition !== -1) {
-        const heredocSize = heredocNameEndPosition + 1;
-        const heredoc = tokenStream.substring(0, heredocSize);
+        let tagIsValid = true;
+        for (let i = 1; i < heredocNameEndPosition; i++) {
+          if (!isWordCharASCII(tokenStream[i])) {
+            tagIsValid = false;
+            break;
+          }
+        }
 
-        const heredocEndPosition = tokenStream.indexOf(heredoc, heredocSize);
-        if (heredocEndPosition !== -1) {
-          this.pos += heredocEndPosition + heredocSize;
-          return new Token(TokenType.HereDoc, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
+        if (tagIsValid) {
+          const heredocSize = heredocNameEndPosition + 1;
+          const heredoc = tokenStream.substring(0, heredocSize);
+
+          const heredocEndPosition = tokenStream.indexOf(heredoc, heredocSize);
+          if (heredocEndPosition !== -1) {
+            this.pos += heredocEndPosition + heredocSize;
+            return new Token(TokenType.HereDoc, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
+          }
         }
       }
 

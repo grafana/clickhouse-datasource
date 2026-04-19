@@ -72,6 +72,7 @@ export enum TokenType {
 }
 
 export const keywords = new Set([
+  // Standard SQL clauses
   'SELECT',
   'FROM',
   'WHERE',
@@ -111,6 +112,68 @@ export const keywords = new Set([
   'NULL',
   'ASC',
   'DESC',
+
+  // ClickHouse-specific SELECT clauses
+  'PREWHERE',
+  'FINAL',
+  'SAMPLE',
+  'SETTINGS',
+  'FORMAT',
+  'INTERVAL',
+
+  // JOIN modifiers
+  'ASOF',
+  'ANY',
+  'ANTI',
+  'SEMI',
+  'GLOBAL',
+  'LATERAL',
+  'ARRAY',
+
+  // CTE
+  'RECURSIVE',
+
+  // ORDER BY / LIMIT modifiers
+  'NULLS',
+  'FIRST',
+  'LAST',
+  'TIES',
+
+  // DML
+  'INSERT',
+  'INTO',
+  'VALUES',
+  'UPDATE',
+  'DELETE',
+  'SET',
+  'TRUNCATE',
+
+  // DDL
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'RENAME',
+  'TABLE',
+  'DATABASE',
+  'VIEW',
+  'MATERIALIZED',
+  'INDEX',
+  'DICTIONARY',
+  'FUNCTION',
+  'TEMPORARY',
+  'IF',
+  'TO',
+
+  // Window functions
+  'OVER',
+  'WINDOW',
+  'PARTITION',
+  'PRECEDING',
+  'FOLLOWING',
+  'CURRENT',
+  'UNBOUNDED',
+  'RANGE',
+  'ROWS',
 ]);
 
 /**
