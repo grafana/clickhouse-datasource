@@ -49,8 +49,8 @@ services:
         # feature-specific fixtures can live alongside seed.sql without
         # creating merge conflicts when multiple PRs add fixtures at once.
         for f in /data/*.sql; do
-          echo "Loading fixture: $f"
-          clickhouse-client --host clickhouse-server --multiquery < "$f"
+          echo "Loading fixture: $$f"
+          clickhouse-client --host clickhouse-server --multiquery < "$$f"
         done
     depends_on:
       clickhouse-server:
