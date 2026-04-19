@@ -36,6 +36,11 @@ async function enterSql(page: Page, sql: string) {
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.type(sql);
+  // Dismiss any Monaco autocomplete popup that may have captured a keyword
+  // mid-stream (e.g. `NOT ` can trigger a suggestion list that, if left open,
+  // swallows the Enter/click on the Run Query button or rewrites the last
+  // token when focus shifts).
+  await page.keyboard.press('Escape');
 }
 
 async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
@@ -102,9 +107,13 @@ test.describe('Ad-hoc regex operator filters', () => {
   test('NOT REGEXP returns the complement', async ({ page, explorePage }) => {
     await page.goto(exploreUrl());
     // 10 rows in the fixture, 2 start with "Request", so 8 remain.
+    // Parenthesize the predicate so the `NOT` keyword is not immediately
+    // followed by `REGEXP` — Monaco's SQL autocomplete tends to offer
+    // keyword suggestions after `NOT ` and can swallow/mangle the next
+    // token when typed via page.keyboard.type().
     await enterSql(
       page,
-      "SELECT timestamp, message FROM e2e_test.events WHERE message NOT REGEXP '^Request' ORDER BY timestamp"
+      "SELECT timestamp, message FROM e2e_test.events WHERE NOT (message REGEXP '^Request') ORDER BY timestamp"
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
