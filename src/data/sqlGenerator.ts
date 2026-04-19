@@ -856,8 +856,12 @@ const getFilters = (options: QueryBuilderOptions): string => {
         .split('.')
         .map((p) => `\`${p}\``)
         .join('.');
-      column += `.${escapedJSONPaths}`;
-      // JSON sub-column values are strings; update type so filter value generation routes correctly
+      // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
+      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
+      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
+      // that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // Update type so filter value generation routes through the string-aware branches.
       type = 'String';
     }
 
