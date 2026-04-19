@@ -73,6 +73,12 @@ export class Datasource
   adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
   adHocCHVerReq = { major: 22, minor: 7 };
 
+  // Keyed by `${db}.${table}` (or `${table}` when db unknown). Populated each
+  // time getTagKeys() reads from system.columns; consumed by
+  // fetchTagValuesFromSchema() to detect Map-column access patterns (e.g.
+  // `LogAttributes.http.method`) and rewrite the SELECT accordingly.
+  private mapColumnsByTable: Map<string, Set<string>> = new Map();
+
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
     this.settings = instanceSettings;
@@ -1036,11 +1042,130 @@ export class Datasource
     if (type === TagType.query) {
       return frame.fields.map((f) => ({ text: f.name }));
     }
-    const view = new DataFrameView(frame);
+    const view = new DataFrameView<{ 0: string; 1: string; 2: string }>(frame);
     const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
-    return view.map((item) => ({
+
+    // First pass: flat list of tag keys as before. Second pass (below)
+    // expands Map-typed columns into one entry per discovered map key.
+    const keys: MetricFindValue[] = view.map((item) => ({
       text: hideTableName ? item[0] : `${item[2]}.${item[0]}`,
     }));
+
+    // Collect Map columns per-table and populate both the datasource cache
+    // (consumed by fetchTagValuesFromSchema) and the AdHocFilter cache
+    // (consumed by escapeKey). Done regardless of whether Map expansion is
+    // feasible for this context — the caches are used even when expansion
+    // bails out.
+    this.mapColumnsByTable = new Map();
+    const mapCols: Array<{ name: string; table: string }> = [];
+    view.forEach((item) => {
+      if (isMapColumnType(item[1])) {
+        const tableKey = item[2];
+        let set = this.mapColumnsByTable.get(tableKey);
+        if (!set) {
+          set = new Set<string>();
+          this.mapColumnsByTable.set(tableKey, set);
+        }
+        set.add(item[0]);
+        mapCols.push({ name: item[0], table: item[2] });
+      }
+    });
+
+    // Republish the flattened Map-column set to the AdHocFilter so its
+    // escapeKey can disambiguate `col.key` references.
+    const allMapCols = new Set<string>();
+    for (const set of this.mapColumnsByTable.values()) {
+      for (const c of set) {
+        allMapCols.add(c);
+      }
+    }
+    this.adHocFilter.setMapColumns(allMapCols);
+
+    // Map-key expansion only runs when the adhoc context points at a
+    // specific `db.table` — otherwise we'd need to probe every table in a
+    // database, which is too expensive to do on every dashboard render.
+    const db = this.resolveAdhocDatabase(frame);
+    const singleTable = this.resolveAdhocSingleTable();
+    if (!db || !singleTable || mapCols.length === 0) {
+      return keys;
+    }
+
+    // Only probe Map columns that belong to the targeted table.
+    const probeTargets = mapCols.filter((c) => c.table === singleTable);
+    if (probeTargets.length === 0) {
+      return keys;
+    }
+
+    const probed = await Promise.all(
+      probeTargets.map(async (c) => {
+        try {
+          const mapKeys = await this.fetchUniqueMapKeys(c.name, db, c.table);
+          return { col: c, keys: mapKeys };
+        } catch (ex) {
+          console.warn(`Failed to fetch map keys for ${db}.${c.table}.${c.name}:`, ex);
+          return { col: c, keys: [] as string[] };
+        }
+      })
+    );
+
+    // Replace each top-level Map-column entry with one entry per discovered
+    // map key. If probing returned nothing (empty set, stripped by the
+    // filter), keep the original entry as a no-op fallback.
+    const expandedKeyByCol = new Map<string, string[]>();
+    for (const p of probed) {
+      if (p.keys.length > 0) {
+        expandedKeyByCol.set(p.col.name, p.keys);
+      }
+    }
+    if (expandedKeyByCol.size === 0) {
+      return keys;
+    }
+
+    const expanded: MetricFindValue[] = [];
+    view.forEach((item) => {
+      const col = item[0];
+      const table = item[2];
+      const baseText = hideTableName ? col : `${table}.${col}`;
+      const mapKeys = expandedKeyByCol.get(col);
+      if (!mapKeys || table !== singleTable) {
+        expanded.push({ text: baseText });
+        return;
+      }
+      for (const k of mapKeys) {
+        expanded.push({ text: `${baseText}.${k}` });
+      }
+    });
+    return expanded;
+  }
+
+  /**
+   * The `$clickhouse_adhoc_query` template variable may resolve to a bare
+   * database name or `db.table`. This returns the database component, or
+   * undefined when we can't derive one (free-form SELECT variable, etc.).
+   */
+  private resolveAdhocDatabase(_frame: DataFrame): string | undefined {
+    const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
+    const defaultDatabase = this.getDefaultDatabase();
+    const raw = source === '$clickhouse_adhoc_query' ? defaultDatabase : source;
+    if (!raw || raw.toLowerCase().startsWith('select')) {
+      return defaultDatabase;
+    }
+    return raw.includes('.') ? raw.split('.')[0] : raw;
+  }
+
+  /**
+   * Returns the table name when the adhoc source resolves to a specific
+   * `db.table`. Returns undefined when the source is a bare database or a
+   * free-form SELECT, since we can't safely probe Map keys across many
+   * tables without a dramatic fan-out.
+   */
+  private resolveAdhocSingleTable(): string | undefined {
+    const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
+    const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultDatabase() : source;
+    if (!raw || raw.toLowerCase().startsWith('select')) {
+      return undefined;
+    }
+    return raw.includes('.') ? raw.split('.')[1] : undefined;
   }
 
   async getTagValues({ key }: any): Promise<MetricFindValue[]> {
@@ -1079,13 +1204,47 @@ export class Datasource
       source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     }
 
-    const rawSql = `select distinct ${col} from ${source} limit 1000`;
+    // If `col` is of the form `<mapCol>.<mapKey>` and <mapCol> is known to
+    // be a Map-typed column, rewrite to bracket-access so the SELECT pulls
+    // distinct Map values rather than stringified Map objects (which the
+    // Grafana frame layer renders as `[object Object]`).
+    const mapAccess = this.asMapAccess(col, source);
+    const selectExpr = mapAccess ? `${mapAccess.column}['${mapAccess.key}']` : col;
+
+    const rawSql = `select distinct ${selectExpr} from ${source} limit 1000`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
     }
     const field = frame.fields[0];
     return this.fieldValuesToMetricFindValues(field);
+  }
+
+  /**
+   * Parses a dotted tag key and returns `{column, key}` when the leading
+   * segment refers to a Map-typed column in the given source. The source
+   * may be either `db.table` or a bare table name.
+   */
+  private asMapAccess(col: string, source: string): { column: string; key: string } | undefined {
+    if (!col.includes('.')) {
+      return undefined;
+    }
+    const parts = col.split('.');
+    const mapCols = this.mapColumnsByTable.get(source) ?? this.getFlatMapColumnSet();
+    if (!mapCols.has(parts[0])) {
+      return undefined;
+    }
+    return { column: parts[0], key: parts.slice(1).join('.') };
+  }
+
+  private getFlatMapColumnSet(): Set<string> {
+    const flat = new Set<string>();
+    for (const set of this.mapColumnsByTable.values()) {
+      for (const c of set) {
+        flat.add(c);
+      }
+    }
+    return flat;
   }
 
   private async fetchTagValuesFromQuery(key: string): Promise<MetricFindValue[]> {
@@ -1458,6 +1617,18 @@ function getConnectionErrorHint(category: string, detail: string): string | unde
 enum TagType {
   query,
   schema,
+}
+
+/**
+ * Returns true when a ClickHouse type string describes a Map column
+ * (including `Nullable(Map(...))` and `LowCardinality(Map(...))` wrappers
+ * that callers may reasonably encounter).
+ */
+function isMapColumnType(type: string | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+  return /^(?:Nullable\(|LowCardinality\()?Map\(/.test(type);
 }
 
 enum AdHocFilterStatus {
