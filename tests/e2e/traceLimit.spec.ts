@@ -102,7 +102,7 @@ test.describe('Trace ID query (#1541)', () => {
   });
 
   test('applying a 3-row LIMIT truncates — confirms the fixture has >3 spans', async ({ page, explorePage }) => {
-    // Complementary assertion: with the old buggy behaviour (LIMIT 3 inherited
+    // Complementary assertion: with the old buggy behavior (LIMIT 3 inherited
     // from the list query), only 3 of the 5 spans would be returned. This
     // test guards against the fixture accidentally seeding <=3 spans, which
     // would make the companion "no LIMIT" assertion above trivially pass.
