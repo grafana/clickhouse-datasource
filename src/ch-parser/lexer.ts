@@ -99,7 +99,8 @@ export class Lexer {
    */
   private parseQuotedHexOrBinString(): Token {
     const tokenBegin = this.pos;
-    const isHex = this.text[this.pos].toLowerCase() === 'x';
+    const leadChar = this.text[this.pos];
+    const isHex = leadChar === 'x' || leadChar === 'X';
 
     // Skip 'x' and opening quote
     this.pos += 2;
@@ -203,13 +204,12 @@ export class Lexer {
         let hex = false;
 
         // Check for hex (0x) or binary (0b) notation
-        if (
-          this.pos + 2 < this.end &&
-          currentChar === '0' &&
-          (this.text[this.pos + 1].toLowerCase() === 'x' || this.text[this.pos + 1].toLowerCase() === 'b')
-        ) {
+        const prefixChar = this.pos + 2 < this.end && currentChar === '0' ? this.text[this.pos + 1] : '';
+        const isHexPrefix = prefixChar === 'x' || prefixChar === 'X';
+        const isBinPrefix = prefixChar === 'b' || prefixChar === 'B';
+        if (isHexPrefix || isBinPrefix) {
           let isValid = false;
-          if (this.text[this.pos + 1].toLowerCase() === 'x') {
+          if (isHexPrefix) {
             if (this.pos + 2 < this.end && isHexDigit(this.text[this.pos + 2])) {
               hex = true;
               isValid = true; // hex
@@ -601,26 +601,28 @@ export class Lexer {
     if (currentChar === '$') {
       // Try to parse here-doc ($tag$...$tag$). ClickHouse requires the tag to consist
       // solely of ASCII word characters (letters, digits, underscore). An empty tag
-      // ($$...$$) is valid by vacuous truth.
-      const tokenStream = this.text.substring(this.pos);
-      const heredocNameEndPosition = tokenStream.indexOf('$', 1);
+      // ($$...$$) is valid by vacuous truth. We scan using absolute positions in
+      // this.text rather than taking a substring of the remaining input, which
+      // would allocate O(n) per $ — a real hot path in queries with many Grafana
+      // macros ($__timeFilter, ${variable}, ...).
+      const tagEndPos = this.text.indexOf('$', this.pos + 1);
 
-      if (heredocNameEndPosition !== -1) {
+      if (tagEndPos !== -1) {
         let tagIsValid = true;
-        for (let i = 1; i < heredocNameEndPosition; i++) {
-          if (!isWordCharASCII(tokenStream[i])) {
+        for (let i = this.pos + 1; i < tagEndPos; i++) {
+          if (!isWordCharASCII(this.text[i])) {
             tagIsValid = false;
             break;
           }
         }
 
         if (tagIsValid) {
-          const heredocSize = heredocNameEndPosition + 1;
-          const heredoc = tokenStream.substring(0, heredocSize);
+          const heredocSize = tagEndPos - this.pos + 1;
+          const heredoc = this.text.substring(this.pos, this.pos + heredocSize);
 
-          const heredocEndPosition = tokenStream.indexOf(heredoc, heredocSize);
-          if (heredocEndPosition !== -1) {
-            this.pos += heredocEndPosition + heredocSize;
+          const heredocEndPos = this.text.indexOf(heredoc, this.pos + heredocSize);
+          if (heredocEndPos !== -1) {
+            this.pos = heredocEndPos + heredocSize;
             return new Token(TokenType.HereDoc, tokenBegin, this.pos, this.text.substring(tokenBegin, this.pos));
           }
         }
@@ -632,11 +634,11 @@ export class Lexer {
       }
     }
 
-    // Hex or binary string literals
+    // Hex or binary string literals (x'AB' / X'AB' / b'101' / B'101')
     if (
       this.pos + 2 < this.end &&
       this.text[this.pos + 1] === "'" &&
-      (currentChar.toLowerCase() === 'x' || currentChar.toLowerCase() === 'b')
+      (currentChar === 'x' || currentChar === 'X' || currentChar === 'b' || currentChar === 'B')
     ) {
       return this.parseQuotedHexOrBinString();
     }
