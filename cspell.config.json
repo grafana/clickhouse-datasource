@@ -28,6 +28,7 @@
     "concats",
     "createddate",
     "dataframe",
+    "dataproxy",
     "DataSource",
     "datasourcese",
     "DataSources",
