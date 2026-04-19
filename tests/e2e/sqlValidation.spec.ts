@@ -66,7 +66,7 @@ async function expectHasErrorMarker(page: Page) {
  * ASOF JOIN, :: cast, etc.) as errors, producing red squiggles in the SQL editor
  * whenever `validateSql` was enabled. This suite exercises the full wiring —
  * user types SQL → onKeyUp → validate() → setModelMarkers() → Monaco renders — so
- * if anyone re-introduces a parser that misrecognises these constructs, the
+ * if anyone re-introduces a parser that misidentifies these constructs, the
  * regression shows up as a failing test here rather than as a user complaint.
  */
 test.describe('SQL editor validation', () => {
