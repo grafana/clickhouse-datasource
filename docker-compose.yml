@@ -45,7 +45,14 @@ services:
       - -c
       - |
         set -e
-        clickhouse-client --host clickhouse-server --multiquery < /data/seed.sql
+        # Load every *.sql fixture under /data in lexicographic order so new
+        # feature-specific fixtures can live alongside seed.sql without
+        # creating merge conflicts when multiple PRs add fixtures at once.
+        # $$f (not $f) so docker-compose passes a literal $ to the shell.
+        for f in /data/*.sql; do
+          echo "Loading fixture: $$f"
+          clickhouse-client --host clickhouse-server --multiquery < "$$f"
+        done
     depends_on:
       clickhouse-server:
         condition: service_healthy
