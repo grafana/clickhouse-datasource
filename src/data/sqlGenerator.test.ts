@@ -1063,7 +1063,7 @@ describe('getFilters', () => {
       ],
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
-    expect(sql).toEqual("( LogAttributes.`request_id` = 'abc123' )");
+    expect(sql).toEqual("( LogAttributes.`request_id`::Nullable(String) = 'abc123' )");
   });
 
   it('generates dot-notation SQL for JSON mapKey filter (nested path)', () => {
@@ -1081,7 +1081,7 @@ describe('getFilters', () => {
       ],
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
-    expect(sql).toEqual("( SpanAttributes.`http`.`status_code` = '200' )");
+    expect(sql).toEqual("( SpanAttributes.`http`.`status_code`::Nullable(String) = '200' )");
   });
 
   it('generates correct IN clause for JSON mapKey filter', () => {
@@ -1099,7 +1099,7 @@ describe('getFilters', () => {
       ],
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
-    expect(sql).toEqual("( LogAttributes.`level` IN ('error', 'warn') )");
+    expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) IN ('error', 'warn') )");
   });
 
   it('generates correct NOT IN clause for JSON mapKey filter', () => {
@@ -1117,7 +1117,7 @@ describe('getFilters', () => {
       ],
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
-    expect(sql).toEqual("( LogAttributes.`level` NOT IN ('debug', 'trace') )");
+    expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) NOT IN ('debug', 'trace') )");
   });
 
   it('generates LIKE clause for JSON mapKey filter', () => {
@@ -1135,7 +1135,7 @@ describe('getFilters', () => {
       ],
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
-    expect(sql).toEqual("( ResourceAttributes.`service`.`name` LIKE '%my-service%' )");
+    expect(sql).toEqual("( ResourceAttributes.`service`.`name`::Nullable(String) LIKE '%my-service%' )");
   });
 
   it('generates IS NULL clause for JSON mapKey filter', () => {
@@ -1152,7 +1152,7 @@ describe('getFilters', () => {
       ],
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
-    expect(sql).toEqual('( LogAttributes.`user_id` IS NULL )');
+    expect(sql).toEqual('( LogAttributes.`user_id`::Nullable(String) IS NULL )');
   });
 
   it('returns complex filter array', () => {
