@@ -69,7 +69,7 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 // or silently reintroduces ILIKE (which does not honour indexes and is
 // not regex), one of these tests will fail.
 //
-// The previous behaviour translated `=~` to `ILIKE`, which is a LIKE
+// The previous behavior translated `=~` to `ILIKE`, which is a LIKE
 // pattern — not a regex — and prevents primary-key skip-index pruning on
 // indexed columns. See the issue for the user-visible consequence.
 // ---------------------------------------------------------------------------
