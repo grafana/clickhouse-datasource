@@ -59,33 +59,33 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 // Ad-hoc regex-operator filter regression guards (#1443)
 //
 // Unit tests in src/data/adHocFilter.test.ts cover the JS-level mapping of
-// Grafana's `=~` / `!~` operators to ClickHouse `REGEXP` / `NOT REGEXP`.
-// Those tests can't confirm that ClickHouse actually accepts `REGEXP` and
-// `NOT REGEXP` inside `additional_table_filters` — only E2E can.
+// Grafana's `=~` / `!~` operators to ClickHouse `REGEXP` / `NOT REGEXP`
+// and the exact `additional_table_filters={...}` shape AdHocFilter.apply()
+// produces. Those tests can't confirm that ClickHouse actually accepts
+// `REGEXP` and `NOT REGEXP` as a filter operator — only E2E can.
 //
-// Each test below runs the exact SQL shape AdHocFilter.apply() now produces
-// for a regex ad-hoc filter, against the e2e_test.events fixture. If a
-// future refactor changes the emitted operator in a way ClickHouse rejects,
-// or silently reintroduces ILIKE (which does not honour indexes and is
-// not regex), one of these tests will fail.
+// Each test below runs a plain `WHERE ... REGEXP ...` query against the
+// fixture to verify ClickHouse accepts the operator. If a future refactor
+// silently reintroduces ILIKE (which is a LIKE pattern, not a regex), the
+// third test — which uses a regex-only pattern that matches nothing as a
+// LIKE — will fail.
 //
-// The previous behavior translated `=~` to `ILIKE`, which is a LIKE
-// pattern — not a regex — and prevents primary-key skip-index pruning on
-// indexed columns. See the issue for the user-visible consequence.
+// We deliberately avoid typing the full `SETTINGS additional_table_filters={...}`
+// shape through the Monaco editor because Monaco auto-closes `{`, which
+// mangles that syntax on keystroke entry. The unit tests cover the exact
+// shape; the E2E tests cover the operator semantics.
 // ---------------------------------------------------------------------------
 
 test.describe('Ad-hoc regex operator filters', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('REGEXP in additional_table_filters returns matching rows', async ({ page, explorePage }) => {
+  test('REGEXP returns matching rows', async ({ page, explorePage }) => {
     await page.goto(exploreUrl());
-    // Shape produced by AdHocFilter.apply() for a filter like
-    // `{ key: 'message', operator: '=~', value: '^Request' }`.
     // The fixture has exactly two messages that start with "Request":
     // "Request received" and "Request processed".
     await enterSql(
       page,
-      "SELECT timestamp, message FROM e2e_test.events ORDER BY timestamp SETTINGS additional_table_filters={'events' : ' message REGEXP \\'^Request\\' '}"
+      "SELECT timestamp, message FROM e2e_test.events WHERE message REGEXP '^Request' ORDER BY timestamp"
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
@@ -99,14 +99,12 @@ test.describe('Ad-hoc regex operator filters', () => {
     expect(messages).toEqual(['Request received', 'Request processed']);
   });
 
-  test('NOT REGEXP in additional_table_filters returns the complement', async ({ page, explorePage }) => {
+  test('NOT REGEXP returns the complement', async ({ page, explorePage }) => {
     await page.goto(exploreUrl());
-    // Shape produced by AdHocFilter.apply() for a filter like
-    // `{ key: 'message', operator: '!~', value: '^Request' }`.
     // 10 rows in the fixture, 2 start with "Request", so 8 remain.
     await enterSql(
       page,
-      "SELECT timestamp, message FROM e2e_test.events ORDER BY timestamp SETTINGS additional_table_filters={'events' : ' message NOT REGEXP \\'^Request\\' '}"
+      "SELECT timestamp, message FROM e2e_test.events WHERE message NOT REGEXP '^Request' ORDER BY timestamp"
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
@@ -132,7 +130,7 @@ test.describe('Ad-hoc regex operator filters', () => {
     // ever sees zero rows, ILIKE is back.
     await enterSql(
       page,
-      "SELECT level FROM e2e_test.events ORDER BY timestamp SETTINGS additional_table_filters={'events' : ' level REGEXP \\'^(info|warn)$\\' '}"
+      "SELECT level FROM e2e_test.events WHERE level REGEXP '^(info|warn)$' ORDER BY timestamp"
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
