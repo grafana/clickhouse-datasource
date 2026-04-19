@@ -1,8 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
 import { ServerAndEncryptionSection } from './ServerAndEncryptionSection';
-import { createTestProps } from './helpers';
+import { createMockValidation, createTestProps } from './helpers';
 import { Protocol } from 'types/config';
 
 describe('ServerAndEncryptionSection', () => {
@@ -121,5 +121,49 @@ describe('ServerAndEncryptionSection', () => {
         jsonData: expect.objectContaining({ secure: true }),
       })
     );
+  });
+
+  describe('validation', () => {
+    const emptyProps = createTestProps({
+      options: {
+        jsonData: { host: '', port: undefined, protocol: Protocol.Native, secure: false },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: jest.fn() },
+    });
+
+    const filledProps = createTestProps({
+      options: {
+        jsonData: { host: 'clickhouse-server', port: 9000, protocol: Protocol.Native, secure: false },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: jest.fn() },
+    });
+
+    it('shows inline errors for host and port when validator is called with empty values', async () => {
+      const validation = createMockValidation();
+      render(<ServerAndEncryptionSection {...emptyProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.getByText('Server address required')).toBeInTheDocument();
+      expect(screen.getByText('Port is required')).toBeInTheDocument();
+    });
+
+    it('shows no errors when all fields are filled', async () => {
+      const validation = createMockValidation();
+      render(<ServerAndEncryptionSection {...filledProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.queryByText('Server address required')).not.toBeInTheDocument();
+      expect(screen.queryByText('Port is required')).not.toBeInTheDocument();
+    });
   });
 });

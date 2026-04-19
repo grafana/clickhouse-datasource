@@ -1,8 +1,8 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
 
 import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
-import { createTestProps } from './helpers';
+import { createMockValidation, createTestProps } from './helpers';
 
 describe('DatabaseCredentialsSection', () => {
   const onOptionsChangeMock = jest.fn();
@@ -59,6 +59,48 @@ describe('DatabaseCredentialsSection', () => {
 
     const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
     expect(lastArgs.secureJsonData?.password).toBe('secret');
+  });
+
+  describe('validation', () => {
+    const emptyProps = createTestProps({
+      options: {
+        jsonData: { username: '' },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: jest.fn() },
+    });
+
+    const filledProps = createTestProps({
+      options: {
+        jsonData: { username: 'default' },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: jest.fn() },
+    });
+
+    it('shows inline error for username when validator is called with empty value', async () => {
+      const validation = createMockValidation();
+      render(<DatabaseCredentialsSection {...emptyProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.getByText('Username is required')).toBeInTheDocument();
+    });
+
+    it('shows no errors when all fields are filled', async () => {
+      const validation = createMockValidation();
+      render(<DatabaseCredentialsSection {...filledProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.queryByText('Username is required')).not.toBeInTheDocument();
+    });
   });
 
   it('resets password when Reset is clicked (isConfigured=true)', () => {
