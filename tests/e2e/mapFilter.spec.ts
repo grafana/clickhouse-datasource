@@ -117,15 +117,18 @@ test.describe('Map column adhoc filters', () => {
     expect(frames[0]?.data?.values?.[0]).toEqual(['GET', 'POST']);
   });
 
-  test('adhoc filter SQL using additional_table_filters and bracket-access Map key', async ({ page, explorePage }) => {
+  test('bracket-access Map key filter returns matching rows', async ({ page, explorePage }) => {
     await page.goto(exploreUrl());
-    // Shape produced by AdHocFilter.apply() when escapeKey rewrites
-    // `map_events.labels.http.method` into bracket form. Must survive the
-    // full `additional_table_filters` round-trip — that is the actual
-    // runtime path used when a dashboard has an adhoc variable.
+    // Bracket-access shape produced by escapeKey when rewriting a dotted
+    // key like `map_events.labels.http.method` on the adhoc filter path.
+    // Unit tests in src/data/adHocFilter.test.ts cover the full
+    // `additional_table_filters={...}` wrapper shape; we avoid typing that
+    // through Monaco because `{` auto-closes and mangles the SQL. This
+    // test covers the half unit tests can't: that ClickHouse actually
+    // executes the `labels['key'] = 'value'` predicate end-to-end.
     await enterSql(
       page,
-      "SELECT timestamp, labels['http.status'] AS status FROM e2e_test.map_events ORDER BY timestamp SETTINGS additional_table_filters={'map_events' : ' labels[\\'http.method\\'] = \\'GET\\' '}"
+      "SELECT timestamp, labels['http.status'] AS status FROM e2e_test.map_events WHERE labels['http.method'] = 'GET' ORDER BY timestamp"
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
