@@ -59,14 +59,14 @@ describe('findColumnByNameHeuristic', () => {
 });
 
 describe('type predicates', () => {
-  it('isDateTimeColumn recognises Date and DateTime variants', () => {
+  it('isDateTimeColumn recognizes Date and DateTime variants', () => {
     expect(isDateTimeColumn(col('c', 'DateTime'))).toBe(true);
     expect(isDateTimeColumn(col('c', 'DateTime64(9)'))).toBe(true);
     expect(isDateTimeColumn(col('c', 'Date'))).toBe(true);
     expect(isDateTimeColumn(col('c', 'String'))).toBe(false);
   });
 
-  it('isStringLikeColumn recognises String, FixedString, LowCardinality(String), Enum', () => {
+  it('isStringLikeColumn recognizes String, FixedString, LowCardinality(String), Enum', () => {
     expect(isStringLikeColumn(col('c', 'String'))).toBe(true);
     expect(isStringLikeColumn(col('c', 'FixedString(8)'))).toBe(true);
     expect(isStringLikeColumn(col('c', 'LowCardinality(String)'))).toBe(true);
@@ -74,7 +74,7 @@ describe('type predicates', () => {
     expect(isStringLikeColumn(col('c', 'UInt64'))).toBe(false);
   });
 
-  it('isNumericColumn recognises integer/float/decimal types', () => {
+  it('isNumericColumn recognizes integer/float/decimal types', () => {
     expect(isNumericColumn(col('c', 'UInt64'))).toBe(true);
     expect(isNumericColumn(col('c', 'Int32'))).toBe(true);
     expect(isNumericColumn(col('c', 'Float64'))).toBe(true);

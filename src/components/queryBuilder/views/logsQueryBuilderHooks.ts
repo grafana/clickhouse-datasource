@@ -163,7 +163,7 @@ export const useDefaultTimeColumn = (
 
     // Prefer a DateTime column whose name matches a common timestamp convention
     // (timestamp, event_time, created_at, ...); fall back to the first DateTime
-    // column if nothing matches. This keeps existing behaviour for schemas that
+    // column if nothing matches. This keeps existing behavior for schemas that
     // use unusual names while auto-picking the right column for conventional ones.
     const dateTimeColumns = allColumns.filter((c) => isDateTimeColumn(c));
     const col = findColumnByNameHeuristic(dateTimeColumns, ColumnHint.Time) || dateTimeColumns[0];
@@ -191,7 +191,7 @@ export const useDefaultTimeColumn = (
  *   - the role slot is still empty (never overwrites explicit user picks).
  *
  * The Time role is handled separately by `useDefaultTimeColumn` so the two
- * stay independently testable and the Time fallback behaviour is preserved.
+ * stay independently testable and the Time fallback behavior is preserved.
  */
 export const useDefaultLogColumnsByName = (
   allColumns: readonly TableColumn[],
