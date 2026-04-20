@@ -9,6 +9,12 @@ const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
 // Its presence indicates the local provisioning file and seed fixtures do not apply.
 const isCloudRun = !!process.env.GRAFANA_URL;
 
+// CLOUD_DEFAULT_UID points at `[managed_data_source] - ClickHouse Native (PDC)` on the
+// shared Cloud dev instance. The uid is infra-managed and usually stable, but it can rotate
+// if the datasource is re-provisioned — if Cloud E2E starts failing randomly with
+// datasource-not-found errors, log into the instance, copy the current uid from the
+// /connections/datasources/edit/<uid> URL, and either update this constant or set
+// DS_E2E_UID in the workflow as a quick override.
 const CLOUD_DEFAULT_UID = 'cf1uvcf1yrz0ge';
 const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
 const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
