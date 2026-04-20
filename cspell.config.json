@@ -27,6 +27,7 @@
     "createddate",
     "dataframe",
     "DataSource",
+    "datasourcese",
     "DataSources",
     "Drilldown",
     "DateTime",
@@ -59,6 +60,7 @@
     "Nonproxy",
     "openfeature",
     "oper",
+    "OFREP",
     "otel",
     "semconv",
     "OUTFILE",
@@ -100,6 +102,7 @@
     "typecheck",
     "Ulimits",
     "uuidv",
+    "uvcf",
     "vectorator",
     "WorkDir",
     "varname"

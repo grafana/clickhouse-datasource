@@ -1,11 +1,23 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Locator, Page } from '@playwright/test';
+import { Page } from '@playwright/test';
 import { QueryType } from '../../src/types/queryBuilder';
 import { EditorType } from '../../src/types/sql';
 
-// Matches the uid set in provisioning/datasources/clickhouse.yml
-const DATASOURCE_UID = 'clickhouse-e2e';
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
+
+// GRAFANA_URL is set only by the Cloud cron workflow (see .github/workflows/cron.yml).
+// Its presence indicates the local provisioning file and seed fixtures do not apply.
+const isCloudRun = !!process.env.GRAFANA_URL;
+
+// CLOUD_DEFAULT_UID points at `[managed_data_source] - ClickHouse Native (PDC)` on the
+// shared Cloud dev instance. The uid is infra-managed and usually stable, but it can rotate
+// if the datasource is re-provisioned — if Cloud E2E starts failing randomly with
+// datasource-not-found errors, log into the instance, copy the current uid from the
+// /connections/datasources/edit/<uid> URL, and either update this constant or set
+// DS_E2E_UID in the workflow as a quick override.
+const CLOUD_DEFAULT_UID = 'cf1uvcf1yrz0ge';
+const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
+const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
 // Time range that fully covers the seed fixture data in tests/e2e/fixtures/seed.sql
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
@@ -16,15 +28,6 @@ interface ExploreUrlOpts {
   editorType?: EditorType;
   from?: string;
   to?: string;
-}
-
-/**
- * Returns a locator that matches the query editor row regardless of Grafana version.
- * Grafana < 13 uses [aria-label="Query editor row"]; Grafana >= 13 uses
- * [data-testid="data-testid Query editor row"]. The CSS union matches whichever is present.
- */
-function queryEditorRow(page: Page): Locator {
-  return page.locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]');
 }
 
 /**
@@ -135,7 +138,7 @@ test.describe('Query editor', () => {
       // The toolbar also has a "Run query" button — scope to the query editor row to
       // avoid a strict-mode violation from matching both.
       await expect(
-        queryEditorRow(page).getByRole('button', { name: 'Run Query' })
+        page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' })
       ).toBeVisible();
     });
 
@@ -152,7 +155,7 @@ test.describe('Query editor', () => {
       // Use a scoped locator — `label.query-keyword` is the Grafana inline form label
       // class used by the builder for all its field labels (Database, Table, etc.).
       await expect(
-        queryEditorRow(page).locator('label.query-keyword', { hasText: 'Database' })
+        page.locator('.query-editor-row').locator('label.query-keyword', { hasText: 'Database' })
       ).toBeVisible();
     });
 
@@ -195,12 +198,19 @@ test.describe('Query editor', () => {
 test.describe('Query editor with fixture data', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Fixture-data tests depend on e2e_test.events seeded by tests/e2e/fixtures/seed.sql via the local e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
   test('SQL query returns rows from fixture data', async ({ page, explorePage }) => {
     await page.goto(exploreUrl({ from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO }));
     await enterSql(page, 'SELECT timestamp, level, message FROM e2e_test.events ORDER BY timestamp LIMIT 10');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
@@ -211,7 +221,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, 'SELECT count(*) AS total FROM e2e_test.events');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
@@ -222,7 +232,7 @@ test.describe('Query editor with fixture data', () => {
     await enterSql(page, "SELECT timestamp, message FROM e2e_test.events WHERE level = 'error' ORDER BY timestamp");
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
     expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
