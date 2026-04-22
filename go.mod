@@ -6,7 +6,11 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.45.0
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.292.0
-	github.com/grafana/macropro v0.0.0
+	// macropro is a private Grafana module; its release-please tag
+	// "macropro-v1.0.0" is not semver-resolvable by Go, so we pin to the
+	// equivalent pseudo-version of the same commit. Requires
+	// GOPRIVATE=github.com/grafana/macropro and git access to the repo.
+	github.com/grafana/macropro v0.0.0-20260422220223-2d87e55058e4
 	github.com/grafana/sqlds/v5 v5.1.1
 	github.com/moby/moby/api v1.54.1
 	github.com/paulmach/orb v0.13.0
@@ -173,5 +177,3 @@ require (
 	gopkg.in/fsnotify/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/grafana/macropro v0.0.0 => /Users/adamyeats/Code/grafana-macropro
