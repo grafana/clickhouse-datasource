@@ -6,9 +6,19 @@ import (
 	"strings"
 	"time"
 
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/macropro"
 )
+
+// badArgsErr wraps a bad-argument-count error so that downstream callers
+// (sqlds/grafana) classify it as ErrorSourceDownstream rather than a plugin
+// bug. macropro's MacroFunc signature forbids a backend.ErrorWithSource
+// return type, so we wrap via backend.DownstreamError and let errors.As
+// unwrap it at the sqlds boundary.
+func badArgsErr(macro string, want, got int) error {
+	return backend.DownstreamError(fmt.Errorf("%w: %s expected %d argument(s), received %d", sqlutil.ErrorBadArgumentCount, macro, want, got))
+}
 
 // timeToDate converts a time.Time to a ClickHouse Date literal.
 func timeToDate(t time.Time) string {
@@ -63,7 +73,7 @@ func ToTimeFilterMs(ctx macropro.QueryContext[struct{}], args []string) (string,
 // $__timeFilter(col) → col >= toDateTime(<from>) AND col <= toDateTime(<to>)
 func TimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("timeFilter requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__timeFilter", 1, len(args))
 	}
 	col := args[0]
 	return fmt.Sprintf("%s >= %s AND %s <= %s", col, timeToDateTime(ctx.TimeRange.From), col, timeToDateTime(ctx.TimeRange.To)), nil
@@ -73,7 +83,7 @@ func TimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string, err
 // $__timeFilter_ms(col) → col >= fromUnixTimestamp64Milli(<from>) AND col <= fromUnixTimestamp64Milli(<to>)
 func TimeFilterMs(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("timeFilter_ms requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__timeFilter_ms", 1, len(args))
 	}
 	col := args[0]
 	return fmt.Sprintf("%s >= %s AND %s <= %s", col, timeToDateTime64(ctx.TimeRange.From), col, timeToDateTime64(ctx.TimeRange.To)), nil
@@ -83,7 +93,7 @@ func TimeFilterMs(ctx macropro.QueryContext[struct{}], args []string) (string, e
 // $__dateFilter(col) → col >= toDate('YYYY-MM-DD') AND col <= toDate('YYYY-MM-DD')
 func DateFilter(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("dateFilter requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__dateFilter", 1, len(args))
 	}
 	col := args[0]
 	return fmt.Sprintf("%s >= %s AND %s <= %s", col, timeToDate(ctx.TimeRange.From), col, timeToDate(ctx.TimeRange.To)), nil
@@ -93,7 +103,7 @@ func DateFilter(ctx macropro.QueryContext[struct{}], args []string) (string, err
 // $__dateTimeFilter(dateCol, timeCol) → (dateCol >= toDate(...) AND ...) AND (timeCol >= toDateTime(...) AND ...)
 func DateTimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 2 {
-		return "", fmt.Errorf("dateTimeFilter requires 2 arguments, received %d", len(args))
+		return "", badArgsErr("$__dateTimeFilter", 2, len(args))
 	}
 	dateCol, timeCol := args[0], args[1]
 	dateFilter := fmt.Sprintf("(%s >= %s AND %s <= %s)", dateCol, timeToDate(ctx.TimeRange.From), dateCol, timeToDate(ctx.TimeRange.To))
@@ -105,7 +115,7 @@ func DateTimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string,
 // $__timeInterval(col) → toStartOfInterval(toDateTime(col), INTERVAL N second)
 func TimeInterval(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("timeInterval requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__timeInterval", 1, len(args))
 	}
 	seconds := math.Max(ctx.Interval.Seconds(), 1)
 	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", args[0], int(seconds)), nil
@@ -115,7 +125,7 @@ func TimeInterval(ctx macropro.QueryContext[struct{}], args []string) (string, e
 // $__timeInterval_ms(col) → toStartOfInterval(toDateTime64(col, 3), INTERVAL N millisecond)
 func TimeIntervalMs(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("timeInterval_ms requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__timeInterval_ms", 1, len(args))
 	}
 	ms := math.Max(float64(ctx.IntervalMS), 1)
 	return fmt.Sprintf("toStartOfInterval(toDateTime64(%s, 3), INTERVAL %d millisecond)", args[0], int(ms)), nil
@@ -135,7 +145,7 @@ func IntervalSeconds(ctx macropro.QueryContext[struct{}], args []string) (string
 // $__timeFrom(col) → col >= toDateTime(<from_unix>)
 func TimeFrom(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("timeFrom requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__timeFrom", 1, len(args))
 	}
 	return fmt.Sprintf("%s >= %s", args[0], timeToDateTime(ctx.TimeRange.From)), nil
 }
@@ -144,7 +154,7 @@ func TimeFrom(ctx macropro.QueryContext[struct{}], args []string) (string, error
 // $__timeTo(col) → col <= toDateTime(<to_unix>)
 func TimeTo(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", fmt.Errorf("timeTo requires 1 argument, received %d", len(args))
+		return "", badArgsErr("$__timeTo", 1, len(args))
 	}
 	return fmt.Sprintf("%s <= %s", args[0], timeToDateTime(ctx.TimeRange.To)), nil
 }
@@ -155,18 +165,18 @@ func TimeTo(ctx macropro.QueryContext[struct{}], args []string) (string, error) 
 // $__timeGroup(col, 5m) → toStartOfInterval(toDateTime(col), INTERVAL 300 second)
 func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 2 {
-		return "", fmt.Errorf("timeGroup requires 2 arguments, received %d", len(args))
+		return "", badArgsErr("$__timeGroup", 2, len(args))
 	}
 	col := strings.TrimSpace(args[0])
 	periodStr := strings.Trim(strings.TrimSpace(args[1]), "'\"")
 
 	d, err := time.ParseDuration(periodStr)
 	if err != nil {
-		return "", fmt.Errorf("timeGroup: invalid interval %q: %w", periodStr, err)
+		return "", backend.DownstreamError(fmt.Errorf("$__timeGroup: invalid interval %q: %w", periodStr, err))
 	}
 	secs := int64(math.Round(d.Seconds()))
 	if secs <= 0 {
-		return "", fmt.Errorf("timeGroup: interval must be positive, got %q", periodStr)
+		return "", backend.DownstreamError(fmt.Errorf("$__timeGroup: interval must be positive, got %q", periodStr))
 	}
 	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", col, secs), nil
 }
