@@ -439,11 +439,14 @@ func expandMacros(req *backend.QueryDataRequest) *backend.QueryDataRequest {
 	}
 }
 
-// expandMacrosInQuery expands macros in a single query. On any error
-// (malformed JSON, missing rawSql, handler error), the query is returned
-// unchanged so downstream sqlds still gets a chance to process it. Macro
-// errors are logged so admins can diagnose misuses even when the DB
-// ultimately rejects the unexpanded query.
+// expandMacrosInQuery expands macros in a single query. When macro
+// expansion fails the rawSql is rewritten to a ClickHouse throwIf() call
+// that surfaces the macro error at execution time: ClickHouse raises an
+// Exception carrying our message, MutateQueryError classifies it as
+// downstream, and the user sees the real reason their query failed
+// instead of a cryptic DB syntax error on the unexpanded macro. We cannot
+// return an error from MutateQueryData directly — sqlds's hook signature
+// forbids it — so the DB round-trip is the only available error channel.
 func expandMacrosInQuery(q backend.DataQuery) backend.DataQuery {
 	var sqq sqlutil.Query
 	if err := json.Unmarshal(q.JSON, &sqq); err != nil {
@@ -461,20 +464,23 @@ func expandMacrosInQuery(q backend.DataQuery) backend.DataQuery {
 	expanded, err := macros.Interpolate(sqq.RawSQL, &sqq)
 	if err != nil {
 		backend.Logger.Error("failed to expand macros", "error", err.Error(), "refId", q.RefID)
-		return q
+		return replaceRawSQL(q, macroErrorQuery(err))
 	}
 	if expanded == sqq.RawSQL {
 		return q
 	}
+	return replaceRawSQL(q, expanded)
+}
 
-	// Write the expanded rawSql back into the original JSON without losing
-	// plugin-specific fields (meta.timezone, format, etc.) that sqlutil.Query
-	// does not know about.
+// replaceRawSQL writes newRawSQL into q.JSON while preserving plugin-specific
+// fields (meta.timezone, format, etc.) that sqlutil.Query does not know about.
+// On any serialization failure the original query is returned unchanged.
+func replaceRawSQL(q backend.DataQuery, newRawSQL string) backend.DataQuery {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(q.JSON, &raw); err != nil {
 		return q
 	}
-	newRawSQLMsg, err := json.Marshal(expanded)
+	newRawSQLMsg, err := json.Marshal(newRawSQL)
 	if err != nil {
 		return q
 	}
@@ -485,6 +491,16 @@ func expandMacrosInQuery(q backend.DataQuery) backend.DataQuery {
 	}
 	q.JSON = newJSON
 	return q
+}
+
+// macroErrorQuery turns a macro expansion error into a ClickHouse query that
+// fails at execution with the error message attached. ClickHouse's throwIf()
+// raises an Exception carrying the literal string, which is then classified
+// as a downstream error by MutateQueryError and surfaced to the user.
+func macroErrorQuery(err error) string {
+	// ClickHouse single-quoted string literals escape ' as ''.
+	msg := strings.ReplaceAll(err.Error(), "'", "''")
+	return fmt.Sprintf("SELECT throwIf(1, 'macro expansion failed: %s')", msg)
 }
 
 func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
