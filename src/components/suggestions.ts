@@ -310,7 +310,7 @@ async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, t
       insertText: prefix && prefix.includes('.') ? c.name.substring(prefix?.length || 0) : c.name,
       range,
     }))
-    .filter((c) => !prefix || c.label.startsWith(prefix));
+    .filter((c) => !prefix || c.label.toLowerCase().startsWith(prefix.toLowerCase()));
 }
 
 async function fetchFunctionSuggestions(schema: Schema, range: Range) {
