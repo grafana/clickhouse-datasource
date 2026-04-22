@@ -14,17 +14,7 @@ Before you can set up the plugin, you need to set up your environment by followi
 
 #### Compiling the backend
 
-The backend depends on [`github.com/grafana/macropro`](https://github.com/grafana/macropro), a private Grafana Go module. Before running any `go` or `mage` commands, configure your environment to fetch it directly via git instead of through the public module proxy:
-
-```sh
-export GOPRIVATE=github.com/grafana/macropro
-# Ensure git can read the repo — either via SSH:
-git config --global url."git@github.com:grafana/macropro".insteadOf "https://github.com/grafana/macropro"
-# …or via HTTPS with a PAT scoped to read the private repo:
-# git config --global url."https://${GITHUB_TOKEN}:x-oauth-basic@github.com/grafana/macropro".insteadOf "https://github.com/grafana/macropro"
-```
-
-You can then use [mage](https://github.com/magefile/mage) to compile and test the Go backend.
+You can use [mage](https://github.com/magefile/mage) to compile and test the Go backend.
 
 ```sh
 mage test # run all Go test cases
