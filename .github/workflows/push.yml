@@ -11,16 +11,6 @@ on:
   # Allow manual re-runs from the Actions UI (useful for debugging failures)
   workflow_dispatch:
 
-# GOPRIVATE is required so `go mod download` fetches github.com/grafana/macropro
-# (a private module) directly via git using the insteadOf rewrite that the
-# shared backend action installs, instead of going through proxy.golang.org
-# which cannot see private repos. Top-level env is not guaranteed to propagate
-# into reusable-workflow steps — if CI fails resolving macropro, the shared
-# workflow (grafana/plugin-ci-workflows) needs to export GOPRIVATE in its
-# backend action.
-env:
-  GOPRIVATE: github.com/grafana/macropro
-
 # Minimal top-level permissions; jobs can extend as needed
 permissions:
   contents: read
