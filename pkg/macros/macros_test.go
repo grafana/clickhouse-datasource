@@ -1,6 +1,7 @@
 package macros
 
 import (
+	stdErrors "errors"
 	"fmt"
 	"testing"
 	"time"
@@ -233,6 +234,44 @@ func TestMacroTimeGroup(t *testing.T) {
 
 	_, err = TimeGroup(ctx, []string{"ts", "not-a-duration"})
 	assert.Error(t, err)
+}
+
+// TestMacroErrorsAreDownstream ensures bad-argument and bad-duration errors
+// are wrapped as downstream errors so grafana classifies them as user input
+// errors rather than plugin bugs.
+func TestMacroErrorsAreDownstream(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{"TimeFilter wrong arity", func() error { _, err := TimeFilter(ctx, nil); return err }},
+		{"TimeFilterMs wrong arity", func() error { _, err := TimeFilterMs(ctx, nil); return err }},
+		{"DateFilter wrong arity", func() error { _, err := DateFilter(ctx, nil); return err }},
+		{"DateTimeFilter wrong arity", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }},
+		{"TimeInterval wrong arity", func() error { _, err := TimeInterval(ctx, nil); return err }},
+		{"TimeIntervalMs wrong arity", func() error { _, err := TimeIntervalMs(ctx, nil); return err }},
+		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, nil); return err }},
+		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, nil); return err }},
+		{"TimeGroup wrong arity", func() error { _, err := TimeGroup(ctx, []string{"ts"}); return err }},
+		{"TimeGroup bad duration", func() error { _, err := TimeGroup(ctx, []string{"ts", "nope"}); return err }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.call()
+			require.Error(t, err)
+			var es backend.ErrorWithSource
+			require.True(t, stdErrors.As(err, &es), "expected error to satisfy backend.ErrorWithSource")
+			assert.Equal(t, backend.ErrorSourceDownstream, es.ErrorSource())
+		})
+	}
+
+	t.Run("arg-count errors unwrap to ErrorBadArgumentCount", func(t *testing.T) {
+		_, err := TimeFilter(ctx, nil)
+		require.Error(t, err)
+		assert.True(t, stdErrors.Is(err, sqlutil.ErrorBadArgumentCount))
+	})
 }
 
 // TestInterpolate verifies end-to-end macro expansion using macropro.Interpolate directly,
