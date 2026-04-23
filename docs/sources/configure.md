@@ -104,6 +104,37 @@ Click **Save & test** to verify the connection. When the connection test succeed
 
 If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
+## Forward Grafana HTTP headers
+
+When you use the **HTTP** protocol, you can propagate Grafana's per-request HTTP headers end-to-end to ClickHouse. This attaches context about the originating Grafana user, dashboard, and panel to every query so you can drive query-log attribution, quotas, and row policies from ClickHouse.
+
+To enable it, expand **Optional HTTP settings** on the data source and turn on **Forward Grafana HTTP headers to data source**.
+
+{{< admonition type="note" >}}
+This setting is only available on the HTTP protocol. The native protocol does not carry HTTP headers.
+{{< /admonition >}}
+
+When the toggle is on, the following headers are forwarded on each ClickHouse connection:
+
+| Header | Source |
+| ------ | ------ |
+| `X-Grafana-User` | The logged-in Grafana user's login. Populated from the plugin's request context, so you do not need to enable the Grafana `dataproxy.send_user_header` setting for this plugin. |
+| `X-Dashboard-Uid`, `X-Panel-Id`, `X-Panel-Plugin-Id`, `X-Dashboard-Title`, `X-Panel-Title` | Identifiers set by Grafana when the query originates from a dashboard panel. |
+| `X-Grafana-Org-Id`, `X-Query-Group-Id`, `X-Grafana-From-Expr`, `X-Datasource-Uid` | Request-context headers set by Grafana core. |
+
+### Use cases
+
+- **Query-log attribution** — ClickHouse records the forwarded headers in `system.query_log.http_user_agent` and related fields, so operators can correlate queries back to the Grafana user and dashboard that triggered them.
+- **Row policies and quotas** — ClickHouse [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies) and [quotas](https://clickhouse.com/docs/en/operations/quotas) can key on the `X-Grafana-User` header, so a single shared ClickHouse account can still enforce per-viewer access rules.
+
+### Connection pool implications
+
+With header forwarding enabled, connections are keyed by the forwarded header set, which means each distinct Grafana user opens their own ClickHouse connection. Expect the connection count to scale with concurrent unique users and size `max_connections` on your ClickHouse server accordingly.
+
+### Custom headers
+
+To forward headers other than the Grafana-set ones — for example, bearer tokens or tenant identifiers — add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
+
 ## Provision the data source
 
 You can define the data source in YAML files as part of the Grafana provisioning system. For more information, refer to [Provisioning Grafana data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources).
