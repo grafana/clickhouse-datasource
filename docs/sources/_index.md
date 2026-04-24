@@ -11,7 +11,7 @@ menuTitle: ClickHouse data source
 title: ClickHouse data source
 weight: 10
 version: 0.1
-last_reviewed: 2026-02-11
+last_reviewed: 2026-04-24
 ---
 
 # ClickHouse data source

@@ -11,7 +11,7 @@ menuTitle: Configure
 title: Configure the ClickHouse data source
 weight: 20
 version: 0.1
-last_reviewed: 2026-04-27
+last_reviewed: 2026-04-24
 ---
 
 # Configure the ClickHouse data source
