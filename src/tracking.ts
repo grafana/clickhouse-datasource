@@ -6,6 +6,10 @@ export const trackClickhouseDashboardLoaded = (props: ClickhouseDashboardLoadedP
   reportInteraction('grafana_ds_clickhouse_dashboard_loaded', props);
 };
 
+export const trackClickhouseHealthCheckFailed = (props: { error_category: string; protocol: string }) => {
+  reportInteraction('grafana_ds_clickhouse_healthcheck_failed', props);
+};
+
 export type ClickhouseCounters = {
   sql_queries: number;
   sql_query_type_table: number;
