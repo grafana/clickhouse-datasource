@@ -54,6 +54,8 @@
     "jsonencode",
     "listbox",
     "lowcardinality",
+    "macropro",
+    "datepart",
     "magefile",
     "multiquery",
     "mgbench",
