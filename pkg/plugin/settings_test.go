@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +20,7 @@ func TestLoadSettings(t *testing.T) {
 	t.Run("should parse settings correctly", func(t *testing.T) {
 
 		ctx := context.Background()
-		ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		ctx = sdkconfig.WithGrafanaConfig(ctx, sdkconfig.NewGrafanaCfg(map[string]string{
 			"GF_SQL_ROW_LIMIT":                         "1000000",
 			"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
 			"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
@@ -292,7 +293,7 @@ func TestLoadSettings(t *testing.T) {
 	})
 	t.Run("should capture invalid settings", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		ctx = sdkconfig.WithGrafanaConfig(ctx, sdkconfig.NewGrafanaCfg(map[string]string{
 			"GF_SQL_ROW_LIMIT":                         "1000000",
 			"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
 			"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",

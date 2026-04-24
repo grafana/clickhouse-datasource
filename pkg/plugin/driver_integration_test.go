@@ -21,7 +21,7 @@ import (
 	"time"
 
 	clickhouse_sql "github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/docker/docker/api/types/container"
+	"github.com/moby/moby/api/types/container"
 	"github.com/docker/go-units"
 	"github.com/elazarl/goproxy"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
