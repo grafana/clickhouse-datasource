@@ -49,6 +49,8 @@
     "ILIKE",
     "instancemgmt",
     "lowcardinality",
+    "macropro",
+    "datepart",
     "magefile",
     "multiquery",
     "mgbench",
