@@ -3,9 +3,13 @@ import { Locator, Page } from '@playwright/test';
 import { QueryType } from '../../src/types/queryBuilder';
 import { Components as Selectors } from '../../src/selectors';
 
-// Matches the uid set in provisioning/datasources/clickhouse.yml
-const DATASOURCE_UID = 'clickhouse-e2e';
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
+
+const isCloudRun = !!process.env.GRAFANA_URL;
+
+const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
+const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
+const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
 // Doc anchor the help link points to; kept in sync with labels.ts.
 const COLUMN_ROLES_DOCS_PATH = '/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles';
