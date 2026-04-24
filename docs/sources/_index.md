@@ -32,11 +32,12 @@ The ClickHouse data source allows you to query and visualize ClickHouse data in 
 
 | Grafana version | Plugin version |
 |-----------------|----------------|
-| 9.x and later | v4 |
-| 8.x | v2.2.0 |
+| 11.6.0 and later | v4.15+ |
+| 9.x – 11.5.x | v4.0 – v4.14 |
 
 {{< admonition type="note" >}}
-Ad hoc filters require ClickHouse 22.7 or later (from plugin v2.0 onward).
+- Ad hoc filters require ClickHouse 22.7 or later (from plugin v2.0 onward).
+- Log volume queries in the SQL editor require Grafana 12.4.0 or later.
 {{< /admonition >}}
 
 ## Get started

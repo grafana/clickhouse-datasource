@@ -116,7 +116,9 @@ To add the data source:
 
 ## Configure settings
 
-After adding the data source, configure the following:
+After adding the data source, configure the following settings.
+
+### Server settings
 
 | Setting | Description |
 |---------|-------------|
@@ -126,9 +128,10 @@ After adding the data source, configure the following:
 | **Protocol** | **Native** or **HTTP**. |
 | **Port** | Port number; depends on protocol and whether TLS is enabled (see default ports above). |
 | **Secure connection** | Enable when your ClickHouse server uses TLS. |
-| **Username** | ClickHouse user name. |
+| **Username** | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions). |
 | **Password** | ClickHouse user password. |
 | **Default database** | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`. |
+| **Default table** | The default table used by the query builder. |
 
 ### Default database guidance
 
@@ -138,6 +141,31 @@ The **Default database** setting controls which database the query builder and a
 - **ClickHouse Cloud:** Leave this field **blank**. ClickHouse Cloud connections already route to the correct default database for your service. Setting an explicit value can cause `Unknown database` errors if the name does not match the service's configured database.
 
 If you are unsure which database to use, leave the field blank and select a database per query in the query builder.
+
+### HTTP settings
+
+The following settings appear only when **Protocol** is set to **HTTP**:
+
+| Setting | Description |
+|---------|-------------|
+| **HTTP URL Path** | Additional URL path appended to HTTP requests (for example, `/clickhouse`). Defaults to `/`. |
+| **Custom HTTP headers** | Static headers sent with every request. Each header has a name, value, and an optional **Secure** toggle that stores the value in encrypted storage. |
+| **Forward Grafana HTTP headers** | When enabled, forwards Grafana request headers (such as authentication headers) to ClickHouse. Enables multi-connection mode so each unique set of forwarded headers gets its own connection. |
+
+### Additional settings
+
+| Setting | Description |
+|---------|-------------|
+| **Dial Timeout** | Timeout in seconds for establishing a connection. Default: `10`. |
+| **Query Timeout** | Timeout in seconds for read queries. Default: `60`. |
+| **Validate SQL** | When enabled, validates SQL syntax in the query editor. |
+| **Enable row limit** | When enabled, applies the Grafana row limit setting to query results. |
+
+### Custom ClickHouse settings
+
+You can pass arbitrary ClickHouse `SETTINGS` with every query by adding key-value pairs in the **Custom Settings** section. For example, you can set `max_block_size` or `max_threads` to tune query performance.
+
+These settings are appended to each query's `SETTINGS` clause. They do not replace any settings that the plugin sets internally (such as `max_execution_time`).
 
 ## Verify the connection
 
@@ -160,20 +188,27 @@ datasources:
       host: localhost
       port: 9000
       protocol: native
-      defaultDatabase: database
-      tlsSkipVerify: false
+      username: grafana_reader
+      # defaultDatabase: <string>
+      # defaultTable: <string>
       # secure: <bool>
+      # tlsSkipVerify: <bool>
       # tlsAuth: <bool>
       # tlsAuthWithCACert: <bool>
       # dialTimeout: <seconds>
       # queryTimeout: <seconds>
-      # defaultTable: <string>
-      # httpHeaders:
+      # validateSql: <bool>
+      # enableRowLimit: <bool>
+      # forwardGrafanaHeaders: <bool>
+      # path: <string>  # HTTP URL path (HTTP protocol only)
+      # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
       #     secure: false
       #     value: <string>
+      # customSettings:
+      #   - setting: max_block_size
+      #     value: "65505"
     secureJsonData:
-      username: username
       password: password
       # tlsCACert: <string>
       # tlsClientCert: <string>
@@ -189,17 +224,22 @@ resource "grafana_data_source" "clickhouse" {
   type = "grafana-clickhouse-datasource"
   name = "ClickHouse"
 
-  json_data = {
-    defaultDatabase = "default"
-    port             = 9000
+  json_data_encoded = jsonencode({
     host             = "localhost"
+    port             = 9000
     protocol         = "native"
+    username         = "grafana_reader"
     tlsSkipVerify    = false
-  }
+    # defaultDatabase = "mydb"
+    # dialTimeout     = "10"
+    # queryTimeout    = "60"
+    # validateSql     = true
+    # enableRowLimit  = true
+  })
 
-  secure_json_data = {
+  secure_json_data_encoded = jsonencode({
     password = var.clickhouse_password
-  }
+  })
 }
 ```
 
