@@ -1,5 +1,5 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Locator, Page } from '@playwright/test';
+import { Page } from '@playwright/test';
 
 // Regression guard for #1541 — Trace viewer LIMIT applies to both list view
 // and trace view.
@@ -18,8 +18,13 @@ import { Locator, Page } from '@playwright/test';
 // column provisioning that isn't currently wired into the e2e setup.
 // Unit tests cover the builder side.
 
-const DATASOURCE_UID = 'clickhouse-e2e';
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
+
+const isCloudRun = !!process.env.GRAFANA_URL;
+
+const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
+const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
+const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
 // The trace_spans fixture in tests/e2e/fixtures/trace_spans.sql seeds five
 // spans for this trace at 2024-03-15 10:00:00–10:00:04 UTC.
@@ -27,10 +32,6 @@ const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 const TRACE_ID = 'e2e-trace-a';
 const EXPECTED_SPAN_COUNT = 5;
-
-function queryEditorRow(page: Page): Locator {
-  return page.locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]');
-}
 
 function exploreUrl(from: string, to: string): string {
   const query = {
@@ -71,6 +72,13 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 }
 
 test.describe('Trace ID query (#1541)', () => {
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Fixture-data tests depend on the local trace_spans seed (tests/e2e/fixtures/trace_spans.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
   test.describe.configure({ mode: 'serial' });
 
   test('single-trace span query returns all spans (no LIMIT truncation)', async ({ page, explorePage }) => {
@@ -84,7 +92,7 @@ test.describe('Trace ID query (#1541)', () => {
     await enterSql(page, sql);
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     await responsePromise;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,7 +120,7 @@ test.describe('Trace ID query (#1541)', () => {
     await enterSql(page, sql);
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     await responsePromise;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
