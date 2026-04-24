@@ -8,7 +8,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.291.1
 	github.com/grafana/sqlds/v5 v5.1.1
-	github.com/paulmach/orb v0.12.0
+	github.com/paulmach/orb v0.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.11.1
