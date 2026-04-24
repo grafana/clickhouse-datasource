@@ -7,7 +7,7 @@ products:
   - Grafana Enterprise
 keywords:
   - data source
-menuTitle: ClickHouse query editor
+menuTitle: Query editor
 title: ClickHouse query editor
 weight: 30
 version: 0.1

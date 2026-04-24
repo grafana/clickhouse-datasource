@@ -8,7 +8,7 @@ products:
 keywords:
   - data source
   - annotations
-menuTitle: ClickHouse annotations
+menuTitle: Annotations
 title: ClickHouse annotations
 weight: 50
 version: 0.1

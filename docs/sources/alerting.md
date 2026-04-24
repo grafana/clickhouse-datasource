@@ -8,9 +8,9 @@ products:
 keywords:
   - data source
   - alerting
-menuTitle: ClickHouse alerting
+menuTitle: Alerting
 title: ClickHouse alerting
-weight: 55
+weight: 60
 version: 0.1
 last_reviewed: 2026-02-11
 ---

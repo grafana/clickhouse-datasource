@@ -10,7 +10,7 @@ keywords:
   - troubleshooting
 menuTitle: Troubleshooting
 title: Troubleshoot ClickHouse data source issues
-weight: 40
+weight: 70
 version: 0.1
 last_reviewed: 2026-02-11
 ---

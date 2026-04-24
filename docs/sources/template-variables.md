@@ -10,7 +10,7 @@ keywords:
   - variables
 menuTitle: Template variables
 title: ClickHouse template variables
-weight: 20
+weight: 40
 version: 0.1
 last_reviewed: 2026-02-11
 ---
