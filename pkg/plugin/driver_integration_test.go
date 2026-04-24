@@ -1474,12 +1474,12 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, resp.Responses, "A")
 
-		qerr := resp.Responses["A"].Error
-		require.Error(t, qerr, "expected query to fail at the DB with the macro error")
+		respErr := resp.Responses["A"].Error
+		require.Error(t, respErr, "expected query to fail at the DB with the macro error")
 		// The macro error message is embedded in the throwIf payload, which
 		// ClickHouse echoes back in the Exception's Message field.
-		assert.Contains(t, qerr.Error(), "macro expansion failed")
-		assert.Contains(t, qerr.Error(), "$__timeFilter")
+		assert.Contains(t, respErr.Error(), "macro expansion failed")
+		assert.Contains(t, respErr.Error(), "$__timeFilter")
 		// MutateQueryError classifies any ClickHouse Exception as downstream,
 		// so the raised throwIf must come back tagged as user input rather
 		// than a plugin bug.
