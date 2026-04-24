@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { CodeEditor, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
-import { registerSQL, Range, Fetcher } from './sqlProvider';
+import { registerSQL, Range, Fetcher, SQLRegistration } from './sqlProvider';
 import { CHConfig } from 'types/config';
 import { CHQuery, EditorType, CHSqlQuery } from 'types/sql';
 import { styles } from 'styles';
@@ -35,6 +35,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 export const SqlEditor = (props: SqlEditorProps) => {
   const { query, onChange, datasource } = props;
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
+  const sqlRegistrationRef = useRef<SQLRegistration | null>(null);
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
 
@@ -77,7 +78,9 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
     editorRef.current = editor;
-    const me = registerSQL('sql', editor, _getSuggestions);
+    const registration = registerSQL('sql', editor, _getSuggestions);
+    sqlRegistrationRef.current = registration;
+    const me = registration.editor;
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
       if (datasource.settings.jsonData.validateSql) {
@@ -101,6 +104,10 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   const onEditorWillUnmount = () => {
     editorRef.current = null;
+    if (sqlRegistrationRef.current) {
+      sqlRegistrationRef.current.dispose();
+      sqlRegistrationRef.current = null;
+    }
   };
   const triggerFormat = () => {
     if (editorRef.current !== null) {
