@@ -231,6 +231,29 @@ Invalid Timeout Values
 
 ---
 
+### Permission and Settings Errors
+
+Setting Is Locked (readonly)
+
+**Error message:** "DB::Exception: Cannot modify 'max_execution_time': Setting is locked (in readonly mode)"
+
+**Cause:** The ClickHouse user has `readonly = 1` but does not have permission to modify the `max_execution_time` setting, which the plugin's client needs to enforce query timeouts.
+
+**Solution:**
+
+1. Create a settings profile or constraint that allows `max_execution_time` to be changed in read-only mode:
+   ```sql
+   ALTER SETTINGS PROFILE grafana_reader
+     SETTINGS readonly = 1,
+     SETTINGS max_execution_time CHANGEABLE_IN_READONLY;
+   ```
+2. Assign this profile to the Grafana ClickHouse user.
+3. Verify the fix by running `SELECT 1 SETTINGS max_execution_time = 30` as the Grafana user in `clickhouse-client`.
+
+For more details on configuring permissions, refer to [ClickHouse user and permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#clickhouse-user-and-permissions).
+
+---
+
 ### Query Errors
 
 ClickHouse Database Exception

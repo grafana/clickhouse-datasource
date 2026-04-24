@@ -7,11 +7,11 @@ products:
   - Grafana Enterprise
 keywords:
   - data source
-menuTitle: Configure the ClickHouse data source
+menuTitle: Configure
 title: Configure the ClickHouse data source
 weight: 20
 version: 0.1
-last_reviewed: 2026-02-11
+last_reviewed: 2026-04-27
 ---
 
 # Configure the ClickHouse data source
@@ -26,6 +26,10 @@ Before configuring the data source, ensure you have:
 - **Plugin:** The ClickHouse data source plugin installed. For Grafana version compatibility, see [Requirements](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/#requirements).
 - **ClickHouse:** A running ClickHouse server and a user with read-only access (or the permissions described below).
 - **Network access:** The Grafana server can reach the ClickHouse server on the intended port (HTTP: 8123 or 8443 with TLS; Native: 9000 or 9440 with TLS).
+
+{{< admonition type="note" >}}
+**Grafana Cloud users:** If your ClickHouse server is behind a firewall, you must allowlist the Grafana Cloud outbound IP addresses so that queries can reach your database. For the current list of IPs, refer to [Allow Grafana Cloud outbound traffic](https://grafana.com/docs/grafana-cloud/account-management/allow-traffic/). Because these IPs can change, check the list periodically or subscribe to updates.
+{{< /admonition >}}
 
 ## ClickHouse user and permissions
 
@@ -53,10 +57,35 @@ To configure a suitable read-only user:
 1. Set `readonly = 1` for the user or profile. For details, see [Permissions for queries (readonly)](https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly).
 1. Allow modification of the **max_execution_time** setting, which is required by the [clickhouse-go](https://github.com/ClickHouse/clickhouse-go/) client so the plugin can enforce query timeouts.
 
-If you use a **public ClickHouse instance**, do not set `readonly = 2`. Instead:
+### Required SETTINGS permissions
 
-- Keep `readonly = 1`
-- Set the constraint type for **max_execution_time** to [changeable_in_readonly](https://clickhouse.com/docs/en/operations/settings/constraints-on-settings)
+The plugin's underlying client ([clickhouse-go](https://github.com/ClickHouse/clickhouse-go/)) sets certain ClickHouse `SETTINGS` on each query. If the ClickHouse user does not have permission to modify these settings, queries will fail at runtime even though the **Save & test** check may pass.
+
+At a minimum the user must be allowed to change the following settings:
+
+| Setting | Why the plugin needs it |
+|---------|------------------------|
+| **max_execution_time** | Enforces the query timeout configured in the data source. |
+
+When `readonly = 1` is set, ClickHouse blocks all setting changes by default. To allow the required settings without disabling read-only mode:
+
+1. Create a [settings profile or constraint](https://clickhouse.com/docs/en/operations/settings/constraints-on-settings) for the Grafana user.
+1. Set the constraint type for each required setting to **changeable_in_readonly**.
+
+Example (SQL):
+
+```sql
+-- Allow the grafana_reader profile to modify max_execution_time while remaining read-only
+ALTER SETTINGS PROFILE grafana_reader
+  SETTINGS readonly = 1,
+  SETTINGS max_execution_time CHANGEABLE_IN_READONLY;
+```
+
+If you see errors such as `DB::Exception: Cannot modify 'max_execution_time': Setting is locked` at query time, the user is missing this permission. Refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for more details.
+
+{{< admonition type="note" >}}
+If you use a **public ClickHouse instance**, do not set `readonly = 2`. Keep `readonly = 1` and use the `changeable_in_readonly` constraint described above.
+{{< /admonition >}}
 
 ## ClickHouse protocol support
 
@@ -97,6 +126,16 @@ After adding the data source, configure the following:
 | **Secure connection** | Enable when your ClickHouse server uses TLS. |
 | **Username** | ClickHouse user name. |
 | **Password** | ClickHouse user password. |
+| **Default database** | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`. |
+
+### Default database guidance
+
+The **Default database** setting controls which database the query builder and ad hoc filters use when no database is explicitly specified.
+
+- **Self-hosted ClickHouse:** Set this to the database you query most often so that the query builder pre-selects it.
+- **ClickHouse Cloud:** Leave this field **blank**. ClickHouse Cloud connections already route to the correct default database for your service. Setting an explicit value can cause `Unknown database` errors if the name does not match the service's configured database.
+
+If you are unsure which database to use, leave the field blank and select a database per query in the query builder.
 
 ## Verify the connection
 
