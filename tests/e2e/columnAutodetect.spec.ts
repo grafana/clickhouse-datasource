@@ -2,9 +2,13 @@ import { expect, test } from '@grafana/plugin-e2e';
 import { Locator, Page } from '@playwright/test';
 import { QueryType } from '../../src/types/queryBuilder';
 
-// Matches the uid set in provisioning/datasources/clickhouse.yml
-const DATASOURCE_UID = 'clickhouse-e2e';
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
+
+const isCloudRun = !!process.env.GRAFANA_URL;
+
+const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
+const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
+const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
 // Seed database + table from tests/e2e/fixtures/seed.sql. Chosen deliberately so the
 // column names (`timestamp`, `message`, `level`) match the Layer 2 heuristics.
@@ -97,6 +101,13 @@ function columnRow(page: Page, label: string): Locator {
 }
 
 test.describe('Column auto-detection (Layer 2)', () => {
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Fixture-data tests depend on e2e_test.events seeded by tests/e2e/fixtures/seed.sql via the local e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
   test.describe('Logs builder', () => {
     test.beforeEach(async ({ page }) => {
       await page.goto(exploreUrl(QueryType.Logs));
