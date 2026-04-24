@@ -28,7 +28,9 @@ Before configuring the data source, ensure you have:
 - **Network access:** The Grafana server can reach the ClickHouse server on the intended port (HTTP: 8123 or 8443 with TLS; Native: 9000 or 9440 with TLS).
 
 {{< admonition type="note" >}}
-**Grafana Cloud users:** If your ClickHouse server is behind a firewall, you must allowlist the Grafana Cloud outbound IP addresses so that queries can reach your database. For the current list of IPs, refer to [Allow Grafana Cloud outbound traffic](https://grafana.com/docs/grafana-cloud/account-management/allow-traffic/). Because these IPs can change, check the list periodically or subscribe to updates.
+**Grafana Cloud users:** If your ClickHouse server is behind a firewall, you must allowlist the Grafana Cloud outbound IP addresses so that queries can reach your database. For the current list of IPs, refer to [Allow Grafana Cloud outbound traffic](https://grafana.com/docs/grafana-cloud/account-management/allow-traffic/).
+
+The published list covers standard outbound IPs but may not include every address used by your specific Grafana Cloud stack. If connections are still blocked after allowlisting the documented IPs, check your firewall or ClickHouse server logs for the rejected source addresses and [open a support ticket](https://grafana.com/profile/org#support) so the Grafana team can confirm the full set of IPs for your stack.
 {{< /admonition >}}
 
 ## ClickHouse user and permissions

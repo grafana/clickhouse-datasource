@@ -52,9 +52,9 @@ Invalid Port
 
 Failed to Create ClickHouse Client
 
-**Error message:** "failed to create ClickHouse client"
+**Error message:** "failed to create ClickHouse client" or "failed to create data source"
 
-**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This can occur due to network issues, incorrect credentials, firewall rules, or server unavailability.
+**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This can occur due to network issues, incorrect credentials, firewall rules, server unavailability, or an invalid default database configuration.
 
 **Solution:**
 
@@ -62,8 +62,9 @@ Failed to Create ClickHouse Client
 2. Check that the hostname, port, username, and password are correct.
 3. Ensure there are no firewall rules blocking the connection.
 4. If using TLS/SSL, verify that the certificates are correctly configured.
-5. Test the connection using `clickhouse-client` from the Grafana server to isolate network issues.
-6. Check the Grafana server logs for more detailed error information.
+5. Try clearing the **Default database** field. If you are connecting to **ClickHouse Cloud**, leave it blank — setting an explicit database name that does not match the service's configured database can cause this error. For details, see [Default database guidance](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#default-database-guidance).
+6. Test the connection using `clickhouse-client` from the Grafana server to isolate network issues.
+7. Check the Grafana server logs for more detailed error information.
 
 ---
 
@@ -94,6 +95,20 @@ Operation Cancelled During Execution
 2. Optimize your query to reduce execution time.
 3. Check if the ClickHouse server is under heavy load.
 4. Consider adding appropriate indexes to your ClickHouse tables.
+
+---
+
+Plugin Not Found After Installation (Grafana Cloud)
+
+**Error message:** 404 error when adding the ClickHouse data source, or the plugin does not appear in the data source list after installation.
+
+**Cause:** New Grafana Cloud instances on the **Fast** release channel may not yet have the ClickHouse plugin available. The Fast channel receives Grafana updates earlier, but plugin availability can lag behind.
+
+**Solution:**
+
+1. [Open a support ticket](https://grafana.com/profile/org#support) and request that your instance be moved to the **Steady** release channel.
+2. After the channel change takes effect, reinstall or re-add the ClickHouse data source.
+3. Once the plugin is working, you can discuss with support whether switching back to the Fast channel is safe for your use case.
 
 ---
 
@@ -425,7 +440,7 @@ Unable to Match Log Context Columns
 
 ---
 
-### Proxy Errors
+### Proxy and Private Data Connect (PDC) Errors
 
 Unable to Cast SOCKS Proxy Dialer
 
@@ -439,6 +454,25 @@ Unable to Cast SOCKS Proxy Dialer
 2. Check that the SOCKS proxy is properly configured and accessible.
 3. Review Grafana server logs for more detailed error information.
 4. Ensure your Grafana version supports the PDC feature.
+
+---
+
+PDC Connection Fails with No Agent Logs
+
+**Error message:** "check PDC agent logs" (but no relevant logs appear in the PDC agent pod)
+
+**Cause:** The PDC agent accepted the connection request but could not forward it to the target database. This commonly happens when the agent's authentication token has expired or become stale, or when the agent pod was restarted without refreshing credentials.
+
+**Solution:**
+
+1. Restart the PDC agent pod to force a fresh token handshake.
+2. If using Kubernetes, delete the pod and let the deployment recreate it:
+   ```bash
+   kubectl delete pod <pdc-agent-pod-name> -n <namespace>
+   ```
+3. Regenerate or refresh the PDC agent token in the Grafana Cloud portal, then redeploy the agent with the new token.
+4. After restarting, verify the agent logs show a successful registration message before retrying the data source connection.
+5. Confirm that the PDC agent can reach the ClickHouse server on the required port from within its network.
 
 ---
 
