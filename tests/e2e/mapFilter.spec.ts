@@ -1,17 +1,17 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Locator, Page } from '@playwright/test';
+import { Page } from '@playwright/test';
 
-// Matches the uid set in provisioning/datasources/clickhouse.yml
-const DATASOURCE_UID = 'clickhouse-e2e';
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
+
+const isCloudRun = !!process.env.GRAFANA_URL;
+
+const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
+const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
+const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
 // Time range that fully covers the seed fixture data in tests/e2e/fixtures/seed.sql
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
-
-function queryEditorRow(page: Page): Locator {
-  return page.locator('[data-testid="data-testid Query editor row"], [aria-label="Query editor row"]');
-}
 
 function exploreUrl(from = FIXTURE_FROM_ISO, to = FIXTURE_TO_ISO): string {
   const query = {
@@ -73,6 +73,13 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 test.describe('Map column adhoc filters', () => {
   test.describe.configure({ mode: 'serial' });
 
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Fixture-data tests depend on e2e_test.map_events seeded by tests/e2e/fixtures/map_events.sql via the local e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
   test('mapKeys() discovery query returns distinct keys', async ({ page, explorePage }) => {
     await page.goto(exploreUrl());
     // This is exactly the shape fetchUniqueMapKeys() emits, which
@@ -83,7 +90,7 @@ test.describe('Map column adhoc filters', () => {
     await enterSql(page, 'SELECT DISTINCT arrayJoin(labels.keys) AS keys FROM e2e_test.map_events ORDER BY keys');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     await responsePromise;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -108,7 +115,7 @@ test.describe('Map column adhoc filters', () => {
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     await responsePromise;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -132,7 +139,7 @@ test.describe('Map column adhoc filters', () => {
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     await responsePromise;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -150,7 +157,7 @@ test.describe('Map column adhoc filters', () => {
     await enterSql(page, 'SELECT DISTINCT labels FROM e2e_test.map_events ORDER BY toString(labels)');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
-    await queryEditorRow(page).getByRole('button', { name: 'Run Query' }).click();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     await responsePromise;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
