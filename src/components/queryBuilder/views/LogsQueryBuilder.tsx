@@ -17,6 +17,7 @@ import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import {
   useDefaultFilters,
+  useDefaultLogColumnsByName,
   useDefaultTimeColumn,
   useLogDefaultsOnMount,
   useOtelColumns,
@@ -107,6 +108,14 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     allColumns,
     builderOptions.table,
     builderState.timeColumn,
+    builderState.otelEnabled,
+    builderOptionsDispatch
+  );
+  useDefaultLogColumnsByName(
+    allColumns,
+    builderOptions.table,
+    builderState.messageColumn,
+    builderState.logLevelColumn,
     builderState.otelEnabled,
     builderOptionsDispatch
   );
