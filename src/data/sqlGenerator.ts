@@ -300,10 +300,10 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(orderBy);
   }
 
-  const limit = getLimit(options.limit);
-  if (limit !== '') {
-    queryParts.push(limit);
-  }
+  // Intentionally no LIMIT: this query is only reached in single-trace mode
+  // (`generateSql` routes here when `isTraceIdMode && traceId` are both set),
+  // and the WHERE clause already narrows to one trace ID. Applying the list's
+  // LIMIT here cuts off spans in the trace waterfall — see #1541.
 
   return concatQueryParts(queryParts);
 };
