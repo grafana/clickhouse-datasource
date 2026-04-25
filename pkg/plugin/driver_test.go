@@ -468,15 +468,20 @@ func TestExpandMacrosInQuery(t *testing.T) {
 		}
 		require.NoError(t, json.Unmarshal(out.JSON, &body))
 		assert.True(t, strings.HasPrefix(body.RawSQL, "SELECT throwIf(1, 'macro expansion failed: "))
-		assert.Contains(t, body.RawSQL, "$__timeFilter")
+		assert.Contains(t, body.RawSQL, "timeFilter")
+		// $__ tokens leaking into the throwIf payload would be re-expanded by
+		// sqlutil.DefaultMacros downstream and hide the throwIf behind a
+		// "Could not apply macros" error, so the rewrite must scrub them.
+		assert.NotContains(t, body.RawSQL, "$__")
 	})
 
-	t.Run("escapes single quotes in throwIf message", func(t *testing.T) {
+	t.Run("escapes single quotes and scrubs $__ in throwIf message", func(t *testing.T) {
 		// ClickHouse string literals escape ' as ''. macroErrorQuery must
 		// double every single quote so a message containing one can't
-		// prematurely close the literal.
-		got := macroErrorQuery(errors.New("oh 'no' it failed"))
-		assert.Equal(t, "SELECT throwIf(1, 'macro expansion failed: oh ''no'' it failed')", got)
+		// prematurely close the literal, and strip $__ prefixes so
+		// sqlutil's downstream macro scan doesn't mistake them for macros.
+		got := macroErrorQuery(errors.New("$__timeFilter failed: oh 'no' it broke"))
+		assert.Equal(t, "SELECT throwIf(1, 'macro expansion failed: __timeFilter failed: oh ''no'' it broke')", got)
 	})
 
 	t.Run("returns query unchanged when there are no macros", func(t *testing.T) {

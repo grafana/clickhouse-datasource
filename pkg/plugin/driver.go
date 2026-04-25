@@ -471,9 +471,17 @@ func replaceRawSQL(q backend.DataQuery, newRawSQL string) backend.DataQuery {
 // fails at execution with the error message attached. ClickHouse's throwIf()
 // raises an Exception carrying the literal string, which is then classified
 // as a downstream error by MutateQueryError and surfaced to the user.
+//
+// sqlds runs sqlutil.Interpolate AFTER MutateQueryData and that function
+// always merges sqlutil.DefaultMacros — meaning any "$__" tokens left in the
+// rewritten rawSql (including inside the throwIf string literal) are
+// re-scanned and may trigger the stock macro handlers, hiding our throwIf
+// behind a "Could not apply macros" error. Strip the "$" prefix to neutralize
+// the scanner while keeping macro names readable.
 func macroErrorQuery(err error) string {
+	msg := strings.ReplaceAll(err.Error(), "$__", "__")
 	// ClickHouse single-quoted string literals escape ' as ''.
-	msg := strings.ReplaceAll(err.Error(), "'", "''")
+	msg = strings.ReplaceAll(msg, "'", "''")
 	return fmt.Sprintf("SELECT throwIf(1, 'macro expansion failed: %s')", msg)
 }
 
