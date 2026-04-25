@@ -148,19 +148,26 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
   }
 
-  // TODO: for tags and serviceTags, consider the column type. They might not require mapping, they could already be JSON.
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   if (traceTags !== undefined) {
-    selectParts.push(
-      `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
-    );
+    if (traceTags.type?.toLowerCase().startsWith('json')) {
+      selectParts.push(`${escapeIdentifier(traceTags.name)} as tags`);
+    } else {
+      selectParts.push(
+        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
+      );
+    }
   }
 
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
   if (traceServiceTags !== undefined) {
-    selectParts.push(
-      `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
-    );
+    if (traceServiceTags.type?.toLowerCase().startsWith('json')) {
+      selectParts.push(`${escapeIdentifier(traceServiceTags.name)} as serviceTags`);
+    } else {
+      selectParts.push(
+        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
+      );
+    }
   }
 
   const traceStatusCode = getColumnByHint(options, ColumnHint.TraceStatusCode);
@@ -849,7 +856,13 @@ const getFilters = (options: QueryBuilderOptions): string => {
         .split('.')
         .map((p) => `\`${p}\``)
         .join('.');
-      column += `.${escapedJSONPaths}`;
+      // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
+      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
+      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
+      // that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // Update type so filter value generation routes through the string-aware branches.
+      type = 'String';
     }
 
     filterParts.push(column);
