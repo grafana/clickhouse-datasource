@@ -10,7 +10,7 @@ on:
 
 jobs:
   playwright-cloud:
-    uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@main
+    uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@cba42f3de6fce37bb278584f910d0e733ec03e35 # main
     secrets: inherit
     with:
       pdc-network-name: datasources-pdc-network-aws-datasourcese2e
