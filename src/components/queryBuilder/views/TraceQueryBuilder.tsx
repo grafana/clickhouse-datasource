@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit, OrderBy } from 'types/queryBuilder';
+import { ColumnRolesHelp } from '../ColumnRolesHelp';
 import { ColumnSelect } from '../ColumnSelect';
+import { Components as allSelectors } from 'selectors';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
@@ -173,6 +175,13 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
       <Collapse label={labels.columnsSection} collapsible isOpen={isColumnsOpen} onToggle={setColumnsOpen}>
         {configWarning}
+        <ColumnRolesHelp
+          text={labels.columnsHelp.text}
+          linkText={labels.columnsHelp.linkText}
+          href={labels.columnsHelp.href}
+          testIdWrapper={allSelectors.QueryBuilder.TraceQueryBuilder.columnRolesHelp}
+          testIdLink={allSelectors.QueryBuilder.TraceQueryBuilder.columnRolesHelpLink}
+        />
         <OtelVersionSelect
           enabled={builderState.otelEnabled}
           onEnabledChange={(e) => builderOptionsDispatch(setOtelEnabled(e))}
