@@ -1,5 +1,6 @@
 import { Lexer } from 'ch-parser/lexer';
 import { getErrorTokenDescription } from 'ch-parser/types';
+import { analyzerValidate } from 'ch-parser/analyzer';
 
 export interface Error {
   startLine: number;
@@ -24,6 +25,15 @@ function offsetToLineCol(sql: string, offset: number): { line: number; col: numb
 }
 
 export function validate(sql: string): Validation {
+  // Use the ClickHouse-aware WASM analyzer when it has been pre-warmed
+  // (initAnalyzer() is called from module.ts at plugin startup).
+  const analyzerResult = analyzerValidate(sql);
+  if (analyzerResult !== null) {
+    return analyzerResult;
+  }
+
+  // Synchronous fallback: the existing ClickHouse lexer flags lexical errors
+  // (unterminated strings, unclosed comments, etc.) without needing the WASM.
   const lexer = new Lexer(sql);
   while (true) {
     const token = lexer.nextToken();

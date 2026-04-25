@@ -6,6 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "prebuild": "node scripts/copy-analyzer-wasm.js",
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
     "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
     "e2e:report": "npx playwright show-report",
@@ -93,7 +94,6 @@
     "@grafana/ui": "12.4.2",
     "@openfeature/web-sdk": "^1.7.3",
     "es-toolkit": "^1.45.1",
-    "pgsql-ast-parser": "^12.0.1",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "react-router-dom": "5.3.4",

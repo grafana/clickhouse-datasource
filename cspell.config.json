@@ -15,6 +15,9 @@
   ],
   "words": [
     "aggregatable",
+    "ccall",
+    "Emscripten",
+    "HEAPU",
     "aheads",
     "ASOF",
     "apikey",
