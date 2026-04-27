@@ -11,12 +11,12 @@ menuTitle: ClickHouse data source
 title: ClickHouse data source
 weight: 10
 version: 0.1
-last_reviewed: 2026-04-24
+last_reviewed: 2026-04-27
 ---
 
 # ClickHouse data source
 
-The ClickHouse data source allows you to query and visualize ClickHouse data in Grafana. Use the raw SQL editor or query builder to create dashboards, time series, tables, logs, and traces.
+The ClickHouse data source plugin allows you to query and visualize ClickHouse data in Grafana and create alerts based on your ClickHouse queries. Use the SQL editor or the visual query builder to build dashboards with time series, tables, logs, and traces.
 
 ## Supported features
 
@@ -25,8 +25,11 @@ The ClickHouse data source allows you to query and visualize ClickHouse data in 
 | Metrics | Yes |
 | Logs | Yes |
 | Traces | Yes |
-| Alerting | Yes |
+| Alerting and recording rules | Yes |
 | Annotations | Yes |
+| Template variables | Yes |
+| Ad hoc filters | Yes (ClickHouse 22.7+) |
+| Private Data Connect (PDC) | Yes (Grafana Cloud) |
 
 ## Requirements
 
@@ -42,14 +45,14 @@ The ClickHouse data source allows you to query and visualize ClickHouse data in 
 
 ## Get started
 
-The following documents help you get started:
+Start by configuring a connection to your ClickHouse server, then use the query editor to build queries for dashboards and alerts.
 
-- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/)
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/)
-- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/)
-- [ClickHouse annotations](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/annotations/)
-- [ClickHouse alerting](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/alerting/)
-- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/)
+1. [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/) — Set up the connection, authentication, TLS, and optional features like logs and traces.
+2. [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Write SQL queries or use the visual query builder. Includes macros, query types, and examples.
+3. [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Create dynamic dashboards with variables and ad hoc filters.
+4. [ClickHouse annotations](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/annotations/) — Overlay event markers on dashboard panels from ClickHouse data.
+5. [ClickHouse alerting](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/alerting/) — Create alert rules and recording rules from ClickHouse queries.
+6. [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) — Solutions for common connection, query, and configuration errors.
 
 ## Additional features
 
@@ -87,4 +90,5 @@ Plugins are automatically updated in Grafana Cloud.
 ## Related resources
 
 - [ClickHouse documentation](https://clickhouse.com/docs)
+- [grafana-clickhouse-datasource on GitHub](https://github.com/grafana/clickhouse-datasource) — Source code, issues, and changelog.
 - [Grafana community forum](https://community.grafana.com/)
