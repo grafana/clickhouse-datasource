@@ -1249,12 +1249,29 @@ export class Datasource
       throw new Error('Missing time column for log context');
     }
 
+    // Preserve the user's secondary ORDER BY (e.g. `offset ASC` alongside
+    // `timestamp DESC`) so rows with identical timestamps keep their
+    // stable order in the log-context view. The time column is forced to
+    // the front because context pagination uses it; the user's remaining
+    // ORDER BY entries ride along as tiebreakers. Drop any existing entry
+    // that targets the same time column to avoid duplicating it. See #1293.
+    const originalOrderBy = builderOptions.orderBy ?? [];
     builderOptions.orderBy = [];
     builderOptions.orderBy.push({
       name: '',
       hint: timeColumn.hint!,
       dir: options.direction === LogRowContextQueryDirection.Forward ? OrderByDirection.ASC : OrderByDirection.DESC,
     });
+    for (const entry of originalOrderBy) {
+      const targetsTimeColumn =
+        entry.hint === ColumnHint.Time ||
+        entry.hint === ColumnHint.FilterTime ||
+        (!!entry.name && entry.name === timeColumn.name);
+      if (targetsTimeColumn) {
+        continue;
+      }
+      builderOptions.orderBy.push(entry);
+    }
 
     builderOptions.filters = [];
     builderOptions.filters.push({
@@ -1290,7 +1307,39 @@ export class Datasource
       targets: [contextQuery],
     } as DataQueryRequest<CHQuery>;
 
-    return await firstValueFrom(this.query(req));
+    // Surface the underlying ClickHouse error instead of letting Grafana
+    // wrap it in the generic "Error loading more logs" banner. The observable
+    // returned by `this.query(req)` can reject with a structured error or emit
+    // a `DataQueryResponse` with a populated `errors`/`error` field. In both
+    // cases we want the original server message to reach the user. See #1362.
+    let response: DataQueryResponse;
+    try {
+      response = await firstValueFrom(this.query(req));
+    } catch (err) {
+      const detail = this.extractQueryErrorMessage(err);
+      throw new Error(detail ? `Log context query failed: ${detail}` : 'Log context query failed');
+    }
+
+    const responseError = response?.errors?.find((e) => !!e?.message)?.message;
+    if (responseError) {
+      throw new Error(`Log context query failed: ${responseError}`);
+    }
+
+    return response;
+  }
+
+  private extractQueryErrorMessage(err: unknown): string | undefined {
+    if (!err) {
+      return undefined;
+    }
+    if (typeof err === 'string') {
+      return err;
+    }
+    if (typeof err === 'object') {
+      const anyErr = err as { data?: { message?: string }; message?: string; statusText?: string };
+      return anyErr.data?.message || anyErr.message || anyErr.statusText;
+    }
+    return undefined;
   }
 
   /**
