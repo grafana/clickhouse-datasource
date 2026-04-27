@@ -106,11 +106,28 @@ You can alert when a query returns no rows (for example, a health check that sho
 4. **Handle no data** — In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (e.g. a heartbeat query).
 5. **Test the query first** — Run the query in **Explore** with the ClickHouse data source and confirm it returns the expected numeric data before saving the alert rule.
 
+## Recording rules
+
+The ClickHouse data source supports [Grafana-managed recording rules](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/create-recording-rules/), which evaluate a ClickHouse query on a schedule and write the result as a Prometheus metric. This is useful for pre-aggregating expensive queries so dashboards load faster.
+
+The same query requirements and best practices that apply to alert rules also apply to recording rules. Pay particular attention to **data ingestion latency** — see the section below.
+
+### Account for data ingestion latency
+
+ClickHouse data may not be available at the exact moment a rule evaluates. This is especially common when ClickHouse is fed by an asynchronous pipeline (for example, Kafka, Segment, or an OTel collector) where data arrives with a delay of seconds to minutes.
+
+If a recording rule or alert rule returns missing data points or incomplete results:
+
+1. **Widen the relative time range.** Instead of querying only the last evaluation interval (for example, the last 1 minute), shift the query window back to account for ingestion lag. For example, query the last 5 minutes even if the rule evaluates every 1 minute.
+2. **Avoid filtering on `now()` tightly.** A `WHERE timestamp > now() - INTERVAL 1 MINUTE` filter will miss data that hasn't been flushed to ClickHouse yet. Use a wider window like `now() - INTERVAL 5 MINUTE` and rely on **Reduce** > **Last** to pick up the most recent value.
+3. **Test the query lag in Explore.** Run the query manually with different time offsets to determine how much delay your pipeline typically introduces, then build that buffer into the rule's time range.
+
 ## Troubleshooting
 
-If alerts do not fire or evaluate as expected:
+If alerts or recording rules do not fire or evaluate as expected:
 
 - **Query returns no numeric data** — Confirm the query returns a time column and a numeric column (or a single numeric value). Test in **Explore** and check the result format.
+- **Missing data points** — Check for data ingestion latency. See [Account for data ingestion latency](#account-for-data-ingestion-latency) above.
 - **Evaluation interval** — Ensure the evaluation interval is long enough for data to be available. Avoid intervals shorter than your data resolution.
 - **No data handling** — In **Configure no data and error handling**, choose whether no data should fire the alert, resolve it, or keep the current state.
 
