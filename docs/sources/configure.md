@@ -167,9 +167,19 @@ You can pass arbitrary ClickHouse `SETTINGS` with every query by adding key-valu
 
 These settings are appended to each query's `SETTINGS` clause. They do not replace any settings that the plugin sets internally (such as `max_execution_time`).
 
+### Private data source connect
+
+{{< admonition type="note" >}}
+Only available for Grafana Cloud users.
+{{< /admonition >}}
+
+Private data source connect (PDC) allows you to establish a private, secured connection between a Grafana Cloud instance (or stack) and data sources secured within a private network. Select the drop-down to locate the URL for PDC. For more information, refer to [Private data source connect](https://grafana.com/docs/grafana-cloud/connect-externally-hosted/private-data-source-connect/).
+
+Click **Manage private data source connect** to go to your PDC connection page, where you can find your PDC configuration details.
+
 ## Verify the connection
 
-Click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
+Once you have configured your ClickHouse connection settings, click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
 
 If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
