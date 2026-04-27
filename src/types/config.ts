@@ -112,6 +112,14 @@ export interface CHTracesConfig {
   traceEventsColumnPrefix?: string;
   traceLinksColumnPrefix?: string;
   showTraceLinks?: boolean;
+
+  /**
+   * Suffix appended to the traces table name to locate a companion trace-timestamp
+   * index table (e.g. `<table>_trace_id_ts`). When such a table exists, trace ID
+   * queries run a two-step lookup that narrows the main query's time range,
+   * avoiding a full scan. Defaults to `_trace_id_ts` (the OTel convention).
+   */
+  traceTimestampTableSuffix?: string;
 }
 
 export interface AliasTableEntry {
