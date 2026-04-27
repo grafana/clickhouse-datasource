@@ -3,8 +3,11 @@ package plugin
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
+	"github.com/grafana/clickhouse-datasource/pkg/plugin/schemacache"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	schemas "github.com/grafana/schemads"
 )
@@ -43,6 +46,13 @@ var (
 type SchemaProvider struct {
 	clickhousePlugin *Clickhouse
 	settings         backend.DataSourceInstanceSettings
+
+	// The three caches below are populated from datasource settings at
+	// construction time. A nil cache means caching is disabled for that
+	// handler — the handler code must treat nil as "always miss, no set".
+	tablesCache  *schemacache.Cache[[]string]
+	columnsCache *schemacache.Cache[map[string][]schemas.Column]
+	valuesCache  *schemacache.Cache[map[string][]string]
 }
 
 // Schema implements [schemas.SchemaHandler].
@@ -54,7 +64,7 @@ func (p *SchemaProvider) Schema(ctx context.Context, req *schemas.SchemaRequest)
 		}, nil
 	}
 
-	columnsMap, err := p.fetchColumnsForAllTables(ctx, tableResponse.Tables, nil)
+	columnsMap, err := p.cachedFetchColumns(ctx, tableResponse.Tables, nil)
 	if err != nil {
 		return &schemas.SchemaResponse{
 			Errors: err.Error(),
@@ -77,23 +87,43 @@ func (p *SchemaProvider) Schema(ctx context.Context, req *schemas.SchemaRequest)
 }
 
 // Tables implements [schemas.TablesHandler].
+//
+// Results are memoised via the per-datasource tables cache when enabled. The
+// cache holds a single entry ("all") because the query is parameter-free —
+// every caller gets the same list. The 60s TTL (see NewSchemaProvider) means
+// a newly-created table shows up within one TTL window, which is acceptable
+// for a schema picker but explicit here so future readers know the trade-off.
 func (p *SchemaProvider) Tables(ctx context.Context, req *schemas.TablesRequest) (*schemas.TablesResponse, error) {
+	if p.tablesCache == nil {
+		tables, err := p.fetchTables(ctx)
+		if err != nil {
+			return &schemas.TablesResponse{Errors: map[string]string{"A": err.Error()}}, nil
+		}
+		return &schemas.TablesResponse{Tables: tables}, nil
+	}
+
+	tables, err := p.tablesCache.Do(ctx, "all", func(ctx context.Context) ([]string, error) {
+		return p.fetchTables(ctx)
+	})
+	if err != nil {
+		return &schemas.TablesResponse{Errors: map[string]string{"A": err.Error()}}, nil
+	}
+	return &schemas.TablesResponse{Tables: tables}, nil
+}
+
+// fetchTables runs the underlying system.tables query and is the function
+// wrapped by the cache in [SchemaProvider.Tables]. Kept as a method so a
+// singleflight-collapsed caller can reuse the same code path as a
+// cache-disabled caller.
+func (p *SchemaProvider) fetchTables(ctx context.Context) ([]string, error) {
 	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
 	if err != nil {
-		return &schemas.TablesResponse{
-			Errors: map[string]string{
-				"A": err.Error(),
-			},
-		}, nil
+		return nil, err
 	}
 
 	rows, err := ds.QueryContext(ctx, "SELECT database, name FROM system.tables ORDER BY database, name")
 	if err != nil {
-		return &schemas.TablesResponse{
-			Errors: map[string]string{
-				"A": err.Error(),
-			},
-		}, nil
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -105,18 +135,14 @@ func (p *SchemaProvider) Tables(ctx context.Context, req *schemas.TablesRequest)
 	for rows.Next() {
 		var database, table string
 		if err := rows.Scan(&database, &table); err != nil {
-			return &schemas.TablesResponse{
-				Errors: map[string]string{
-					"A": err.Error(),
-				},
-			}, nil
+			return nil, err
 		}
 		if database == "system" {
 			continue
 		}
 		tables = append(tables, fmt.Sprintf("%s.%s", database, table))
 	}
-	return &schemas.TablesResponse{Tables: tables}, nil
+	return tables, nil
 }
 
 // Columns implements [schemas.ColumnsHandler].
@@ -134,7 +160,7 @@ func (p *SchemaProvider) Columns(ctx context.Context, req *schemas.ColumnsReques
 		return &schemas.ColumnsResponse{Columns: columns, Errors: errors}, nil
 	}
 
-	columnsMap, err := p.fetchColumnsForAllTables(ctx, tables, req.Headers)
+	columnsMap, err := p.cachedFetchColumns(ctx, tables, req.Headers)
 	if err != nil {
 		for _, table := range tables {
 			errors[table] = err.Error()
@@ -173,6 +199,30 @@ func escapeSQLString(s string) string {
 // quoteIdentifier quotes a ClickHouse identifier with backticks.
 func quoteIdentifier(s string) string {
 	return "`" + strings.ReplaceAll(s, "`", "``") + "`"
+}
+
+// cachedFetchColumns wraps fetchColumnsForAllTables with a per-datasource
+// cache keyed by the sorted table list. The sort is load-bearing: Grafana's
+// query builder sometimes asks for the same tables in a different order
+// (e.g. as the user toggles JOIN targets), and without the sort we'd cache
+// each permutation separately — a high miss rate with no upside since the
+// upstream query is order-independent.
+//
+// Headers intentionally do not participate in the key: they are per-request
+// forwarded auth tokens that do not change the schema ClickHouse sees for
+// the same datasource. If we ever need per-user schema filtering this
+// assumption must be revisited.
+func (p *SchemaProvider) cachedFetchColumns(ctx context.Context, tables []string, headers map[string]string) (map[string][]schemas.Column, error) {
+	if p.columnsCache == nil {
+		return p.fetchColumnsForAllTables(ctx, tables, headers)
+	}
+	sorted := make([]string, len(tables))
+	copy(sorted, tables)
+	sort.Strings(sorted)
+	key := strings.Join(sorted, "|")
+	return p.columnsCache.Do(ctx, key, func(ctx context.Context) (map[string][]schemas.Column, error) {
+		return p.fetchColumnsForAllTables(ctx, tables, headers)
+	})
 }
 
 // fetchColumnsForAllTables queries system.columns once for all tables and returns columns keyed by "database.table".
@@ -378,14 +428,43 @@ func mapClickHouseTypeToSchema(chType string) (schemas.ColumnType, []schemas.Ope
 }
 
 // ColumnValues implements [schemas.ColumnValuesHandler].
+//
+// Caching rationale: the response is DISTINCT user data from the target
+// table, so a short TTL (60s) trades at most one TTL-window of staleness
+// for filter dropdowns against what is typically the heaviest of the three
+// schema queries (a DISTINCT scan of potentially many columns). If the user
+// wants fresh values they hit "refresh". The cache is keyed on
+// (table, sorted columns) so a caller asking for columns A,B gets the same
+// entry as one asking for B,A.
 func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnValuesRequest) (*schemas.ColumnValuesResponse, error) {
+	if p.valuesCache == nil {
+		values, err := p.fetchColumnValues(ctx, req.Table, req.Columns)
+		if err != nil {
+			return &schemas.ColumnValuesResponse{Errors: map[string]string{req.Table: err.Error()}}, nil
+		}
+		return &schemas.ColumnValuesResponse{ColumnValues: values}, nil
+	}
+
+	sortedCols := make([]string, len(req.Columns))
+	copy(sortedCols, req.Columns)
+	sort.Strings(sortedCols)
+	key := req.Table + "::" + strings.Join(sortedCols, "|")
+
+	values, err := p.valuesCache.Do(ctx, key, func(ctx context.Context) (map[string][]string, error) {
+		return p.fetchColumnValues(ctx, req.Table, req.Columns)
+	})
+	if err != nil {
+		return &schemas.ColumnValuesResponse{Errors: map[string]string{req.Table: err.Error()}}, nil
+	}
+	return &schemas.ColumnValuesResponse{ColumnValues: values}, nil
+}
+
+// fetchColumnValues runs the DISTINCT-per-column UNION ALL probe. It is the
+// function wrapped by the cache in [SchemaProvider.ColumnValues].
+func (p *SchemaProvider) fetchColumnValues(ctx context.Context, table string, requestedColumns []string) (map[string][]string, error) {
 	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
 	if err != nil {
-		return &schemas.ColumnValuesResponse{
-			Errors: map[string]string{
-				req.Table: err.Error(),
-			},
-		}, nil
+		return nil, err
 	}
 	defer func() {
 		if err := ds.Close(); err != nil {
@@ -393,15 +472,11 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 		}
 	}()
 
-	columns := req.Columns
+	columns := requestedColumns
 	if len(columns) == 0 {
-		cols, err := p.fetchColumnsForTable(ctx, req.Table, nil)
+		cols, err := p.fetchColumnsForTable(ctx, table, nil)
 		if err != nil {
-			return &schemas.ColumnValuesResponse{
-				Errors: map[string]string{
-					req.Table: err.Error(),
-				},
-			}, nil
+			return nil, err
 		}
 		columns = make([]string, len(cols))
 		for i, col := range cols {
@@ -409,11 +484,9 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 		}
 	}
 
-	response := &schemas.ColumnValuesResponse{
-		ColumnValues: make(map[string][]string),
-	}
+	values := make(map[string][]string)
 	if len(columns) == 0 {
-		return response, nil
+		return values, nil
 	}
 
 	// Build a single UNION ALL query so all columns are fetched in one round-trip
@@ -422,19 +495,15 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 	for i, col := range columns {
 		parts[i] = fmt.Sprintf(
 			"SELECT '%s' AS col_name, toString(%s) AS val FROM (SELECT DISTINCT %s FROM %s SETTINGS max_execution_time=10)",
-			escapeSQLString(col), quoteIdentifier(col), quoteIdentifier(col), req.Table,
+			escapeSQLString(col), quoteIdentifier(col), quoteIdentifier(col), table,
 		)
-		response.ColumnValues[col] = make([]string, 0)
+		values[col] = make([]string, 0)
 	}
 	query := strings.Join(parts, " UNION ALL ")
 
 	rows, err := ds.QueryContext(ctx, query)
 	if err != nil {
-		return &schemas.ColumnValuesResponse{
-			Errors: map[string]string{
-				req.Table: err.Error(),
-			},
-		}, nil
+		return nil, err
 	}
 	defer func() {
 		if err := rows.Close(); err != nil {
@@ -445,18 +514,40 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 	for rows.Next() {
 		var colName, value string
 		if err := rows.Scan(&colName, &value); err != nil {
-			return &schemas.ColumnValuesResponse{
-				Errors: map[string]string{
-					req.Table: err.Error(),
-				},
-			}, nil
+			return nil, err
 		}
-		response.ColumnValues[colName] = append(response.ColumnValues[colName], value)
+		values[colName] = append(values[colName], value)
 	}
-
-	return response, nil
+	return values, nil
 }
 
-func NewSchemaProvider(clickhousePlugin *Clickhouse, settings backend.DataSourceInstanceSettings) *SchemaProvider {
-	return &SchemaProvider{clickhousePlugin: clickhousePlugin, settings: settings}
+// NewSchemaProvider builds a SchemaProvider and, if schema caching is enabled
+// in the datasource settings, initializes per-handler TTL caches. Settings
+// parsing failures degrade to a cache-disabled provider so the query builder
+// still works — we never want schema introspection to be gated on cache
+// availability.
+func NewSchemaProvider(ctx context.Context, clickhousePlugin *Clickhouse, settings backend.DataSourceInstanceSettings) *SchemaProvider {
+	p := &SchemaProvider{clickhousePlugin: clickhousePlugin, settings: settings}
+
+	parsed, err := LoadSettings(ctx, settings)
+	if err != nil || !parsed.EnableSchemaCache {
+		return p
+	}
+
+	ttl := time.Duration(parsed.SchemaCacheTTLSeconds) * time.Second
+	// ±5% jitter to avoid stampedes when many entries are populated in a
+	// burst (typical on first dashboard load). Width of the uniform band,
+	// not the half-width — see schemacache.New godoc.
+	jitter := ttl / 10
+
+	// Tables: one entry ever (the full "all tables" list). Use max=1 to
+	// make that explicit and keep the map tiny.
+	p.tablesCache = schemacache.New[[]string](ttl, jitter, 1)
+	// Columns and values: the key is the requested table set, so there's
+	// one entry per distinct request shape. 256 is generous for typical
+	// dashboards; the bound matters mainly for ad-hoc filter use.
+	p.columnsCache = schemacache.New[map[string][]schemas.Column](ttl, jitter, 256)
+	p.valuesCache = schemacache.New[map[string][]string](ttl, jitter, 256)
+
+	return p
 }
