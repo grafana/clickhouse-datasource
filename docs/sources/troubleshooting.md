@@ -536,8 +536,8 @@ Alerting Times Out via PDC While Dashboards Work
 
 **Solution:**
 
-1. Ensure you are using the **Grafana ClickHouse plugin** (`grafana-clickhouse-datasource`), not the community Altinity plugin. The Grafana plugin has better PDC compatibility for backend operations like alerting.
-2. Upgrade to the latest plugin version — PDC-related alerting fixes have been included in recent releases.
+1. Ensure you are using the **Grafana ClickHouse plugin** (`grafana-clickhouse-datasource`), not a community or third-party ClickHouse plugin. The Grafana plugin has better PDC compatibility for backend operations like alerting.
+2. Upgrade to the latest plugin version. PDC-related alerting fixes have been included in recent releases.
 3. Verify the PDC agent is healthy and not silently disconnected (see [PDC Connection Fails with No Agent Logs](#pdc-connection-fails-with-no-agent-logs) above).
 4. Check the Grafana alerting logs for detailed timeout or connection errors by filtering for the data source name or UID.
 
