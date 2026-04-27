@@ -374,7 +374,7 @@ Ad Hoc Filters Produce Incorrect or Missing Results
 1. **Upgrade to plugin v4.12.0 or later.** Both issues were fixed in v4.12.0:
    - Column names with dots are now handled correctly ([#1481](https://github.com/grafana/clickhouse-datasource/pull/1481)).
    - You can now manually control where ad hoc filters are placed in a query, which prevents silent injection failures in complex `WHERE` clauses ([#1488](https://github.com/grafana/clickhouse-datasource/pull/1488)).
-2. **Manual filter placement (v4.12.0+):** If you have a complex query where automatic filter injection fails, you can manually place ad hoc filters by adding the `$__adHocFilter()` macro in your `WHERE` clause. This gives you explicit control over where filters are injected.
+2. **Manual filter placement (v4.12.0+):** If you have a complex query where automatic filter injection fails, use the `$__adHocFilters('table_name')` macro to explicitly specify where filters are applied. Place it in the `SETTINGS` clause. For details and examples, see [Apply ad hoc filters manually](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#apply-ad-hoc-filters-manually-with-__adHocFilters).
 3. **Older plugin versions:** If you cannot upgrade, avoid column names with dots in ad hoc filters (use a ClickHouse [alias](https://clickhouse.com/docs/en/sql-reference/statements/create/table#alias) to flatten nested paths), and simplify complex `WHERE` clauses or move them into a subquery.
 
 ---
