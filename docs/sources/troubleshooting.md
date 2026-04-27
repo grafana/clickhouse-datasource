@@ -12,7 +12,7 @@ menuTitle: Troubleshooting
 title: Troubleshoot ClickHouse data source issues
 weight: 70
 version: 0.1
-last_reviewed: 2026-04-24
+last_reviewed: 2026-04-27
 ---
 
 ## Troubleshoot ClickHouse data source issues
@@ -270,6 +270,37 @@ Setting Is Locked (readonly)
 3. Verify the fix by running `SELECT 1 SETTINGS max_execution_time = 30` as the Grafana user in `clickhouse-client`.
 
 For more details on configuring permissions, refer to [ClickHouse user and permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#clickhouse-user-and-permissions).
+
+---
+
+### Query Builder Issues
+
+Empty Database, Table, or Column Dropdowns
+
+**Symptoms:** The database, table, or column dropdowns in the query builder show no options, or they briefly attempt to load and then appear empty.
+
+**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these dropdowns. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the dropdowns will be empty without a visible error message in the panel — the error is logged only to the browser console.
+
+**Solution:**
+
+1. Open the browser developer console (**F12** > **Console**) and look for errors from the ClickHouse data source.
+2. Verify the ClickHouse user has `SELECT` permission on `system.databases`, `system.tables`, and `system.columns`.
+3. If the ClickHouse server is slow or under heavy load, the schema query may time out. Wait and try again, or optimize the server's load.
+4. Test the data source connection with **Save & test** to confirm basic connectivity.
+
+---
+
+Column Value Suggestions Time Out on Large Tables
+
+**Symptoms:** Autocomplete suggestions for column values in the query builder are slow or return no results.
+
+**Cause:** The plugin runs `SELECT DISTINCT` queries for each column with `SETTINGS max_execution_time=10`. On tables with millions of rows or high-cardinality columns, this query can time out before completing.
+
+**Solution:**
+
+1. Use simpler filter values that you type manually rather than relying on autocomplete.
+2. Create a materialized view or dictionary with pre-aggregated distinct values for frequently filtered columns.
+3. Add a `clickhouse_adhoc_query` variable with a targeted `SELECT` query instead of relying on schema-driven suggestions.
 
 ---
 
@@ -588,6 +619,59 @@ WHERE $__timeFilter(timestamp)
 {{< admonition type="note" >}}
 This is a Grafana platform limitation, not specific to the ClickHouse plugin. A feature request for native sub-second display has been filed with the Grafana team.
 {{< /admonition >}}
+
+---
+
+### Upgrade and Compatibility Issues
+
+v3 to v4 Migration Problems
+
+**Symptoms:** After upgrading from plugin v3 to v4, data source settings appear to be missing (blank host, no timeout), or saved dashboard queries no longer load in the query editor.
+
+**Cause:** Plugin v4 renamed several configuration fields (`server` to `host`, `timeout` to `dialTimeout`) and restructured the query model (the `queryType` field changed from `sql`/`builder` to the new `editorType` format). The plugin includes automatic migration logic, but in some cases — especially with provisioned data sources — the migration may not run until the configuration page is opened.
+
+**Solution:**
+
+1. Open the data source configuration page in Grafana, then click **Save & test**. This triggers the frontend migration that copies v3 field values to v4 fields.
+2. If provisioning via YAML or Terraform, update the field names manually:
+   - `server` → `host`
+   - `timeout` → `dialTimeout`
+3. For dashboard queries that fail to load, open the dashboard and re-save it. The plugin automatically migrates v3 query formats to v4 when the query editor loads.
+4. If individual panels still show errors, switch to the **SQL Editor** tab, verify the query, and re-save the panel.
+
+---
+
+Log Volume Not Showing in SQL Editor
+
+**Symptoms:** The log volume histogram does not appear above log results when using the SQL editor in Explore. It works in the query builder.
+
+**Cause:** Log volume support for SQL editor queries requires **Grafana 12.4.0 or later**. On older Grafana versions, log volume is only available for queries built with the query builder.
+
+**Solution:**
+
+1. Upgrade Grafana to version 12.4.0 or later.
+2. Alternatively, switch the query to the **Builder** editor mode, which supports log volume on older Grafana versions.
+
+---
+
+Connection Pool Saturation (Sudden Slowness)
+
+**Symptoms:** Queries become progressively slower or time out under concurrent load, even though individual queries run quickly when tested in isolation. The ClickHouse server itself is not overloaded.
+
+**Cause:** The plugin uses a connection pool with default limits: **50 max open connections**, **25 max idle connections**, and **5-minute connection lifetime**. When many dashboard panels, alert rules, or concurrent users exhaust the pool, new queries queue until a connection becomes available.
+
+**Solution:**
+
+1. Reduce the number of concurrent queries by consolidating dashboard panels or staggering alert evaluation groups.
+2. Increase the connection pool limits by adding custom settings in the data source provisioning configuration:
+   ```yaml
+   jsonData:
+     maxOpenConns: "100"
+     maxIdleConns: "50"
+     connMaxLifetime: "10"
+   ```
+3. Monitor the ClickHouse server's `system.metrics` table (`CurrentMetric_TCPConnection`) to see whether the connection count from Grafana is approaching the server-side limit.
+4. If using HTTP protocol, check whether a reverse proxy between Grafana and ClickHouse has its own connection limits.
 
 ---
 
