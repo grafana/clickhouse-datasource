@@ -1,5 +1,5 @@
 ---
-description: This document outlines configuration options for the ClickHouse data source
+description: Configure the ClickHouse data source for Grafana, including connection, TLS, logs, traces, and provisioning
 labels:
 products:
   - Grafana Cloud
@@ -16,7 +16,7 @@ last_reviewed: 2026-04-24
 
 # Configure the ClickHouse data source
 
-This document explains how to configure the ClickHouse data source.
+This page explains how to configure the ClickHouse data source, including connection settings, TLS, logs and traces column mappings, and provisioning.
 
 ## Before you begin
 
@@ -39,7 +39,7 @@ Grafana executes queries exactly as written and does not validate or restrict SQ
 
 If your ClickHouse administrator has already given you a read-only user and connection details, you can skip to [Add the data source](#add-the-data-source).
 
-## Recommended permissions
+### Recommended permissions
 
 Create a ClickHouse user with:
 
@@ -51,7 +51,7 @@ Create a ClickHouse user with:
 Grafana does not prevent execution of non-read queries. If the ClickHouse user has sufficient privileges, statements such as `DROP TABLE` or `ALTER TABLE` will be executed by ClickHouse.
 {{< /admonition >}}
 
-## Configure a read-only user
+### Configure a read-only user
 
 To configure a suitable read-only user:
 
@@ -59,7 +59,7 @@ To configure a suitable read-only user:
 1. Set `readonly = 1` for the user or profile. For details, see [Permissions for queries (readonly)](https://clickhouse.com/docs/en/operations/settings/permissions-for-queries#readonly).
 1. Allow modification of the **max_execution_time** setting, which is required by the [clickhouse-go](https://github.com/ClickHouse/clickhouse-go/) client so the plugin can enforce query timeouts.
 
-### Required SETTINGS permissions
+#### Required SETTINGS permissions
 
 The plugin's underlying client ([clickhouse-go](https://github.com/ClickHouse/clickhouse-go/)) sets certain ClickHouse `SETTINGS` on each query. If the ClickHouse user does not have permission to modify these settings, queries will fail at runtime even though the **Save & test** check may pass.
 
@@ -91,9 +91,9 @@ If you use a **public ClickHouse instance**, do not set `readonly = 2`. Keep `re
 
 ## ClickHouse protocol support
 
-The data source supports two transport protocols: **Native** (default) and **HTTP**. Both use ClickHouse’s optimized native data formats and support the same query capabilities.
+The data source supports two transport protocols: **Native** (default) and **HTTP**. Both support the same query capabilities. The Native protocol uses ClickHouse's binary TCP interface for better performance. HTTP uses the ClickHouse HTTP interface, which is useful when your network requires HTTP-based connectivity (for example, through a reverse proxy or load balancer).
 
-## Default ports
+### Default ports
 
 | Protocol | TLS  | Port |
 |----------|------|------|
@@ -102,7 +102,7 @@ The data source supports two transport protocols: **Native** (default) and **HTT
 | Native   | No   | 9000 |
 | Native   | Yes  | 9440 |
 
-When you enable **Secure connection (TLS)** in Grafana, use a port that supports TLS. Grafana does not change the port automatically when TLS is enabled.
+When you enable **Secure connection** in Grafana, you must also set the port to a TLS-enabled port. Grafana does not change the port automatically when TLS is toggled on.
 
 ## Add the data source
 
@@ -127,7 +127,7 @@ After adding the data source, configure the following settings.
 | **Server** | The ClickHouse server host (for example, `localhost`). |
 | **Protocol** | **Native** or **HTTP**. |
 | **Port** | Port number; depends on protocol and whether TLS is enabled (see default ports above). |
-| **Secure connection** | Enable when your ClickHouse server uses TLS. |
+| **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
 | **Username** | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions). |
 | **Password** | ClickHouse user password. |
 | **Default database** | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`. |
@@ -152,6 +152,19 @@ The following settings appear only when **Protocol** is set to **HTTP**:
 | **Custom HTTP headers** | Static headers sent with every request. Each header has a name, value, and an optional **Secure** toggle that stores the value in encrypted storage. |
 | **Forward Grafana HTTP headers** | When enabled, forwards Grafana request headers (such as authentication headers) to ClickHouse. Enables multi-connection mode so each unique set of forwarded headers gets its own connection. |
 
+### TLS settings
+
+When **Secure connection** is enabled, the following TLS settings become available:
+
+| Setting | Description |
+|---------|-------------|
+| **Skip TLS Verify** | Skip server certificate verification. Use only for testing; not recommended for production. |
+| **TLS Client Auth** | Enable mutual TLS (mTLS) by providing a client certificate and key. |
+| **With CA Cert** | Provide a custom CA certificate for verifying the ClickHouse server's TLS certificate (required for self-signed certificates). |
+| **CA Cert** | PEM-encoded CA certificate. |
+| **Client Cert** | PEM-encoded client certificate (required when TLS Client Auth is enabled). |
+| **Client Key** | PEM-encoded client private key (required when TLS Client Auth is enabled). |
+
 ### Additional settings
 
 | Setting | Description |
@@ -166,6 +179,35 @@ The following settings appear only when **Protocol** is set to **HTTP**:
 You can pass arbitrary ClickHouse `SETTINGS` with every query by adding key-value pairs in the **Custom Settings** section. For example, you can set `max_block_size` or `max_threads` to tune query performance.
 
 These settings are appended to each query's `SETTINGS` clause. They do not replace any settings that the plugin sets internally (such as `max_execution_time`).
+
+### Logs configuration
+
+The data source includes a dedicated configuration section for log queries. These settings control the default column mappings used by the [logs query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#logs-query-builder):
+
+| Setting | Description |
+|---------|-------------|
+| **Default log database** | The default database for log queries. |
+| **Default log table** | The default table for log queries. |
+| **Use OTel** | When enabled, pre-fills column mappings for [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter) tables. Select the OTel schema version that matches your exporter. |
+| **Time column** | The high-precision timestamp column for sorting log rows. |
+| **Filter Time column** | A lower-precision time column for fast partition-based filtering. |
+| **Log Level column** | The column containing the log severity level. |
+| **Log Message column** | The column containing the log message body. |
+| **Context columns** | Comma-separated list of columns included alongside log messages for additional context. |
+
+### Traces configuration
+
+The data source includes a dedicated configuration section for trace queries. These settings control the default column mappings used by the [traces query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#traces-query-builder):
+
+| Setting | Description |
+|---------|-------------|
+| **Default trace database** | The default database for trace queries. |
+| **Default trace table** | The default table for trace queries. |
+| **Use OTel** | When enabled, pre-fills column mappings for OpenTelemetry tables. Select the OTel schema version that matches your exporter. |
+| **Duration unit** | The unit for the duration column (`seconds`, `milliseconds`, `microseconds`, or `nanoseconds`). |
+| **Flatten nested** | Enable if your traces table was created with `flatten_nested=1`. |
+
+When **Use OTel** is disabled, you can manually configure columns for Trace ID, Span ID, Parent Span ID, Service Name, Operation Name, Start Time, Duration, Tags, Service Tags, Kind, Status Code, Status Message, State, and Instrumentation Library.
 
 ### Private data source connect
 
