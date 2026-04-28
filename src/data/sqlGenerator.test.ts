@@ -231,7 +231,6 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
-      'LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
@@ -295,7 +294,6 @@ describe('SQL Generator', () => {
       '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
       '"TraceState" as traceState',
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
-      'LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
@@ -359,7 +357,6 @@ describe('SQL Generator', () => {
       '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
       '"TraceState" as traceState',
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
-      'LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
@@ -407,7 +404,6 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
-      'LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
@@ -453,11 +449,37 @@ describe('SQL Generator', () => {
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
       `FROM "default"."otel_traces" WHERE traceID = 'abcdefg'`,
-      'LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('regression #1541: trace ID query does not apply LIMIT (spans must not be truncated)', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: 'latest',
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+      },
+      // Inherited from the trace-search builder; this is the bug: spans of
+      // the selected trace must not be capped at this number.
+      limit: 3,
+      orderBy: [],
+    };
+    const sql = generateSql(opts);
+    expect(sql).not.toMatch(/\bLIMIT\b/);
   });
 
   it('generates trace search query', () => {
