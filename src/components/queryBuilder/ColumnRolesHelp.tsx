@@ -1,6 +1,5 @@
 import React from 'react';
-import { Icon } from '@grafana/ui';
-import { css } from '@emotion/css';
+import { Box, Icon, Text, TextLink } from '@grafana/ui';
 
 interface ColumnRolesHelpProps {
   text: string;
@@ -9,20 +8,6 @@ interface ColumnRolesHelpProps {
   testIdWrapper: string;
   testIdLink: string;
 }
-
-const styles = {
-  wrapper: css`
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin: 4px 0 8px 0;
-    font-size: 12px;
-    opacity: 0.85;
-  `,
-  link: css`
-    text-decoration: underline;
-  `,
-};
 
 /**
  * Small inline note rendered above the Columns section of the query builder
@@ -33,14 +18,16 @@ const styles = {
 export const ColumnRolesHelp = (props: ColumnRolesHelpProps) => {
   const { text, linkText, href, testIdWrapper, testIdLink } = props;
   return (
-    <div className={styles.wrapper} data-testid={testIdWrapper}>
-      <Icon name="info-circle" size="sm" />
-      <span>
+    <Box display="flex" alignItems="center" gap={0.5} marginTop={0.5} marginBottom={1} data-testid={testIdWrapper}>
+      <Text variant="bodySmall" color="secondary">
+        <Icon name="info-circle" size="sm" />
+      </Text>
+      <Text variant="bodySmall" color="secondary">
         {text}{' '}
-        <a className={styles.link} href={href} target="_blank" rel="noreferrer" data-testid={testIdLink}>
+        <TextLink href={href} external inline variant="bodySmall" color="secondary" data-testid={testIdLink}>
           {linkText}
-        </a>
-      </span>
-    </div>
+        </TextLink>
+      </Text>
+    </Box>
   );
 };
