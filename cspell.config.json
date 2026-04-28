@@ -60,6 +60,7 @@
     "mydb",
     "networkidle",
     "nofile",
+    "noreferrer",
     "nolint",
     "operationname",
     "Nonproxy",

@@ -161,6 +161,53 @@ WHERE TraceId = '61d489320c01243966700e172ab37081'
 ORDER BY startTime ASC
 ```
 
+## Column roles
+
+When you use the Query builder with the **Logs**, **Time series**, or **Traces** query type, each built-in column slot is mapped to a *semantic role*. The builder renames your columns to the fixed aliases Grafana's panels expect, so the same panel can visualize data from any ClickHouse schema once you tell it which columns play which roles.
+
+For example, choosing your `EventTime` column as the **Time** role for a Logs query produces `SELECT EventTime AS timestamp, ...`; the Logs panel then sorts on `timestamp` without needing to know your real column name.
+
+### Logs query type
+
+| Role          | SQL alias   | OTel column    | Common non-OTel names                                 |
+| ------------- | ----------- | -------------- | ----------------------------------------------------- |
+| **Time**      | `timestamp` | `Timestamp`    | `timestamp`, `event_time`, `@timestamp`, `created_at` |
+| **Message**   | `body`      | `Body`         | `message`, `msg`, `log_message`                       |
+| **Log Level** | `level`     | `SeverityText` | `level`, `severity`, `severity_text`, `log_level`     |
+
+Optional additional columns (OTel mode only): `TraceId` → `traceID`, plus the attribute maps `ResourceAttributes`, `ScopeAttributes`, and `LogAttributes`.
+
+### Time series query type
+
+| Role     | Description                                                                                                                                     |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Time** | Timestamp used to order and bucket the series. Must be a `DateTime` or `DateTime64` column. The panel time range filter applies to this column. |
+
+Any other selected columns become value series. In **Aggregate** mode the builder produces `GROUP BY` on the time column and the aggregated columns.
+
+### Traces query type
+
+Trace-panel column aliases are fixed; choose the table columns that play each role.
+
+| Role               | SQL alias       | OTel column          | Common non-OTel names                      |
+| ------------------ | --------------- | -------------------- | ------------------------------------------ |
+| **Trace ID**       | `traceID`       | `TraceId`            | `trace_id`, `traceId`                      |
+| **Span ID**        | `spanID`        | `SpanId`             | `span_id`, `spanId`                        |
+| **Parent Span ID** | `parentSpanID`  | `ParentSpanId`       | `parent_span_id`                           |
+| **Service Name**   | `serviceName`   | `ServiceName`        | `service`, `service_name`                  |
+| **Operation Name** | `operationName` | `SpanName`           | `operation`, `operation_name`, `span_name` |
+| **Start Time**     | `startTime`     | `Timestamp`          | `start_time`, `timestamp`                  |
+| **Duration Time**  | `duration`      | `Duration`           | `duration`, `duration_ns`, `duration_ms`   |
+| **Tags**           | `tags`          | `SpanAttributes`     | `tags`, `attributes`                       |
+| **Service Tags**   | `serviceTags`   | `ResourceAttributes` | `resource`, `resource_attributes`          |
+| **Kind**           | `kind`          | `SpanKind`           | `kind`, `span_kind`                        |
+| **Status Code**    | `statusCode`    | `StatusCode`         | `status`, `status_code`                    |
+| **Status Message** | `statusMessage` | `StatusMessage`      | `status_message`                           |
+
+Set the **Duration Unit** to match the units your column stores (OTel uses nanoseconds; other schemas often use milliseconds or seconds). The builder converts durations to milliseconds for the trace panel.
+
+To avoid re-mapping roles for every query, configure defaults under **Data source settings → Logs** and **Data source settings → Traces**. Enabling **OTel** mode populates every role with the OTel-conventional column name automatically.
+
 ## Macros
 
 Macros simplify query syntax and add dynamic parts such as dashboard time range filters. The plugin replaces macros with the corresponding SQL before the query is sent to ClickHouse.
