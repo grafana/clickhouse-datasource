@@ -10,9 +10,9 @@ keywords:
   - troubleshooting
 menuTitle: Troubleshooting
 title: Troubleshoot ClickHouse data source issues
-weight: 40
+weight: 70
 version: 0.1
-last_reviewed: 2026-02-11
+last_reviewed: 2026-04-27
 ---
 
 ## Troubleshoot ClickHouse data source issues
@@ -52,18 +52,23 @@ Invalid Port
 
 Failed to Create ClickHouse Client
 
-**Error message:** "failed to create ClickHouse client"
+**Error message:** "failed to create ClickHouse client" or "failed to create data source"
 
-**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This can occur due to network issues, incorrect credentials, firewall rules, or server unavailability.
+**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This is the most commonly reported ClickHouse error. The error message is intentionally generic — the actual root cause can be any of the issues listed below.
 
 **Solution:**
 
-1. Verify that the ClickHouse server is running and accessible from the Grafana server.
-2. Check that the hostname, port, username, and password are correct.
-3. Ensure there are no firewall rules blocking the connection.
-4. If using TLS/SSL, verify that the certificates are correctly configured.
-5. Test the connection using `clickhouse-client` from the Grafana server to isolate network issues.
-6. Check the Grafana server logs for more detailed error information.
+Work through the following checks in order. Most cases are resolved by one of the first four items.
+
+1. **Clear the Default database field.** This is one of the most common fixes. If you are connecting to **ClickHouse Cloud**, leave it blank — setting an explicit database name that does not match the service's configured database causes this error. For details, see [Default database guidance](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#default-database-guidance).
+2. **Verify credentials.** Confirm that the username and password are correct for the ClickHouse server. A typo or stale password is a frequent cause.
+3. **Check ClickHouse user permissions.** The connection test may pass, but queries can still fail if the user lacks permission to modify settings such as `max_execution_time`. See [Required SETTINGS permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#required-settings-permissions).
+4. **Confirm network connectivity.** Verify that the ClickHouse server is running and reachable from the Grafana server on the configured port. Ensure no firewall rules or security groups are blocking the connection.
+5. **Review the hostname and port.** Check for leading/trailing spaces and confirm the port matches the protocol (Native: 9000/9440, HTTP: 8123/8443).
+6. **Verify TLS configuration.** If using TLS/SSL, confirm that certificates are correctly configured and the port supports TLS.
+7. **Check Grafana Cloud data source quotas.** On Grafana Cloud, verify that the data source is being added to the correct stack and that you have not reached the data source quota for your plan.
+8. **Test from the command line.** Run `clickhouse-client` from the Grafana server to isolate whether the problem is network/ClickHouse-side or Grafana-side.
+9. **Check Grafana server logs.** The server logs often contain a more detailed error message that narrows down the root cause.
 
 ---
 
@@ -94,6 +99,20 @@ Operation Cancelled During Execution
 2. Optimize your query to reduce execution time.
 3. Check if the ClickHouse server is under heavy load.
 4. Consider adding appropriate indexes to your ClickHouse tables.
+
+---
+
+Plugin Not Found After Installation (Grafana Cloud)
+
+**Error message:** 404 error when adding the ClickHouse data source, or the plugin does not appear in the data source list after installation.
+
+**Cause:** New Grafana Cloud instances on the **Fast** release channel may not yet have the ClickHouse plugin available. The Fast channel receives Grafana updates earlier, but plugin availability can lag behind.
+
+**Solution:**
+
+1. [Open a support ticket](https://grafana.com/profile/org#support) and request that your instance be moved to the **Steady** release channel.
+2. After the channel change takes effect, reinstall or re-add the ClickHouse data source.
+3. Once the plugin is working, you can discuss with support whether switching back to the Fast channel is safe for your use case.
 
 ---
 
@@ -231,6 +250,60 @@ Invalid Timeout Values
 
 ---
 
+### Permission and Settings Errors
+
+Setting Is Locked (readonly)
+
+**Error message:** "DB::Exception: Cannot modify 'max_execution_time': Setting is locked (in readonly mode)"
+
+**Cause:** The ClickHouse user has `readonly = 1` but does not have permission to modify the `max_execution_time` setting, which the plugin's client needs to enforce query timeouts.
+
+**Solution:**
+
+1. Create a settings profile or constraint that allows `max_execution_time` to be changed in read-only mode:
+   ```sql
+   ALTER SETTINGS PROFILE grafana_reader
+     SETTINGS readonly = 1,
+     SETTINGS max_execution_time CHANGEABLE_IN_READONLY;
+   ```
+2. Assign this profile to the Grafana ClickHouse user.
+3. Verify the fix by running `SELECT 1 SETTINGS max_execution_time = 30` as the Grafana user in `clickhouse-client`.
+
+For more details on configuring permissions, refer to [ClickHouse user and permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#clickhouse-user-and-permissions).
+
+---
+
+### Query Builder Issues
+
+Empty Database, Table, or Column Dropdowns
+
+**Symptoms:** The database, table, or column dropdowns in the query builder show no options, or they briefly attempt to load and then appear empty.
+
+**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these dropdowns. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the dropdowns will be empty without a visible error message in the panel — the error is logged only to the browser console.
+
+**Solution:**
+
+1. Open the browser developer console (**F12** > **Console**) and look for errors from the ClickHouse data source.
+2. Verify the ClickHouse user has `SELECT` permission on `system.databases`, `system.tables`, and `system.columns`.
+3. If the ClickHouse server is slow or under heavy load, the schema query may time out. Wait and try again, or optimize the server's load.
+4. Test the data source connection with **Save & test** to confirm basic connectivity.
+
+---
+
+Column Value Suggestions Time Out on Large Tables
+
+**Symptoms:** Autocomplete suggestions for column values in the query builder are slow or return no results.
+
+**Cause:** The plugin runs `SELECT DISTINCT` queries for each column with `SETTINGS max_execution_time=10`. On tables with millions of rows or high-cardinality columns, this query can time out before completing.
+
+**Solution:**
+
+1. Use simpler filter values that you type manually rather than relying on autocomplete.
+2. Create a materialized view or dictionary with pre-aggregated distinct values for frequently filtered columns.
+3. Add a `clickhouse_adhoc_query` variable with a targeted `SELECT` query instead of relying on schema-driven suggestions.
+
+---
+
 ### Query Errors
 
 ClickHouse Database Exception
@@ -320,6 +393,23 @@ Failed to Get Table from Ad Hoc Query
 
 ---
 
+Ad Hoc Filters Produce Incorrect or Missing Results
+
+**Symptoms:**
+
+- Filters on column names that contain dots (for example, `raw.log.CONTEXT.subscriber`) are truncated to just the first segment (for example, `raw`), producing invalid or overly broad filters.
+- Filters silently stop being applied when the query contains a complex multi-condition `WHERE` clause. The `SETTINGS additional_table_filters` injection stops working entirely, and no error is shown.
+
+**Solution:**
+
+1. **Upgrade to plugin v4.12.0 or later.** Both issues were fixed in v4.12.0:
+   - Column names with dots are now handled correctly ([#1481](https://github.com/grafana/clickhouse-datasource/pull/1481)).
+   - You can now manually control where ad hoc filters are placed in a query, which prevents silent injection failures in complex `WHERE` clauses ([#1488](https://github.com/grafana/clickhouse-datasource/pull/1488)).
+2. **Manual filter placement (v4.12.0+):** If you have a complex query where automatic filter injection fails, use the `$__adHocFilters('table_name')` macro to explicitly specify where filters are applied. Place it in the `SETTINGS` clause. For details and examples, see [Apply ad hoc filters manually](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#apply-ad-hoc-filters-manually-with-__adHocFilters).
+3. **Older plugin versions:** If you cannot upgrade, avoid column names with dots in ad hoc filters (use a ClickHouse [alias](https://clickhouse.com/docs/en/sql-reference/statements/create/table#alias) to flatten nested paths), and simplify complex `WHERE` clauses or move them into a subquery.
+
+---
+
 Invalid Ad Hoc Filter
 
 **Error message:** "Invalid adhoc filter will be ignored: [filter details]"
@@ -402,7 +492,7 @@ Unable to Match Log Context Columns
 
 ---
 
-### Proxy Errors
+### Proxy and Private Data Connect (PDC) Errors
 
 Unable to Cast SOCKS Proxy Dialer
 
@@ -416,6 +506,58 @@ Unable to Cast SOCKS Proxy Dialer
 2. Check that the SOCKS proxy is properly configured and accessible.
 3. Review Grafana server logs for more detailed error information.
 4. Ensure your Grafana version supports the PDC feature.
+
+---
+
+PDC Connection Fails with No Agent Logs
+
+**Error message:** "check PDC agent logs" (but no relevant logs appear in the PDC agent pod)
+
+**Cause:** The PDC agent accepted the connection request but could not forward it to the target database. This commonly happens when the agent's authentication token has expired or become stale, or when the agent pod was restarted without refreshing credentials.
+
+**Solution:**
+
+1. Restart the PDC agent pod to force a fresh token handshake.
+2. If using Kubernetes, delete the pod and let the deployment recreate it:
+   ```bash
+   kubectl delete pod <pdc-agent-pod-name> -n <namespace>
+   ```
+3. Regenerate or refresh the PDC agent token in the Grafana Cloud portal, then redeploy the agent with the new token.
+4. After restarting, verify the agent logs show a successful registration message before retrying the data source connection.
+5. Confirm that the PDC agent can reach the ClickHouse server on the required port from within its network.
+
+---
+
+Alerting Times Out via PDC While Dashboards Work
+
+**Error message:** "i/o timeout", "datasourceError", or alert rule evaluations fail while dashboard queries using the same data source succeed.
+
+**Cause:** Alert rule evaluation uses a different backend code path than dashboard queries. In some configurations, the PDC connection is available for interactive queries but the alerting backend cannot establish or maintain the tunneled connection, causing timeouts specifically for alert evaluations.
+
+**Solution:**
+
+1. Ensure you are using the **Grafana ClickHouse plugin** (`grafana-clickhouse-datasource`), not a community or third-party ClickHouse plugin. The Grafana plugin has better PDC compatibility for backend operations like alerting.
+2. Upgrade to the latest plugin version. PDC-related alerting fixes have been included in recent releases.
+3. Verify the PDC agent is healthy and not silently disconnected (see [PDC Connection Fails with No Agent Logs](#pdc-connection-fails-with-no-agent-logs) above).
+4. Check the Grafana alerting logs for detailed timeout or connection errors by filtering for the data source name or UID.
+
+---
+
+Stale PDC Token — Metrics Suddenly Lost
+
+**Symptoms:** ClickHouse dashboards that were previously working stop loading data. The PDC agent pod appears to be running, but all queries return errors or empty results. No obvious error is shown in Grafana.
+
+**Cause:** The PDC agent's authentication token has expired. The agent pod continues running but can no longer relay connections to Grafana Cloud. This can happen silently, with no alerts from the agent itself.
+
+**Solution:**
+
+1. Restart the PDC agent pod to trigger a fresh token handshake:
+   ```bash
+   kubectl delete pod <pdc-agent-pod-name> -n <namespace>
+   ```
+2. If restarting doesn't resolve it, regenerate the PDC agent token in the Grafana Cloud portal and redeploy the agent with the new token.
+3. After the agent is back, click **Save & test** on the data source to confirm connectivity.
+4. To prevent recurrence, set up monitoring on the PDC agent pod — for example, a liveness probe or periodic health check that verifies the agent can relay a test query.
 
 ---
 
@@ -446,6 +588,90 @@ Couldn't Parse Grafana HTTP Headers
 1. Verify the header forwarding configuration.
 2. Check that custom HTTP headers are properly formatted.
 3. Review the data source configuration for any malformed header entries.
+
+---
+
+### Data Display Issues
+
+Timestamp Millisecond Precision Lost
+
+**Symptoms:** ClickHouse `DateTime64` timestamps with millisecond (or higher) precision display in Grafana with only second-level granularity. Milliseconds are truncated or shown as `.000` in both Explore and dashboard panels.
+
+**Cause:** This is a known Grafana platform limitation — Grafana's default time formatter displays timestamps at second precision regardless of the underlying data. The ClickHouse plugin returns the full-precision value, but Grafana's display layer truncates it.
+
+**Workaround for dashboards:**
+
+1. Add a [Convert field type](https://grafana.com/docs/grafana/latest/panels-visualizations/query-transform-data/transform-data/#convert-field-type) transformation to the panel.
+2. Set the time column's format to a pattern that includes milliseconds, for example `YYYY-MM-DD HH:mm:ss.SSS`.
+
+**Workaround for Explore:**
+
+There is currently no transformation support in Explore. As an alternative, you can cast the timestamp to a string with millisecond precision directly in the SQL query:
+
+```sql
+SELECT
+  formatDateTime(timestamp, '%Y-%m-%d %H:%i:%S') || '.' || toString(toUnixTimestamp64Milli(timestamp) % 1000) AS timestamp_ms,
+  message
+FROM my_table
+WHERE $__timeFilter(timestamp)
+```
+
+{{< admonition type="note" >}}
+This is a Grafana platform limitation, not specific to the ClickHouse plugin. A feature request for native sub-second display has been filed with the Grafana team.
+{{< /admonition >}}
+
+---
+
+### Upgrade and Compatibility Issues
+
+v3 to v4 Migration Problems
+
+**Symptoms:** After upgrading from plugin v3 to v4, data source settings appear to be missing (blank host, no timeout), or saved dashboard queries no longer load in the query editor.
+
+**Cause:** Plugin v4 renamed several configuration fields (`server` to `host`, `timeout` to `dialTimeout`) and restructured the query model (the `queryType` field changed from `sql`/`builder` to the new `editorType` format). The plugin includes automatic migration logic, but in some cases — especially with provisioned data sources — the migration may not run until the configuration page is opened.
+
+**Solution:**
+
+1. Open the data source configuration page in Grafana, then click **Save & test**. This triggers the frontend migration that copies v3 field values to v4 fields.
+2. If provisioning via YAML or Terraform, update the field names manually:
+   - `server` → `host`
+   - `timeout` → `dialTimeout`
+3. For dashboard queries that fail to load, open the dashboard and re-save it. The plugin automatically migrates v3 query formats to v4 when the query editor loads.
+4. If individual panels still show errors, switch to the **SQL Editor** tab, verify the query, and re-save the panel.
+
+---
+
+Log Volume Not Showing in SQL Editor
+
+**Symptoms:** The log volume histogram does not appear above log results when using the SQL editor in Explore. It works in the query builder.
+
+**Cause:** Log volume support for SQL editor queries requires **Grafana 12.4.0 or later**. On older Grafana versions, log volume is only available for queries built with the query builder.
+
+**Solution:**
+
+1. Upgrade Grafana to version 12.4.0 or later.
+2. Alternatively, switch the query to the **Builder** editor mode, which supports log volume on older Grafana versions.
+
+---
+
+Connection Pool Saturation (Sudden Slowness)
+
+**Symptoms:** Queries become progressively slower or time out under concurrent load, even though individual queries run quickly when tested in isolation. The ClickHouse server itself is not overloaded.
+
+**Cause:** The plugin uses a connection pool with default limits: **50 max open connections**, **25 max idle connections**, and **5-minute connection lifetime**. When many dashboard panels, alert rules, or concurrent users exhaust the pool, new queries queue until a connection becomes available.
+
+**Solution:**
+
+1. Reduce the number of concurrent queries by consolidating dashboard panels or staggering alert evaluation groups.
+2. Increase the connection pool limits by adding custom settings in the data source provisioning configuration:
+   ```yaml
+   jsonData:
+     maxOpenConns: "100"
+     maxIdleConns: "50"
+     connMaxLifetime: "10"
+   ```
+3. Monitor the ClickHouse server's `system.metrics` table (`CurrentMetric_TCPConnection`) to see whether the connection count from Grafana is approaching the server-side limit.
+4. If using HTTP protocol, check whether a reverse proxy between Grafana and ClickHouse has its own connection limits.
 
 ---
 

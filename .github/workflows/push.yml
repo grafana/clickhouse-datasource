@@ -27,7 +27,7 @@ jobs:
   ci:
     name: CI
 
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v6.1.1
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v7.3.1
 
     # Only run CI job for PRs / non-main refs.
     # Main publishing is handled by the CD workflow below.

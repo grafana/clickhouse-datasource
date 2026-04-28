@@ -1,5 +1,6 @@
 {
   "gopls": {
     "buildFlags": ["-tags=integration"]
-  }
+  },
+  "specstory.cloudSync.enabled": "never"
 }
