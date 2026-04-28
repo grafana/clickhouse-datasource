@@ -404,7 +404,7 @@ export default {
       columnsHelp: {
         text: 'Map your table columns to the roles the logs panel expects. Each column is aliased in the generated SQL.',
         linkText: 'Learn about column roles',
-        href: '/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
+        href: 'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
       },
       logTimeColumn: {
         label: 'Time',
