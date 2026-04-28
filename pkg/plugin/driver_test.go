@@ -425,3 +425,78 @@ func TestMutateQuery_GrafanaMetadata(t *testing.T) {
 		assert.NotEqual(t, ctx, newCtx)
 	})
 }
+
+func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
+	h := &Clickhouse{}
+
+	newRequest := func(forward bool) *backend.QueryDataRequest {
+		jsonBytes, _ := json.Marshal(map[string]any{
+			"host":                  "localhost",
+			"port":                  9000,
+			"forwardGrafanaHeaders": forward,
+		})
+		return &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{
+				DataSourceInstanceSettings: &backend.DataSourceInstanceSettings{
+					JSONData: jsonBytes,
+				},
+			},
+			Headers: map[string]string{},
+		}
+	}
+
+	t.Run("populates X-Grafana-User from context when forwardGrafanaHeaders is enabled", func(t *testing.T) {
+		req := newRequest(true)
+		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
+
+		h.MutateQueryData(ctx, req)
+
+		assert.Equal(t, "alice", req.GetHTTPHeader("X-Grafana-User"))
+	})
+
+	t.Run("does not inject when forwardGrafanaHeaders is disabled", func(t *testing.T) {
+		req := newRequest(false)
+		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
+
+		h.MutateQueryData(ctx, req)
+
+		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
+	})
+
+	t.Run("does not override header already set by Grafana proxy", func(t *testing.T) {
+		req := newRequest(true)
+		req.SetHTTPHeader("X-Grafana-User", "from-proxy")
+		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
+
+		h.MutateQueryData(ctx, req)
+
+		assert.Equal(t, "from-proxy", req.GetHTTPHeader("X-Grafana-User"))
+	})
+
+	t.Run("no user in context is a no-op", func(t *testing.T) {
+		req := newRequest(true)
+
+		h.MutateQueryData(t.Context(), req)
+
+		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
+	})
+
+	t.Run("nil DataSourceInstanceSettings is a no-op", func(t *testing.T) {
+		req := &backend.QueryDataRequest{Headers: map[string]string{}}
+		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
+
+		// Should not panic and should not set the header.
+		h.MutateQueryData(ctx, req)
+
+		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
+	})
+
+	t.Run("empty Login is a no-op", func(t *testing.T) {
+		req := newRequest(true)
+		ctx := backend.WithUser(t.Context(), &backend.User{Login: ""})
+
+		h.MutateQueryData(ctx, req)
+
+		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
+	})
+}
