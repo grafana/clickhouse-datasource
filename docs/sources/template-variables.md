@@ -10,9 +10,9 @@ keywords:
   - variables
 menuTitle: Template variables
 title: ClickHouse template variables
-weight: 20
+weight: 40
 version: 0.1
-last_reviewed: 2026-02-11
+last_reviewed: 2026-04-24
 ---
 
 # ClickHouse template variables
@@ -129,6 +129,10 @@ WHERE $__conditionalAll(database IN (${database:singlequote}), $database)
 
 When the user selects one or more databases, the condition filters by those databases. When the user selects **All**, the condition becomes `1=1` and all databases are included for optimization.
 
+{{< admonition type="note" >}}
+The second argument to `$__conditionalAll` must be a plain variable reference (`$database` or `${database}`). Do not use format specifiers like `${database:singlequote}` in the second argument — the macro will not detect the "All" selection correctly. Format specifiers should only be used in the **first** argument (the condition).
+{{< /admonition >}}
+
 See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section for the full list of macros.
 
 ## Query examples
@@ -169,11 +173,15 @@ Ad hoc filters let you add key/value filters that are applied to queries that us
 
 By default, the ad hoc filter drop-down lists all tables and columns from the data source. If you set a default database in the data source settings, only tables from that database are used. To limit which tables or columns appear (for example, to avoid slow loads), add a dashboard variable of type **Constant** named `clickhouse_adhoc_query`. Set its value to one of:
 
-- A comma-separated list of databases
-- A single database name
-- `database.table` to show only columns for one table
+- A single database name (for example, `my_database`) — shows tables and columns from that database only.
+- `database.table` (for example, `my_database.my_table`) — shows only columns for that specific table.
+- A `SELECT` query — uses the query results to populate filter keys. See [Use a query to populate ad hoc filters](#use-a-query-to-populate-ad-hoc-filters).
 
 You can hide this variable from the dashboard; it is only used to scope the ad hoc filter options.
+
+{{< admonition type="note" >}}
+Ad hoc filter values loaded from the schema are limited to **1000 distinct values** per column. If a column has more than 1000 distinct values, only the first 1000 are shown in the filter drop-down.
+{{< /admonition >}}
 
 ## Use a query to populate ad hoc filters
 
@@ -185,6 +193,36 @@ SELECT DISTINCT machine_name FROM mgbench.logs1
 
 Then the dashboard filter drop-down lists distinct `machine_name` values, and you can filter queries by the selected machine.
 
+### Dynamic column values with `$__adhoc_column`
+
+When using a `SELECT` query in `clickhouse_adhoc_query`, you can use the `$__adhoc_column` placeholder to make the query dynamic. The plugin replaces `$__adhoc_column` with the column name that the user selected as the filter key.
+
+This is useful when you want the filter **values** drop-down to be populated by a query rather than by scanning the schema. For example, set `clickhouse_adhoc_query` to:
+
+```sql
+SELECT DISTINCT $__adhoc_column FROM my_database.my_table
+```
+
+When the user selects a column (for example, `status`) in the ad hoc filter key drop-down, the plugin runs `SELECT DISTINCT status FROM my_database.my_table` to populate the value drop-down. The filter keys themselves are derived from the table's columns in `system.columns`.
+
+## Supported ad hoc filter operators
+
+Ad hoc filters support the following operators:
+
+| Operator | ClickHouse equivalent | Description |
+|----------|----------------------|-------------|
+| `=` | `=` | Equals |
+| `!=` | `!=` | Not equals |
+| `<` | `<` | Less than |
+| `>` | `>` | Greater than |
+| `=~` | `ILIKE` | Case-insensitive pattern match (use `%` as wildcard) |
+| `!~` | `NOT ILIKE` | Negated case-insensitive pattern match |
+| `IN` | `IN (...)` | Matches any value in a list |
+
+## Hide table name in ad hoc filter keys
+
+By default, ad hoc filter keys are shown as `table.column`. To show only the column name (without the table prefix), enable the **Hide table name in ad hoc filters** option in the data source settings. This makes the filter drop-down cleaner when all queries target the same table.
+
 ## Map and JSON types (OpenTelemetry)
 
 Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is the default and turns merged labels into a filter. To use **JSON** syntax for the filter logic, add a dashboard variable of type **Constant** named `clickhouse_adhoc_use_json`. The variable’s value is ignored; it only needs to exist.
@@ -194,6 +232,10 @@ Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is t
 By default, ad hoc filters are applied automatically by detecting the target table from your SQL. For queries that use CTEs, subqueries, or ClickHouse-specific syntax (for example `INTERVAL` or parameterized aggregate functions), automatic detection can fail. In those cases, use the `$__adHocFilters('table_name')` macro to specify where to apply the filters.
 
 The macro expands to the ClickHouse `additional_table_filters` setting with the currently active ad hoc filter conditions. Place it in the **SETTINGS** clause of your query.
+
+{{< admonition type="note" >}}
+When `$__adHocFilters` is present in a query, the plugin skips automatic ad hoc filter injection for that query. Use either the macro **or** automatic injection for a given query, not both.
+{{< /admonition >}}
 
 Example:
 
