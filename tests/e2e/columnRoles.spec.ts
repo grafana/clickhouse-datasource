@@ -12,7 +12,7 @@ const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
 const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
 // Doc anchor the help link points to; kept in sync with labels.ts.
-const COLUMN_ROLES_DOCS_PATH = '/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles';
+const COLUMN_ROLES_DOCS_PATH = 'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles';
 
 interface ExploreUrlOpts {
   queryType?: QueryType;
