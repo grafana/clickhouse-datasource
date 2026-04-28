@@ -443,7 +443,7 @@ export default {
       columnsHelp: {
         text: 'The Time column is required — it anchors the series to the panel time range. Other selected columns become value series.',
         linkText: 'Learn about column roles',
-        href: '/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
+        href: 'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
       },
       timeColumn: {
         label: 'Time',
