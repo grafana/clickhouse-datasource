@@ -196,6 +196,66 @@ func TestCache_DoSingleflight(t *testing.T) {
 	}
 }
 
+func TestCache_DoLeaderCancelDoesNotPoisonWaiters(t *testing.T) {
+	// If the singleflight leader's context is cancelled mid-flight, waiters
+	// whose own contexts are still valid should not see that cancellation.
+	// The cache uses context.WithoutCancel for the upstream call to keep
+	// one panel closing from aborting the schema fetch for every other panel.
+	c := New[int](time.Minute, 0, 10)
+
+	release := make(chan struct{})
+	fn := func(ctx context.Context) (int, error) {
+		<-release
+		// If WithoutCancel weren't applied, the leader's cancellation would
+		// have made it here; assert that we still see a live context.
+		if err := ctx.Err(); err != nil {
+			return 0, err
+		}
+		return 11, nil
+	}
+
+	leaderCtx, cancelLeader := context.WithCancel(context.Background())
+	var wg sync.WaitGroup
+	leaderResult := struct {
+		v   int
+		err error
+	}{}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		leaderResult.v, leaderResult.err = c.Do(leaderCtx, "k", fn)
+	}()
+
+	// Give the leader time to enter singleflight, then start a waiter and
+	// cancel the leader before fn returns.
+	time.Sleep(10 * time.Millisecond)
+
+	const waiters = 5
+	results := make([]int, waiters)
+	errs := make([]error, waiters)
+	for i := range waiters {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			results[i], errs[i] = c.Do(context.Background(), "k", fn)
+		}(i)
+	}
+
+	time.Sleep(10 * time.Millisecond)
+	cancelLeader()
+	close(release)
+	wg.Wait()
+
+	for i := range waiters {
+		if errs[i] != nil {
+			t.Fatalf("waiter %d should not see leader's cancellation: %v", i, errs[i])
+		}
+		if results[i] != 11 {
+			t.Fatalf("waiter %d got %d, want 11", i, results[i])
+		}
+	}
+}
+
 func TestCache_KeyIsolation(t *testing.T) {
 	// A primitive defense-in-depth check: different keys must not collide.
 	// If a future refactor regresses this, integration tests won't catch it.

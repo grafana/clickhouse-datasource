@@ -133,7 +133,11 @@ func (c *Cache[V]) Do(ctx context.Context, key string, fn func(context.Context) 
 		if v, ok := c.Get(key); ok {
 			return v, nil
 		}
-		v, err := fn(ctx)
+		// Detach the originating caller's cancellation from the upstream
+		// call: singleflight broadcasts fn's error to every waiter, so one
+		// panel closing would otherwise abort the fetch for the other N-1
+		// panels. Driver-level timeouts still bound the call.
+		v, err := fn(context.WithoutCancel(ctx))
 		if err != nil {
 			return v, err
 		}
