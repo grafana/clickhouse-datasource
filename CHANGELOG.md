@@ -1,5 +1,20 @@
 # Changelog
 
+## 4.16.0
+
+### Features
+
+- Explain column roles in logs/traces/timeseries query builders (#1790)
+
+### Fixes
+
+- Drop LIMIT from single-trace span query (#1795)
+- Forward X-Grafana-User header to ClickHouse when enabled (#1797)
+- Fix slow traceId lookup (#1705)
+- Replace `js-sql-parser` with existing ClickHouse lexer for SQL validation (#1778)
+- Match column suggestions case-insensitively in autocomplete (#1779)
+- Dependency updates
+
 ## 4.15.0
 
 ### Features
