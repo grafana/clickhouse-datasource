@@ -1,12 +1,8 @@
-// Package schemacache provides a small TTL + singleflight cache used to memoize
-// ClickHouse schema introspection queries (system.tables, system.columns, and
-// DISTINCT column-value probes) per datasource instance.
+// Package schemacache is a TTL + singleflight cache for ClickHouse schema
+// introspection queries (system.tables, system.columns, DISTINCT column probes).
 //
-// The goal is narrow: cut the N+1 round-trips the query builder produces when a
-// dashboard with many panels is opened, without caching anything that crosses
-// tenant or datasource boundaries. The cache lives on the SchemaProvider, so
-// each datasource instance has its own namespace; keys are composed by the
-// caller and do not need to include the datasource UID.
+// One cache lives per SchemaProvider, so entries never cross datasource or
+// tenant boundaries.
 package schemacache
 
 import (
@@ -19,11 +15,10 @@ import (
 	"golang.org/x/sync/singleflight"
 )
 
-// DefaultMaxItems is used when New is called with maxItems <= 0.
 const DefaultMaxItems = 256
 
-// Cache is a generic, TTL-bounded in-process cache with singleflight-backed
-// miss dedup. It is safe for concurrent use.
+// Cache is a TTL-bounded in-process cache with singleflight miss dedup.
+// Safe for concurrent use.
 type Cache[V any] struct {
 	ttl      time.Duration
 	jitter   time.Duration
@@ -33,8 +28,7 @@ type Cache[V any] struct {
 	entries map[string]entry[V]
 	sf      singleflight.Group
 
-	// now is overridable in tests so TTL behavior is deterministic.
-	now func() time.Time
+	now func() time.Time // test seam
 }
 
 type entry[V any] struct {
@@ -42,12 +36,9 @@ type entry[V any] struct {
 	expires time.Time
 }
 
-// New returns a cache with the given TTL, expiry jitter, and max item count.
-// jitter is applied as a uniform ±jitter/2 band around ttl on every Set —
-// mt-infra caching.md calls for jitter specifically to avoid stampedes when
-// many entries were populated in a burst (e.g. on first dashboard load).
-//
-// A maxItems <= 0 is replaced with DefaultMaxItems.
+// New returns a cache with the given TTL, expiry jitter (±jitter/2 around ttl
+// per Set, to avoid stampedes), and max item count. maxItems <= 0 uses
+// DefaultMaxItems.
 func New[V any](ttl, jitter time.Duration, maxItems int) *Cache[V] {
 	if maxItems <= 0 {
 		maxItems = DefaultMaxItems
@@ -62,7 +53,7 @@ func New[V any](ttl, jitter time.Duration, maxItems int) *Cache[V] {
 }
 
 // Get returns the cached value if present and unexpired. Expired entries are
-// removed opportunistically on access.
+// dropped on access.
 func (c *Cache[V]) Get(key string) (V, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -82,7 +73,7 @@ func (c *Cache[V]) getLocked(key string) (V, bool) {
 	return e.value, true
 }
 
-// Set stores value under key with the cache's TTL (± jitter).
+// Set stores value under key with the cache's TTL (±jitter).
 func (c *Cache[V]) Set(key string, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -93,50 +84,41 @@ func (c *Cache[V]) Set(key string, value V) {
 	c.evictIfNeededLocked()
 }
 
-// Delete removes key from the cache. It's a no-op if key is absent.
+// Delete removes key from the cache.
 func (c *Cache[V]) Delete(key string) {
 	c.mu.Lock()
 	delete(c.entries, key)
 	c.mu.Unlock()
 }
 
-// Clear drops all entries. Useful for a "refresh schema" action wired to the
-// frontend, or in tests.
+// Clear drops all entries.
 func (c *Cache[V]) Clear() {
 	c.mu.Lock()
 	c.entries = make(map[string]entry[V])
 	c.mu.Unlock()
 }
 
-// Len returns the current number of (including expired but not-yet-evicted) entries.
-// Intended for tests and metrics.
+// Len returns the entry count, including expired-but-not-yet-evicted entries.
 func (c *Cache[V]) Len() int {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return len(c.entries)
 }
 
-// Do returns the cached value for key if present, otherwise calls fn and caches
-// its result. Concurrent callers miss-hitting the same key are collapsed into a
-// single fn invocation via singleflight, so one slow upstream query does not
-// produce N queued queries when a dashboard opens.
-//
-// If fn returns an error the result is not cached. The caller receives the
-// zero value and the error.
+// Do returns the cached value for key if present; otherwise calls fn and
+// caches its result. Concurrent misses on the same key collapse into one fn
+// invocation via singleflight. Errors are not cached.
 func (c *Cache[V]) Do(ctx context.Context, key string, fn func(context.Context) (V, error)) (V, error) {
 	if v, ok := c.Get(key); ok {
 		return v, nil
 	}
 	result, err, _ := c.sf.Do(key, func() (any, error) {
-		// Re-check after acquiring the singleflight slot: another caller
-		// may have populated the entry while we waited.
+		// Recheck under singleflight: another caller may have populated it.
 		if v, ok := c.Get(key); ok {
 			return v, nil
 		}
-		// Detach the originating caller's cancellation from the upstream
-		// call: singleflight broadcasts fn's error to every waiter, so one
-		// panel closing would otherwise abort the fetch for the other N-1
-		// panels. Driver-level timeouts still bound the call.
+		// Detach from the leader's ctx — singleflight broadcasts fn's error
+		// to every waiter, so leader cancellation would poison them too.
 		v, err := fn(context.WithoutCancel(ctx))
 		if err != nil {
 			return v, err
@@ -155,17 +137,12 @@ func (c *Cache[V]) ttlWithJitter() time.Duration {
 	if c.jitter <= 0 {
 		return c.ttl
 	}
-	// Uniform band of width c.jitter centred on c.ttl.
 	delta := time.Duration(rand.Int64N(int64(c.jitter))) - c.jitter/2
 	return c.ttl + delta
 }
 
-// evictIfNeededLocked keeps the cache at or below maxItems. It first drops
-// expired entries (cheap) and, only if still over capacity, falls back to
-// dropping the earliest-expiring entries (a simple approximation of LRU that
-// does not require tracking access order on every Get).
-//
-// Must be called with c.mu held.
+// evictIfNeededLocked keeps len <= maxItems by dropping expired entries first,
+// then earliest-expiring entries (cheap LRU approximation). Caller holds c.mu.
 func (c *Cache[V]) evictIfNeededLocked() {
 	if len(c.entries) <= c.maxItems {
 		return
