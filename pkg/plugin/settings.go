@@ -48,6 +48,15 @@ type Settings struct {
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
+
+	// EnableSchemaCache gates the in-process cache that memoizes
+	// system.tables / system.columns / DISTINCT column-value lookups used
+	// by the query builder. Defaults to true.
+	EnableSchemaCache bool `json:"enableSchemaCache,omitempty"`
+	// SchemaCacheTTLSeconds controls how long schema-introspection results
+	// are considered fresh. Defaults to 60. Set lower if users commonly run
+	// ALTER TABLE and expect the builder to reflect changes immediately.
+	SchemaCacheTTLSeconds int `json:"schemaCacheTTLSeconds,omitempty"`
 }
 
 type CustomSetting struct {
@@ -209,6 +218,37 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		} else {
 			settings.EnableRowLimit = jsonData["enableRowLimit"].(bool)
 		}
+	}
+
+	// Default schema cache on; surface both as booleans and strings to stay
+	// consistent with the existing settings-parsing style in this file.
+	settings.EnableSchemaCache = true
+	if raw, ok := jsonData["enableSchemaCache"]; ok && raw != nil {
+		switch v := raw.(type) {
+		case bool:
+			settings.EnableSchemaCache = v
+		case string:
+			if parsed, parseErr := strconv.ParseBool(v); parseErr == nil {
+				settings.EnableSchemaCache = parsed
+			} else {
+				backend.Logger.Warn("Failed to parse enableSchemaCache value, defaulting to true", "error", parseErr)
+			}
+		}
+	}
+	if raw, ok := jsonData["schemaCacheTTLSeconds"]; ok && raw != nil {
+		switch v := raw.(type) {
+		case float64:
+			settings.SchemaCacheTTLSeconds = int(v)
+		case string:
+			if parsed, parseErr := strconv.Atoi(v); parseErr == nil {
+				settings.SchemaCacheTTLSeconds = parsed
+			} else {
+				backend.Logger.Warn("Failed to parse schemaCacheTTLSeconds value, using default", "error", parseErr)
+			}
+		}
+	}
+	if settings.SchemaCacheTTLSeconds <= 0 {
+		settings.SchemaCacheTTLSeconds = 60
 	}
 
 	// Set default values

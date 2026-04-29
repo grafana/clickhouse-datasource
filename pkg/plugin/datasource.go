@@ -17,7 +17,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		ds.EnableMultipleConnections = true
 	}
 
-	schemaProvider := NewSchemaProvider(&clickhousePlugin, settings)
+	schemaProvider := NewSchemaProvider(ctx, &clickhousePlugin, settings)
 	ds.ResourceMiddleware = func(next backend.CallResourceHandler) backend.CallResourceHandler {
 		return schemas.NewSchemaDatasource(
 			schemaProvider,
