@@ -16,7 +16,9 @@ import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { AggregateEditor } from '../AggregateEditor';
 import { GroupByEditor } from '../GroupByEditor';
+import { ColumnRolesHelp } from '../ColumnRolesHelp';
 import { ColumnSelect } from '../ColumnSelect';
+import { Components as allSelectors } from 'selectors';
 import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
@@ -98,6 +100,14 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
         onChange={onOptionChange('isAggregateMode')}
         label={labels.builderModeLabel}
         tooltip={labels.builderModeTooltip}
+      />
+
+      <ColumnRolesHelp
+        text={labels.columnsHelp.text}
+        linkText={labels.columnsHelp.linkText}
+        href={labels.columnsHelp.href}
+        testIdWrapper={allSelectors.QueryBuilder.TimeSeriesQueryBuilder.columnRolesHelp}
+        testIdLink={allSelectors.QueryBuilder.TimeSeriesQueryBuilder.columnRolesHelpLink}
       />
 
       <ColumnSelect

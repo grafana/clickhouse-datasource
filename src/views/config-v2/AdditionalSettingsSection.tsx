@@ -48,6 +48,7 @@ import {
   trackClickhouseConfigV2TracesConfig,
 } from './tracking';
 import { css } from '@emotion/css';
+import { isEqual } from 'es-toolkit/compat';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -117,47 +118,26 @@ export const AdditionalSettingsSection = (props: Props) => {
       },
     });
   };
-
-  const shallowSettingsCompare = (currentSettings: any, defaultSettings: any): boolean => {
-    // needed for dealing with proxy object from currentSettings
-    currentSettings = Object.assign({}, currentSettings);
-
-    const currentSettingsKeys = Object.keys(currentSettings);
-    const defaultSettingsKeys = Object.keys(defaultSettings);
-
-    if (currentSettingsKeys.length !== defaultSettingsKeys.length) {
-      return false;
-    }
-
-    for (const key of currentSettingsKeys) {
-      if (!defaultSettingsKeys.includes(key)) {
-        return false;
-      }
-      if (currentSettings[key].length === 0 && defaultSettings[key].length === 0) {
-        continue;
-      }
-      if (currentSettings[key] !== defaultSettings[key]) {
-        return false;
-      }
-    }
-    return true;
-  };
-
   const shouldBeOpen = useMemo(() => {
+    const defaultLogs = defaultCHAdditionalSettingsConfig.logs;
+    const defaultTraces = defaultCHAdditionalSettingsConfig.traces;
+    const logs = jsonData.logs ?? defaultLogs;
+    const traces = jsonData.traces ?? defaultTraces;
+
     return (
-      jsonData.defaultDatabase ||
-      jsonData.defaultTable ||
-      jsonData.connMaxLifetime ||
-      jsonData.dialTimeout ||
-      jsonData.maxIdleConns ||
-      jsonData.maxOpenConns ||
-      jsonData.queryTimeout ||
-      jsonData.validateSql ||
-      !shallowSettingsCompare(jsonData.logs, defaultCHAdditionalSettingsConfig.logs) ||
-      !shallowSettingsCompare(jsonData.traces, defaultCHAdditionalSettingsConfig.traces) ||
-      (jsonData.aliasTables && jsonData.aliasTables.length > 0) ||
-      jsonData.enableRowLimit ||
-      jsonData.enableSecureSocksProxy ||
+      !!jsonData.defaultDatabase ||
+      !!jsonData.defaultTable ||
+      !!jsonData.connMaxLifetime ||
+      !!jsonData.dialTimeout ||
+      !!jsonData.maxIdleConns ||
+      !!jsonData.maxOpenConns ||
+      !!jsonData.queryTimeout ||
+      !!jsonData.validateSql ||
+      !isEqual(logs, defaultLogs) ||
+      !isEqual(traces, defaultTraces) ||
+      (jsonData.aliasTables?.length ?? 0) > 0 ||
+      !!jsonData.enableRowLimit ||
+      !!jsonData.enableSecureSocksProxy ||
       customSettings.length > 0
     );
   }, [jsonData, customSettings]);
@@ -238,6 +218,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onMessageColumnChange={(c) => onUpdateLogsConfig('messageColumn', c)}
           onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
           onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
+          onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
         />
 
         <Divider />
@@ -268,6 +249,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onFlattenNestedChange={(c) => onUpdateTracesConfig('flattenNested', c)}
           onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
           onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}
+          onShowTraceLinksChange={(v) => onUpdateTracesConfig('showTraceLinks', v)}
         />
         <Divider />
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />

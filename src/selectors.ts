@@ -143,6 +143,16 @@ export const Components = {
       LogMessageLikeInput: {
         input: 'query-builder__logs-query-builder__log-message-like-input__input',
       },
+      columnRolesHelp: 'query-builder__logs-query-builder__column-roles-help',
+      columnRolesHelpLink: 'query-builder__logs-query-builder__column-roles-help-link',
+    },
+    TraceQueryBuilder: {
+      columnRolesHelp: 'query-builder__trace-query-builder__column-roles-help',
+      columnRolesHelpLink: 'query-builder__trace-query-builder__column-roles-help-link',
+    },
+    TimeSeriesQueryBuilder: {
+      columnRolesHelp: 'query-builder__time-series-query-builder__column-roles-help',
+      columnRolesHelpLink: 'query-builder__time-series-query-builder__column-roles-help-link',
     },
     AggregateEditor: {
       sectionLabel: 'query-builder__aggregate-editor__section-label',

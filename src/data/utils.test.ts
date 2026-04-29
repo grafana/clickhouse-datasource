@@ -1,5 +1,6 @@
-import { ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, QueryType, TimeUnit } from 'types/queryBuilder';
 import {
+  applyTraceSearchFieldConfig,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
   isBuilderOptionsRunnable,
@@ -10,6 +11,8 @@ import {
 import { newMockDatasource } from '__mocks__/datasource';
 import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from '@grafana/data';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { Datasource } from './CHDatasource';
+import otel from 'otel';
 
 describe('isBuilderOptionsRunnable', () => {
   it('should return false for empty builder options', () => {
@@ -107,6 +110,116 @@ describe('columnLabelToPlaceholder', () => {
     const expected = 'expected_test_output';
     const actual = columnLabelToPlaceholder('Expected TEST output');
     expect(actual).toEqual(expected);
+  });
+});
+
+describe('applyTraceSearchFieldConfig', () => {
+  const buildTraceSearchRequestResponse = (
+    fields: Field[],
+    builderOptions: Partial<QueryBuilderOptions> = {}
+  ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
+    const inputQuery: CHBuilderQuery = {
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'default',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        ...builderOptions,
+      },
+      pluginVersion: '',
+      rawSql: '',
+    };
+
+    const request: DataQueryRequest<CHQuery> = {
+      requestId: '',
+      interval: '',
+      intervalMs: 0,
+      range: {} as any,
+      scopedVars: {} as any,
+      targets: [inputQuery],
+      timezone: '',
+      app: CoreApp.Explore,
+      startTime: 0,
+    };
+
+    const data: DataFrame[] = [{
+      fields,
+      length: 1,
+      refId: 'A',
+    }];
+    const response: DataQueryResponse = { data };
+
+    return [request, response];
+  };
+
+  it('applies field configs to trace search result fields', () => {
+    const fields: Field[] = [
+      { name: 'traceID', type: FieldType.string, config: {}, values: [] },
+      { name: 'serviceName', type: FieldType.string, config: {}, values: [] },
+      { name: 'operationName', type: FieldType.string, config: {}, values: [] },
+      { name: 'startTime', type: FieldType.time, config: {}, values: [] },
+      { name: 'duration', type: FieldType.number, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields);
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[4].config.unit).toBe('ms');
+    expect(response.data[0].fields[4].config.displayName).toBe('Duration');
+    expect(response.data[0].fields[0].config.displayName).toBe('Trace ID');
+    expect(response.data[0].fields[1].config.displayName).toBe('Service Name');
+    expect(response.data[0].fields[2].config.displayName).toBe('Operation Name');
+    expect(response.data[0].fields[3].config.displayName).toBe('Start Time');
+  });
+
+  it('does not apply field configs to trace ID mode queries', () => {
+    const fields: Field[] = [
+      { name: 'duration', type: FieldType.number, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields, {
+      meta: { isTraceIdMode: true, traceId: 'abc123' },
+    });
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config.unit).toBeUndefined();
+  });
+
+  it('does not apply field configs to non-trace queries', () => {
+    const fields: Field[] = [
+      { name: 'duration', type: FieldType.number, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields, {
+      queryType: QueryType.Table,
+    });
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config.unit).toBeUndefined();
+  });
+
+  it('preserves existing field config properties', () => {
+    const fields: Field[] = [
+      { name: 'duration', type: FieldType.number, config: { decimals: 2 }, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields);
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config.unit).toBe('ms');
+    expect(response.data[0].fields[0].config.decimals).toBe(2);
+  });
+
+  it('does not modify fields that have no matching config', () => {
+    const fields: Field[] = [
+      { name: 'customColumn', type: FieldType.string, config: {}, values: [] },
+    ];
+
+    const [request, response] = buildTraceSearchRequestResponse(fields);
+    applyTraceSearchFieldConfig(request, response);
+
+    expect(response.data[0].fields[0].config).toEqual({});
   });
 });
 
@@ -220,9 +333,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
   it('includes TraceId filter in View logs link query using configured column', async () => {
     const mockDatasource = newMockDatasource();
     // Mock that TraceId is configured
-    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(
-      new Map([[ColumnHint.TraceId, 'TraceId']])
-    );
+    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(new Map([[ColumnHint.TraceId, 'TraceId']]));
 
     const builderOptions: Partial<QueryBuilderOptions> = {
       queryType: QueryType.Traces,
@@ -239,18 +350,174 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(logsQuery.builderOptions.columns).toBeDefined();
 
     // TraceId column should be in the columns array
-    const traceIdColumn = logsQuery.builderOptions.columns?.find(
-      (c) => c.hint === ColumnHint.TraceId
-    );
+    const traceIdColumn = logsQuery.builderOptions.columns?.find((c) => c.hint === ColumnHint.TraceId);
     expect(traceIdColumn).toBeDefined();
     expect(traceIdColumn?.name).toBe('TraceId');
 
     // Filter should have the TraceId hint and column name as key
-    const traceIdFilter = logsQuery.builderOptions.filters?.find(
-      (f) => (f as any).hint === ColumnHint.TraceId
-    ) as any;
+    const traceIdFilter = logsQuery.builderOptions.filters?.find((f) => (f as any).hint === ColumnHint.TraceId) as any;
     expect(traceIdFilter).toBeDefined();
     expect(traceIdFilter.key).toBe('TraceId');
+  });
+
+  describe('trace ID link rawSql pre-generation', () => {
+    const newOtelMockDatasource = (): Datasource => {
+      const ds = newMockDatasource();
+      (ds as any).settings = {
+        ...((ds as any).settings || {}),
+        jsonData: {
+          ...(((ds as any).settings || {}).jsonData || {}),
+          defaultDatabase: 'otel',
+          traces: {
+            defaultDatabase: 'otel',
+            defaultTable: 'otel_traces',
+            otelEnabled: true,
+            otelVersion: 'latest',
+            durationUnit: TimeUnit.Nanoseconds,
+          },
+        },
+      };
+      return ds;
+    };
+
+    it('trace→trace link has pre-generated rawSql with _trace_id_ts optimization', () => {
+      const mockDatasource = newOtelMockDatasource();
+      const otelConfig = otel.getVersion('latest')!;
+      const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns,
+        meta: {
+          otelEnabled: true,
+          otelVersion: 'latest',
+          traceDurationUnit: TimeUnit.Nanoseconds,
+          hasTraceTimestampTable: true,
+        },
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.rawSql).not.toBe('');
+      expect(traceQuery.rawSql).toContain('otel_traces_trace_id_ts');
+      expect(traceQuery.rawSql).toContain('trace_start');
+      expect(traceQuery.rawSql).toContain('trace_end');
+      expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(true);
+    });
+
+    it('logs→trace link with OTel sets hasTraceTimestampTable and generates optimized rawSql', () => {
+      const mockDatasource = newOtelMockDatasource();
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        queryType: QueryType.Logs,
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.builderOptions.meta?.otelEnabled).toBe(true);
+      expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(true);
+      expect(traceQuery.rawSql).not.toBe('');
+      expect(traceQuery.rawSql).toContain('otel_traces_trace_id_ts');
+      expect(traceQuery.rawSql).toContain('trace_start');
+      expect(traceQuery.rawSql).toContain('trace_end');
+    });
+
+    it('logs→trace link without OTel generates rawSql without _trace_id_ts optimization', () => {
+      const mockDatasource = newMockDatasource();
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        queryType: QueryType.Logs,
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.rawSql).not.toBe('');
+      expect(traceQuery.rawSql).not.toContain('trace_id_ts');
+      expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBeFalsy();
+    });
+
+    it('trace→trace link without hasTraceTimestampTable generates rawSql without optimization', () => {
+      const mockDatasource = newOtelMockDatasource();
+      const otelConfig = otel.getVersion('latest')!;
+      const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns,
+        meta: {
+          otelEnabled: true,
+          otelVersion: 'latest',
+          traceDurationUnit: TimeUnit.Nanoseconds,
+          hasTraceTimestampTable: false,
+        },
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.rawSql).not.toBe('');
+      expect(traceQuery.rawSql).not.toContain('trace_id_ts');
+      expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(false);
+    });
+  });
+
+  it('does not inject "View trace" link when showTraceLinks is false', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.traces = { showTraceLinks: false };
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeUndefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeDefined();
+  });
+
+  it('does not inject "View logs" link when showLogLinks is false', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.logs = { showLogLinks: false };
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
   });
 });
 

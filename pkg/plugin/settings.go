@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 )
 
 // Settings - data loaded from grafana settings database
@@ -263,7 +264,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 	// This condition can be removed once the minimum supported Grafana version is 11.0.0
 	if settings.EnableRowLimit {
-		cfg := backend.GrafanaConfigFromContext(ctx)
+		cfg := sdkconfig.GrafanaConfigFromContext(ctx)
 		sqlCfg, err := cfg.SQL()
 		if err != nil {
 			return settings, err

@@ -253,6 +253,15 @@ export default {
           },
         },
       },
+      traceIdCorrelation: {
+        title: 'Trace ID correlation',
+        description: 'Options for showing links to correlated data.',
+
+        showTraceLinks: {
+          label: 'Show "View trace" links',
+          tooltip: 'Show "View trace" links on trace_id/traceid fields.',
+        },
+      },
       LogsConfig: {
         title: 'Logs configuration',
         description: '(Optional) default settings for log queries',
@@ -282,6 +291,15 @@ export default {
           message: {
             label: 'Log Message column',
             tooltip: 'Column for log message',
+          },
+        },
+        traceIdCorrelation: {
+          title: 'Trace ID correlation',
+          description: 'Options for showing links to correlated data.',
+
+          showLogLinks: {
+            label: 'Show "View logs" links',
+            tooltip: 'Show "View logs" links on trace_id/traceid fields.',
           },
         },
         contextColumns: {

@@ -4,6 +4,45 @@ import { Range } from './sqlProvider';
 import { pluginMacros } from 'ch-parser/pluginMacros';
 
 describe('Suggestions', () => {
+  it('matches columns case-insensitively when a prefix is typed', async () => {
+    // User types lowercase "codefile" but the column is named "CodeFile"
+    const sql = 'SELECT codefile FROM system.query_log';
+    //                          ^ cursor here (position 15, end of "codefile")
+    const cursorPosition = 15;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['system'],
+      tables: async (): Promise<string[]> => ['query_log'],
+      columns: async (): Promise<TableColumn[]> => [
+        { label: 'CodeFile', name: 'CodeFile', type: 'String' } as TableColumn,
+        { label: 'EventDate', name: 'EventDate', type: 'DateTime' } as TableColumn,
+      ],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'system',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const suggestions = await getSuggestions(sql, schema, range, cursorPosition);
+    const labels = suggestions.map((s) => s.label);
+
+    // "CodeFile" should appear even though the user typed "codefile"
+    expect(labels).toContain('CodeFile');
+    // "EventDate" should not appear — it doesn't start with "codefile"
+    expect(labels).not.toContain('EventDate');
+  });
+
   it('shows suggestions', async () => {
     const sql = `SELECT number, (SELECT query,  FROM system.query_log LIMIT 1) FROM system.numbers LIMIT 1`;
     const cursorPosition = 30; //         here ^ after "query"

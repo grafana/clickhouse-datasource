@@ -1,30 +1,20 @@
 services:
   grafana:
-    container_name: grafana
-    build:
-      context: ./.config
-      args:
-        grafana_image: ${GRAFANA_IMAGE:-grafana-enterprise}
-        grafana_version: ${GRAFANA_VERSION:-latest}
-        # remove the following line when developing to have backend debugger
-        development: false
-    ports:
-      - 3000:3000
-    volumes:
-      - ./dist:/var/lib/grafana/plugins/grafana-clickhouse-datasource
-      - ./provisioning:/etc/grafana/provisioning
-      - .:/root/grafana-clickhouse-datasource
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:3000/login"]
-      interval: 1m30s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
-    environment:
-      - GF_LOG_LEVEL=debug
-      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=true
+    extends:
+      file: .config/docker-compose-base.yaml
+      service: grafana
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+      e2e-data-loader:
+        condition: service_completed_successfully
     networks:
       - grafana
+    environment:
+      # splashScreen is disabled at runtime for E2E tests via @grafana/plugin-e2e's
+      # OFREP interception (>=3.5.0), but we also disable it at the server level so
+      # that manual `docker-compose up` + browsing doesn't trigger the onboarding modal.
+      - GF_FEATURE_TOGGLES_splashScreen=false
 
   clickhouse-server:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
@@ -47,16 +37,28 @@ services:
     networks:
       - grafana
 
-  test-data-loader:
+  e2e-data-loader:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
-    container_name: test-data-loader
-    entrypoint: ["clickhouse-client", "--host", "clickhouse-server", "--queries-file", "/dev/shm/property-prices.sql"]
+    container_name: e2e-data-loader
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        # Load every *.sql fixture under /data in lexicographic order so new
+        # feature-specific fixtures can live alongside seed.sql without
+        # creating merge conflicts when multiple PRs add fixtures at once.
+        # $$f (not $f) so docker-compose passes a literal $ to the shell.
+        for f in /data/*.sql; do
+          echo "Loading fixture: $$f"
+          clickhouse-client --host clickhouse-server --multiquery < "$$f"
+        done
     depends_on:
       clickhouse-server:
         condition: service_healthy
-    restart: on-failure
+    restart: no
     volumes:
-      - ./tests/fixtures/property-prices.sql:/dev/shm/property-prices.sql
+      - ./tests/e2e/fixtures:/data:ro
     networks:
       - grafana
 

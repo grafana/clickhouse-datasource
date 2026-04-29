@@ -257,6 +257,15 @@ export default {
             tooltip: 'Column for the trace state',
           },
         },
+        traceIdCorrelation: {
+          title: 'Trace ID correlation',
+          description: 'Options for showing links to correlated data.',
+
+          showTraceLinks: {
+            label: 'Show "View trace" links',
+            tooltip: 'Show "View trace" links on trace_id/traceid fields.',
+          },
+        },
       },
       LogsConfig: {
         title: 'Logs configuration',
@@ -291,6 +300,15 @@ export default {
           message: {
             label: 'Log Message column',
             tooltip: 'Column for log message',
+          },
+        },
+        traceIdCorrelation: {
+          title: 'Trace ID correlation',
+          description: 'Options for showing links to correlated data.',
+
+          showLogLinks: {
+            label: 'Show "View logs" links',
+            tooltip: 'Show "View logs" links on trace_id/traceid fields.',
           },
         },
         contextColumns: {
@@ -383,17 +401,25 @@ export default {
       tooltip: 'Group the results by specific column',
     },
     LogsQueryBuilder: {
+      columnsHelp: {
+        text: 'Map your table columns to the roles the logs panel expects. Each column is aliased in the generated SQL.',
+        linkText: 'Learn about column roles',
+        href: 'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
+      },
       logTimeColumn: {
         label: 'Time',
-        tooltip: 'Column that contains the log timestamp',
+        tooltip:
+          'Primary log timestamp. Aliased to `timestamp` in the generated SQL. Common names: Timestamp, timestamp, event_time, @timestamp, created_at. OTel: Timestamp.',
       },
       logLevelColumn: {
         label: 'Log Level',
-        tooltip: 'Column that contains the log level',
+        tooltip:
+          'Log severity. Aliased to `level` in the generated SQL. Common names: level, severity, severity_text, log_level. OTel: SeverityText.',
       },
       logMessageColumn: {
         label: 'Message',
-        tooltip: 'Column that contains the log message',
+        tooltip:
+          'Log message body. Aliased to `body` in the generated SQL. Common names: message, msg, body, log_message. OTel: Body.',
       },
       liveView: {
         label: 'Live View',
@@ -414,9 +440,15 @@ export default {
       aggregateQueryModeLabel: 'Aggregate',
       builderModeLabel: 'Builder Mode',
       builderModeTooltip: 'Switches the query builder between the simple and aggregate modes',
+      columnsHelp: {
+        text: 'The Time column is required — it anchors the series to the panel time range. Other selected columns become value series.',
+        linkText: 'Learn about column roles',
+        href: 'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
+      },
       timeColumn: {
         label: 'Time',
-        tooltip: 'Column to use for the time series',
+        tooltip:
+          'Timestamp used to order and bucket the series. Must be a DateTime/DateTime64 column. Common names: time, timestamp, event_time. OTel: Timestamp.',
       },
     },
     TableQueryBuilder: {
@@ -432,47 +464,62 @@ export default {
       traceModeTooltip: 'Switches between trace ID and trace search mode',
       columnsSection: 'Columns',
       filtersSection: 'Filters',
+      columnsHelp: {
+        text: 'Map your table columns to the roles the traces panel expects. Each column is aliased in the generated SQL.',
+        linkText: 'Learn about column roles',
+        href: 'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles',
+      },
 
       columns: {
         traceId: {
           label: 'Trace ID Column',
-          tooltip: 'Column that contains the trace ID',
+          tooltip:
+            'Identifier shared by all spans in a trace. Aliased to `traceID` in the generated SQL. Common names: trace_id, traceId. OTel: TraceId.',
         },
         spanId: {
           label: 'Span ID Column',
-          tooltip: 'Column that contains the span ID',
+          tooltip:
+            'Identifier for an individual span. Aliased to `spanID` in the generated SQL. Common names: span_id, spanId. OTel: SpanId.',
         },
         parentSpanId: {
           label: 'Parent Span ID Column',
-          tooltip: 'Column that contains the parent span ID',
+          tooltip:
+            'Parent span reference, empty for root spans. Aliased to `parentSpanID` in the generated SQL. Common names: parent_span_id, parentSpanId. OTel: ParentSpanId.',
         },
         serviceName: {
           label: 'Service Name Column',
-          tooltip: 'Column that contains the service name',
+          tooltip:
+            'Name of the service that emitted the span. Aliased to `serviceName` in the generated SQL. Common names: service, service_name. OTel: ServiceName.',
         },
         operationName: {
           label: 'Operation Name Column',
-          tooltip: 'Column that contains the operation name',
+          tooltip:
+            'Name of the operation or endpoint. Aliased to `operationName` in the generated SQL. Common names: operation, operation_name, span_name. OTel: SpanName.',
         },
         startTime: {
           label: 'Start Time Column',
-          tooltip: 'Column that contains the start time',
+          tooltip:
+            'Span start time. Used to filter by the panel time range. Must be a DateTime/DateTime64 column. Common names: start_time, timestamp. OTel: Timestamp.',
         },
         durationTime: {
           label: 'Duration Time Column',
-          tooltip: 'Column that contains the duration time',
+          tooltip:
+            'Span duration. Set the unit field to match your column (ns, ms, s, ...). Common names: duration, duration_ns, duration_ms. OTel: Duration.',
         },
         durationUnit: {
           label: 'Duration Unit',
-          tooltip: 'The unit of time used for the duration time',
+          tooltip:
+            'Unit used by your Duration column. OTel stores nanoseconds; other schemas often use milliseconds or seconds.',
         },
         tags: {
           label: 'Tags Column',
-          tooltip: 'Column that contains the trace tags',
+          tooltip:
+            'Span attributes, typically a Map. Aliased to `tags` in the generated SQL. Common names: tags, attributes. OTel: SpanAttributes.',
         },
         serviceTags: {
           label: 'Service Tags Column',
-          tooltip: 'Column that contains the service tags',
+          tooltip:
+            'Resource-level attributes, typically a Map. Aliased to `serviceTags` in the generated SQL. Common names: resource, resource_attributes. OTel: ResourceAttributes.',
         },
         flattenNested: {
           label: 'Use Flatten Nested',
@@ -480,35 +527,40 @@ export default {
         },
         eventsPrefix: {
           label: 'Events Prefix',
-          tooltip: 'Prefix for the events column',
+          tooltip: 'Prefix for the events column (OTel default: `Events`)',
         },
         linksPrefix: {
           label: 'Links Prefix',
-          tooltip: 'Prefix for the trace references column',
+          tooltip: 'Prefix for the trace references column (OTel default: `Links`)',
         },
         kind: {
           label: 'Kind Column',
-          tooltip: 'Column that contains the trace kind',
+          tooltip:
+            'Kind of span (SERVER, CLIENT, PRODUCER, CONSUMER, INTERNAL). Common names: kind, span_kind. OTel: SpanKind.',
         },
         statusCode: {
           label: 'Status Code Column',
-          tooltip: 'Column that contains the trace status code',
+          tooltip:
+            'Span status code (Ok, Error, Unset). Aliased to `statusCode` in the generated SQL. OTel: StatusCode.',
         },
         statusMessage: {
           label: 'Status Message Column',
-          tooltip: 'Column that contains the trace status message',
+          tooltip:
+            'Human-readable status description for the span. Common names: status_message. OTel: StatusMessage.',
         },
         instrumentationLibraryName: {
           label: 'Library Name Column',
-          tooltip: 'Column that contains the instrumentation library name (Optional)',
+          tooltip:
+            'Name of the instrumentation library (Optional). OTel: ScopeName or InstrumentationLibraryName.',
         },
         instrumentationLibraryVersion: {
           label: 'Library Version Column',
-          tooltip: 'Column that contains the instrumentation library version (Optional)',
+          tooltip:
+            'Version of the instrumentation library (Optional). OTel: ScopeVersion or InstrumentationLibraryVersion.',
         },
         state: {
           label: 'State Column',
-          tooltip: 'Column that contains the trace state',
+          tooltip: 'W3C trace state baggage passed alongside the trace. OTel: TraceState.',
         },
         traceIdFilter: {
           label: 'Trace ID',

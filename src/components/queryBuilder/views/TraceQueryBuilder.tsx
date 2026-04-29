@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { Filter, QueryBuilderOptions, SelectedColumn, ColumnHint, TimeUnit, OrderBy } from 'types/queryBuilder';
+import { ColumnRolesHelp } from '../ColumnRolesHelp';
 import { ColumnSelect } from '../ColumnSelect';
+import { Components as allSelectors } from 'selectors';
 import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
@@ -19,8 +21,6 @@ import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
 import { LabeledInput } from 'components/configEditor/LabeledInput';
 import { Switch } from '../Switch';
-import useTables from 'hooks/useTables';
-import otel from 'otel';
 
 interface TraceQueryBuilderProps {
   datasource: Datasource;
@@ -60,11 +60,6 @@ interface TraceQueryBuilderState {
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
-  const tables = useTables(datasource, builderOptions.database);
-  const hasTraceTimestampTable = useMemo(
-    () => tables.some((t) => t === builderOptions.table + otel.traceTimestampTableSuffix),
-    [builderOptions.table, tables]
-  );
   const isNewQuery = useIsNewQuery(builderOptions);
   const [showConfigWarning, setConfigWarningOpen] = useState(
     datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0
@@ -142,7 +137,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           flattenNested: next.flattenNested,
           traceEventsColumnPrefix: next.traceEventsColumnPrefix,
           traceLinksColumnPrefix: next.traceLinksColumnPrefix,
-          hasTraceTimestampTable,
         },
       })
     );
@@ -181,6 +175,13 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
       <Collapse label={labels.columnsSection} collapsible isOpen={isColumnsOpen} onToggle={setColumnsOpen}>
         {configWarning}
+        <ColumnRolesHelp
+          text={labels.columnsHelp.text}
+          linkText={labels.columnsHelp.linkText}
+          href={labels.columnsHelp.href}
+          testIdWrapper={allSelectors.QueryBuilder.TraceQueryBuilder.columnRolesHelp}
+          testIdLink={allSelectors.QueryBuilder.TraceQueryBuilder.columnRolesHelpLink}
+        />
         <OtelVersionSelect
           enabled={builderState.otelEnabled}
           onEnabledChange={(e) => builderOptionsDispatch(setOtelEnabled(e))}
