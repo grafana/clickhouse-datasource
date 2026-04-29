@@ -5,6 +5,7 @@
 ### Features
 
 - Explain column roles in logs/traces/timeseries query builders (#1790)
+- Cache system.tables/columns schema introspection with single flight (#1787)
 
 ### Fixes
 
