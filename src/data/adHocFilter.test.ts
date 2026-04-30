@@ -131,25 +131,25 @@ describe('AdHocManager', () => {
     expect(val).toEqual(`SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
 
-  it('apply ad hoc filter converts "=~" to "ILIKE"', () => {
+  it('apply ad hoc filter converts "=~" to "REGEXP"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');
     const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
       { key: 'key', operator: '=~', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key ILIKE \\'val\\' '}`
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key REGEXP \\'val\\' '}`
     );
   });
 
-  it('apply ad hoc filter converts "!~" to "NOT ILIKE"', () => {
+  it('apply ad hoc filter converts "!~" to "NOT REGEXP"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');
     const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
       { key: 'key', operator: '!~', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key NOT ILIKE \\'val\\' '}`
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key NOT REGEXP \\'val\\' '}`
     );
   });
 
@@ -285,7 +285,13 @@ describe('AdHocManager', () => {
     it('builds filter string with regex operators', () => {
       const ahm = new AdHocFilter();
       const result = ahm.buildFilterString([{ key: 'key', operator: '=~', value: 'val' }] as AdHocVariableFilter[]);
-      expect(result).toEqual(" key ILIKE \\'val\\' ");
+      expect(result).toEqual(" key REGEXP \\'val\\' ");
+    });
+
+    it('builds filter string with negated regex operator', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'key', operator: '!~', value: 'val' }] as AdHocVariableFilter[]);
+      expect(result).toEqual(" key NOT REGEXP \\'val\\' ");
     });
 
     it('builds filter string with IN operator', () => {
