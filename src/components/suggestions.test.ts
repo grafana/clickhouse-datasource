@@ -43,6 +43,49 @@ describe('Suggestions', () => {
     expect(labels).not.toContain('EventDate');
   });
 
+  it('dedupes suggestions sharing the same label, kind, and insertText', async () => {
+    // Schema returns the same column twice (e.g., upstream cache miss or system.functions
+    // duplicate rows). The dedupe pass must collapse these into a single suggestion.
+    const sql = 'SELECT  FROM system.query_log';
+    //                  ^ cursor here (position 7, inside SELECT clause)
+    const cursorPosition = 7;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['system'],
+      tables: async (): Promise<string[]> => ['query_log'],
+      columns: async (): Promise<TableColumn[]> => [
+        { label: 'CodeFile', name: 'CodeFile', type: 'String' } as TableColumn,
+        { label: 'CodeFile', name: 'CodeFile', type: 'String' } as TableColumn,
+        { label: 'EventDate', name: 'EventDate', type: 'DateTime' } as TableColumn,
+      ],
+      functions: async (): Promise<SqlFunction[]> => [
+        { name: 'toDateTime' } as SqlFunction,
+        { name: 'toDateTime' } as SqlFunction,
+      ],
+      defaultDatabase: 'system',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const suggestions = await getSuggestions(sql, schema, range, cursorPosition);
+    const codeFileMatches = suggestions.filter((s) => s.label === 'CodeFile');
+    const toDateTimeMatches = suggestions.filter((s) => s.label === 'toDateTime');
+
+    expect(codeFileMatches).toHaveLength(1);
+    expect(toDateTimeMatches).toHaveLength(1);
+  });
+
   it('shows suggestions', async () => {
     const sql = `SELECT number, (SELECT query,  FROM system.query_log LIMIT 1) FROM system.numbers LIMIT 1`;
     const cursorPosition = 30; //         here ^ after "query"

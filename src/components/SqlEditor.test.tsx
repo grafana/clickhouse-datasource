@@ -6,6 +6,9 @@ import * as ui from '@grafana/ui';
 import { mockDatasource } from '__mocks__/datasource';
 import { EditorType } from 'types/sql';
 
+const mockCompletionDispose = jest.fn();
+const mockFormattingDispose = jest.fn();
+
 // Mock the Monaco editor types
 const mockMonaco = {
   KeyMod: {
@@ -19,8 +22,8 @@ const mockMonaco = {
     getLanguages: () => [],
     register: jest.fn(),
     setMonarchTokensProvider: jest.fn(),
-    registerCompletionItemProvider: jest.fn(),
-    registerDocumentFormattingEditProvider: jest.fn(),
+    registerCompletionItemProvider: jest.fn(() => ({ dispose: mockCompletionDispose })),
+    registerDocumentFormattingEditProvider: jest.fn(() => ({ dispose: mockFormattingDispose })),
   },
 };
 
@@ -51,13 +54,24 @@ let mockEditorInstance: ReturnType<typeof mockEditor>;
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
-  CodeEditor: function CodeEditor({ onEditorDidMount, value }: { onEditorDidMount: any; value: string }) {
+  CodeEditor: function CodeEditor({
+    onEditorDidMount,
+    onEditorWillUnmount,
+    value,
+  }: {
+    onEditorDidMount: any;
+    onEditorWillUnmount?: () => void;
+    value: string;
+  }) {
     React.useEffect(() => {
       if (onEditorDidMount) {
         mockEditorInstance = mockEditor(value);
         onEditorDidMount(mockEditorInstance, mockMonaco);
       }
-    }, [onEditorDidMount, value]);
+      return () => {
+        onEditorWillUnmount?.();
+      };
+    }, [onEditorDidMount, onEditorWillUnmount, value]);
 
     return <div data-testid="code-editor">{value}</div>;
   },
@@ -67,6 +81,10 @@ describe('SQL Editor', () => {
   beforeEach(() => {
     // Reset the mock editor instance before each test
     mockEditorInstance = undefined as any;
+    mockCompletionDispose.mockClear();
+    mockFormattingDispose.mockClear();
+    mockMonaco.languages.registerCompletionItemProvider.mockClear();
+    mockMonaco.languages.registerDocumentFormattingEditProvider.mockClear();
   });
 
   it('Should display sql in the editor', () => {
@@ -122,5 +140,31 @@ describe('SQL Editor', () => {
 
     // Verify mockOnRunQuery was called once
     expect(mockOnRunQuery).toHaveBeenCalledTimes(1);
+  });
+
+  // Regression test for duplicate autocomplete suggestions: each mount registered a
+  // completion provider that was never disposed, so re-mounts stacked providers and
+  // Monaco merged their results. Unmounting must dispose both providers.
+  it('disposes Monaco language providers when the editor unmounts', () => {
+    const rawSql = 'SELECT 1';
+
+    const { unmount } = render(
+      <SqlEditor
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={mockDatasource}
+      />
+    );
+
+    expect(mockMonaco.languages.registerCompletionItemProvider).toHaveBeenCalledTimes(1);
+    expect(mockMonaco.languages.registerDocumentFormattingEditProvider).toHaveBeenCalledTimes(1);
+    expect(mockCompletionDispose).not.toHaveBeenCalled();
+    expect(mockFormattingDispose).not.toHaveBeenCalled();
+
+    unmount();
+
+    expect(mockCompletionDispose).toHaveBeenCalledTimes(1);
+    expect(mockFormattingDispose).toHaveBeenCalledTimes(1);
   });
 });
