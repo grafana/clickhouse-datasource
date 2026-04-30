@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,6 +13,11 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	schemas "github.com/grafana/schemads"
 )
+
+// dbConnector is the SchemaProvider's view of Clickhouse, narrowed for tests.
+type dbConnector interface {
+	Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error)
+}
 
 var (
 	numberOperators = []schemas.Operator{
@@ -44,7 +51,7 @@ var (
 )
 
 type SchemaProvider struct {
-	clickhousePlugin *Clickhouse
+	clickhousePlugin dbConnector
 	settings         backend.DataSourceInstanceSettings
 
 	// The three caches below are populated from datasource settings at
@@ -120,6 +127,11 @@ func (p *SchemaProvider) fetchTables(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 
 	rows, err := ds.QueryContext(ctx, "SELECT database, name FROM system.tables ORDER BY database, name")
 	if err != nil {
@@ -267,6 +279,11 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 
 	var currentDb string
 	if len(tableOnlyNames) > 0 {
@@ -324,6 +341,11 @@ func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string,
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 	rows, err := ds.QueryContext(ctx, rawSQL)
 	if err != nil {
 		return nil, err
@@ -334,9 +356,6 @@ func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string,
 		}
 	}()
 	cols := make([]schemas.Column, 0)
-	if err != nil {
-		return nil, err
-	}
 	for rows.Next() {
 		var name string
 		var chType string

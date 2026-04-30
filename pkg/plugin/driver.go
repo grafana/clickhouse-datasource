@@ -284,7 +284,13 @@ func (h *Clickhouse) Connect(
 		return nil, backend.DownstreamError(fmt.Errorf("failed to create ClickHouse client"))
 	}
 
-	return db, settings.isValid()
+	// Honor the (nil-resource-on-error) contract so callers can rely on
+	// `if err != nil { return err }` without leaking the *sql.DB.
+	if err := settings.isValid(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
 }
 
 // Converters defines list of data type converters
