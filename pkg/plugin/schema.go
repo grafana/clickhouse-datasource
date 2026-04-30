@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/clickhouse-datasource/pkg/plugin/schemacache"
@@ -54,12 +55,47 @@ type SchemaProvider struct {
 	clickhousePlugin dbConnector
 	settings         backend.DataSourceInstanceSettings
 
+	// db is the long-lived *sql.DB shared by every schema introspection call.
+	// Lazily built on first use under dbMu and closed by Close. nil after Close.
+	dbMu sync.Mutex
+	db   *sql.DB
+
 	// The three caches below are populated from datasource settings at
 	// construction time. A nil cache means caching is disabled for that
 	// handler — the handler code must treat nil as "always miss, no set".
 	tablesCache  *schemacache.Cache[[]string]
 	columnsCache *schemacache.Cache[map[string][]schemas.Column]
 	valuesCache  *schemacache.Cache[map[string][]string]
+}
+
+// getDB returns the provider's shared *sql.DB, building it on first use.
+// On Connect failure the result is not cached so transient errors recover on
+// the next call. After Close, getDB rebuilds — Close is intended for shutdown
+// but the contract stays simple either way.
+func (p *SchemaProvider) getDB(ctx context.Context) (*sql.DB, error) {
+	p.dbMu.Lock()
+	defer p.dbMu.Unlock()
+	if p.db != nil {
+		return p.db, nil
+	}
+	db, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
+	if err != nil {
+		return nil, err
+	}
+	p.db = db
+	return db, nil
+}
+
+// Close releases the shared *sql.DB. Safe to call multiple times.
+func (p *SchemaProvider) Close() error {
+	p.dbMu.Lock()
+	defer p.dbMu.Unlock()
+	if p.db == nil {
+		return nil
+	}
+	err := p.db.Close()
+	p.db = nil
+	return err
 }
 
 // Schema implements [schemas.SchemaHandler].
@@ -123,15 +159,10 @@ func (p *SchemaProvider) Tables(ctx context.Context, req *schemas.TablesRequest)
 // singleflight-collapsed caller can reuse the same code path as a
 // cache-disabled caller.
 func (p *SchemaProvider) fetchTables(ctx context.Context) ([]string, error) {
-	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
+	ds, err := p.getDB(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := ds.Close(); err != nil {
-			backend.Logger.Error("failed to close database connection", "error", err)
-		}
-	}()
 
 	rows, err := ds.QueryContext(ctx, "SELECT database, name FROM system.tables ORDER BY database, name")
 	if err != nil {
@@ -275,15 +306,10 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 	rawSQL := fmt.Sprintf("SELECT database, table, name, type, comment FROM system.columns WHERE %s ORDER BY database, table, position",
 		strings.Join(whereParts, " OR "))
 
-	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
+	ds, err := p.getDB(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := ds.Close(); err != nil {
-			backend.Logger.Error("failed to close database connection", "error", err)
-		}
-	}()
 
 	var currentDb string
 	if len(tableOnlyNames) > 0 {
@@ -337,15 +363,10 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string, headers map[string]string) ([]schemas.Column, error) {
 	database, table := splitTable(table)
 	rawSQL := fmt.Sprintf("DESCRIBE TABLE \"%s\".\"%s\"", database, table)
-	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
+	ds, err := p.getDB(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := ds.Close(); err != nil {
-			backend.Logger.Error("failed to close database connection", "error", err)
-		}
-	}()
 	rows, err := ds.QueryContext(ctx, rawSQL)
 	if err != nil {
 		return nil, err
@@ -481,15 +502,10 @@ func (p *SchemaProvider) ColumnValues(ctx context.Context, req *schemas.ColumnVa
 // fetchColumnValues runs the DISTINCT-per-column UNION ALL probe. It is the
 // function wrapped by the cache in [SchemaProvider.ColumnValues].
 func (p *SchemaProvider) fetchColumnValues(ctx context.Context, table string, requestedColumns []string) (map[string][]string, error) {
-	ds, err := p.clickhousePlugin.Connect(ctx, p.settings, nil)
+	ds, err := p.getDB(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := ds.Close(); err != nil {
-			backend.Logger.Error("failed to close database connection", "error", err)
-		}
-	}()
 
 	columns := requestedColumns
 	if len(columns) == 0 {
