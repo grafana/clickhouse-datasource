@@ -149,17 +149,15 @@ function dedupeSuggestions(
   items: monacoTypes.languages.CompletionItem[]
 ): monacoTypes.languages.CompletionItem[] {
   const seen = new Set<string>();
-  const out: monacoTypes.languages.CompletionItem[] = [];
-  for (const item of items) {
+  return items.filter((item) => {
     const label = typeof item.label === 'string' ? item.label : item.label.label;
     const key = JSON.stringify([label, item.kind, item.insertText]);
     if (seen.has(key)) {
-      continue;
+      return false;
     }
     seen.add(key);
-    out.push(item);
-  }
-  return out;
+    return true;
+  });
 }
 
 async function getSuggestionsFromCursorData(

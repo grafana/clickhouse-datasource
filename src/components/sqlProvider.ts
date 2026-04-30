@@ -100,8 +100,8 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
   return {
     monacoEditor: monaco.editor,
     dispose: () => {
-      completionProvider?.dispose?.();
-      formattingProvider?.dispose?.();
+      completionProvider.dispose();
+      formattingProvider.dispose();
     },
   };
 }
