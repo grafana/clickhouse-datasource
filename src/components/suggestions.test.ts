@@ -44,8 +44,6 @@ describe('Suggestions', () => {
   });
 
   it('dedupes suggestions sharing the same label, kind, and insertText', async () => {
-    // Schema returns the same column twice (e.g., upstream cache miss or system.functions
-    // duplicate rows). The dedupe pass must collapse these into a single suggestion.
     const sql = 'SELECT  FROM system.query_log';
     //                  ^ cursor here (position 7, inside SELECT clause)
     const cursorPosition = 7;

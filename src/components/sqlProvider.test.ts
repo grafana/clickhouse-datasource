@@ -12,9 +12,6 @@ describe('SQL Formatter', () => {
 
 describe('registerSQL', () => {
   it('disposes the completion and formatting providers when dispose() is called', () => {
-    // Each registration call returns a fresh disposable; we track them so we can
-    // assert dispose() fires on every one. This guards against the provider-leak
-    // that caused duplicate autocomplete entries when SqlEditor was re-mounted.
     const disposables: Array<{ dispose: jest.Mock }> = [];
     const makeDisposable = () => {
       const d = { dispose: jest.fn() };
@@ -58,8 +55,6 @@ describe('registerSQL', () => {
     registerSQL('sql', editor, jest.fn());
     registerSQL('sql', editor, jest.fn());
 
-    // Two mounts == two registrations. Without dispose-on-unmount in the caller,
-    // these stack and Monaco merges results from all of them — the source of duplicates.
     expect(completionRegister).toHaveBeenCalledTimes(2);
     expect(formattingRegister).toHaveBeenCalledTimes(2);
   });

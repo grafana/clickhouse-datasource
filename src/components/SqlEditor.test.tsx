@@ -142,9 +142,6 @@ describe('SQL Editor', () => {
     expect(mockOnRunQuery).toHaveBeenCalledTimes(1);
   });
 
-  // Regression test for duplicate autocomplete suggestions: each mount registered a
-  // completion provider that was never disposed, so re-mounts stacked providers and
-  // Monaco merged their results. Unmounting must dispose both providers.
   it('disposes Monaco language providers when the editor unmounts', () => {
     const rawSql = 'SELECT 1';
 
