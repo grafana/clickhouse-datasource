@@ -28,7 +28,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/sqlds/v5"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1327,8 +1326,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		dsInstance, err := NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
-		ds, ok := dsInstance.(*sqlds.SQLDatasource)
-		assert.Equal(t, true, ok)
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
 
 		// We test that the X-Test header is absent
 		req.PluginContext.DataSourceInstanceSettings = &settings
@@ -1344,8 +1343,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		dsInstance, err := NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
-		ds, ok := dsInstance.(*sqlds.SQLDatasource)
-		assert.Equal(t, true, ok)
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
 
 		// We test that the X-Test header exists
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Hello World!"})
@@ -1361,8 +1360,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		dsInstance, err := NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
-		ds, ok := dsInstance.(*sqlds.SQLDatasource)
-		assert.Equal(t, true, ok)
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
 
 		// We test that the X-Test header exists
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"custom-test-header": "value-1", "X-Test": "Hello World!"})
@@ -1378,8 +1377,8 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		dsInstance, err := NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
 
-		ds, ok := dsInstance.(*sqlds.SQLDatasource)
-		assert.Equal(t, true, ok)
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
 
 		// We test that the X-Test header exists
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Test": "Override"})
