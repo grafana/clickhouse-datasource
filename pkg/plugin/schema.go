@@ -120,6 +120,11 @@ func (p *SchemaProvider) fetchTables(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 
 	rows, err := ds.QueryContext(ctx, "SELECT database, name FROM system.tables ORDER BY database, name")
 	if err != nil {
@@ -267,6 +272,11 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 
 	var currentDb string
 	if len(tableOnlyNames) > 0 {
@@ -324,6 +334,11 @@ func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string,
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if err := ds.Close(); err != nil {
+			backend.Logger.Error("failed to close database connection", "error", err)
+		}
+	}()
 	rows, err := ds.QueryContext(ctx, rawSQL)
 	if err != nil {
 		return nil, err
@@ -334,9 +349,6 @@ func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string,
 		}
 	}()
 	cols := make([]schemas.Column, 0)
-	if err != nil {
-		return nil, err
-	}
 	for rows.Next() {
 		var name string
 		var chType string
