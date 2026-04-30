@@ -15,11 +15,11 @@ import (
 )
 
 // trackingConnector hands out *sql.DBs and records them so tests can assert
-// each one was closed (OpenConnections == 0) after the call returned.
+// reuse (one DB across calls) and Close behavior at end-of-life.
 type trackingConnector struct {
 	mu       sync.Mutex
 	opened   []*sql.DB
-	connErr  error                                 // injected error from Connect
+	connErr  error                                   // injected error from Connect
 	rowsFn   func(query string) (driver.Rows, error) // injected Query handler
 	connects atomic.Int32
 }
@@ -36,7 +36,7 @@ func (t *trackingConnector) Connect(_ context.Context, _ backend.DataSourceInsta
 	return db, nil
 }
 
-// allClosed: zero open conns on a fresh pool ⇒ DB.Close() ran.
+// allClosed: zero open conns on every handed-out pool ⇒ DB.Close() ran.
 func (t *trackingConnector) allClosed() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -141,7 +141,9 @@ func describeRows() (driver.Rows, error) {
 	}, nil
 }
 
-func TestFetchTables_ClosesDB_OnSuccess(t *testing.T) {
+// --- success paths still return correct data ---
+
+func TestFetchTables_Success(t *testing.T) {
 	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) { return tablesRows() }}
 	p := newProvider(t, conn)
 
@@ -152,41 +154,9 @@ func TestFetchTables_ClosesDB_OnSuccess(t *testing.T) {
 	if want := []string{"default.users", "default.events"}; !equalStrings(tables, want) {
 		t.Errorf("tables = %v, want %v", tables, want)
 	}
-	if conn.openedCount() != 1 {
-		t.Errorf("opened DBs = %d, want 1", conn.openedCount())
-	}
-	if !conn.allClosed() {
-		t.Errorf("DB was not closed after fetchTables; OpenConnections != 0")
-	}
 }
 
-func TestFetchTables_ClosesDB_OnQueryError(t *testing.T) {
-	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) {
-		return nil, errors.New("query failed")
-	}}
-	p := newProvider(t, conn)
-
-	if _, err := p.fetchTables(context.Background()); err == nil {
-		t.Fatal("fetchTables: expected error, got nil")
-	}
-	if !conn.allClosed() {
-		t.Errorf("DB was not closed after query error; leak in error path")
-	}
-}
-
-func TestFetchTables_ConnectError_NoDBToClose(t *testing.T) {
-	conn := &trackingConnector{connErr: errors.New("connect failed")}
-	p := newProvider(t, conn)
-
-	if _, err := p.fetchTables(context.Background()); err == nil {
-		t.Fatal("fetchTables: expected connect error, got nil")
-	}
-	if got := conn.openedCount(); got != 0 {
-		t.Errorf("opened DBs = %d, want 0 (no DB on connect failure)", got)
-	}
-}
-
-func TestFetchColumnsForAllTables_ClosesDB_OnSuccess(t *testing.T) {
+func TestFetchColumnsForAllTables_Success(t *testing.T) {
 	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) { return columnsRows() }}
 	p := newProvider(t, conn)
 
@@ -197,26 +167,9 @@ func TestFetchColumnsForAllTables_ClosesDB_OnSuccess(t *testing.T) {
 	if got := len(cols["default.users"]); got != 2 {
 		t.Errorf("default.users columns = %d, want 2", got)
 	}
-	if !conn.allClosed() {
-		t.Error("DB was not closed after fetchColumnsForAllTables")
-	}
 }
 
-func TestFetchColumnsForAllTables_ClosesDB_OnQueryError(t *testing.T) {
-	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) {
-		return nil, errors.New("query failed")
-	}}
-	p := newProvider(t, conn)
-
-	if _, err := p.fetchColumnsForAllTables(context.Background(), []string{"default.users"}, nil); err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !conn.allClosed() {
-		t.Error("DB was not closed after query error")
-	}
-}
-
-func TestFetchColumnsForTable_ClosesDB_OnSuccess(t *testing.T) {
+func TestFetchColumnsForTable_Success(t *testing.T) {
 	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) { return describeRows() }}
 	p := newProvider(t, conn)
 
@@ -227,12 +180,33 @@ func TestFetchColumnsForTable_ClosesDB_OnSuccess(t *testing.T) {
 	if len(cols) != 2 {
 		t.Errorf("columns = %d, want 2", len(cols))
 	}
-	if !conn.allClosed() {
-		t.Error("DB was not closed after fetchColumnsForTable")
+}
+
+// --- query-error paths still surface the error and don't cache it ---
+
+func TestFetchTables_QueryErrorIsReturned(t *testing.T) {
+	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) {
+		return nil, errors.New("query failed")
+	}}
+	p := newProvider(t, conn)
+
+	if _, err := p.fetchTables(context.Background()); err == nil {
+		t.Fatal("fetchTables: expected error, got nil")
 	}
 }
 
-func TestFetchColumnsForTable_ClosesDB_OnQueryError(t *testing.T) {
+func TestFetchColumnsForAllTables_QueryErrorIsReturned(t *testing.T) {
+	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) {
+		return nil, errors.New("query failed")
+	}}
+	p := newProvider(t, conn)
+
+	if _, err := p.fetchColumnsForAllTables(context.Background(), []string{"default.users"}, nil); err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestFetchColumnsForTable_QueryErrorIsReturned(t *testing.T) {
 	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) {
 		return nil, errors.New("query failed")
 	}}
@@ -241,12 +215,135 @@ func TestFetchColumnsForTable_ClosesDB_OnQueryError(t *testing.T) {
 	if _, err := p.fetchColumnsForTable(context.Background(), "default.users", nil); err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !conn.allClosed() {
-		t.Error("DB was not closed after query error")
+}
+
+// --- held-DB lifecycle ---
+
+func TestGetDB_ReusedAcrossCalls(t *testing.T) {
+	conn := &trackingConnector{rowsFn: func(query string) (driver.Rows, error) {
+		switch {
+		case containsAny(query, "system.tables"):
+			return tablesRows()
+		case containsAny(query, "system.columns"):
+			return columnsRows()
+		case containsAny(query, "DESCRIBE"):
+			return describeRows()
+		}
+		return &fakeRows{cols: []string{"x"}, data: [][]driver.Value{{int64(1)}}}, nil
+	}}
+	p := newProvider(t, conn)
+
+	if _, err := p.fetchTables(context.Background()); err != nil {
+		t.Fatalf("fetchTables: %v", err)
+	}
+	if _, err := p.fetchColumnsForAllTables(context.Background(), []string{"default.users"}, nil); err != nil {
+		t.Fatalf("fetchColumnsForAllTables: %v", err)
+	}
+	if _, err := p.fetchColumnsForTable(context.Background(), "default.users", nil); err != nil {
+		t.Fatalf("fetchColumnsForTable: %v", err)
+	}
+
+	if got := conn.openedCount(); got != 1 {
+		t.Errorf("opened DBs = %d, want 1 (held DB should be reused)", got)
+	}
+	if got := conn.connects.Load(); got != 1 {
+		t.Errorf("Connect calls = %d, want 1", got)
 	}
 }
 
-// Run with -race; catches any sync issue around the new close defers.
+func TestGetDB_ConnectErrorNotCached(t *testing.T) {
+	rows := func(string) (driver.Rows, error) { return tablesRows() }
+	conn := &trackingConnector{rowsFn: rows, connErr: errors.New("transient")}
+	p := newProvider(t, conn)
+
+	// First call fails because Connect errors.
+	if _, err := p.fetchTables(context.Background()); err == nil {
+		t.Fatal("expected connect error, got nil")
+	}
+
+	// Recover from the transient error and retry; the provider must call
+	// Connect again (no sticky cached error).
+	conn.connErr = nil
+	if _, err := p.fetchTables(context.Background()); err != nil {
+		t.Fatalf("retry: %v", err)
+	}
+	if got := conn.connects.Load(); got != 2 {
+		t.Errorf("Connect calls = %d, want 2 (one failed, one succeeded)", got)
+	}
+	if got := conn.openedCount(); got != 1 {
+		t.Errorf("opened DBs = %d, want 1", got)
+	}
+}
+
+func TestClose_ClosesHeldDBAndIsIdempotent(t *testing.T) {
+	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) { return tablesRows() }}
+	p := newProvider(t, conn)
+
+	if _, err := p.fetchTables(context.Background()); err != nil {
+		t.Fatalf("fetchTables: %v", err)
+	}
+	if conn.allClosed() {
+		t.Fatal("DB closed before Close was called; held-DB invariant broken")
+	}
+
+	if err := p.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if !conn.allClosed() {
+		t.Error("Close did not close the held DB")
+	}
+
+	// Idempotent: a second Close on a provider with no held DB is a no-op.
+	if err := p.Close(); err != nil {
+		t.Errorf("second Close: %v", err)
+	}
+}
+
+func TestClose_WithoutAnyFetchIsNoOp(t *testing.T) {
+	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) { return tablesRows() }}
+	p := newProvider(t, conn)
+
+	if err := p.Close(); err != nil {
+		t.Errorf("Close on never-used provider: %v", err)
+	}
+	if got := conn.openedCount(); got != 0 {
+		t.Errorf("opened DBs = %d, want 0", got)
+	}
+}
+
+// TestGetDB_ConcurrentFirstUse asserts that under simultaneous first-call
+// pressure the provider builds exactly one DB. Run with -race.
+func TestGetDB_ConcurrentFirstUse(t *testing.T) {
+	conn := &trackingConnector{rowsFn: func(string) (driver.Rows, error) { return tablesRows() }}
+	p := newProvider(t, conn)
+
+	const goroutines = 32
+	var ready, start sync.WaitGroup
+	ready.Add(goroutines)
+	start.Add(1)
+	errs := make(chan error, goroutines)
+	for range goroutines {
+		go func() {
+			ready.Done()
+			start.Wait()
+			_, err := p.fetchTables(context.Background())
+			errs <- err
+		}()
+	}
+	ready.Wait()
+	start.Done()
+	for range goroutines {
+		if err := <-errs; err != nil {
+			t.Errorf("fetchTables: %v", err)
+		}
+	}
+
+	if got := conn.openedCount(); got != 1 {
+		t.Errorf("opened DBs = %d under concurrent first-use, want 1", got)
+	}
+}
+
+// Run with -race; catches any sync issue around the held-DB and Close paths.
 func TestSchema_Concurrent_NoRace(t *testing.T) {
 	conn := &trackingConnector{rowsFn: func(query string) (driver.Rows, error) {
 		switch {
@@ -286,9 +383,15 @@ func TestSchema_Concurrent_NoRace(t *testing.T) {
 	}
 	wg.Wait()
 
+	if got := conn.openedCount(); got != 1 {
+		t.Errorf("after concurrent run, opened DBs = %d, want 1 (held DB reused)", got)
+	}
+
+	if err := p.Close(); err != nil {
+		t.Errorf("Close: %v", err)
+	}
 	if !conn.allClosed() {
-		t.Errorf("after %d concurrent calls, %d DBs still hold connections",
-			goroutines*iterations*3, leakedCount(conn))
+		t.Errorf("after Close, %d DBs still hold connections", leakedCount(conn))
 	}
 }
 
