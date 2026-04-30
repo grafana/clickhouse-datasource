@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -11,6 +13,11 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	schemas "github.com/grafana/schemads"
 )
+
+// dbConnector is the SchemaProvider's view of Clickhouse, narrowed for tests.
+type dbConnector interface {
+	Connect(ctx context.Context, config backend.DataSourceInstanceSettings, message json.RawMessage) (*sql.DB, error)
+}
 
 var (
 	numberOperators = []schemas.Operator{
@@ -44,7 +51,7 @@ var (
 )
 
 type SchemaProvider struct {
-	clickhousePlugin *Clickhouse
+	clickhousePlugin dbConnector
 	settings         backend.DataSourceInstanceSettings
 
 	// The three caches below are populated from datasource settings at
