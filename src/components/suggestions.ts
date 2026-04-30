@@ -132,16 +132,30 @@ export async function getSuggestions(
 
   const parser = new QueryNodeParser(tokens);
   const selectNode = parseSelectQueryNode(parser);
-  // console.log(selectNode);
 
   if (!selectNode) {
     return [];
   }
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
-  // console.log('database:', cursorData.database, 'table:', cursorData.table, 'identifiers:', cursorData.identifiers, 'prefix:', cursorData.prefix, 'clause:', cursorData.clause);
 
-  return await getSuggestionsFromCursorData(cursorData, schema, range);
+  const results = await getSuggestionsFromCursorData(cursorData, schema, range);
+  return dedupeSuggestions(results);
+}
+
+function dedupeSuggestions(
+  items: monacoTypes.languages.CompletionItem[]
+): monacoTypes.languages.CompletionItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const label = typeof item.label === 'string' ? item.label : item.label.label;
+    const key = JSON.stringify([label, item.kind, item.insertText]);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 async function getSuggestionsFromCursorData(
@@ -184,7 +198,6 @@ async function getSuggestionsFromCursorData(
   }
 
   const contextType = mapping[data.clause];
-  // console.log(contextType);
 
   const db = data.database || schema.defaultDatabase || 'default';
   switch (contextType) {
@@ -208,16 +221,6 @@ async function getSuggestionsFromCursorData(
       results.push(...macros);
       const variables = await getVariableSuggestions(range);
       results.push(...variables);
-
-      // Causes duplicates. Must fix identifier parsing first, or filter/dupe check.
-      // results.push(...data.identifiers.map(id => ({
-      //   label: id,
-      //   insertText: id,
-      //   sortText: `!!${id}`,
-      //   kind: monaco.languages.CompletionItemKind.Field,
-      //   documentation: '',
-      //   range
-      // })));
 
       results.push({
         label: 'NULL',
