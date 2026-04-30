@@ -132,14 +132,12 @@ export async function getSuggestions(
 
   const parser = new QueryNodeParser(tokens);
   const selectNode = parseSelectQueryNode(parser);
-  // console.log(selectNode);
 
   if (!selectNode) {
     return [];
   }
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
-  // console.log('database:', cursorData.database, 'table:', cursorData.table, 'identifiers:', cursorData.identifiers, 'prefix:', cursorData.prefix, 'clause:', cursorData.clause);
 
   const results = await getSuggestionsFromCursorData(cursorData, schema, range);
   return dedupeSuggestions(results);
@@ -200,7 +198,6 @@ async function getSuggestionsFromCursorData(
   }
 
   const contextType = mapping[data.clause];
-  // console.log(contextType);
 
   const db = data.database || schema.defaultDatabase || 'default';
   switch (contextType) {
