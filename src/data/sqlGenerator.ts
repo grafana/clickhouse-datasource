@@ -220,7 +220,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const traceKind = getColumnByHint(options, ColumnHint.TraceKind);
   if (traceKind !== undefined) {
-    selectParts.push(`${escapeIdentifier(traceKind.name)} as kind`);
+    selectParts.push(`lower(${escapeIdentifier(traceKind.name)}) as kind`);
   }
 
   const traceStatusMessage = getColumnByHint(options, ColumnHint.TraceStatusMessage);
