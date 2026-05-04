@@ -146,6 +146,10 @@ test.describe('Config editor', () => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
+      if (isV2) {
+        await page.getByPlaceholder('Enter server port').fill('9000');
+        await page.getByPlaceholder('Enter username').fill('invalid_user');
+      }
       await expect(configPage.saveAndTest()).not.toBeOK();
     });
 
@@ -195,7 +199,11 @@ test.describe('Config editor', () => {
       await portInput.press('Tab');
       await expect(page.getByText('Port is required')).toBeVisible();
 
-      await expect(configPage.saveAndTest()).not.toBeOK();
+      // In V2, validation blocks the save when required fields are empty — no network
+      // request is made. Grafana surfaces the errors in the testing-status banner instead.
+      await page.getByRole('button', { name: 'Save & test' }).click();
+      await expect(page.getByText('Server address required')).toBeVisible();
+      await expect(page.getByText('Port is required')).toBeVisible();
     });
   });
 });
