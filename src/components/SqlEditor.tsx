@@ -35,6 +35,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 export const SqlEditor = (props: SqlEditorProps) => {
   const { query, onChange, datasource } = props;
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
+  const disposeRegistrationRef = useRef<(() => void) | null>(null);
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
 
@@ -77,12 +78,13 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
     editorRef.current = editor;
-    const me = registerSQL('sql', editor, _getSuggestions);
+    const registration = registerSQL('sql', editor, _getSuggestions);
+    disposeRegistrationRef.current = registration.dispose;
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
       if (datasource.settings.jsonData.validateSql) {
         const sql = editor.getValue();
-        validateSql(sql, editor.getModel(), me);
+        validateSql(sql, editor.getModel(), registration.monacoEditor);
       }
     });
 
@@ -100,6 +102,8 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const onEditorWillUnmount = () => {
+    disposeRegistrationRef.current?.();
+    disposeRegistrationRef.current = null;
     editorRef.current = null;
   };
   const triggerFormat = () => {
