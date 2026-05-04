@@ -482,6 +482,92 @@ describe('SQL Generator', () => {
     expect(sql).not.toMatch(/\bLIMIT\b/);
   });
 
+  it('generates an optimized trace ID query without OTel when a trace timestamp table exists', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'custom_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: undefined,
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        hasTraceTimestampTable: true,
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+    const expectedSqlParts = [
+      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
+      '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
+      'multiply("Duration", 0.000001) as duration,',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
+      `FROM "default"."custom_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('honours a configured traceTimestampTableSuffix in the optimized trace ID query', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'custom_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: undefined,
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        hasTraceTimestampTable: true,
+        traceTimestampTableSuffix: '_ts_index',
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+    const sql = generateSql(opts);
+
+    expect(sql).toContain('FROM "default"."custom_traces_ts_index"');
+    expect(sql).not.toContain('custom_traces_trace_id_ts');
+    expect(sql).toContain(`WITH 'abcdefg' as trace_id`);
+    expect(sql).toContain('"Timestamp" >= trace_start');
+  });
+
   it('generates trace search query', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',

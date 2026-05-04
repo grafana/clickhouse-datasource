@@ -715,6 +715,16 @@ export class Datasource
   }
 
   /**
+   * Returns the suffix used to locate the companion trace-timestamp index table.
+   * Defaults to the OTel convention (`_trace_id_ts`) when nothing is configured
+   * so the two-step trace ID lookup works out of the box for OTel users and
+   * can be opted into by non-OTel users that follow the same naming convention.
+   */
+  getTraceTimestampTableSuffix(): string {
+    return this.settings.jsonData.traces?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
+  }
+
+  /**
    * Get the TraceId column name from traces configuration
    * Used when creating logs filter to correlate with trace data
    */
