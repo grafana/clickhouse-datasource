@@ -52,6 +52,7 @@
     "ILIKE",
     "instancemgmt",
     "jsonencode",
+    "listbox",
     "lowcardinality",
     "magefile",
     "multiquery",

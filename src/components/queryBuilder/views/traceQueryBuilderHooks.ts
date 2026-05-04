@@ -12,8 +12,15 @@ import {
   QueryBuilderOptions,
   SelectedColumn,
   StringFilter,
+  TableColumn,
 } from 'types/queryBuilder';
-import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
+import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import {
+  findColumnByNameHeuristic,
+  isDateTimeColumn,
+  isNumericColumn,
+  isStringLikeColumn,
+} from './columnNameHeuristics';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -113,6 +120,84 @@ export const useOtelColumns = (
     );
     didSetColumns.current = true;
   }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+};
+
+/**
+ * Fills trace role slots from common non-OTel column names (mirrors the OTel
+ * column map in src/otel.ts so OTel-conventional names still match when the
+ * OTel toggle is off). Runs once per table change; never overwrites an
+ * explicit user pick.
+ *
+ * The trace builder has many slots; we only heuristic-fill the ones with
+ * unambiguous conventional names (Trace ID, Span ID, Parent Span ID, Service
+ * Name, Operation/Span Name, Start Time, Duration). Other slots (Tags, Kind,
+ * StatusCode, ...) use vendor-specific names where a wrong guess is worse
+ * than leaving the slot empty.
+ */
+export const useDefaultTraceColumnsByName = (
+  allColumns: readonly TableColumn[],
+  table: string,
+  currentColumns: {
+    traceId?: SelectedColumn;
+    spanId?: SelectedColumn;
+    parentSpanId?: SelectedColumn;
+    serviceName?: SelectedColumn;
+    operationName?: SelectedColumn;
+    startTime?: SelectedColumn;
+    durationTime?: SelectedColumn;
+  },
+  otelEnabled: boolean,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
+  const lastTable = useRef<string>(table || '');
+  const didRun = useRef<boolean>(false);
+  if (table !== lastTable.current) {
+    didRun.current = false;
+  }
+
+  useEffect(() => {
+    if (otelEnabled || didRun.current || !table || allColumns.length === 0) {
+      return;
+    }
+
+    const tryFill = (
+      hint: ColumnHint,
+      alreadySet: SelectedColumn | undefined,
+      typeFilter?: (c: TableColumn) => boolean
+    ) => {
+      if (alreadySet) {
+        return;
+      }
+      const match = findColumnByNameHeuristic(allColumns, hint, typeFilter);
+      if (!match) {
+        return;
+      }
+      builderOptionsDispatch(setColumnByHint({ name: match.name, type: match.type, hint }));
+    };
+
+    tryFill(ColumnHint.TraceId, currentColumns.traceId, isStringLikeColumn);
+    tryFill(ColumnHint.TraceSpanId, currentColumns.spanId, isStringLikeColumn);
+    tryFill(ColumnHint.TraceParentSpanId, currentColumns.parentSpanId, isStringLikeColumn);
+    tryFill(ColumnHint.TraceServiceName, currentColumns.serviceName, isStringLikeColumn);
+    tryFill(ColumnHint.TraceOperationName, currentColumns.operationName, isStringLikeColumn);
+    tryFill(ColumnHint.Time, currentColumns.startTime, isDateTimeColumn);
+    tryFill(ColumnHint.TraceDurationTime, currentColumns.durationTime, isNumericColumn);
+
+    lastTable.current = table;
+    didRun.current = true;
+  }, [
+    allColumns,
+    table,
+    currentColumns.traceId,
+    currentColumns.spanId,
+    currentColumns.parentSpanId,
+    currentColumns.serviceName,
+    currentColumns.operationName,
+    currentColumns.startTime,
+    currentColumns.durationTime,
+    otelEnabled,
+    builderOptionsDispatch,
+  ]);
 };
 
 // Apply default filters on table change
