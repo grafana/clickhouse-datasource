@@ -7,7 +7,7 @@ export const trackClickhouseDashboardLoaded = (props: ClickhouseDashboardLoadedP
 };
 
 export const trackClickhouseHealthCheckFailed = (props: { error_category: string; protocol: string }) => {
-  reportInteraction('grafana_ds_clickhouse_healthcheck_failed', props);
+  reportInteraction('grafana_ds_clickhouse_healthcheck_failed', { error_category, protocol });
 };
 
 export type ClickhouseCounters = {
