@@ -49,7 +49,7 @@ jobs:
     # Main-only: publish the latest build and trigger Argo deployment
     if: github.ref == 'refs/heads/main'
 
-    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@75b9d9544fb63508d7d0e9afec354afd86f94d5b # main
 
     permissions:
       attestations: write
