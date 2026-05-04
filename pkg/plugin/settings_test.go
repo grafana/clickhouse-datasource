@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -19,7 +20,7 @@ func TestLoadSettings(t *testing.T) {
 	t.Run("should parse settings correctly", func(t *testing.T) {
 
 		ctx := context.Background()
-		ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		ctx = sdkconfig.WithGrafanaConfig(ctx, sdkconfig.NewGrafanaCfg(map[string]string{
 			"GF_SQL_ROW_LIMIT":                         "1000000",
 			"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
 			"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
@@ -96,8 +97,10 @@ func TestLoadSettings(t *testing.T) {
 							KeepAlive: proxy.DefaultTimeoutOptions.KeepAlive,
 						},
 					},
-					EnableRowLimit: true,
-					RowLimit:       1000000,
+					EnableRowLimit:        true,
+					RowLimit:              1000000,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -122,9 +125,11 @@ func TestLoadSettings(t *testing.T) {
 					MaxIdleConns:       "25",
 					MaxOpenConns:       "50",
 					QueryTimeout:       "60",
-					ProxyOptions:       nil,
-					EnableRowLimit:     true,
-					RowLimit:           1000000,
+					ProxyOptions:          nil,
+					EnableRowLimit:        true,
+					RowLimit:              1000000,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -144,9 +149,11 @@ func TestLoadSettings(t *testing.T) {
 					DialTimeout:     "10",
 					MaxIdleConns:    "25",
 					MaxOpenConns:    "50",
-					QueryTimeout:    "60",
-					RowLimit:        1000000,
-					EnableRowLimit:  true,
+					QueryTimeout:          "60",
+					RowLimit:              1000000,
+					EnableRowLimit:        true,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -211,7 +218,9 @@ func TestLoadSettings(t *testing.T) {
 							KeepAlive: proxy.DefaultTimeoutOptions.KeepAlive,
 						},
 					},
-					EnableRowLimit: false,
+					EnableRowLimit:        false,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -231,8 +240,10 @@ func TestLoadSettings(t *testing.T) {
 					DialTimeout:     "15",
 					MaxIdleConns:    "25",
 					MaxOpenConns:    "50",
-					QueryTimeout:    "120",
-					EnableRowLimit:  false,
+					QueryTimeout:          "120",
+					EnableRowLimit:        false,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -252,8 +263,10 @@ func TestLoadSettings(t *testing.T) {
 					DialTimeout:     "25",
 					MaxIdleConns:    "25",
 					MaxOpenConns:    "50",
-					QueryTimeout:    "60",
-					EnableRowLimit:  false,
+					QueryTimeout:          "60",
+					EnableRowLimit:        false,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -273,8 +286,10 @@ func TestLoadSettings(t *testing.T) {
 					DialTimeout:     "10",
 					MaxIdleConns:    "25",
 					MaxOpenConns:    "50",
-					QueryTimeout:    "60",
-					EnableRowLimit:  false,
+					QueryTimeout:          "60",
+					EnableRowLimit:        false,
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
 				},
 				wantErr: nil,
 				testCtx: ctx,
@@ -292,7 +307,7 @@ func TestLoadSettings(t *testing.T) {
 	})
 	t.Run("should capture invalid settings", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		ctx = sdkconfig.WithGrafanaConfig(ctx, sdkconfig.NewGrafanaCfg(map[string]string{
 			"GF_SQL_ROW_LIMIT":                         "1000000",
 			"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
 			"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",

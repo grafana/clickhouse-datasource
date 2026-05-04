@@ -1,5 +1,38 @@
 # Changelog
 
+## 4.17.0
+
+### Features
+
+- Allow `$__adhocFilters` macro to work with multiple tables (#1757)
+
+### Performance
+
+- Hold a single `*sql.DB` on `SchemaProvider` and dispose it with the instance (#1819)
+
+### Fixes
+
+- Dedupe autocomplete suggestions and dispose Monaco providers on unmount (#1820)
+- Map adhoc regex operators to `REGEXP` instead of `ILIKE` (#1794)
+- Close `*sql.DB` after each schema introspection query (#1818)
+- Dependency updates
+
+## 4.16.0
+
+### Features
+
+- Explain column roles in logs/traces/timeseries query builders (#1790)
+- Cache system.tables/columns schema introspection with single flight (#1787)
+
+### Fixes
+
+- Drop LIMIT from single-trace span query (#1795)
+- Forward X-Grafana-User header to ClickHouse when enabled (#1797)
+- Fix slow traceId lookup (#1705)
+- Replace `js-sql-parser` with existing ClickHouse lexer for SQL validation (#1778)
+- Match column suggestions case-insensitively in autocomplete (#1779)
+- Dependency updates
+
 ## 4.15.0
 
 ### Features

@@ -5,6 +5,11 @@ import { CHConfig } from '../../src/types/config';
 const PLUGIN_UID = 'grafana-clickhouse-datasource';
 const PROVISIONING_FILE = 'clickhouse.yml';
 
+// GRAFANA_URL is set only by the Cloud cron workflow (playwright-cloud). Local and PR CI
+// don't set it, so its presence is a reliable signal that we're running against a shared
+// Cloud instance where the local provisioning/datasources/clickhouse.yml is not applied.
+const isCloudRun = !!process.env.GRAFANA_URL;
+
 function resolveClickhouseUrl(env = process.env) {
   const { CI, DS_INSTANCE_HOST } = env;
   return CI ? DS_INSTANCE_HOST || 'clickhouse-server' : 'localhost';
@@ -49,6 +54,13 @@ test.describe('Config editor', () => {
   });
 
   test.describe('provisioned datasource', () => {
+    test.beforeEach(() => {
+      test.skip(
+        isCloudRun,
+        'Provisioned-datasource tests assert values from the local provisioning/datasources/clickhouse.yml file, which is not applied on the shared Cloud instance.'
+      );
+    });
+
     test('should load provisioned server address', async ({
       readProvisionedDataSource,
       gotoDataSourceConfigPage,
@@ -77,6 +89,10 @@ test.describe('Config editor', () => {
       gotoDataSourceConfigPage,
       page,
     }) => {
+      test.skip(
+        isCloudRun,
+        'Provisioned-datasource tests assert values from the local provisioning/datasources/clickhouse.yml file, which is not applied on the shared Cloud instance.'
+      );
       // Provisioned datasources show a read-only "Test" button (not "Save & test"),
       // since the UI cannot modify provisioned configuration.
       const ds = await readProvisionedDataSource<CHConfig>({ fileName: PROVISIONING_FILE });

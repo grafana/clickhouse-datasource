@@ -54,7 +54,12 @@ export function formatSql(rawSql: string, tabWidth = 4): string {
   return formatted;
 }
 
-export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions: Fetcher) {
+export interface SqlRegistration {
+  monacoEditor: typeof monaco.editor;
+  dispose: () => void;
+}
+
+export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions: Fetcher): SqlRegistration {
   // show options outside query editor
   editor.updateOptions({ fixedOverflowWidgets: true, scrollBeyondLastLine: false });
 
@@ -66,7 +71,7 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
   // monaco.languages.register({ id: lang });
 
   // just extend sql for now so we get syntax highlighting
-  monaco.languages.registerCompletionItemProvider('sql', {
+  const completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
     triggerCharacters: [' ', '.', '$'],
     provideCompletionItems: async (model: Model, position: Position) => {
       const word = model.getWordUntilPosition(position);
@@ -81,7 +86,7 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
     },
   });
 
-  monaco.languages.registerDocumentFormattingEditProvider('sql', {
+  const formattingProvider = monaco.languages.registerDocumentFormattingEditProvider('sql', {
     provideDocumentFormattingEdits(model, options) {
       return [
         {
@@ -92,5 +97,11 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
     },
   });
 
-  return monaco.editor;
+  return {
+    monacoEditor: monaco.editor,
+    dispose: () => {
+      completionProvider.dispose();
+      formattingProvider.dispose();
+    },
+  };
 }

@@ -72,6 +72,7 @@ export enum TokenType {
 }
 
 export const keywords = new Set([
+  // Standard SQL clauses
   'SELECT',
   'FROM',
   'WHERE',
@@ -111,6 +112,68 @@ export const keywords = new Set([
   'NULL',
   'ASC',
   'DESC',
+
+  // ClickHouse-specific SELECT clauses
+  'PREWHERE',
+  'FINAL',
+  'SAMPLE',
+  'SETTINGS',
+  'FORMAT',
+  'INTERVAL',
+
+  // JOIN modifiers
+  'ASOF',
+  'ANY',
+  'ANTI',
+  'SEMI',
+  'GLOBAL',
+  'LATERAL',
+  'ARRAY',
+
+  // CTE
+  'RECURSIVE',
+
+  // ORDER BY / LIMIT modifiers
+  'NULLS',
+  'FIRST',
+  'LAST',
+  'TIES',
+
+  // DML
+  'INSERT',
+  'INTO',
+  'VALUES',
+  'UPDATE',
+  'DELETE',
+  'SET',
+  'TRUNCATE',
+
+  // DDL
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'RENAME',
+  'TABLE',
+  'DATABASE',
+  'VIEW',
+  'MATERIALIZED',
+  'INDEX',
+  'DICTIONARY',
+  'FUNCTION',
+  'TEMPORARY',
+  'IF',
+  'TO',
+
+  // Window functions
+  'OVER',
+  'WINDOW',
+  'PARTITION',
+  'PRECEDING',
+  'FOLLOWING',
+  'CURRENT',
+  'UNBOUNDED',
+  'RANGE',
+  'ROWS',
 ]);
 
 /**
@@ -121,12 +184,22 @@ export class Token {
   begin: number;
   end: number;
   text: string;
+  private _upperText?: string;
 
   constructor(type: TokenType, begin: number, end: number, text: string) {
     this.type = type;
     this.begin = begin;
     this.end = end;
     this.text = text;
+  }
+
+  /**
+   * Lazily-cached uppercase form of the token text, used for case-insensitive
+   * keyword comparisons. Avoids re-allocating an uppercase copy on every
+   * isKeyword/matchKeyword call from the parser's hot loops.
+   */
+  private upperText(): string {
+    return (this._upperText ??= this.text.toUpperCase());
   }
 
   size(): number {
@@ -137,16 +210,17 @@ export class Token {
     return this.type !== TokenType.Whitespace && this.type !== TokenType.Comment;
   }
 
+  /**
+   * Returns true if this token is a BareWord matching the given keyword
+   * case-insensitively. Callers should pass the keyword in uppercase
+   * (all internal call sites already do, e.g. `matchKeyword('SELECT')`).
+   */
   matchKeyword(keyword: string): boolean {
-    return (
-      this.type === TokenType.BareWord &&
-      keywords.has(keyword.toUpperCase()) &&
-      this.text.toUpperCase() === keyword.toUpperCase()
-    );
+    return this.type === TokenType.BareWord && this.upperText() === keyword;
   }
 
   isKeyword(): boolean {
-    return this.type === TokenType.BareWord && keywords.has(this.text.toUpperCase());
+    return this.type === TokenType.BareWord && keywords.has(this.upperText());
   }
 
   isError(): boolean {
