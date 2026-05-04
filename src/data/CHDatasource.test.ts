@@ -1539,4 +1539,115 @@ describe('ClickHouseDatasource', () => {
       expect(result).toBe(query);
     });
   });
+
+  describe('getLogRowContext', () => {
+    const baseBuilderOptions: QueryBuilderOptions = {
+      database: 'default',
+      table: 'logs',
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      columns: [
+        { name: 'timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      filters: [],
+      orderBy: [
+        { name: 'timestamp', hint: ColumnHint.Time, dir: OrderByDirection.DESC },
+        { name: 'offset', dir: OrderByDirection.ASC },
+      ],
+    };
+
+    const baseQuery: CHBuilderQuery = {
+      pluginVersion: '',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      builderOptions: baseBuilderOptions,
+    };
+
+    const makeRow = () => {
+      const frame = toDataFrame({ fields: [{ name: 'timestamp', values: [1700000000000] }] });
+      return {
+        entryFieldIndex: 0,
+        rowIndex: 0,
+        dataFrame: frame,
+        timeEpochNs: '1700000000000000000',
+        entry: '',
+        hasAnsi: false,
+        hasUnescapedContent: false,
+        labels: {},
+        logLevel: 'info',
+        raw: '',
+        timeFromNow: '',
+        timeEpochMs: 1700000000000,
+        timeLocal: '',
+        timeUtc: '',
+        uid: '',
+      } as any;
+    };
+
+    const contextOptions = {
+      direction: 'BACKWARD' as any,
+      limit: 10,
+    };
+
+    it('preserves secondary ORDER BY entries (e.g. `offset ASC`) as tiebreakers', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // Force a single context column so we don't hit the "no columns" guard.
+      jest.spyOn(ds, 'getLogContextColumnsFromLogRow').mockReturnValue([{ name: 'service', value: 'web' }]);
+      const querySpy = jest
+        .spyOn(ds, 'query')
+        .mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+
+      const query = cloneDeep(baseQuery);
+      await ds.getLogRowContext(makeRow(), contextOptions, query);
+
+      expect(querySpy).toHaveBeenCalledTimes(1);
+      const request = querySpy.mock.calls[0][0] as DataQueryRequest<CHQuery>;
+      const sent = request.targets[0] as CHBuilderQuery;
+      const orderBy = sent.builderOptions.orderBy ?? [];
+
+      // Primary entry is the time column (inserted by getLogRowContext).
+      expect(orderBy[0]).toMatchObject({ hint: ColumnHint.Time });
+      // User's secondary entry survives as a tiebreaker.
+      expect(orderBy).toContainEqual(
+        expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC })
+      );
+      // Original time-column entry is not duplicated.
+      const timeEntries = orderBy.filter(
+        (e) => e.hint === ColumnHint.Time || e.name === 'timestamp'
+      );
+      expect(timeEntries).toHaveLength(1);
+    });
+
+    it('surfaces the underlying ClickHouse error text instead of swallowing it', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'getLogContextColumnsFromLogRow').mockReturnValue([{ name: 'service', value: 'web' }]);
+      jest.spyOn(ds, 'query').mockImplementation((_req) => {
+        // Observable that errors with a ClickHouse-shaped error payload.
+        return new (require('rxjs').Observable)((subscriber: any) => {
+          subscriber.error({ data: { message: 'Code: 47. DB::Exception: Unknown identifier: offset' } });
+        });
+      });
+
+      await expect(ds.getLogRowContext(makeRow(), contextOptions, cloneDeep(baseQuery))).rejects.toThrow(
+        /Unknown identifier: offset/
+      );
+    });
+
+    it('surfaces errors reported on DataQueryResponse.errors[]', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'getLogContextColumnsFromLogRow').mockReturnValue([{ name: 'service', value: 'web' }]);
+      jest.spyOn(ds, 'query').mockImplementation((_req) =>
+        of({
+          data: [],
+          errors: [{ message: 'Code: 62. DB::Exception: Syntax error' } as any],
+        })
+      );
+
+      await expect(ds.getLogRowContext(makeRow(), contextOptions, cloneDeep(baseQuery))).rejects.toThrow(
+        /Syntax error/
+      );
+    });
+  });
 });
