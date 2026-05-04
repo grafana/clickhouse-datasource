@@ -192,18 +192,18 @@ test.describe('Config editor', () => {
       const hostInput = page.getByPlaceholder('Enter server address');
       await hostInput.focus();
       await hostInput.press('Tab');
-      await expect(page.getByText('Server address required')).toBeVisible();
+      await expect(page.getByText('Server address required', { exact: true })).toBeVisible();
 
       const portInput = page.getByPlaceholder('Enter server port');
       await portInput.focus();
       await portInput.press('Tab');
-      await expect(page.getByText('Port is required')).toBeVisible();
+      await expect(page.getByText('Port is required', { exact: true })).toBeVisible();
 
       // In V2, validation blocks the save when required fields are empty — no network
       // request is made. Grafana surfaces the errors in the testing-status banner instead.
       await page.getByRole('button', { name: 'Save & test' }).click();
-      await expect(page.getByText('Server address required')).toBeVisible();
-      await expect(page.getByText('Port is required')).toBeVisible();
+      await expect(page.getByText('Server address required', { exact: true })).toBeVisible();
+      await expect(page.getByText('Port is required', { exact: true })).toBeVisible();
     });
   });
 });
