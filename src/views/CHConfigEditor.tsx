@@ -1,4 +1,4 @@
-import React, { ChangeEvent, useState } from 'react';
+import React, { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import {
   DataSourcePluginOptionsEditorProps,
   onUpdateDatasourceJsonDataOption,
@@ -26,7 +26,7 @@ import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from '../labels';
-import { onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
+import { createValidationAPI, onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
 import { AliasTableConfig } from '../components/configEditor/AliasTableConfig';
 import * as trackingV1 from './trackingV1';
 
@@ -35,6 +35,15 @@ export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CH
 export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
   const { jsonData, secureJsonFields } = options;
+
+  const validationEnabled = (config.featureToggles as Record<string, boolean | undefined> | undefined)?.[
+    'clickHouseConfigValidation'
+  ];
+  const validation = useMemo(
+    () => (validationEnabled ? (props.validation ?? createValidationAPI()) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.validation]
+  );
   const labels = allLabels.components.Config.ConfigEditor;
   const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
   const hasTLSCACert = secureJsonFields && secureJsonFields.tlsCACert;
@@ -46,6 +55,44 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   ];
 
   useConfigDefaults(options, onOptionsChange);
+
+  // Register a validator for required fields. The validator runs when
+  // validation.validate() is called by Grafana before saving — if it returns
+  // false, the save and backend health check are both blocked.
+  //
+  // We also eagerly call clearError in the effect body so that inline errors
+  // disappear as soon as the user fills in a field, rather than waiting for
+  // the next save attempt.
+  useEffect(() => {
+    if (!validation) {
+      return;
+    }
+    if (jsonData.host) {
+      validation.clearError('host');
+    }
+    if (jsonData.port) {
+      validation.clearError('port');
+    }
+
+    return validation.registerValidation(() => {
+      let valid = true;
+      if (!jsonData.host) {
+        validation.setError('host', labels.serverAddress.error);
+        valid = false;
+      } else {
+        validation.clearError('host');
+      }
+      if (!jsonData.port) {
+        validation.setError('port', labels.serverPort.error);
+        valid = false;
+      } else {
+        validation.clearError('port');
+      }
+      return valid;
+    });
+  }, [jsonData.host, jsonData.port, validation, labels.serverAddress.error, labels.serverPort.error]);
+
+  const fieldErrors = validation?.getErrors() ?? {};
 
   const onPortChange = (port: string) => {
     onOptionsChange({
@@ -71,7 +118,12 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const onSwitchToggle = (
     key: keyof Pick<
       CHConfig,
-      'secure' | 'validateSql' | 'enableSecureSocksProxy' | 'forwardGrafanaHeaders' | 'enableRowLimit' | 'hideTableNameInAdhocFilters'
+      | 'secure'
+      | 'validateSql'
+      | 'enableSecureSocksProxy'
+      | 'forwardGrafanaHeaders'
+      | 'enableRowLimit'
+      | 'hideTableNameInAdhocFilters'
     >,
     value: boolean
   ) => {
@@ -181,15 +233,15 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
-      options.jsonData.defaultDatabase ||
-      options.jsonData.defaultTable ||
-      options.jsonData.dialTimeout ||
-      options.jsonData.queryTimeout ||
-      options.jsonData.validateSql ||
-      options.jsonData.enableSecureSocksProxy ||
-      options.jsonData.customSettings ||
-      options.jsonData.logs ||
-      options.jsonData.traces
+    options.jsonData.defaultDatabase ||
+    options.jsonData.defaultTable ||
+    options.jsonData.dialTimeout ||
+    options.jsonData.queryTimeout ||
+    options.jsonData.validateSql ||
+    options.jsonData.enableSecureSocksProxy ||
+    options.jsonData.customSettings ||
+    options.jsonData.logs ||
+    options.jsonData.traces
   );
 
   const defaultPort = jsonData.secure
@@ -236,8 +288,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           required
           label={labels.serverAddress.label}
           description={labels.serverAddress.tooltip}
-          invalid={!jsonData.host}
-          error={labels.serverAddress.error}
+          invalid={!!fieldErrors.host}
+          error={fieldErrors.host}
         >
           <Input
             name="host"
@@ -254,8 +306,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           required
           label={labels.serverPort.label}
           description={portDescription}
-          invalid={!jsonData.port}
-          error={labels.serverPort.error}
+          invalid={!!fieldErrors.port}
+          error={fieldErrors.port}
         >
           <Input
             name="port"
@@ -632,7 +684,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             }}
           />
         </Field>
-        <Field label={labels.hideTableNameInAdhocFilters.label} description={labels.hideTableNameInAdhocFilters.tooltip}>
+        <Field
+          label={labels.hideTableNameInAdhocFilters.label}
+          description={labels.hideTableNameInAdhocFilters.tooltip}
+        >
           <Switch
             className="gf-form"
             value={jsonData.hideTableNameInAdhocFilters || false}
