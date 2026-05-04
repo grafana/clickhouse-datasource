@@ -141,6 +141,12 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 	return true, nil
 }
 
+func wrapCategorizedConnectionError(err error) error {
+	category := CategorizeConnectionError(err)
+	backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
+	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
+}
+
 // Connect opens a sql.DB connection using datasource settings
 func (h *Clickhouse) Connect(
 	ctx context.Context,
@@ -155,16 +161,14 @@ func (h *Clickhouse) Connect(
 
 	settings, err := LoadSettings(ctx, config)
 	if err != nil {
-		category := CategorizeConnectionError(err)
-		backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
-		return nil, backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
+		return nil, wrapCategorizedConnectionError(err)
 	}
 
 	var tlsConfig *tls.Config
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err = getTLSConfig(settings)
 		if err != nil {
-			return nil, err
+			return nil, wrapCategorizedConnectionError(err)
 		}
 	} else if settings.Secure {
 		tlsConfig = &tls.Config{
@@ -274,9 +278,7 @@ func (h *Clickhouse) Connect(
 			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
 		}
 
-		category := CategorizeConnectionError(err)
-		backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
-		return nil, backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
+		return nil, wrapCategorizedConnectionError(err)
 	}
 
 	// Honor the (nil-resource-on-error) contract so callers can rely on
