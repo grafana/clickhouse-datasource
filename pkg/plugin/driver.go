@@ -284,7 +284,13 @@ func (h *Clickhouse) Connect(
 		return nil, backend.DownstreamError(fmt.Errorf("failed to create ClickHouse client"))
 	}
 
-	return db, settings.isValid()
+	// Honor the (nil-resource-on-error) contract so callers can rely on
+	// `if err != nil { return err }` without leaking the *sql.DB.
+	if err := settings.isValid(); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return db, nil
 }
 
 // Converters defines list of data type converters
@@ -385,8 +391,34 @@ func (h *Clickhouse) MutateQueryData(
 		ctx = context.WithValue(ctx, grafanaHeadersKey, gh)
 	}
 
+	injectGrafanaUserHeader(ctx, req)
+
 	req = preprocessGrafanaSQL(req)
 	return ctx, req
+}
+
+// injectGrafanaUserHeader populates X-Grafana-User from the request's user
+// context when "Forward Grafana HTTP Headers" is enabled. Grafana's
+// `dataproxy.send_user_header` setting only adds the header to the proxy
+// path (core HTTP datasources); plugin-initiated connections never see it,
+// so downstream ClickHouse loses the user attribution that operators expect
+// when the toggle is on. See #1451.
+func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest) {
+	if req == nil || req.PluginContext.DataSourceInstanceSettings == nil {
+		return
+	}
+	if req.GetHTTPHeader("X-Grafana-User") != "" {
+		return
+	}
+	settings, err := LoadSettings(ctx, *req.PluginContext.DataSourceInstanceSettings)
+	if err != nil || !settings.ForwardGrafanaHeaders {
+		return
+	}
+	user := backend.UserFromContext(ctx)
+	if user == nil || user.Login == "" {
+		return
+	}
+	req.SetHTTPHeader("X-Grafana-User", user.Login)
 }
 
 func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ColumnsEditor } from '../ColumnsEditor';
 import { Filter, OrderBy, QueryBuilderOptions, SelectedColumn, ColumnHint } from 'types/queryBuilder';
+import { ColumnRolesHelp } from '../ColumnRolesHelp';
 import { ColumnSelect } from '../ColumnSelect';
 import { OtelVersionSelect } from '../OtelVersionSelect';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
@@ -136,6 +137,13 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         onEnabledChange={(e) => builderOptionsDispatch(setOtelEnabled(e))}
         selectedVersion={builderState.otelVersion}
         onVersionChange={(v) => builderOptionsDispatch(setOtelVersion(v))}
+      />
+      <ColumnRolesHelp
+        text={labels.columnsHelp.text}
+        linkText={labels.columnsHelp.linkText}
+        href={labels.columnsHelp.href}
+        testIdWrapper={allSelectors.QueryBuilder.LogsQueryBuilder.columnRolesHelp}
+        testIdLink={allSelectors.QueryBuilder.LogsQueryBuilder.columnRolesHelpLink}
       />
       <ColumnsEditor
         disabled={builderState.otelEnabled}

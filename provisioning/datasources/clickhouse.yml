@@ -19,5 +19,9 @@ datasources:
       username: "default"
       port: 9000
       protocol: native
+      # Enables the Monaco SQL validator in the query editor. Turned on in the
+      # E2E datasource so tests/e2e/sqlValidation.spec.ts can regression-guard
+      # against false positives on ClickHouse-specific syntax.
+      validateSql: true
     secureJsonData:
       # password: ""
