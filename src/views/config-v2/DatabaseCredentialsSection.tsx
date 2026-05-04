@@ -100,7 +100,13 @@ export const DatabaseCredentialsSection = (props: Props) => {
               label={labels.username.label}
               aria-label={labels.username.label}
               placeholder={labels.username.placeholder}
-              onBlur={trackClickhouseConfigV2DatabaseCredentialsUserInput}
+              onBlur={(e) => {
+                trackClickhouseConfigV2DatabaseCredentialsUserInput();
+                if (!e.currentTarget.value) {
+                  setFieldErrors((prev) => ({ ...prev, username: labels.username.error }));
+                  validation?.setError('username', labels.username.error);
+                }
+              }}
             />
           </Field>
           <Field
