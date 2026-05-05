@@ -17,8 +17,7 @@ import (
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/clickhouse-datasource/pkg/macros"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
-	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
-	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
+sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
@@ -142,6 +141,12 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 	return true, nil
 }
 
+func wrapCategorizedConnectionError(err error) error {
+	category := CategorizeConnectionError(err)
+	backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
+	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
+}
+
 // Connect opens a sql.DB connection using datasource settings
 func (h *Clickhouse) Connect(
 	ctx context.Context,
@@ -156,14 +161,14 @@ func (h *Clickhouse) Connect(
 
 	settings, err := LoadSettings(ctx, config)
 	if err != nil {
-		return nil, err
+		return nil, wrapCategorizedConnectionError(err)
 	}
 
 	var tlsConfig *tls.Config
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err = getTLSConfig(settings)
 		if err != nil {
-			return nil, err
+			return nil, wrapCategorizedConnectionError(err)
 		}
 	} else if settings.Secure {
 		tlsConfig = &tls.Config{
@@ -267,21 +272,13 @@ func (h *Clickhouse) Connect(
 
 	// `sqlds` normally calls `db.PingContext()` to check if the connection is alive,
 	// however, as ClickHouse returns its own non-standard `Exception` type, we need
-	// to handle it here so that we can log the error code, message and stack trace
+	// to handle it here so that we can categorize and surface the error correctly.
 	if err := db.PingContext(ctx); err != nil {
 		if ctx.Err() != nil {
 			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
 		}
 
-		if exception, ok := err.(*clickhouse.Exception); ok {
-			log.DefaultLogger.Error("[%d] %s \n%s\n", exception.Code, exception.Message, exception.StackTrace)
-		} else {
-			log.DefaultLogger.Error(err.Error())
-		}
-
-		backend.Logger.Error("failed to create ClickHouse client")
-		backend.Logger.Debug("clickhouse client creation error", "error", err)
-		return nil, backend.DownstreamError(fmt.Errorf("failed to create ClickHouse client"))
+		return nil, wrapCategorizedConnectionError(err)
 	}
 
 	// Honor the (nil-resource-on-error) contract so callers can rely on
