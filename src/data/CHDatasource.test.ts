@@ -12,7 +12,14 @@ import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
 import { of } from 'rxjs';
-import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+} from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
 import { Datasource } from './CHDatasource';
@@ -124,7 +131,7 @@ describe('ClickHouseDatasource', () => {
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -169,12 +176,14 @@ describe('ClickHouseDatasource', () => {
 
       // Mock the template variable resolution
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => resolvedSql);
-      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [{name: 'clickhouse_adhoc_use_json'}]);
+      const spyOnGetVars = jest
+        .spyOn(templateSrvMock, 'getVariables')
+        .mockImplementation(() => [{ name: 'clickhouse_adhoc_use_json' }]);
 
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -200,7 +209,6 @@ describe('ClickHouseDatasource', () => {
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
     });
-
 
     it('should expand $__adHocFilters macro with single quotes', async () => {
       const query = {
@@ -569,6 +577,107 @@ describe('ClickHouseDatasource', () => {
       );
 
       expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+  });
+
+  describe('Map type ad-hoc filters (#1434)', () => {
+    it('expands Map-typed columns into one tag key per discovered map key', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      // system.columns → two columns, one Map-typed.
+      const columnsFrame = arrayToDataFrame([
+        { name: 'level', type: 'String', table: 'events' },
+        { name: 'labels', type: 'Map(String, String)', table: 'events' },
+      ]);
+      // fetchUniqueMapKeys → distinct map keys for `labels`.
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }, { keys: 'http.status' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin(labels.keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([
+        { text: 'events.level' },
+        { text: 'events.labels.http.method' },
+        { text: 'events.labels.http.status' },
+      ]);
+    });
+
+    it('falls back to a flat Map column entry when no table context is available', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [columnsFrame] }));
+
+      const keys = await ds.getTagKeys();
+      // No `db.table` context → we don't fan out mapKeys probes; show the
+      // raw Map column entry instead of crashing or emitting `[object Object]`.
+      expect(keys).toEqual([{ text: 'events.labels' }]);
+    });
+
+    it('rewrites dotted Map keys into bracket access in fetchTagValuesFromSchema', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'GET' }, { val: 'POST' }]);
+
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin(labels.keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        if (sql.includes("labels['http.method']")) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys(); // populates the mapColumnsByTable cache
+      const values = await ds.getTagValues({ key: 'events.labels.http.method' });
+      expect(values).toEqual([{ text: 'GET' }, { text: 'POST' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: "select distinct labels['http.method'] from db.events limit 1000",
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('publishes the Map-column set to the AdHocFilter for escapeKey rewriting', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'labels', type: 'Map(String, String)', table: 'events' },
+        { name: 'other_map', type: 'Nullable(Map(String, String))', table: 'events' },
+      ]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'a' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('.keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys();
+      const published = ds.adHocFilter.getMapColumns();
+      expect(published.has('labels')).toBe(true);
+      expect(published.has('other_map')).toBe(true);
+      // OTel fallback names remain in the set for back-compat.
+      expect(published.has('LogAttributes')).toBe(true);
     });
   });
 
@@ -1048,7 +1157,7 @@ describe('ClickHouseDatasource', () => {
                 value: 'error',
                 type: 'string',
                 filterType: 'custom',
-                condition: 'AND'
+                condition: 'AND',
               },
             ],
           },
@@ -1190,7 +1299,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'debug',
+              },
+            ],
           },
         };
 
@@ -1234,7 +1352,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'info' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'info',
+              },
+            ],
           },
         };
 
@@ -1261,7 +1388,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'info' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.NotEquals,
+                value: 'info',
+              },
+            ],
           },
         };
 
@@ -1281,7 +1417,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'error' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.NotEquals,
+                value: 'error',
+              },
+            ],
           },
         };
 
@@ -1421,7 +1566,17 @@ describe('ClickHouseDatasource', () => {
           builderOptions: {
             ...query.builderOptions,
             columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
-            filters: [{ condition: 'AND', key: '', hint: ColumnHint.LogLevel, type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: '',
+                hint: ColumnHint.LogLevel,
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'debug',
+              },
+            ],
           },
         };
 
@@ -1530,7 +1685,10 @@ describe('ClickHouseDatasource', () => {
 
     it('returns query unchanged for non-Builder editorType', () => {
       const sqlQuery: CHSqlQuery = { pluginVersion: '', refId: 'A', editorType: EditorType.SQL, rawSql: 'SELECT 1' };
-      const result = datasource.modifyQuery(sqlQuery, { type: 'ADD_FILTER', options: { key: 'level', value: 'info' } } as any);
+      const result = datasource.modifyQuery(sqlQuery, {
+        type: 'ADD_FILTER',
+        options: { key: 'level', value: 'info' },
+      } as any);
       expect(result).toBe(sqlQuery);
     });
 
