@@ -962,6 +962,113 @@ describe('getFilters', () => {
     expect(sql).toEqual(`( NumericAttrs['retry_count'] = 3 )`);
   });
 
+  it('generates dot-notation SQL for JSON mapKey filter (basic path)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'request_id',
+          operator: FilterOperator.Equals,
+          type: 'JSON',
+          value: 'abc123',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`request_id`::Nullable(String) = 'abc123' )");
+  });
+
+  it('generates dot-notation SQL for JSON mapKey filter (nested path)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'SpanAttributes',
+          mapKey: 'http.status_code',
+          operator: FilterOperator.Equals,
+          type: 'JSON',
+          value: '200',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( SpanAttributes.`http`.`status_code`::Nullable(String) = '200' )");
+  });
+
+  it('generates correct IN clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'level',
+          operator: FilterOperator.In,
+          type: 'JSON',
+          value: ['error', 'warn'],
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) IN ('error', 'warn') )");
+  });
+
+  it('generates correct NOT IN clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'level',
+          operator: FilterOperator.NotIn,
+          type: 'JSON',
+          value: ['debug', 'trace'],
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) NOT IN ('debug', 'trace') )");
+  });
+
+  it('generates LIKE clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'ResourceAttributes',
+          mapKey: 'service.name',
+          operator: FilterOperator.Like,
+          type: 'JSON',
+          value: 'my-service',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( ResourceAttributes.`service`.`name`::Nullable(String) LIKE '%my-service%' )");
+  });
+
+  it('generates IS NULL clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'user_id',
+          operator: FilterOperator.IsNull,
+          type: 'JSON',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual('( LogAttributes.`user_id`::Nullable(String) IS NULL )');
+  });
+
   it('returns complex filter array', () => {
     const options = {
       columns: [{ name: 'hinted', hint: ColumnHint.Time }],
