@@ -1,5 +1,11 @@
 # Changelog
 
+## 4.17.1
+
+### Fixes
+
+- Dependency updates
+
 ## 4.17.0
 
 ### Features
