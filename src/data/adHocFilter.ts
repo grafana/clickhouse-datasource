@@ -107,11 +107,15 @@ function escapeValueBasedOnOperator(s: string, operator: string): string {
 }
 
 function convertOperatorToClickHouseOperator(operator: string): string {
+  // Grafana's "Matches regex" (=~) and "Does not match regex" (!~) are regex
+  // operators, so map them to ClickHouse's REGEXP. Using ILIKE here produced
+  // semantically wrong filters and prevented index usage for indexed columns
+  // (see grafana/clickhouse-datasource#1443).
   if (operator === '=~') {
-    return 'ILIKE';
+    return 'REGEXP';
   }
   if (operator === '!~') {
-    return 'NOT ILIKE';
+    return 'NOT REGEXP';
   }
   return operator;
 }

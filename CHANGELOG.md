@@ -1,5 +1,22 @@
 # Changelog
 
+## 4.17.0
+
+### Features
+
+- Allow `$__adhocFilters` macro to work with multiple tables (#1757)
+
+### Performance
+
+- Hold a single `*sql.DB` on `SchemaProvider` and dispose it with the instance (#1819)
+
+### Fixes
+
+- Dedupe autocomplete suggestions and dispose Monaco providers on unmount (#1820)
+- Map adhoc regex operators to `REGEXP` instead of `ILIKE` (#1794)
+- Close `*sql.DB` after each schema introspection query (#1818)
+- Dependency updates
+
 ## 4.16.0
 
 ### Features

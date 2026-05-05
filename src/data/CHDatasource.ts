@@ -22,6 +22,7 @@ import {
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
+import { trackClickhouseHealthCheckFailed } from 'tracking';
 import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
@@ -159,7 +160,9 @@ export class Datasource
       return undefined;
     }
 
-    const timeColumn = getColumnByHint(query.builderOptions, ColumnHint.FilterTime) || getColumnByHint(query.builderOptions, ColumnHint.Time);
+    const timeColumn =
+      getColumnByHint(query.builderOptions, ColumnHint.FilterTime) ||
+      getColumnByHint(query.builderOptions, ColumnHint.Time);
     if (timeColumn === undefined) {
       return undefined;
     }
@@ -258,7 +261,6 @@ export class Datasource
       ? defaultColumns
       : (query.builderOptions.columns ?? [{ name: timeColumn.name, hint: timeHint }]);
 
-
     const logsSampleBuilderOptions: QueryBuilderOptions = {
       database: query.builderOptions.database,
       table: query.builderOptions.table,
@@ -325,7 +327,7 @@ export class Datasource
         );
       }
 
-      const useJSON = Boolean(templateSrvVariables.find(v => v.name === 'clickhouse_adhoc_use_json'));
+      const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
 
       // Check if query contains $__adHocFilters macro
       const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
@@ -380,20 +382,36 @@ export class Datasource
       return rawQuery;
     }
 
-    // Match $__adHocFilters('table_name') or $__adHocFilters("table_name")
-    const regex = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/g;
+    // Match $__adHocFilters('table_name') or $__adHocFilters("table_name") or multiple tables
+    const regex = /\$__adHocFilters\s*\(([^)]+)\)/g;
 
-    return rawQuery.replace(regex, (match, tableName) => {
+    return rawQuery.replace(regex, (match, args) => {
+      // Extract all table names from comma-separated quoted strings
+      const tableNameRegex = /['"]([^'"]+)['"]/g;
+      const tableNames: string[] = [];
+      let tableMatch;
+
+      while ((tableMatch = tableNameRegex.exec(args)) !== null) {
+        tableNames.push(tableMatch[1]);
+      }
+
+      if (tableNames.length === 0) {
+        return match; // Return original if no valid table names found
+      }
+
       const filterStr = this.adHocFilter.buildFilterString(filters, useJSON);
       if (filterStr === '') {
         return 'additional_table_filters={}';
       }
-      return `additional_table_filters={'${tableName}': '${filterStr}'}`;
+
+      // Build filter entries for all tables
+      const tableFilters = tableNames.map(tableName => `'${tableName}': '${filterStr}'`).join(', ');
+      return `additional_table_filters={${tableFilters}}`;
     });
   }
 
   getSupportedQueryModifications() {
-    return ['ADD_FILTER', 'ADD_FILTER_OUT', 'ADD_STRING_FILTER', 'ADD_STRING_FILTER_OUT']
+    return ['ADD_FILTER', 'ADD_FILTER_OUT', 'ADD_STRING_FILTER', 'ADD_STRING_FILTER_OUT'];
   }
 
   // Support filtering by field value in Explore
@@ -402,21 +420,20 @@ export class Datasource
       return query;
     }
 
-    
     let columnName = (() => {
       const isStringFilterAction = action.type === 'ADD_STRING_FILTER' || action.type === 'ADD_STRING_FILTER_OUT';
 
       if (isStringFilterAction) {
         // has no key — resolve the column name from the log message hint.
         const logMessageColumn = getColumnByHint(query.builderOptions, ColumnHint.LogMessage);
-        return logMessageColumn?.alias || logMessageColumn?.name || action.options.key || ''
+        return logMessageColumn?.alias || logMessageColumn?.name || action.options.key || '';
       }
 
-      return action.options.key || ''
-    })()
+      return action.options.key || '';
+    })();
 
     if (!columnName) {
-      return query
+      return query;
     }
 
     const actionValue = action.options.value;
@@ -1188,9 +1205,7 @@ export class Datasource
             (f.name === mapName ||
               // single key was selected from map
               f.name === `arrayElement(${mapName}, '${keyName}')` ||
-              f.name === 'labels'
-            )
-          )
+              f.name === 'labels'))
       );
       if (!field) {
         continue;
@@ -1254,17 +1269,35 @@ export class Datasource
     const builderOptions = contextQuery.builderOptions;
     builderOptions.limit = options.limit;
 
-    const timeColumn = getColumnByHint(builderOptions, ColumnHint.FilterTime) || getColumnByHint(builderOptions, ColumnHint.Time)
+    const timeColumn =
+      getColumnByHint(builderOptions, ColumnHint.FilterTime) || getColumnByHint(builderOptions, ColumnHint.Time);
     if (!timeColumn) {
       throw new Error('Missing time column for log context');
     }
 
+    // Preserve the user's secondary ORDER BY (e.g. `offset ASC` alongside
+    // `timestamp DESC`) so rows with identical timestamps keep their
+    // stable order in the log-context view. The time column is forced to
+    // the front because context pagination uses it; the user's remaining
+    // ORDER BY entries ride along as tiebreakers. Drop any existing entry
+    // that targets the same time column to avoid duplicating it. See #1293.
+    const originalOrderBy = builderOptions.orderBy ?? [];
     builderOptions.orderBy = [];
     builderOptions.orderBy.push({
       name: '',
       hint: timeColumn.hint!,
       dir: options.direction === LogRowContextQueryDirection.Forward ? OrderByDirection.ASC : OrderByDirection.DESC,
     });
+    for (const entry of originalOrderBy) {
+      const targetsTimeColumn =
+        entry.hint === ColumnHint.Time ||
+        entry.hint === ColumnHint.FilterTime ||
+        (!!entry.name && entry.name === timeColumn.name);
+      if (targetsTimeColumn) {
+        continue;
+      }
+      builderOptions.orderBy.push(entry);
+    }
 
     builderOptions.filters = [];
     builderOptions.filters.push({
@@ -1300,7 +1333,39 @@ export class Datasource
       targets: [contextQuery],
     } as DataQueryRequest<CHQuery>;
 
-    return await firstValueFrom(this.query(req));
+    // Surface the underlying ClickHouse error instead of letting Grafana
+    // wrap it in the generic "Error loading more logs" banner. The observable
+    // returned by `this.query(req)` can reject with a structured error or emit
+    // a `DataQueryResponse` with a populated `errors`/`error` field. In both
+    // cases we want the original server message to reach the user. See #1362.
+    let response: DataQueryResponse;
+    try {
+      response = await firstValueFrom(this.query(req));
+    } catch (err) {
+      const detail = this.extractQueryErrorMessage(err);
+      throw new Error(detail ? `Log context query failed: ${detail}` : 'Log context query failed');
+    }
+
+    const responseError = response?.errors?.find((e) => !!e?.message)?.message;
+    if (responseError) {
+      throw new Error(`Log context query failed: ${responseError}`);
+    }
+
+    return response;
+  }
+
+  private extractQueryErrorMessage(err: unknown): string | undefined {
+    if (!err) {
+      return undefined;
+    }
+    if (typeof err === 'string') {
+      return err;
+    }
+    if (typeof err === 'object') {
+      const anyErr = err as { data?: { message?: string }; message?: string; statusText?: string };
+      return anyErr.data?.message || anyErr.message || anyErr.statusText;
+    }
+    return undefined;
   }
 
   /**
@@ -1322,6 +1387,49 @@ export class Datasource
     const contextColumns = this.getLogContextColumnsFromLogRow(row);
     return createReactElement(LogsContextPanel, { columns: contextColumns, datasourceUid: this.uid });
   }
+
+  async testDatasource(): Promise<{ status: string; message: string }> {
+    const result = await this.callHealthCheck();
+    if (result.status !== 'OK') {
+      const category = parseConnectionErrorCategory(result.message);
+      trackClickhouseHealthCheckFailed({
+        error_category: category,
+        protocol: this.settings.jsonData.protocol ?? 'native',
+      });
+      const detail = result.message.replace(/^\[\w+\]\s*/, '');
+      const hint = getConnectionErrorHint(category, detail);
+      const label = category === 'tls' ? 'TLS' : category.charAt(0).toUpperCase() + category.slice(1);
+      return {
+        status: 'error',
+        message: hint ? `${label} error [${detail}]: ${hint}` : result.message,
+      };
+    }
+    return { status: 'success', message: result.message };
+  }
+}
+
+// parseConnectionErrorCategory extracts the error category embedded by the backend in
+// health check failure messages of the form "[category] original error message".
+function parseConnectionErrorCategory(message: string): string {
+  const match = message?.match(/^\[(\w+)\]/);
+  return match ? match[1] : 'unknown';
+}
+
+const CONNECTION_ERROR_HINTS: Record<string, string> = {
+  auth: 'Verify your credentials and that the user has the required permissions in ClickHouse.',
+  network:
+    'Check that the host and port are correct and that the ClickHouse server is reachable from the machine running Grafana.',
+  tls: 'Verify your TLS certificate configuration. If using a self-signed certificate, ensure the CA certificate is configured.',
+  timeout:
+    'Check that the ClickHouse server is reachable and consider increasing the dial timeout in the connection settings.',
+  config: 'Check that all required fields are correctly filled in.',
+};
+
+function getConnectionErrorHint(category: string, detail: string): string | undefined {
+  if (category === 'tls' && detail.includes('first record does not look like a TLS handshake')) {
+    return 'The server does not appear to be using TLS. Try disabling the secure connection toggle.';
+  }
+  return CONNECTION_ERROR_HINTS[category];
 }
 
 enum TagType {

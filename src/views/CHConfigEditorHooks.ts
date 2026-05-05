@@ -4,6 +4,20 @@ import { CHConfig, CHHttpHeader, CHSecureConfig, defaultCHAdditionalSettingsConf
 import { pluginVersion } from 'utils/version';
 
 /**
+ * Mirrors the DataSourceConfigValidationAPI interface from @grafana/data.
+ * Defined locally until this plugin updates its @grafana/data peer dependency
+ * to a version that includes DataSourceConfigValidationAPI in its exports.
+ */
+export interface ValidationAPI {
+  registerValidation: (validator: () => Promise<boolean> | boolean) => () => void;
+  validate: () => Promise<boolean>;
+  isValid: () => boolean;
+  getErrors: () => Record<string, string>;
+  setError: (field: string, message: string) => void;
+  clearError: (field: string) => void;
+}
+
+/**
  * Handles saving HTTP headers to Grafana config.
  *
  * All header keys go to the unsecure config.
@@ -121,4 +135,50 @@ export const useConfigDefaults = (
     });
     appliedDefaults.current = true;
   }, [options, onOptionsChange]);
+};
+
+/**
+ * Factory that creates a local DataSourceConfigValidationAPI instance.
+ *
+ * Used when Grafana core does not yet pass props.validation down to the config
+ * editor. Config editors should prefer props.validation when present and fall
+ * back to a memoised instance created by this factory:
+ *
+ *   const validationAPI = useMemo(() => props.validation ?? createValidationAPI(), [props.validation]);
+ *
+ * Validators registered via registerValidation are run in order when
+ * validate() is called. setError / clearError let components push field-level
+ * errors imperatively (e.g. on blur or after an async check).
+ */
+export const createValidationAPI = (): ValidationAPI => {
+  const validators = new Set<() => Promise<boolean> | boolean>();
+  const errors: Record<string, string> = {};
+
+  return {
+    registerValidation(validator: () => Promise<boolean> | boolean): () => void {
+      validators.add(validator);
+      return () => validators.delete(validator);
+    },
+
+    async validate(): Promise<boolean> {
+      const results = await Promise.all(Array.from(validators).map((v) => Promise.resolve(v())));
+      return results.every(Boolean);
+    },
+
+    isValid(): boolean {
+      return Object.keys(errors).length === 0;
+    },
+
+    getErrors(): Record<string, string> {
+      return errors;
+    },
+
+    setError(field: string, message: string): void {
+      errors[field] = message;
+    },
+
+    clearError(field: string): void {
+      delete errors[field];
+    },
+  };
 };

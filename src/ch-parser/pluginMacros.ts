@@ -96,7 +96,7 @@ export const pluginMacros: PluginMacro[] = [
     name: '$__adHocFilters',
     isFunction: true,
     documentation:
-      'Manually applies ad-hoc filters to a specific table. Useful for complex queries where automatic filter detection fails. Use in SETTINGS clause to specify the target table for ad-hoc filters',
-    example: "additional_table_filters={'table_name': 'column = \\'value\\' AND column2 = \\'value2\\'}",
+      'Manually applies ad-hoc filters to specific table(s). Useful for complex queries where automatic filter detection fails. Supports multiple tables by passing comma-separated table names. Use in SETTINGS clause to specify the target table(s) for ad-hoc filters',
+    example: "additional_table_filters={'table1': 'column = \\'value\\'', 'table2': 'column = \\'value\\''} (for multiple tables)",
   },
 ];
