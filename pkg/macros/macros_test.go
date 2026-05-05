@@ -1,27 +1,25 @@
 package macros
 
 import (
+	stdErrors "errors"
 	"fmt"
 	"testing"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	"github.com/grafana/sqlds/v5"
+	"github.com/grafana/macropro"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-type ClickhouseDriver struct {
-	sqlds.Driver
-}
-
-type MockDB struct {
-	ClickhouseDriver
-}
-
-func (h *ClickhouseDriver) Macros() sqlds.Macros {
-	return Macros
+// makeCtx is a test helper that builds a macropro.QueryContext from time range and interval.
+func makeCtx(from, to time.Time, interval time.Duration) macropro.QueryContext[struct{}] {
+	return macropro.QueryContext[struct{}]{
+		TimeRange: macropro.TimeRange{From: from, To: to},
+		Interval:  interval,
+		IntervalMS: interval.Milliseconds(),
+	}
 }
 
 func TestTimeToDate(t *testing.T) {
@@ -60,28 +58,20 @@ func TestTimeToDateTime64(t *testing.T) {
 func TestMacroFromTimeFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlutil.Query{
-		TimeRange: backend.TimeRange{
-			From: from,
-			To:   to,
-		},
-		RawSQL: "select foo from foo where bar > $__fromTime",
-	}
+	ctx := makeCtx(from, to, 0)
+
 	tests := []struct {
 		want    string
 		wantErr bool
 		name    string
 	}{
-		{
-			name: "should return timeFilter",
-			want: "toDateTime(1415792726)",
-		},
+		{name: "should return timeFilter", want: "toDateTime(1415792726)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FromTimeFilter(&query, []string{})
+			got, err := FromTimeFilter(ctx, []string{})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("macroFromTimeFilter() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FromTimeFilter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -92,28 +82,20 @@ func TestMacroFromTimeFilter(t *testing.T) {
 func TestMacroToTimeFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlutil.Query{
-		TimeRange: backend.TimeRange{
-			From: from,
-			To:   to,
-		},
-		RawSQL: "select foo from foo where bar > $__toTime",
-	}
+	ctx := makeCtx(from, to, 0)
+
 	tests := []struct {
 		want    string
 		wantErr bool
 		name    string
 	}{
-		{
-			name: "should return timeFilter",
-			want: "toDateTime(1447328726)",
-		},
+		{name: "should return timeFilter", want: "toDateTime(1447328726)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ToTimeFilter(&query, []string{})
+			got, err := ToTimeFilter(ctx, []string{})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("macroToTimeFilter() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ToTimeFilter() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -124,28 +106,20 @@ func TestMacroToTimeFilter(t *testing.T) {
 func TestMacroFromTimeFilterMs(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlutil.Query{
-		TimeRange: backend.TimeRange{
-			From: from,
-			To:   to,
-		},
-		RawSQL: "select foo from foo where bar > $__fromTime",
-	}
+	ctx := makeCtx(from, to, 0)
+
 	tests := []struct {
 		want    string
 		wantErr bool
 		name    string
 	}{
-		{
-			name: "should return timeFilter_ms",
-			want: "fromUnixTimestamp64Milli(1415792726371)",
-		},
+		{name: "should return timeFilter_ms", want: "fromUnixTimestamp64Milli(1415792726371)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := FromTimeFilterMs(&query, []string{})
+			got, err := FromTimeFilterMs(ctx, []string{})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("macroFromTimeFilterMs() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("FromTimeFilterMs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -156,28 +130,20 @@ func TestMacroFromTimeFilterMs(t *testing.T) {
 func TestMacroToTimeFilterMs(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlutil.Query{
-		TimeRange: backend.TimeRange{
-			From: from,
-			To:   to,
-		},
-		RawSQL: "select foo from foo where bar > $__toTime",
-	}
+	ctx := makeCtx(from, to, 0)
+
 	tests := []struct {
 		want    string
 		wantErr bool
 		name    string
 	}{
-		{
-			name: "should return timeFilter_ms",
-			want: "fromUnixTimestamp64Milli(1447328726371)",
-		},
+		{name: "should return timeFilter_ms", want: "fromUnixTimestamp64Milli(1447328726371)"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := ToTimeFilterMs(&query, []string{})
+			got, err := ToTimeFilterMs(ctx, []string{})
 			if (err != nil) != tt.wantErr {
-				t.Errorf("macroToTimeFilterMs() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ToTimeFilterMs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			assert.Equal(t, tt.want, got)
@@ -188,13 +154,9 @@ func TestMacroToTimeFilterMs(t *testing.T) {
 func TestMacroDateFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlutil.Query{
-		TimeRange: backend.TimeRange{
-			From: from,
-			To:   to,
-		},
-	}
-	got, err := DateFilter(&query, []string{"dateCol"})
+	ctx := makeCtx(from, to, 0)
+
+	got, err := DateFilter(ctx, []string{"dateCol"})
 	assert.Nil(t, err)
 	assert.Equal(t, "dateCol >= toDate('2014-11-12') AND dateCol <= toDate('2015-11-12')", got)
 }
@@ -202,48 +164,118 @@ func TestMacroDateFilter(t *testing.T) {
 func TestMacroDateTimeFilter(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
-	query := sqlutil.Query{
-		TimeRange: backend.TimeRange{
-			From: from,
-			To:   to,
-		},
-	}
-	got, err := DateTimeFilter(&query, []string{"dateCol", "timeCol"})
+	ctx := makeCtx(from, to, 0)
+
+	got, err := DateTimeFilter(ctx, []string{"dateCol", "timeCol"})
 	assert.Nil(t, err)
 	assert.Equal(t, "(dateCol >= toDate('2014-11-12') AND dateCol <= toDate('2015-11-12')) AND (timeCol >= toDateTime(1415792726) AND timeCol <= toDateTime(1447328726))", got)
 }
 
 func TestMacroTimeInterval(t *testing.T) {
-	query := sqlutil.Query{
-		RawSQL:   "select $__timeInterval(col) from foo",
-		Interval: time.Duration(20000000000),
-	}
-	got, err := TimeInterval(&query, []string{"col"})
+	ctx := makeCtx(time.Time{}, time.Time{}, time.Duration(20000000000))
+	got, err := TimeInterval(ctx, []string{"col"})
 	assert.Nil(t, err)
 	assert.Equal(t, "toStartOfInterval(toDateTime(col), INTERVAL 20 second)", got)
 }
 
 func TestMacroTimeIntervalMs(t *testing.T) {
-	query := sqlutil.Query{
-		RawSQL:   "select $__timeInterval_ms(col) from foo",
-		Interval: time.Duration(20000000000),
-	}
-	got, err := TimeIntervalMs(&query, []string{"col"})
+	ctx := makeCtx(time.Time{}, time.Time{}, time.Duration(20000000000))
+	got, err := TimeIntervalMs(ctx, []string{"col"})
 	assert.Nil(t, err)
 	assert.Equal(t, "toStartOfInterval(toDateTime64(col, 3), INTERVAL 20000 millisecond)", got)
 }
 
 func TestMacroIntervalSeconds(t *testing.T) {
-	query := sqlutil.Query{
-		RawSQL:   "select toStartOfInterval(col, INTERVAL $__interval_s second) AS time from foo",
-		Interval: time.Duration(20000000000),
-	}
-	got, err := IntervalSeconds(&query, []string{})
+	ctx := makeCtx(time.Time{}, time.Time{}, time.Duration(20000000000))
+	got, err := IntervalSeconds(ctx, []string{})
 	assert.Nil(t, err)
 	assert.Equal(t, "20", got)
 }
 
-// test sqlds query interpolation with clickhouse filters used
+func TestMacroTimeFrom(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	ctx := makeCtx(from, to, 0)
+
+	got, err := TimeFrom(ctx, []string{"ts"})
+	assert.Nil(t, err)
+	assert.Equal(t, "ts >= toDateTime(1415792726)", got)
+
+	_, err = TimeFrom(ctx, []string{})
+	assert.Error(t, err)
+}
+
+func TestMacroTimeTo(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	ctx := makeCtx(from, to, 0)
+
+	got, err := TimeTo(ctx, []string{"ts"})
+	assert.Nil(t, err)
+	assert.Equal(t, "ts <= toDateTime(1447328726)", got)
+
+	_, err = TimeTo(ctx, []string{})
+	assert.Error(t, err)
+}
+
+func TestMacroTimeGroup(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	got, err := TimeGroup(ctx, []string{"ts", "5m"})
+	assert.Nil(t, err)
+	assert.Equal(t, "toStartOfInterval(toDateTime(ts), INTERVAL 300 second)", got)
+
+	got, err = TimeGroup(ctx, []string{"ts", "1h"})
+	assert.Nil(t, err)
+	assert.Equal(t, "toStartOfInterval(toDateTime(ts), INTERVAL 3600 second)", got)
+
+	_, err = TimeGroup(ctx, []string{"ts"})
+	assert.Error(t, err)
+
+	_, err = TimeGroup(ctx, []string{"ts", "not-a-duration"})
+	assert.Error(t, err)
+}
+
+// TestMacroErrorsAreDownstream ensures bad-argument and bad-duration errors
+// are wrapped as downstream errors so grafana classifies them as user input
+// errors rather than plugin bugs.
+func TestMacroErrorsAreDownstream(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	cases := []struct {
+		name string
+		call func() error
+	}{
+		{"TimeFilter wrong arity", func() error { _, err := TimeFilter(ctx, nil); return err }},
+		{"TimeFilterMs wrong arity", func() error { _, err := TimeFilterMs(ctx, nil); return err }},
+		{"DateFilter wrong arity", func() error { _, err := DateFilter(ctx, nil); return err }},
+		{"DateTimeFilter wrong arity", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }},
+		{"TimeInterval wrong arity", func() error { _, err := TimeInterval(ctx, nil); return err }},
+		{"TimeIntervalMs wrong arity", func() error { _, err := TimeIntervalMs(ctx, nil); return err }},
+		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, nil); return err }},
+		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, nil); return err }},
+		{"TimeGroup wrong arity", func() error { _, err := TimeGroup(ctx, []string{"ts"}); return err }},
+		{"TimeGroup bad duration", func() error { _, err := TimeGroup(ctx, []string{"ts", "nope"}); return err }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.call()
+			require.Error(t, err)
+			var es backend.ErrorWithSource
+			require.True(t, stdErrors.As(err, &es), "expected error to satisfy backend.ErrorWithSource")
+			assert.Equal(t, backend.ErrorSourceDownstream, es.ErrorSource())
+		})
+	}
+
+	t.Run("arg-count errors unwrap to ErrorBadArgumentCount", func(t *testing.T) {
+		_, err := TimeFilter(ctx, nil)
+		require.Error(t, err)
+		assert.True(t, stdErrors.Is(err, sqlutil.ErrorBadArgumentCount))
+	})
+}
+
+// TestInterpolate verifies end-to-end macro expansion using macropro.Interpolate directly,
+// without going through sqlds. The mock driver is no longer required.
 func TestInterpolate(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.123Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.456Z")
@@ -269,7 +301,6 @@ func TestInterpolate(t *testing.T) {
 	}
 
 	for i, tc := range tests {
-		driver := MockDB{}
 		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
 			query := &sqlutil.Query{
 				RawSQL: tc.input,
@@ -280,7 +311,7 @@ func TestInterpolate(t *testing.T) {
 					To:   to,
 				},
 			}
-			interpolatedQuery, err := sqlds.Interpolate(&driver, query)
+			interpolatedQuery, err := Interpolate(tc.input, query)
 			require.Nil(t, err)
 			assert.Equal(t, tc.output, interpolatedQuery)
 		})

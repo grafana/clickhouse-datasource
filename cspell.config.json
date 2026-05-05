@@ -53,6 +53,8 @@
     "instancemgmt",
     "jsonencode",
     "lowcardinality",
+    "macropro",
+    "datepart",
     "magefile",
     "multiquery",
     "mgbench",
