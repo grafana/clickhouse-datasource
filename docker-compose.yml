@@ -15,6 +15,9 @@ services:
       # OFREP interception (>=3.5.0), but we also disable it at the server level so
       # that manual `docker-compose up` + browsing doesn't trigger the onboarding modal.
       - GF_FEATURE_TOGGLES_splashScreen=false
+      - GF_FEATURE_TOGGLES_dashboardNewLayouts=false
+      - GF_FEATURE_TOGGLES_newClickhouseConfigPageDesign=true
+      - GF_FEATURE_TOGGLES_clickHouseConfigValidation=true
 
   clickhouse-server:
     image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
