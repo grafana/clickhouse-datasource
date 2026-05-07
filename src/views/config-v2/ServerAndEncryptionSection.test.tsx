@@ -45,6 +45,60 @@ describe('ServerAndEncryptionSection', () => {
     expect(onOptionsChangeMock).toHaveBeenCalled();
   });
 
+  it('trims leading and trailing whitespace from host on blur', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: {
+          host: '  clickhouse-example.com  ',
+          secure: false,
+          protocol: Protocol.Native,
+          port: undefined,
+          pdcInjected: false,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+    render(<ServerAndEncryptionSection {...props} />);
+
+    const input = screen.getByTestId('clickhouse-v2-config-host-input');
+    fireEvent.blur(input);
+
+    expect(onOptionsChangeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ host: 'clickhouse-example.com' }),
+      })
+    );
+  });
+
+  it('shows server address error when host is whitespace-only on blur', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: {
+          host: '   ',
+          secure: false,
+          protocol: Protocol.Native,
+          port: undefined,
+          pdcInjected: false,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+    render(<ServerAndEncryptionSection {...props} />);
+
+    const input = screen.getByTestId('clickhouse-v2-config-host-input');
+    fireEvent.blur(input);
+
+    expect(screen.getByText(/server address required/i)).toBeInTheDocument();
+  });
+
   it('updates protocol value on radio button toggle', () => {
     render(<ServerAndEncryptionSection {...defaultProps} />);
 
