@@ -63,8 +63,10 @@ export const ServerAndEncryptionSection = (props: Props) => {
 
   useEffect(() => {
     // Always clear errors eagerly when the user fills in a field, regardless of
-    // whether the ValidationAPI is available
-    if (jsonData.host) {
+    // whether the ValidationAPI is available. Whitespace-only is treated as
+    // empty so the user gets a clear field-level error instead of a
+    // confusing connection failure later.
+    if (jsonData.host?.trim()) {
       setFieldErrors((prev) => { const next = { ...prev }; delete next.host; return next; });
       validation?.clearError('host');
     }
@@ -77,7 +79,7 @@ export const ServerAndEncryptionSection = (props: Props) => {
     }
     return validation.registerValidation(() => {
       const errors: Record<string, string> = {};
-      if (!jsonData.host) {
+      if (!jsonData.host?.trim()) {
         errors.host = labels.serverAddress.error;
       }
       if (!jsonData.port) {
@@ -155,7 +157,14 @@ export const ServerAndEncryptionSection = (props: Props) => {
             placeholder={labels.serverAddress.placeholder}
             onBlur={(e) => {
               trackClickhouseConfigV2HostInput();
-              if (!e.currentTarget.value) {
+              const trimmed = e.currentTarget.value.trim();
+              if (trimmed !== e.currentTarget.value) {
+                onOptionsChange({
+                  ...options,
+                  jsonData: { ...options.jsonData, host: trimmed },
+                });
+              }
+              if (!trimmed) {
                 setFieldErrors((prev) => ({ ...prev, host: labels.serverAddress.error }));
                 validation?.setError('host', labels.serverAddress.error);
               }
