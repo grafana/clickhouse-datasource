@@ -38,6 +38,7 @@ export const useTraceDefaultsOnMount = (
     const defaultFlattenNested = datasource.getDefaultTraceFlattenNested();
     const defaultEventsColumnPrefix = datasource.getDefaultTraceEventsColumnPrefix();
     const defaultLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
+    const traceTimestampTableSuffix = datasource.getTraceTimestampTableSuffix();
 
     const nextColumns: SelectedColumn[] = [];
     for (let [hint, colName] of defaultColumns) {
@@ -56,6 +57,7 @@ export const useTraceDefaultsOnMount = (
           flattenNested: defaultFlattenNested,
           traceEventsColumnPrefix: defaultEventsColumnPrefix,
           traceLinksColumnPrefix: defaultLinksColumnPrefix,
+          traceTimestampTableSuffix,
         },
       })
     );

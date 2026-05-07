@@ -245,19 +245,18 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const selectPartsSql = selectParts.join(', ');
 
-  // Optimize trace ID filtering for OTel enabled trace lookups
+  // Optimize trace ID filtering when a companion timestamp index table is available.
+  // The optimization is gated purely on that capability — OTel is not required, so
+  // any schema following the `<table>_trace_id_ts` convention (or a user-configured
+  // suffix) benefits from the narrowed time range.
   const hasTraceTimestampTable = options.meta?.hasTraceTimestampTable;
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
-  const otelVersion = otel.getVersion(options.meta?.otelVersion);
   const applyTraceIdOptimization =
-    hasTraceTimestampTable &&
-    hasTraceIdFilter &&
-    traceStartTime !== undefined &&
-    options.meta?.otelEnabled &&
-    otelVersion;
+    hasTraceTimestampTable && hasTraceIdFilter && traceStartTime !== undefined;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
-    const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
+    const suffix = options.meta?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
+    const timestampTable = getTableIdentifier(database, table + suffix);
     queryParts.push('WITH');
     queryParts.push(`'${traceId}' as trace_id,`);
     queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);

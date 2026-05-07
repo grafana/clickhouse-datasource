@@ -217,6 +217,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       refId: 'Trace ID',
     };
 
+    const traceTimestampTableSuffix = datasource.getTraceTimestampTableSuffix();
+
     if (
       originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces
@@ -232,6 +234,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           minimized: true,
           isTraceIdMode: true,
           traceId: '${__value.raw}',
+          traceTimestampTableSuffix:
+            originalQuery.builderOptions.meta?.traceTimestampTableSuffix || traceTimestampTableSuffix,
         },
       };
     } else {
@@ -261,6 +265,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceEventsColumnPrefix: traceEventsColumnPrefix,
           traceLinksColumnPrefix: traceLinksColumnPrefix,
           hasTraceTimestampTable: Boolean(otelVersion),
+          traceTimestampTableSuffix,
         },
       };
 
