@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CHQueryEditor } from './CHQueryEditor';
 import * as ui from '@grafana/ui';
@@ -150,5 +150,109 @@ describe('Query Editor', () => {
         expect(updated.rawSql).toContain('otel_traces_trace_id_ts');
       }
     }
+  });
+
+  it('renders compact SQL chrome for single-table datasources', () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+
+    render(
+      <CHQueryEditor
+        query={{ pluginVersion: '', rawSql: 'SELECT 1', refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: 'Query Builder' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run Query' })).toBeInTheDocument();
+    expect(screen.queryByText('Editor Type')).not.toBeInTheDocument();
+    expect(screen.getByText('SELECT 1')).toBeInTheDocument();
+  });
+
+  it('switches from compact SQL back to a configured logs builder query', () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    const onChange = jest.fn();
+
+    render(
+      <CHQueryEditor
+        query={{ pluginVersion: '', rawSql: 'SELECT 1', refId: 'A', editorType: EditorType.SQL }}
+        onChange={onChange}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Query Builder' }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editorType: EditorType.Builder,
+        builderOptions: expect.objectContaining({
+          database: 'otel_v2',
+          table: 'otel_logs',
+          queryType: QueryType.Logs,
+        }),
+      })
+    );
+  });
+
+  it('switches compact trace builder to SQL with traces query type', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'traces';
+    datasource.settings.jsonData.traces = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_traces',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+    const onChange = jest.fn();
+
+    render(
+      <CHQueryEditor
+        query={{
+          pluginVersion,
+          rawSql: 'SELECT 1',
+          refId: 'A',
+          editorType: EditorType.Builder,
+          builderOptions: {
+            database: 'otel_v2',
+            table: 'otel_traces',
+            queryType: QueryType.Traces,
+          },
+        }}
+        onChange={onChange}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+    await act(async () => {});
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit as SQL' }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editorType: EditorType.SQL,
+        queryType: QueryType.Traces,
+      })
+    );
   });
 });

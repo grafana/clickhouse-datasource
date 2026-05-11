@@ -52,6 +52,43 @@ const createInstance = ({ queryResponse }: Partial<InstanceConfig> = {}) => {
 };
 
 describe('ClickHouseDatasource', () => {
+  describe('single-table configuration mode', () => {
+    it('defaults to classic mode when configMode and signalType are unset', () => {
+      const ds = createInstance({});
+
+      expect(ds.getSignalType()).toBeUndefined();
+      expect(ds.getConfigMode()).toBe('classic');
+      expect(ds.isSingleTableMode()).toBe(false);
+    });
+
+    it('uses explicit configMode and signalType', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+
+      expect(ds.getSignalType()).toBe('logs');
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(true);
+    });
+
+    it('infers single-table mode from legacy signalType', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.signalType = 'traces';
+
+      expect(ds.getSignalType()).toBe('traces');
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(true);
+    });
+
+    it('does not enter single-table mode without a signal type', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.configMode = 'single-table';
+
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(false);
+    });
+  });
+
   describe('metricFindQuery', () => {
     it('fetches values', async () => {
       const mockedValues = [1, 100];

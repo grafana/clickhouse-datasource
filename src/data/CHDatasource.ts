@@ -32,7 +32,7 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
-import { CHConfig } from 'types/config';
+import { CHConfig, ConfigMode, SignalType } from 'types/config';
 import {
   AggregateColumn,
   AggregateType,
@@ -774,6 +774,22 @@ export class Datasource
     return this.settings.jsonData.defaultTable;
   }
 
+  getSignalType(): SignalType | undefined {
+    return this.settings.jsonData.signalType;
+  }
+
+  getConfigMode(): ConfigMode {
+    if (this.settings.jsonData.configMode) {
+      return this.settings.jsonData.configMode;
+    }
+
+    return this.getSignalType() ? 'single-table' : 'classic';
+  }
+
+  isSingleTableMode(): boolean {
+    return this.getConfigMode() === 'single-table' && Boolean(this.getSignalType());
+  }
+
   getDefaultLogsDatabase(): string | undefined {
     return this.settings.jsonData.logs?.defaultDatabase;
   }
@@ -1050,6 +1066,16 @@ export class Datasource
     const rawSql = keysColumn
       ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
       : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctValues(column: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT "${column}" FROM "${db}"."${table}" WHERE "${column}" IS NOT NULL LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctMapValues(mapColumn: string, mapKey: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT ${mapColumn}['${mapKey}'] FROM "${db}"."${table}" WHERE mapContains(${mapColumn}, '${mapKey}') LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
