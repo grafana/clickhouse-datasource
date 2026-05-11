@@ -174,7 +174,7 @@ Use **Configuration mode** to choose how the data source is used by the query bu
 | **All databases** | Allows queries against any database and table the ClickHouse user can read. Use this mode for general exploration and dashboards that query multiple tables. |
 | **Single source** | Focuses the data source on one logs or traces table. Choose a **Signal type**, then configure the database, table, and column mappings for that source. |
 
-Use **Single source** when the data source is dedicated to one logs or traces table, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query.
+Use **Single source** when the data source is dedicated to one logs or traces table, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query. Single source data sources use the [compact query mode](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#compact-query-mode) in the query editor.
 
 ### Additional settings
 
