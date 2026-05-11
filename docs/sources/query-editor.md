@@ -48,6 +48,18 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 
 If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
 
+### Compact query mode
+
+When a data source is configured in **Single source** mode for logs or traces, the query builder uses a compact editor focused on the configured source. The compact editor omits database, table, and query type controls because those values come from the data source configuration.
+
+For logs, use the search field to filter log message text. Use **Add filter** to add column filters, and use the advanced options to adjust sorting and the result limit.
+
+Compact filters use Grafana's selected time range automatically. The configured time fields are not shown in the filter field list because the query builder manages the time range filter for you.
+
+Filter operators are tailored to the selected field type. Numeric fields offer comparison operators such as `>`, `<`, `>=`, `<=`, `=`, and `!=`. String fields offer text matching and equality operators such as **contains**, **does not contain**, `=`, and `!=`.
+
+The compact editor also includes a generated SQL preview. Use **Copy** to copy the generated query, or **Edit as SQL** to switch to the SQL editor for manual customization.
+
 ## Build queries
 
 You can build queries using the **SQL editor** (raw SQL) or the **Query builder**. Queries can include macros for dynamic parts such as time range filters.
