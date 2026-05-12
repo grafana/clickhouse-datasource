@@ -46,6 +46,8 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 - **Type-specific options** — Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
 - **SQL preview** — At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
 
+If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
+
 ## Build queries
 
 You can build queries using the **SQL editor** (raw SQL) or the **Query builder**. Queries can include macros for dynamic parts such as time range filters.
@@ -206,7 +208,7 @@ Trace-panel column aliases are fixed; choose the table columns that play each ro
 
 Set the **Duration Unit** to match the units your column stores (OTel uses nanoseconds; other schemas often use milliseconds or seconds). The builder converts durations to milliseconds for the trace panel.
 
-To avoid re-mapping roles for every query, configure defaults under **Data source settings → Logs** and **Data source settings → Traces**. Enabling **OTel** mode populates every role with the OTel-conventional column name automatically.
+To avoid re-mapping roles for every query, configure defaults under **Data source settings → Logs** and **Data source settings → Traces**, or use **Single source** mode when a data source is dedicated to one logs or traces table. Enabling **OTel** mode populates every role with the OTel-conventional column name automatically.
 
 ## Macros
 
