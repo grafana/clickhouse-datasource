@@ -111,5 +111,5 @@
     "sql-formatter": "^15.6.12",
     "tslib": "2.8.1"
   },
-  "packageManager": "npm"
+  "packageManager": "npm@11.12.1"
 }
