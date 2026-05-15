@@ -57,6 +57,8 @@ export const AdditionalSettingsSection = (props: Props) => {
   const { jsonData } = options;
   const labels = allLabels.components.Config.ConfigEditor;
   const styles = useStyles2(getStyles);
+  const isSingleTableMode =
+    (jsonData.configMode || (jsonData.signalType ? 'single-table' : 'classic')) === 'single-table';
 
   useConfigDefaults(options, onOptionsChange);
 
@@ -119,28 +121,33 @@ export const AdditionalSettingsSection = (props: Props) => {
     });
   };
   const shouldBeOpen = useMemo(() => {
-    const defaultLogs = defaultCHAdditionalSettingsConfig.logs;
-    const defaultTraces = defaultCHAdditionalSettingsConfig.traces;
-    const logs = jsonData.logs ?? defaultLogs;
-    const traces = jsonData.traces ?? defaultTraces;
-
     return (
-      !!jsonData.defaultDatabase ||
-      !!jsonData.defaultTable ||
-      !!jsonData.connMaxLifetime ||
-      !!jsonData.dialTimeout ||
-      !!jsonData.maxIdleConns ||
-      !!jsonData.maxOpenConns ||
-      !!jsonData.queryTimeout ||
-      !!jsonData.validateSql ||
-      !isEqual(logs, defaultLogs) ||
-      !isEqual(traces, defaultTraces) ||
+      (!isSingleTableMode &&
+        (() => {
+          const defaultLogs = defaultCHAdditionalSettingsConfig.logs;
+          const defaultTraces = defaultCHAdditionalSettingsConfig.traces;
+          const logs = jsonData.logs ?? defaultLogs;
+          const traces = jsonData.traces ?? defaultTraces;
+
+          return (
+            !!jsonData.defaultDatabase ||
+            !!jsonData.defaultTable ||
+            !!jsonData.connMaxLifetime ||
+            !!jsonData.dialTimeout ||
+            !!jsonData.maxIdleConns ||
+            !!jsonData.maxOpenConns ||
+            !!jsonData.queryTimeout ||
+            !!jsonData.validateSql ||
+            !isEqual(logs, defaultLogs) ||
+            !isEqual(traces, defaultTraces)
+          );
+        })()) ||
       (jsonData.aliasTables?.length ?? 0) > 0 ||
       !!jsonData.enableRowLimit ||
       !!jsonData.enableSecureSocksProxy ||
       customSettings.length > 0
     );
-  }, [jsonData, customSettings]);
+  }, [jsonData, isSingleTableMode, customSettings]);
 
   return (
     <Box
@@ -148,111 +155,117 @@ export const AdditionalSettingsSection = (props: Props) => {
       borderColor="weak"
       padding={2}
       marginBottom={4}
-      id={`${CONFIG_SECTION_HEADERS[3].id}`}
+      id={`${CONFIG_SECTION_HEADERS[4].id}`}
       minWidth={CONTAINER_MIN_WIDTH}
     >
       <CollapsableSection
         label={
           <>
-            <Text variant="h3">{CONFIG_SECTION_HEADERS[3].label}</Text>
+            <Text variant="h3">{CONFIG_SECTION_HEADERS[4].label}</Text>
             <Badge text="optional" color="darkgrey" className={styles.badge} />
           </>
         }
         isOpen={!!shouldBeOpen}
       >
-        <DefaultDatabaseTableConfig
-          defaultDatabase={jsonData.defaultDatabase}
-          defaultTable={jsonData.defaultTable}
-          onDefaultDatabaseChange={(e) => {
-            trackClickhouseConfigV2DefaultDbInput();
-            onUpdateDatasourceJsonDataOption(props, 'defaultDatabase')(e);
-          }}
-          onDefaultTableChange={(e) => {
-            trackClickhouseConfigV2DefaultTableInput();
-            onUpdateDatasourceJsonDataOption(props, 'defaultTable')(e);
-          }}
-        />
-        <Divider />
-        <QuerySettingsConfig
-          connMaxLifetime={jsonData.connMaxLifetime}
-          dialTimeout={jsonData.dialTimeout}
-          maxIdleConns={jsonData.maxIdleConns}
-          maxOpenConns={jsonData.maxOpenConns}
-          queryTimeout={jsonData.queryTimeout}
-          validateSql={jsonData.validateSql}
-          onDialTimeoutChange={(e) => {
-            trackClickhouseConfigV2QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
-            onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
-          }}
-          onQueryTimeoutChange={(e) => {
-            trackClickhouseConfigV2QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
-            onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
-          }}
-          onConnMaxLifetimeChange={(e) => {
-            trackClickhouseConfigV2QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });
-            onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e);
-          }}
-          onConnMaxIdleConnsChange={(e) => {
-            trackClickhouseConfigV2QuerySettings({ maxIdleConns: Number(e.currentTarget.value) });
-            onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e);
-          }}
-          onConnMaxOpenConnsChange={(e) => {
-            trackClickhouseConfigV2QuerySettings({ maxOpenConns: Number(e.currentTarget.value) });
-            onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e);
-          }}
-          onValidateSqlChange={(e) => {
-            trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
-            onUpdateDatasourceJsonDataOptionChecked(props, 'validateSql')(e);
-          }}
-        />
-        <Divider />
-        <LogsConfig
-          logsConfig={jsonData.logs}
-          onDefaultDatabaseChange={(db) => onUpdateLogsConfig('defaultDatabase', db)}
-          onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
-          onOtelEnabledChange={(v) => onUpdateLogsConfig('otelEnabled', v)}
-          onOtelVersionChange={(v) => onUpdateLogsConfig('otelVersion', v)}
-          onFilterTimeColumnChange={(c) => onUpdateLogsConfig('filterTimeColumn', c)}
-          onTimeColumnChange={(c) => onUpdateLogsConfig('timeColumn', c)}
-          onLevelColumnChange={(c) => onUpdateLogsConfig('levelColumn', c)}
-          onMessageColumnChange={(c) => onUpdateLogsConfig('messageColumn', c)}
-          onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
-          onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
-          onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
-        />
+        {!isSingleTableMode && (
+          <>
+            <DefaultDatabaseTableConfig
+              defaultDatabase={jsonData.defaultDatabase}
+              defaultTable={jsonData.defaultTable}
+              onDefaultDatabaseChange={(e) => {
+                trackClickhouseConfigV2DefaultDbInput();
+                onUpdateDatasourceJsonDataOption(props, 'defaultDatabase')(e);
+              }}
+              onDefaultTableChange={(e) => {
+                trackClickhouseConfigV2DefaultTableInput();
+                onUpdateDatasourceJsonDataOption(props, 'defaultTable')(e);
+              }}
+            />
+            <Divider />
+            <QuerySettingsConfig
+              connMaxLifetime={jsonData.connMaxLifetime}
+              dialTimeout={jsonData.dialTimeout}
+              maxIdleConns={jsonData.maxIdleConns}
+              maxOpenConns={jsonData.maxOpenConns}
+              queryTimeout={jsonData.queryTimeout}
+              validateSql={jsonData.validateSql}
+              onDialTimeoutChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
+              }}
+              onQueryTimeoutChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
+              }}
+              onConnMaxLifetimeChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e);
+              }}
+              onConnMaxIdleConnsChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ maxIdleConns: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e);
+              }}
+              onConnMaxOpenConnsChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ maxOpenConns: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e);
+              }}
+              onValidateSqlChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
+                onUpdateDatasourceJsonDataOptionChecked(props, 'validateSql')(e);
+              }}
+            />
+            <Divider />
+            <LogsConfig
+              logsConfig={jsonData.logs}
+              onDefaultDatabaseChange={(db) => onUpdateLogsConfig('defaultDatabase', db)}
+              onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
+              onOtelEnabledChange={(v) => onUpdateLogsConfig('otelEnabled', v)}
+              onOtelVersionChange={(v) => onUpdateLogsConfig('otelVersion', v)}
+              onFilterTimeColumnChange={(c) => onUpdateLogsConfig('filterTimeColumn', c)}
+              onTimeColumnChange={(c) => onUpdateLogsConfig('timeColumn', c)}
+              onLevelColumnChange={(c) => onUpdateLogsConfig('levelColumn', c)}
+              onMessageColumnChange={(c) => onUpdateLogsConfig('messageColumn', c)}
+              onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
+              onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
+              onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
+            />
 
-        <Divider />
-        <TracesConfig
-          tracesConfig={jsonData.traces}
-          onDefaultDatabaseChange={(db) => onUpdateTracesConfig('defaultDatabase', db)}
-          onDefaultTableChange={(table) => onUpdateTracesConfig('defaultTable', table)}
-          onOtelEnabledChange={(v) => onUpdateTracesConfig('otelEnabled', v)}
-          onOtelVersionChange={(v) => onUpdateTracesConfig('otelVersion', v)}
-          onTraceIdColumnChange={(c) => onUpdateTracesConfig('traceIdColumn', c)}
-          onSpanIdColumnChange={(c) => onUpdateTracesConfig('spanIdColumn', c)}
-          onOperationNameColumnChange={(c) => onUpdateTracesConfig('operationNameColumn', c)}
-          onParentSpanIdColumnChange={(c) => onUpdateTracesConfig('parentSpanIdColumn', c)}
-          onServiceNameColumnChange={(c) => onUpdateTracesConfig('serviceNameColumn', c)}
-          onDurationColumnChange={(c) => onUpdateTracesConfig('durationColumn', c)}
-          onDurationUnitChange={(c) => onUpdateTracesConfig('durationUnit', c)}
-          onStartTimeColumnChange={(c) => onUpdateTracesConfig('startTimeColumn', c)}
-          onTagsColumnChange={(c) => onUpdateTracesConfig('tagsColumn', c)}
-          onServiceTagsColumnChange={(c) => onUpdateTracesConfig('serviceTagsColumn', c)}
-          onKindColumnChange={(c) => onUpdateTracesConfig('kindColumn', c)}
-          onStatusCodeColumnChange={(c) => onUpdateTracesConfig('statusCodeColumn', c)}
-          onStatusMessageColumnChange={(c) => onUpdateTracesConfig('statusMessageColumn', c)}
-          onStateColumnChange={(c) => onUpdateTracesConfig('stateColumn', c)}
-          onInstrumentationLibraryNameColumnChange={(c) => onUpdateTracesConfig('instrumentationLibraryNameColumn', c)}
-          onInstrumentationLibraryVersionColumnChange={(c) =>
-            onUpdateTracesConfig('instrumentationLibraryVersionColumn', c)
-          }
-          onFlattenNestedChange={(c) => onUpdateTracesConfig('flattenNested', c)}
-          onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
-          onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}
-          onShowTraceLinksChange={(v) => onUpdateTracesConfig('showTraceLinks', v)}
-          onTraceTimestampTableSuffixChange={(c) => onUpdateTracesConfig('traceTimestampTableSuffix', c)}
-        />
-        <Divider />
+            <Divider />
+            <TracesConfig
+              tracesConfig={jsonData.traces}
+              onDefaultDatabaseChange={(db) => onUpdateTracesConfig('defaultDatabase', db)}
+              onDefaultTableChange={(table) => onUpdateTracesConfig('defaultTable', table)}
+              onOtelEnabledChange={(v) => onUpdateTracesConfig('otelEnabled', v)}
+              onOtelVersionChange={(v) => onUpdateTracesConfig('otelVersion', v)}
+              onTraceIdColumnChange={(c) => onUpdateTracesConfig('traceIdColumn', c)}
+              onSpanIdColumnChange={(c) => onUpdateTracesConfig('spanIdColumn', c)}
+              onOperationNameColumnChange={(c) => onUpdateTracesConfig('operationNameColumn', c)}
+              onParentSpanIdColumnChange={(c) => onUpdateTracesConfig('parentSpanIdColumn', c)}
+              onServiceNameColumnChange={(c) => onUpdateTracesConfig('serviceNameColumn', c)}
+              onDurationColumnChange={(c) => onUpdateTracesConfig('durationColumn', c)}
+              onDurationUnitChange={(c) => onUpdateTracesConfig('durationUnit', c)}
+              onStartTimeColumnChange={(c) => onUpdateTracesConfig('startTimeColumn', c)}
+              onTagsColumnChange={(c) => onUpdateTracesConfig('tagsColumn', c)}
+              onServiceTagsColumnChange={(c) => onUpdateTracesConfig('serviceTagsColumn', c)}
+              onKindColumnChange={(c) => onUpdateTracesConfig('kindColumn', c)}
+              onStatusCodeColumnChange={(c) => onUpdateTracesConfig('statusCodeColumn', c)}
+              onStatusMessageColumnChange={(c) => onUpdateTracesConfig('statusMessageColumn', c)}
+              onStateColumnChange={(c) => onUpdateTracesConfig('stateColumn', c)}
+              onInstrumentationLibraryNameColumnChange={(c) =>
+                onUpdateTracesConfig('instrumentationLibraryNameColumn', c)
+              }
+              onInstrumentationLibraryVersionColumnChange={(c) =>
+                onUpdateTracesConfig('instrumentationLibraryVersionColumn', c)
+              }
+              onFlattenNestedChange={(c) => onUpdateTracesConfig('flattenNested', c)}
+              onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
+              onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}
+              onShowTraceLinksChange={(v) => onUpdateTracesConfig('showTraceLinks', v)}
+              onTraceTimestampTableSuffixChange={(c) => onUpdateTracesConfig('traceTimestampTableSuffix', c)}
+            />
+            <Divider />
+          </>
+        )}
         <AliasTableConfig aliasTables={jsonData.aliasTables} onAliasTablesChange={onAliasTableConfigChange} />
         <Divider />
         <Field label={labels.enableRowLimit.label} description={labels.enableRowLimit.tooltip}>
