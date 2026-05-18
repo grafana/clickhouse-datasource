@@ -1,6 +1,14 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Datasource } from 'data/CHDatasource';
-import { QueryType, QueryBuilderOptions, ColumnHint, StringFilter } from 'types/queryBuilder';
+import {
+  Filter,
+  OrderBy,
+  QueryType,
+  QueryBuilderOptions,
+  ColumnHint,
+  StringFilter,
+  TableColumn,
+} from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
 import { TimeSeriesQueryBuilder } from './views/TimeSeriesQueryBuilder';
@@ -12,6 +20,7 @@ import { styles } from 'styles';
 import { TraceQueryBuilder } from './views/TraceQueryBuilder';
 import {
   BuilderOptionsReducerAction,
+  setAllOptions,
   setBuilderMinimized,
   setDatabase,
   setQueryType,
@@ -21,6 +30,12 @@ import TraceIdInput from './TraceIdInput';
 import { Alert, Button, VerticalGroup } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
+import { buildCompactQueryDefaults, isDefaultOrMismatchedCompactQuery } from './compactQueryDefaults';
+import { SignalType } from 'types/config';
+import useColumns from 'hooks/useColumns';
+import { CompactModeBar } from './CompactModeBar';
+import { CompactFilterBar } from './CompactFilterBar';
+import { CompactAdvanced } from './CompactAdvanced';
 
 interface QueryBuilderProps {
   app: CoreApp | undefined;
@@ -28,10 +43,14 @@ interface QueryBuilderProps {
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
   datasource: Datasource;
   generatedSql: string;
+  onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
+  onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
-  const { datasource, builderOptions, builderOptionsDispatch, generatedSql } = props;
+  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, onQueryChange, onEditAsSql } = props;
+  const signalType = datasource.getSignalType();
+  const singleTableMode = datasource.isSingleTableMode();
 
   const onDatabaseChange = (database: string) => builderOptionsDispatch(setDatabase(database));
   const onTableChange = (table: string) => builderOptionsDispatch(setTable(table));
@@ -43,6 +62,20 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         builderOptions={builderOptions}
         builderOptionsDispatch={builderOptionsDispatch}
         datasource={datasource}
+      />
+    );
+  }
+
+  if (singleTableMode && signalType) {
+    return (
+      <CompactQueryEditor
+        datasource={datasource}
+        builderOptions={builderOptions}
+        builderOptionsDispatch={builderOptionsDispatch}
+        generatedSql={generatedSql}
+        signalType={signalType}
+        onQueryChange={onQueryChange}
+        onEditAsSql={onEditAsSql}
       />
     );
   }
@@ -92,6 +125,114 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       )}
 
       <SqlPreview sql={generatedSql} />
+    </div>
+  );
+};
+
+export const getCompactFilterColumns = (
+  allColumns: readonly TableColumn[],
+  builderOptions: QueryBuilderOptions
+): readonly TableColumn[] => {
+  const timeColumnNames = new Set(
+    (builderOptions.columns || [])
+      .filter((column) => column.hint === ColumnHint.Time || column.hint === ColumnHint.FilterTime)
+      .map((column) => column.name)
+  );
+
+  return allColumns.filter((column) => !timeColumnNames.has(column.name));
+};
+
+interface CompactQueryEditorProps {
+  datasource: Datasource;
+  builderOptions: QueryBuilderOptions;
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
+  generatedSql: string;
+  signalType: SignalType;
+  onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
+  onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+}
+
+const CompactQueryEditor = (props: CompactQueryEditorProps) => {
+  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, signalType, onQueryChange, onEditAsSql } =
+    props;
+  const needsInitialization = isDefaultOrMismatchedCompactQuery(builderOptions, signalType);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const lastInitializationKey = useRef<string>();
+  const onQueryChangeRef = useRef(onQueryChange);
+
+  useEffect(() => {
+    onQueryChangeRef.current = onQueryChange;
+  }, [onQueryChange]);
+
+  useEffect(() => {
+    if (!needsInitialization) {
+      return;
+    }
+
+    const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}`;
+    if (lastInitializationKey.current === initializationKey) {
+      return;
+    }
+    lastInitializationKey.current = initializationKey;
+
+    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+    builderOptionsDispatch(setAllOptions(nextOptions));
+    onQueryChangeRef.current?.(nextOptions);
+  }, [builderOptions.table, builderOptionsDispatch, datasource, needsInitialization, signalType]);
+
+  const activeOptions = needsInitialization
+    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table)
+    : builderOptions;
+  const allColumns = useColumns(datasource, activeOptions.database, activeOptions.table);
+  const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
+
+  const onActiveOptionsChange = (nextOptions: QueryBuilderOptions) => {
+    builderOptionsDispatch(setAllOptions(nextOptions));
+    onQueryChange?.(nextOptions);
+  };
+
+  const mergeActiveOptions = (nextOptions: Partial<QueryBuilderOptions>) => {
+    onActiveOptionsChange({
+      ...activeOptions,
+      ...nextOptions,
+      meta: {
+        ...activeOptions.meta,
+        ...nextOptions.meta,
+      },
+    });
+  };
+
+  return (
+    <div data-testid="query-editor-section-builder">
+      <CompactModeBar
+        datasource={datasource}
+        signalType={signalType}
+        mode={signalType === 'logs' ? 'otel-logs' : 'otel-traces'}
+        onModeChange={() => {}}
+        searchText={activeOptions.meta?.logMessageLike || ''}
+        onSearchChange={(logMessageLike) => mergeActiveOptions({ meta: { logMessageLike } })}
+        onSearchSubmit={() => {}}
+      />
+      <CompactFilterBar
+        datasource={datasource}
+        database={activeOptions.database}
+        table={activeOptions.table}
+        filters={activeOptions.filters || []}
+        allColumns={filterColumns}
+        onFiltersChange={(filters: Filter[]) => mergeActiveOptions({ filters })}
+        onToggleAdvanced={() => setAdvancedOpen(!advancedOpen)}
+        advancedOpen={advancedOpen}
+      />
+      {advancedOpen && (
+        <CompactAdvanced
+          builderOptions={activeOptions}
+          allColumns={allColumns}
+          onOrderByChange={(orderBy: OrderBy[]) => mergeActiveOptions({ orderBy })}
+          onLimitChange={(limit: number) => mergeActiveOptions({ limit })}
+        />
+      )}
+
+      <SqlPreview sql={generatedSql} compact onEditAsSql={() => onEditAsSql?.(activeOptions)} />
     </div>
   );
 };
