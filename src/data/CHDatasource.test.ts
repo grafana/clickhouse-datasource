@@ -69,6 +69,21 @@ describe('ClickHouseDatasource', () => {
       const values = await createInstance({ queryResponse }).metricFindQuery('mock', {});
       expect(values).toEqual(expectedValues);
     });
+
+    it('forwards scopedVars from options to the query request', async () => {
+      const queryResponse = {
+        fields: [{ name: 'field', type: 'string', values: ['val1'] }],
+      };
+      const instance = createInstance({ queryResponse });
+      const querySpy = jest.spyOn(instance, 'query');
+      const scopedVars = { namespace: { text: 'prod', value: 'prod' } };
+
+      await instance.metricFindQuery('SELECT 1', { scopedVars });
+
+      expect(querySpy).toHaveBeenCalledWith(
+        expect.objectContaining({ scopedVars })
+      );
+    });
   });
 
   describe('applyTemplateVariables', () => {
