@@ -1540,6 +1540,100 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('LogsLabelTypesSupport', () => {
+    let datasource: Datasource;
+    beforeEach(() => {
+      datasource = cloneDeep(mockDatasource);
+    });
+
+    describe('getLabelDisplayTypeFromFrame', () => {
+      it('returns "Resource attributes" for a ResourceAttributes-prefixed key', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes.service.name', undefined, null)).toBe(
+          'Resource attributes'
+        );
+      });
+
+      it('returns "Scope attributes" for a ScopeAttributes-prefixed key', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('ScopeAttributes.otelcol.name', undefined, null)).toBe(
+          'Scope attributes'
+        );
+      });
+
+      it('returns "Log attributes" for a LogAttributes-prefixed key', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('LogAttributes.http.status_code', undefined, null)).toBe(
+          'Log attributes'
+        );
+      });
+
+      it('returns null for the Body core column', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('Body', undefined, null)).toBeNull();
+      });
+
+      it('returns null for the TraceId core column', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('TraceId', undefined, null)).toBeNull();
+      });
+
+      it('returns null for the bare "ResourceAttributes" without a dot', () => {
+        // The backend's flatten always emits at least one nested key, so the
+        // bare column name never reaches Grafana's label list. Guard against
+        // mis-grouping if a custom schema ever surfaces it.
+        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBeNull();
+      });
+
+      it('returns null for an arbitrary user-defined column', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+      });
+    });
+
+    describe('round-trip with modifyQuery', () => {
+      // Each grouped key, when fed back through modifyQuery, must split the
+      // prefix into a Map column + mapKey so the Filter for value action
+      // hits the right Map(String, String) column. This keeps the Log Details
+      // grouping and the filter routing aligned.
+      const cases = [
+        { prefix: 'ResourceAttributes', mapKey: 'service.name', value: 'my-service' },
+        { prefix: 'ScopeAttributes', mapKey: 'version', value: '1.0' },
+        { prefix: 'LogAttributes', mapKey: 'http.status_code', value: '200' },
+      ];
+
+      cases.forEach(({ prefix, mapKey, value }) => {
+        it(`${prefix}: classifies the key and routes the filter to the Map column`, () => {
+          const labelKey = `${prefix}.${mapKey}`;
+
+          // 1. The grouping classifies it into a non-null section.
+          expect(datasource.getLabelDisplayTypeFromFrame(labelKey, undefined, null)).not.toBeNull();
+
+          // 2. modifyQuery splits the same prefix back into column + mapKey.
+          const queryForPrefix: CHBuilderQuery = {
+            pluginVersion: '',
+            refId: 'A',
+            editorType: EditorType.Builder,
+            rawSql: '',
+            builderOptions: {
+              database: 'default',
+              table: 'logs',
+              queryType: QueryType.Logs,
+              mode: BuilderMode.List,
+              columns: [{ name: prefix, type: 'Map(String, String)' }],
+            },
+          };
+
+          const result = datasource.modifyQuery(queryForPrefix, {
+            type: 'ADD_FILTER',
+            options: { key: labelKey, value },
+          } as any) as CHBuilderQuery;
+
+          expect(result.builderOptions.filters![0]).toMatchObject({
+            mapKey,
+            type: 'Map(String, String)',
+            operator: FilterOperator.Equals,
+            value,
+          });
+        });
+      });
+    });
+  });
+
   describe('getLogRowContext', () => {
     const baseBuilderOptions: QueryBuilderOptions = {
       database: 'default',

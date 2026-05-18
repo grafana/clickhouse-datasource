@@ -6,6 +6,7 @@ import {
   DataQueryResponse,
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
+  DataSourceWithLogsLabelTypesSupport,
   DataSourceWithQueryModificationSupport,
   DataSourceWithSupplementaryQueriesSupport,
   Field,
@@ -63,6 +64,7 @@ export class Datasource
   implements
     DataSourceWithSupplementaryQueriesSupport<CHQuery>,
     DataSourceWithLogsContextSupport<CHQuery>,
+    DataSourceWithLogsLabelTypesSupport,
     DataSourceWithQueryModificationSupport<CHQuery>
 {
   // This enables default annotation support for 7.2+
@@ -424,7 +426,7 @@ export class Datasource
       const isStringFilterAction = action.type === 'ADD_STRING_FILTER' || action.type === 'ADD_STRING_FILTER_OUT';
 
       if (isStringFilterAction) {
-        // has no key — resolve the column name from the log message hint.
+        // has no key; resolve the column name from the log message hint.
         const logMessageColumn = getColumnByHint(query.builderOptions, ColumnHint.LogMessage);
         return logMessageColumn?.alias || logMessageColumn?.name || action.options.key || '';
       }
@@ -1386,6 +1388,37 @@ export class Datasource
   ): ReactNode {
     const contextColumns = this.getLogContextColumnsFromLogRow(row);
     return createReactElement(LogsContextPanel, { columns: contextColumns, datasourceUid: this.uid });
+  }
+
+  // interface DataSourceWithLogsLabelTypesSupport
+  /**
+   * Groups log fields in the Logs Details panel by OTel attribute layer.
+   * The Go backend (`mergeOpenTelemetryLabels` in pkg/plugin/driver.go)
+   * flattens ResourceAttributes / ScopeAttributes / LogAttributes Map
+   * columns into a single `labels` JSON field with prefixed keys
+   * (e.g. "ResourceAttributes.service.name"). This method tells Grafana
+   * how to bucket those keys into named, collapsible sections.
+   *
+   * Returning null leaves the field under Grafana's default "Fields"
+   * section. Filtering is unaffected: `modifyQuery` already splits the
+   * same prefix back when a user clicks "Filter for value", so the
+   * visual grouping and the filter routing stay aligned.
+   *
+   * Strings are plain English; the plugin codebase does not currently
+   * use `@grafana/i18n`, so a future i18n pass would localise these
+   * alongside the rest of the plugin's UI strings.
+   */
+  getLabelDisplayTypeFromFrame(labelKey: string, _frame: DataFrame | undefined, _index: number | null): string | null {
+    if (labelKey.startsWith('ResourceAttributes.')) {
+      return 'Resource attributes';
+    }
+    if (labelKey.startsWith('ScopeAttributes.')) {
+      return 'Scope attributes';
+    }
+    if (labelKey.startsWith('LogAttributes.')) {
+      return 'Log attributes';
+    }
+    return null;
   }
 
   async testDatasource(): Promise<{ status: string; message: string }> {
