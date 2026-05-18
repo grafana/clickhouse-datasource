@@ -8,6 +8,7 @@ import {
   DataSourceWithLogsContextSupport,
   DataSourceWithQueryModificationSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  DataSourceWithToggleableQueryFiltersSupport,
   Field,
   getTimeZone,
   getTimeZoneInfo,
@@ -15,10 +16,12 @@ import {
   LogRowContextQueryDirection,
   LogRowModel,
   MetricFindValue,
+  QueryFilterOptions,
   QueryFixAction,
   ScopedVars,
   SupplementaryQueryOptions,
   SupplementaryQueryType,
+  ToggleFilterAction,
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
@@ -38,6 +41,7 @@ import {
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
+  StringFilter,
   QueryType,
   SelectedColumn,
   SqlFunction,
@@ -58,12 +62,75 @@ import {
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
+interface ResolvedColumn {
+  columnName: string;
+  mapKey: string;
+  column: SelectedColumn | undefined;
+  columnType: string;
+  hasMapKey: boolean;
+}
+
+/** Resolve a filter key to a column in the builder options, handling OTel map key splitting and alias/hint lookup. */
+function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): ResolvedColumn {
+  let columnName = key;
+  let mapKey = '';
+
+  // Convert flattened/merged OTel attributes into column+path pair
+  if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
+    const prefixIndex = columnName.indexOf('.');
+    mapKey = columnName.substring(prefixIndex + 1);
+    columnName = columnName.substring(0, prefixIndex);
+  }
+
+  // Find selected column by alias/name
+  const lookupByAlias = builderOptions.columns?.find((c) => c.alias === columnName);
+  const lookupByName = builderOptions.columns?.find((c) => c.name === columnName);
+  const lookupByLogsAlias = logAliasToColumnHints.has(columnName)
+    ? getColumnByHint(builderOptions, logAliasToColumnHints.get(columnName)!)
+    : undefined;
+  const column = lookupByAlias || lookupByName || lookupByLogsAlias;
+
+  return {
+    columnName,
+    mapKey,
+    column,
+    columnType: column ? column.type || '' : '',
+    hasMapKey: mapKey !== '',
+  };
+}
+
+/** Build a filter object from resolved column info. */
+function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'], value: string): Filter {
+  return {
+    condition: 'AND',
+    key: resolved.column?.hint ? '' : resolved.columnName,
+    hint: resolved.column?.hint || undefined,
+    mapKey: resolved.hasMapKey ? resolved.mapKey : undefined,
+    type: resolved.hasMapKey ? (resolved.columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'string',
+    filterType: 'custom',
+    operator,
+    value,
+  };
+}
+
+/** Check whether a filter targets the same column as a resolved column reference. */
+function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
+  if (resolved.hasMapKey) {
+    return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey;
+  }
+  return (
+    f.type === 'string' &&
+    (resolved.column?.hint && f.hint ? f.hint === resolved.column.hint : f.key === resolved.columnName)
+  );
+}
+
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
   implements
     DataSourceWithSupplementaryQueriesSupport<CHQuery>,
     DataSourceWithLogsContextSupport<CHQuery>,
-    DataSourceWithQueryModificationSupport<CHQuery>
+    DataSourceWithQueryModificationSupport<CHQuery>,
+    DataSourceWithToggleableQueryFiltersSupport<CHQuery>
 {
   // This enables default annotation support for 7.2+
   annotations = {};
@@ -437,24 +504,7 @@ export class Datasource
     }
 
     const actionValue = action.options.value;
-    let mapKey = '';
-
-    // Convert flattened/merged OTel attributes into column+path pair
-    if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
-      const prefixIndex = columnName.indexOf('.');
-      mapKey = columnName.substring(prefixIndex + 1);
-      columnName = columnName.substring(0, prefixIndex);
-    }
-
-    // Find selected column by alias/name
-    const lookupByAlias = query.builderOptions.columns?.find((c) => c.alias === columnName); // Check all aliases first,
-    const lookupByName = query.builderOptions.columns?.find((c) => c.name === columnName); // then try matching column name
-    const lookupByLogsAlias = logAliasToColumnHints.has(columnName)
-      ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!)
-      : undefined;
-    const column = lookupByAlias || lookupByName || lookupByLogsAlias;
-    const columnType = column ? column.type || '' : '';
-    const hasMapKey = mapKey !== '';
+    const resolved = resolveFilterColumn(query.builderOptions, columnName);
 
     let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
     if (action.type === 'ADD_FILTER') {
@@ -463,33 +513,14 @@ export class Datasource
       nextFilters = nextFilters.filter(
         (f) =>
           !(
-            f.type === 'string' &&
-            (column && column.hint && f.hint ? f.hint === column.hint : f.key === columnName) &&
-            (f.operator === FilterOperator.IsAnything ||
-              f.operator === FilterOperator.Equals ||
-              f.operator === FilterOperator.NotEquals)
-          ) &&
-          !(
-            (f.type.startsWith('Map') || f.type.startsWith('JSON')) &&
-            column &&
-            hasMapKey &&
-            f.mapKey === mapKey &&
+            filterMatchesColumn(f, resolved) &&
             (f.operator === FilterOperator.IsAnything ||
               f.operator === FilterOperator.Equals ||
               f.operator === FilterOperator.NotEquals)
           )
       );
 
-      nextFilters.push({
-        condition: 'AND',
-        key: column && column.hint ? '' : columnName,
-        hint: column && column.hint ? column.hint : undefined,
-        mapKey: hasMapKey ? mapKey : undefined,
-        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
-        filterType: 'custom',
-        operator: FilterOperator.Equals,
-        value: actionValue,
-      });
+      nextFilters.push(buildFilter(resolved, FilterOperator.Equals, actionValue));
     } else if (action.type === 'ADD_FILTER_OUT') {
       // with this we might want to add multiple values as NE filters
       // for example, `level != info` AND `level != debug`
@@ -497,36 +528,20 @@ export class Datasource
       nextFilters = nextFilters.filter(
         (f) =>
           !(
-            (f.type === 'string' &&
-              (column && column.hint && f.hint ? f.hint === column.hint : f.key === columnName) &&
+            (filterMatchesColumn(f, resolved) &&
               'value' in f &&
               f.value === actionValue &&
               (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.NotEquals)) ||
-            (f.type === 'string' &&
-              (column && column.hint && f.hint ? f.hint === column.hint : f.key === columnName) &&
-              (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)) ||
-            ((f.type.startsWith('Map') || f.type.startsWith('JSON')) &&
-              column &&
-              hasMapKey &&
-              f.mapKey === mapKey &&
+            (filterMatchesColumn(f, resolved) &&
               (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals))
           )
       );
 
-      nextFilters.push({
-        condition: 'AND',
-        key: column && column.hint ? '' : columnName,
-        hint: column && column.hint ? column.hint : undefined,
-        mapKey: hasMapKey ? mapKey : undefined,
-        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
-        filterType: 'custom',
-        operator: FilterOperator.NotEquals,
-        value: actionValue,
-      });
+      nextFilters.push(buildFilter(resolved, FilterOperator.NotEquals, actionValue));
     } else if (action.type === 'ADD_STRING_FILTER') {
       nextFilters.push({
         condition: 'AND',
-        key: columnName,
+        key: resolved.columnName,
         filterType: 'custom',
         type: 'string',
         operator: FilterOperator.ILike,
@@ -535,7 +550,7 @@ export class Datasource
     } else if (action.type === 'ADD_STRING_FILTER_OUT') {
       nextFilters.push({
         condition: 'AND',
-        key: columnName,
+        key: resolved.columnName,
         filterType: 'custom',
         type: 'string',
         operator: FilterOperator.NotILike,
@@ -544,6 +559,82 @@ export class Datasource
     }
 
     // the query is updated to trigger the URL update and propagation to the panels
+    const nextOptions = { ...query.builderOptions, filters: nextFilters };
+    return {
+      ...query,
+      rawSql: generateSql(nextOptions),
+      builderOptions: nextOptions,
+    };
+  }
+
+  queryHasFilter(query: CHQuery, filter: QueryFilterOptions): boolean {
+    if (query.editorType !== EditorType.Builder) {
+      return false;
+    }
+
+    const key = filter.key;
+    const value = filter.value;
+    if (!key || !value) {
+      return false;
+    }
+
+    const resolved = resolveFilterColumn(query.builderOptions, key);
+    const filters = query.builderOptions.filters || [];
+
+    return filters.some(
+      (f) =>
+        filterMatchesColumn(f, resolved) &&
+        f.operator === FilterOperator.Equals &&
+        'value' in f &&
+        String(f.value) === value
+    );
+  }
+
+  toggleQueryFilter(query: CHQuery, filter: ToggleFilterAction): CHQuery {
+    if (query.editorType !== EditorType.Builder) {
+      return query;
+    }
+
+    const key = filter.options.key;
+    const value = filter.options.value;
+    if (!key || !value) {
+      return query;
+    }
+
+    const resolved = resolveFilterColumn(query.builderOptions, key);
+    const targetOperator = filter.type === 'FILTER_FOR' ? FilterOperator.Equals : FilterOperator.NotEquals;
+    const oppositeOperator = filter.type === 'FILTER_FOR' ? FilterOperator.NotEquals : FilterOperator.Equals;
+
+    let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
+
+    // Check if the exact filter already exists (toggle off)
+    const exactMatchIndex = nextFilters.findIndex(
+      (f) =>
+        filterMatchesColumn(f, resolved) &&
+        f.operator === targetOperator &&
+        'value' in f &&
+        String(f.value) === value
+    );
+
+    if (exactMatchIndex !== -1) {
+      // Toggle off: remove the existing filter
+      nextFilters.splice(exactMatchIndex, 1);
+    } else {
+      // Remove any opposite filter with the same value
+      nextFilters = nextFilters.filter(
+        (f) =>
+          !(
+            filterMatchesColumn(f, resolved) &&
+            f.operator === oppositeOperator &&
+            'value' in f &&
+            String(f.value) === value
+          )
+      );
+
+      // Add the new filter
+      nextFilters.push(buildFilter(resolved, targetOperator, value));
+    }
+
     const nextOptions = { ...query.builderOptions, filters: nextFilters };
     return {
       ...query,
