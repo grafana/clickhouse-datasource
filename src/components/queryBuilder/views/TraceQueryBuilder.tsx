@@ -15,7 +15,12 @@ import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { OtelVersionSelect } from '../OtelVersionSelect';
-import { useDefaultFilters, useOtelColumns, useTraceDefaultsOnMount } from './traceQueryBuilderHooks';
+import {
+  useDefaultFilters,
+  useDefaultTraceColumnsByName,
+  useOtelColumns,
+  useTraceDefaultsOnMount,
+} from './traceQueryBuilderHooks';
 import TraceIdInput from '../TraceIdInput';
 import { OrderByEditor, getOrderByOptions } from '../OrderByEditor';
 import { LimitEditor } from '../LimitEditor';
@@ -144,6 +149,21 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
   useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useDefaultTraceColumnsByName(
+    allColumns,
+    builderOptions.table,
+    {
+      traceId: builderState.traceIdColumn,
+      spanId: builderState.spanIdColumn,
+      parentSpanId: builderState.parentSpanIdColumn,
+      serviceName: builderState.serviceNameColumn,
+      operationName: builderState.operationNameColumn,
+      startTime: builderState.startTimeColumn,
+      durationTime: builderState.durationTimeColumn,
+    },
+    builderState.otelEnabled,
+    builderOptionsDispatch
+  );
   useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, isNewQuery, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
