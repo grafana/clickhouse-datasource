@@ -85,10 +85,10 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 	// Deprecated: Replaced with Host for v4. Deserializes "server" field for old v3 configs.
 	if jsonData["server"] != nil {
-		settings.Host = jsonData["server"].(string)
+		settings.Host = strings.TrimSpace(jsonData["server"].(string))
 	}
 	if jsonData["host"] != nil {
-		settings.Host = jsonData["host"].(string)
+		settings.Host = strings.TrimSpace(jsonData["host"].(string))
 	}
 
 	if jsonData["port"] != nil {

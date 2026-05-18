@@ -294,6 +294,50 @@ func TestLoadSettings(t *testing.T) {
 				wantErr: nil,
 				testCtx: ctx,
 			},
+			{
+				name: "should trim whitespace from host",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"host": "  ch.example.com  ", "port": 443}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Host:                  "ch.example.com",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
+					QueryTimeout:          "60",
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
+				},
+				wantErr: nil,
+				testCtx: ctx,
+			},
+			{
+				name: "should trim whitespace from v3 server field",
+				args: args{
+					config: backend.DataSourceInstanceSettings{
+						JSONData:                []byte(`{"server": "  ch.example.com  ", "port": 443}`),
+						DecryptedSecureJSONData: map[string]string{},
+					},
+				},
+				wantSettings: Settings{
+					Host:                  "ch.example.com",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
+					QueryTimeout:          "60",
+					EnableSchemaCache:     true,
+					SchemaCacheTTLSeconds: 60,
+				},
+				wantErr: nil,
+				testCtx: ctx,
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -321,6 +365,7 @@ func TestLoadSettings(t *testing.T) {
 			description string
 		}{
 			{jsonData: `{ "host": "", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidHost, description: "should capture empty server name"},
+			{jsonData: `{ "host": "   ", "port": 443 }`, password: "", wantErr: ErrorMessageInvalidHost, description: "should capture whitespace-only server name"},
 			{jsonData: `{ "host": "foo" }`, password: "", wantErr: ErrorMessageInvalidPort, description: "should capture nil port"},
 			{jsonData: `  "host": "foo", "port": 443, "username" : "foo" }`, password: "", wantErr: ErrorMessageInvalidJSON, description: "should capture invalid json"},
 		}
