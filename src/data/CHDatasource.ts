@@ -1405,7 +1405,7 @@ export class Datasource
    * visual grouping and the filter routing stay aligned.
    *
    * Strings are plain English; the plugin codebase does not currently
-   * use `@grafana/i18n`, so a future i18n pass would localise these
+   * use `@grafana/i18n`, so a future i18n pass would localize these
    * alongside the rest of the plugin's UI strings.
    */
   getLabelDisplayTypeFromFrame(labelKey: string, _frame: DataFrame | undefined, _index: number | null): string | null {
