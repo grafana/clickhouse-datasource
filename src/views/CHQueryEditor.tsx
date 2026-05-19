@@ -14,7 +14,6 @@ import { setAllOptions, setOptions, useBuilderOptionsState } from 'hooks/useBuil
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
 import useTables from 'hooks/useTables';
-import otel from 'otel';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -67,15 +66,19 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     shouldSkipChanges.current = false;
   }
 
-  // Resolve hasTraceTimestampTable for OTel trace ID queries.
-  // This runs at the CHEditorByType level (not inside TraceQueryBuilder)
-  // so it works even when the builder is minimized via deep-links.
-  const needsTraceTableCheck = Boolean(builderOptions.meta?.isTraceIdMode && builderOptions.meta?.otelEnabled);
+  // Resolve hasTraceTimestampTable for any trace ID query — not only OTel ones.
+  // Running this at the CHEditorByType level means the check fires even when
+  // the builder is minimized via a logs→trace deep-link. The companion-table
+  // suffix is configurable on the datasource (defaults to the OTel convention)
+  // so non-OTel schemas can opt in to the two-step trace ID lookup.
+  const traceTimestampTableSuffix =
+    builderOptions.meta?.traceTimestampTableSuffix || props.datasource.getTraceTimestampTableSuffix();
+  const needsTraceTableCheck = Boolean(builderOptions.meta?.isTraceIdMode);
   const traceDb = needsTraceTableCheck ? builderOptions.database : '';
   const traceTables = useTables(props.datasource, traceDb);
   const hasTraceTimestampTable = useMemo(
-    () => traceTables.some((t) => t === builderOptions.table + otel.traceTimestampTableSuffix),
-    [builderOptions.table, traceTables]
+    () => traceTables.some((t) => t === builderOptions.table + traceTimestampTableSuffix),
+    [builderOptions.table, traceTables, traceTimestampTableSuffix]
   );
 
   useEffect(() => {

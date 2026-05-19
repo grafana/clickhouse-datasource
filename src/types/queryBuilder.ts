@@ -59,6 +59,12 @@ export interface QueryBuilderOptions {
      * true when the trace timestamp optimization table is detected
      */
     hasTraceTimestampTable?: boolean;
+    /**
+     * Suffix used to locate the companion trace-timestamp index table
+     * (e.g. `_trace_id_ts`). When omitted, generators fall back to the
+     * built-in OTel default.
+     */
+    traceTimestampTableSuffix?: string;
 
     /**
      * True if "Nested" column types should be treated as if they

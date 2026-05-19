@@ -482,6 +482,92 @@ describe('SQL Generator', () => {
     expect(sql).not.toMatch(/\bLIMIT\b/);
   });
 
+  it('generates an optimized trace ID query without OTel when a trace timestamp table exists', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'custom_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: undefined,
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        hasTraceTimestampTable: true,
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+    const expectedSqlParts = [
+      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
+      '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
+      'multiply("Duration", 0.000001) as duration,',
+      `arrayMap(key -> map('key', key, 'value',"SpanAttributes"[key]),`,
+      `mapKeys("SpanAttributes")) as tags,`,
+      `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
+      `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
+      `FROM "default"."custom_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('honours a configured traceTimestampTableSuffix in the optimized trace ID query', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'custom_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'Map(LowCardinality(String), String)', hint: ColumnHint.TraceServiceTags },
+        { name: 'StatusCode', type: 'LowCardinality(String)', hint: ColumnHint.TraceStatusCode },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: undefined,
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        hasTraceTimestampTable: true,
+        traceTimestampTableSuffix: '_ts_index',
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+    const sql = generateSql(opts);
+
+    expect(sql).toContain('FROM "default"."custom_traces_ts_index"');
+    expect(sql).not.toContain('custom_traces_trace_id_ts');
+    expect(sql).toContain(`WITH 'abcdefg' as trace_id`);
+    expect(sql).toContain('"Timestamp" >= trace_start');
+  });
+
   it('generates trace search query', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
@@ -960,6 +1046,113 @@ describe('getFilters', () => {
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
     expect(sql).toEqual(`( NumericAttrs['retry_count'] = 3 )`);
+  });
+
+  it('generates dot-notation SQL for JSON mapKey filter (basic path)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'request_id',
+          operator: FilterOperator.Equals,
+          type: 'JSON',
+          value: 'abc123',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`request_id`::Nullable(String) = 'abc123' )");
+  });
+
+  it('generates dot-notation SQL for JSON mapKey filter (nested path)', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'SpanAttributes',
+          mapKey: 'http.status_code',
+          operator: FilterOperator.Equals,
+          type: 'JSON',
+          value: '200',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( SpanAttributes.`http`.`status_code`::Nullable(String) = '200' )");
+  });
+
+  it('generates correct IN clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'level',
+          operator: FilterOperator.In,
+          type: 'JSON',
+          value: ['error', 'warn'],
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) IN ('error', 'warn') )");
+  });
+
+  it('generates correct NOT IN clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'level',
+          operator: FilterOperator.NotIn,
+          type: 'JSON',
+          value: ['debug', 'trace'],
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) NOT IN ('debug', 'trace') )");
+  });
+
+  it('generates LIKE clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'ResourceAttributes',
+          mapKey: 'service.name',
+          operator: FilterOperator.Like,
+          type: 'JSON',
+          value: 'my-service',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( ResourceAttributes.`service`.`name`::Nullable(String) LIKE '%my-service%' )");
+  });
+
+  it('generates IS NULL clause for JSON mapKey filter', () => {
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'user_id',
+          operator: FilterOperator.IsNull,
+          type: 'JSON',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual('( LogAttributes.`user_id`::Nullable(String) IS NULL )');
   });
 
   it('returns complex filter array', () => {

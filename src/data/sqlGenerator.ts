@@ -148,19 +148,26 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     selectParts.push(getTraceDurationSelectSql(escapeIdentifier(traceDurationTime.name), timeUnit));
   }
 
-  // TODO: for tags and serviceTags, consider the column type. They might not require mapping, they could already be JSON.
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   if (traceTags !== undefined) {
-    selectParts.push(
-      `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
-    );
+    if (traceTags.type?.toLowerCase().startsWith('json')) {
+      selectParts.push(`${escapeIdentifier(traceTags.name)} as tags`);
+    } else {
+      selectParts.push(
+        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
+      );
+    }
   }
 
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
   if (traceServiceTags !== undefined) {
-    selectParts.push(
-      `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
-    );
+    if (traceServiceTags.type?.toLowerCase().startsWith('json')) {
+      selectParts.push(`${escapeIdentifier(traceServiceTags.name)} as serviceTags`);
+    } else {
+      selectParts.push(
+        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
+      );
+    }
   }
 
   const traceStatusCode = getColumnByHint(options, ColumnHint.TraceStatusCode);
@@ -245,19 +252,18 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const selectPartsSql = selectParts.join(', ');
 
-  // Optimize trace ID filtering for OTel enabled trace lookups
+  // Optimize trace ID filtering when a companion timestamp index table is available.
+  // The optimization is gated purely on that capability — OTel is not required, so
+  // any schema following the `<table>_trace_id_ts` convention (or a user-configured
+  // suffix) benefits from the narrowed time range.
   const hasTraceTimestampTable = options.meta?.hasTraceTimestampTable;
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
-  const otelVersion = otel.getVersion(options.meta?.otelVersion);
   const applyTraceIdOptimization =
-    hasTraceTimestampTable &&
-    hasTraceIdFilter &&
-    traceStartTime !== undefined &&
-    options.meta?.otelEnabled &&
-    otelVersion;
+    hasTraceTimestampTable && hasTraceIdFilter && traceStartTime !== undefined;
   if (applyTraceIdOptimization) {
     const traceId = options.meta!.traceId;
-    const timestampTable = getTableIdentifier(database, table + otel.traceTimestampTableSuffix);
+    const suffix = options.meta?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
+    const timestampTable = getTableIdentifier(database, table + suffix);
     queryParts.push('WITH');
     queryParts.push(`'${traceId}' as trace_id,`);
     queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
@@ -849,7 +855,13 @@ const getFilters = (options: QueryBuilderOptions): string => {
         .split('.')
         .map((p) => `\`${p}\``)
         .join('.');
-      column += `.${escapedJSONPaths}`;
+      // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
+      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
+      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
+      // that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // Update type so filter value generation routes through the string-aware branches.
+      type = 'String';
     }
 
     filterParts.push(column);
