@@ -71,6 +71,7 @@
     "oper",
     "OFREP",
     "otel",
+    "otelcol",
     "semconv",
     "OUTFILE",
     "paulmach",
