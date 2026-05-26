@@ -988,6 +988,7 @@ export class Datasource
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
         range: options ? options.range : (getTemplateSrv() as any).timeRange,
+        scopedVars: options?.scopedVars,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
         resolve(res.data[0] || { fields: [] });
