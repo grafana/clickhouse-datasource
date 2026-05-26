@@ -178,11 +178,11 @@ func (h *Clickhouse) Connect(
 
 	t, err := strconv.Atoi(settings.DialTimeout)
 	if err != nil {
-		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid timeout: %s", settings.DialTimeout)))
+		return nil, backend.DownstreamError(fmt.Errorf("invalid timeout: %s", settings.DialTimeout))
 	}
 	qt, err := strconv.Atoi(settings.QueryTimeout)
 	if err != nil {
-		return nil, backend.DownstreamError(errors.New(fmt.Sprintf("invalid query timeout: %s", settings.QueryTimeout)))
+		return nil, backend.DownstreamError(fmt.Errorf("invalid query timeout: %s", settings.QueryTimeout))
 	}
 
 	protocol := clickhouse.Native
@@ -608,20 +608,20 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 	err := json.Unmarshal(message, &messageArgs)
 	if err != nil {
 		backend.Logger.Warn(fmt.Sprintf("Failed to apply headers: %s", err.Error()))
-		return nil, errors.New("Couldn't parse message as args")
+		return nil, errors.New("couldn't parse message as args")
 	}
 
 	httpHeaders := make(map[string]string)
 	if grafanaHttpHeaders, ok := messageArgs[sqlds.HeaderKey]; ok {
 		fwdHeaders, ok := grafanaHttpHeaders.(map[string]interface{})
 		if !ok {
-			return nil, errors.New("Couldn't parse grafana HTTP headers")
+			return nil, errors.New("couldn't parse grafana HTTP headers")
 		}
 
 		for k, v := range fwdHeaders {
 			anyHeadersArr, ok := v.([]interface{})
 			if !ok {
-				return nil, errors.New(fmt.Sprintf("Couldn't parse header %s as an array", k))
+				return nil, fmt.Errorf("couldn't parse header %s as an array", k)
 			}
 
 			strHeadersArr := make([]string, len(anyHeadersArr))
