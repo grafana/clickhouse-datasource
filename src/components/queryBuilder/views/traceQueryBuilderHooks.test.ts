@@ -63,14 +63,14 @@ describe('useOtelColumns', () => {
 
   it('should not call builderOptionsDispatch if OTEL is already enabled', async () => {
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useOtelColumns(true, testOtelVersion.version, builderOptionsDispatch));
+    renderHook(() => useOtelColumns(true, testOtelVersion.version, false, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
 
   it('should not call builderOptionsDispatch if OTEL is disabled', async () => {
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useOtelColumns(true, testOtelVersion.version, builderOptionsDispatch));
+    renderHook(() => useOtelColumns(true, testOtelVersion.version, false, builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -79,7 +79,7 @@ describe('useOtelColumns', () => {
     const builderOptionsDispatch = jest.fn();
 
     let otelEnabled = false;
-    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, builderOptionsDispatch), {
+    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, false, builderOptionsDispatch), {
       initialProps: otelEnabled,
     });
     otelEnabled = true;
@@ -94,6 +94,7 @@ describe('useOtelColumns', () => {
         flattenNested: expect.anything(),
         traceEventsColumnPrefix: expect.anything(),
         traceLinksColumnPrefix: expect.anything(),
+        tagsAreJSON: false,
       },
     };
 
@@ -105,7 +106,7 @@ describe('useOtelColumns', () => {
     const builderOptionsDispatch = jest.fn();
 
     let otelEnabled = false; // OTEL is off
-    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, builderOptionsDispatch), {
+    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, false, builderOptionsDispatch), {
       initialProps: otelEnabled,
     });
     otelEnabled = true;

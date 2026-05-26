@@ -15,9 +15,8 @@ import { generateSql } from './sqlGenerator';
 import otel from 'otel';
 
 // Syncs type:'JSON' on TraceTags/TraceServiceTags columns with the tagsAreJSON flag.
-// When true: adds type:'JSON' to columns that don't yet have a type set.
+// When true: upgrades any non-JSON type (or unset type) to 'JSON'.
 // When false: strips a stale type:'JSON' so a config toggle-off takes effect immediately.
-// Columns with other explicit types are left untouched so manual selections always win.
 const enrichTagColumnTypes = (
   columns: SelectedColumn[] | undefined,
   tagsAreJSON: boolean
@@ -29,7 +28,7 @@ const enrichTagColumnTypes = (
     if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
       return col;
     }
-    if (tagsAreJSON && !col.type) {
+    if (tagsAreJSON && !col.type?.toLowerCase().startsWith('json')) {
       return { ...col, type: 'JSON' };
     }
     if (!tagsAreJSON && col.type?.toLowerCase().startsWith('json')) {
@@ -205,17 +204,22 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
 // Object.entries() call would yield "[object Object]" for the value.
 const flattenJsonTags = (
   obj: Record<string, unknown>,
-  prefix = ''
-): Array<{ key: string; value: string }> =>
-  Object.entries(obj).flatMap(([k, v]) => {
+  prefix = '',
+  depth = 0
+): Array<{ key: string; value: string }> => {
+  if (depth > 20) {
+    return [{ key: prefix || '(truncated)', value: JSON.stringify(obj) }];
+  }
+  return Object.entries(obj).flatMap(([k, v]) => {
     const fullKey = prefix ? `${prefix}.${k}` : k;
     if (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) {
-      return flattenJsonTags(v as Record<string, unknown>, fullKey);
+      return flattenJsonTags(v as Record<string, unknown>, fullKey, depth + 1);
     }
     // Arrays are left as-is via String(v) (e.g. "a,b,c") — ClickHouse JSON type
     // does not produce array attribute values in standard OTel schemas.
     return [{ key: fullKey, value: v !== null && v !== undefined ? String(v) : '' }];
   });
+};
 
 /**
  * Converts a plain JSON object `{"k":"v",...}` returned by a ClickHouse JSON-type
@@ -231,7 +235,8 @@ export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: Dat
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     if (
       originalQuery?.editorType !== EditorType.Builder ||
-      (originalQuery as CHBuilderQuery).builderOptions?.queryType !== QueryType.Traces
+      (originalQuery as CHBuilderQuery).builderOptions?.queryType !== QueryType.Traces ||
+      !(originalQuery as CHBuilderQuery).builderOptions?.meta?.tagsAreJSON
     ) {
       return;
     }

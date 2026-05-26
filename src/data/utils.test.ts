@@ -533,7 +533,7 @@ describe('transformTraceTagFields', () => {
       {
         refId: 'A',
         editorType: EditorType.Builder,
-        builderOptions: { database: '', table: '', queryType: QueryType.Traces },
+        builderOptions: { database: '', table: '', queryType: QueryType.Traces, meta: { tagsAreJSON: true } },
         pluginVersion: '',
         rawSql: '',
       } as CHBuilderQuery,
@@ -585,7 +585,7 @@ describe('transformTraceTagFields', () => {
   it('does not touch unrelated fields', () => {
     const res = makeResponse({}, {});
     transformTraceTagFields(makeTraceRequest(), res);
-    const traceField = res.data[0].fields.find((f) => f.name === 'traceID');
+    const traceField = res.data[0].fields.find((f: Field) => f.name === 'traceID');
     expect(traceField?.values).toEqual(['abc']);
   });
 

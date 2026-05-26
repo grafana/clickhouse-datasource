@@ -149,8 +149,17 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
+  const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
+
+  // Single source of truth: col.type drives both the tags SELECT and the events/links lambda paths.
+  // meta.tagsAreJSON is the fallback when columns aren't stamped yet (e.g. raw SQL mode or useOtelColumns).
+  const tagsAreJSON =
+    traceTags?.type?.toLowerCase().startsWith('json') === true ||
+    traceServiceTags?.type?.toLowerCase().startsWith('json') === true ||
+    Boolean(options.meta?.tagsAreJSON);
+
   if (traceTags !== undefined) {
-    if (traceTags.type?.toLowerCase().startsWith('json')) {
+    if (tagsAreJSON) {
       selectParts.push(`${escapeIdentifier(traceTags.name)} as tags`);
     } else {
       selectParts.push(
@@ -159,9 +168,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     }
   }
 
-  const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
   if (traceServiceTags !== undefined) {
-    if (traceServiceTags.type?.toLowerCase().startsWith('json')) {
+    if (tagsAreJSON) {
       selectParts.push(`${escapeIdentifier(traceServiceTags.name)} as serviceTags`);
     } else {
       selectParts.push(
@@ -178,10 +186,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   const flattenNested = Boolean(options.meta?.flattenNested);
-  const tagsAreJSON = options.meta?.tagsAreJSON ?? false;
-  // Converts an attribute expression (Map or JSON) to Array(Map(String,String)) for the Grafana trace frame.
-  // For JSON columns, CAST(toString(expr),'Map(String,String)') fails in ClickHouse because String→Map
-  // is unsupported; JSONExtractKeysAndValues parses the JSON string and returns Array(Tuple(String,String)).
+  // For JSON columns JSONExtractKeysAndValues is used instead of mapKeys because Map-subscript syntax
+  // does not work on the JSON type. kv.1/kv.2 unpack the returned Array(Tuple(String,String)).
   const attrsToFields = (expr: string) => tagsAreJSON
     ? `arrayMap(kv -> map('key', kv.1, 'value', kv.2), JSONExtractKeysAndValues(toString(${expr}), 'String'))`
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;

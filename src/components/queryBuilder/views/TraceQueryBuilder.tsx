@@ -143,7 +143,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   }, builderState);
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
-  useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useOtelColumns(builderState.otelEnabled, builderState.otelVersion, datasource.getTraceTagsAreJSON(), builderOptionsDispatch);
   useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, isNewQuery, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (

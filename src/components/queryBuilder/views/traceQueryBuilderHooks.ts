@@ -82,6 +82,7 @@ export const useTraceDefaultsOnMount = (
 export const useOtelColumns = (
   otelEnabled: boolean,
   otelVersion: string,
+  tagsAreJSON: boolean,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
@@ -102,7 +103,8 @@ export const useOtelColumns = (
 
     const columns: SelectedColumn[] = [];
     traceColumnMap.forEach((name, hint) => {
-      columns.push({ name, hint });
+      const isTagHint = hint === ColumnHint.TraceTags || hint === ColumnHint.TraceServiceTags;
+      columns.push({ name, hint, ...(isTagHint && tagsAreJSON ? { type: 'JSON' } : {}) });
     });
 
     builderOptionsDispatch(
@@ -113,11 +115,12 @@ export const useOtelColumns = (
           flattenNested: otelConfig.flattenNested,
           traceEventsColumnPrefix: otelConfig.traceEventsColumnPrefix,
           traceLinksColumnPrefix: otelConfig.traceLinksColumnPrefix,
+          tagsAreJSON,
         },
       })
     );
     didSetColumns.current = true;
-  }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+  }, [otelEnabled, otelVersion, tagsAreJSON, builderOptionsDispatch]);
 };
 
 // Apply default filters on table change

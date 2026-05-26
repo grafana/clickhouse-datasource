@@ -654,6 +654,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onTracesConfigChange('instrumentationLibraryVersionColumn', c);
           }}
           onTagsColumnIsJSONChange={(c) => {
+            trackingV1.trackClickhouseConfigV1TracesConfig({ tagsColumnIsJSON: c });
             onTracesConfigChange('tagsColumnIsJSON', c);
           }}
           onFlattenNestedChange={(c) => {
