@@ -707,6 +707,10 @@ export class Datasource
     return this.settings.jsonData.traces?.flattenNested || false;
   }
 
+  getTraceTagsAreJSON(): boolean {
+    return this.settings.jsonData.traces?.tagsColumnIsJSON || false;
+  }
+
   getDefaultTraceEventsColumnPrefix(): string {
     return this.settings.jsonData.traces?.traceEventsColumnPrefix || 'Events';
   }

@@ -14,6 +14,31 @@ import { pluginVersion } from 'utils/version';
 import { generateSql } from './sqlGenerator';
 import otel from 'otel';
 
+// Syncs type:'JSON' on TraceTags/TraceServiceTags columns with the tagsAreJSON flag.
+// When true: adds type:'JSON' to columns that don't yet have a type set.
+// When false: strips a stale type:'JSON' so a config toggle-off takes effect immediately.
+// Columns with other explicit types are left untouched so manual selections always win.
+const enrichTagColumnTypes = (
+  columns: SelectedColumn[] | undefined,
+  tagsAreJSON: boolean
+): SelectedColumn[] | undefined => {
+  if (!columns) {
+    return columns;
+  }
+  return columns.map((col) => {
+    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
+      return col;
+    }
+    if (tagsAreJSON && !col.type) {
+      return { ...col, type: 'JSON' };
+    }
+    if (!tagsAreJSON && col.type?.toLowerCase().startsWith('json')) {
+      return { ...col, type: undefined };
+    }
+    return col;
+  });
+};
+
 /**
  * Returns true if the builder options contain enough information to start showing a query
  */
@@ -175,6 +200,55 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
   });
 };
 
+// Flattens a nested object into [{key,value}] pairs using dot-notation for nested keys.
+// ClickHouse JSON type turns "http.method" into {"http":{"method":"GET"}}, so a single
+// Object.entries() call would yield "[object Object]" for the value.
+const flattenJsonTags = (
+  obj: Record<string, unknown>,
+  prefix = ''
+): Array<{ key: string; value: string }> =>
+  Object.entries(obj).flatMap(([k, v]) => {
+    const fullKey = prefix ? `${prefix}.${k}` : k;
+    if (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) {
+      return flattenJsonTags(v as Record<string, unknown>, fullKey);
+    }
+    // Arrays are left as-is via String(v) (e.g. "a,b,c") — ClickHouse JSON type
+    // does not produce array attribute values in standard OTel schemas.
+    return [{ key: fullKey, value: v !== null && v !== undefined ? String(v) : '' }];
+  });
+
+/**
+ * Converts a plain JSON object `{"k":"v",...}` returned by a ClickHouse JSON-type
+ * column into the `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects
+ * for the `tags` and `serviceTags` fields.  If the value is already an array (Map-type
+ * column after the arrayMap/mapKeys transform) it is left untouched.
+ *
+ * Only applied to frames from Builder Trace queries to avoid mutating unrelated frames
+ * (e.g. a Logs query with a column coincidentally named "tags").
+ */
+export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
+  res.data.forEach((frame: DataFrame) => {
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+    if (
+      originalQuery?.editorType !== EditorType.Builder ||
+      (originalQuery as CHBuilderQuery).builderOptions?.queryType !== QueryType.Traces
+    ) {
+      return;
+    }
+    frame.fields.forEach((field) => {
+      if (field.name !== 'tags' && field.name !== 'serviceTags') {
+        return;
+      }
+      field.values = (field.values as unknown[]).map((value) => {
+        if (value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
+          return flattenJsonTags(value as Record<string, unknown>);
+        }
+        return value;
+      });
+    });
+  });
+};
+
 /**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view
@@ -188,6 +262,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
   res: DataQueryResponse
 ): DataQueryResponse => {
   applyTraceSearchFieldConfig(req, res);
+  transformTraceTagFields(req, res);
 
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
@@ -219,14 +294,18 @@ export const transformQueryResponseWithTraceAndLogLinks = (
 
     const traceTimestampTableSuffix = datasource.getTraceTimestampTableSuffix();
 
+    const tagsAreJSON = datasource.getTraceTagsAreJSON();
+
     if (
       originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces
     ) {
       // Copy fields directly from trace search
+      const columns = enrichTagColumnTypes(originalQuery.builderOptions.columns, tagsAreJSON);
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
+        columns,
         filters: [], // Clear filters and orderBy since it's an exact ID lookup
         orderBy: [],
         meta: {
@@ -236,6 +315,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceId: '${__value.raw}',
           traceTimestampTableSuffix:
             originalQuery.builderOptions.meta?.traceTimestampTableSuffix || traceTimestampTableSuffix,
+          tagsAreJSON,
         },
       };
     } else {
@@ -266,6 +346,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceLinksColumnPrefix: traceLinksColumnPrefix,
           hasTraceTimestampTable: Boolean(otelVersion),
           traceTimestampTableSuffix,
+          tagsAreJSON,
         },
       };
 
@@ -278,6 +359,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         }
       }
 
+      options.columns = enrichTagColumnTypes(options.columns, tagsAreJSON);
       traceIdQuery.builderOptions = options;
     }
 

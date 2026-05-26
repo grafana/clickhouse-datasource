@@ -6,6 +6,7 @@ import {
   isBuilderOptionsRunnable,
   labelsFieldName,
   transformQueryResponseWithTraceAndLogLinks,
+  transformTraceTagFields,
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
@@ -518,6 +519,118 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(links).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
+  });
+});
+
+describe('transformTraceTagFields', () => {
+  const makeTraceRequest = (): DataQueryRequest<CHQuery> => ({
+    requestId: '',
+    interval: '',
+    intervalMs: 0,
+    range: {} as any,
+    scopedVars: {} as any,
+    targets: [
+      {
+        refId: 'A',
+        editorType: EditorType.Builder,
+        builderOptions: { database: '', table: '', queryType: QueryType.Traces },
+        pluginVersion: '',
+        rawSql: '',
+      } as CHBuilderQuery,
+    ],
+    timezone: '',
+    app: CoreApp.Explore,
+    startTime: 0,
+  });
+
+  const makeResponse = (tagsValue: unknown, serviceTagsValue: unknown): DataQueryResponse => ({
+    data: [
+      {
+        refId: 'A',
+        fields: [
+          { name: 'tags', values: [tagsValue], type: FieldType.other, config: {} } as Field,
+          { name: 'serviceTags', values: [serviceTagsValue], type: FieldType.other, config: {} } as Field,
+          { name: 'traceID', values: ['abc'], type: FieldType.string, config: {} } as Field,
+        ],
+        length: 1,
+      } as DataFrame,
+    ],
+  });
+
+  it('converts a plain JSON object to [{key,value}] array', () => {
+    const res = makeResponse({ 'http.method': 'GET', 'db.system': 'redis' }, { 'service.name': 'api' });
+    transformTraceTagFields(makeTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([
+      [
+        { key: 'http.method', value: 'GET' },
+        { key: 'db.system', value: 'redis' },
+      ],
+    ]);
+    expect(res.data[0].fields[1].values).toEqual([[{ key: 'service.name', value: 'api' }]]);
+  });
+
+  it('leaves an already-correct [{key,value}] array untouched', () => {
+    const existing = [{ key: 'http.method', value: 'GET' }];
+    const res = makeResponse(existing, []);
+    transformTraceTagFields(makeTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([existing]);
+  });
+
+  it('leaves null values untouched', () => {
+    const res = makeResponse(null, null);
+    transformTraceTagFields(makeTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([null]);
+  });
+
+  it('does not touch unrelated fields', () => {
+    const res = makeResponse({}, {});
+    transformTraceTagFields(makeTraceRequest(), res);
+    const traceField = res.data[0].fields.find((f) => f.name === 'traceID');
+    expect(traceField?.values).toEqual(['abc']);
+  });
+
+  it('stringifies non-string values', () => {
+    const res = makeResponse({ count: 42 }, {});
+    transformTraceTagFields(makeTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([[{ key: 'count', value: '42' }]]);
+  });
+
+  it('flattens nested objects returned by ClickHouse JSON type (dot-notation keys become nested)', () => {
+    // ClickHouse JSON type interprets "http.method" as a nested path and returns
+    // {"http":{"method":"GET","status_code":"200"}} instead of {"http.method":"GET"}.
+    const nested = {
+      http: { method: 'GET', status_code: '200' },
+      'service': { name: 'api' },
+    };
+    const res = makeResponse(nested, { deployment: { environment: 'prod' } });
+    transformTraceTagFields(makeTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([
+      [
+        { key: 'http.method', value: 'GET' },
+        { key: 'http.status_code', value: '200' },
+        { key: 'service.name', value: 'api' },
+      ],
+    ]);
+    expect(res.data[0].fields[1].values).toEqual([[{ key: 'deployment.environment', value: 'prod' }]]);
+  });
+
+  it('does not transform tags fields from non-Trace query frames', () => {
+    const logsRequest: DataQueryRequest<CHQuery> = {
+      ...makeTraceRequest(),
+      targets: [
+        {
+          refId: 'A',
+          editorType: EditorType.Builder,
+          builderOptions: { database: '', table: '', queryType: QueryType.Logs },
+          pluginVersion: '',
+          rawSql: '',
+        } as CHBuilderQuery,
+      ],
+    };
+    const originalValue = { 'http.method': 'GET' };
+    const res = makeResponse(originalValue, {});
+    transformTraceTagFields(logsRequest, res);
+    expect(res.data[0].fields[0].values).toEqual([originalValue]);
   });
 });
 

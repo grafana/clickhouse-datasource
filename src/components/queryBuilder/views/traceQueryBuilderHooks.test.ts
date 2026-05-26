@@ -27,6 +27,7 @@ describe('useTraceDefaultsOnMount', () => {
         traceEventsColumnPrefix: expect.anything(),
         traceLinksColumnPrefix: expect.anything(),
         traceTimestampTableSuffix: expect.anything(),
+        tagsAreJSON: expect.anything(),
       },
     };
 

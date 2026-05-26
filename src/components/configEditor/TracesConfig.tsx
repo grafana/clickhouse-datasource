@@ -33,6 +33,7 @@ export interface TraceConfigProps {
   onStateColumnChange: (v: string) => void;
   onInstrumentationLibraryNameColumnChange: (v: string) => void;
   onInstrumentationLibraryVersionColumnChange: (v: string) => void;
+  onTagsColumnIsJSONChange: (v: boolean) => void;
   onFlattenNestedChange: (v: boolean) => void;
   onEventsColumnPrefixChange: (v: string) => void;
   onLinksColumnPrefixChange: (v: string) => void;
@@ -62,6 +63,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     onStateColumnChange,
     onInstrumentationLibraryNameColumnChange,
     onInstrumentationLibraryVersionColumnChange,
+    onTagsColumnIsJSONChange,
     onFlattenNestedChange,
     onEventsColumnPrefixChange,
     onLinksColumnPrefixChange,
@@ -90,6 +92,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     instrumentationLibraryNameColumn,
     instrumentationLibraryVersionColumn,
     flattenNested,
+    tagsColumnIsJSON,
     traceEventsColumnPrefix,
     traceLinksColumnPrefix,
     showTraceLinks,
@@ -277,6 +280,13 @@ export const TracesConfig = (props: TraceConfigProps) => {
           tooltip={labels.columns.instrumentationLibraryVersion.tooltip}
           value={instrumentationLibraryVersionColumn || ''}
           onChange={onInstrumentationLibraryVersionColumnChange}
+        />
+        <Switch
+          label={labels.columns.tagsColumnIsJSON.label}
+          tooltip={labels.columns.tagsColumnIsJSON.tooltip}
+          value={tagsColumnIsJSON || false}
+          onChange={onTagsColumnIsJSONChange}
+          wide
         />
         <Switch
           disabled={otelEnabled}

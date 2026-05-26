@@ -40,9 +40,11 @@ export const useTraceDefaultsOnMount = (
     const defaultLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
     const traceTimestampTableSuffix = datasource.getTraceTimestampTableSuffix();
 
+    const tagsAreJSON = datasource.getTraceTagsAreJSON();
     const nextColumns: SelectedColumn[] = [];
     for (let [hint, colName] of defaultColumns) {
-      nextColumns.push({ name: colName, hint });
+      const isTagHint = hint === ColumnHint.TraceTags || hint === ColumnHint.TraceServiceTags;
+      nextColumns.push({ name: colName, hint, ...(isTagHint && tagsAreJSON ? { type: 'JSON' } : {}) });
     }
 
     builderOptionsDispatch(
@@ -58,6 +60,7 @@ export const useTraceDefaultsOnMount = (
           traceEventsColumnPrefix: defaultEventsColumnPrefix,
           traceLinksColumnPrefix: defaultLinksColumnPrefix,
           traceTimestampTableSuffix,
+          tagsAreJSON,
         },
       })
     );

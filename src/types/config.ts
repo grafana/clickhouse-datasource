@@ -114,6 +114,14 @@ export interface CHTracesConfig {
   showTraceLinks?: boolean;
 
   /**
+   * When true, the tags and serviceTags columns hold ClickHouse JSON type values
+   * rather than Map(String,String). The SQL generator skips the mapKeys() transform
+   * and the response pipeline reshapes the JSON object into the [{key,value}] array
+   * that Grafana's trace panel expects.
+   */
+  tagsColumnIsJSON?: boolean;
+
+  /**
    * Suffix appended to the traces table name to locate a companion trace-timestamp
    * index table (e.g. `<table>_trace_id_ts`). When such a table exists, trace ID
    * queries run a two-step lookup that narrows the main query's time range,

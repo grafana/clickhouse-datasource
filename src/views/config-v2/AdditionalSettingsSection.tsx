@@ -246,6 +246,7 @@ export const AdditionalSettingsSection = (props: Props) => {
           onInstrumentationLibraryVersionColumnChange={(c) =>
             onUpdateTracesConfig('instrumentationLibraryVersionColumn', c)
           }
+          onTagsColumnIsJSONChange={(c) => onUpdateTracesConfig('tagsColumnIsJSON', c)}
           onFlattenNestedChange={(c) => onUpdateTracesConfig('flattenNested', c)}
           onEventsColumnPrefixChange={(c) => onUpdateTracesConfig('traceEventsColumnPrefix', c)}
           onLinksColumnPrefixChange={(c) => onUpdateTracesConfig('traceLinksColumnPrefix', c)}

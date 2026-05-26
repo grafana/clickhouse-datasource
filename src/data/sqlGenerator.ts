@@ -178,6 +178,13 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   const flattenNested = Boolean(options.meta?.flattenNested);
+  const tagsAreJSON = options.meta?.tagsAreJSON ?? false;
+  // Converts an attribute expression (Map or JSON) to Array(Map(String,String)) for the Grafana trace frame.
+  // For JSON columns, CAST(toString(expr),'Map(String,String)') fails in ClickHouse because String→Map
+  // is unsupported; JSONExtractKeysAndValues parses the JSON string and returns Array(Tuple(String,String)).
+  const attrsToFields = (expr: string) => tagsAreJSON
+    ? `arrayMap(kv -> map('key', kv.1, 'value', kv.2), JSONExtractKeysAndValues(toString(${expr}), 'String'))`
+    : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
 
   const traceEventsPrefix = options.meta?.traceEventsColumnPrefix || '';
   if (traceEventsPrefix !== '') {
@@ -185,8 +192,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
       selectParts.push(
         [
           `arrayMap(event -> tuple(multiply(toFloat64(event.Timestamp), 1000),`,
-          `arrayConcat(arrayMap(key -> map('key', key, 'value', event.Attributes[key]),`,
-          `mapKeys(event.Attributes)), [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))),`,
+          `arrayConcat(${attrsToFields('event.Attributes')}, [map('key', 'message', 'value', event.Name)]))::Tuple(timestamp Float64, fields Array(Map(String, String))),`,
           `${escapeIdentifier(traceEventsPrefix)}) as logs`,
         ].join(' ')
       );
@@ -194,8 +200,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
       selectParts.push(
         [
           `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)),`,
-          `arrayMap( key -> map('key', key, 'value', attributes[key]),`,
-          `mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),`,
+          `${attrsToFields('attributes')})::Tuple(name String, timestamp String, fields Array(Map(String, String))),`,
           `${escapeIdentifier(traceEventsPrefix)}.Name, ${escapeIdentifier(traceEventsPrefix)}.Timestamp,`,
           `${escapeIdentifier(traceEventsPrefix)}.Attributes) AS logs`,
         ].join(' ')
@@ -208,16 +213,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     if (flattenNested) {
       selectParts.push(
         [
-          `arrayMap(link -> tuple(link.TraceId, link.SpanId, arrayMap(key -> map('key', key, 'value', link.Attributes[key]),`,
-          `mapKeys(link.Attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))),`,
+          `arrayMap(link -> tuple(link.TraceId, link.SpanId, ${attrsToFields('link.Attributes')})::Tuple(traceID String, spanID String, tags Array(Map(String, String))),`,
           `${escapeIdentifier(traceLinksPrefix)}) AS references`,
         ].join(' ')
       );
     } else {
       selectParts.push(
         [
-          `arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, arrayMap(key -> map('key', key, 'value', attributes[key]),`,
-          `mapKeys(attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))),`,
+          `arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, ${attrsToFields('attributes')})::Tuple(traceID String, spanID String, tags Array(Map(String, String))),`,
           `${escapeIdentifier(traceLinksPrefix)}.TraceId, ${escapeIdentifier(traceLinksPrefix)}.SpanId,`,
           `${escapeIdentifier(traceLinksPrefix)}.Attributes) AS references`,
         ].join(' ')
