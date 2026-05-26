@@ -2,6 +2,11 @@ name: Run commands when issues are labeled
 on:
   issues:
     types: [labeled]
+
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   main:
     runs-on: ubuntu-latest
@@ -11,7 +16,10 @@ jobs:
         with:
           repository: 'grafana/grafana-github-actions'
           path: ./actions
-          ref: main
+          # SHA-pinned (formerly @main). Bump alongside grafana-github-actions
+          # releases; Renovate's shared-workflows preset will not manage this
+          # because it's a checkout, not a `uses:` ref.
+          ref: 3c62d35c5a66e730186a338e45aeb8fa784e2d56
           persist-credentials: false
       - name: Install Actions
         run: npm install --production --prefix ./actions

@@ -1,5 +1,10 @@
 name: Compatibility check
-on: [push, pull_request]
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write # needed for the `comment-pr: yes` step below
 
 jobs:
   compatibilitycheck:
@@ -13,7 +18,7 @@ jobs:
         with:
           node-version-file: '.nvmrc'
       - name: Install dependencies
-        run: npm install
+        run: npm ci
       - name: Build plugin
         run: npm run build
       - name: Compatibility check

@@ -23,7 +23,7 @@ import { TracesConfig } from 'components/configEditor/TracesConfig';
 import { config } from '@grafana/runtime';
 import { TimeUnit } from 'types/queryBuilder';
 import { useConfigDefaults } from 'views/CHConfigEditorHooks';
-import { gte as versionGte } from 'semver';
+import { isVersionGtOrEq as versionGte } from 'utils/version';
 import {
   Field,
   Divider,
@@ -48,7 +48,7 @@ import {
   trackClickhouseConfigV2TracesConfig,
 } from './tracking';
 import { css } from '@emotion/css';
-import { isEqual } from 'es-toolkit/compat';
+import { isEqual } from 'lodash';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
