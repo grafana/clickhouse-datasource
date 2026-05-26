@@ -25,3 +25,26 @@ datasources:
       validateSql: true
     secureJsonData:
       # password: ""
+
+  # Second datasource used by tests/e2e/traceJsonTags.spec.ts.
+  # Mirrors the configuration a user with ClickHouse 26+ JSON-type attribute
+  # columns would apply: OTel enabled and tagsColumnIsJSON set to true.
+  - name: ClickHouse JSON Tags
+    uid: clickhouse-e2e-json-tags
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: clickhouse-server
+    orgId: 1
+    jsonData:
+      host: clickhouse-server
+      port: 9000
+      protocol: native
+      username: default
+      traces:
+        otelEnabled: true
+        otelVersion: latest
+        defaultDatabase: e2e_test
+        defaultTable: trace_spans_json
+        tagsColumnIsJSON: true
+    secureJsonData:
+      # password: ""

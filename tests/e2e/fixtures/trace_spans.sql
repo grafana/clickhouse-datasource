@@ -1,7 +1,6 @@
 -- Trace-spans fixture for the #1541 trace-viewer LIMIT regression guard.
 --
--- Self-contained so ordering with seed.sql does not matter. The
--- docker-compose e2e-data-loader service iterates every *.sql file under
+-- The docker-compose e2e-data-loader service iterates every *.sql file under
 -- /data in lexicographic order.
 --
 -- The bug: when the user searches traces with a LIMIT (e.g. 3), the plugin
@@ -12,7 +11,9 @@
 
 CREATE DATABASE IF NOT EXISTS e2e_test;
 
-CREATE TABLE IF NOT EXISTS e2e_test.trace_spans
+DROP TABLE IF EXISTS e2e_test.trace_spans;
+
+CREATE TABLE e2e_test.trace_spans
 (
     Timestamp    DateTime64(9),
     TraceId      String,
@@ -36,3 +37,4 @@ INSERT INTO e2e_test.trace_spans
     ('2024-03-15 10:00:03', 'e2e-trace-a', 'span-4', 'span-2',  'db',     'SELECT users',       4000000),
     ('2024-03-15 10:00:04', 'e2e-trace-a', 'span-5', 'span-3',  'cache',  'GET profile:42',     1000000),
     ('2024-03-15 10:00:10', 'e2e-trace-b', 'span-9', '',        'worker', 'job.run',            8000000);
+
