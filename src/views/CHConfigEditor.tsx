@@ -15,7 +15,7 @@ import {
   CHTracesConfig,
   AliasTableEntry,
 } from 'types/config';
-import { gte as versionGte } from 'semver';
+import { isVersionGtOrEq as versionGte } from 'utils/version';
 import { ConfigSection, ConfigSubSection, DataSourceDescription } from 'components/experimental/ConfigSection';
 import { config } from '@grafana/runtime';
 import { Divider } from 'components/Divider';

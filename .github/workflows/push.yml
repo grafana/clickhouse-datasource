@@ -49,6 +49,9 @@ jobs:
     # Main-only: publish the latest build and trigger Argo deployment
     if: github.ref == 'refs/heads/main'
 
+    # Intentionally pinned to @main: data-sources-ci-workflows does not
+    # publish versioned tags for cd-dev.yml yet. Allowed by the zizmor
+    # policy (`grafana/*: any`); review periodically.
     uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main
 
     permissions:

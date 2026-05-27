@@ -12,6 +12,9 @@ on:
   schedule:
     - cron: '0 9 1 * *'
 
+permissions:
+  contents: read
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -43,4 +46,6 @@ jobs:
           version: latest
 
       - name: Run integration tests
-        run: CLICKHOUSE_VERSION=${{ matrix.clickhouse }} go test -v -tags=integration ./...
+        env:
+          CLICKHOUSE_VERSION: ${{ matrix.clickhouse }}
+        run: go test -v -tags=integration ./...

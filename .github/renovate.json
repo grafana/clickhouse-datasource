@@ -1,10 +1,30 @@
 {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
     "extends": [
+        "github>grafana/grafana-renovate-config//presets/base",
+        "github>grafana/grafana-renovate-config//presets/npm",
+        "github>grafana/grafana-renovate-config//presets/github-actions",
+        "github>grafana/grafana-renovate-config//presets/shared-workflows",
+        "github>grafana/grafana-renovate-config//presets/plugin-ci-workflows",
+        "github>grafana/grafana-renovate-config//presets/rate-limits",
+        "github>grafana/grafana-renovate-config//presets/labels",
         "github>grafana/grafana-renovate-config//presets/automerge"
     ],
     "platformAutomerge": true,
     "packageRules": [
+        {
+            "description": "Apply 3-day release-age soak to non-Grafana npm devDependencies (npm preset only covers dependencies)",
+            "matchDatasources": [
+                "npm"
+            ],
+            "matchDepTypes": [
+                "devDependencies"
+            ],
+            "matchPackageNames": [
+                "!@grafana/*"
+            ],
+            "minimumReleaseAge": "3 days"
+        },
         {
             "description": "Disable minimum release age for Grafana owned npm packages (@grafana/*)",
             "matchDatasources": [
@@ -75,9 +95,12 @@
             "enabled": false
         },
         {
-            "description": "Automerge minor dependencies",
+            "description": "Automerge minor devDependencies only (production deps need human review)",
             "matchUpdateTypes": [
                 "minor"
+            ],
+            "matchDepTypes": [
+                "devDependencies"
             ],
             "automerge": true,
             "labels": [
