@@ -36,7 +36,7 @@ Both tables are referenced by their bare names in raw SQL, so the data source's 
 
 The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`, `SeverityText`, `ServiceName`, `TraceId`, `SpanId`, `ResourceAttributes` for logs; `TraceId`, `ServiceName`, `SpanName`, `Timestamp`, `Duration`, `StatusCode`, `SpanKind`, `ParentSpanId`, `SpanAttributes`, `ResourceAttributes` for traces.
 
-`StatusCode` is matched against `'Error'` and `'STATUS_CODE_ERROR'` so both the current Go-exporter schema and the older string-based schema render correctly.
+`StatusCode` is matched against the OTel spec value `'Error'`, which is what the current ClickHouse exporter writes.
 
 ## OTel Logs Explorer
 
@@ -45,6 +45,8 @@ The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`,
 A multi-service log overview. Top row: stacked log volume by SeverityText, top services bar gauge with click-to-filter, severity donut, and a Top Error Messages table that strips common id-style tokens (userId, traceId, etc.) before grouping so similar messages cluster.
 
 Below the overview, a per-service row repeats once per service in the **Service** variable, showing log volume by SeverityText alongside recent log samples for that service.
+
+The per-service Log Volume panel has an **Open in Explore** link in the panel header that pre-fills a matching query in Explore, where you can refine filters or change visualisation.
 
 Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
 
@@ -56,26 +58,27 @@ Annotations: deployment markers derived from `service.version` changes in `otel_
 
 System topology + trace search. Top row: service map node graph computed from `parent.SpanId = child.ParentSpanId` joins on `otel_traces`, limited to the top 30 services and top 50 inter-service edges. Node arcs show success/error fractions; edge labels show call counts.
 
-Trace Search Results lists recent traces matching the variable filters (Service, Operation, Status, Min Duration). Click a TraceId to open the OTel Service Dashboard for that trace; click a Service or Operation to filter this view.
+Trace Search Results lists recent traces matching the variable filters (Service, Operation, Status, Min Duration). Click a TraceId to open Grafana's trace view for that trace; click a Service to open the OTel Service Dashboard for that service; click an Operation to filter this view.
 
 Below trace search, a per-service row repeats once per service: a 1-in-500 sampled duration heatmap, four sparkline stats (Spans, Errors, P99, Avg Duration), and a Top Operations table with error counts colour-coded by error percent.
+
+Each per-service panel has an **Open in Explore** link in its panel header that pre-fills a matching query in Explore.
 
 Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`).
 
 ## OTel Service Dashboard
 
-![OTel Service Dashboard with a TraceId set (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-service-dashboard-light.png)
+![OTel Service Dashboard (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-service-dashboard-light.png)
 
 Single-service deep dive. Top to bottom:
 
 1. **RED Metrics**: Request Rate (spans per second), Error Rate (with green/yellow/red thresholds at 1% and 5%), and Duration Percentiles (P50 and P90 solid, P99 dashed orange).
 2. **Errors & Slow Operations**: Top Errors and Slowest Operations tables. Click an operation to open the matching trace search in OTel Traces Explorer.
 3. **Related Logs**: recent logs for the selected service.
-4. **Trace** (driven by the `Trace ID` textbox): a Trace Summary table, a builder-mode trace waterfall, and Correlated Logs filtered to the same TraceId. Empty until a Trace ID is set; paste one from the **Trace Search Results** table on OTel Traces Explorer.
 
-Filter variables: **Service** (single-select), **Operation** (multi), **Trace ID** (textbox).
+Filter variables: **Service** (single-select), **Operation** (multi).
 
-The trace waterfall uses the plugin's builder mode and currently hardcodes the database name to `otel_v2` (the standard OTel Collector ClickHouse exporter database). If your traces live in a different database, open the Trace Waterfall panel, switch to **Edit**, and change the **Database** field, then save the panel under a new copy of the dashboard.
+To see a specific trace, open OTel Traces Explorer and click a TraceId in Trace Search Results. That opens Grafana's trace view in a side pane.
 
 ## Cross-dashboard navigation
 
@@ -83,7 +86,8 @@ Each dashboard has an **OTEL Dashboards** link in the top-right that drops down 
 
 Data links between panels carry the same context:
 
-- **OTel Traces Explorer** → **OTel Service Dashboard**: clicking a TraceId in Trace Search Results opens the Service Dashboard with both `var-traceId` and `var-service` set; the trace block populates immediately.
+- **OTel Traces Explorer** → trace view: clicking a TraceId in Trace Search Results opens Grafana's trace view for that trace.
+- **OTel Traces Explorer** → **OTel Service Dashboard**: clicking a Service in Trace Search Results opens the Service Dashboard filtered to that service.
 - **OTel Service Dashboard** → **OTel Traces Explorer**: clicking an operation in Top Errors or Slowest Operations opens trace search filtered to that service and operation.
 - **OTel Logs Explorer**: clicking a service in the bar gauge self-filters the dashboard to that service.
 
