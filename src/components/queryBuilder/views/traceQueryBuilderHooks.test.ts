@@ -115,6 +115,27 @@ describe('useOtelColumns', () => {
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
   });
+
+  it('should stamp TraceTags/TraceServiceTags columns with type JSON when tagsAreJSON is true', async () => {
+    const builderOptionsDispatch = jest.fn();
+
+    let otelEnabled = false;
+    const hook = renderHook(
+      (enabled) => useOtelColumns(enabled, testOtelVersion.version, true, builderOptionsDispatch),
+      { initialProps: otelEnabled }
+    );
+    otelEnabled = true;
+    hook.rerender(otelEnabled);
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+
+    const dispatchedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[0][0].payload.columns;
+    const tagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceTags);
+    const serviceTagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceServiceTags);
+
+    expect(tagsCol?.type).toBe('JSON');
+    expect(serviceTagsCol?.type).toBe('JSON');
+  });
 });
 
 describe('useDefaultFilters', () => {

@@ -188,6 +188,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const flattenNested = Boolean(options.meta?.flattenNested);
   // For JSON columns JSONExtractKeysAndValues is used instead of mapKeys because Map-subscript syntax
   // does not work on the JSON type. kv.1/kv.2 unpack the returned Array(Tuple(String,String)).
+  //
+  // NOTE: attrsToFields uses the same tagsAreJSON flag as the top-level tag columns. This is correct
+  // for the full ClickHouse 26+ OTel schema where all attribute columns (SpanAttributes,
+  // ResourceAttributes, Events.Attributes, Links.Attributes) are uniformly JSON type. In a
+  // partially-migrated schema where Events/Links Attributes are still Map(String,String) while the
+  // span-level columns are JSON, toString(Map) produces ClickHouse syntax (not standard JSON) and
+  // JSONExtractKeysAndValues would return empty arrays. A separate config flag would be required to
+  // support that edge case.
   const attrsToFields = (expr: string) => tagsAreJSON
     ? `arrayMap(kv -> map('key', kv.1, 'value', kv.2), JSONExtractKeysAndValues(toString(${expr}), 'String'))`
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;

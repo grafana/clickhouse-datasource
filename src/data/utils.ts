@@ -222,27 +222,63 @@ const flattenJsonTags = (
 };
 
 /**
- * Converts a plain JSON object `{"k":"v",...}` returned by a ClickHouse JSON-type
+ * Converts plain JSON objects `{"k":"v",...}` returned by a ClickHouse JSON-type
  * column into the `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects
- * for the `tags` and `serviceTags` fields.  If the value is already an array (Map-type
- * column after the arrayMap/mapKeys transform) it is left untouched.
+ * for the `tags` and `serviceTags` fields. Already-transformed arrays are left untouched.
  *
- * Only applied to frames from Builder Trace queries to avoid mutating unrelated frames
- * (e.g. a Logs query with a column coincidentally named "tags").
+ * For Builder Trace queries: activates when `meta.tagsAreJSON` is set OR when any
+ * TraceTags/TraceServiceTags column carries `type:'JSON'`, mirroring the detection
+ * logic in generateTraceIdQuery so the SQL output and the response transform always agree.
+ *
+ * For raw-SQL queries: activates when `datasourceLevelTagsAreJSON` is true and the
+ * first non-null field value is a plain object (runtime detection), to avoid mutating
+ * unrelated frames that happen to have a column named "tags".
  */
-export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
+export const transformTraceTagFields = (
+  req: DataQueryRequest<CHQuery>,
+  res: DataQueryResponse,
+  datasourceLevelTagsAreJSON = false
+): void => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
-    if (
-      originalQuery?.editorType !== EditorType.Builder ||
-      (originalQuery as CHBuilderQuery).builderOptions?.queryType !== QueryType.Traces ||
-      !(originalQuery as CHBuilderQuery).builderOptions?.meta?.tagsAreJSON
-    ) {
+
+    let shouldTransform: boolean;
+    if (originalQuery?.editorType === EditorType.Builder) {
+      if (originalQuery.builderOptions?.queryType !== QueryType.Traces) {
+        return;
+      }
+      const builderOpts = originalQuery.builderOptions;
+      // Mirror the tagsAreJSON OR-logic from sqlGenerator.ts so the SQL output and
+      // response transform always agree: column type is the primary signal,
+      // meta.tagsAreJSON is the fallback (initial-load / persisted-query scenarios).
+      shouldTransform =
+        Boolean(builderOpts?.meta?.tagsAreJSON) ||
+        Boolean(
+          builderOpts?.columns?.some(
+            (c) =>
+              (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+              c.type?.toLowerCase().startsWith('json')
+          )
+        );
+    } else {
+      shouldTransform = datasourceLevelTagsAreJSON;
+    }
+
+    if (!shouldTransform) {
       return;
     }
+
     frame.fields.forEach((field) => {
       if (field.name !== 'tags' && field.name !== 'serviceTags') {
         return;
+      }
+      // For raw-SQL frames, skip if values are already [{key,value}] arrays rather
+      // than plain objects — the frame doesn't need the JSON→array conversion.
+      if (originalQuery?.editorType !== EditorType.Builder) {
+        const firstNonNull = (field.values as unknown[]).find((v) => v !== null && v !== undefined);
+        if (firstNonNull === undefined || Array.isArray(firstNonNull) || typeof firstNonNull !== 'object') {
+          return;
+        }
       }
       field.values = (field.values as unknown[]).map((value) => {
         if (value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
@@ -267,7 +303,8 @@ export const transformQueryResponseWithTraceAndLogLinks = (
   res: DataQueryResponse
 ): DataQueryResponse => {
   applyTraceSearchFieldConfig(req, res);
-  transformTraceTagFields(req, res);
+  const tagsAreJSON = datasource.getTraceTagsAreJSON();
+  transformTraceTagFields(req, res, tagsAreJSON);
 
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
@@ -298,8 +335,6 @@ export const transformQueryResponseWithTraceAndLogLinks = (
     };
 
     const traceTimestampTableSuffix = datasource.getTraceTimestampTableSuffix();
-
-    const tagsAreJSON = datasource.getTraceTagsAreJSON();
 
     if (
       originalQuery.editorType === EditorType.Builder &&
