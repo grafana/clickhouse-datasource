@@ -205,8 +205,15 @@
       },
       "gridPos": { "h": 13, "w": 8, "x": 0, "y": 12 },
       "id": 201,
-      "description": "Log volume by SeverityText for $service.",
+      "description": "Log volume by SeverityText for $service. Use Open in Explore to refine the query.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, SeverityText AS metric, count() AS count FROM otel_logs WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time, metric ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "Log Volume: $service",
       "targets": [
         {
