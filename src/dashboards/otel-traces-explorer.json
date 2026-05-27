@@ -147,7 +147,7 @@
           "text": "",
           "value": ""
         },
-        "description": "Filter trace search to traces lasting at least this many milliseconds. Leave blank for no minimum.",
+        "description": "Filter to traces lasting at least this many milliseconds. Leave blank for no minimum.",
         "hide": 0,
         "label": "Min Duration (ms)",
         "name": "min_duration",
@@ -291,8 +291,46 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "View trace & correlated logs",
-                    "url": "/d/otel-service-dashboard?var-traceId=${__value.raw}&var-service=${__data.fields.Service}&${__url_time_range}&var-datasource=${datasource}"
+                    "title": "View trace",
+                    "url": "",
+                    "internal": {
+                      "datasourceUid": "${datasource}",
+                      "datasourceName": "ClickHouse",
+                      "query": {
+                        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+                        "refId": "A",
+                        "editorType": "builder",
+                        "queryType": "traces",
+                        "builderOptions": {
+                          "database": "",
+                          "table": "otel_traces",
+                          "queryType": "traces",
+                          "columns": [
+                            { "name": "Timestamp", "hint": "time" },
+                            { "name": "TraceId", "hint": "trace_id" },
+                            { "name": "SpanId", "hint": "trace_span_id" },
+                            { "name": "ParentSpanId", "hint": "trace_parent_span_id" },
+                            { "name": "ServiceName", "hint": "trace_service_name" },
+                            { "name": "SpanName", "hint": "trace_operation_name" },
+                            { "name": "Duration", "hint": "trace_duration_time" },
+                            { "name": "SpanAttributes", "hint": "trace_tags" },
+                            { "name": "ResourceAttributes", "hint": "trace_service_tags" },
+                            { "name": "StatusCode", "hint": "trace_status_code" },
+                            { "name": "StatusMessage", "hint": "trace_status_message" },
+                            { "name": "SpanKind", "hint": "trace_kind" }
+                          ],
+                          "filters": [],
+                          "meta": {
+                            "isTraceIdMode": true,
+                            "traceId": "${__value.raw}",
+                            "traceDurationUnit": "nanoseconds",
+                            "otelEnabled": true,
+                            "otelVersion": "latest"
+                          }
+                        },
+                        "format": 3
+                      }
+                    }
                   }
                 ]
               }
@@ -306,8 +344,8 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Filter to ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                    "title": "Service Dashboard",
+                    "url": "/d/otel-service-dashboard?var-service=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
                   }
                 ]
               }
@@ -331,7 +369,7 @@
       },
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
       "id": 20,
-      "description": "Recent traces matching the variable filters. Click a TraceId to open the Service Dashboard for the trace; click a Service or Operation to filter this view.",
+      "description": "Recent traces matching the variable filters. Click a TraceId to view the trace; click a Service to open the Service Dashboard; click an Operation to filter this view.",
       "options": {
         "showHeader": true,
         "sortBy": [
@@ -390,7 +428,7 @@
       },
       "gridPos": { "h": 8, "w": 16, "x": 0, "y": 25 },
       "id": 301,
-      "description": "Span duration distribution over time for $service, log-scale. Sampled at 1-in-500 spans for performance.",
+      "description": "Span duration distribution over time for $service, log-scale. Sampled at 1-in-500 spans for performance. Use Open in Explore to refine the query.",
       "options": {
         "calculate": true,
         "calculation": {
@@ -413,6 +451,13 @@
         },
         "legend": { "show": false }
       },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, Duration / 1000000 AS duration_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND cityHash64(SpanId) % 500 = 0 ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "Duration Distribution",
       "type": "heatmap",
       "targets": [
@@ -433,6 +478,7 @@
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 25 },
       "id": 302,
+      "description": "Total span count for $service. Use Open in Explore to refine the query.",
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "none",
@@ -440,6 +486,13 @@
         "textMode": "value_and_name",
         "orientation": "horizontal"
       },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, count() AS Spans FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "",
       "transparent": true,
       "type": "stat",
@@ -456,6 +509,7 @@
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 27 },
       "id": 303,
+      "description": "Error span count for $service. Use Open in Explore to refine the query.",
       "options": {
         "reduceOptions": { "calcs": ["sum"] },
         "colorMode": "none",
@@ -463,6 +517,13 @@
         "textMode": "value_and_name",
         "orientation": "horizontal"
       },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "",
       "transparent": true,
       "type": "stat",
@@ -479,6 +540,7 @@
       "fieldConfig": { "defaults": { "unit": "ms", "color": { "mode": "fixed", "fixedColor": "orange" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 29 },
       "id": 304,
+      "description": "P99 span duration for $service. Use Open in Explore to refine the query.",
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "none",
@@ -486,6 +548,13 @@
         "textMode": "value_and_name",
         "orientation": "horizontal"
       },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, quantile(0.99)(Duration) / 1000000 AS p99_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "",
       "transparent": true,
       "type": "stat",
@@ -507,6 +576,7 @@
       "fieldConfig": { "defaults": { "unit": "ms", "color": { "mode": "fixed", "fixedColor": "blue" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 31 },
       "id": 305,
+      "description": "Mean span duration for $service. Use Open in Explore to refine the query.",
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "none",
@@ -514,6 +584,13 @@
         "orientation": "horizontal",
         "textMode": "value_and_name"
       },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, avg(Duration) / 1000000 AS \\\"Avg Duration\\\" FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "",
       "transparent": true,
       "type": "stat",
@@ -638,7 +715,7 @@
       },
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 33 },
       "id": 306,
-      "description": "Operations for $service ranked by call count. Errors and Error % are colour-coded; click an operation to filter the dashboard.",
+      "description": "Operations for $service ranked by call count. Errors and Error % are colour-coded; click an operation to filter the dashboard. Use Open in Explore to refine the query.",
       "options": {
         "showHeader": true,
         "sortBy": [
@@ -650,6 +727,13 @@
           "fields": []
         }
       },
+      "links": [
+        {
+          "title": "Open in Explore",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors, round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \\\"Error %\\\", quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY Operation ORDER BY Count DESC LIMIT 50\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "targetBlank": false
+        }
+      ],
       "title": "Top Operations",
       "type": "table",
       "targets": [
