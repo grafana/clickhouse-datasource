@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
+import { concatMap, firstValueFrom, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -81,6 +81,10 @@ export class Datasource
   // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
   // can pass either form.
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
+  // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
+  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes
+  // concurrent callers and lets cache hits resolve in a microtask.
+  private traceTimestampTableCache = new Map<string, Promise<boolean>>();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -735,6 +739,38 @@ export class Datasource
   }
 
   /**
+   * Resolves whether the `<table>_trace_id_ts` companion exists for the given
+   * (database, table). Caches the Promise so concurrent and repeat callers share
+   * a single `SHOW TABLES` round-trip; on failure, evicts so the next caller
+   * retries and meanwhile returns `false` (the safe, unoptimised path).
+   */
+  async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
+    if (!database || !table) {
+      return false;
+    }
+
+    const key = `${database}.${table}`;
+
+    let pending = this.traceTimestampTableCache.get(key);
+
+    if (!pending) {
+      pending = (async () => {
+        try {
+          const tables = await this.fetchTables(database);
+          return tables.includes(table + this.getTraceTimestampTableSuffix());
+        } catch {
+          this.traceTimestampTableCache.delete(key);
+          return false;
+        }
+      })();
+
+      this.traceTimestampTableCache.set(key, pending);
+    }
+
+    return pending;
+  }
+
+  /**
    * Get the TraceId column name from traces configuration
    * Used when creating logs filter to correlate with trace data
    */
@@ -1000,16 +1036,13 @@ export class Datasource
         targets,
       })
       .pipe(
-        mergeMap((res: DataQueryResponse) =>
-          from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
-            map((transformed) => {
-              if (hasLogsVolumeTargets) {
-                return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
-              }
-              return transformed;
-            })
-          )
-        )
+        concatMap(async (res: DataQueryResponse) => {
+          const transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          if (hasLogsVolumeTargets) {
+            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+          }
+          return transformed;
+        })
       );
   }
 
