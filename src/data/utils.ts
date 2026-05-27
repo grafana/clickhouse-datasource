@@ -17,7 +17,7 @@ import otel from 'otel';
 // Syncs type:'JSON' on TraceTags/TraceServiceTags columns with the tagsAreJSON flag.
 // When true: upgrades any non-JSON type (or unset type) to 'JSON'.
 // When false: strips a stale type:'JSON' so a config toggle-off takes effect immediately.
-const enrichTagColumnTypes = (
+export const enrichTagColumnTypes = (
   columns: SelectedColumn[] | undefined,
   tagsAreJSON: boolean
 ): SelectedColumn[] | undefined => {
@@ -207,7 +207,7 @@ const flattenJsonTags = (
   prefix = '',
   depth = 0
 ): Array<{ key: string; value: string }> => {
-  if (depth > 20) {
+  if (depth >= 20) {
     return [{ key: prefix || '(truncated)', value: JSON.stringify(obj) }];
   }
   return Object.entries(obj).flatMap(([k, v]) => {
@@ -222,63 +222,36 @@ const flattenJsonTags = (
 };
 
 /**
- * Converts plain JSON objects `{"k":"v",...}` returned by a ClickHouse JSON-type
- * column into the `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects
- * for the `tags` and `serviceTags` fields. Already-transformed arrays are left untouched.
+ * For raw-SQL trace queries where the datasource is configured with `tagsColumnIsJSON`,
+ * converts plain JSON objects returned by ClickHouse JSON-type columns into the
+ * `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects for `tags`
+ * and `serviceTags` fields.
  *
- * For Builder Trace queries: activates when `meta.tagsAreJSON` is set OR when any
- * TraceTags/TraceServiceTags column carries `type:'JSON'`, mirroring the detection
- * logic in generateTraceIdQuery so the SQL output and the response transform always agree.
- *
- * For raw-SQL queries: activates when `datasourceLevelTagsAreJSON` is true and the
- * first non-null field value is a plain object (runtime detection), to avoid mutating
- * unrelated frames that happen to have a column named "tags".
+ * Builder trace queries do not need this transform — the SQL generator produces
+ * `[{key,value}]` arrays directly via JSONAllPaths + JSON_VALUE.
  */
 export const transformTraceTagFields = (
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse,
   datasourceLevelTagsAreJSON = false
 ): void => {
+  if (!datasourceLevelTagsAreJSON) {
+    return;
+  }
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
-
-    let shouldTransform: boolean;
+    // Builder queries produce [{key,value}] arrays in SQL — nothing to do here.
     if (originalQuery?.editorType === EditorType.Builder) {
-      if (originalQuery.builderOptions?.queryType !== QueryType.Traces) {
-        return;
-      }
-      const builderOpts = originalQuery.builderOptions;
-      // Mirror the tagsAreJSON OR-logic from sqlGenerator.ts so the SQL output and
-      // response transform always agree: column type is the primary signal,
-      // meta.tagsAreJSON is the fallback (initial-load / persisted-query scenarios).
-      shouldTransform =
-        Boolean(builderOpts?.meta?.tagsAreJSON) ||
-        Boolean(
-          builderOpts?.columns?.some(
-            (c) =>
-              (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
-              c.type?.toLowerCase().startsWith('json')
-          )
-        );
-    } else {
-      shouldTransform = datasourceLevelTagsAreJSON;
-    }
-
-    if (!shouldTransform) {
       return;
     }
-
     frame.fields.forEach((field) => {
       if (field.name !== 'tags' && field.name !== 'serviceTags') {
         return;
       }
-      // For raw-SQL frames, skip if values are already [{key,value}] arrays rather
-      // than plain objects — the frame doesn't need the JSON→array conversion.
-      if (originalQuery?.editorType !== EditorType.Builder) {
-        const firstNonNull = (field.values as unknown[]).find((v) => v !== null && v !== undefined);
-        if (firstNonNull === undefined || Array.isArray(firstNonNull) || typeof firstNonNull !== 'object') {
-          return;
-        }
+      // Skip if values are already [{key,value}] arrays rather than plain objects.
+      const firstNonNull = (field.values as unknown[]).find((v) => v !== null && v !== undefined);
+      if (firstNonNull === undefined || Array.isArray(firstNonNull) || typeof firstNonNull !== 'object') {
+        return;
       }
       field.values = (field.values as unknown[]).map((value) => {
         if (value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
@@ -386,6 +359,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceLinksColumnPrefix: traceLinksColumnPrefix,
           hasTraceTimestampTable: Boolean(otelVersion),
           traceTimestampTableSuffix,
+          flattenNested: datasource.getDefaultTraceFlattenNested() || false,
           tagsAreJSON,
         },
       };

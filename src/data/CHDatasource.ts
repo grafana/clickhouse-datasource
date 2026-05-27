@@ -44,7 +44,7 @@ import {
   TableColumn,
   TimeUnit,
 } from 'types/queryBuilder';
-import { CHQuery, EditorType } from 'types/sql';
+import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
@@ -56,7 +56,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { enrichTagColumnTypes, labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -957,16 +957,37 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    const tagsAreJSON = this.getTraceTagsAreJSON();
+
     const targets = request.targets
-      // attach timezone information
+      // attach timezone information, and re-stamp tagsAreJSON for Builder Trace queries
+      // so that persisted dashboards saved before tagsColumnIsJSON was toggled always
+      // generate correct SQL (mapKeys vs JSONAllPaths) without requiring a panel re-save.
       .map((t) => {
-        return {
+        const withTimezone = {
           ...t,
           meta: {
             ...t?.meta,
             timezone: this.getTimezone(request),
           },
         };
+
+        const bq = withTimezone as CHBuilderQuery;
+        if (
+          bq.editorType === EditorType.Builder &&
+          bq.builderOptions?.queryType === QueryType.Traces &&
+          Boolean(bq.builderOptions?.meta?.tagsAreJSON) !== tagsAreJSON
+        ) {
+          const updatedColumns = enrichTagColumnTypes(bq.builderOptions.columns, tagsAreJSON);
+          const updatedOptions: QueryBuilderOptions = {
+            ...bq.builderOptions,
+            columns: updatedColumns,
+            meta: { ...bq.builderOptions.meta, tagsAreJSON },
+          };
+          return { ...bq, builderOptions: updatedOptions, rawSql: generateSql(updatedOptions) };
+        }
+
+        return withTimezone;
       });
 
     const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));

@@ -267,11 +267,10 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
 
-    // JSON-type columns must be referenced directly, never via mapKeys()
-    expect(sql).toContain('"SpanAttributes" as tags');
-    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    // JSON-type columns use JSONAllPaths + JSON_VALUE, never mapKeys()
+    expect(sql).toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).toContain('JSONAllPaths("ResourceAttributes")');
     expect(sql).not.toContain('mapKeys');
-    expect(sql).not.toContain('arrayMap');
   });
 
   it('generates trace ID query with JSON-typed tags and events/links columns, flatten nested disabled', () => {
@@ -309,12 +308,15 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
 
-    expect(sql).toContain('"SpanAttributes" as tags');
-    expect(sql).toContain('"ResourceAttributes" as serviceTags');
-    expect(sql).toContain("JSONExtractKeysAndValues(toString(attributes), 'String')");
+    expect(sql).toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).toContain('"SpanAttributes", \'$.\' || path');
+    expect(sql).toContain('JSONAllPaths("ResourceAttributes")');
+    expect(sql).toContain("JSONAllPaths(attributes)");
+    expect(sql).toContain("JSON_VALUE(attributes, '$.' || path)");
     expect(sql).not.toContain('mapKeys(attributes)');
     expect(sql).not.toContain('mapKeys("Events"');
     expect(sql).not.toContain("CAST(toString(");
+    expect(sql).not.toContain('toString(attributes)');
   });
 
   it('generates trace ID query with JSON-typed tags and events/links columns, flatten nested enabled', () => {
@@ -352,13 +354,17 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
 
-    expect(sql).toContain('"SpanAttributes" as tags');
-    expect(sql).toContain('"ResourceAttributes" as serviceTags');
-    expect(sql).toContain("JSONExtractKeysAndValues(toString(event.Attributes), 'String')");
-    expect(sql).toContain("JSONExtractKeysAndValues(toString(link.Attributes), 'String')");
+    expect(sql).toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).toContain('JSONAllPaths("ResourceAttributes")');
+    expect(sql).toContain('JSONAllPaths(event.Attributes)');
+    expect(sql).toContain("JSON_VALUE(event.Attributes, '$.' || path)");
+    expect(sql).toContain('JSONAllPaths(link.Attributes)');
+    expect(sql).toContain("JSON_VALUE(link.Attributes, '$.' || path)");
     expect(sql).not.toContain('mapKeys(event.Attributes)');
     expect(sql).not.toContain('mapKeys(link.Attributes)');
     expect(sql).not.toContain("CAST(toString(");
+    expect(sql).not.toContain('toString(event.Attributes)');
+    expect(sql).not.toContain('toString(link.Attributes)');
   });
 
   it('generates trace ID query with additional fields, flatten nested disabled', () => {

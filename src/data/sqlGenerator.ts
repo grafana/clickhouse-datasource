@@ -151,16 +151,19 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
 
-  // Single source of truth: col.type drives both the tags SELECT and the events/links lambda paths.
-  // meta.tagsAreJSON is the fallback when columns aren't stamped yet (e.g. raw SQL mode or useOtelColumns).
-  const tagsAreJSON =
-    traceTags?.type?.toLowerCase().startsWith('json') === true ||
-    traceServiceTags?.type?.toLowerCase().startsWith('json') === true ||
-    Boolean(options.meta?.tagsAreJSON);
+  const metaTagsAreJSON = Boolean(options.meta?.tagsAreJSON);
+  // Per-column JSON detection: each column falls back to meta.tagsAreJSON independently so that a
+  // mixed schema (one column JSON, one still Map) doesn't apply JSONAllPaths to the Map column.
+  const traceTagsIsJSON = traceTags?.type?.toLowerCase().startsWith('json') === true || metaTagsAreJSON;
+  const traceServiceTagsIsJSON = traceServiceTags?.type?.toLowerCase().startsWith('json') === true || metaTagsAreJSON;
+  // Combined flag for events/links — the ClickHouse 26+ OTel schema migrates all attribute columns
+  // together, so either top-level column being JSON implies all attribute columns are JSON.
+  const tagsAreJSON = traceTagsIsJSON || traceServiceTagsIsJSON;
 
   if (traceTags !== undefined) {
-    if (tagsAreJSON) {
-      selectParts.push(`${escapeIdentifier(traceTags.name)} as tags`);
+    if (traceTagsIsJSON) {
+      const col = escapeIdentifier(traceTags.name);
+      selectParts.push(`arrayMap(path -> map('key', path, 'value', JSON_VALUE(${col}, '$.' || path)), ifNull(JSONAllPaths(${col}), [])) as tags`);
     } else {
       selectParts.push(
         `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
@@ -169,8 +172,9 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (traceServiceTags !== undefined) {
-    if (tagsAreJSON) {
-      selectParts.push(`${escapeIdentifier(traceServiceTags.name)} as serviceTags`);
+    if (traceServiceTagsIsJSON) {
+      const col = escapeIdentifier(traceServiceTags.name);
+      selectParts.push(`arrayMap(path -> map('key', path, 'value', JSON_VALUE(${col}, '$.' || path)), ifNull(JSONAllPaths(${col}), [])) as serviceTags`);
     } else {
       selectParts.push(
         `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
@@ -186,18 +190,13 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   const flattenNested = Boolean(options.meta?.flattenNested);
-  // For JSON columns JSONExtractKeysAndValues is used instead of mapKeys because Map-subscript syntax
-  // does not work on the JSON type. kv.1/kv.2 unpack the returned Array(Tuple(String,String)).
-  //
-  // NOTE: attrsToFields uses the same tagsAreJSON flag as the top-level tag columns. This is correct
-  // for the full ClickHouse 26+ OTel schema where all attribute columns (SpanAttributes,
-  // ResourceAttributes, Events.Attributes, Links.Attributes) are uniformly JSON type. In a
-  // partially-migrated schema where Events/Links Attributes are still Map(String,String) while the
-  // span-level columns are JSON, toString(Map) produces ClickHouse syntax (not standard JSON) and
-  // JSONExtractKeysAndValues would return empty arrays. A separate config flag would be required to
-  // support that edge case.
+  // JSONAllPaths returns dot-notation paths natively from the JSON type (no toString() roundtrip),
+  // and handles nested keys like {"http":{"method":"GET"}} → path "http.method".
+  // ifNull guards against NULL JSON column values returning NULL instead of an empty array.
+  // NOTE: attrsToFields uses the combined tagsAreJSON flag — the ClickHouse 26+ OTel schema
+  // migrates all attribute columns (Events/Links included) together.
   const attrsToFields = (expr: string) => tagsAreJSON
-    ? `arrayMap(kv -> map('key', kv.1, 'value', kv.2), JSONExtractKeysAndValues(toString(${expr}), 'String'))`
+    ? `arrayMap(path -> map('key', path, 'value', JSON_VALUE(${expr}, '$.' || path)), ifNull(JSONAllPaths(${expr}), []))`
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
 
   const traceEventsPrefix = options.meta?.traceEventsColumnPrefix || '';

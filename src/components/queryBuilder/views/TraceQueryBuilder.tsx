@@ -115,7 +115,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       next.durationTimeColumn,
       next.tagsColumn,
       next.serviceTagsColumn,
-      next.serviceTagsColumn,
       next.kindColumn,
       next.statusCodeColumn,
       next.statusMessageColumn,

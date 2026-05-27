@@ -37,6 +37,7 @@ describe('QueryBuilder', () => {
   mockDs.getDefaultTraceDurationUnit = jest.fn((_db?: string) => 'ms' as TimeUnit);
   mockDs.getTraceOtelVersion = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceFlattenNested = jest.fn((_db?: string) => false);
+  mockDs.getTraceTagsAreJSON = jest.fn(() => false);
   mockDs.getDefaultTraceEventsColumnPrefix = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceLinksColumnPrefix = jest.fn((_db?: string) => '');
   mockDs.fetchColumns = jest.fn(() => {

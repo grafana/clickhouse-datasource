@@ -86,9 +86,16 @@ export const useOtelColumns = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
+  const prevTagsAreJSON = useRef<boolean>(tagsAreJSON);
+
   if (!otelEnabled) {
     didSetColumns.current = false;
   }
+  // Re-trigger column stamping when tagsAreJSON changes while OTel is already enabled.
+  if (otelEnabled && prevTagsAreJSON.current !== tagsAreJSON) {
+    didSetColumns.current = false;
+  }
+  prevTagsAreJSON.current = tagsAreJSON;
 
   useEffect(() => {
     if (!otelEnabled || didSetColumns.current) {
