@@ -1,7 +1,7 @@
 {
   "title": "OTel Service Dashboard",
   "uid": "otel-service-dashboard",
-  "description": "Single-service deep dive: RED metrics, top errors, slowest operations, and recent logs. Click a service in Traces Explorer to land here.",
+  "description": "Single-service deep dive: RED metrics and slowest operations broken out by SpanKind (Server, Client, Internal, Async), with errors and recent logs side by side. Click a service in Traces Explorer to land here.",
   "editable": true,
   "graphTooltip": 2,
   "id": null,
@@ -130,61 +130,40 @@
       "collapsed": false,
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
-      "title": "RED Metrics: ${service}",
+      "title": "Server spans: ${service}",
       "type": "row"
     },
     {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "lineWidth": 2,
-            "showPoints": "never"
-          },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
           "unit": "reqps"
         },
         "overrides": []
       },
       "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
       "id": 1,
-      "description": "Spans per second for ${service}, optionally filtered by Operation. The R in RED.",
-      "title": "Request Rate",
+      "description": "Server spans per second for ${service}: incoming requests this service handles. The R in RED.",
+      "title": "Request Rate (Server)",
       "type": "timeseries",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${datasource}"
-          },
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
       ]
     },
     {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
-          "color": {
-            "fixedColor": "red",
-            "mode": "fixed"
-          },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "lineWidth": 2
-          },
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 },
           "unit": "percentunit",
           "thresholds": {
             "mode": "absolute",
@@ -199,88 +178,59 @@
       },
       "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 },
       "id": 2,
-      "description": "Fraction of spans for ${service} with StatusCode in ('Error', 'STATUS_CODE_ERROR'). The E in RED.",
-      "title": "Error Rate",
+      "description": "Fraction of Server spans for ${service} with StatusCode = 'Error'. The E in RED.",
+      "title": "Error Rate (Server)",
       "type": "timeseries",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${datasource}"
-          },
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
       ]
     },
     {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
           "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "line",
-            "fillOpacity": 5,
-            "lineWidth": 2
-          },
+          "custom": { "drawStyle": "line", "fillOpacity": 5, "lineWidth": 2 },
           "unit": "ns"
         },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "p99" },
             "properties": [
-              {
-                "id": "color",
-                "value": { "fixedColor": "#FF9830", "mode": "fixed" }
-              },
-              {
-                "id": "custom.lineStyle",
-                "value": { "fill": "dash", "dash": [10, 10] }
-              }
+              { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
             ]
           }
         ]
       },
       "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 },
       "id": 3,
-      "description": "P50, P90 (solid) and P99 (dashed orange) span duration for ${service}. The D in RED.",
-      "title": "Duration Percentiles",
+      "description": "P50, P90 (solid) and P99 (dashed orange) Server span duration for ${service}. The D in RED.",
+      "title": "Duration Percentiles (Server)",
       "type": "timeseries",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${datasource}"
-          },
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
       ]
     },
     {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
-      "id": 101,
-      "title": "Errors & Slow Operations",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
       "fieldConfig": {
-        "defaults": {
-          "custom": { "align": "auto", "filterable": true }
-        },
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
         "overrides": [
+          { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "unit", "value": "ns" }] },
+          { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "unit", "value": "ns" }] },
           {
             "matcher": { "id": "byName", "options": "Operation" },
             "properties": [
@@ -297,101 +247,210 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 9 },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 8 },
+      "id": 11,
+      "description": "Server operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer.",
+      "options": { "showHeader": true },
+      "title": "Slowest Server Operations",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
+          "refId": "A",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 101,
+      "title": "Client spans: ${service}",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
+      "id": 12,
+      "description": "Client spans per second for ${service}: outgoing requests this service makes to its dependencies. The R in RED.",
+      "title": "Request Rate (Client)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+          "refId": "A",
+          "format": 0
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "fixedColor": "red", "mode": "fixed" },
+          "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 },
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
+      "id": 13,
+      "description": "Fraction of Client spans for ${service} with StatusCode = 'Error'. The E in RED.",
+      "title": "Error Rate (Client)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+          "refId": "A",
+          "format": 0
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "line", "fillOpacity": 5, "lineWidth": 2 },
+          "unit": "ns"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "p99" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } },
+              { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
+      "id": 14,
+      "description": "P50, P90 (solid) and P99 (dashed orange) Client span duration for ${service}. The D in RED.",
+      "title": "Duration Percentiles (Client)",
+      "type": "timeseries",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+          "refId": "A",
+          "format": 0
+        }
+      ]
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "unit", "value": "ns" }] },
+          { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "unit", "value": "ns" }] },
+          {
+            "matcher": { "id": "byName", "options": "Operation" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View traces for ${__value.raw}",
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 23 },
+      "id": 15,
+      "description": "Client operations for ${service} ranked by P99 duration. Use these to spot slow dependencies. Click an operation to open the matching trace search in Traces Explorer.",
+      "options": { "showHeader": true },
+      "title": "Slowest Client Operations",
+      "type": "table",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
+          "refId": "A",
+          "format": 1
+        }
+      ]
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
+      "id": 102,
+      "title": "Errors & recent logs: ${service}",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": true } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Kind" }, "properties": [{ "id": "custom.width", "value": 90 }] },
+          {
+            "matcher": { "id": "byName", "options": "Operation" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View traces for ${__value.raw}",
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 31 },
       "id": 4,
-      "description": "Operations with errors for ${service}, ranked by error count. Click an operation to open the matching trace search in Traces Explorer.",
+      "description": "Operations with errors for ${service}, ranked by error count, with the SpanKind that produced them. Click an operation to open the matching trace search in Traces Explorer.",
       "options": { "showHeader": true },
       "title": "Top Errors",
       "type": "table",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${datasource}"
-          },
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT SpanName AS Operation, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \"Last Seen\" FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') GROUP BY SpanName, StatusMessage ORDER BY Count DESC LIMIT 20",
+          "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \"Last Seen\" FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') GROUP BY SpanName, SpanKind, StatusMessage ORDER BY Count DESC LIMIT 20",
           "refId": "A",
           "format": 1
         }
       ]
     },
     {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "custom": { "align": "auto", "filterable": true }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "P50" },
-            "properties": [
-              { "id": "unit", "value": "ns" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "P99" },
-            "properties": [
-              { "id": "unit", "value": "ns" }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "Operation" },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
-                  }
-                ]
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 9 },
-      "id": 5,
-      "description": "Operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer.",
-      "options": { "showHeader": true },
-      "title": "Slowest Operations",
-      "type": "table",
-      "targets": [
-        {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${datasource}"
-          },
-          "editorType": "sql",
-          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
-          "refId": "A",
-          "format": 1
-        }
-      ]
-    },
-    {
-      "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 17 },
-      "id": 102,
-      "title": "Related Logs",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 18 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 31 },
       "id": 6,
-      "description": "Recent logs for ${service}. Click a row to expand attributes; use the trace section below for trace-correlated logs.",
+      "description": "Recent logs for ${service}. Click a row to expand attributes.",
       "options": {
         "showTime": true,
         "showLabels": true,
@@ -404,14 +463,290 @@
       "type": "logs",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-clickhouse-datasource",
-            "uid": "${datasource}"
-          },
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
           "rawSql": "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId FROM otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' ORDER BY Timestamp DESC LIMIT 200",
           "refId": "A",
           "format": 2
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 41 },
+      "id": 103,
+      "title": "Internal spans: ${service}",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 42 },
+          "id": 16,
+          "description": "Internal spans per second for ${service}: in-process work (function-level instrumentation, no network).",
+          "title": "Request Rate (Internal)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+              "refId": "A",
+              "format": 0
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "red", "mode": "fixed" },
+              "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 },
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.05 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 42 },
+          "id": 17,
+          "description": "Fraction of Internal spans for ${service} with StatusCode = 'Error'.",
+          "title": "Error Rate (Internal)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+              "refId": "A",
+              "format": 0
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 5, "lineWidth": 2 },
+              "unit": "ns"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "p99" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 42 },
+          "id": 18,
+          "description": "P50, P90 (solid) and P99 (dashed orange) Internal span duration for ${service}.",
+          "title": "Duration Percentiles (Internal)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+              "refId": "A",
+              "format": 0
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": { "custom": { "align": "auto", "filterable": true } },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "unit", "value": "ns" }] },
+              { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "unit", "value": "ns" }] },
+              {
+                "matcher": { "id": "byName", "options": "Operation" },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "View traces for ${__value.raw}",
+                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 49 },
+          "id": 19,
+          "description": "Internal operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer.",
+          "options": { "showHeader": true },
+          "title": "Slowest Internal Operations",
+          "type": "table",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
+              "refId": "A",
+              "format": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
+      "id": 104,
+      "title": "Async spans (Producer + Consumer): ${service}",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 10, "lineWidth": 2, "showPoints": "never" },
+              "unit": "reqps"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 8, "x": 0, "y": 57 },
+          "id": 20,
+          "description": "Async spans (Producer + Consumer) per second for ${service}: message production and consumption against queues / event buses.",
+          "title": "Message Rate (Async)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+              "refId": "A",
+              "format": 0
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "fixedColor": "red", "mode": "fixed" },
+              "custom": { "drawStyle": "line", "fillOpacity": 20, "lineWidth": 2 },
+              "unit": "percentunit",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.01 },
+                  { "color": "red", "value": 0.05 }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 7, "w": 8, "x": 8, "y": 57 },
+          "id": 21,
+          "description": "Fraction of Async (Producer + Consumer) spans for ${service} with StatusCode = 'Error'.",
+          "title": "Error Rate (Async)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+              "refId": "A",
+              "format": 0
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": { "drawStyle": "line", "fillOpacity": 5, "lineWidth": 2 },
+              "unit": "ns"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "p99" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 7, "w": 8, "x": 16, "y": 57 },
+          "id": 22,
+          "description": "P50, P90 (solid) and P99 (dashed orange) Async span duration for ${service}.",
+          "title": "Duration Percentiles (Async)",
+          "type": "timeseries",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY time ORDER BY time",
+              "refId": "A",
+              "format": 0
+            }
+          ]
+        },
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "fieldConfig": {
+            "defaults": { "custom": { "align": "auto", "filterable": true } },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Kind" }, "properties": [{ "id": "custom.width", "value": 90 }] },
+              { "matcher": { "id": "byName", "options": "P50" }, "properties": [{ "id": "unit", "value": "ns" }] },
+              { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "unit", "value": "ns" }] },
+              {
+                "matcher": { "id": "byName", "options": "Operation" },
+                "properties": [
+                  {
+                    "id": "links",
+                    "value": [
+                      {
+                        "title": "View traces for ${__value.raw}",
+                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 7, "w": 24, "x": 0, "y": 64 },
+          "id": 23,
+          "description": "Async (Producer + Consumer) operations for ${service} ranked by P99 duration. The Kind column tells you whether each row is a Producer or a Consumer.",
+          "options": { "showHeader": true },
+          "title": "Slowest Async Operations",
+          "type": "table",
+          "targets": [
+            {
+              "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+              "editorType": "sql",
+              "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) GROUP BY SpanName, SpanKind ORDER BY P99 DESC LIMIT 20",
+              "refId": "A",
+              "format": 1
+            }
+          ]
         }
       ]
     }
