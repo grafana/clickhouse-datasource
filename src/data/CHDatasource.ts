@@ -742,7 +742,7 @@ export class Datasource
    * Resolves whether the `<table>_trace_id_ts` companion exists for the given
    * (database, table). Caches the Promise so concurrent and repeat callers share
    * a single `SHOW TABLES` round-trip; on failure, evicts so the next caller
-   * retries and meanwhile returns `false` (the safe, unoptimised path).
+   * retries and meanwhile returns `false` (the safe, unoptimized path).
    */
   async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
     if (!database || !table) {

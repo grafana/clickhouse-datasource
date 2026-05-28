@@ -490,8 +490,6 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     // Trace ID queries don't contain $__fromTime/$__toTime time macros, so they're
     // safe to include (unlike trace search queries which would break data link detection).
     traceIdQuery.rawSql = generateSql(traceIdQuery.builderOptions);
-    // Set `format` so the sqlds backend tags the response with
-    // `preferredVisualisationType: 'trace'`.
     traceIdQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceIdQuery.builderOptions);
 
     const traceLogsQuery: CHBuilderQuery = {

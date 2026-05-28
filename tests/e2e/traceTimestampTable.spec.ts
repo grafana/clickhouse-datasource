@@ -1,11 +1,11 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
 import { Page } from '@playwright/test';
 
-// E2E guard for the hasTraceTimestampTable optimisation and its #1842
+// E2E guard for the hasTraceTimestampTable optimization and its #1842
 // regression guard. The tests exercise the two SQL shapes the plugin
 // generates against real ClickHouse:
 //
-//   Optimised  – WITH trace_id / trace_start / trace_end + Timestamp bounds
+//   Optimized  – WITH trace_id / trace_start / trace_end + Timestamp bounds
 //   Fallback   – plain WHERE traceID = '<id>'
 //
 // Fixture: tests/e2e/fixtures/trace_id_ts.sql creates
@@ -13,7 +13,7 @@ import { Page } from '@playwright/test';
 //   e2e_test.trace_ts_spans_trace_id_ts (companion entry for trace-a ONLY)
 //
 // The missing trace-b entry in the companion reproduces the #1842 scenario:
-// optimised SQL returns 0 rows because the Timestamp bounds become NULL;
+// optimized SQL returns 0 rows because the Timestamp bounds become NULL;
 // the fallback returns the span correctly.
 
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
@@ -33,7 +33,7 @@ const TRACE_A_SPAN_COUNT = 5;
 const TRACE_B_SPAN_COUNT = 1;
 
 // SQL the plugin generates with hasTraceTimestampTable: true
-function optimisedSql(traceId: string): string {
+function optimizedSql(traceId: string): string {
   return [
     `WITH '${traceId}' as trace_id,`,
     `(SELECT min(Start) FROM "e2e_test"."trace_ts_spans_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
@@ -104,7 +104,7 @@ function spanCount(body: Record<string, unknown> | null): number {
   return Array.isArray(values) ? values.length : 0;
 }
 
-test.describe('trace timestamp table optimisation (#1842)', () => {
+test.describe('trace timestamp table optimization (#1842)', () => {
   test.beforeEach(() => {
     test.skip(
       isCloudRun,
@@ -114,12 +114,12 @@ test.describe('trace timestamp table optimisation (#1842)', () => {
 
   test.describe.configure({ mode: 'serial' });
 
-  test('optimised SQL returns all spans when the companion table has an entry for the trace', async ({
+  test('optimized SQL returns all spans when the companion table has an entry for the trace', async ({
     page,
     explorePage,
   }) => {
     await page.goto(exploreUrl(FIXTURE_FROM_ISO, FIXTURE_TO_ISO));
-    await enterSql(page, optimisedSql(TRACE_A));
+    await enterSql(page, optimizedSql(TRACE_A));
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
@@ -128,16 +128,16 @@ test.describe('trace timestamp table optimisation (#1842)', () => {
     expect(spanCount(getBody())).toBe(TRACE_A_SPAN_COUNT);
   });
 
-  test('optimised SQL returns no rows when the companion table has no entry for the trace (#1842 — why the guard exists)', async ({
+  test('optimized SQL returns no rows when the companion table has no entry for the trace (#1842 — why the guard exists)', async ({
     page,
     explorePage,
   }) => {
     // trace-b has no companion row, so min(Start)/max(End) are NULL.
     // Timestamp >= NULL is NULL (falsy), so all rows are filtered out.
-    // This demonstrates the risk of shipping optimised SQL for an unverified
+    // This demonstrates the risk of shipping optimized SQL for an unverified
     // table: a real trace becomes invisible on first click.
     await page.goto(exploreUrl(FIXTURE_FROM_ISO, FIXTURE_TO_ISO));
-    await enterSql(page, optimisedSql(TRACE_B));
+    await enterSql(page, optimizedSql(TRACE_B));
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
@@ -160,10 +160,7 @@ test.describe('trace timestamp table optimisation (#1842)', () => {
     expect(spanCount(getBody())).toBe(TRACE_B_SPAN_COUNT);
   });
 
-  test('fallback SQL returns all spans for a trace that also has a companion entry', async ({
-    page,
-    explorePage,
-  }) => {
+  test('fallback SQL returns all spans for a trace that also has a companion entry', async ({ page, explorePage }) => {
     // Confirms the fallback is correct in all cases, not just missing-companion.
     await page.goto(exploreUrl(FIXTURE_FROM_ISO, FIXTURE_TO_ISO));
     await enterSql(page, fallbackSql(TRACE_A));
@@ -175,10 +172,7 @@ test.describe('trace timestamp table optimisation (#1842)', () => {
     expect(spanCount(getBody())).toBe(TRACE_A_SPAN_COUNT);
   });
 
-  test('SHOW TABLES FROM e2e_test includes both the spans table and its companion', async ({
-    page,
-    explorePage,
-  }) => {
+  test('SHOW TABLES FROM e2e_test includes both the spans table and its companion', async ({ page, explorePage }) => {
     // Verifies that hasTraceTimestampTable() would resolve true for this table
     // in this database: the companion exists and SHOW TABLES returns it.
     await page.goto(exploreUrl(FIXTURE_FROM_ISO, FIXTURE_TO_ISO));

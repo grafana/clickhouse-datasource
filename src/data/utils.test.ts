@@ -477,9 +477,9 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).not.toContain('"SpanAttributes" as tags');
     });
 
-    it('logs→trace link with OTel ships optimised rawSql on first click when the companion table exists', async () => {
-      // Confirms the #1705 behaviour is preserved: the very first View Trace
-      // click after a fresh page load uses the _trace_id_ts optimisation,
+    it('logs→trace link with OTel ships optimized rawSql on first click when the companion table exists', async () => {
+      // Confirms the #1705 behavior is preserved: the very first View Trace
+      // click after a fresh page load uses the _trace_id_ts optimization,
       // because hasTraceTimestampTable is awaited before rawSql is generated.
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
@@ -523,10 +523,10 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(logsQuery.format).toBe(2); // Logs
     });
 
-    it('logs→trace link with OTel ships unoptimised rawSql when the companion table is missing (#1842)', async () => {
+    it('logs→trace link with OTel ships unoptimized rawSql when the companion table is missing (#1842)', async () => {
       // Regression guard for grafana/clickhouse-datasource#1842: when OTel is
       // configured but the companion `_trace_id_ts` table does not exist, the
-      // optimistic pre-#1842 code shipped the optimised SQL and the query
+      // optimistic pre-#1842 code shipped the optimized SQL and the query
       // failed on first click with "Unknown table expression identifier".
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);
@@ -548,7 +548,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).not.toContain('trace_id_ts');
     });
 
-    it('table→trace link with OTel ships unoptimised rawSql when the companion table is missing (#1842 reproduction)', async () => {
+    it('table→trace link with OTel ships unoptimized rawSql when the companion table is missing (#1842 reproduction)', async () => {
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);
 
@@ -588,7 +588,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBeFalsy();
     });
 
-    it('trace→trace link generates unoptimised rawSql when companion does not exist', async () => {
+    it('trace→trace link generates unoptimized rawSql when companion does not exist', async () => {
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
       jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);

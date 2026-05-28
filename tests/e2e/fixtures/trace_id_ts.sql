@@ -6,8 +6,8 @@
 --     (same column layout as the OTel _trace_id_ts MV: TraceId, Start, End)
 --
 -- Two traces are seeded:
---   'e2e-ts-trace-a'  5 spans, companion entry present  → optimised SQL works
---   'e2e-ts-trace-b'  1 span,  NO companion entry       → optimised SQL returns
+--   'e2e-ts-trace-a'  5 spans, companion entry present  → optimized SQL works
+--   'e2e-ts-trace-b'  1 span,  NO companion entry       → optimized SQL returns
 --                                                          0 rows; only the
 --                                                          fallback path returns
 --                                                          the span (#1842)
@@ -47,7 +47,7 @@ INSERT INTO e2e_test.trace_ts_spans
 
 -- Companion entry only for trace-a. trace-b is intentionally absent to
 -- reproduce the #1842 scenario: new or unindexed traces have no companion row,
--- so the optimised SQL's min(Start)/max(End) subqueries return NULL, the
+-- so the optimized SQL's min(Start)/max(End) subqueries return NULL, the
 -- Timestamp bounds become NULL, and the WHERE trims every row.
 INSERT INTO e2e_test.trace_ts_spans_trace_id_ts
     (TraceId, Start, End) VALUES
