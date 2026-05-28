@@ -220,13 +220,6 @@ export default {
             label: 'Service Tags column',
             tooltip: 'Column for the service tags',
           },
-          tagsColumnIsJSON: {
-            label: 'Tags Columns Use JSON Type',
-            tooltip:
-              'Enable when your tags and serviceTags columns use the ClickHouse JSON type instead of Map(String,String). ' +
-              "The plugin will skip the mapKeys() transform and reshape the JSON object into the [{key,value}] array " +
-              "that Grafana's trace panel expects.",
-          },
           flattenNested: {
             label: 'Use Flatten Nested',
             tooltip: 'Enable if your traces table was created with flatten_nested=1',
@@ -407,6 +400,7 @@ export default {
       tooltip: `List of filters`,
       addLabel: 'Filter',
       mapKeyPlaceholder: 'map key',
+      jsonPathPlaceholder: 'json path',
     },
     GroupByEditor: {
       label: 'Group By',
@@ -532,13 +526,6 @@ export default {
           label: 'Service Tags Column',
           tooltip:
             'Resource-level attributes, typically a Map. Aliased to `serviceTags` in the generated SQL. Common names: resource, resource_attributes. OTel: ResourceAttributes.',
-        },
-        tagsColumnIsJSON: {
-          label: 'Tags Columns Use JSON Type',
-          tooltip:
-            'Enable when your tags and serviceTags columns use the ClickHouse JSON type instead of Map(String,String). ' +
-            "The plugin will skip the mapKeys() transform and reshape the JSON object into the [{key,value}] array " +
-            "that Grafana's trace panel expects.",
         },
         flattenNested: {
           label: 'Use Flatten Nested',

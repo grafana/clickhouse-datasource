@@ -90,7 +90,6 @@ export const trackClickhouseConfigV1TracesConfig = (props: {
   stateColumn?: string;
   instrumentationLibraryNameColumn?: string;
   instrumentationLibraryVersionColumn?: string;
-  tagsColumnIsJSON?: boolean;
   flattenNested?: boolean;
   traceEventsColumnPrefix?: string;
   traceLinksColumnPrefix?: string;

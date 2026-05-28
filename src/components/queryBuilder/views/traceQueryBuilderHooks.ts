@@ -12,6 +12,7 @@ import {
   QueryBuilderOptions,
   SelectedColumn,
   StringFilter,
+  TableColumn,
 } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
@@ -40,11 +41,9 @@ export const useTraceDefaultsOnMount = (
     const defaultLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
     const traceTimestampTableSuffix = datasource.getTraceTimestampTableSuffix();
 
-    const tagsAreJSON = datasource.getTraceTagsAreJSON();
     const nextColumns: SelectedColumn[] = [];
     for (let [hint, colName] of defaultColumns) {
-      const isTagHint = hint === ColumnHint.TraceTags || hint === ColumnHint.TraceServiceTags;
-      nextColumns.push({ name: colName, hint, ...(isTagHint && tagsAreJSON ? { type: 'JSON' } : {}) });
+      nextColumns.push({ name: colName, hint });
     }
 
     builderOptionsDispatch(
@@ -60,7 +59,7 @@ export const useTraceDefaultsOnMount = (
           traceEventsColumnPrefix: defaultEventsColumnPrefix,
           traceLinksColumnPrefix: defaultLinksColumnPrefix,
           traceTimestampTableSuffix,
-          tagsAreJSON,
+          tagsAreJSON: false,
         },
       })
     );
@@ -82,23 +81,19 @@ export const useTraceDefaultsOnMount = (
 export const useOtelColumns = (
   otelEnabled: boolean,
   otelVersion: string,
-  tagsAreJSON: boolean,
+  allColumns: readonly TableColumn[],
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
-  const didSetColumns = useRef<boolean>(otelEnabled);
-  const prevTagsAreJSON = useRef<boolean>(tagsAreJSON);
+  // Start false so that allColumns loading always triggers a stamp, even for saved
+  // queries where otelEnabled is already true on mount.
+  const didSetColumns = useRef<boolean>(false);
 
   if (!otelEnabled) {
     didSetColumns.current = false;
   }
-  // Re-trigger column stamping when tagsAreJSON changes while OTel is already enabled.
-  if (otelEnabled && prevTagsAreJSON.current !== tagsAreJSON) {
-    didSetColumns.current = false;
-  }
-  prevTagsAreJSON.current = tagsAreJSON;
 
   useEffect(() => {
-    if (!otelEnabled || didSetColumns.current) {
+    if (!otelEnabled || didSetColumns.current || allColumns.length === 0) {
       return;
     }
 
@@ -111,8 +106,14 @@ export const useOtelColumns = (
     const columns: SelectedColumn[] = [];
     traceColumnMap.forEach((name, hint) => {
       const isTagHint = hint === ColumnHint.TraceTags || hint === ColumnHint.TraceServiceTags;
-      columns.push({ name, hint, ...(isTagHint && tagsAreJSON ? { type: 'JSON' } : {}) });
+      const colType = allColumns.find((c) => c.name === name)?.type;
+      const isJSON = colType?.startsWith('JSON') === true;
+      columns.push({ name, hint, ...(isTagHint && isJSON ? { type: 'JSON' } : {}) });
     });
+
+    const tagsAreJSON = columns.some(
+      (c) => (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) && c.type === 'JSON'
+    );
 
     builderOptionsDispatch(
       setOptions({
@@ -127,7 +128,7 @@ export const useOtelColumns = (
       })
     );
     didSetColumns.current = true;
-  }, [otelEnabled, otelVersion, tagsAreJSON, builderOptionsDispatch]);
+  }, [otelEnabled, otelVersion, allColumns, builderOptionsDispatch]);
 };
 
 // Apply default filters on table change

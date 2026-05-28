@@ -14,9 +14,9 @@ import { pluginVersion } from 'utils/version';
 import { generateSql } from './sqlGenerator';
 import otel from 'otel';
 
-// Syncs type:'JSON' on TraceTags/TraceServiceTags columns with the tagsAreJSON flag.
-// When true: upgrades any non-JSON type (or unset type) to 'JSON'.
-// When false: strips a stale type:'JSON' so a config toggle-off takes effect immediately.
+// Stamps type:'JSON' on TraceTags/TraceServiceTags columns when the config toggle is on.
+// When tagsAreJSON is false, existing types are preserved — auto-detection via allColumns
+// in useOtelColumns is the authoritative source, and stripping here would undo that work.
 export const enrichTagColumnTypes = (
   columns: SelectedColumn[] | undefined,
   tagsAreJSON: boolean
@@ -30,9 +30,6 @@ export const enrichTagColumnTypes = (
     }
     if (tagsAreJSON && !col.type?.toLowerCase().startsWith('json')) {
       return { ...col, type: 'JSON' };
-    }
-    if (!tagsAreJSON && col.type?.toLowerCase().startsWith('json')) {
-      return { ...col, type: undefined };
     }
     return col;
   });
@@ -222,22 +219,18 @@ const flattenJsonTags = (
 };
 
 /**
- * For raw-SQL trace queries where the datasource is configured with `tagsColumnIsJSON`,
- * converts plain JSON objects returned by ClickHouse JSON-type columns into the
- * `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects for `tags`
- * and `serviceTags` fields.
+ * For raw-SQL trace queries, converts plain JSON objects returned by ClickHouse
+ * JSON-type columns into the `[{key:"k",value:"v"},...]` array that Grafana's
+ * trace panel expects for `tags` and `serviceTags` fields.
  *
  * Builder trace queries do not need this transform — the SQL generator produces
  * `[{key,value}]` arrays directly via JSONAllPaths + JSON_VALUE.
+ * Auto-detects whether values are JSON objects or already-correct arrays.
  */
 export const transformTraceTagFields = (
   req: DataQueryRequest<CHQuery>,
-  res: DataQueryResponse,
-  datasourceLevelTagsAreJSON = false
+  res: DataQueryResponse
 ): void => {
-  if (!datasourceLevelTagsAreJSON) {
-    return;
-  }
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     // Builder queries produce [{key,value}] arrays in SQL — nothing to do here.
@@ -270,26 +263,25 @@ export const transformTraceTagFields = (
  *
  * Requires defaults to be configured when crossing query types.
  */
-export const transformQueryResponseWithTraceAndLogLinks = (
+export const transformQueryResponseWithTraceAndLogLinks = async (
   datasource: Datasource,
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse
-): DataQueryResponse => {
+): Promise<DataQueryResponse> => {
   applyTraceSearchFieldConfig(req, res);
-  const tagsAreJSON = datasource.getTraceTagsAreJSON();
-  transformTraceTagFields(req, res, tagsAreJSON);
+  transformTraceTagFields(req, res);
 
-  res.data.forEach((frame: DataFrame) => {
+  for (const frame of res.data as DataFrame[]) {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     if (!originalQuery) {
-      return;
+      continue;
     }
 
     const traceField = frame.fields.find(
       (field) => field.name.toLowerCase() === 'traceid' || field.name.toLowerCase() === 'trace_id'
     );
     if (!traceField) {
-      return;
+      continue;
     }
 
     // Get the configured TraceId column name for use in both trace and logs queries
@@ -313,8 +305,28 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces
     ) {
-      // Copy fields directly from trace search
-      const columns = enrichTagColumnTypes(originalQuery.builderOptions.columns, tagsAreJSON);
+      // Copy fields directly from trace search; auto-detect JSON tag column types via
+      // fetchColumns so saved queries (where useOtelColumns doesn't re-run) still work.
+      let columns = originalQuery.builderOptions.columns;
+      try {
+        const db = originalQuery.builderOptions.database;
+        const tbl = originalQuery.builderOptions.table;
+        if (db && tbl) {
+          const allCols = await datasource.fetchColumns(db, tbl);
+          columns = columns?.map((col) => {
+            if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) return col;
+            if (col.type?.startsWith('JSON')) return col;
+            const colType = allCols.find((c) => c.name === col.name)?.type;
+            return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
+          });
+        }
+      } catch {
+        // fall through; SQL generator falls back to mapKeys()
+      }
+
+      const effectiveTagsAreJSON = columns?.some((c) =>
+        (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+        c.type?.toLowerCase().startsWith('json')) ?? false;
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
@@ -328,7 +340,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceId: '${__value.raw}',
           traceTimestampTableSuffix:
             originalQuery.builderOptions.meta?.traceTimestampTableSuffix || traceTimestampTableSuffix,
-          tagsAreJSON,
+          tagsAreJSON: effectiveTagsAreJSON,
         },
       };
     } else {
@@ -360,7 +372,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           hasTraceTimestampTable: Boolean(otelVersion),
           traceTimestampTableSuffix,
           flattenNested: datasource.getDefaultTraceFlattenNested() || false,
-          tagsAreJSON,
+          tagsAreJSON: false,
         },
       };
 
@@ -373,7 +385,27 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         }
       }
 
-      options.columns = enrichTagColumnTypes(options.columns, tagsAreJSON);
+      // Auto-detect JSON column types from ClickHouse; fall through silently on error
+      try {
+        if (options.database && options.table) {
+          const allColumns = await datasource.fetchColumns(options.database, options.table);
+          options.columns = options.columns!.map((col) => {
+            if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
+              return col;
+            }
+            const colType = allColumns.find((c) => c.name === col.name)?.type;
+            return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
+          });
+        }
+      } catch {
+        // fall through; SQL generator falls back to mapKeys()
+      }
+
+      const detectedTagsAreJSON = options.columns?.some((c) =>
+        (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+        c.type?.toLowerCase().startsWith('json')) ?? false;
+
+      options.meta!.tagsAreJSON = detectedTagsAreJSON;
       traceIdQuery.builderOptions = options;
     }
 
@@ -492,7 +524,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         },
       });
     }
-  });
+  }
 
   return res;
 };

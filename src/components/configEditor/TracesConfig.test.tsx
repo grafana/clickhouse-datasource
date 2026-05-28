@@ -28,7 +28,6 @@ function defaultTraceConfigProps(): TraceConfigProps {
     onStateColumnChange: () => {},
     onInstrumentationLibraryNameColumnChange: () => {},
     onInstrumentationLibraryVersionColumnChange: () => {},
-    onTagsColumnIsJSONChange: () => {},
     onFlattenNestedChange: () => {},
     onEventsColumnPrefixChange: () => {},
     onLinksColumnPrefixChange: () => {},
@@ -437,15 +436,6 @@ describe('TracesConfig', () => {
     expect(onTraceTimestampTableSuffixChange).toHaveBeenCalledWith('_ts_index');
   });
 
-  it('tagsColumnIsJSON switch is enabled even when OTel is on', async () => {
-    const result = render(
-      <TracesConfig {...defaultTraceConfigProps()} tracesConfig={{ otelEnabled: true }} />
-    );
-    const tagsJsonSwitch = await result.findByRole('switch', { name: allLabels.components.Config.TracesConfig.columns.tagsColumnIsJSON.label });
-    expect(tagsJsonSwitch).toBeInTheDocument();
-    expect(tagsJsonSwitch).not.toBeDisabled();
-  });
-
   it('should call onShowTraceLinksChange when toggled', async () => {
     const onShowTraceLinksChange = jest.fn();
     const result = render(
@@ -453,9 +443,9 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    // showTraceLinks is the 3rd role="switch" (index 2): tagsColumnIsJSON, flattenNested, showTraceLinks
+    // showTraceLinks is the 2nd role="switch" (index 1): flattenNested, showTraceLinks
     const switches = await result.findAllByRole('switch');
-    const input = switches[2];
+    const input = switches[1];
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
     expect(onShowTraceLinksChange).toHaveBeenCalledTimes(1);

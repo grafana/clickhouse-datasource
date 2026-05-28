@@ -152,33 +152,42 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
 
   const metaTagsAreJSON = Boolean(options.meta?.tagsAreJSON);
-  // Per-column JSON detection: each column falls back to meta.tagsAreJSON independently so that a
-  // mixed schema (one column JSON, one still Map) doesn't apply JSONAllPaths to the Map column.
   const traceTagsIsJSON = traceTags?.type?.toLowerCase().startsWith('json') === true || metaTagsAreJSON;
   const traceServiceTagsIsJSON = traceServiceTags?.type?.toLowerCase().startsWith('json') === true || metaTagsAreJSON;
   // Combined flag for events/links — the ClickHouse 26+ OTel schema migrates all attribute columns
   // together, so either top-level column being JSON implies all attribute columns are JSON.
   const tagsAreJSON = traceTagsIsJSON || traceServiceTagsIsJSON;
 
+  // JSONAllPaths gives dot-notation paths (e.g. 'http.method'); splitByChar splits them so
+  // JSONExtractString can traverse the nested structure ClickHouse creates for dotted keys.
+  // JSONExtractString accepts runtime string arguments, unlike JSON_VALUE which requires constants.
+  const jsonToTagArray = (expr: string): string => {
+    const j = `toJSONString(${expr})`;
+    const sp = `splitByChar('.', path)`;
+    return (
+      `arrayMap(path -> map('key', path, 'value', multiIf(` +
+        `length(${sp}) = 2, JSONExtractString(${j}, ${sp}[1], ${sp}[2]), ` +
+        `length(${sp}) = 3, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3]), ` +
+        `JSONExtractString(${j}, path)` +
+      `)), JSONAllPaths(${expr}))`
+    );
+  };
+
   if (traceTags !== undefined) {
+    const col = escapeIdentifier(traceTags.name);
     if (traceTagsIsJSON) {
-      const col = escapeIdentifier(traceTags.name);
-      selectParts.push(`arrayMap(path -> map('key', path, 'value', JSON_VALUE(${col}, '$.' || path)), ifNull(JSONAllPaths(${col}), [])) as tags`);
+      selectParts.push(`${jsonToTagArray(col)} as tags`);
     } else {
-      selectParts.push(
-        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceTags.name)}[key]), mapKeys(${escapeIdentifier(traceTags.name)})) as tags`
-      );
+      selectParts.push(`arrayMap(key -> map('key', key, 'value',${col}[key]), mapKeys(${col})) as tags`);
     }
   }
 
   if (traceServiceTags !== undefined) {
+    const col = escapeIdentifier(traceServiceTags.name);
     if (traceServiceTagsIsJSON) {
-      const col = escapeIdentifier(traceServiceTags.name);
-      selectParts.push(`arrayMap(path -> map('key', path, 'value', JSON_VALUE(${col}, '$.' || path)), ifNull(JSONAllPaths(${col}), [])) as serviceTags`);
+      selectParts.push(`${jsonToTagArray(col)} as serviceTags`);
     } else {
-      selectParts.push(
-        `arrayMap(key -> map('key', key, 'value',${escapeIdentifier(traceServiceTags.name)}[key]), mapKeys(${escapeIdentifier(traceServiceTags.name)})) as serviceTags`
-      );
+      selectParts.push(`arrayMap(key -> map('key', key, 'value',${col}[key]), mapKeys(${col})) as serviceTags`);
     }
   }
 
@@ -190,13 +199,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   const flattenNested = Boolean(options.meta?.flattenNested);
-  // JSONAllPaths returns dot-notation paths natively from the JSON type (no toString() roundtrip),
-  // and handles nested keys like {"http":{"method":"GET"}} → path "http.method".
-  // ifNull guards against NULL JSON column values returning NULL instead of an empty array.
-  // NOTE: attrsToFields uses the combined tagsAreJSON flag — the ClickHouse 26+ OTel schema
-  // migrates all attribute columns (Events/Links included) together.
   const attrsToFields = (expr: string) => tagsAreJSON
-    ? `arrayMap(path -> map('key', path, 'value', JSON_VALUE(${expr}, '$.' || path)), ifNull(JSONAllPaths(${expr}), []))`
+    ? jsonToTagArray(expr)
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
 
   const traceEventsPrefix = options.meta?.traceEventsColumnPrefix || '';

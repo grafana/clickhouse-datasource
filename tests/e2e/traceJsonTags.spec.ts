@@ -1,25 +1,23 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
 import { Page } from '@playwright/test';
 
-// E2E regression guard for the tagsColumnIsJSON feature.
+// E2E regression guard for the JSON-type trace attribute feature.
 //
-// Background: ClickHouse 26+ uses a native JSON type for span/resource
-// attribute columns (SpanAttributes, ResourceAttributes) instead of
-// Map(String,String).  mapKeys() does not work on JSON type, so the plugin
-// must select those columns directly and CAST nested event/link attribute
-// lambdas to Map when tagsColumnIsJSON is enabled.
+// Background: ClickHouse 26+ uses a native JSON type for span/resource/event/link
+// attribute columns (SpanAttributes, ResourceAttributes, Events.Attributes,
+// Links.Attributes) instead of Map(String,String).  mapKeys() does not work on
+// JSON type; the plugin auto-detects JSON columns and uses JSONAllPaths +
+// JSONExtractString (with splitByChar dot-path traversal) instead.
 //
 // These tests verify the full stack:
-//   A. Config editor: the "Tags Columns Use JSON Type" toggle is not disabled
-//      when OTel mode is also enabled (regression for the disabled={otelEnabled} bug).
-//   B. SQL query with JSON attribute columns executes without a mapKeys error
+//   A. SQL query with JSON attribute columns executes without a mapKeys error
 //      and returns the correct number of rows.
-//   C. The tags/serviceTags values in the response body are non-null JSON
+//   B. The tags/serviceTags values in the response body are non-null JSON
 //      objects (confirming ClickHouse returned JSON data, not an error).
 //
 // Fixture data is in tests/e2e/fixtures/trace_spans_json.sql (3 spans for
 // trace 'e2e-json-trace-a').  The provisioned datasource uid
-// 'clickhouse-e2e-json-tags' has otelEnabled:true and tagsColumnIsJSON:true.
+// 'clickhouse-e2e-json-tags' points at the local ClickHouse instance.
 
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
 const DATASOURCE_UID = 'clickhouse-e2e-json-tags';
@@ -31,8 +29,9 @@ const EXPECTED_SPAN_COUNT = 3;
 
 const isCloudRun = !!process.env.GRAFANA_URL;
 
-// SQL that mirrors what generateTraceIdQuery produces with tagsColumnIsJSON=true:
-// SpanAttributes and ResourceAttributes are selected directly (no mapKeys).
+// Simplified SQL that exercises JSON-typed attribute columns without mapKeys.
+// The real generated SQL uses JSONAllPaths + JSONExtractString; this raw query
+// validates that the backend returns JSON column data without errors.
 const TRACE_SQL = [
   `SELECT TraceId as traceID, SpanId as spanID, ParentSpanId as parentSpanID,`,
   `ServiceName as serviceName, SpanName as operationName,`,
@@ -80,48 +79,16 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
   return { responsePromise, getBody: () => body };
 }
 
-test.describe('JSON-typed trace attribute columns (tagsColumnIsJSON)', () => {
+test.describe('JSON-typed trace attribute columns', () => {
   test.describe.configure({ mode: 'serial' });
 
-  // ── Test A: config editor toggle ────────────────────────────────────────────
-
-  test('config editor: tagsColumnIsJSON toggle is visible and checked when OTel is on', async ({
-    gotoDataSourceConfigPage,
-    page,
-  }) => {
-    // Regression guard: the switch was previously disabled={otelEnabled},
-    // preventing JSON-column users from enabling the feature with OTel on.
-    // The provisioned 'clickhouse-e2e-json-tags' datasource has both
-    // otelEnabled:true and tagsColumnIsJSON:true, so the "Additional settings"
-    // section auto-expands (hasAdditionalSettings/shouldBeOpen = true in both
-    // V1 and V2 editors when traces config is non-empty).
-    test.skip(
-      isCloudRun,
-      'Provisioned-datasource tests depend on provisioning/datasources/clickhouse.yml which is not applied on Cloud.'
-    );
-
-    await gotoDataSourceConfigPage(DATASOURCE_UID);
-
-    // The toggle must be visible and enabled — before the fix it was
-    // disabled={otelEnabled}, making it impossible to toggle for OTel users.
-    const tagsJsonSwitch = page.getByRole('switch', { name: 'Tags Columns Use JSON Type' });
-    await expect(tagsJsonSwitch).toBeVisible();
-    await expect(tagsJsonSwitch).toBeEnabled();
-    // Provisioned with tagsColumnIsJSON:true so the switch must be checked.
-    await expect(tagsJsonSwitch).toBeChecked();
-  });
-
-  // ── Tests B & C: require local fixture data ──────────────────────────────────
-
-  test('(fixture) SQL with direct JSON column references returns all spans', async ({ page, explorePage }) => {
+  test('(fixture) SQL with JSON column references returns all spans', async ({ page, explorePage }) => {
     test.skip(
       isCloudRun,
       'Fixture-data tests depend on trace_spans_json seeded via tests/e2e/fixtures/trace_spans_json.sql, which is not available on Cloud.'
     );
-    // Exercises the fix: selecting SpanAttributes/ResourceAttributes directly
-    // (without mapKeys) must succeed and return all 3 seeded spans.
-    // Before the fix this would fail with:
-    //   "Function mapKeys requires at least one argument of type Map"
+    // Selects SpanAttributes/ResourceAttributes as raw JSON (no mapKeys).
+    // Must succeed and return all 3 seeded spans.
     await page.goto(exploreUrl(FIXTURE_FROM_ISO, FIXTURE_TO_ISO));
     await enterSql(page, TRACE_SQL);
 
@@ -141,9 +108,7 @@ test.describe('JSON-typed trace attribute columns (tagsColumnIsJSON)', () => {
   });
 
   test('(fixture) tags and serviceTags fields carry non-null JSON data', async ({ page, explorePage }) => {
-    // Verifies the Go backend correctly passes JSON column data through.
-    // The raw /api/ds/query response (captured before client-side transformation)
-    // should contain non-null objects for the tags and serviceTags fields.
+    // Verifies the Go backend passes JSON column data through correctly.
     test.skip(
       isCloudRun,
       'Fixture-data tests depend on trace_spans_json seeded via tests/e2e/fixtures/trace_spans_json.sql, which is not available on Cloud.'

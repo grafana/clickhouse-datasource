@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { firstValueFrom, from, map, Observable, switchMap } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -44,7 +44,7 @@ import {
   TableColumn,
   TimeUnit,
 } from 'types/queryBuilder';
-import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
@@ -56,7 +56,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { enrichTagColumnTypes, labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -707,10 +707,6 @@ export class Datasource
     return this.settings.jsonData.traces?.flattenNested || false;
   }
 
-  getTraceTagsAreJSON(): boolean {
-    return this.settings.jsonData.traces?.tagsColumnIsJSON || false;
-  }
-
   getDefaultTraceEventsColumnPrefix(): string {
     return this.settings.jsonData.traces?.traceEventsColumnPrefix || 'Events';
   }
@@ -769,6 +765,11 @@ export class Datasource
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
     const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT arrayJoin(JSONAllPaths(${jsonColumn})) as path FROM "${db}"."${table}" LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -957,38 +958,14 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
-    const tagsAreJSON = this.getTraceTagsAreJSON();
-
     const targets = request.targets
-      // attach timezone information, and re-stamp tagsAreJSON for Builder Trace queries
-      // so that persisted dashboards saved before tagsColumnIsJSON was toggled always
-      // generate correct SQL (mapKeys vs JSONAllPaths) without requiring a panel re-save.
-      .map((t) => {
-        const withTimezone = {
-          ...t,
-          meta: {
-            ...t?.meta,
-            timezone: this.getTimezone(request),
-          },
-        };
-
-        const bq = withTimezone as CHBuilderQuery;
-        if (
-          bq.editorType === EditorType.Builder &&
-          bq.builderOptions?.queryType === QueryType.Traces &&
-          Boolean(bq.builderOptions?.meta?.tagsAreJSON) !== tagsAreJSON
-        ) {
-          const updatedColumns = enrichTagColumnTypes(bq.builderOptions.columns, tagsAreJSON);
-          const updatedOptions: QueryBuilderOptions = {
-            ...bq.builderOptions,
-            columns: updatedColumns,
-            meta: { ...bq.builderOptions.meta, tagsAreJSON },
-          };
-          return { ...bq, builderOptions: updatedOptions, rawSql: generateSql(updatedOptions) };
-        }
-
-        return withTimezone;
-      });
+      .map((t) => ({
+        ...t,
+        meta: {
+          ...t?.meta,
+          timezone: this.getTimezone(request),
+        },
+      }));
 
     const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));
 
@@ -998,13 +975,16 @@ export class Datasource
         targets,
       })
       .pipe(
-        map((res: DataQueryResponse) => {
-          const transformed = transformQueryResponseWithTraceAndLogLinks(this, request, res);
-          if (hasLogsVolumeTargets) {
-            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
-          }
-          return transformed;
-        })
+        switchMap((res: DataQueryResponse) =>
+          from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
+            map((transformed) => {
+              if (hasLogsVolumeTargets) {
+                return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+              }
+              return transformed;
+            })
+          )
+        )
       );
   }
 

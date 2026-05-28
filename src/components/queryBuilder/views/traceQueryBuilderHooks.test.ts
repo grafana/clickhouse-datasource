@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { useTraceDefaultsOnMount, useOtelColumns, useDefaultFilters } from './traceQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
-import { ColumnHint, QueryBuilderOptions, SelectedColumn } from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { setOptions } from 'hooks/useBuilderOptionsState';
 import otel from 'otel';
 
@@ -61,16 +61,24 @@ describe('useTraceDefaultsOnMount', () => {
 describe('useOtelColumns', () => {
   const testOtelVersion = otel.getLatestVersion();
 
-  it('should not call builderOptionsDispatch if OTEL is already enabled', async () => {
-    const builderOptionsDispatch = jest.fn();
-    renderHook(() => useOtelColumns(true, testOtelVersion.version, false, builderOptionsDispatch));
+  const makeAllColumns = (overrides: Partial<Record<string, string>> = {}): TableColumn[] => {
+    const cols: TableColumn[] = [];
+    testOtelVersion.traceColumnMap.forEach((name) => {
+      cols.push({ name, type: overrides[name] ?? 'String', label: name, picklistValues: [] });
+    });
+    return cols;
+  };
 
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  it('should call builderOptionsDispatch when OTel is enabled and allColumns is loaded', async () => {
+    const builderOptionsDispatch = jest.fn();
+    renderHook(() => useOtelColumns(true, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
   });
 
   it('should not call builderOptionsDispatch if OTEL is disabled', async () => {
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useOtelColumns(true, testOtelVersion.version, false, builderOptionsDispatch));
+    renderHook(() => useOtelColumns(false, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch));
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -79,9 +87,10 @@ describe('useOtelColumns', () => {
     const builderOptionsDispatch = jest.fn();
 
     let otelEnabled = false;
-    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, false, builderOptionsDispatch), {
-      initialProps: otelEnabled,
-    });
+    const hook = renderHook(
+      (enabled) => useOtelColumns(enabled, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch),
+      { initialProps: otelEnabled }
+    );
     otelEnabled = true;
     hook.rerender(otelEnabled);
 
@@ -105,10 +114,11 @@ describe('useOtelColumns', () => {
   it('should not call builderOptionsDispatch after OTEL columns are set', async () => {
     const builderOptionsDispatch = jest.fn();
 
-    let otelEnabled = false; // OTEL is off
-    const hook = renderHook((enabled) => useOtelColumns(enabled, testOtelVersion.version, false, builderOptionsDispatch), {
-      initialProps: otelEnabled,
-    });
+    let otelEnabled = false;
+    const hook = renderHook(
+      (enabled) => useOtelColumns(enabled, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch),
+      { initialProps: otelEnabled }
+    );
     otelEnabled = true;
     hook.rerender(otelEnabled); // OTEL is on, columns are set
     hook.rerender(otelEnabled); // OTEL still on, should not set again
@@ -116,12 +126,49 @@ describe('useOtelColumns', () => {
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
   });
 
-  it('should stamp TraceTags/TraceServiceTags columns with type JSON when tagsAreJSON is true', async () => {
+  it('should stamp TraceTags/TraceServiceTags columns with type JSON when allColumns reports JSON type', async () => {
     const builderOptionsDispatch = jest.fn();
+    const tagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceTags)!;
+    const serviceTagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceServiceTags)!;
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(enabled, testOtelVersion.version, true, builderOptionsDispatch),
+      (enabled) =>
+        useOtelColumns(
+          enabled,
+          testOtelVersion.version,
+          makeAllColumns({ [tagsName]: 'JSON', [serviceTagsName]: 'JSON' }),
+          builderOptionsDispatch
+        ),
+      { initialProps: otelEnabled }
+    );
+    otelEnabled = true;
+    hook.rerender(otelEnabled);
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+
+    const dispatchedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[0][0].payload.columns;
+    const tagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceTags);
+    const serviceTagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceServiceTags);
+
+    expect(tagsCol?.type).toBe('JSON');
+    expect(serviceTagsCol?.type).toBe('JSON');
+  });
+
+  it('should auto-detect JSON type for TraceTags/TraceServiceTags from allColumns when tagsAreJSON is false', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const tagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceTags)!;
+    const serviceTagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceServiceTags)!;
+
+    let otelEnabled = false;
+    const hook = renderHook(
+      (enabled) =>
+        useOtelColumns(
+          enabled,
+          testOtelVersion.version,
+          makeAllColumns({ [tagsName]: 'JSON', [serviceTagsName]: 'JSON' }),
+          builderOptionsDispatch
+        ),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
