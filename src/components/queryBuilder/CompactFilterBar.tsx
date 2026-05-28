@@ -64,34 +64,20 @@ export const CompactFilterBar = (props: CompactFilterBarProps) => {
           <Button icon="plus" variant="secondary" size="sm" fill="text" onClick={() => setShowPopover(!showPopover)}>
             Add filter
           </Button>
-        </div>
-
-        <div className={styles.actions}>
           {onToggleAdvanced && (
-            <Tooltip content={advancedOpen ? 'Hide advanced options' : 'Show advanced options'}>
+            <Tooltip content={advancedOpen ? 'Hide order and limit options' : 'Show order and limit options'}>
               <Button
-                icon="cog"
-                aria-label={advancedOpen ? 'Hide advanced options' : 'Show advanced options'}
+                icon="plus"
+                aria-label={advancedOpen ? 'Hide order by' : 'Order by'}
                 variant="secondary"
                 size="sm"
                 fill={advancedOpen ? 'solid' : 'text'}
                 onClick={onToggleAdvanced}
-              />
+              >
+                Order by
+              </Button>
             </Tooltip>
           )}
-          <Tooltip content="Open query history (Ctrl+H in Explore)">
-            <Button
-              icon="history"
-              aria-label="Open query history"
-              variant="secondary"
-              size="sm"
-              fill="text"
-              onClick={() => {
-                const event = new KeyboardEvent('keydown', { key: 'h', ctrlKey: true, bubbles: true });
-                document.dispatchEvent(event);
-              }}
-            />
-          </Tooltip>
         </div>
       </div>
       {showPopover && (

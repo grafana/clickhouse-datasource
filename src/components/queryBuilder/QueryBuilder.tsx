@@ -45,10 +45,12 @@ interface QueryBuilderProps {
   generatedSql: string;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+  onRunQuery?: () => void;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
-  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, onQueryChange, onEditAsSql } = props;
+  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, onQueryChange, onEditAsSql, onRunQuery } =
+    props;
   const signalType = datasource.getSignalType();
   const singleTableMode = datasource.isSingleTableMode();
 
@@ -76,6 +78,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
         signalType={signalType}
         onQueryChange={onQueryChange}
         onEditAsSql={onEditAsSql}
+        onRunQuery={onRunQuery}
       />
     );
   }
@@ -150,11 +153,20 @@ interface CompactQueryEditorProps {
   signalType: SignalType;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+  onRunQuery?: () => void;
 }
 
 const CompactQueryEditor = (props: CompactQueryEditorProps) => {
-  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, signalType, onQueryChange, onEditAsSql } =
-    props;
+  const {
+    datasource,
+    builderOptions,
+    builderOptionsDispatch,
+    generatedSql,
+    signalType,
+    onQueryChange,
+    onEditAsSql,
+    onRunQuery,
+  } = props;
   const needsInitialization = isDefaultOrMismatchedCompactQuery(builderOptions, signalType);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const lastInitializationKey = useRef<string>();
@@ -186,20 +198,26 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const allColumns = useColumns(datasource, activeOptions.database, activeOptions.table);
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 
-  const onActiveOptionsChange = (nextOptions: QueryBuilderOptions) => {
+  const onActiveOptionsChange = (nextOptions: QueryBuilderOptions, shouldRunQuery = false) => {
     builderOptionsDispatch(setAllOptions(nextOptions));
     onQueryChange?.(nextOptions);
+    if (shouldRunQuery) {
+      onRunQuery?.();
+    }
   };
 
-  const mergeActiveOptions = (nextOptions: Partial<QueryBuilderOptions>) => {
-    onActiveOptionsChange({
-      ...activeOptions,
-      ...nextOptions,
-      meta: {
-        ...activeOptions.meta,
-        ...nextOptions.meta,
+  const mergeActiveOptions = (nextOptions: Partial<QueryBuilderOptions>, shouldRunQuery = false) => {
+    onActiveOptionsChange(
+      {
+        ...activeOptions,
+        ...nextOptions,
+        meta: {
+          ...activeOptions.meta,
+          ...nextOptions.meta,
+        },
       },
-    });
+      shouldRunQuery
+    );
   };
 
   return (
@@ -210,7 +228,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         mode={signalType === 'logs' ? 'otel-logs' : 'otel-traces'}
         onModeChange={() => {}}
         searchText={activeOptions.meta?.logMessageLike || ''}
-        onSearchChange={(logMessageLike) => mergeActiveOptions({ meta: { logMessageLike } })}
+        onSearchChange={(logMessageLike) => mergeActiveOptions({ meta: { logMessageLike } }, true)}
         onSearchSubmit={() => {}}
       />
       <CompactFilterBar
@@ -219,7 +237,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         table={activeOptions.table}
         filters={activeOptions.filters || []}
         allColumns={filterColumns}
-        onFiltersChange={(filters: Filter[]) => mergeActiveOptions({ filters })}
+        onFiltersChange={(filters: Filter[]) => mergeActiveOptions({ filters }, true)}
         onToggleAdvanced={() => setAdvancedOpen(!advancedOpen)}
         advancedOpen={advancedOpen}
       />
@@ -227,8 +245,8 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         <CompactAdvanced
           builderOptions={activeOptions}
           allColumns={allColumns}
-          onOrderByChange={(orderBy: OrderBy[]) => mergeActiveOptions({ orderBy })}
-          onLimitChange={(limit: number) => mergeActiveOptions({ limit })}
+          onOrderByChange={(orderBy: OrderBy[]) => mergeActiveOptions({ orderBy }, true)}
+          onLimitChange={(limit: number) => mergeActiveOptions({ limit }, true)}
         />
       )}
 

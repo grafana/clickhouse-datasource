@@ -24,7 +24,7 @@ describe('SqlPreview', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
     expect(writeText).toHaveBeenCalledWith('SELECT 1');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit as SQL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open in SQL editor' }));
     expect(onEditAsSql).toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'SQL' }));

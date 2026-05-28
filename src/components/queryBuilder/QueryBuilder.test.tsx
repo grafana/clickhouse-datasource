@@ -207,6 +207,7 @@ describe('QueryBuilder', () => {
     const builderOptionsDispatch = jest.fn();
     const onQueryChange = jest.fn();
     const onEditAsSql = jest.fn();
+    const onRunQuery = jest.fn();
 
     render(
       <QueryBuilder
@@ -224,6 +225,7 @@ describe('QueryBuilder', () => {
         generatedSql=""
         onQueryChange={onQueryChange}
         onEditAsSql={onEditAsSql}
+        onRunQuery={onRunQuery}
       />
     );
 
@@ -234,8 +236,8 @@ describe('QueryBuilder', () => {
     fireEvent.change(screen.getByPlaceholderText('Search log body text...'), { target: { value: 'error' } });
     fireEvent.blur(screen.getByPlaceholderText('Search log body text...'));
     expect(screen.getByRole('button', { name: 'Add filter' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Show advanced options' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Open query history' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Order by' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open query history' })).not.toBeInTheDocument();
     await waitFor(() =>
       expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }))
     );
@@ -251,7 +253,8 @@ describe('QueryBuilder', () => {
         meta: expect.objectContaining({ logMessageLike: 'error' }),
       })
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Edit as SQL' }));
+    expect(onRunQuery).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Open in SQL editor' }));
     expect(onEditAsSql).toHaveBeenCalledWith(
       expect.objectContaining({
         database: 'otel_v2',

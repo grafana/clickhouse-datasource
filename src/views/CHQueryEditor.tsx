@@ -47,7 +47,7 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 };
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
-  const { query, onChange, app } = props;
+  const { query, onChange, onRunQuery, app } = props;
   const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState((query as CHBuilderQuery).builderOptions);
   const singleTableMode = props.datasource.isSingleTableMode();
   const signalType = props.datasource.getSignalType();
@@ -187,6 +187,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       app={app}
       onQueryChange={onQueryChange}
       onEditAsSql={onEditAsSql}
+      onRunQuery={onRunQuery}
     />
   );
 };
@@ -215,7 +216,7 @@ const CompactSqlMode = (props: CHQueryEditorProps) => {
     <>
       <div className={'gf-form ' + styles.QueryEditor.queryType}>
         <Button variant="secondary" onClick={onSwitchToBuilder}>
-          Query Builder
+          Switch to compact view
         </Button>
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </div>

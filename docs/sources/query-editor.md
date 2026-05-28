@@ -58,7 +58,7 @@ Compact filters use Grafana's selected time range automatically. The configured 
 
 Filter operators are tailored to the selected field type. Numeric fields offer comparison operators such as `>`, `<`, `>=`, `<=`, `=`, and `!=`. String fields offer text matching and equality operators such as **contains**, **does not contain**, `=`, and `!=`.
 
-The compact editor also includes a generated SQL preview. Use **Copy** to copy the generated query, or **Edit as SQL** to switch to the SQL editor for manual customization.
+The compact editor also includes a generated SQL preview. Use **Copy** to copy the generated query, or **Open in SQL editor** to switch to the SQL editor for manual customization.
 
 ## Build queries
 
