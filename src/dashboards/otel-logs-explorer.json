@@ -67,11 +67,28 @@
         "defaults": {
           "color": { "mode": "palette-classic" },
           "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 10000 }] }
-        }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Count" },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Filter dashboard to ${__data.fields.Service}",
+                    "url": "/d/otel-logs-explorer?var-service=${__data.fields.Service}&${__url_time_range}&var-datasource=${datasource}&var-level_filter=${level_filter}&var-search=${search}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       },
-      "gridPos": { "h": 5, "w": 8, "x": 0, "y": 6 },
+      "gridPos": { "h": 5, "w": 7, "x": 0, "y": 6 },
       "id": 2,
-      "description": "Top 15 services by log volume in the time range. Click a bar to self-filter the dashboard to that service.",
+      "description": "Top 15 services by log volume in the time range. Click a bar to filter the dashboard to that service.",
       "options": {
         "displayMode": "gradient",
         "orientation": "horizontal",
@@ -80,13 +97,6 @@
         "minVizHeight": 16,
         "minVizWidth": 80
       },
-      "links": [
-        {
-          "title": "Filter by service",
-          "url": "/d/otel-logs-explorer?var-service=${__data.fields.Service}&${__url_time_range}&var-datasource=${datasource}&var-level_filter=${level_filter}&var-search=${search}",
-          "targetBlank": false
-        }
-      ],
       "title": "Services (click to filter)",
       "targets": [
         {
@@ -114,7 +124,7 @@
           { "matcher": { "id": "byRegexp", "options": "/TRACE|Trace/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] }
         ]
       },
-      "gridPos": { "h": 5, "w": 8, "x": 8, "y": 6 },
+      "gridPos": { "h": 5, "w": 5, "x": 7, "y": 6 },
       "id": 4,
       "description": "Share of log lines by SeverityText. Useful for spotting unusual error spikes at a glance.",
       "options": {
@@ -152,7 +162,7 @@
           { "matcher": { "id": "byName", "options": "Service" }, "properties": [{ "id": "custom.width", "value": 100 }] }
         ]
       },
-      "gridPos": { "h": 5, "w": 8, "x": 16, "y": 6 },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 6 },
       "id": 3,
       "description": "Most frequent ERROR / WARN / FATAL bodies across the selected services. Common id-style tokens (userId, traceId, etc.) are stripped before grouping so similar messages cluster.",
       "options": {
@@ -203,7 +213,7 @@
           { "matcher": { "id": "byRegexp", "options": "/(?:^count )?TRACE$|(?:^count )?Trace$/i" }, "properties": [{ "id": "displayName", "value": "trace" }, { "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] }
         ]
       },
-      "gridPos": { "h": 13, "w": 8, "x": 0, "y": 12 },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 12 },
       "id": 201,
       "description": "Log volume by SeverityText for $service. Use Open in Explore to refine the query.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
@@ -229,15 +239,15 @@
     {
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
       "fieldConfig": { "defaults": {}, "overrides": [] },
-      "gridPos": { "h": 13, "w": 16, "x": 8, "y": 12 },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 17 },
       "id": 202,
-      "description": "Recent log lines for $service. Click a row to expand attributes.",
+      "description": "Recent log lines for $service. Click a row to expand attributes. JSON-shaped bodies are pretty-printed.",
       "options": {
         "showTime": true,
         "showLabels": true,
         "showCommonLabels": false,
         "wrapLogMessage": true,
-        "prettifyLogMessage": false,
+        "prettifyLogMessage": true,
         "enableLogDetails": true,
         "dedupStrategy": "none",
         "sortOrder": "Descending"
@@ -247,7 +257,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes['service.namespace'] AS namespace,\n  ResourceAttributes['k8s.pod.name'] AS k8s_pod\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nORDER BY Timestamp DESC\nLIMIT 100",
+          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes['service.namespace'] AS namespace,\n  ResourceAttributes['k8s.pod.name'] AS k8s_pod\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nORDER BY Timestamp DESC\nLIMIT 200",
           "refId": "A",
           "format": 2
         }
