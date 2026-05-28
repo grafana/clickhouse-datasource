@@ -42,9 +42,9 @@ The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`,
 
 ![OTel Logs Explorer (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-logs-explorer-light.png)
 
-A multi-service log overview. Top row: stacked log volume by SeverityText, top services bar gauge with click-to-filter, severity donut, and a Top Error Messages table that strips common id-style tokens (userId, traceId, etc.) before grouping so similar messages cluster.
+A multi-service log overview. Top row: stacked log volume by SeverityText, top services bar gauge with click-to-filter (click a bar to scope the dashboard to that service), severity donut, and a Top Error Messages table that strips common id-style tokens (userId, traceId, etc.) before grouping so similar messages cluster.
 
-Below the overview, a per-service row repeats once per service in the **Service** variable, showing log volume by SeverityText alongside recent log samples for that service.
+Below the overview, a per-service row repeats once per service in the **Service** variable. Each repeat stacks a full-width Log Volume timeseries above a full-width Log Samples panel so log messages wrap less and the expand-row attribute view has room to breathe. JSON-shaped log bodies are pretty-printed.
 
 The per-service Log Volume panel has an **Open in Explore** link in the panel header that pre-fills a matching query in Explore, where you can refine filters or change visualisation.
 
