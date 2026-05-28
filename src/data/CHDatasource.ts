@@ -317,7 +317,7 @@ export class Datasource
     }
     // convention - assume the first field is an id field
     const ids = frame?.fields[0]?.values;
-    return frame?.fields[1]?.values.map((text, i) => ({ text, value: ids.get(i) }));
+    return frame?.fields[1]?.values.map((text, i) => ({ text, value: ids[i] }));
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars, filters: AdHocVariableFilter[] = []): CHQuery {
@@ -1400,7 +1400,7 @@ export class Datasource
         continue;
       }
 
-      let value = field.values.get(row.rowIndex);
+      let value = field.values[row.rowIndex];
       if (value && field.type === 'other' && isMapKey) {
         // Extract merged Resource/Log Attributes from "labels"
         if (field.name === labelsFieldName) {

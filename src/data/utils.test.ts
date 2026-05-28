@@ -734,21 +734,21 @@ describe('dataFrameHasLogLabelWithName', () => {
 
   it('should return false when log labels field is not present', () => {
     const frame: DataFrame = {
-      fields: [{ name: 'otherField', values: { get: jest.fn(), length: 1 } }],
+      fields: [{ name: 'otherField', values: [{}] }],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
   });
 
   it('should return false when log labels field has no values', () => {
     const frame: DataFrame = {
-      fields: [{ name: labelsFieldName, values: { get: jest.fn(), length: 0 } }],
+      fields: [{ name: labelsFieldName, values: [] }],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
   });
 
   it('should return false when log labels field value is null', () => {
     const frame: DataFrame = {
-      fields: [{ name: labelsFieldName, values: { get: () => null, length: 1 } }],
+      fields: [{ name: labelsFieldName, values: [null] }],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
   });
@@ -758,7 +758,7 @@ describe('dataFrameHasLogLabelWithName', () => {
       fields: [
         {
           name: labelsFieldName,
-          values: { get: () => ({ testLabel: 'value', otherLabel: 'otherValue' }), length: 1 },
+          values: [{ testLabel: 'value', otherLabel: 'otherValue' }],
         },
       ],
     } as any as DataFrame;
@@ -770,7 +770,7 @@ describe('dataFrameHasLogLabelWithName', () => {
       fields: [
         {
           name: labelsFieldName,
-          values: { get: () => ({ otherLabel: 'value' }), length: 1 },
+          values: [{ otherLabel: 'value' }],
         },
       ],
     } as any as DataFrame;

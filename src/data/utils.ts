@@ -611,11 +611,11 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   }
 
   const field = frame.fields.find((f) => f.name === labelsFieldName);
-  if (!field || !field.values || field.values.length < 1 || !field.values.get(0)) {
+  if (!field || !field.values || field.values.length < 1 || !field.values[0]) {
     return false;
   }
 
-  const labels = (field.values.get(0) || {}) as object;
+  const labels = (field.values[0] || {}) as object;
   const labelKeys = Object.keys(labels);
 
   return labelKeys.includes(name);
