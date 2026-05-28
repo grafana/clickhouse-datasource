@@ -64,7 +64,7 @@ Below trace search, a per-service row repeats once per service: a 1-in-500 sampl
 
 Each per-service panel has an **Open in Explore** link in its panel header that pre-fills a matching query in Explore.
 
-Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName / StatusMessage applied to every trace panel).
+Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName applied to every trace panel).
 
 ## OTel Service Dashboard
 
@@ -80,7 +80,7 @@ Single-service deep dive, broken out by SpanKind. Top to bottom:
 
 Click any operation in any Slowest Operations or Top Errors table to open the matching trace search in OTel Traces Explorer.
 
-Filter variables: **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName / StatusMessage for trace panels and on Body for the Logs panel).
+Filter variables: **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
 
 Each non-row panel has an **Open in Explore** link in its header that pre-fills the panel's underlying query in Explore. Useful when you want to refine the SQL, change visualisation, or read log details with more horizontal space.
 
