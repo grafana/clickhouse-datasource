@@ -70,11 +70,15 @@ Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi)
 
 ![OTel Service Dashboard (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-service-dashboard-light.png)
 
-Single-service deep dive. Top to bottom:
+Single-service deep dive, broken out by SpanKind. Top to bottom:
 
-1. **RED Metrics**: Request Rate (spans per second), Error Rate (with green/yellow/red thresholds at 1% and 5%), and Duration Percentiles (P50 and P90 solid, P99 dashed orange).
-2. **Errors & Slow Operations**: Top Errors and Slowest Operations tables. Click an operation to open the matching trace search in OTel Traces Explorer.
-3. **Related Logs**: recent logs for the selected service.
+1. **Server spans** (expanded): RED metrics (Request Rate, Error Rate with green/yellow/red thresholds at 1% and 5%, Duration Percentiles with P50 and P90 solid and P99 dashed orange) and Slowest Server Operations table. Server spans are incoming requests this service handles.
+2. **Client spans** (expanded): same RED layout filtered to outgoing requests, plus Slowest Client Operations. Use these to spot slow dependencies.
+3. **Errors & recent logs** (expanded): Top Errors table (with a SpanKind column so you can tell which side produced each error) and recent logs for the service, side by side.
+4. **Internal spans** (collapsed by default): RED metrics and Slowest Internal Operations for in-process work (function-level instrumentation). Click the row header to expand.
+5. **Async spans (Producer + Consumer)** (collapsed by default): RED metrics and Slowest Async Operations for message production and consumption against queues or event buses. The Slowest Async Operations table includes a SpanKind column so you can tell Producer from Consumer at a glance.
+
+Click any operation in any Slowest Operations or Top Errors table to open the matching trace search in OTel Traces Explorer.
 
 Filter variables: **Service** (single-select), **Operation** (multi).
 
