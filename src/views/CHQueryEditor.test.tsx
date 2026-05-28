@@ -102,7 +102,7 @@ describe('Query Editor', () => {
       />
     );
 
-    expect(screen.getByRole('button', { name: 'Query Builder' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Switch to compact view' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run Query' })).toBeInTheDocument();
     expect(screen.queryByText('Editor Type')).not.toBeInTheDocument();
     expect(screen.getByText('SELECT 1')).toBeInTheDocument();
@@ -129,7 +129,7 @@ describe('Query Editor', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Query Builder' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to compact view' }));
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -175,7 +175,7 @@ describe('Query Editor', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Edit as SQL' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open in SQL editor' }));
 
     expect(onChange).toHaveBeenCalledWith(
       expect.objectContaining({
