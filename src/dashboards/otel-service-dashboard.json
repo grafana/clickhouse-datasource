@@ -131,7 +131,8 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
       "id": 100,
       "title": "Server spans: ${service}",
-      "type": "row"
+      "type": "row",
+      "panels": []
     },
     {
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
@@ -268,7 +269,8 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
       "id": 101,
       "title": "Client spans: ${service}",
-      "type": "row"
+      "type": "row",
+      "panels": []
     },
     {
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
@@ -405,7 +407,8 @@
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 30 },
       "id": 102,
       "title": "Errors & recent logs: ${service}",
-      "type": "row"
+      "type": "row",
+      "panels": []
     },
     {
       "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
@@ -612,7 +615,7 @@
     },
     {
       "collapsed": true,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 56 },
       "id": 104,
       "title": "Async spans (Producer + Consumer): ${service}",
       "type": "row",
