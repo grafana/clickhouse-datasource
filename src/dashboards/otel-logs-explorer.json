@@ -54,7 +54,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY time, metric\nORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -102,7 +102,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
           "refId": "A",
           "format": 0
         }
@@ -138,7 +138,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nGROUP BY Level\nORDER BY Count DESC",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY Level\nORDER BY Count DESC",
           "refId": "A",
           "format": 0
         }
@@ -175,7 +175,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
           "refId": "A",
           "format": 0
         }
@@ -229,7 +229,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY time, metric\nORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -257,7 +257,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes['service.namespace'] AS namespace,\n  ResourceAttributes['k8s.pod.name'] AS k8s_pod\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, $search), $search)\nORDER BY Timestamp DESC\nLIMIT 200",
+          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes['service.namespace'] AS namespace,\n  ResourceAttributes['k8s.pod.name'] AS k8s_pod\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nORDER BY Timestamp DESC\nLIMIT 200",
           "refId": "A",
           "format": 2
         }
