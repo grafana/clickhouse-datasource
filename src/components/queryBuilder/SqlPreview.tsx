@@ -77,7 +77,7 @@ export const SqlPreview = (props: SqlPreviewProps) => {
             </Button>
             {onEditAsSql && (
               <Button icon="pen" variant="secondary" size="sm" fill="text" onClick={onEditAsSql}>
-                Edit as SQL
+                Open in SQL editor
               </Button>
             )}
           </div>
