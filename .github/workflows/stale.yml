@@ -6,17 +6,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: write
-  pull-requests: write
+  id-token: write
 
 jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
+      - name: Get GitHub App token
+        id: get-github-app-token
+        uses: grafana/shared-workflows/actions/create-github-app-token@ae92934a14a48b94494dbc06d74a81d47fe08a40 # create-github-app-token/v0.2.2
+        with:
+          github_app: grafana-plugins-platform-bot
+
       - uses: actions/stale@v10
         with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-token: ${{ steps.get-github-app-token.outputs.token }}
           operations-per-run: 750
           # start from the oldest issues/PRs when performing stale operations
           ascending: true
