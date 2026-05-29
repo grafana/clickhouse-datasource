@@ -3,12 +3,11 @@ on:
   issues:
     types: [labeled]
 
-permissions:
-  contents: read
-  issues: write
-
 jobs:
   main:
+    permissions:
+      contents: read
+      issues: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Actions

@@ -2,12 +2,11 @@ name: Compatibility check
 on:
   pull_request:
 
-permissions:
-  contents: read
-  pull-requests: write # needed for the `comment-pr: yes` step below
-
 jobs:
   compatibilitycheck:
+    permissions:
+      contents: read
+      pull-requests: write # needed for the `comment-pr: yes` step below
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
