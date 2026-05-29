@@ -31,6 +31,7 @@
     "@babel/core": "^7.29.0",
     "@grafana/eslint-config": "^8.2.0",
     "@grafana/plugin-e2e": "^3.6.0",
+    "@grafana/sign-plugin": "^3.2.2",
     "@grafana/tsconfig": "^2.0.0",
     "@playwright/test": "^1.57.0",
     "@stylistic/eslint-plugin-ts": "^4.4.1",
