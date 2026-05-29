@@ -12,9 +12,6 @@ on:
   workflow_dispatch:
 
 # Minimal top-level permissions; jobs can extend as needed
-permissions:
-  contents: read
-  id-token: write # Required for OIDC (Vault / shared workflows)
 
 # Prevent duplicate runs on the same ref.
 # For PRs: cancel older in-progress runs when new commits are pushed.

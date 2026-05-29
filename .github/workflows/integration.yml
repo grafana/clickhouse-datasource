@@ -12,11 +12,10 @@ on:
   schedule:
     - cron: '0 9 1 * *'
 
-permissions:
-  contents: read
-
 jobs:
   run:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
