@@ -768,6 +768,11 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
+  async fetchDistinctColumnValues(column: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT toString(${column}) AS val FROM ${db}.${table} WHERE ${column} IS NOT NULL AND ${column} != '' ORDER BY val LIMIT 200`;
+    return this.fetchData(rawSql);
+  }
+
   async fetchEntities() {
     return this.fetchTables();
   }

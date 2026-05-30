@@ -6,6 +6,7 @@ import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
 import { styles } from 'styles';
 import { Datasource } from 'data/CHDatasource';
+import useColumnValues from 'hooks/useColumnValues';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 
 const boolValues: Array<SelectableValue<boolean>> = [
@@ -103,8 +104,23 @@ export const FilterValueEditor = (props: {
   allColumns: readonly TableColumn[];
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
+  datasource?: Datasource;
+  database?: string;
+  table?: string;
 }) => {
-  const { filter, onFilterChange, allColumns: fieldsList } = props;
+  const { filter, onFilterChange, allColumns: fieldsList, datasource, database, table } = props;
+  const shouldFetchValues = Boolean(
+    datasource && database && table && filter.key &&
+    utils.isStringFilter(filter) &&
+    !filter.type.startsWith('Map') && !filter.type.startsWith('JSON') &&
+    (filter.operator === FilterOperator.Equals || filter.operator === FilterOperator.NotEquals)
+  );
+  const columnValues = useColumnValues(
+    datasource!,
+    shouldFetchValues ? filter.key : '',
+    database || '',
+    table || ''
+  );
   const getOptions = () => {
     const matchedFilter = fieldsList.find((f) => f.name === filter.key);
     return matchedFilter?.picklistValues || [];
@@ -163,11 +179,32 @@ export const FilterValueEditor = (props: {
       );
     }
 
+    if (shouldFetchValues) {
+      const allOptions = [...columnValues];
+      if (filter.value && !allOptions.find((o) => o.value === filter.value)) {
+        allOptions.push({ label: filter.value, value: filter.value });
+      }
+      return (
+        <div data-testid="query-builder-filters-autocomplete-value-container">
+          <Select
+            value={filter.value || null}
+            onChange={(e) => onStringFilterValueChange(e.value!)}
+            options={allOptions}
+            width={40}
+            allowCustomValue
+            isClearable
+            isLoading={columnValues.length === 0}
+            menuPlacement={'bottom'}
+            placeholder="Select or type a value"
+          />
+        </div>
+      );
+    }
+
     return (
       <FilterValueSingleStringItem
         value={filter.value}
         onChange={onStringFilterValueChange}
-        // enforce input re-render when filter changes to avoid stale input value
         key={filter.value}
       />
     );
@@ -186,6 +223,22 @@ export const FilterValueEditor = (props: {
         </div>
       );
     }
+
+    if (shouldFetchValues) {
+      return (
+        <div data-testid="query-builder-filters-autocomplete-multi-value-container">
+          <MultiSelect
+            value={filter.value}
+            options={columnValues}
+            onChange={(e) => onMultiFilterValueChange(e.map((v) => v.value!))}
+            allowCustomValue
+            isLoading={columnValues.length === 0}
+            placeholder="Select values"
+          />
+        </div>
+      );
+    }
+
     return <FilterValueMultiStringItem value={filter.value} onChange={onMultiFilterValueChange} />;
   } else {
     return <></>;
@@ -419,7 +472,7 @@ export const FilterEditor = (props: {
         onChange={(e) => onFilterOperatorChange(e.value!)}
         menuPlacement={'bottom'}
       />
-      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
+      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} datasource={props.datasource} database={props.database} table={props.table} />
       <Button
         data-testid="query-builder-filters-remove-button"
         icon="trash-alt"
