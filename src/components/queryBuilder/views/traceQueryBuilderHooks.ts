@@ -75,8 +75,14 @@ export const useTraceDefaultsOnMount = (
 };
 
 /**
- * Sets OTEL Trace columns automatically when OTEL is enabled
- * Does not run if OTEL is already enabled, only when it's changed.
+ * Sets OTEL Trace columns automatically when OTEL is enabled.
+ *
+ * Effect 1: replaces the full column list when OTel is toggled on (not on mount
+ * for saved queries — didSetColumns starts true when otelEnabled is already true).
+ *
+ * Effect 2: once allColumns has loaded, checks whether the tag columns are the
+ * ClickHouse JSON type and sets meta.tagsAreJSON accordingly. Runs for both
+ * freshly-enabled and saved OTel queries without touching anything else.
  */
 export const useOtelColumns = (
   otelEnabled: boolean,
@@ -84,16 +90,18 @@ export const useOtelColumns = (
   allColumns: readonly TableColumn[],
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
-  // Start false so that allColumns loading always triggers a stamp, even for saved
-  // queries where otelEnabled is already true on mount.
-  const didSetColumns = useRef<boolean>(false);
+  // Start true when OTel is already on so Effect 1 doesn't fire for saved queries.
+  const didSetColumns = useRef<boolean>(otelEnabled);
+  const didDetectColumnTypes = useRef<boolean>(false);
 
   if (!otelEnabled) {
     didSetColumns.current = false;
+    didDetectColumnTypes.current = false;
   }
 
+  // Effect 1: full column reset — only fires when OTel is toggled on.
   useEffect(() => {
-    if (!otelEnabled || didSetColumns.current || allColumns.length === 0) {
+    if (!otelEnabled || didSetColumns.current) {
       return;
     }
 
@@ -105,15 +113,8 @@ export const useOtelColumns = (
 
     const columns: SelectedColumn[] = [];
     traceColumnMap.forEach((name, hint) => {
-      const isTagHint = hint === ColumnHint.TraceTags || hint === ColumnHint.TraceServiceTags;
-      const colType = allColumns.find((c) => c.name === name)?.type;
-      const isJSON = colType?.startsWith('JSON') === true;
-      columns.push({ name, hint, ...(isTagHint && isJSON ? { type: 'JSON' } : {}) });
+      columns.push({ name, hint });
     });
-
-    const tagsAreJSON = columns.some(
-      (c) => (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) && c.type === 'JSON'
-    );
 
     builderOptionsDispatch(
       setOptions({
@@ -123,11 +124,47 @@ export const useOtelColumns = (
           flattenNested: otelConfig.flattenNested,
           traceEventsColumnPrefix: otelConfig.traceEventsColumnPrefix,
           traceLinksColumnPrefix: otelConfig.traceLinksColumnPrefix,
-          tagsAreJSON,
+          tagsAreJSON: false,
         },
       })
     );
     didSetColumns.current = true;
+  }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+
+  // Effect 2: detect whether tag columns use the JSON type and update meta.tagsAreJSON.
+  // Runs for both newly-enabled and saved OTel queries. Only dispatches if the
+  // schema actually uses the JSON type — skips entirely for Map schemas.
+  useEffect(() => {
+    if (!otelEnabled || didDetectColumnTypes.current || allColumns.length === 0) {
+      return;
+    }
+
+    const otelConfig = otel.getVersion(otelVersion);
+    const traceColumnMap = otelConfig?.traceColumnMap;
+    if (!traceColumnMap) {
+      return;
+    }
+
+    const tagsName = traceColumnMap.get(ColumnHint.TraceTags);
+    const serviceTagsName = traceColumnMap.get(ColumnHint.TraceServiceTags);
+    const tagsIsJSON = allColumns.find((c) => c.name === tagsName)?.type?.startsWith('JSON') === true;
+    const serviceTagsIsJSON = allColumns.find((c) => c.name === serviceTagsName)?.type?.startsWith('JSON') === true;
+    const tagsAreJSON = tagsIsJSON || serviceTagsIsJSON;
+
+    didDetectColumnTypes.current = true;
+
+    if (!tagsAreJSON) {
+      return;
+    }
+
+    const columns: SelectedColumn[] = [];
+    traceColumnMap.forEach((name, hint) => {
+      const isTagsCol = hint === ColumnHint.TraceTags && tagsIsJSON;
+      const isServiceTagsCol = hint === ColumnHint.TraceServiceTags && serviceTagsIsJSON;
+      columns.push({ name, hint, ...((isTagsCol || isServiceTagsCol) ? { type: 'JSON' } : {}) });
+    });
+
+    builderOptionsDispatch(setOptions({ columns, meta: { tagsAreJSON } }));
   }, [otelEnabled, otelVersion, allColumns, builderOptionsDispatch]);
 };
 

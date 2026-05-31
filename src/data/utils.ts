@@ -213,10 +213,15 @@ export const transformTraceTagFields = (
 ): void => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
-    // Builder queries produce [{key,value}] arrays in SQL — nothing to do here.
-    if (originalQuery?.editorType === EditorType.Builder) {
+    // Only transform frames that look like Grafana trace frames (have a traceID field).
+    // This prevents accidentally mutating 'tags'/'serviceTags' fields in non-trace queries.
+    const isTraceFrame = frame.fields.some(
+      (f) => f.name.toLowerCase() === 'traceid' || f.name.toLowerCase() === 'trace_id'
+    );
+    if (!isTraceFrame) {
       return;
     }
+
     frame.fields.forEach((field) => {
       if (field.name !== 'tags' && field.name !== 'serviceTags') {
         return;
@@ -314,9 +319,13 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
         // fall through; SQL generator falls back to mapKeys()
       }
 
-      const effectiveTagsAreJSON = columns?.some((c) =>
-        (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
-        c.type?.toLowerCase().startsWith('json')) ?? false;
+      // Fall back to the stored meta value so queries with empty database/table
+      // (relying on datasource defaults) still get the correct JSON path SQL.
+      const effectiveTagsAreJSON =
+        (columns?.some((c) =>
+          (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+          c.type?.toLowerCase().startsWith('json')) ?? false) ||
+        Boolean(originalQuery.builderOptions.meta?.tagsAreJSON);
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
@@ -390,9 +399,11 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
         // fall through; SQL generator falls back to mapKeys()
       }
 
-      const detectedTagsAreJSON = options.columns?.some((c) =>
-        (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
-        c.type?.toLowerCase().startsWith('json')) ?? false;
+      const detectedTagsAreJSON =
+        (options.columns?.some((c) =>
+          (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+          c.type?.toLowerCase().startsWith('json')) ?? false) ||
+        Boolean(originalQuery.builderOptions.meta?.tagsAreJSON);
 
       options.meta!.tagsAreJSON = detectedTagsAreJSON;
       traceIdQuery.builderOptions = options;

@@ -158,29 +158,12 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // together, so either top-level column being JSON implies all attribute columns are JSON.
   const tagsAreJSON = traceTagsIsJSON || traceServiceTagsIsJSON;
 
-  // JSONAllPaths gives dot-notation paths (e.g. 'http.method'); splitByChar splits them so
-  // JSONExtractString can traverse the nested structure ClickHouse creates for dotted keys.
-  // JSONExtractString accepts runtime string arguments, unlike JSON_VALUE which requires constants.
-  // Depths up to 5 are handled explicitly; 6+ fall back to a flat-key lookup (not reachable
-  // in standard OTel semantic conventions).
-  const jsonToTagArray = (expr: string): string => {
-    const j = `toJSONString(${expr})`;
-    const sp = `splitByChar('.', path)`;
-    return (
-      `arrayMap(path -> map('key', path, 'value', multiIf(` +
-        `length(${sp}) = 2, JSONExtractString(${j}, ${sp}[1], ${sp}[2]), ` +
-        `length(${sp}) = 3, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3]), ` +
-        `length(${sp}) = 4, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3], ${sp}[4]), ` +
-        `length(${sp}) = 5, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3], ${sp}[4], ${sp}[5]), ` +
-        `JSONExtractString(${j}, path)` +
-      `)), JSONAllPaths(${expr}))`
-    );
-  };
-
+  // JSON-type tags/serviceTags: return the column as-is; client-side flattenJsonTags
+  // handles the {key,value} conversion (cheaper than SQL reconstruction, more compact wire).
   if (traceTags !== undefined) {
     const col = escapeIdentifier(traceTags.name);
     if (traceTagsIsJSON) {
-      selectParts.push(`${jsonToTagArray(col)} as tags`);
+      selectParts.push(`${col} as tags`);
     } else {
       selectParts.push(`arrayMap(key -> map('key', key, 'value',${col}[key]), mapKeys(${col})) as tags`);
     }
@@ -189,7 +172,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   if (traceServiceTags !== undefined) {
     const col = escapeIdentifier(traceServiceTags.name);
     if (traceServiceTagsIsJSON) {
-      selectParts.push(`${jsonToTagArray(col)} as serviceTags`);
+      selectParts.push(`${col} as serviceTags`);
     } else {
       selectParts.push(`arrayMap(key -> map('key', key, 'value',${col}[key]), mapKeys(${col})) as serviceTags`);
     }
@@ -203,8 +186,27 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   const flattenNested = Boolean(options.meta?.flattenNested);
+  // Events/links attributes must be Array(Map(String,String)) in the typed tuple cast so
+  // the conversion must happen in SQL. For JSON-type columns, ClickHouse stores dotted keys
+  // as nested objects (e.g. "db.rows_examined" → {"db":{"rows_examined":"42"}}), so we use
+  // JSONAllPaths to enumerate all paths and JSONExtractString to retrieve each value.
+  // Paths are pre-split once via a two-array arrayMap to avoid repeating splitByChar.
+  // ClickHouse's JSONExtractString is variadic and can't accept a runtime array, so each
+  // depth case is generated explicitly up to maxDepth; the fallback handles anything deeper.
+  const jsonAttrsToFields = (expr: string): string => {
+    const j = `toJSONString(${expr})`;
+    const maxDepth = 4;
+    const partsUpTo = (d: number) => Array.from({ length: d }, (_, i) => `parts[${i + 1}]`).join(', ');
+    const extractAt = (d: number) => `JSONExtractString(${j}, ${partsUpTo(d)})`;
+    const cases = Array.from({ length: maxDepth - 1 }, (_, i) => `length(parts) = ${i + 1}, ${extractAt(i + 1)}`);
+    return (
+      `arrayMap((path, parts) -> map('key', path, 'value', multiIf(` +
+        `${cases.join(', ')}, ${extractAt(maxDepth)}` +
+      `)), JSONAllPaths(${expr}), arrayMap(p -> splitByChar('.', p), JSONAllPaths(${expr})))`
+    );
+  };
   const attrsToFields = (expr: string) => tagsAreJSON
-    ? jsonToTagArray(expr)
+    ? jsonAttrsToFields(expr)
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
 
   const traceEventsPrefix = options.meta?.traceEventsColumnPrefix || '';
@@ -285,11 +287,11 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const applyTraceIdOptimization =
     hasTraceTimestampTable && hasTraceIdFilter && traceStartTime !== undefined;
   if (applyTraceIdOptimization) {
-    const traceId = options.meta!.traceId;
+    const traceIdValue = options.meta!.traceId;
     const suffix = options.meta?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
     const timestampTable = getTableIdentifier(database, table + suffix);
     queryParts.push('WITH');
-    queryParts.push(`'${traceId}' as trace_id,`);
+    queryParts.push(`'${traceIdValue}' as trace_id,`);
     queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
     queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = trace_id) as trace_end`);
   }
@@ -706,7 +708,7 @@ const getTableIdentifier = (database: string, table: string): string => {
   return `${escapeIdentifier(database)}${sep}${escapeIdentifier(table)}`;
 };
 
-const escapeIdentifier = (id: string): string => {
+export const escapeIdentifier = (id: string): string => {
   return id ? `"${id}"` : '';
 };
 

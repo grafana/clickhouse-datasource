@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, from, map, Observable, switchMap } from 'rxjs';
+import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -55,7 +55,7 @@ import {
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
 export class Datasource
@@ -764,12 +764,12 @@ export class Datasource
    * TODO: This query can be slow/expensive
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
   async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(JSONAllPaths(${jsonColumn})) as path FROM "${db}"."${table}" LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM "${db}"."${table}" LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -975,7 +975,7 @@ export class Datasource
         targets,
       })
       .pipe(
-        switchMap((res: DataQueryResponse) =>
+        mergeMap((res: DataQueryResponse) =>
           from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
             map((transformed) => {
               if (hasLogsVolumeTargets) {

@@ -440,8 +440,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       const traceQuery = out?.data[0]?.fields[0]?.config?.links
         ?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
 
-      expect(traceQuery.rawSql).toContain('JSONAllPaths("SpanAttributes")');
-      expect(traceQuery.rawSql).toContain('JSONExtractString(toJSONString("SpanAttributes")');
+      expect(traceQuery.rawSql).toContain('"SpanAttributes" as tags');
+      expect(traceQuery.rawSql).not.toContain('JSONAllPaths("SpanAttributes")');
       expect(traceQuery.rawSql).not.toContain('mapKeys("SpanAttributes")');
       expect(traceQuery.builderOptions.meta?.tagsAreJSON).toBe(true);
     });
@@ -675,11 +675,21 @@ describe('transformTraceTagFields', () => {
     expect(res.data[0].fields[0].values).toEqual([[{ key: 'http.method', value: 'GET' }]]);
   });
 
-  it('does not transform builder query frames (SQL produces [{key,value}] directly)', () => {
-    const originalValue = { 'http.method': 'GET' };
-    const res = makeResponse(originalValue, {});
+  it('transforms builder query frames when tags are raw JSON objects (JSON-type columns)', () => {
+    // JSON-type tag columns now return the raw column; the transform handles the conversion
+    // for both builder and raw SQL queries. Already-correct [{key,value}] arrays (from
+    // Map-type columns) are left untouched by the Array.isArray check inside the transform.
+    const nested = { http: { method: 'GET' } };
+    const res = makeResponse(nested, {});
     transformTraceTagFields(makeBuilderTraceRequest(), res);
-    expect(res.data[0].fields[0].values).toEqual([originalValue]);
+    expect(res.data[0].fields[0].values).toEqual([[{ key: 'http.method', value: 'GET' }]]);
+  });
+
+  it('leaves already-correct [{key,value}] arrays untouched for builder queries (Map-type columns)', () => {
+    const existing = [{ key: 'http.method', value: 'GET' }];
+    const res = makeResponse(existing, []);
+    transformTraceTagFields(makeBuilderTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([existing]);
   });
 });
 

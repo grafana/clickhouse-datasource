@@ -267,10 +267,10 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
 
-    expect(sql).toContain('JSONAllPaths("SpanAttributes")');
-    expect(sql).toContain('JSONExtractString(toJSONString("SpanAttributes")');
-    expect(sql).toContain('JSONAllPaths("ResourceAttributes")');
-    expect(sql).toContain('JSONExtractString(toJSONString("ResourceAttributes")');
+    expect(sql).toContain('"SpanAttributes" as tags');
+    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
     expect(sql).not.toContain('mapKeys("SpanAttributes")');
     expect(sql).not.toContain('mapKeys("ResourceAttributes")');
     expect(sql).not.toContain('CAST');
@@ -311,10 +311,11 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
 
-    expect(sql).toContain('JSONAllPaths("SpanAttributes")');
-    expect(sql).toContain('JSONExtractString(toJSONString("SpanAttributes")');
-    expect(sql).toContain('JSONAllPaths("ResourceAttributes")');
-    expect(sql).toContain('JSONExtractString(toJSONString("ResourceAttributes")');
+    expect(sql).toContain('"SpanAttributes" as tags');
+    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
+    // events/links attributes must be converted in SQL (inside a typed tuple cast)
     expect(sql).toContain('JSONAllPaths(attributes)');
     expect(sql).toContain('JSONExtractString(toJSONString(attributes)');
     expect(sql).not.toContain('mapKeys(attributes)');
@@ -356,9 +357,11 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
 
-    expect(sql).toContain('JSONAllPaths("SpanAttributes")');
-    expect(sql).toContain('JSONExtractString(toJSONString("SpanAttributes")');
-    expect(sql).toContain('JSONAllPaths("ResourceAttributes")');
+    expect(sql).toContain('"SpanAttributes" as tags');
+    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
+    // events/links attributes must be converted in SQL (inside a typed tuple cast)
     expect(sql).toContain('JSONAllPaths(event.Attributes)');
     expect(sql).toContain('JSONExtractString(toJSONString(event.Attributes)');
     expect(sql).toContain('JSONAllPaths(link.Attributes)');

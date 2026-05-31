@@ -69,11 +69,13 @@ describe('useOtelColumns', () => {
     return cols;
   };
 
-  it('should call builderOptionsDispatch when OTel is enabled and allColumns is loaded', async () => {
+  it('should not call builderOptionsDispatch when OTel is already enabled on mount (saved query, non-JSON columns)', async () => {
+    // didSetColumns starts true when otelEnabled=true on mount (saved query), so Effect 1
+    // is skipped. Effect 2 runs but finds no JSON columns and returns without dispatching.
     const builderOptionsDispatch = jest.fn();
     renderHook(() => useOtelColumns(true, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch));
 
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
 
   it('should not call builderOptionsDispatch if OTEL is disabled', async () => {
@@ -127,6 +129,9 @@ describe('useOtelColumns', () => {
   });
 
   it('should stamp TraceTags/TraceServiceTags columns with type JSON when allColumns reports JSON type', async () => {
+    // When OTel is toggled on with JSON columns, two dispatches occur:
+    // Effect 1 sets the canonical column list (without JSON type), then
+    // Effect 2 re-dispatches with JSON types stamped on the tag columns.
     const builderOptionsDispatch = jest.fn();
     const tagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceTags)!;
     const serviceTagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceServiceTags)!;
@@ -145,9 +150,10 @@ describe('useOtelColumns', () => {
     otelEnabled = true;
     hook.rerender(otelEnabled);
 
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(2);
 
-    const dispatchedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[0][0].payload.columns;
+    // The second dispatch (from Effect 2) carries the JSON-typed columns.
+    const dispatchedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[1][0].payload.columns;
     const tagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceTags);
     const serviceTagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceServiceTags);
 
