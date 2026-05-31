@@ -16,11 +16,10 @@ import { Page } from '@playwright/test';
 //      objects (confirming ClickHouse returned JSON data, not an error).
 //
 // Fixture data is in tests/e2e/fixtures/trace_spans_json.sql (3 spans for
-// trace 'e2e-json-trace-a').  The provisioned datasource uid
-// 'clickhouse-e2e-json-tags' points at the local ClickHouse instance.
+// trace 'e2e-json-trace-a').
 
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
-const DATASOURCE_UID = 'clickhouse-e2e-json-tags';
+const DATASOURCE_UID = 'clickhouse-e2e';
 
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';

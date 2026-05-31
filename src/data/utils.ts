@@ -7,33 +7,13 @@ import {
   QueryType,
   SelectedColumn,
   StringFilter,
+  TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql } from './sqlGenerator';
 import otel from 'otel';
-
-// Stamps type:'JSON' on TraceTags/TraceServiceTags columns when the config toggle is on.
-// When tagsAreJSON is false, existing types are preserved — auto-detection via allColumns
-// in useOtelColumns is the authoritative source, and stripping here would undo that work.
-export const enrichTagColumnTypes = (
-  columns: SelectedColumn[] | undefined,
-  tagsAreJSON: boolean
-): SelectedColumn[] | undefined => {
-  if (!columns) {
-    return columns;
-  }
-  return columns.map((col) => {
-    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
-      return col;
-    }
-    if (tagsAreJSON && !col.type?.toLowerCase().startsWith('json')) {
-      return { ...col, type: 'JSON' };
-    }
-    return col;
-  });
-};
 
 /**
  * Returns true if the builder options contain enough information to start showing a query
@@ -271,6 +251,16 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
   applyTraceSearchFieldConfig(req, res);
   transformTraceTagFields(req, res);
 
+  // Cache fetchColumns results so we don't make a separate request for every frame.
+  const colCache = new Map<string, TableColumn[]>();
+  const getCachedColumns = async (db: string, tbl: string): Promise<TableColumn[]> => {
+    const key = `${db}\0${tbl}`;
+    if (!colCache.has(key)) {
+      colCache.set(key, await datasource.fetchColumns(db, tbl));
+    }
+    return colCache.get(key)!;
+  };
+
   for (const frame of res.data as DataFrame[]) {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     if (!originalQuery) {
@@ -312,7 +302,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
         const db = originalQuery.builderOptions.database;
         const tbl = originalQuery.builderOptions.table;
         if (db && tbl) {
-          const allCols = await datasource.fetchColumns(db, tbl);
+          const allCols = await getCachedColumns(db, tbl);
           columns = columns?.map((col) => {
             if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) return col;
             if (col.type?.startsWith('JSON')) return col;
@@ -372,7 +362,6 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           hasTraceTimestampTable: Boolean(otelVersion),
           traceTimestampTableSuffix,
           flattenNested: datasource.getDefaultTraceFlattenNested() || false,
-          tagsAreJSON: false,
         },
       };
 
@@ -388,7 +377,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       // Auto-detect JSON column types from ClickHouse; fall through silently on error
       try {
         if (options.database && options.table) {
-          const allColumns = await datasource.fetchColumns(options.database, options.table);
+          const allColumns = await getCachedColumns(options.database, options.table);
           options.columns = options.columns!.map((col) => {
             if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
               return col;

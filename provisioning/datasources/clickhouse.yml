@@ -25,7 +25,3 @@ datasources:
       validateSql: true
     secureJsonData:
       # password: ""
-
-  # Second datasource used by tests/e2e/traceJsonTags.spec.ts.
-  # Mirrors the configuration a user with ClickHouse 26+ JSON-type attribute
-  # columns would apply: OTel enabled and tagsColumnIsJSON set to true.

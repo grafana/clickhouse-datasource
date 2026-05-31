@@ -161,6 +161,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // JSONAllPaths gives dot-notation paths (e.g. 'http.method'); splitByChar splits them so
   // JSONExtractString can traverse the nested structure ClickHouse creates for dotted keys.
   // JSONExtractString accepts runtime string arguments, unlike JSON_VALUE which requires constants.
+  // Depths up to 5 are handled explicitly; 6+ fall back to a flat-key lookup (not reachable
+  // in standard OTel semantic conventions).
   const jsonToTagArray = (expr: string): string => {
     const j = `toJSONString(${expr})`;
     const sp = `splitByChar('.', path)`;
@@ -168,6 +170,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
       `arrayMap(path -> map('key', path, 'value', multiIf(` +
         `length(${sp}) = 2, JSONExtractString(${j}, ${sp}[1], ${sp}[2]), ` +
         `length(${sp}) = 3, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3]), ` +
+        `length(${sp}) = 4, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3], ${sp}[4]), ` +
+        `length(${sp}) = 5, JSONExtractString(${j}, ${sp}[1], ${sp}[2], ${sp}[3], ${sp}[4], ${sp}[5]), ` +
         `JSONExtractString(${j}, path)` +
       `)), JSONAllPaths(${expr}))`
     );

@@ -155,20 +155,12 @@ describe('useOtelColumns', () => {
     expect(serviceTagsCol?.type).toBe('JSON');
   });
 
-  it('should auto-detect JSON type for TraceTags/TraceServiceTags from allColumns when tagsAreJSON is false', async () => {
+  it('should not stamp type JSON on TraceTags/TraceServiceTags when allColumns reports String type', async () => {
     const builderOptionsDispatch = jest.fn();
-    const tagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceTags)!;
-    const serviceTagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceServiceTags)!;
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) =>
-        useOtelColumns(
-          enabled,
-          testOtelVersion.version,
-          makeAllColumns({ [tagsName]: 'JSON', [serviceTagsName]: 'JSON' }),
-          builderOptionsDispatch
-        ),
+      (enabled) => useOtelColumns(enabled, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -180,8 +172,8 @@ describe('useOtelColumns', () => {
     const tagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceTags);
     const serviceTagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceServiceTags);
 
-    expect(tagsCol?.type).toBe('JSON');
-    expect(serviceTagsCol?.type).toBe('JSON');
+    expect(tagsCol?.type).toBeUndefined();
+    expect(serviceTagsCol?.type).toBeUndefined();
   });
 });
 
