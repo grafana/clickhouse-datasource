@@ -199,20 +199,20 @@ const flattenJsonTags = (
 };
 
 /**
- * For raw-SQL trace queries, converts plain JSON objects returned by ClickHouse
- * JSON-type columns into the `[{key:"k",value:"v"},...]` array that Grafana's
- * trace panel expects for `tags` and `serviceTags` fields.
+ * Converts plain JSON objects returned by ClickHouse JSON-type tag columns into the
+ * `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects for `tags` and
+ * `serviceTags` fields.
  *
- * Builder trace queries do not need this transform — the SQL generator produces
- * `[{key,value}]` arrays directly via JSONAllPaths + JSON_VALUE.
- * Auto-detects whether values are JSON objects or already-correct arrays.
+ * Needed for both raw-SQL and builder queries with JSON-type columns. Builder queries
+ * with Map-type columns already receive correctly-shaped `[{key,value}]` arrays from
+ * the SQL generator, so those frames are skipped by the Array.isArray check below.
+ * Auto-detects whether values are plain objects (need conversion) or already arrays.
  */
 export const transformTraceTagFields = (
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse
 ): void => {
   res.data.forEach((frame: DataFrame) => {
-    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     // Only transform frames that look like Grafana trace frames (have a traceID field).
     // This prevents accidentally mutating 'tags'/'serviceTags' fields in non-trace queries.
     const isTraceFrame = frame.fields.some(

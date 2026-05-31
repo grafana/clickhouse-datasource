@@ -194,15 +194,19 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // ClickHouse's JSONExtractString is variadic and can't accept a runtime array, so each
   // depth case is generated explicitly up to maxDepth; the fallback handles anything deeper.
   const jsonAttrsToFields = (expr: string): string => {
-    const j = `toJSONString(${expr})`;
+    // JSONAllPaths is called once; paths are zipped with their dot-split parts inside
+    // a single arrayMap so we avoid calling JSONAllPaths(expr) twice.
+    // toJSONString must appear once per depth case because ClickHouse has no
+    // let-binding in expressions; a WITH clause would require a subquery here.
+    const json = `toJSONString(${expr})`;
     const maxDepth = 4;
-    const partsUpTo = (d: number) => Array.from({ length: d }, (_, i) => `parts[${i + 1}]`).join(', ');
-    const extractAt = (d: number) => `JSONExtractString(${j}, ${partsUpTo(d)})`;
-    const cases = Array.from({ length: maxDepth - 1 }, (_, i) => `length(parts) = ${i + 1}, ${extractAt(i + 1)}`);
+    const partsRef = (d: number) => Array.from({ length: d }, (_, i) => `entry.2[${i + 1}]`).join(', ');
+    const extractAt = (d: number) => `JSONExtractString(${json}, ${partsRef(d)})`;
+    const cases = Array.from({ length: maxDepth - 1 }, (_, i) => `length(entry.2) = ${i + 1}, ${extractAt(i + 1)}`);
     return (
-      `arrayMap((path, parts) -> map('key', path, 'value', multiIf(` +
+      `arrayMap(entry -> map('key', entry.1, 'value', multiIf(` +
         `${cases.join(', ')}, ${extractAt(maxDepth)}` +
-      `)), JSONAllPaths(${expr}), arrayMap(p -> splitByChar('.', p), JSONAllPaths(${expr})))`
+      `)), arrayMap(p -> tuple(p, splitByChar('.', p)), JSONAllPaths(${expr})))`
     );
   };
   const attrsToFields = (expr: string) => tagsAreJSON

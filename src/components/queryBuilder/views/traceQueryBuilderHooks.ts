@@ -77,12 +77,16 @@ export const useTraceDefaultsOnMount = (
 /**
  * Sets OTEL Trace columns automatically when OTEL is enabled.
  *
- * Effect 1: replaces the full column list when OTel is toggled on (not on mount
- * for saved queries — didSetColumns starts true when otelEnabled is already true).
+ * Two effects are used instead of one because allColumns loads asynchronously:
  *
- * Effect 2: once allColumns has loaded, checks whether the tag columns are the
- * ClickHouse JSON type and sets meta.tagsAreJSON accordingly. Runs for both
- * freshly-enabled and saved OTel queries without touching anything else.
+ * Effect 1: fires as soon as OTel is toggled on, before allColumns may be ready.
+ *   Sets the canonical column list immediately so the query builder isn't blank
+ *   while the schema loads. Uses tagsAreJSON: false as a safe default.
+ *   Skipped on mount for saved queries (didSetColumns starts true).
+ *
+ * Effect 2: fires once allColumns has loaded. Detects JSON-type tag columns and
+ *   re-dispatches with the corrected types and tagsAreJSON: true. For Map-type
+ *   schemas this effect returns without dispatching, so only one render occurs.
  */
 export const useOtelColumns = (
   otelEnabled: boolean,
