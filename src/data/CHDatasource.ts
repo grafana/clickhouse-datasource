@@ -489,7 +489,7 @@ export class Datasource
       const isStringFilterAction = action.type === 'ADD_STRING_FILTER' || action.type === 'ADD_STRING_FILTER_OUT';
 
       if (isStringFilterAction) {
-        // has no key — resolve the column name from the log message hint.
+        // has no key, so resolve the column name from the log message hint.
         const logMessageColumn = getColumnByHint(query.builderOptions, ColumnHint.LogMessage);
         return logMessageColumn?.alias || logMessageColumn?.name || action.options.key || '';
       }
