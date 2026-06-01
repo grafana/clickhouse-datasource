@@ -58,6 +58,7 @@ import {
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { CHVariableSupport } from './CHVariableSupport';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -98,6 +99,7 @@ export class Datasource
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+    this.variables = new CHVariableSupport(this);
   }
 
   static logVolumePrefix = 'log-volume-';
