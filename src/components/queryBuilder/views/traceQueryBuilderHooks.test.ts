@@ -129,9 +129,9 @@ describe('useOtelColumns', () => {
   });
 
   it('should stamp TraceTags/TraceServiceTags columns with type JSON when allColumns reports JSON type', async () => {
-    // When OTel is toggled on with JSON columns, two dispatches occur:
-    // Effect 1 sets the canonical column list (without JSON type), then
-    // Effect 2 re-dispatches with JSON types stamped on the tag columns.
+    // When OTel is toggled on and allColumns is already loaded with JSON types,
+    // Effect 1 detects them immediately and dispatches once with JSON types stamped.
+    // Effect 2 is skipped (didDetectColumnTypes is set by Effect 1).
     const builderOptionsDispatch = jest.fn();
     const tagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceTags)!;
     const serviceTagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceServiceTags)!;
@@ -150,10 +150,9 @@ describe('useOtelColumns', () => {
     otelEnabled = true;
     hook.rerender(otelEnabled);
 
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(2);
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
 
-    // The second dispatch (from Effect 2) carries the JSON-typed columns.
-    const dispatchedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[1][0].payload.columns;
+    const dispatchedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[0][0].payload.columns;
     const tagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceTags);
     const serviceTagsCol = dispatchedColumns.find((c) => c.hint === ColumnHint.TraceServiceTags);
 

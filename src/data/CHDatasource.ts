@@ -764,12 +764,12 @@ export class Datasource
    * TODO: This query can be slow/expensive
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
   async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM "${db}"."${table}" LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 

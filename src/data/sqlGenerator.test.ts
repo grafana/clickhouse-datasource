@@ -317,7 +317,7 @@ describe('SQL Generator', () => {
     expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
     // events/links attributes must be converted in SQL (inside a typed tuple cast)
     expect(sql).toContain('JSONAllPaths(attributes)');
-    expect(sql).toContain('JSONExtractString(toJSONString(attributes)');
+    expect(sql).toContain('JSON_VALUE(toJSONString(attributes)');
     expect(sql).not.toContain('mapKeys(attributes)');
     expect(sql).not.toContain('CAST');
   });
@@ -363,9 +363,9 @@ describe('SQL Generator', () => {
     expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
     // events/links attributes must be converted in SQL (inside a typed tuple cast)
     expect(sql).toContain('JSONAllPaths(event.Attributes)');
-    expect(sql).toContain('JSONExtractString(toJSONString(event.Attributes)');
+    expect(sql).toContain('JSON_VALUE(toJSONString(event.Attributes)');
     expect(sql).toContain('JSONAllPaths(link.Attributes)');
-    expect(sql).toContain('JSONExtractString(toJSONString(link.Attributes)');
+    expect(sql).toContain('JSON_VALUE(toJSONString(link.Attributes)');
     expect(sql).not.toContain('mapKeys(event.Attributes)');
     expect(sql).not.toContain('mapKeys(link.Attributes)');
     expect(sql).not.toContain('CAST');

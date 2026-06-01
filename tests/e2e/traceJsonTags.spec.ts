@@ -78,6 +78,20 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
   return { responsePromise, getBody: () => body };
 }
 
+// SQL matching the shape generateSql produces for a non-flattenNested OTel trace query
+// against a JSON-column table. Exercises JSONAllPaths + JSON_VALUE (the real generated SQL).
+const BUILDER_SQL = [
+  `SELECT TraceId as traceID, SpanId as spanID, ParentSpanId as parentSpanID,`,
+  `ServiceName as serviceName, SpanName as operationName,`,
+  `SpanAttributes as tags, ResourceAttributes as serviceTags,`,
+  `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)),`,
+  `arrayMap(path -> map('key', path, 'value', ifNull(JSON_VALUE(toJSONString(attributes), concat('$.', path)), '')),`,
+  `JSONAllPaths(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),`,
+  `Events.Name, Events.Timestamp, Events.Attributes) AS logs`,
+  `FROM e2e_test.trace_spans_json`,
+  `WHERE TraceId = '${TRACE_ID}'`,
+].join(' ');
+
 test.describe('JSON-typed trace attribute columns', () => {
   test.describe.configure({ mode: 'serial' });
 
@@ -151,5 +165,45 @@ test.describe('JSON-typed trace attribute columns', () => {
       expect(v).not.toBeNull();
       expect(typeof v).toBe('object');
     }
+  });
+
+  test('(fixture) builder-shaped SQL with JSONAllPaths + JSON_VALUE executes and returns event logs', async ({ page, explorePage }) => {
+    // Validates the SQL shape the plugin generates for JSON-column OTel queries:
+    // JSONAllPaths enumerates attribute paths; JSON_VALUE extracts each value as a string
+    // regardless of JSON type (number, boolean, string). mapKeys must NOT appear.
+    test.skip(
+      isCloudRun,
+      'Fixture-data tests depend on trace_spans_json seeded via tests/e2e/fixtures/trace_spans_json.sql, which is not available on Cloud.'
+    );
+
+    await page.goto(exploreUrl(FIXTURE_FROM_ISO, FIXTURE_TO_ISO));
+    await enterSql(page, BUILDER_SQL);
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+    await responsePromise;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const frames = (getBody() as any)?.results?.A?.frames;
+    expect(Array.isArray(frames) && frames.length).toBeGreaterThan(0);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const firstFrame = frames[0] as any;
+
+    // All EXPECTED_SPAN_COUNT rows must be present.
+    const anyColumn = firstFrame?.data?.values?.[0];
+    expect(Array.isArray(anyColumn)).toBe(true);
+    expect(anyColumn.length).toBe(EXPECTED_SPAN_COUNT);
+
+    // The 'logs' field (events) must be present and non-null for spans with events.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const schemaFields: Array<{ name: string }> = firstFrame?.schema?.fields ?? [];
+    const logsIdx = schemaFields.findIndex((f) => f.name === 'logs');
+    expect(logsIdx).toBeGreaterThanOrEqual(0);
+
+    const logsValues: unknown[] = firstFrame?.data?.values?.[logsIdx] ?? [];
+    // jspan-1 and jspan-2 have events; at least one row must have a non-empty array.
+    const hasEvents = logsValues.some((v) => Array.isArray(v) && v.length > 0);
+    expect(hasEvents).toBe(true);
   });
 });

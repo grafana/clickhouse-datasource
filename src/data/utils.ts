@@ -184,7 +184,7 @@ const flattenJsonTags = (
   prefix = '',
   depth = 0
 ): Array<{ key: string; value: string }> => {
-  if (depth >= 20) {
+  if (depth >= 6) {
     return [{ key: prefix || '(truncated)', value: JSON.stringify(obj) }];
   }
   return Object.entries(obj).flatMap(([k, v]) => {

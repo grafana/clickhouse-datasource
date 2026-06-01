@@ -187,27 +187,12 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const flattenNested = Boolean(options.meta?.flattenNested);
   // Events/links attributes must be Array(Map(String,String)) in the typed tuple cast so
-  // the conversion must happen in SQL. For JSON-type columns, ClickHouse stores dotted keys
-  // as nested objects (e.g. "db.rows_examined" → {"db":{"rows_examined":"42"}}), so we use
-  // JSONAllPaths to enumerate all paths and JSONExtractString to retrieve each value.
-  // Paths are pre-split once via a two-array arrayMap to avoid repeating splitByChar.
-  // ClickHouse's JSONExtractString is variadic and can't accept a runtime array, so each
-  // depth case is generated explicitly up to maxDepth; the fallback handles anything deeper.
+  // the conversion must happen in SQL. JSON_VALUE accepts a runtime String path and returns
+  // the scalar value as a String for any JSON type (string, number, boolean); ifNull coerces
+  // null/missing to '' for consistency with the Map schema path.
   const jsonAttrsToFields = (expr: string): string => {
-    // JSONAllPaths is called once; paths are zipped with their dot-split parts inside
-    // a single arrayMap so we avoid calling JSONAllPaths(expr) twice.
-    // toJSONString must appear once per depth case because ClickHouse has no
-    // let-binding in expressions; a WITH clause would require a subquery here.
     const json = `toJSONString(${expr})`;
-    const maxDepth = 4;
-    const partsRef = (d: number) => Array.from({ length: d }, (_, i) => `entry.2[${i + 1}]`).join(', ');
-    const extractAt = (d: number) => `JSONExtractString(${json}, ${partsRef(d)})`;
-    const cases = Array.from({ length: maxDepth - 1 }, (_, i) => `length(entry.2) = ${i + 1}, ${extractAt(i + 1)}`);
-    return (
-      `arrayMap(entry -> map('key', entry.1, 'value', multiIf(` +
-        `${cases.join(', ')}, ${extractAt(maxDepth)}` +
-      `)), arrayMap(p -> tuple(p, splitByChar('.', p)), JSONAllPaths(${expr})))`
-    );
+    return `arrayMap(path -> map('key', path, 'value', ifNull(JSON_VALUE(${json}, concat('$.', path)), '')), JSONAllPaths(${expr}))`;
   };
   const attrsToFields = (expr: string) => tagsAreJSON
     ? jsonAttrsToFields(expr)

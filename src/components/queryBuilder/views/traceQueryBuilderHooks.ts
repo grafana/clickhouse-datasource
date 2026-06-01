@@ -104,6 +104,9 @@ export const useOtelColumns = (
   }
 
   // Effect 1: full column reset — only fires when OTel is toggled on.
+  // If allColumns is already loaded, JSON types are stamped immediately so there is no
+  // second render. When allColumns is still empty (loading), tagsAreJSON defaults to false
+  // and Effect 2 corrects it once the schema arrives.
   useEffect(() => {
     if (!otelEnabled || didSetColumns.current) {
       return;
@@ -115,9 +118,17 @@ export const useOtelColumns = (
       return;
     }
 
+    const tagsName = traceColumnMap.get(ColumnHint.TraceTags);
+    const serviceTagsName = traceColumnMap.get(ColumnHint.TraceServiceTags);
+    const tagsIsJSON = allColumns.length > 0 && allColumns.find((c) => c.name === tagsName)?.type?.startsWith('JSON') === true;
+    const serviceTagsIsJSON = allColumns.length > 0 && allColumns.find((c) => c.name === serviceTagsName)?.type?.startsWith('JSON') === true;
+    const tagsAreJSON = tagsIsJSON || serviceTagsIsJSON;
+
     const columns: SelectedColumn[] = [];
     traceColumnMap.forEach((name, hint) => {
-      columns.push({ name, hint });
+      const isTagsCol = hint === ColumnHint.TraceTags && tagsIsJSON;
+      const isServiceTagsCol = hint === ColumnHint.TraceServiceTags && serviceTagsIsJSON;
+      columns.push({ name, hint, ...((isTagsCol || isServiceTagsCol) ? { type: 'JSON' } : {}) });
     });
 
     builderOptionsDispatch(
@@ -128,12 +139,15 @@ export const useOtelColumns = (
           flattenNested: otelConfig.flattenNested,
           traceEventsColumnPrefix: otelConfig.traceEventsColumnPrefix,
           traceLinksColumnPrefix: otelConfig.traceLinksColumnPrefix,
-          tagsAreJSON: false,
+          tagsAreJSON,
         },
       })
     );
     didSetColumns.current = true;
-  }, [otelEnabled, otelVersion, builderOptionsDispatch]);
+    if (tagsAreJSON) {
+      didDetectColumnTypes.current = true;
+    }
+  }, [otelEnabled, otelVersion, allColumns, builderOptionsDispatch]);
 
   // Effect 2: detect whether tag columns use the JSON type and update meta.tagsAreJSON.
   // Runs for both newly-enabled and saved OTel queries. Only dispatches if the
