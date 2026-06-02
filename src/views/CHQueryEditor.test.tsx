@@ -5,7 +5,7 @@ import { CHQueryEditor } from './CHQueryEditor';
 import * as ui from '@grafana/ui';
 import { mockDatasource, newMockDatasource } from '__mocks__/datasource';
 import { EditorType } from 'types/sql';
-import { QueryType } from 'types/queryBuilder';
+import { ColumnHint, FilterOperator, QueryType } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 
 jest.mock('@grafana/ui', () => ({
@@ -183,5 +183,65 @@ describe('Query Editor', () => {
         queryType: QueryType.Traces,
       })
     );
+  });
+
+  it('syncs compact builder state when query filters change externally', () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+    const baseQuery = {
+      pluginVersion,
+      rawSql: 'SELECT 1',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'otel_v2',
+        table: 'otel_logs',
+        queryType: QueryType.Logs,
+        columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel }],
+        filters: [],
+      },
+    };
+
+    const result = render(
+      <CHQueryEditor query={baseQuery} onChange={jest.fn()} onRunQuery={jest.fn()} datasource={datasource} />
+    );
+
+    expect(screen.queryByText('SeverityText')).not.toBeInTheDocument();
+
+    result.rerender(
+      <CHQueryEditor
+        query={{
+          ...baseQuery,
+          rawSql: 'SELECT 2',
+          builderOptions: {
+            ...baseQuery.builderOptions,
+            filters: [
+              {
+                condition: 'AND',
+                key: 'SeverityText',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'error',
+              },
+            ],
+          },
+        }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    expect(screen.getByText('SeverityText')).toBeInTheDocument();
+    expect(screen.getByText('error')).toBeInTheDocument();
   });
 });
