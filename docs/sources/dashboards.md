@@ -46,7 +46,7 @@ A multi-service log overview. Top row: stacked log volume by SeverityText, top s
 
 Below the overview, a per-service row repeats once per service in the **Service** variable. Each repeat stacks a full-width Log Volume timeseries above a full-width Log Samples panel so log messages wrap less and the expand-row attribute view has room to breathe. JSON-shaped log bodies are pretty-printed.
 
-Both per-service panels have an **Open in Explore** link in the panel header that pre-fills a matching query for that row's service in Explore. The Log Volume link drops you into a time-series query; the Log Samples link drops you into the logs visualisation with the same column projection as the dashboard panel. Because the per-service row repeats once per selected service, each panel-header link is scoped to its row's `$service` value.
+Both per-service panels have an **Open in Explore** link in the panel header that pre-fills a matching query for that row's service in Explore. The Log Volume link drops you into a time-series query; the Log Samples link drops you into the logs visualization with the same column projection as the dashboard panel. Because the per-service row repeats once per selected service, each panel-header link is scoped to its row's `$service` value.
 
 Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
 
@@ -60,7 +60,7 @@ System topology + trace search. Top row: service map node graph computed from `p
 
 Trace Search Results lists recent traces matching the variable filters (Service, Operation, Status, Min Duration). Click a TraceId to open Grafana's trace view for that trace; click a Service to open the OpenTelemetry Service Dashboard for that service; click an Operation to filter this view.
 
-Below trace search, a per-service row repeats once per service: a 1-in-500 sampled duration heatmap, four sparkline stats (Spans, Errors, P99, Avg Duration), and a Top Operations table with error counts colour-coded by error percent.
+Below trace search, a per-service row repeats once per service: a 1-in-500 sampled duration heatmap, four sparkline stats (Spans, Errors, P99, Avg Duration), and a Top Operations table with error counts color-coded by error percent.
 
 Each per-service panel has an **Open in Explore** link in its panel header that pre-fills a matching query in Explore.
 
@@ -82,7 +82,7 @@ Click any operation in any Slowest Operations or Top Errors table to open the ma
 
 Filter variables: **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
 
-Each non-row panel has an **Open in Explore** link in its header that pre-fills the panel's underlying query in Explore. Useful when you want to refine the SQL, change visualisation, or read log details with more horizontal space.
+Each non-row panel has an **Open in Explore** link in its header that pre-fills the panel's underlying query in Explore. Useful when you want to refine the SQL, change visualization, or read log details with more horizontal space.
 
 To see a specific trace, open OpenTelemetry Traces Explorer and click a TraceId in Trace Search Results. That opens Grafana's trace view in a side pane.
 
@@ -99,15 +99,15 @@ Data links between panels carry the same context:
 
 ## Performance considerations
 
-- The service map in OpenTelemetry Traces Explorer self-joins `otel_traces` on `ParentSpanId`. On large traces tables this can be slow. If you exceed the demo data scale, consider sampling on the join side or backing the dashboard with a materialised view that pre-computes parent-child edges.
+- The service map in OpenTelemetry Traces Explorer self-joins `otel_traces` on `ParentSpanId`. On large traces tables this can be slow. If you exceed the demo data scale, consider sampling on the join side or backing the dashboard with a materialized view that pre-computes parent-child edges.
 - The duration heatmap on OpenTelemetry Traces Explorer is sampled at 1-in-500 spans (`cityHash64(SpanId) % 500 = 0`) to keep heatmap cardinality low. Adjust the sampling fraction in the panel SQL if you have lower trace volume and want denser heatmaps.
 - All dashboards default to a 30-second auto-refresh and a 1-hour time range. Widen the time range gradually; the trace queries scan `otel_traces` over the full range each refresh.
 
-## Customising
+## Customizing
 
 The dashboards are JSON files in the plugin source under `src/dashboards/`. Import a copy via **Dashboards** > **New** > **Import**, edit it, and save under a new UID. The plugin-shipped versions get refreshed on every plugin update; your copy is stable.
 
-Common customisations:
+Common customizations:
 
 - **Different table names**: replace the literal `otel_logs` / `otel_traces` references in the panel SQL.
 - **Per-environment defaults**: add an environment variable and an extra `WHERE` clause via `$__conditionalAll`.
