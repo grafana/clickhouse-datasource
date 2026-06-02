@@ -465,7 +465,7 @@
       "links": [
         {
           "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, Duration / 1000000 AS duration_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND cityHash64(SpanId) % 500 = 0 ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, Duration / 1000000 AS duration_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND cityHash64(SpanId) % 500 = 0 ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
           "targetBlank": false
         }
       ],
@@ -500,7 +500,7 @@
       "links": [
         {
           "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, count() AS Spans FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, count() AS Spans FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
           "targetBlank": false
         }
       ],
@@ -531,7 +531,7 @@
       "links": [
         {
           "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
           "targetBlank": false
         }
       ],
@@ -562,7 +562,7 @@
       "links": [
         {
           "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, quantile(0.99)(Duration) / 1000000 AS p99_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, quantile(0.99)(Duration) / 1000000 AS p99_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
           "targetBlank": false
         }
       ],
@@ -598,7 +598,7 @@
       "links": [
         {
           "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, avg(Duration) / 1000000 AS \\\"Avg Duration\\\" FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, avg(Duration) / 1000000 AS \\\"Avg Duration\\\" FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
           "targetBlank": false
         }
       ],
@@ -741,7 +741,7 @@
       "links": [
         {
           "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":{\"type\":\"grafana-clickhouse-datasource\",\"uid\":\"${datasource}\"},\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors, round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \\\"Error %\\\", quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY Operation ORDER BY Count DESC LIMIT 50\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
+          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors, round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \\\"Error %\\\", quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY Operation ORDER BY Count DESC LIMIT 50\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
           "targetBlank": false
         }
       ],
