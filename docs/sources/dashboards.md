@@ -38,9 +38,9 @@ The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`,
 
 `StatusCode` is matched against the OTel spec value `'Error'`, which is what the current ClickHouse exporter writes.
 
-## OTel Logs Explorer
+## OpenTelemetry Logs Explorer
 
-![OTel Logs Explorer (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-logs-explorer-light.png)
+![OpenTelemetry Logs Explorer (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-logs-explorer-light.png)
 
 A multi-service log overview. Top row: stacked log volume by SeverityText, top services bar gauge with click-to-filter (click a bar to scope the dashboard to that service), severity donut, and a Top Error Messages table that strips common id-style tokens (userId, traceId, etc.) before grouping so similar messages cluster.
 
@@ -52,13 +52,13 @@ Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (
 
 Annotations: deployment markers derived from `service.version` changes in `otel_traces` over 30-second buckets.
 
-## OTel Traces Explorer
+## OpenTelemetry Traces Explorer
 
-![OTel Traces Explorer (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-traces-explorer-light.png)
+![OpenTelemetry Traces Explorer (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-traces-explorer-light.png)
 
 System topology + trace search. Top row: service map node graph computed from `parent.SpanId = child.ParentSpanId` joins on `otel_traces`, limited to the top 30 services and top 50 inter-service edges. Node arcs show success/error fractions; edge labels show call counts.
 
-Trace Search Results lists recent traces matching the variable filters (Service, Operation, Status, Min Duration). Click a TraceId to open Grafana's trace view for that trace; click a Service to open the OTel Service Dashboard for that service; click an Operation to filter this view.
+Trace Search Results lists recent traces matching the variable filters (Service, Operation, Status, Min Duration). Click a TraceId to open Grafana's trace view for that trace; click a Service to open the OpenTelemetry Service Dashboard for that service; click an Operation to filter this view.
 
 Below trace search, a per-service row repeats once per service: a 1-in-500 sampled duration heatmap, four sparkline stats (Spans, Errors, P99, Avg Duration), and a Top Operations table with error counts colour-coded by error percent.
 
@@ -66,9 +66,9 @@ Each per-service panel has an **Open in Explore** link in its panel header that 
 
 Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName applied to every trace panel).
 
-## OTel Service Dashboard
+## OpenTelemetry Service Dashboard
 
-![OTel Service Dashboard (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-service-dashboard-light.png)
+![OpenTelemetry Service Dashboard (light theme)](https://raw.githubusercontent.com/alex-fedotyev/clickhouse-datasource/alex/ootb-dashboards-screenshots/screenshots/otel-service-dashboard-light.png)
 
 Single-service deep dive, broken out by SpanKind. Top to bottom:
 
@@ -78,29 +78,29 @@ Single-service deep dive, broken out by SpanKind. Top to bottom:
 4. **Internal spans** (collapsed by default): RED metrics and Slowest Internal Operations for in-process work (function-level instrumentation). Click the row header to expand.
 5. **Async spans (Producer + Consumer)** (collapsed by default): RED metrics and Slowest Async Operations for message production and consumption against queues or event buses. The Slowest Async Operations table includes a SpanKind column so you can tell Producer from Consumer at a glance.
 
-Click any operation in any Slowest Operations or Top Errors table to open the matching trace search in OTel Traces Explorer.
+Click any operation in any Slowest Operations or Top Errors table to open the matching trace search in OpenTelemetry Traces Explorer.
 
 Filter variables: **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
 
 Each non-row panel has an **Open in Explore** link in its header that pre-fills the panel's underlying query in Explore. Useful when you want to refine the SQL, change visualisation, or read log details with more horizontal space.
 
-To see a specific trace, open OTel Traces Explorer and click a TraceId in Trace Search Results. That opens Grafana's trace view in a side pane.
+To see a specific trace, open OpenTelemetry Traces Explorer and click a TraceId in Trace Search Results. That opens Grafana's trace view in a side pane.
 
 ## Cross-dashboard navigation
 
-Each dashboard has an **OTEL Dashboards** link in the top-right that drops down to the other two, preserving variables and time range.
+Each dashboard has an **OpenTelemetry Dashboards** link in the top-right that drops down to the other two, preserving variables and time range.
 
 Data links between panels carry the same context:
 
-- **OTel Traces Explorer** → trace view: clicking a TraceId in Trace Search Results opens Grafana's trace view for that trace.
-- **OTel Traces Explorer** → **OTel Service Dashboard**: clicking a Service in Trace Search Results opens the Service Dashboard filtered to that service.
-- **OTel Service Dashboard** → **OTel Traces Explorer**: clicking an operation in Top Errors or Slowest Operations opens trace search filtered to that service and operation.
-- **OTel Logs Explorer**: clicking a service in the bar gauge self-filters the dashboard to that service.
+- **OpenTelemetry Traces Explorer** → trace view: clicking a TraceId in Trace Search Results opens Grafana's trace view for that trace.
+- **OpenTelemetry Traces Explorer** → **OpenTelemetry Service Dashboard**: clicking a Service in Trace Search Results opens the Service Dashboard filtered to that service.
+- **OpenTelemetry Service Dashboard** → **OpenTelemetry Traces Explorer**: clicking an operation in Top Errors or Slowest Operations opens trace search filtered to that service and operation.
+- **OpenTelemetry Logs Explorer**: clicking a service in the bar gauge self-filters the dashboard to that service.
 
 ## Performance considerations
 
-- The service map in OTel Traces Explorer self-joins `otel_traces` on `ParentSpanId`. On large traces tables this can be slow. If you exceed the demo data scale, consider sampling on the join side or backing the dashboard with a materialised view that pre-computes parent-child edges.
-- The duration heatmap on OTel Traces Explorer is sampled at 1-in-500 spans (`cityHash64(SpanId) % 500 = 0`) to keep heatmap cardinality low. Adjust the sampling fraction in the panel SQL if you have lower trace volume and want denser heatmaps.
+- The service map in OpenTelemetry Traces Explorer self-joins `otel_traces` on `ParentSpanId`. On large traces tables this can be slow. If you exceed the demo data scale, consider sampling on the join side or backing the dashboard with a materialised view that pre-computes parent-child edges.
+- The duration heatmap on OpenTelemetry Traces Explorer is sampled at 1-in-500 spans (`cityHash64(SpanId) % 500 = 0`) to keep heatmap cardinality low. Adjust the sampling fraction in the panel SQL if you have lower trace volume and want denser heatmaps.
 - All dashboards default to a 30-second auto-refresh and a 1-hour time range. Widen the time range gradually; the trace queries scan `otel_traces` over the full range each refresh.
 
 ## Customising

@@ -10,7 +10,7 @@
       "includeVars": true,
       "keepTime": true,
       "tags": ["clickhouse", "otel"],
-      "title": "OTEL Dashboards",
+      "title": "OpenTelemetry Dashboards",
       "type": "dashboards"
     }
   ],
@@ -364,6 +364,6 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "",
-  "title": "OTel Logs Explorer",
+  "title": "OpenTelemetry Logs Explorer",
   "uid": "otel-logs-explorer"
 }

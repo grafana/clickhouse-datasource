@@ -1,5 +1,5 @@
 {
-  "title": "OTel Traces Explorer",
+  "title": "OpenTelemetry Traces Explorer",
   "uid": "otel-traces-explorer",
   "description": "Explore OpenTelemetry traces with service topology, per-service drill-downs, and trace search. Click services, operations, or TraceIds to navigate.",
   "editable": true,
@@ -23,7 +23,7 @@
       "includeVars": true,
       "keepTime": true,
       "tags": ["clickhouse", "otel"],
-      "title": "OTEL Dashboards",
+      "title": "OpenTelemetry Dashboards",
       "type": "dashboards"
     }
   ],
