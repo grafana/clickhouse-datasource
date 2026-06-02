@@ -73,16 +73,44 @@ interface ResolvedColumn {
   hasMapKey: boolean;
 }
 
+const attributeColumnHints = new Set([
+  ColumnHint.ResourceAttributes,
+  ColumnHint.ScopeAttributes,
+  ColumnHint.LogAttributes,
+]);
+
+function getAttributeColumnByDisplayPrefix(
+  builderOptions: QueryBuilderOptions,
+  columnPrefix: string
+): SelectedColumn | undefined {
+  const normalizedPrefix = normalizeLogFieldName(columnPrefix);
+
+  return builderOptions.columns?.find((column) => {
+    const isAttributeHint = column.hint ? attributeColumnHints.has(column.hint) : false;
+    const isAttributeType = column.type?.startsWith('Map') || column.type?.startsWith('JSON');
+    if (!isAttributeHint && !isAttributeType) {
+      return false;
+    }
+
+    const candidates = isAttributeHint ? [column.name, column.alias, column.hint] : [column.name, column.alias];
+    return candidates.filter(isString).some((candidate) => normalizeLogFieldName(candidate) === normalizedPrefix);
+  });
+}
+
 /** Resolve a filter key to a column in the builder options, handling OTel map key splitting and alias/hint lookup. */
 function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): ResolvedColumn {
   let columnName = key;
   let mapKey = '';
 
-  // Convert flattened/merged OTel attributes into column+path pair
-  if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
-    const prefixIndex = columnName.indexOf('.');
-    mapKey = columnName.substring(prefixIndex + 1);
-    columnName = columnName.substring(0, prefixIndex);
+  // Convert flattened/merged OTel attributes into a column+path pair.
+  const prefixIndex = columnName.indexOf('.');
+  if (prefixIndex > -1) {
+    const columnPrefix = columnName.substring(0, prefixIndex);
+    const attributeColumn = getAttributeColumnByDisplayPrefix(builderOptions, columnPrefix);
+    if (attributeColumn) {
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = attributeColumn.alias || attributeColumn.name;
+    }
   }
 
   // Find selected column by alias/name
@@ -109,7 +137,7 @@ function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'
     key: resolved.column?.hint ? '' : resolved.columnName,
     hint: resolved.column?.hint || undefined,
     mapKey: resolved.hasMapKey ? resolved.mapKey : undefined,
-    type: resolved.hasMapKey ? (resolved.columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'string',
+    type: resolved.hasMapKey ? (resolved.columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'string',
     filterType: 'custom',
     operator,
     value,
@@ -1976,6 +2004,8 @@ enum AdHocFilterStatus {
   enabled,
   disabled,
 }
+
+const normalizeLogFieldName = (fieldName: string): string => fieldName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface Tags {
   type?: TagType;

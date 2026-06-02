@@ -73,6 +73,16 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   }
   lastEditorType.current = query.editorType;
 
+  const propBuilderOptions =
+    query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
+  const lastPropBuilderOptions = useRef<QueryBuilderOptions | undefined>(propBuilderOptions);
+  if (propBuilderOptions && propBuilderOptions !== lastPropBuilderOptions.current) {
+    lastPropBuilderOptions.current = propBuilderOptions;
+    if (propBuilderOptions !== builderOptions) {
+      builderOptionsDispatch(setAllOptions(propBuilderOptions));
+    }
+  }
+
   // Prevent trying to run empty query on load, or stale query after datasource/signal switches.
   const shouldSkipChanges = useRef<boolean>(true);
   if (isBuilderOptionsRunnable(builderOptions)) {
