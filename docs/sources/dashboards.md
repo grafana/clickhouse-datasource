@@ -46,7 +46,7 @@ A multi-service log overview. Top row: stacked log volume by SeverityText, top s
 
 Below the overview, a per-service row repeats once per service in the **Service** variable. Each repeat stacks a full-width Log Volume timeseries above a full-width Log Samples panel so log messages wrap less and the expand-row attribute view has room to breathe. JSON-shaped log bodies are pretty-printed.
 
-The per-service Log Volume panel has an **Open in Explore** link in the panel header that pre-fills a matching query in Explore, where you can refine filters or change visualisation.
+Both per-service panels have an **Open in Explore** link in the panel header that pre-fills a matching query for that row's service in Explore. The Log Volume link drops you into a time-series query; the Log Samples link drops you into the logs visualisation with the same column projection as the dashboard panel. Because the per-service row repeats once per selected service, each panel-header link is scoped to its row's `$service` value.
 
 Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
 
