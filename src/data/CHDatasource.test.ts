@@ -1593,6 +1593,31 @@ describe('ClickHouseDatasource', () => {
           value: 'abc123',
         });
       });
+
+      it('resolves normalized log attribute field names through column hints', () => {
+        const queryWithLogAttributes: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLogAttributes, {
+          type: 'ADD_FILTER',
+          options: { key: 'log_attributes.log.file.path', value: '/var/log/pod.log' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: '',
+          hint: ColumnHint.LogAttributes,
+          mapKey: 'log.file.path',
+          type: 'Map(String, String)',
+          operator: FilterOperator.Equals,
+          value: '/var/log/pod.log',
+        });
+        expect(result.rawSql).toContain("LogAttributes['log.file.path'] = '/var/log/pod.log'");
+      });
     });
 
     describe('ADD_STRING_FILTER with LogMessage column alias', () => {

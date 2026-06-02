@@ -99,7 +99,7 @@ export const ConfigurationModeSection = (props: Props) => {
           />
         </Field>
         {isSingleTableMode && (
-          <Field label="Signal type" description="What kind of data does this table contain????">
+          <Field label="Signal type" description="What kind of data does this table contain?">
             <RadioButtonGroup<SignalType>
               options={[
                 { label: 'Logs', value: 'logs', description: 'Log search with severity, message, and attributes' },
