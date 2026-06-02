@@ -28,17 +28,17 @@
     },
     {
       "type": "dashboard",
-      "name": "OTel Logs Explorer",
+      "name": "OpenTelemetry Logs Explorer",
       "path": "dashboards/otel-logs-explorer.json"
     },
     {
       "type": "dashboard",
-      "name": "OTel Traces Explorer",
+      "name": "OpenTelemetry Traces Explorer",
       "path": "dashboards/otel-traces-explorer.json"
     },
     {
       "type": "dashboard",
-      "name": "OTel Service Dashboard",
+      "name": "OpenTelemetry Service Dashboard",
       "path": "dashboards/otel-service-dashboard.json"
     },
     {

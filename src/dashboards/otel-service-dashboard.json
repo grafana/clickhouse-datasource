@@ -1,5 +1,5 @@
 {
-  "title": "OTel Service Dashboard",
+  "title": "OpenTelemetry Service Dashboard",
   "uid": "otel-service-dashboard",
   "description": "Single-service deep dive: RED metrics and slowest operations broken out by SpanKind (Server, Client, Internal, Async), with errors and recent logs side by side. Click a service in Traces Explorer to land here.",
   "editable": true,
@@ -30,7 +30,7 @@
         "clickhouse",
         "otel"
       ],
-      "title": "OTEL Dashboards",
+      "title": "OpenTelemetry Dashboards",
       "type": "dashboards"
     }
   ],
