@@ -242,6 +242,21 @@ export const transformTraceTagFields = (
 };
 
 /**
+ * Stamps type:'JSON' on TraceTags/TraceServiceTags SelectedColumns whose names appear
+ * as JSON-typed columns in allCols. Columns already typed 'JSON' are passed through
+ * unchanged; all other hints are passed through unchanged. Both branches of
+ * transformQueryResponseWithTraceAndLogLinks use this function so the logic stays in sync.
+ */
+function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[]): SelectedColumn[] {
+  return columns.map((col) => {
+    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) return col;
+    if (col.type?.startsWith('JSON')) return col;
+    const colType = allCols.find((c) => c.name === col.name)?.type;
+    return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
+  });
+}
+
+/**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view
  * on the explore page with the selected trace ID.
@@ -303,29 +318,26 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       // Copy fields directly from trace search; auto-detect JSON tag column types via
       // fetchColumns so saved queries (where useOtelColumns doesn't re-run) still work.
       let columns = originalQuery.builderOptions.columns;
+      const db = originalQuery.builderOptions.database;
+      const tbl = originalQuery.builderOptions.table;
+      // fetchedLiveSchema tracks whether we actually queried ClickHouse for column types.
+      // The meta.tagsAreJSON fallback is only used when we couldn't fetch (empty db/table).
+      const fetchedLiveSchema = !!(db && tbl);
       try {
-        const db = originalQuery.builderOptions.database;
-        const tbl = originalQuery.builderOptions.table;
-        if (db && tbl) {
+        if (fetchedLiveSchema) {
           const allCols = await getCachedColumns(db, tbl);
-          columns = columns?.map((col) => {
-            if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) return col;
-            if (col.type?.startsWith('JSON')) return col;
-            const colType = allCols.find((c) => c.name === col.name)?.type;
-            return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
-          });
+          columns = stampJsonColumnTypes(columns ?? [], allCols);
         }
       } catch {
         // fall through; SQL generator falls back to mapKeys()
       }
 
-      // Fall back to the stored meta value so queries with empty database/table
-      // (relying on datasource defaults) still get the correct JSON path SQL.
+      // Only fall back to stored meta when fetchColumns was not called (empty db/table).
       const effectiveTagsAreJSON =
         (columns?.some((c) =>
           (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
           c.type?.toLowerCase().startsWith('json')) ?? false) ||
-        Boolean(originalQuery.builderOptions.meta?.tagsAreJSON);
+        (!fetchedLiveSchema && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
@@ -384,26 +396,22 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       }
 
       // Auto-detect JSON column types from ClickHouse; fall through silently on error
+      const fetchedLiveSchema = !!(options.database && options.table);
       try {
-        if (options.database && options.table) {
+        if (fetchedLiveSchema) {
           const allColumns = await getCachedColumns(options.database, options.table);
-          options.columns = options.columns!.map((col) => {
-            if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
-              return col;
-            }
-            const colType = allColumns.find((c) => c.name === col.name)?.type;
-            return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
-          });
+          options.columns = stampJsonColumnTypes(options.columns!, allColumns);
         }
       } catch {
         // fall through; SQL generator falls back to mapKeys()
       }
 
+      // Only fall back to stored meta when fetchColumns was not called (empty db/table).
       const detectedTagsAreJSON =
         (options.columns?.some((c) =>
           (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
           c.type?.toLowerCase().startsWith('json')) ?? false) ||
-        Boolean(originalQuery.builderOptions.meta?.tagsAreJSON);
+        (!fetchedLiveSchema && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
       options.meta!.tagsAreJSON = detectedTagsAreJSON;
       traceIdQuery.builderOptions = options;

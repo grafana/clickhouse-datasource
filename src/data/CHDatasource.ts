@@ -768,8 +768,10 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
-  async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+  async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string, keysColumn?: string): Promise<string[]> {
+    const rawSql = keysColumn
+      ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
+      : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 

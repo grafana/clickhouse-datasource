@@ -446,6 +446,41 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.builderOptions.meta?.tagsAreJSON).toBe(true);
     });
 
+    it('live fetchColumns result overrides stale meta.tagsAreJSON when schema is Map-typed', async () => {
+      // Regression guard for the stale meta fallback bug:
+      // If fetchColumns returns Map-typed columns but meta.tagsAreJSON is saved as true
+      // (from a prior JSON-schema table), effectiveTagsAreJSON must be false so the
+      // SQL generator uses mapKeys() rather than JSON-path SQL.
+      const mockDatasource = newOtelMockDatasource();
+      // fetchColumns returns Map-typed columns (no JSON)
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([
+        { name: 'SpanAttributes', type: 'Map(String,String)', label: 'SpanAttributes', picklistValues: [] },
+        { name: 'ResourceAttributes', type: 'Map(String,String)', label: 'ResourceAttributes', picklistValues: [] },
+      ]);
+      const otelConfig = otel.getVersion('latest')!;
+      const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns,
+        // Stale saved meta: was true from when the table used JSON columns
+        meta: { otelEnabled: true, otelVersion: 'latest', tagsAreJSON: true },
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const traceQuery = out?.data[0]?.fields[0]?.config?.links
+        ?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+
+      // Live schema wins: Map SQL, not JSON-path SQL
+      expect(traceQuery.builderOptions.meta?.tagsAreJSON).toBe(false);
+      expect(traceQuery.rawSql).toContain('mapKeys');
+      expect(traceQuery.rawSql).not.toContain('"SpanAttributes" as tags');
+    });
+
     it('logs→trace link with OTel sets hasTraceTimestampTable and generates optimized rawSql', async () => {
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);

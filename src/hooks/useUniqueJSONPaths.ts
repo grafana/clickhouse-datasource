@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Datasource } from 'data/CHDatasource';
 
-export default (datasource: Datasource, jsonColumn: string, database: string, table: string): readonly string[] => {
+export default (datasource: Datasource, jsonColumn: string, database: string, table: string, keysColumn?: string): readonly string[] => {
   const [paths, setPaths] = useState<string[]>([]);
 
   useEffect(() => {
@@ -13,7 +13,7 @@ export default (datasource: Datasource, jsonColumn: string, database: string, ta
     setPaths([]);
     let ignore = false;
     datasource
-      .fetchUniqueJSONPaths(jsonColumn, database, table)
+      .fetchUniqueJSONPaths(jsonColumn, database, table, keysColumn)
       .then((result) => {
         if (ignore) {
           return;
@@ -27,7 +27,7 @@ export default (datasource: Datasource, jsonColumn: string, database: string, ta
     return () => {
       ignore = true;
     };
-  }, [datasource, jsonColumn, database, table]);
+  }, [datasource, jsonColumn, database, table, keysColumn]);
 
   return paths;
 };

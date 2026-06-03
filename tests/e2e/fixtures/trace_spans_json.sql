@@ -30,10 +30,12 @@ CREATE TABLE e2e_test.trace_spans_json
     SpanName            LowCardinality(String),
     SpanKind            LowCardinality(String),
     ServiceName         LowCardinality(String),
-    ResourceAttributes  JSON,
-    ScopeName           String,
-    ScopeVersion        String,
-    SpanAttributes      JSON,
+    ResourceAttributes      JSON,
+    ResourceAttributesKeys  Array(LowCardinality(String)),
+    ScopeName               String,
+    ScopeVersion            String,
+    SpanAttributes          JSON,
+    SpanAttributesKeys      Array(LowCardinality(String)),
     Duration            Int64,
     StatusCode          LowCardinality(String),
     StatusMessage       String,
@@ -58,15 +60,17 @@ ORDER BY (TraceId, Timestamp);
 INSERT INTO e2e_test.trace_spans_json
     (Timestamp, TraceId, SpanId, ParentSpanId, TraceState,
      SpanName, SpanKind, ServiceName,
-     ResourceAttributes, ScopeName, ScopeVersion,
-     SpanAttributes, Duration, StatusCode, StatusMessage,
+     ResourceAttributes, ResourceAttributesKeys, ScopeName, ScopeVersion,
+     SpanAttributes, SpanAttributesKeys, Duration, StatusCode, StatusMessage,
      `Events.Timestamp`, `Events.Name`, `Events.Attributes`)
 VALUES
     ('2024-03-15 10:00:00', 'e2e-json-trace-a', 'jspan-1', '', '',
      'HTTP GET /users', 'SPAN_KIND_SERVER', 'api',
      '{"service.name":"api","deployment.environment":"test"}',
+     ['service.name','deployment.environment'],
      'io.opentelemetry.api', '1.0.0',
      '{"http.method":"GET","http.url":"/users","http.status_code":"200"}',
+     ['http.method','http.url','http.status_code'],
      1000000, 'STATUS_CODE_OK', '',
      ['2024-03-15 10:00:00.500000000'],
      ['log'],
@@ -76,15 +80,17 @@ VALUES
 INSERT INTO e2e_test.trace_spans_json
     (Timestamp, TraceId, SpanId, ParentSpanId, TraceState,
      SpanName, SpanKind, ServiceName,
-     ResourceAttributes, ScopeName, ScopeVersion,
-     SpanAttributes, Duration, StatusCode, StatusMessage,
+     ResourceAttributes, ResourceAttributesKeys, ScopeName, ScopeVersion,
+     SpanAttributes, SpanAttributesKeys, Duration, StatusCode, StatusMessage,
      `Events.Timestamp`, `Events.Name`, `Events.Attributes`)
 VALUES
     ('2024-03-15 10:00:01', 'e2e-json-trace-a', 'jspan-2', 'jspan-1', '',
      'db.query', 'SPAN_KIND_CLIENT', 'db',
      '{"service.name":"db","deployment.environment":"test"}',
+     ['service.name','deployment.environment'],
      'io.opentelemetry.api', '1.0.0',
      '{"db.system":"clickhouse","db.statement":"SELECT * FROM users"}',
+     ['db.system','db.statement'],
      500000, 'STATUS_CODE_OK', '',
      ['2024-03-15 10:00:01.250000000', '2024-03-15 10:00:01.490000000'],
      ['db.query.start', 'db.query.end'],
@@ -94,14 +100,16 @@ VALUES
 INSERT INTO e2e_test.trace_spans_json
     (Timestamp, TraceId, SpanId, ParentSpanId, TraceState,
      SpanName, SpanKind, ServiceName,
-     ResourceAttributes, ScopeName, ScopeVersion,
-     SpanAttributes, Duration, StatusCode, StatusMessage)
+     ResourceAttributes, ResourceAttributesKeys, ScopeName, ScopeVersion,
+     SpanAttributes, SpanAttributesKeys, Duration, StatusCode, StatusMessage)
 VALUES
     ('2024-03-15 10:00:02', 'e2e-json-trace-a', 'jspan-3', 'jspan-1', '',
      'cache.get', 'SPAN_KIND_CLIENT', 'cache',
      '{"service.name":"cache"}',
+     ['service.name'],
      'io.opentelemetry.api', '1.0.0',
      '{"cache.key":"profile:42"}',
+     ['cache.key'],
      300000, 'STATUS_CODE_OK', '');
 
 -- Companion timestamp-index table for the OTel trace-ID query optimisation.

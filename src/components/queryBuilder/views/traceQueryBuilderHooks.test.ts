@@ -70,8 +70,8 @@ describe('useOtelColumns', () => {
   };
 
   it('should not call builderOptionsDispatch when OTel is already enabled on mount (saved query, non-JSON columns)', async () => {
-    // didSetColumns starts true when otelEnabled=true on mount (saved query), so Effect 1
-    // is skipped. Effect 2 runs but finds no JSON columns and returns without dispatching.
+    // didSetColumns starts true when otelEnabled=true on mount (saved query).
+    // The saved-query path runs once allColumns loads and finds no JSON — no dispatch.
     const builderOptionsDispatch = jest.fn();
     renderHook(() => useOtelColumns(true, testOtelVersion.version, makeAllColumns(), builderOptionsDispatch));
 
@@ -179,6 +179,53 @@ describe('useOtelColumns', () => {
 
     expect(tagsCol?.type).toBeUndefined();
     expect(serviceTagsCol?.type).toBeUndefined();
+  });
+
+  it('should defer dispatch until allColumns loads when OTel is toggled on', async () => {
+    // When OTel is toggled on with empty allColumns (schema still loading),
+    // no dispatch occurs. Once allColumns loads the Effect re-runs and dispatches once.
+    const builderOptionsDispatch = jest.fn();
+
+    type Props = { enabled: boolean; cols: TableColumn[] };
+    const hook = renderHook(
+      ({ enabled, cols }: Props) =>
+        useOtelColumns(enabled, testOtelVersion.version, cols, builderOptionsDispatch),
+      { initialProps: { enabled: false, cols: [] as TableColumn[] } }
+    );
+
+    // Toggle on but schema hasn't arrived yet
+    hook.rerender({ enabled: true, cols: [] });
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+
+    // Schema loads — single dispatch with correct tagsAreJSON
+    hook.rerender({ enabled: true, cols: makeAllColumns() });
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+  });
+
+  it('should re-dispatch columns when otelVersion changes while OTel is enabled', async () => {
+    // prevOtelVersion detects the version change and resets flags so the Effect
+    // re-dispatches with the new version's column map.
+    const builderOptionsDispatch = jest.fn();
+    const versionA = testOtelVersion.version;
+    const versionB = versionA + '-changed';
+
+    // Make both version strings resolve to a valid config
+    const getVersionSpy = jest.spyOn(otel, 'getVersion').mockImplementation((v) =>
+      v === versionA || v === versionB ? testOtelVersion : undefined
+    );
+
+    // Mount with OTel already enabled (saved query) — no dispatch expected
+    const hook = renderHook(
+      (version: string) => useOtelColumns(true, version, makeAllColumns(), builderOptionsDispatch),
+      { initialProps: versionA }
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+
+    // Change version while OTel is on — flags reset, Effect dispatches new column map
+    hook.rerender(versionB);
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+
+    getVersionSpy.mockRestore();
   });
 });
 

@@ -187,12 +187,13 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
 
   const flattenNested = Boolean(options.meta?.flattenNested);
   // Events/links attributes must be Array(Map(String,String)) in the typed tuple cast so
-  // the conversion must happen in SQL. JSON_VALUE accepts a runtime String path and returns
-  // the scalar value as a String for any JSON type (string, number, boolean); ifNull coerces
-  // null/missing to '' for consistency with the Map schema path.
+  // the conversion must happen in SQL. JSONExtractKeysAndValuesRaw returns all key-value
+  // pairs from a JSON string as Array(Tuple(String,String)); values are raw JSON literals
+  // (strings are quoted, numbers/booleans are not). replaceRegexpOne strips the surrounding
+  // quotes from string values so every value lands as a plain string.
   const jsonAttrsToFields = (expr: string): string => {
     const json = `toJSONString(${expr})`;
-    return `arrayMap(path -> map('key', path, 'value', ifNull(JSON_VALUE(${json}, concat('$.', path)), '')), JSONAllPaths(${expr}))`;
+    return `arrayMap(kv -> map('key', kv.1, 'value', replaceRegexpOne(kv.2, '^"(.*)"$', '\\1')), JSONExtractKeysAndValuesRaw(${json}))`;
   };
   const attrsToFields = (expr: string) => tagsAreJSON
     ? jsonAttrsToFields(expr)

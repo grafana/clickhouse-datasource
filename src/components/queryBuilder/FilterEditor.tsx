@@ -208,7 +208,8 @@ export const FilterEditor = (props: {
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
-  const jsonPaths = useUniqueJSONPaths(props.datasource, isJSONType ? filter.key : '', props.database, props.table);
+  const keysColumnName = isJSONType ? props.allColumns.find(c => c.name === filter.key + 'Keys')?.name : undefined;
+  const jsonPaths = useUniqueJSONPaths(props.datasource, isJSONType ? filter.key : '', props.database, props.table, keysColumnName);
   const subKeyOptions = isJSONType
     ? jsonPaths.map((p) => ({ label: p, value: p }))
     : mapKeys.map((k) => ({ label: k, value: k }));
