@@ -1,0 +1,25 @@
+# Datasource provisioning for Railway PR preview environments.
+# All connection values come from environment variables so each Railway
+# environment points at the shared external ClickHouse via its own variables.
+# Grafana expands $VAR references in provisioning files at startup.
+apiVersion: 1
+
+deleteDatasources:
+  - name: ClickHouse
+    orgId: 1
+
+datasources:
+  - name: ClickHouse
+    uid: clickhouse-preview
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: $CLICKHOUSE_HOST
+    orgId: 1
+    jsonData:
+      host: $CLICKHOUSE_HOST
+      port: $CLICKHOUSE_PORT
+      protocol: $CLICKHOUSE_PROTOCOL
+      secure: $CLICKHOUSE_SECURE
+      username: $CLICKHOUSE_USERNAME
+    secureJsonData:
+      password: $CLICKHOUSE_PASSWORD

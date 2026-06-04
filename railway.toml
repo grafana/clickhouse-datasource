@@ -1,0 +1,7 @@
+# Railway build config for PR preview environments.
+# Builds the Grafana + ClickHouse plugin preview image. See railway/README.md
+# for the one-time project setup (variables, PR environments, access gating).
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "railway/Dockerfile"
