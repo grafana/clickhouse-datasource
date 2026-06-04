@@ -8,8 +8,9 @@ deleted automatically when the PR is merged or closed.
 
 Each PR gets its own isolated environment, so the plugin artifact and config are
 already namespaced per PR; no storage bucket or per-PR ClickHouse is needed. The
-preview Grafana points at a single shared external ClickHouse via environment
-variables.
+preview Grafana points at ClickHouse's public demo
+(`sql-clickhouse.clickhouse.com`, read-only `otel_demo` user, no password), so
+there are no per-environment connection secrets to manage.
 
 ## What's in here
 
@@ -17,7 +18,7 @@ variables.
   backend (`mage build:linux`), then a stock `grafana-enterprise` image with the
   built plugin baked into `/var/lib/grafana/plugins`.
 - [`provisioning/datasources/clickhouse.yml`](provisioning/datasources/clickhouse.yml) -
-  provisions the ClickHouse data source from `CLICKHOUSE_*` env vars.
+  provisions the ClickHouse data source pointed at the public demo ClickHouse.
 - [`../railway.toml`](../railway.toml) - tells Railway to build with this Dockerfile.
 
 ## One-time project setup
@@ -35,19 +36,16 @@ These steps are done once in the Railway dashboard; they are not part of the rep
    | Variable | Example | Notes |
    | --- | --- | --- |
    | `GF_SERVER_ROOT_URL` | `https://${{RAILWAY_PUBLIC_DOMAIN}}` | Correct asset/redirect URLs per PR |
-   | `CLICKHOUSE_HOST` | `clickhouse.example.com` | Shared external ClickHouse host |
-   | `CLICKHOUSE_PORT` | `9440` | `9000` native / `9440` native+TLS / `8443` https |
-   | `CLICKHOUSE_PROTOCOL` | `native` | `native` or `http` |
-   | `CLICKHOUSE_SECURE` | `true` | `true` to use TLS |
-   | `CLICKHOUSE_USERNAME` | `default` | |
-   | `CLICKHOUSE_PASSWORD` | (secret) | Store as a sealed/secret variable |
+
+   The ClickHouse connection itself is hardcoded to the public demo in
+   [`provisioning/datasources/clickhouse.yml`](provisioning/datasources/clickhouse.yml),
+   so no `CLICKHOUSE_*` variables or secrets are required.
 
 ## Access gating: only maintainers can spin up an environment
 
-Preview environments build and run the PR's code with access to the
-`CLICKHOUSE_PASSWORD` and other variables, so it is important that untrusted
-forked PRs cannot create them. This uses Railway's native gate, no custom
-workflow required:
+Preview environments build and run the PR's code, so it is important that
+untrusted forked PRs cannot spin them up (and consume build resources). This uses
+Railway's native gate, no custom workflow required:
 
 - Railway will not deploy a PR branch from a user who is not in your workspace or
   invited to your project (with their GitHub account linked). Workspace/project
@@ -75,16 +73,9 @@ Build and run the preview image locally before relying on it in CI:
 ```sh
 docker build -f railway/Dockerfile -t ch-preview .
 
-docker run --rm -p 3000:3000 \
-  -e CLICKHOUSE_HOST=clickhouse.example.com \
-  -e CLICKHOUSE_PORT=9440 \
-  -e CLICKHOUSE_PROTOCOL=native \
-  -e CLICKHOUSE_SECURE=true \
-  -e CLICKHOUSE_USERNAME=default \
-  -e CLICKHOUSE_PASSWORD=secret \
-  ch-preview
+docker run --rm -p 3000:3000 ch-preview
 ```
 
 Then open <http://localhost:3000> and confirm the ClickHouse data source is
-provisioned (Connections -> Data sources -> ClickHouse) and can query the
-shared database.
+provisioned (Connections -> Data sources -> ClickHouse) and can query the public
+demo database (e.g. the `otel_v2` tables).
