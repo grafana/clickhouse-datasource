@@ -4,10 +4,6 @@
 # previews have working connectivity without any per-environment secrets.
 apiVersion: 1
 
-deleteDatasources:
-  - name: ClickHouse
-    orgId: 1
-
 datasources:
   - name: ClickHouse
     type: grafana-clickhouse-datasource

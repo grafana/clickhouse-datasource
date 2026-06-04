@@ -18,8 +18,11 @@ RUN go install github.com/magefile/mage@latest
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-# Builds dist/gpx_clickhouse_linux_amd64 (matches "executable": "gpx_clickhouse").
-RUN mage -v build:linux
+# Build both linux archs so the plugin's backend starts whether the runtime is
+# amd64 or arm64. Grafana resolves the executable as gpx_clickhouse_<os>_<arch>
+# at runtime; shipping only one arch makes the plugin fail to start (appears
+# "disabled") on the other. Produces dist/gpx_clickhouse_linux_{amd64,arm64}.
+RUN mage -v build:linux build:linuxARM64
 
 # ---- Runtime image -----------------------------------------------------------
 FROM grafana/grafana-enterprise:12.4.2
@@ -31,5 +34,5 @@ ENV GF_AUTH_ANONYMOUS_ENABLED=true \
     GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=grafana-clickhouse-datasource
 
 COPY --from=frontend --chown=grafana:root /app/dist /var/lib/grafana/plugins/grafana-clickhouse-datasource
-COPY --from=backend --chown=grafana:root /app/dist/gpx_clickhouse_linux_amd64 /var/lib/grafana/plugins/grafana-clickhouse-datasource/
+COPY --from=backend --chown=grafana:root /app/dist/gpx_clickhouse_linux_* /var/lib/grafana/plugins/grafana-clickhouse-datasource/
 COPY --chown=grafana:root railway/provisioning /etc/grafana/provisioning
