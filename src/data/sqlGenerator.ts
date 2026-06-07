@@ -191,10 +191,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // pairs from a JSON string as Array(Tuple(String,String)); values are raw JSON literals
   // (strings are quoted, numbers/booleans are not). replaceRegexpOne strips the surrounding
   // quotes from string values so every value lands as a plain string.
-  const jsonAttrsToFields = (expr: string): string => {
-    const json = `toJSONString(${expr})`;
-    return `arrayMap(kv -> map('key', kv.1, 'value', replaceRegexpOne(kv.2, '^"(.*)"$', '\\1')), JSONExtractKeysAndValuesRaw(${json}))`;
-  };
+  const jsonAttrsToFields = (expr: string): string =>
+    `[map('key', '__json__', 'value', toJSONString(${expr}))]`;
   const attrsToFields = (expr: string) => tagsAreJSON
     ? jsonAttrsToFields(expr)
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
@@ -699,7 +697,7 @@ const getTableIdentifier = (database: string, table: string): string => {
 };
 
 export const escapeIdentifier = (id: string): string => {
-  return id ? `"${id}"` : '';
+  return id ? `"${id.replace(/"/g, '""')}"` : '';
 };
 
 const escapeValue = (value: string): string => {

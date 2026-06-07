@@ -208,6 +208,22 @@ const flattenJsonTags = (
  * the SQL generator, so those frames are skipped by the Array.isArray check below.
  * Auto-detects whether values are plain objects (need conversion) or already arrays.
  */
+const expandJsonSentinel = (
+  fields: Array<{ key: string; value: string }>
+): Array<{ key: string; value: string }> =>
+  fields.flatMap((f) => {
+    if (f.key !== '__json__') {
+      return [f];
+    }
+    try {
+      const parsed = JSON.parse(f.value);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return flattenJsonTags(parsed as Record<string, unknown>);
+      }
+    } catch {}
+    return [f];
+  });
+
 export const transformTraceTagFields = (
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse
@@ -223,20 +239,45 @@ export const transformTraceTagFields = (
     }
 
     frame.fields.forEach((field) => {
-      if (field.name !== 'tags' && field.name !== 'serviceTags') {
-        return;
-      }
-      // Skip if values are already [{key,value}] arrays rather than plain objects.
-      const firstNonNull = (field.values as unknown[]).find((v) => v !== null && v !== undefined);
-      if (firstNonNull === undefined || Array.isArray(firstNonNull) || typeof firstNonNull !== 'object') {
-        return;
-      }
-      field.values = (field.values as unknown[]).map((value) => {
-        if (value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
-          return flattenJsonTags(value as Record<string, unknown>);
+      if (field.name === 'tags' || field.name === 'serviceTags') {
+        // Skip if values are already [{key,value}] arrays rather than plain objects.
+        const firstNonNull = (field.values as unknown[]).find((v) => v !== null && v !== undefined);
+        if (firstNonNull === undefined || Array.isArray(firstNonNull) || typeof firstNonNull !== 'object') {
+          return;
         }
-        return value;
-      });
+        field.values = (field.values as unknown[]).map((value) => {
+          if (value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
+            return flattenJsonTags(value as Record<string, unknown>);
+          }
+          return value;
+        });
+      } else if (field.name === 'logs') {
+        field.values = (field.values as unknown[]).map((events) => {
+          if (!Array.isArray(events)) {
+            return events;
+          }
+          return events.map((event: unknown) => {
+            const e = event as Record<string, unknown>;
+            if (!Array.isArray(e?.fields)) {
+              return event;
+            }
+            return { ...e, fields: expandJsonSentinel(e.fields as Array<{ key: string; value: string }>) };
+          });
+        });
+      } else if (field.name === 'references') {
+        field.values = (field.values as unknown[]).map((links) => {
+          if (!Array.isArray(links)) {
+            return links;
+          }
+          return links.map((link: unknown) => {
+            const l = link as Record<string, unknown>;
+            if (!Array.isArray(l?.tags)) {
+              return link;
+            }
+            return { ...l, tags: expandJsonSentinel(l.tags as Array<{ key: string; value: string }>) };
+          });
+        });
+      }
     });
   });
 };
@@ -320,24 +361,29 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       let columns = originalQuery.builderOptions.columns;
       const db = originalQuery.builderOptions.database;
       const tbl = originalQuery.builderOptions.table;
-      // fetchedLiveSchema tracks whether we actually queried ClickHouse for column types.
-      // The meta.tagsAreJSON fallback is only used when we couldn't fetch (empty db/table).
-      const fetchedLiveSchema = !!(db && tbl);
-      try {
-        if (fetchedLiveSchema) {
+
+      const tagsCol = columns?.find(
+        (c) => c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags
+      );
+      const typeKnown = tagsCol?.type !== undefined;
+
+      let fetchedLiveSchema = false;
+      if (db && tbl && !typeKnown) {
+        try {
           const allCols = await getCachedColumns(db, tbl);
           columns = stampJsonColumnTypes(columns ?? [], allCols);
+          fetchedLiveSchema = true;
+        } catch {
+          // fall through; SQL generator falls back to mapKeys()
         }
-      } catch {
-        // fall through; SQL generator falls back to mapKeys()
       }
 
-      // Only fall back to stored meta when fetchColumns was not called (empty db/table).
+      // Fall back to stored meta only when we didn't fetch and the column type isn't already set.
       const effectiveTagsAreJSON =
         (columns?.some((c) =>
           (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
           c.type?.toLowerCase().startsWith('json')) ?? false) ||
-        (!fetchedLiveSchema && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
+        (!fetchedLiveSchema && !typeKnown && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,

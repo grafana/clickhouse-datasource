@@ -202,7 +202,7 @@ test.describe('JSON-typed trace attribute columns', () => {
     expect(logsIdx).toBeGreaterThanOrEqual(0);
 
     const logsValues: unknown[] = firstFrame?.data?.values?.[logsIdx] ?? [];
-    // jspan-1 and jspan-2 have events; at least one row must have a non-empty array.
+    // jspan-1 and jspan-2 have events; at least one row must have a non-empty array. // cspell:ignore jspan
     const hasEvents = logsValues.some((v) => Array.isArray(v) && v.length > 0);
     expect(hasEvents).toBe(true);
   });

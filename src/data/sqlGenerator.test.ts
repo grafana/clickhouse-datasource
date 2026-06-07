@@ -315,8 +315,8 @@ describe('SQL Generator', () => {
     expect(sql).toContain('"ResourceAttributes" as serviceTags');
     expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
     expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
-    // events/links attributes must be converted in SQL via JSONExtractKeysAndValuesRaw
-    expect(sql).toContain('JSONExtractKeysAndValuesRaw(toJSONString(attributes))');
+    // events/links attributes are passed as raw JSON and expanded client-side
+    expect(sql).toContain("map('key', '__json__', 'value', toJSONString(attributes))");
     expect(sql).not.toContain('mapKeys(attributes)');
     expect(sql).not.toContain('CAST');
   });
@@ -360,9 +360,9 @@ describe('SQL Generator', () => {
     expect(sql).toContain('"ResourceAttributes" as serviceTags');
     expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
     expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
-    // events/links attributes must be converted in SQL via JSONExtractKeysAndValuesRaw
-    expect(sql).toContain('JSONExtractKeysAndValuesRaw(toJSONString(event.Attributes))');
-    expect(sql).toContain('JSONExtractKeysAndValuesRaw(toJSONString(link.Attributes))');
+    // events/links attributes are passed as raw JSON and expanded client-side
+    expect(sql).toContain("map('key', '__json__', 'value', toJSONString(event.Attributes))");
+    expect(sql).toContain("map('key', '__json__', 'value', toJSONString(link.Attributes))");
     expect(sql).not.toContain('mapKeys(event.Attributes)');
     expect(sql).not.toContain('mapKeys(link.Attributes)');
     expect(sql).not.toContain('CAST');
