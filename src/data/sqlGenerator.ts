@@ -151,9 +151,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   const traceTags = getColumnByHint(options, ColumnHint.TraceTags);
   const traceServiceTags = getColumnByHint(options, ColumnHint.TraceServiceTags);
 
-  const metaTagsAreJSON = Boolean(options.meta?.tagsAreJSON);
-  const traceTagsIsJSON = traceTags?.type?.toLowerCase().startsWith('json') === true || metaTagsAreJSON;
-  const traceServiceTagsIsJSON = traceServiceTags?.type?.toLowerCase().startsWith('json') === true || metaTagsAreJSON;
+  // Use only the column type to determine JSON mode. Both buildOtelColumns (in
+  // traceQueryBuilderHooks.ts) and stampJsonColumnTypes (in utils.ts) stamp the
+  // correct type:'JSON' on these columns before generateSql is called, so the
+  // column type is authoritative. meta.tagsAreJSON is not consulted here to avoid
+  // stale saved values from a prior JSON-schema table influencing SQL generation
+  // when the datasource is later pointed at a Map-typed table.
+  const traceTagsIsJSON = traceTags?.type?.toLowerCase().startsWith('json') === true;
+  const traceServiceTagsIsJSON = traceServiceTags?.type?.toLowerCase().startsWith('json') === true;
   // Combined flag for events/links — the ClickHouse 26+ OTel schema migrates all attribute columns
   // together, so either top-level column being JSON implies all attribute columns are JSON.
   const tagsAreJSON = traceTagsIsJSON || traceServiceTagsIsJSON;
@@ -192,7 +197,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // (strings are quoted, numbers/booleans are not). replaceRegexpOne strips the surrounding
   // quotes from string values so every value lands as a plain string.
   const jsonAttrsToFields = (expr: string): string =>
-    `[map('key', '__json__', 'value', toJSONString(${expr}))]`;
+    `[map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(${expr}))]`;
   const attrsToFields = (expr: string) => tagsAreJSON
     ? jsonAttrsToFields(expr)
     : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
@@ -699,6 +704,16 @@ const getTableIdentifier = (database: string, table: string): string => {
 export const escapeIdentifier = (id: string): string => {
   return id ? `"${id.replace(/"/g, '""')}"` : '';
 };
+
+/**
+ * Sentinel Map key used to carry a raw JSON blob through the typed
+ * Array(Map(String,String)) tuple cast in events/links SQL. Chosen to be
+ * distinct from any valid OTel attribute key (OTel keys follow the pattern
+ * [a-z_][0-9a-z_\-.*]* and never start with double-underscores).
+ * Client-side expandJsonSentinel in utils.ts recognizes this key and
+ * replaces the entry with the flattened key-value pairs from the JSON blob.
+ */
+export const JSON_SENTINEL_KEY = '__ch_json__';
 
 const escapeValue = (value: string): string => {
   if (value.includes('$') || value.includes('(') || value.includes(')') || value.includes("'") || value.includes('"')) {

@@ -12,7 +12,7 @@ import {
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
-import { generateSql } from './sqlGenerator';
+import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
 import otel from 'otel';
 
 /**
@@ -212,7 +212,7 @@ const expandJsonSentinel = (
   fields: Array<{ key: string; value: string }>
 ): Array<{ key: string; value: string }> =>
   fields.flatMap((f) => {
-    if (f.key !== '__json__') {
+    if (f.key !== JSON_SENTINEL_KEY) {
       return [f];
     }
     try {
@@ -229,11 +229,19 @@ export const transformTraceTagFields = (
   res: DataQueryResponse
 ): void => {
   res.data.forEach((frame: DataFrame) => {
-    // Only transform frames that look like Grafana trace frames (have a traceID field).
-    // This prevents accidentally mutating 'tags'/'serviceTags' fields in non-trace queries.
-    const isTraceFrame = frame.fields.some(
-      (f) => f.name.toLowerCase() === 'traceid' || f.name.toLowerCase() === 'trace_id'
-    );
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+
+    // For builder queries use the queryType directly — it's authoritative and avoids
+    // false-positive matches on non-trace tables that happen to have a 'traceID' column.
+    // For raw SQL we fall back to a field-name heuristic since there's no queryType.
+    let isTraceFrame: boolean;
+    if (originalQuery?.editorType === EditorType.Builder) {
+      isTraceFrame = originalQuery.builderOptions?.queryType === QueryType.Traces;
+    } else {
+      isTraceFrame = frame.fields.some(
+        (f) => f.name.toLowerCase() === 'traceid' || f.name.toLowerCase() === 'trace_id'
+      );
+    }
     if (!isTraceFrame) {
       return;
     }
@@ -299,10 +307,16 @@ function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[])
 
 /**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
- * The link will open a second query editor in split view
- * on the explore page with the selected trace ID.
+ * The link will open a second query editor in split view on the explore page
+ * with the selected trace ID.
  *
  * Requires defaults to be configured when crossing query types.
+ *
+ * **Async** — fetches live column schema via `datasource.getColumnsCached()` to
+ * auto-detect JSON-typed tag columns (SpanAttributes, ResourceAttributes). Results
+ * are cached on the datasource instance so repeated calls for the same table are
+ * free after the first. Callers must `await` or use `mergeMap(from(...))` in an
+ * RxJS pipeline (see `CHDatasource.query()`).
  */
 export const transformQueryResponseWithTraceAndLogLinks = async (
   datasource: Datasource,
@@ -312,15 +326,9 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
   applyTraceSearchFieldConfig(req, res);
   transformTraceTagFields(req, res);
 
-  // Cache fetchColumns results so we don't make a separate request for every frame.
-  const colCache = new Map<string, TableColumn[]>();
-  const getCachedColumns = async (db: string, tbl: string): Promise<TableColumn[]> => {
-    const key = `${db}\0${tbl}`;
-    if (!colCache.has(key)) {
-      colCache.set(key, await datasource.fetchColumns(db, tbl));
-    }
-    return colCache.get(key)!;
-  };
+  // Use the datasource-level column cache so repeated queries against the same
+  // table (dashboard refreshes, live tail) don't each trigger a DESC TABLE round-trip.
+  const getCachedColumns = (db: string, tbl: string) => datasource.getColumnsCached(db, tbl);
 
   for (const frame of res.data as DataFrame[]) {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;

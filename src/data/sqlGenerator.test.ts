@@ -16,6 +16,7 @@ import {
   getColumnIndexByHint,
   getColumnsByHints,
   isAggregateQuery,
+  JSON_SENTINEL_KEY,
 } from './sqlGenerator';
 
 describe('SQL Generator', () => {
@@ -316,7 +317,7 @@ describe('SQL Generator', () => {
     expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
     expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
     // events/links attributes are passed as raw JSON and expanded client-side
-    expect(sql).toContain("map('key', '__json__', 'value', toJSONString(attributes))");
+    expect(sql).toContain(`map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(attributes))`);
     expect(sql).not.toContain('mapKeys(attributes)');
     expect(sql).not.toContain('CAST');
   });
@@ -361,8 +362,8 @@ describe('SQL Generator', () => {
     expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
     expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
     // events/links attributes are passed as raw JSON and expanded client-side
-    expect(sql).toContain("map('key', '__json__', 'value', toJSONString(event.Attributes))");
-    expect(sql).toContain("map('key', '__json__', 'value', toJSONString(link.Attributes))");
+    expect(sql).toContain(`map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(event.Attributes))`);
+    expect(sql).toContain(`map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(link.Attributes))`);
     expect(sql).not.toContain('mapKeys(event.Attributes)');
     expect(sql).not.toContain('mapKeys(link.Attributes)');
     expect(sql).not.toContain('CAST');

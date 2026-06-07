@@ -5,9 +5,11 @@ import { Page } from '@playwright/test';
 //
 // Background: ClickHouse 26+ uses a native JSON type for span/resource/event/link
 // attribute columns (SpanAttributes, ResourceAttributes, Events.Attributes,
-// Links.Attributes) instead of Map(String,String).  mapKeys() does not work on
-// JSON type; the plugin auto-detects JSON columns and uses JSONAllPaths +
-// JSONExtractString (with splitByChar dot-path traversal) instead.
+// Links.Attributes) instead of Map(String,String). mapKeys() does not work on
+// JSON type. The plugin auto-detects JSON columns and uses a sentinel pattern for
+// events/links: toJSONString(attributes) is stored under a sentinel Map key and
+// expanded client-side. Top-level tags/serviceTags are returned as raw JSON and
+// flattened client-side by flattenJsonTags in utils.ts.
 //
 // These tests verify the full stack:
 //   A. SQL query with JSON attribute columns executes without a mapKeys error
@@ -79,14 +81,17 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 }
 
 // SQL matching the shape generateSql produces for a non-flattenNested OTel trace query
-// against a JSON-column table. Exercises JSONAllPaths + JSON_VALUE (the real generated SQL).
+// against a JSON-column table. For events/links, attributes are wrapped in a single-element
+// Array(Map(String,String)) carrying the raw JSON blob under the sentinel key '__ch_json__',
+// which is expanded client-side by expandJsonSentinel in utils.ts.
+// NOTE: JSON_VALUE with a dynamic concat path is NOT used — ClickHouse requires the path
+// argument to be a compile-time constant (error code 44).
 const BUILDER_SQL = [
   `SELECT TraceId as traceID, SpanId as spanID, ParentSpanId as parentSpanID,`,
   `ServiceName as serviceName, SpanName as operationName,`,
   `SpanAttributes as tags, ResourceAttributes as serviceTags,`,
   `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)),`,
-  `arrayMap(path -> map('key', path, 'value', ifNull(JSON_VALUE(toJSONString(attributes), concat('$.', path)), '')),`,
-  `JSONAllPaths(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))),`,
+  `[map('key', '__ch_json__', 'value', toJSONString(attributes))])::Tuple(name String, timestamp String, fields Array(Map(String, String))),`,
   `Events.Name, Events.Timestamp, Events.Attributes) AS logs`,
   `FROM e2e_test.trace_spans_json`,
   `WHERE TraceId = '${TRACE_ID}'`,
@@ -167,10 +172,10 @@ test.describe('JSON-typed trace attribute columns', () => {
     }
   });
 
-  test('(fixture) builder-shaped SQL with JSONAllPaths + JSON_VALUE executes and returns event logs', async ({ page, explorePage }) => {
+  test('(fixture) builder-shaped SQL with JSON sentinel pattern executes and returns event logs', async ({ page, explorePage }) => {
     // Validates the SQL shape the plugin generates for JSON-column OTel queries:
-    // JSONAllPaths enumerates attribute paths; JSON_VALUE extracts each value as a string
-    // regardless of JSON type (number, boolean, string). mapKeys must NOT appear.
+    // event attributes are wrapped in a single sentinel Map entry carrying the raw JSON blob;
+    // the client-side expandJsonSentinel expands it into key-value pairs. mapKeys must NOT appear.
     test.skip(
       isCloudRun,
       'Fixture-data tests depend on trace_spans_json seeded via tests/e2e/fixtures/trace_spans_json.sql, which is not available on Cloud.'

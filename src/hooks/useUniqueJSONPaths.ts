@@ -1,7 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Datasource } from 'data/CHDatasource';
 
-export default (datasource: Datasource, jsonColumn: string, database: string, table: string, keysColumn?: string): readonly string[] => {
+const useUniqueJSONPaths = (
+  datasource: Datasource,
+  jsonColumn: string,
+  database: string,
+  table: string,
+  keysColumn?: string
+): readonly string[] => {
   const [paths, setPaths] = useState<string[]>([]);
 
   useEffect(() => {
@@ -31,3 +37,5 @@ export default (datasource: Datasource, jsonColumn: string, database: string, ta
 
   return paths;
 };
+
+export default useUniqueJSONPaths;

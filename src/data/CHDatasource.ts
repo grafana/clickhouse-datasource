@@ -940,6 +940,21 @@ export class Datasource
     return this.fetchColumnsFromTable(database, table);
   }
 
+  private readonly _columnCache = new Map<string, TableColumn[]>();
+
+  /**
+   * Returns columns for the given table, reusing a cached result when available.
+   * The cache lives for the lifetime of the datasource instance, which is reset on
+   * config save or page reload — short enough that stale schema is not a concern.
+   */
+  async getColumnsCached(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const key = `${database ?? ''}\0${table}`;
+    if (!this._columnCache.has(key)) {
+      this._columnCache.set(key, await this.fetchColumns(database, table));
+    }
+    return this._columnCache.get(key)!;
+  }
+
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
