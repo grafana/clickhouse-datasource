@@ -155,7 +155,8 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
       return;
     }
 
-    const isTraceSearch = originalQuery.editorType === EditorType.Builder &&
+    const isTraceSearch =
+      originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces &&
       !originalQuery.builderOptions.meta?.isTraceIdMode;
 
@@ -367,7 +368,16 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       traceLogsQuery.rawSql = '';
     }
     traceField.config.links = [];
-    if (datasource.settings.jsonData.traces?.showTraceLinks !== false) {
+    const canLinkToTraces =
+      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Traces
+        ? true
+        : canBuildTraceLink(datasource);
+    const canLinkToLogs =
+      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs
+        ? true
+        : canBuildLogsLink(datasource);
+
+    if (datasource.settings.jsonData.traces?.showTraceLinks !== false && canLinkToTraces) {
       traceField.config.links!.push({
         title: 'View trace',
         targetBlank: openInNewWindow,
@@ -384,7 +394,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         },
       });
     }
-    if (datasource.settings.jsonData.logs?.showLogLinks !== false) {
+    if (datasource.settings.jsonData.logs?.showLogLinks !== false && canLinkToLogs) {
       traceField.config.links!.push({
         title: 'View logs',
         targetBlank: openInNewWindow,
@@ -399,6 +409,16 @@ export const transformQueryResponseWithTraceAndLogLinks = (
   });
 
   return res;
+};
+
+const canBuildTraceLink = (datasource: Datasource): boolean => {
+  const traceColumns = datasource.getDefaultTraceColumns();
+  return Boolean(datasource.getDefaultTraceTable() && traceColumns.get(ColumnHint.TraceId));
+};
+
+const canBuildLogsLink = (datasource: Datasource): boolean => {
+  const logColumns = datasource.getDefaultLogsColumns();
+  return Boolean(datasource.getDefaultLogsTable() && logColumns.get(ColumnHint.TraceId));
 };
 
 // The name of the dataframe field containing labels

@@ -28,7 +28,7 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { firstValueFrom, map, Observable } from 'rxjs';
-import { CHConfig } from 'types/config';
+import { CHConfig, ConfigMode, SignalType } from 'types/config';
 import {
   AggregateColumn,
   AggregateType,
@@ -405,7 +405,7 @@ export class Datasource
       }
 
       // Build filter entries for all tables
-      const tableFilters = tableNames.map(tableName => `'${tableName}': '${filterStr}'`).join(', ');
+      const tableFilters = tableNames.map((tableName) => `'${tableName}': '${filterStr}'`).join(', ');
       return `additional_table_filters={${tableFilters}}`;
     });
   }
@@ -439,11 +439,19 @@ export class Datasource
     const actionValue = action.options.value;
     let mapKey = '';
 
-    // Convert flattened/merged OTel attributes into column+path pair
-    if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
-      const prefixIndex = columnName.indexOf('.');
-      mapKey = columnName.substring(prefixIndex + 1);
-      columnName = columnName.substring(0, prefixIndex);
+    // Convert flattened/merged OTel attributes into column+path pair.
+    // Grafana log details can emit semantic, normalized keys like
+    // `log_attributes.log.file.path`, while the query may use a configured
+    // column name like `LogAttributes`. Resolve the prefix through selected
+    // column hints/names/aliases so compact and classic builders behave alike.
+    const prefixIndex = columnName.indexOf('.');
+    if (prefixIndex > -1) {
+      const columnPrefix = columnName.substring(0, prefixIndex);
+      const attributeColumn = this.getAttributeColumnByDisplayPrefix(query.builderOptions, columnPrefix);
+      if (attributeColumn) {
+        mapKey = columnName.substring(prefixIndex + 1);
+        columnName = attributeColumn.alias || attributeColumn.name;
+      }
     }
 
     // Find selected column by alias/name
@@ -485,7 +493,7 @@ export class Datasource
         key: column && column.hint ? '' : columnName,
         hint: column && column.hint ? column.hint : undefined,
         mapKey: hasMapKey ? mapKey : undefined,
-        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
+        type: hasMapKey ? (columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'String',
         filterType: 'custom',
         operator: FilterOperator.Equals,
         value: actionValue,
@@ -518,7 +526,7 @@ export class Datasource
         key: column && column.hint ? '' : columnName,
         hint: column && column.hint ? column.hint : undefined,
         mapKey: hasMapKey ? mapKey : undefined,
-        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
+        type: hasMapKey ? (columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'String',
         filterType: 'custom',
         operator: FilterOperator.NotEquals,
         value: actionValue,
@@ -550,6 +558,31 @@ export class Datasource
       rawSql: generateSql(nextOptions),
       builderOptions: nextOptions,
     };
+  }
+
+  private getAttributeColumnByDisplayPrefix(
+    builderOptions: QueryBuilderOptions,
+    columnPrefix: string
+  ): SelectedColumn | undefined {
+    const attributeHints = new Set([
+      ColumnHint.ResourceAttributes,
+      ColumnHint.ScopeAttributes,
+      ColumnHint.LogAttributes,
+    ]);
+    const normalizedPrefix = normalizeLogFieldName(columnPrefix);
+
+    return builderOptions.columns?.find((column) => {
+      const isAttributeHint = column.hint ? attributeHints.has(column.hint) : false;
+      const isAttributeType = column.type?.startsWith('Map') || column.type?.startsWith('JSON');
+      if (!isAttributeHint && !isAttributeType) {
+        return false;
+      }
+
+      const candidates = isAttributeHint ? [column.name, column.alias, column.hint] : [column.name, column.alias];
+      return candidates.filter(isString).some((candidate) => {
+        return normalizeLogFieldName(candidate) === normalizedPrefix;
+      });
+    });
   }
 
   private getMacroArgs(query: string, argsIndex: number): string[] {
@@ -598,6 +631,22 @@ export class Datasource
 
   getDefaultTable(): string | undefined {
     return this.settings.jsonData.defaultTable;
+  }
+
+  getSignalType(): SignalType | undefined {
+    return this.settings.jsonData.signalType;
+  }
+
+  getConfigMode(): ConfigMode {
+    if (this.settings.jsonData.configMode) {
+      return this.settings.jsonData.configMode;
+    }
+
+    return this.getSignalType() ? 'single-table' : 'classic';
+  }
+
+  isSingleTableMode(): boolean {
+    return this.getConfigMode() === 'single-table' && Boolean(this.getSignalType());
   }
 
   getDefaultLogsDatabase(): string | undefined {
@@ -765,6 +814,16 @@ export class Datasource
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
     const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctValues(column: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT "${column}" FROM "${db}"."${table}" WHERE "${column}" IS NOT NULL LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctMapValues(mapColumn: string, mapKey: string, db: string, table: string): Promise<string[]> {
+    const rawSql = `SELECT DISTINCT ${mapColumn}['${mapKey}'] FROM "${db}"."${table}" WHERE mapContains(${mapColumn}, '${mapKey}') LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1443,6 +1502,8 @@ enum AdHocFilterStatus {
   enabled,
   disabled,
 }
+
+const normalizeLogFieldName = (fieldName: string): string => fieldName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface Tags {
   type?: TagType;

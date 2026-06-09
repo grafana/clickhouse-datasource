@@ -12,7 +12,14 @@ import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
 import { of } from 'rxjs';
-import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+} from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
 import { Datasource } from './CHDatasource';
@@ -45,6 +52,43 @@ const createInstance = ({ queryResponse }: Partial<InstanceConfig> = {}) => {
 };
 
 describe('ClickHouseDatasource', () => {
+  describe('single-table configuration mode', () => {
+    it('defaults to classic mode when configMode and signalType are unset', () => {
+      const ds = createInstance({});
+
+      expect(ds.getSignalType()).toBeUndefined();
+      expect(ds.getConfigMode()).toBe('classic');
+      expect(ds.isSingleTableMode()).toBe(false);
+    });
+
+    it('uses explicit configMode and signalType', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+
+      expect(ds.getSignalType()).toBe('logs');
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(true);
+    });
+
+    it('infers single-table mode from legacy signalType', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.signalType = 'traces';
+
+      expect(ds.getSignalType()).toBe('traces');
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(true);
+    });
+
+    it('does not enter single-table mode without a signal type', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.configMode = 'single-table';
+
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(false);
+    });
+  });
+
   describe('metricFindQuery', () => {
     it('fetches values', async () => {
       const mockedValues = [1, 100];
@@ -139,7 +183,7 @@ describe('ClickHouseDatasource', () => {
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -184,12 +228,14 @@ describe('ClickHouseDatasource', () => {
 
       // Mock the template variable resolution
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => resolvedSql);
-      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [{name: 'clickhouse_adhoc_use_json'}]);
+      const spyOnGetVars = jest
+        .spyOn(templateSrvMock, 'getVariables')
+        .mockImplementation(() => [{ name: 'clickhouse_adhoc_use_json' }]);
 
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -215,7 +261,6 @@ describe('ClickHouseDatasource', () => {
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
     });
-
 
     it('should expand $__adHocFilters macro with single quotes', async () => {
       const query = {
@@ -1063,7 +1108,7 @@ describe('ClickHouseDatasource', () => {
                 value: 'error',
                 type: 'string',
                 filterType: 'custom',
-                condition: 'AND'
+                condition: 'AND',
               },
             ],
           },
@@ -1205,7 +1250,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'debug',
+              },
+            ],
           },
         };
 
@@ -1249,7 +1303,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'info' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'info',
+              },
+            ],
           },
         };
 
@@ -1276,7 +1339,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'info' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.NotEquals,
+                value: 'info',
+              },
+            ],
           },
         };
 
@@ -1296,7 +1368,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'error' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.NotEquals,
+                value: 'error',
+              },
+            ],
           },
         };
 
@@ -1436,7 +1517,17 @@ describe('ClickHouseDatasource', () => {
           builderOptions: {
             ...query.builderOptions,
             columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
-            filters: [{ condition: 'AND', key: '', hint: ColumnHint.LogLevel, type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: '',
+                hint: ColumnHint.LogLevel,
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'debug',
+              },
+            ],
           },
         };
 
@@ -1517,6 +1608,31 @@ describe('ClickHouseDatasource', () => {
           value: 'abc123',
         });
       });
+
+      it('resolves normalized log attribute field names through column hints', () => {
+        const queryWithLogAttributes: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLogAttributes, {
+          type: 'ADD_FILTER',
+          options: { key: 'log_attributes.log.file.path', value: '/var/log/pod.log' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: '',
+          hint: ColumnHint.LogAttributes,
+          mapKey: 'log.file.path',
+          type: 'Map(String, String)',
+          operator: FilterOperator.Equals,
+          value: '/var/log/pod.log',
+        });
+        expect(result.rawSql).toContain("LogAttributes['log.file.path'] = '/var/log/pod.log'");
+      });
     });
 
     describe('ADD_STRING_FILTER with LogMessage column alias', () => {
@@ -1545,7 +1661,10 @@ describe('ClickHouseDatasource', () => {
 
     it('returns query unchanged for non-Builder editorType', () => {
       const sqlQuery: CHSqlQuery = { pluginVersion: '', refId: 'A', editorType: EditorType.SQL, rawSql: 'SELECT 1' };
-      const result = datasource.modifyQuery(sqlQuery, { type: 'ADD_FILTER', options: { key: 'level', value: 'info' } } as any);
+      const result = datasource.modifyQuery(sqlQuery, {
+        type: 'ADD_FILTER',
+        options: { key: 'level', value: 'info' },
+      } as any);
       expect(result).toBe(sqlQuery);
     });
 
@@ -1610,9 +1729,7 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       // Force a single context column so we don't hit the "no columns" guard.
       jest.spyOn(ds, 'getLogContextColumnsFromLogRow').mockReturnValue([{ name: 'service', value: 'web' }]);
-      const querySpy = jest
-        .spyOn(ds, 'query')
-        .mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+      const querySpy = jest.spyOn(ds, 'query').mockImplementation((_req) => of({ data: [toDataFrame([])] }));
 
       const query = cloneDeep(baseQuery);
       await ds.getLogRowContext(makeRow(), contextOptions, query);
@@ -1625,13 +1742,9 @@ describe('ClickHouseDatasource', () => {
       // Primary entry is the time column (inserted by getLogRowContext).
       expect(orderBy[0]).toMatchObject({ hint: ColumnHint.Time });
       // User's secondary entry survives as a tiebreaker.
-      expect(orderBy).toContainEqual(
-        expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC })
-      );
+      expect(orderBy).toContainEqual(expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC }));
       // Original time-column entry is not duplicated.
-      const timeEntries = orderBy.filter(
-        (e) => e.hint === ColumnHint.Time || e.name === 'timestamp'
-      );
+      const timeEntries = orderBy.filter((e) => e.hint === ColumnHint.Time || e.name === 'timestamp');
       expect(timeEntries).toHaveLength(1);
     });
 

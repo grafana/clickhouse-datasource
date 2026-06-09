@@ -5,13 +5,14 @@ import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
 import otel from 'otel';
 import { LabeledInput } from './LabeledInput';
-import { CHLogsConfig, defaultCHAdditionalSettingsConfig } from 'types/config';
+import { CHLogsConfig, ConfigMode, defaultCHAdditionalSettingsConfig } from 'types/config';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
 
 interface LogsConfigProps {
   logsConfig?: CHLogsConfig;
+  variant?: ConfigMode;
   onDefaultDatabaseChange: (v: string) => void;
   onDefaultTableChange: (v: string) => void;
   onOtelEnabledChange: (v: boolean) => void;
@@ -53,6 +54,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     showLogLinks,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
+  const sectionLabels = props.variant === 'single-table' ? labels.variants.singleTable : labels;
 
   const otelConfig = otel.getVersion(otelVersion);
   if (otelEnabled && otelConfig) {
@@ -66,7 +68,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onContextColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
 
   return (
-    <ConfigSection title={labels.title} description={labels.description}>
+    <ConfigSection title={sectionLabels.title} description={sectionLabels.description}>
       <div id="logs-config" />
       <Field label={labels.defaultDatabase.label} description={labels.defaultDatabase.description}>
         <Input

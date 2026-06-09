@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { ConfigEditor } from './CHConfigEditor';
 import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
 import '@testing-library/jest-dom';
@@ -130,5 +130,82 @@ describe('ConfigEditor', () => {
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();
     expect(screen.getByText(labels.enableRowLimit.label)).toBeInTheDocument();
     expect(screen.getByTestId(labels.enableRowLimit.testid)).toBeChecked();
+  });
+
+  it('renders single-table logs configuration', () => {
+    render(
+      <ConfigEditor
+        {...mockConfigEditorProps({
+          configMode: 'single-table',
+          signalType: 'logs',
+          logs: {
+            defaultDatabase: 'otel_v2',
+            defaultTable: 'otel_logs',
+            otelEnabled: true,
+            otelVersion: '1.29.0',
+          },
+        })}
+      />
+    );
+
+    expect(screen.getByText('Configuration Mode')).toBeInTheDocument();
+    expect(screen.getByText('Signal type')).toBeInTheDocument();
+    expect(screen.getByText('Logs Table & Schema')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('otel_v2')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('otel_logs')).toBeInTheDocument();
+    expect(screen.getByText(allLabels.components.OtelVersionSelect.label)).toBeInTheDocument();
+    expect(screen.getByText(allLabels.components.Config.LogsConfig.traceIdCorrelation.title)).toBeInTheDocument();
+    expect(
+      screen.getByText(allLabels.components.Config.LogsConfig.traceIdCorrelation.showLogLinks.label)
+    ).toBeInTheDocument();
+  });
+
+  it('defaults to logs when switching to single-table mode', () => {
+    const props = mockConfigEditorProps({ configMode: 'classic' });
+    render(<ConfigEditor {...props} />);
+
+    (props.onOptionsChange as jest.Mock).mockClear();
+    fireEvent.click(screen.getByText('Single table'));
+
+    expect(props.onOptionsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({
+          configMode: 'single-table',
+          signalType: 'logs',
+        }),
+      })
+    );
+  });
+
+  it('persists the single-table logs trace correlation setting', () => {
+    const props = mockConfigEditorProps({
+      configMode: 'single-table',
+      signalType: 'logs',
+      logs: {
+        defaultTable: 'otel_logs',
+        otelVersion: '1.29.0',
+        showLogLinks: true,
+      },
+    });
+    render(<ConfigEditor {...props} />);
+
+    (props.onOptionsChange as jest.Mock).mockClear();
+    const showLogLinksLabel = screen.getByText(
+      allLabels.components.Config.LogsConfig.traceIdCorrelation.showLogLinks.label
+    );
+    const showLogLinksInput = showLogLinksLabel.closest('.gf-form')?.querySelector('input');
+
+    expect(showLogLinksInput).toBeChecked();
+    fireEvent.click(showLogLinksInput!);
+
+    expect(props.onOptionsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({
+          logs: expect.objectContaining({
+            showLogLinks: false,
+          }),
+        }),
+      })
+    );
   });
 });

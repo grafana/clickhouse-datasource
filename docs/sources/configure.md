@@ -165,6 +165,17 @@ When **Secure connection** is enabled, the following TLS settings become availab
 | **Client Cert** | PEM-encoded client certificate (required when TLS Client Auth is enabled). |
 | **Client Key** | PEM-encoded client private key (required when TLS Client Auth is enabled). |
 
+### Configuration mode
+
+Use **Configuration mode** to choose how the data source is used by the query builder.
+
+| Mode | Description |
+|------|-------------|
+| **All databases** | Allows queries against any database and table the ClickHouse user can read. Use this mode for general exploration and dashboards that query multiple tables. |
+| **Single source** | Focuses the data source on one logs or traces table. Choose a **Signal type**, then configure the database, table, and column mappings for that source. |
+
+Use **Single source** when the data source is dedicated to one logs or traces table, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query. Single source data sources use the [compact query mode](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#compact-query-mode) in the query editor.
+
 ### Additional settings
 
 | Setting | Description |
@@ -195,6 +206,8 @@ The data source includes a dedicated configuration section for log queries. Thes
 | **Log Message column** | The column containing the log message body. |
 | **Context columns** | Comma-separated list of columns included alongside log messages for additional context. |
 
+When **Configuration mode** is set to **Single source** and **Signal type** is set to **Logs**, these settings define the focused logs source.
+
 ### Traces configuration
 
 The data source includes a dedicated configuration section for trace queries. These settings control the default column mappings used by the [traces query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#traces-query-builder):
@@ -208,6 +221,8 @@ The data source includes a dedicated configuration section for trace queries. Th
 | **Flatten nested** | Enable if your traces table was created with `flatten_nested=1`. |
 
 When **Use OTel** is disabled, you can manually configure columns for Trace ID, Span ID, Parent Span ID, Service Name, Operation Name, Start Time, Duration, Tags, Service Tags, Kind, Status Code, Status Message, State, and Instrumentation Library.
+
+When **Configuration mode** is set to **Single source** and **Signal type** is set to **Traces**, these settings define the focused traces source.
 
 ### Private data source connect
 
@@ -272,8 +287,18 @@ datasources:
       port: 9000
       protocol: native
       username: grafana_reader
+      # configMode: classic          # "classic" for all databases, "single-table" for single source
+      # signalType: logs             # "logs" or "traces"; used when configMode is "single-table"
       # defaultDatabase: <string>
       # defaultTable: <string>
+      # logs:
+      #   defaultDatabase: <string>
+      #   defaultTable: <string>
+      #   otelEnabled: <bool>
+      # traces:
+      #   defaultDatabase: <string>
+      #   defaultTable: <string>
+      #   otelEnabled: <bool>
       # secure: <bool>
       # tlsSkipVerify: <bool>
       # tlsAuth: <bool>
@@ -313,7 +338,14 @@ resource "grafana_data_source" "clickhouse" {
     protocol         = "native"
     username         = "grafana_reader"
     tlsSkipVerify    = false
+    # configMode     = "classic" # or "single-table"
+    # signalType     = "logs"    # or "traces"; used when configMode is "single-table"
     # defaultDatabase = "mydb"
+    # logs            = {
+    #   defaultDatabase = "otel"
+    #   defaultTable    = "otel_logs"
+    #   otelEnabled     = true
+    # }
     # dialTimeout     = "10"
     # queryTimeout    = "60"
     # validateSql     = true
