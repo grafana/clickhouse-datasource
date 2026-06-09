@@ -610,7 +610,7 @@ describe('ClickHouseDatasource', () => {
       const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }, { keys: 'http.status' }]);
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin(labels.keys)')) {
+        if (sql.includes('arrayJoin("labels".keys)')) {
           return of({ data: [mapKeysFrame] });
         }
         return of({ data: [columnsFrame] });
@@ -647,7 +647,7 @@ describe('ClickHouseDatasource', () => {
 
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin(labels.keys)')) {
+        if (sql.includes('arrayJoin("labels".keys)')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['http.method']")) {
@@ -664,6 +664,77 @@ describe('ClickHouseDatasource', () => {
           targets: expect.arrayContaining([
             expect.objectContaining({
               rawSql: "select distinct labels['http.method'] from db.events limit 1000",
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('looks up per-table Map columns using the bare table name even when source is db.table', async () => {
+      // Regression: mapColumnsByTable is populated from system.columns
+      // (keyed by bare table name), but fetchTagValuesFromSchema passes
+      // `db.table` as the source. The lookup must normalize the prefix so
+      // the per-table set is hit — without this the code falls back to a
+      // flattened union, which can mis-detect Map columns when two tables
+      // share a column name (one Map, one scalar).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([
+        // `labels` is Map in `events` but a String in `other` — the lookup
+        // must scope by table.
+        { name: 'labels', type: 'Map(String, String)', table: 'events' },
+        { name: 'labels', type: 'String', table: 'other' },
+      ]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'region' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'eu' }]);
+
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        if (sql.includes("labels['region']")) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys();
+      const values = await ds.getTagValues({ key: 'events.labels.region' });
+      expect(values).toEqual([{ text: 'eu' }]);
+    });
+
+    it('escapes single quotes in Map keys when building the values SELECT', async () => {
+      // A Map key containing `'` must be escaped for ClickHouse string-
+      // literal embedding (`'` → `\'`) — otherwise the SELECT is invalid
+      // SQL and could allow injection via a crafted key.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: "weird'key" }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'v' }]);
+
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        if (sql.includes("labels['weird\\'key']")) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys();
+      const values = await ds.getTagValues({ key: "events.labels.weird'key" });
+      expect(values).toEqual([{ text: 'v' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: "select distinct labels['weird\\'key'] from db.events limit 1000",
             }),
           ]),
         })

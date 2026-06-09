@@ -73,10 +73,13 @@ export class Datasource
   adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
   adHocCHVerReq = { major: 22, minor: 7 };
 
-  // Keyed by `${db}.${table}` (or `${table}` when db unknown). Populated each
-  // time getTagKeys() reads from system.columns; consumed by
-  // fetchTagValuesFromSchema() to detect Map-column access patterns (e.g.
+  // Keyed by the bare table name (the `table` column of `system.columns`,
+  // which has no database qualifier). Populated each time getTagKeys() reads
+  // from system.columns; consumed by fetchTagValuesFromSchema() — via
+  // asMapAccess() — to detect Map-column access patterns (e.g.
   // `LogAttributes.http.method`) and rewrite the SELECT accordingly.
+  // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
+  // can pass either form.
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
@@ -1207,9 +1210,13 @@ export class Datasource
     // If `col` is of the form `<mapCol>.<mapKey>` and <mapCol> is known to
     // be a Map-typed column, rewrite to bracket-access so the SELECT pulls
     // distinct Map values rather than stringified Map objects (which the
-    // Grafana frame layer renders as `[object Object]`).
+    // Grafana frame layer renders as `[object Object]`). The map key is
+    // escaped for CH string-literal embedding so that keys containing `'`
+    // or `\` produce valid SQL.
     const mapAccess = this.asMapAccess(col, source);
-    const selectExpr = mapAccess ? `${mapAccess.column}['${mapAccess.key}']` : col;
+    const selectExpr = mapAccess
+      ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']`
+      : col;
 
     const rawSql = `select distinct ${selectExpr} from ${source} limit 1000`;
     const frame = await this.runQuery({ rawSql });
@@ -1223,14 +1230,17 @@ export class Datasource
   /**
    * Parses a dotted tag key and returns `{column, key}` when the leading
    * segment refers to a Map-typed column in the given source. The source
-   * may be either `db.table` or a bare table name.
+   * may be either `db.table` or a bare table name — we strip the `db.`
+   * prefix before lookup so the per-table cache (keyed by bare table name)
+   * is hit, rather than always falling back to the flattened union.
    */
   private asMapAccess(col: string, source: string): { column: string; key: string } | undefined {
     if (!col.includes('.')) {
       return undefined;
     }
     const parts = col.split('.');
-    const mapCols = this.mapColumnsByTable.get(source) ?? this.getFlatMapColumnSet();
+    const tableKey = source.includes('.') ? source.split('.')[1] : source;
+    const mapCols = this.mapColumnsByTable.get(tableKey) ?? this.getFlatMapColumnSet();
     if (!mapCols.has(parts[0])) {
       return undefined;
     }
@@ -1629,6 +1639,14 @@ function isMapColumnType(type: string | undefined): boolean {
     return false;
   }
   return /^(?:Nullable\(|LowCardinality\()?Map\(/.test(type);
+}
+
+// Escape a string for embedding inside a single-quoted ClickHouse string
+// literal: backslash and single quote are the only characters that need
+// escaping. Use when interpolating an untrusted identifier (e.g. a Map key
+// from system.columns) into raw SQL.
+function escapeCHStringLiteral(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 enum AdHocFilterStatus {

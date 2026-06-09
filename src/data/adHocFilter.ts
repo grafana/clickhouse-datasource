@@ -102,6 +102,15 @@ function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
 }
 
+// Two-layer escape for Map keys embedded as `MapCol[\'<key>\']` inside the
+// outer single-quoted string passed to `additional_table_filters`. A raw
+// `'` in the key has to survive (a) the inner bracket-access string literal
+// and (b) the outer filter string — so each `'` produces `\\\'` and each
+// `\` produces `\\\\` at SQL source level.
+function escapeMapKeyForOuterFilter(key: string): string {
+  return key.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
+}
+
 function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
@@ -109,7 +118,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const match = s.match(/arrayElement\((.*?),\s*['"](.*?)['"]\)/);
     if (match) {
       const [_, array, key] = match;
-      return `${array}[\\'${key}\\']`;
+      return `${array}[\\'${escapeMapKeyForOuterFilter(key)}\\']`;
     }
   }
 
@@ -125,7 +134,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return `${mapCol}.${mapKey}`;
     }
-    return `${mapCol}[\\'${mapKey}\\']`;
+    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
   }
 
   // Non-prefixed Map access: `MapCol.key1.key2` (hideTableName=true or
@@ -137,7 +146,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return s;
     }
-    return `${mapCol}[\\'${mapKey}\\']`;
+    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
   }
 
   // Default: bare column, or `table.col` reference where col isn't a Map.

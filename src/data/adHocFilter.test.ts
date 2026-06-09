@@ -374,5 +374,30 @@ describe('AdHocManager', () => {
       expect(ahm.getMapColumns().has('LogAttributes')).toBe(true);
       expect(ahm.getMapColumns().has('ResourceAttributes')).toBe(true);
     });
+
+    it("escapes single quotes and backslashes in Map keys (two-layer SQL embedding)", () => {
+      // A Map key containing `'` must survive both the inner bracket-access
+      // string literal and the outer additional_table_filters string. Without
+      // escaping, `'` would close the outer string early and produce invalid
+      // SQL (or worse, allow injection through a crafted key).
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['labels']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: "labels.a'b", operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      // Outer-string bytes for `a'b` are `a\\\'b` (raw `\\\'` is the
+      // two-level escape of `'`). The surrounding `\\\\'` brackets remain
+      // the existing outer-escaped quote.
+      expect(val).toContain("labels[\\'a\\\\\\'b\\']");
+    });
+
+    it('escapes backslashes in Map keys', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['labels']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: 'labels.a\\b', operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("labels[\\'a\\\\\\\\b\\']");
+    });
   });
 });
