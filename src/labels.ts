@@ -400,6 +400,7 @@ export default {
       tooltip: `List of filters`,
       addLabel: 'Filter',
       mapKeyPlaceholder: 'map key',
+      jsonPathPlaceholder: 'json path',
     },
     GroupByEditor: {
       label: 'Group By',

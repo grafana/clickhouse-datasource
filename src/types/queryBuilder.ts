@@ -73,6 +73,11 @@ export interface QueryBuilderOptions {
     flattenNested?: boolean;
     traceEventsColumnPrefix?: string;
     traceLinksColumnPrefix?: string;
+    /**
+     * True when the tags/serviceTags columns (and nested events/links attributes) use
+     * the ClickHouse JSON type instead of Map(String,String).
+     */
+    tagsAreJSON?: boolean;
 
     // Logs & Traces
     otelEnabled?: boolean;

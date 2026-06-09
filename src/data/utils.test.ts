@@ -6,6 +6,7 @@ import {
   isBuilderOptionsRunnable,
   labelsFieldName,
   transformQueryResponseWithTraceAndLogLinks,
+  transformTraceTagFields,
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
@@ -285,7 +286,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     };
 
     const [request, response] = buildTestRequestResponse(builderOptions);
-    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links).not.toBeUndefined();
@@ -300,6 +301,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
   it('inserts links into logs query. Copy logs columns, default trace columns.', async () => {
     const mockDatasource = newMockDatasource();
+    jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
     const getDefaultTraceDatabase = jest.spyOn(mockDatasource, 'getDefaultTraceDatabase');
     const getDefaultTraceTable = jest.spyOn(mockDatasource, 'getDefaultTraceTable');
     const getDefaultTraceColumns = jest.spyOn(mockDatasource, 'getDefaultTraceColumns');
@@ -314,7 +316,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     };
 
     const [request, response] = buildTestRequestResponse(builderOptions);
-    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links).not.toBeUndefined();
@@ -341,7 +343,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     };
 
     const [request, response] = buildTestRequestResponse(builderOptions);
-    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
     const links = out?.data[0]?.fields[0]?.config?.links;
     const viewLogsLink = links?.find((link: any) => link.title === 'View logs');
@@ -380,8 +382,9 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       return ds;
     };
 
-    it('trace→trace link has pre-generated rawSql with _trace_id_ts optimization', () => {
+    it('trace→trace link has pre-generated rawSql with _trace_id_ts optimization', async () => {
       const mockDatasource = newOtelMockDatasource();
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
       const otelConfig = otel.getVersion('latest')!;
       const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
 
@@ -399,7 +402,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       };
 
       const [request, response] = buildTestRequestResponse(builderOptions);
-      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
       const links = out?.data[0]?.fields[0]?.config?.links;
       const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
@@ -412,15 +415,82 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(true);
     });
 
-    it('logs→trace link with OTel sets hasTraceTimestampTable and generates optimized rawSql', () => {
+    it('trace→trace link auto-detects JSON tag columns via fetchColumns', async () => {
       const mockDatasource = newOtelMockDatasource();
+      // fetchColumns reports SpanAttributes and ResourceAttributes as JSON type
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([
+        { name: 'SpanAttributes', type: 'JSON', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'JSON', hint: ColumnHint.TraceServiceTags },
+      ] as any);
+      const otelConfig = otel.getVersion('latest')!;
+      // columns do NOT have type:'JSON' pre-set (simulating saved query / OTel already enabled on mount)
+      const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns,
+        meta: { otelEnabled: true, otelVersion: 'latest' },
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const traceQuery = out?.data[0]?.fields[0]?.config?.links
+        ?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.rawSql).toContain('"SpanAttributes" as tags');
+      expect(traceQuery.rawSql).not.toContain('JSONAllPaths("SpanAttributes")');
+      expect(traceQuery.rawSql).not.toContain('mapKeys("SpanAttributes")');
+      expect(traceQuery.builderOptions.meta?.tagsAreJSON).toBe(true);
+    });
+
+    it('live fetchColumns result overrides stale meta.tagsAreJSON when schema is Map-typed', async () => {
+      // Regression guard for the stale meta fallback bug:
+      // If fetchColumns returns Map-typed columns but meta.tagsAreJSON is saved as true
+      // (from a prior JSON-schema table), effectiveTagsAreJSON must be false so the
+      // SQL generator uses mapKeys() rather than JSON-path SQL.
+      const mockDatasource = newOtelMockDatasource();
+      // fetchColumns returns Map-typed columns (no JSON)
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([
+        { name: 'SpanAttributes', type: 'Map(String,String)', label: 'SpanAttributes', picklistValues: [] },
+        { name: 'ResourceAttributes', type: 'Map(String,String)', label: 'ResourceAttributes', picklistValues: [] },
+      ]);
+      const otelConfig = otel.getVersion('latest')!;
+      const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns,
+        // Stale saved meta: was true from when the table used JSON columns
+        meta: { otelEnabled: true, otelVersion: 'latest', tagsAreJSON: true },
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const traceQuery = out?.data[0]?.fields[0]?.config?.links
+        ?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+
+      // Live schema wins: Map SQL, not JSON-path SQL
+      expect(traceQuery.builderOptions.meta?.tagsAreJSON).toBe(false);
+      expect(traceQuery.rawSql).toContain('mapKeys');
+      expect(traceQuery.rawSql).not.toContain('"SpanAttributes" as tags');
+    });
+
+    it('logs→trace link with OTel sets hasTraceTimestampTable and generates optimized rawSql', async () => {
+      const mockDatasource = newOtelMockDatasource();
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
 
       const builderOptions: Partial<QueryBuilderOptions> = {
         queryType: QueryType.Logs,
       };
 
       const [request, response] = buildTestRequestResponse(builderOptions);
-      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
       const links = out?.data[0]?.fields[0]?.config?.links;
       const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
@@ -434,15 +504,16 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).toContain('trace_end');
     });
 
-    it('logs→trace link without OTel generates rawSql without _trace_id_ts optimization', () => {
+    it('logs→trace link without OTel generates rawSql without _trace_id_ts optimization', async () => {
       const mockDatasource = newMockDatasource();
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
 
       const builderOptions: Partial<QueryBuilderOptions> = {
         queryType: QueryType.Logs,
       };
 
       const [request, response] = buildTestRequestResponse(builderOptions);
-      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
       const links = out?.data[0]?.fields[0]?.config?.links;
       const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
@@ -453,8 +524,9 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBeFalsy();
     });
 
-    it('trace→trace link without hasTraceTimestampTable generates rawSql without optimization', () => {
+    it('trace→trace link without hasTraceTimestampTable generates rawSql without optimization', async () => {
       const mockDatasource = newOtelMockDatasource();
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
       const otelConfig = otel.getVersion('latest')!;
       const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
 
@@ -472,7 +544,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       };
 
       const [request, response] = buildTestRequestResponse(builderOptions);
-      const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
       const links = out?.data[0]?.fields[0]?.config?.links;
       const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
@@ -494,7 +566,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     };
 
     const [request, response] = buildTestRequestResponse(builderOptions);
-    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links).toBeDefined();
@@ -512,12 +584,147 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     };
 
     const [request, response] = buildTestRequestResponse(builderOptions);
-    const out = transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
+  });
+});
+
+describe('transformTraceTagFields', () => {
+  const makeRawSqlRequest = (): DataQueryRequest<CHQuery> => ({
+    requestId: '',
+    interval: '',
+    intervalMs: 0,
+    range: {} as any,
+    scopedVars: {} as any,
+    targets: [
+      {
+        refId: 'A',
+        editorType: EditorType.SQL,
+        pluginVersion: '',
+        rawSql: '',
+      } as CHQuery,
+    ],
+    timezone: '',
+    app: CoreApp.Explore,
+    startTime: 0,
+  });
+
+  const makeBuilderTraceRequest = (): DataQueryRequest<CHQuery> => ({
+    requestId: '',
+    interval: '',
+    intervalMs: 0,
+    range: {} as any,
+    scopedVars: {} as any,
+    targets: [
+      {
+        refId: 'A',
+        editorType: EditorType.Builder,
+        builderOptions: { database: '', table: '', queryType: QueryType.Traces, meta: { tagsAreJSON: true } },
+        pluginVersion: '',
+        rawSql: '',
+      } as CHBuilderQuery,
+    ],
+    timezone: '',
+    app: CoreApp.Explore,
+    startTime: 0,
+  });
+
+  const makeResponse = (tagsValue: unknown, serviceTagsValue: unknown): DataQueryResponse => ({
+    data: [
+      {
+        refId: 'A',
+        fields: [
+          { name: 'tags', values: [tagsValue], type: FieldType.other, config: {} } as Field,
+          { name: 'serviceTags', values: [serviceTagsValue], type: FieldType.other, config: {} } as Field,
+          { name: 'traceID', values: ['abc'], type: FieldType.string, config: {} } as Field,
+        ],
+        length: 1,
+      } as DataFrame,
+    ],
+  });
+
+  it('converts a plain JSON object to [{key,value}] array (raw SQL)', () => {
+    const res = makeResponse({ 'http.method': 'GET', 'db.system': 'redis' }, { 'service.name': 'api' });
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([
+      [
+        { key: 'http.method', value: 'GET' },
+        { key: 'db.system', value: 'redis' },
+      ],
+    ]);
+    expect(res.data[0].fields[1].values).toEqual([[{ key: 'service.name', value: 'api' }]]);
+  });
+
+  it('leaves an already-correct [{key,value}] array untouched (raw SQL)', () => {
+    const existing = [{ key: 'http.method', value: 'GET' }];
+    const res = makeResponse(existing, []);
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([existing]);
+  });
+
+  it('leaves null values untouched (raw SQL)', () => {
+    const res = makeResponse(null, null);
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([null]);
+  });
+
+  it('does not touch unrelated fields (raw SQL)', () => {
+    const res = makeResponse({}, {});
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    const traceField = res.data[0].fields.find((f: Field) => f.name === 'traceID');
+    expect(traceField?.values).toEqual(['abc']);
+  });
+
+  it('stringifies non-string values (raw SQL)', () => {
+    const res = makeResponse({ count: 42 }, {});
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([[{ key: 'count', value: '42' }]]);
+  });
+
+  it('flattens nested objects returned by ClickHouse JSON type (raw SQL)', () => {
+    // ClickHouse JSON type interprets "http.method" as a nested path and returns
+    // {"http":{"method":"GET","status_code":"200"}} instead of {"http.method":"GET"}.
+    const nested = {
+      http: { method: 'GET', status_code: '200' },
+      'service': { name: 'api' },
+    };
+    const res = makeResponse(nested, { deployment: { environment: 'prod' } });
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([
+      [
+        { key: 'http.method', value: 'GET' },
+        { key: 'http.status_code', value: '200' },
+        { key: 'service.name', value: 'api' },
+      ],
+    ]);
+    expect(res.data[0].fields[1].values).toEqual([[{ key: 'deployment.environment', value: 'prod' }]]);
+  });
+
+  it('transforms plain objects from Map columns the same as JSON columns (auto-detects from values)', () => {
+    const res = makeResponse({ 'http.method': 'GET' }, {});
+    transformTraceTagFields(makeRawSqlRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([[{ key: 'http.method', value: 'GET' }]]);
+  });
+
+  it('transforms builder query frames when tags are raw JSON objects (JSON-type columns)', () => {
+    // JSON-type tag columns now return the raw column; the transform handles the conversion
+    // for both builder and raw SQL queries. Already-correct [{key,value}] arrays (from
+    // Map-type columns) are left untouched by the Array.isArray check inside the transform.
+    const nested = { http: { method: 'GET' } };
+    const res = makeResponse(nested, {});
+    transformTraceTagFields(makeBuilderTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([[{ key: 'http.method', value: 'GET' }]]);
+  });
+
+  it('leaves already-correct [{key,value}] arrays untouched for builder queries (Map-type columns)', () => {
+    const existing = [{ key: 'http.method', value: 'GET' }];
+    const res = makeResponse(existing, []);
+    transformTraceTagFields(makeBuilderTraceRequest(), res);
+    expect(res.data[0].fields[0].values).toEqual([existing]);
   });
 });
 

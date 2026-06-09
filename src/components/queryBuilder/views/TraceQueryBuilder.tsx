@@ -115,7 +115,6 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
       next.durationTimeColumn,
       next.tagsColumn,
       next.serviceTagsColumn,
-      next.serviceTagsColumn,
       next.kindColumn,
       next.statusCodeColumn,
       next.statusMessageColumn,
@@ -143,7 +142,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   }, builderState);
 
   useTraceDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
-  useOtelColumns(builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useOtelColumns(builderState.otelEnabled, builderState.otelVersion, allColumns, builderOptionsDispatch);
   useDefaultFilters(builderOptions.table, builderState.isTraceIdMode, isNewQuery, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (

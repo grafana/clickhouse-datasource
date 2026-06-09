@@ -7,11 +7,12 @@ import {
   QueryType,
   SelectedColumn,
   StringFilter,
+  TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
-import { generateSql } from './sqlGenerator';
+import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
 import otel from 'otel';
 
 /**
@@ -155,7 +156,8 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
       return;
     }
 
-    const isTraceSearch = originalQuery.editorType === EditorType.Builder &&
+    const isTraceSearch =
+      originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces &&
       !originalQuery.builderOptions.meta?.isTraceIdMode;
 
@@ -175,31 +177,166 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
   });
 };
 
+// Flattens a nested object into [{key,value}] pairs using dot-notation for nested keys.
+// ClickHouse JSON type turns "http.method" into {"http":{"method":"GET"}}, so a single
+// Object.entries() call would yield "[object Object]" for the value.
+const flattenJsonTags = (
+  obj: Record<string, unknown>,
+  prefix = '',
+  depth = 0
+): Array<{ key: string; value: string }> => {
+  if (depth >= 6) {
+    return [{ key: prefix || '(truncated)', value: JSON.stringify(obj) }];
+  }
+  return Object.entries(obj).flatMap(([k, v]) => {
+    const fullKey = prefix ? `${prefix}.${k}` : k;
+    if (v !== null && v !== undefined && typeof v === 'object' && !Array.isArray(v)) {
+      return flattenJsonTags(v as Record<string, unknown>, fullKey, depth + 1);
+    }
+    // Arrays are left as-is via String(v) (e.g. "a,b,c") — ClickHouse JSON type
+    // does not produce array attribute values in standard OTel schemas.
+    return [{ key: fullKey, value: v !== null && v !== undefined ? String(v) : '' }];
+  });
+};
+
+/**
+ * Converts plain JSON objects returned by ClickHouse JSON-type tag columns into the
+ * `[{key:"k",value:"v"},...]` array that Grafana's trace panel expects for `tags` and
+ * `serviceTags` fields.
+ *
+ * Needed for both raw-SQL and builder queries with JSON-type columns. Builder queries
+ * with Map-type columns already receive correctly-shaped `[{key,value}]` arrays from
+ * the SQL generator, so those frames are skipped by the Array.isArray check below.
+ * Auto-detects whether values are plain objects (need conversion) or already arrays.
+ */
+const expandJsonSentinel = (fields: Array<{ key: string; value: string }>): Array<{ key: string; value: string }> =>
+  fields.flatMap((f) => {
+    if (f.key !== JSON_SENTINEL_KEY) {
+      return [f];
+    }
+    try {
+      const parsed = JSON.parse(f.value);
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return flattenJsonTags(parsed as Record<string, unknown>);
+      }
+    } catch {}
+    return [f];
+  });
+
+export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
+  res.data.forEach((frame: DataFrame) => {
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+
+    // For builder queries use the queryType directly — it's authoritative and avoids
+    // false-positive matches on non-trace tables that happen to have a 'traceID' column.
+    // For raw SQL we fall back to a field-name heuristic since there's no queryType.
+    let isTraceFrame: boolean;
+    if (originalQuery?.editorType === EditorType.Builder) {
+      isTraceFrame = originalQuery.builderOptions?.queryType === QueryType.Traces;
+    } else {
+      isTraceFrame = frame.fields.some(
+        (f) => f.name.toLowerCase() === 'traceid' || f.name.toLowerCase() === 'trace_id'
+      );
+    }
+    if (!isTraceFrame) {
+      return;
+    }
+
+    frame.fields.forEach((field) => {
+      if (field.name === 'tags' || field.name === 'serviceTags') {
+        // Skip if values are already [{key,value}] arrays rather than plain objects.
+        const firstNonNull = (field.values as unknown[]).find((v) => v !== null && v !== undefined);
+        if (firstNonNull === undefined || Array.isArray(firstNonNull) || typeof firstNonNull !== 'object') {
+          return;
+        }
+        field.values = (field.values as unknown[]).map((value) => {
+          if (value !== null && value !== undefined && typeof value === 'object' && !Array.isArray(value)) {
+            return flattenJsonTags(value as Record<string, unknown>);
+          }
+          return value;
+        });
+      } else if (field.name === 'logs') {
+        field.values = (field.values as unknown[]).map((events) => {
+          if (!Array.isArray(events)) {
+            return events;
+          }
+          return events.map((event: unknown) => {
+            const e = event as Record<string, unknown>;
+            if (!Array.isArray(e?.fields)) {
+              return event;
+            }
+            return { ...e, fields: expandJsonSentinel(e.fields as Array<{ key: string; value: string }>) };
+          });
+        });
+      } else if (field.name === 'references') {
+        field.values = (field.values as unknown[]).map((links) => {
+          if (!Array.isArray(links)) {
+            return links;
+          }
+          return links.map((link: unknown) => {
+            const l = link as Record<string, unknown>;
+            if (!Array.isArray(l?.tags)) {
+              return link;
+            }
+            return { ...l, tags: expandJsonSentinel(l.tags as Array<{ key: string; value: string }>) };
+          });
+        });
+      }
+    });
+  });
+};
+
+/**
+ * Stamps type:'JSON' on TraceTags/TraceServiceTags SelectedColumns whose names appear
+ * as JSON-typed columns in allCols. Columns already typed 'JSON' are passed through
+ * unchanged; all other hints are passed through unchanged. Both branches of
+ * transformQueryResponseWithTraceAndLogLinks use this function so the logic stays in sync.
+ */
+function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[]): SelectedColumn[] {
+  return columns.map((col) => {
+    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) { return col; }
+    if (col.type?.startsWith('JSON')) { return col; }
+    const colType = allCols.find((c) => c.name === col.name)?.type;
+    return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
+  });
+}
+
 /**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
- * The link will open a second query editor in split view
- * on the explore page with the selected trace ID.
+ * The link will open a second query editor in split view on the explore page
+ * with the selected trace ID.
  *
  * Requires defaults to be configured when crossing query types.
+ *
+ * **Async** — fetches live column schema via `datasource.getColumnsCached()` to
+ * auto-detect JSON-typed tag columns (SpanAttributes, ResourceAttributes). Results
+ * are cached on the datasource instance so repeated calls for the same table are
+ * free after the first. Callers must `await` or use `mergeMap(from(...))` in an
+ * RxJS pipeline (see `CHDatasource.query()`).
  */
-export const transformQueryResponseWithTraceAndLogLinks = (
+export const transformQueryResponseWithTraceAndLogLinks = async (
   datasource: Datasource,
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse
-): DataQueryResponse => {
+): Promise<DataQueryResponse> => {
   applyTraceSearchFieldConfig(req, res);
+  transformTraceTagFields(req, res);
 
-  res.data.forEach((frame: DataFrame) => {
+  // Use the datasource-level column cache so repeated queries against the same
+  // table (dashboard refreshes, live tail) don't each trigger a DESC TABLE round-trip.
+  const getCachedColumns = (db: string, tbl: string) => datasource.getColumnsCached(db, tbl);
+
+  for (const frame of res.data as DataFrame[]) {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
     if (!originalQuery) {
-      return;
+      continue;
     }
 
     const traceField = frame.fields.find(
       (field) => field.name.toLowerCase() === 'traceid' || field.name.toLowerCase() === 'trace_id'
     );
     if (!traceField) {
-      return;
+      continue;
     }
 
     // Get the configured TraceId column name for use in both trace and logs queries
@@ -223,10 +360,39 @@ export const transformQueryResponseWithTraceAndLogLinks = (
       originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces
     ) {
-      // Copy fields directly from trace search
+      // Copy fields directly from trace search; auto-detect JSON tag column types via
+      // fetchColumns so saved queries (where useOtelColumns doesn't re-run) still work.
+      let columns = originalQuery.builderOptions.columns;
+      const db = originalQuery.builderOptions.database;
+      const tbl = originalQuery.builderOptions.table;
+
+      const tagsCol = columns?.find((c) => c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags);
+      const typeKnown = tagsCol?.type !== undefined;
+
+      let fetchedLiveSchema = false;
+      if (db && tbl && !typeKnown) {
+        try {
+          const allCols = await getCachedColumns(db, tbl);
+          columns = stampJsonColumnTypes(columns ?? [], allCols);
+          fetchedLiveSchema = true;
+        } catch {
+          // fall through; SQL generator falls back to mapKeys()
+        }
+      }
+
+      // Fall back to stored meta only when we didn't fetch and the column type isn't already set.
+      const effectiveTagsAreJSON =
+        (columns?.some(
+          (c) =>
+            (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+            c.type?.toLowerCase().startsWith('json')
+        ) ??
+          false) ||
+        (!fetchedLiveSchema && !typeKnown && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
+        columns,
         filters: [], // Clear filters and orderBy since it's an exact ID lookup
         orderBy: [],
         meta: {
@@ -236,6 +402,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceId: '${__value.raw}',
           traceTimestampTableSuffix:
             originalQuery.builderOptions.meta?.traceTimestampTableSuffix || traceTimestampTableSuffix,
+          tagsAreJSON: effectiveTagsAreJSON,
         },
       };
     } else {
@@ -266,6 +433,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
           traceLinksColumnPrefix: traceLinksColumnPrefix,
           hasTraceTimestampTable: Boolean(otelVersion),
           traceTimestampTableSuffix,
+          flattenNested: datasource.getDefaultTraceFlattenNested() || false,
         },
       };
 
@@ -278,6 +446,28 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         }
       }
 
+      // Auto-detect JSON column types from ClickHouse; fall through silently on error
+      const fetchedLiveSchema = !!(options.database && options.table);
+      try {
+        if (fetchedLiveSchema) {
+          const allColumns = await getCachedColumns(options.database, options.table);
+          options.columns = stampJsonColumnTypes(options.columns!, allColumns);
+        }
+      } catch {
+        // fall through; SQL generator falls back to mapKeys()
+      }
+
+      // Only fall back to stored meta when fetchColumns was not called (empty db/table).
+      const detectedTagsAreJSON =
+        (options.columns?.some(
+          (c) =>
+            (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+            c.type?.toLowerCase().startsWith('json')
+        ) ??
+          false) ||
+        (!fetchedLiveSchema && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
+
+      options.meta!.tagsAreJSON = detectedTagsAreJSON;
       traceIdQuery.builderOptions = options;
     }
 
@@ -396,7 +586,7 @@ export const transformQueryResponseWithTraceAndLogLinks = (
         },
       });
     }
-  });
+  }
 
   return res;
 };

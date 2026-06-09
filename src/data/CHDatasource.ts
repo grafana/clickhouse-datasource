@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -55,7 +55,7 @@ import {
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
 export class Datasource
@@ -764,7 +764,14 @@ export class Datasource
    * TODO: This query can be slow/expensive
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string, keysColumn?: string): Promise<string[]> {
+    const rawSql = keysColumn
+      ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
+      : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -933,6 +940,21 @@ export class Datasource
     return this.fetchColumnsFromTable(database, table);
   }
 
+  private readonly _columnCache = new Map<string, TableColumn[]>();
+
+  /**
+   * Returns columns for the given table, reusing a cached result when available.
+   * The cache lives for the lifetime of the datasource instance, which is reset on
+   * config save or page reload — short enough that stale schema is not a concern.
+   */
+  async getColumnsCached(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const key = `${database ?? ''}\0${table}`;
+    if (!this._columnCache.has(key)) {
+      this._columnCache.set(key, await this.fetchColumns(database, table));
+    }
+    return this._columnCache.get(key)!;
+  }
+
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
@@ -954,16 +976,13 @@ export class Datasource
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
     const targets = request.targets
-      // attach timezone information
-      .map((t) => {
-        return {
-          ...t,
-          meta: {
-            ...t?.meta,
-            timezone: this.getTimezone(request),
-          },
-        };
-      });
+      .map((t) => ({
+        ...t,
+        meta: {
+          ...t?.meta,
+          timezone: this.getTimezone(request),
+        },
+      }));
 
     const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));
 
@@ -973,13 +992,16 @@ export class Datasource
         targets,
       })
       .pipe(
-        map((res: DataQueryResponse) => {
-          const transformed = transformQueryResponseWithTraceAndLogLinks(this, request, res);
-          if (hasLogsVolumeTargets) {
-            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
-          }
-          return transformed;
-        })
+        mergeMap((res: DataQueryResponse) =>
+          from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
+            map((transformed) => {
+              if (hasLogsVolumeTargets) {
+                return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+              }
+              return transformed;
+            })
+          )
+        )
       );
   }
 

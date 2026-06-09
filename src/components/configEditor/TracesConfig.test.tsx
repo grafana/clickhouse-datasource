@@ -443,7 +443,7 @@ describe('TracesConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    // showTraceLinks is the 2nd role="switch" (index 1), after flattenNested
+    // showTraceLinks is the 2nd role="switch" (index 1): flattenNested, showTraceLinks
     const switches = await result.findAllByRole('switch');
     const input = switches[1];
     expect(input).toBeInTheDocument();

@@ -36,6 +36,7 @@ export const Switch = (props: SwitchProps) => {
           className="gf-form"
           value={value}
           onChange={(e) => onChange(e.currentTarget.checked)}
+          aria-label={label}
         />
       </div>
     </div>
