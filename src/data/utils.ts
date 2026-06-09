@@ -156,7 +156,8 @@ export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res:
       return;
     }
 
-    const isTraceSearch = originalQuery.editorType === EditorType.Builder &&
+    const isTraceSearch =
+      originalQuery.editorType === EditorType.Builder &&
       originalQuery.builderOptions.queryType === QueryType.Traces &&
       !originalQuery.builderOptions.meta?.isTraceIdMode;
 
@@ -208,9 +209,7 @@ const flattenJsonTags = (
  * the SQL generator, so those frames are skipped by the Array.isArray check below.
  * Auto-detects whether values are plain objects (need conversion) or already arrays.
  */
-const expandJsonSentinel = (
-  fields: Array<{ key: string; value: string }>
-): Array<{ key: string; value: string }> =>
+const expandJsonSentinel = (fields: Array<{ key: string; value: string }>): Array<{ key: string; value: string }> =>
   fields.flatMap((f) => {
     if (f.key !== JSON_SENTINEL_KEY) {
       return [f];
@@ -224,10 +223,7 @@ const expandJsonSentinel = (
     return [f];
   });
 
-export const transformTraceTagFields = (
-  req: DataQueryRequest<CHQuery>,
-  res: DataQueryResponse
-): void => {
+export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
   res.data.forEach((frame: DataFrame) => {
     const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
 
@@ -298,8 +294,8 @@ export const transformTraceTagFields = (
  */
 function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[]): SelectedColumn[] {
   return columns.map((col) => {
-    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) return col;
-    if (col.type?.startsWith('JSON')) return col;
+    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) { return col; }
+    if (col.type?.startsWith('JSON')) { return col; }
     const colType = allCols.find((c) => c.name === col.name)?.type;
     return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
   });
@@ -370,9 +366,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       const db = originalQuery.builderOptions.database;
       const tbl = originalQuery.builderOptions.table;
 
-      const tagsCol = columns?.find(
-        (c) => c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags
-      );
+      const tagsCol = columns?.find((c) => c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags);
       const typeKnown = tagsCol?.type !== undefined;
 
       let fetchedLiveSchema = false;
@@ -388,9 +382,12 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
 
       // Fall back to stored meta only when we didn't fetch and the column type isn't already set.
       const effectiveTagsAreJSON =
-        (columns?.some((c) =>
-          (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
-          c.type?.toLowerCase().startsWith('json')) ?? false) ||
+        (columns?.some(
+          (c) =>
+            (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+            c.type?.toLowerCase().startsWith('json')
+        ) ??
+          false) ||
         (!fetchedLiveSchema && !typeKnown && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
       traceIdQuery.builderOptions = {
@@ -462,9 +459,12 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
 
       // Only fall back to stored meta when fetchColumns was not called (empty db/table).
       const detectedTagsAreJSON =
-        (options.columns?.some((c) =>
-          (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
-          c.type?.toLowerCase().startsWith('json')) ?? false) ||
+        (options.columns?.some(
+          (c) =>
+            (c.hint === ColumnHint.TraceTags || c.hint === ColumnHint.TraceServiceTags) &&
+            c.type?.toLowerCase().startsWith('json')
+        ) ??
+          false) ||
         (!fetchedLiveSchema && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
       options.meta!.tagsAreJSON = detectedTagsAreJSON;
