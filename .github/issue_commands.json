@@ -4,7 +4,7 @@
     "name": "datasource/ClickHouse",
     "action": "addToProject",
     "addToProject": {
-      "url": "https://github.com/orgs/grafana/projects/190"
+      "url": "https://github.com/orgs/grafana/projects/1085"
     }
   },
   {
@@ -12,7 +12,7 @@
     "name": "datasource/ClickHouse",
     "action": "removeFromProject",
     "addToProject": {
-      "url": "https://github.com/orgs/grafana/projects/190"
+      "url": "https://github.com/orgs/grafana/projects/1085"
     }
   },
   {
