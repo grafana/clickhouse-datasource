@@ -14,6 +14,8 @@ on:
 
 jobs:
   run:
+    permissions:
+      contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
@@ -43,4 +45,6 @@ jobs:
           version: latest
 
       - name: Run integration tests
-        run: CLICKHOUSE_VERSION=${{ matrix.clickhouse }} go test -v -tags=integration ./...
+        env:
+          CLICKHOUSE_VERSION: ${{ matrix.clickhouse }}
+        run: go test -v -tags=integration ./...

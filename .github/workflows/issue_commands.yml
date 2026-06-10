@@ -5,18 +5,29 @@ on:
 jobs:
   main:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
     steps:
       - name: Checkout Actions
-        uses: actions/checkout@v6
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6
         with:
-          repository: 'grafana/grafana-github-actions'
+          repository: "grafana/grafana-github-actions"
           path: ./actions
           ref: main
           persist-credentials: false
+
       - name: Install Actions
         run: npm install --production --prefix ./actions
+
+      - id: get-github-token
+        uses: grafana/shared-workflows/actions/create-github-app-token@create-github-app-token/v0.3.1
+        with:
+          github_app: grafana-oss-big-tent
+
       - name: Run Commands
         uses: ./actions/commands
         with:
-          token: ${{secrets.ISSUE_COMMANDS_TOKEN}}
+          token: ${{ steps.get-github-token.outputs.token }}
           configPath: issue_commands

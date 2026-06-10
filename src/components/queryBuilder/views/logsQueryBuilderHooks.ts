@@ -215,18 +215,14 @@ export const useDefaultLogColumnsByName = (
     if (!messageColumn) {
       const match = findColumnByNameHeuristic(allColumns, ColumnHint.LogMessage, isStringLikeColumn);
       if (match) {
-        builderOptionsDispatch(
-          setColumnByHint({ name: match.name, type: match.type, hint: ColumnHint.LogMessage })
-        );
+        builderOptionsDispatch(setColumnByHint({ name: match.name, type: match.type, hint: ColumnHint.LogMessage }));
       }
     }
 
     if (!logLevelColumn) {
       const match = findColumnByNameHeuristic(allColumns, ColumnHint.LogLevel, isStringLikeColumn);
       if (match) {
-        builderOptionsDispatch(
-          setColumnByHint({ name: match.name, type: match.type, hint: ColumnHint.LogLevel })
-        );
+        builderOptionsDispatch(setColumnByHint({ name: match.name, type: match.type, hint: ColumnHint.LogLevel }));
       }
     }
 
@@ -273,7 +269,7 @@ export const useDefaultFilters = (
 
     const defaultOrderBy: OrderBy[] = [
       { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true }
+      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
     ];
 
     lastTable.current = table;

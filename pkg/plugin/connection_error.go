@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"net"
 	"strconv"
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/pkg/errors"
 )
 
 type ConnectionErrorCategory string

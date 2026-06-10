@@ -2,7 +2,6 @@ import { FieldType } from '@grafana/data';
 import { getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE, splitLogsVolumeFrames } from './logs';
 
 describe('logs', () => {
-
   describe('getIntervalInfo', () => {
     it('should return the default value when no interval info is provided', async () => {
       expect(getIntervalInfo({})).toEqual({ interval: '$__interval' });
@@ -117,7 +116,10 @@ describe('logs', () => {
     });
 
     it('passes through frames that do not match the prefix', () => {
-      const frame = makeFrame('other-query', [{ name: 'time', values: times }, { name: 'logs', values: [1, 2, 3] }]);
+      const frame = makeFrame('other-query', [
+        { name: 'time', values: times },
+        { name: 'logs', values: [1, 2, 3] },
+      ]);
       expect(splitLogsVolumeFrames([frame], prefix)).toEqual([frame]);
     });
 
@@ -169,7 +171,10 @@ describe('logs', () => {
     });
 
     it('preserves non-volume frames alongside split volume frames', () => {
-      const nonVolume = makeFrame('other', [{ name: 'time', values: times }, { name: 'val', values: [7, 8, 9] }]);
+      const nonVolume = makeFrame('other', [
+        { name: 'time', values: times },
+        { name: 'val', values: [7, 8, 9] },
+      ]);
       const volume = {
         refId: `${prefix}1`,
         length: times.length,

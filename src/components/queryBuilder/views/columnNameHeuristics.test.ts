@@ -11,7 +11,9 @@ const col = (name: string, type: string): TableColumn => ({ name, type, picklist
 describe('findColumnByNameHeuristic', () => {
   it('returns undefined when no heuristic is registered for the hint', () => {
     // ColumnHint.TraceTags intentionally has no heuristic; vendor-specific names.
-    expect(findColumnByNameHeuristic([col('SpanAttributes', 'Map(String, String)')], ColumnHint.TraceTags)).toBeUndefined();
+    expect(
+      findColumnByNameHeuristic([col('SpanAttributes', 'Map(String, String)')], ColumnHint.TraceTags)
+    ).toBeUndefined();
   });
 
   it('returns undefined when no column name matches', () => {
@@ -70,7 +72,7 @@ describe('type predicates', () => {
     expect(isStringLikeColumn(col('c', 'String'))).toBe(true);
     expect(isStringLikeColumn(col('c', 'FixedString(8)'))).toBe(true);
     expect(isStringLikeColumn(col('c', 'LowCardinality(String)'))).toBe(true);
-    expect(isStringLikeColumn(col('c', 'Enum8(\'ok\' = 1)'))).toBe(true);
+    expect(isStringLikeColumn(col('c', "Enum8('ok' = 1)"))).toBe(true);
     expect(isStringLikeColumn(col('c', 'UInt64'))).toBe(false);
   });
 

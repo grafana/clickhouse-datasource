@@ -43,9 +43,7 @@ async function focusEditorAndType(page: Page, text: string) {
 async function captureMacroLabels(page: Page): Promise<string[]> {
   const widget = page.locator('.monaco-editor .suggest-widget.visible');
   await widget.waitFor({ timeout: 5000 });
-  const labels = await page
-    .locator('.monaco-editor .suggest-widget .monaco-list-row .label-name')
-    .allTextContents();
+  const labels = await page.locator('.monaco-editor .suggest-widget .monaco-list-row .label-name').allTextContents();
   return labels.map((l) => l.trim()).filter((l) => l.startsWith('$__'));
 }
 

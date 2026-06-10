@@ -12,7 +12,14 @@ import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
 import { of } from 'rxjs';
-import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+} from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
 import { Datasource } from './CHDatasource';
@@ -69,6 +76,19 @@ describe('ClickHouseDatasource', () => {
       const values = await createInstance({ queryResponse }).metricFindQuery('mock', {});
       expect(values).toEqual(expectedValues);
     });
+
+    it('forwards scopedVars from options to the query request', async () => {
+      const queryResponse = {
+        fields: [{ name: 'field', type: 'string', values: ['val1'] }],
+      };
+      const instance = createInstance({ queryResponse });
+      const querySpy = jest.spyOn(instance, 'query');
+      const scopedVars = { namespace: { text: 'prod', value: 'prod' } };
+
+      await instance.metricFindQuery('SELECT 1', { scopedVars });
+
+      expect(querySpy).toHaveBeenCalledWith(expect.objectContaining({ scopedVars }));
+    });
   });
 
   describe('applyTemplateVariables', () => {
@@ -124,7 +144,7 @@ describe('ClickHouseDatasource', () => {
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -169,12 +189,14 @@ describe('ClickHouseDatasource', () => {
 
       // Mock the template variable resolution
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => resolvedSql);
-      const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => [{name: 'clickhouse_adhoc_use_json'}]);
+      const spyOnGetVars = jest
+        .spyOn(templateSrvMock, 'getVariables')
+        .mockImplementation(() => [{ name: 'clickhouse_adhoc_use_json' }]);
 
       // Setup ad-hoc filters
       const adHocFilters = [
         { key: 'column', operator: '=', value: 'value' },
-        { key: 'column.nested', operator: '=', value: 'value2' }
+        { key: 'column.nested', operator: '=', value: 'value2' },
       ];
 
       // Mock getAdhocFilters to return our test filters
@@ -200,7 +222,6 @@ describe('ClickHouseDatasource', () => {
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
     });
-
 
     it('should expand $__adHocFilters macro with single quotes', async () => {
       const query = {
@@ -569,6 +590,178 @@ describe('ClickHouseDatasource', () => {
       );
 
       expect(values).toEqual([{ text: 'value1' }, { text: 'value2' }]);
+    });
+  });
+
+  describe('Map type ad-hoc filters (#1434)', () => {
+    it('expands Map-typed columns into one tag key per discovered map key', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      // system.columns → two columns, one Map-typed.
+      const columnsFrame = arrayToDataFrame([
+        { name: 'level', type: 'String', table: 'events' },
+        { name: 'labels', type: 'Map(String, String)', table: 'events' },
+      ]);
+      // fetchUniqueMapKeys → distinct map keys for `labels`.
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }, { keys: 'http.status' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([
+        { text: 'events.level' },
+        { text: 'events.labels.http.method' },
+        { text: 'events.labels.http.status' },
+      ]);
+    });
+
+    it('falls back to a flat Map column entry when no table context is available', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [columnsFrame] }));
+
+      const keys = await ds.getTagKeys();
+      // No `db.table` context → we don't fan out mapKeys probes; show the
+      // raw Map column entry instead of crashing or emitting `[object Object]`.
+      expect(keys).toEqual([{ text: 'events.labels' }]);
+    });
+
+    it('rewrites dotted Map keys into bracket access in fetchTagValuesFromSchema', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'GET' }, { val: 'POST' }]);
+
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        if (sql.includes("labels['http.method']")) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys(); // populates the mapColumnsByTable cache
+      const values = await ds.getTagValues({ key: 'events.labels.http.method' });
+      expect(values).toEqual([{ text: 'GET' }, { text: 'POST' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: "select distinct labels['http.method'] from db.events limit 1000",
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('looks up per-table Map columns using the bare table name even when source is db.table', async () => {
+      // Regression: mapColumnsByTable is populated from system.columns
+      // (keyed by bare table name), but fetchTagValuesFromSchema passes
+      // `db.table` as the source. The lookup must normalize the prefix so
+      // the per-table set is hit — without this the code falls back to a
+      // flattened union, which can mis-detect Map columns when two tables
+      // share a column name (one Map, one scalar).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([
+        // `labels` is Map in `events` but a String in `other` — the lookup
+        // must scope by table.
+        { name: 'labels', type: 'Map(String, String)', table: 'events' },
+        { name: 'labels', type: 'String', table: 'other' },
+      ]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'region' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'eu' }]);
+
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        if (sql.includes("labels['region']")) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys();
+      const values = await ds.getTagValues({ key: 'events.labels.region' });
+      expect(values).toEqual([{ text: 'eu' }]);
+    });
+
+    it('escapes single quotes in Map keys when building the values SELECT', async () => {
+      // A Map key containing `'` must be escaped for ClickHouse string-
+      // literal embedding (`'` → `\'`) — otherwise the SELECT is invalid
+      // SQL and could allow injection via a crafted key.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: "weird'key" }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'v' }]);
+
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        if (sql.includes("labels['weird\\'key']")) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys();
+      const values = await ds.getTagValues({ key: "events.labels.weird'key" });
+      expect(values).toEqual([{ text: 'v' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: "select distinct labels['weird\\'key'] from db.events limit 1000",
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('publishes the Map-column set to the AdHocFilter for escapeKey rewriting', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'labels', type: 'Map(String, String)', table: 'events' },
+        { name: 'other_map', type: 'Nullable(Map(String, String))', table: 'events' },
+      ]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: 'a' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('.keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagKeys();
+      const published = ds.adHocFilter.getMapColumns();
+      expect(published.has('labels')).toBe(true);
+      expect(published.has('other_map')).toBe(true);
+      // OTel fallback names remain in the set for back-compat.
+      expect(published.has('LogAttributes')).toBe(true);
     });
   });
 
@@ -1048,7 +1241,7 @@ describe('ClickHouseDatasource', () => {
                 value: 'error',
                 type: 'string',
                 filterType: 'custom',
-                condition: 'AND'
+                condition: 'AND',
               },
             ],
           },
@@ -1190,7 +1383,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'debug',
+              },
+            ],
           },
         };
 
@@ -1234,7 +1436,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'info' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'info',
+              },
+            ],
           },
         };
 
@@ -1261,7 +1472,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'info' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.NotEquals,
+                value: 'info',
+              },
+            ],
           },
         };
 
@@ -1281,7 +1501,16 @@ describe('ClickHouseDatasource', () => {
           ...query,
           builderOptions: {
             ...query.builderOptions,
-            filters: [{ condition: 'AND', key: 'level', type: 'string', filterType: 'custom', operator: FilterOperator.NotEquals, value: 'error' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: 'level',
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.NotEquals,
+                value: 'error',
+              },
+            ],
           },
         };
 
@@ -1421,7 +1650,17 @@ describe('ClickHouseDatasource', () => {
           builderOptions: {
             ...query.builderOptions,
             columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
-            filters: [{ condition: 'AND', key: '', hint: ColumnHint.LogLevel, type: 'string', filterType: 'custom', operator: FilterOperator.Equals, value: 'debug' }],
+            filters: [
+              {
+                condition: 'AND',
+                key: '',
+                hint: ColumnHint.LogLevel,
+                type: 'string',
+                filterType: 'custom',
+                operator: FilterOperator.Equals,
+                value: 'debug',
+              },
+            ],
           },
         };
 
@@ -1530,7 +1769,10 @@ describe('ClickHouseDatasource', () => {
 
     it('returns query unchanged for non-Builder editorType', () => {
       const sqlQuery: CHSqlQuery = { pluginVersion: '', refId: 'A', editorType: EditorType.SQL, rawSql: 'SELECT 1' };
-      const result = datasource.modifyQuery(sqlQuery, { type: 'ADD_FILTER', options: { key: 'level', value: 'info' } } as any);
+      const result = datasource.modifyQuery(sqlQuery, {
+        type: 'ADD_FILTER',
+        options: { key: 'level', value: 'info' },
+      } as any);
       expect(result).toBe(sqlQuery);
     });
 
@@ -1595,9 +1837,7 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       // Force a single context column so we don't hit the "no columns" guard.
       jest.spyOn(ds, 'getLogContextColumnsFromLogRow').mockReturnValue([{ name: 'service', value: 'web' }]);
-      const querySpy = jest
-        .spyOn(ds, 'query')
-        .mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+      const querySpy = jest.spyOn(ds, 'query').mockImplementation((_req) => of({ data: [toDataFrame([])] }));
 
       const query = cloneDeep(baseQuery);
       await ds.getLogRowContext(makeRow(), contextOptions, query);
@@ -1610,13 +1850,9 @@ describe('ClickHouseDatasource', () => {
       // Primary entry is the time column (inserted by getLogRowContext).
       expect(orderBy[0]).toMatchObject({ hint: ColumnHint.Time });
       // User's secondary entry survives as a tiebreaker.
-      expect(orderBy).toContainEqual(
-        expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC })
-      );
+      expect(orderBy).toContainEqual(expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC }));
       // Original time-column entry is not duplicated.
-      const timeEntries = orderBy.filter(
-        (e) => e.hint === ColumnHint.Time || e.name === 'timestamp'
-      );
+      const timeEntries = orderBy.filter((e) => e.hint === ColumnHint.Time || e.name === 'timestamp');
       expect(timeEntries).toHaveLength(1);
     });
 

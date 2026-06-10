@@ -52,8 +52,7 @@ export const findColumnByNameHeuristic = (
 };
 
 /** Type predicate: ClickHouse DateTime / DateTime64 / Date columns. */
-export const isDateTimeColumn = (column: TableColumn): boolean =>
-  (column.type || '').toLowerCase().includes('date');
+export const isDateTimeColumn = (column: TableColumn): boolean => (column.type || '').toLowerCase().includes('date');
 
 /** Type predicate: ClickHouse String / FixedString / LowCardinality(String) / Enum columns. */
 export const isStringLikeColumn = (column: TableColumn): boolean => {

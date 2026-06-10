@@ -92,6 +92,7 @@
     "sqlutil",
     "stagename",
     "stretchr",
+    "subkey",
     "subquery",
     "subqueries",
     "subresource",
@@ -117,6 +118,7 @@
     "uvcf",
     "vectorator",
     "WorkDir",
-    "varname"
+    "varname",
+    "zizmor"
   ]
 }

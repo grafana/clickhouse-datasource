@@ -143,9 +143,7 @@ export async function getSuggestions(
   return dedupeSuggestions(results);
 }
 
-function dedupeSuggestions(
-  items: monacoTypes.languages.CompletionItem[]
-): monacoTypes.languages.CompletionItem[] {
+function dedupeSuggestions(items: monacoTypes.languages.CompletionItem[]): monacoTypes.languages.CompletionItem[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const label = typeof item.label === 'string' ? item.label : item.label.label;

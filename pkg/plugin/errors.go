@@ -1,6 +1,6 @@
 package plugin
 
-import "github.com/pkg/errors"
+import "errors"
 
 var (
 	ErrorMessageInvalidJSON       = errors.New("could not parse json")

@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, map, Observable } from 'rxjs';
+import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -55,7 +55,7 @@ import {
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 
 export class Datasource
@@ -72,6 +72,15 @@ export class Datasource
   skipAdHocFilter = false; // don't apply adhoc filters to the query
   adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
   adHocCHVerReq = { major: 22, minor: 7 };
+
+  // Keyed by the bare table name (the `table` column of `system.columns`,
+  // which has no database qualifier). Populated each time getTagKeys() reads
+  // from system.columns; consumed by fetchTagValuesFromSchema() — via
+  // asMapAccess() — to detect Map-column access patterns (e.g.
+  // `LogAttributes.http.method`) and rewrite the SELECT accordingly.
+  // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
+  // can pass either form.
+  private mapColumnsByTable: Map<string, Set<string>> = new Map();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -405,7 +414,7 @@ export class Datasource
       }
 
       // Build filter entries for all tables
-      const tableFilters = tableNames.map(tableName => `'${tableName}': '${filterStr}'`).join(', ');
+      const tableFilters = tableNames.map((tableName) => `'${tableName}': '${filterStr}'`).join(', ');
       return `additional_table_filters={${tableFilters}}`;
     });
   }
@@ -764,7 +773,14 @@ export class Datasource
    * TODO: This query can be slow/expensive
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(${mapColumn}.keys) as keys FROM "${db}"."${table}" LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchUniqueJSONPaths(jsonColumn: string, db: string, table: string, keysColumn?: string): Promise<string[]> {
+    const rawSql = keysColumn
+      ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
+      : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -933,6 +949,21 @@ export class Datasource
     return this.fetchColumnsFromTable(database, table);
   }
 
+  private readonly _columnCache = new Map<string, TableColumn[]>();
+
+  /**
+   * Returns columns for the given table, reusing a cached result when available.
+   * The cache lives for the lifetime of the datasource instance, which is reset on
+   * config save or page reload — short enough that stale schema is not a concern.
+   */
+  async getColumnsCached(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const key = `${database ?? ''}\0${table}`;
+    if (!this._columnCache.has(key)) {
+      this._columnCache.set(key, await this.fetchColumns(database, table));
+    }
+    return this._columnCache.get(key)!;
+  }
+
   private async fetchData(rawSql: string) {
     const frame = await this.runQuery({ rawSql });
     return this.values(frame);
@@ -953,17 +984,13 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
-    const targets = request.targets
-      // attach timezone information
-      .map((t) => {
-        return {
-          ...t,
-          meta: {
-            ...t?.meta,
-            timezone: this.getTimezone(request),
-          },
-        };
-      });
+    const targets = request.targets.map((t) => ({
+      ...t,
+      meta: {
+        ...t?.meta,
+        timezone: this.getTimezone(request),
+      },
+    }));
 
     const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));
 
@@ -973,13 +1000,16 @@ export class Datasource
         targets,
       })
       .pipe(
-        map((res: DataQueryResponse) => {
-          const transformed = transformQueryResponseWithTraceAndLogLinks(this, request, res);
-          if (hasLogsVolumeTargets) {
-            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
-          }
-          return transformed;
-        })
+        mergeMap((res: DataQueryResponse) =>
+          from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
+            map((transformed) => {
+              if (hasLogsVolumeTargets) {
+                return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+              }
+              return transformed;
+            })
+          )
+        )
       );
   }
 
@@ -988,6 +1018,7 @@ export class Datasource
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
         range: options ? options.range : (getTemplateSrv() as any).timeRange,
+        scopedVars: options?.scopedVars,
       } as DataQueryRequest<CHQuery>;
       this.query(req).subscribe((res: DataQueryResponse) => {
         resolve(res.data[0] || { fields: [] });
@@ -1013,11 +1044,130 @@ export class Datasource
     if (type === TagType.query) {
       return frame.fields.map((f) => ({ text: f.name }));
     }
-    const view = new DataFrameView(frame);
+    const view = new DataFrameView<{ 0: string; 1: string; 2: string }>(frame);
     const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
-    return view.map((item) => ({
+
+    // First pass: flat list of tag keys as before. Second pass (below)
+    // expands Map-typed columns into one entry per discovered map key.
+    const keys: MetricFindValue[] = view.map((item) => ({
       text: hideTableName ? item[0] : `${item[2]}.${item[0]}`,
     }));
+
+    // Collect Map columns per-table and populate both the datasource cache
+    // (consumed by fetchTagValuesFromSchema) and the AdHocFilter cache
+    // (consumed by escapeKey). Done regardless of whether Map expansion is
+    // feasible for this context — the caches are used even when expansion
+    // bails out.
+    this.mapColumnsByTable = new Map();
+    const mapCols: Array<{ name: string; table: string }> = [];
+    view.forEach((item) => {
+      if (isMapColumnType(item[1])) {
+        const tableKey = item[2];
+        let set = this.mapColumnsByTable.get(tableKey);
+        if (!set) {
+          set = new Set<string>();
+          this.mapColumnsByTable.set(tableKey, set);
+        }
+        set.add(item[0]);
+        mapCols.push({ name: item[0], table: item[2] });
+      }
+    });
+
+    // Republish the flattened Map-column set to the AdHocFilter so its
+    // escapeKey can disambiguate `col.key` references.
+    const allMapCols = new Set<string>();
+    for (const set of this.mapColumnsByTable.values()) {
+      for (const c of set) {
+        allMapCols.add(c);
+      }
+    }
+    this.adHocFilter.setMapColumns(allMapCols);
+
+    // Map-key expansion only runs when the adhoc context points at a
+    // specific `db.table` — otherwise we'd need to probe every table in a
+    // database, which is too expensive to do on every dashboard render.
+    const db = this.resolveAdhocDatabase(frame);
+    const singleTable = this.resolveAdhocSingleTable();
+    if (!db || !singleTable || mapCols.length === 0) {
+      return keys;
+    }
+
+    // Only probe Map columns that belong to the targeted table.
+    const probeTargets = mapCols.filter((c) => c.table === singleTable);
+    if (probeTargets.length === 0) {
+      return keys;
+    }
+
+    const probed = await Promise.all(
+      probeTargets.map(async (c) => {
+        try {
+          const mapKeys = await this.fetchUniqueMapKeys(c.name, db, c.table);
+          return { col: c, keys: mapKeys };
+        } catch (ex) {
+          console.warn(`Failed to fetch map keys for ${db}.${c.table}.${c.name}:`, ex);
+          return { col: c, keys: [] as string[] };
+        }
+      })
+    );
+
+    // Replace each top-level Map-column entry with one entry per discovered
+    // map key. If probing returned nothing (empty set, stripped by the
+    // filter), keep the original entry as a no-op fallback.
+    const expandedKeyByCol = new Map<string, string[]>();
+    for (const p of probed) {
+      if (p.keys.length > 0) {
+        expandedKeyByCol.set(p.col.name, p.keys);
+      }
+    }
+    if (expandedKeyByCol.size === 0) {
+      return keys;
+    }
+
+    const expanded: MetricFindValue[] = [];
+    view.forEach((item) => {
+      const col = item[0];
+      const table = item[2];
+      const baseText = hideTableName ? col : `${table}.${col}`;
+      const mapKeys = expandedKeyByCol.get(col);
+      if (!mapKeys || table !== singleTable) {
+        expanded.push({ text: baseText });
+        return;
+      }
+      for (const k of mapKeys) {
+        expanded.push({ text: `${baseText}.${k}` });
+      }
+    });
+    return expanded;
+  }
+
+  /**
+   * The `$clickhouse_adhoc_query` template variable may resolve to a bare
+   * database name or `db.table`. This returns the database component, or
+   * undefined when we can't derive one (free-form SELECT variable, etc.).
+   */
+  private resolveAdhocDatabase(_frame: DataFrame): string | undefined {
+    const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
+    const defaultDatabase = this.getDefaultDatabase();
+    const raw = source === '$clickhouse_adhoc_query' ? defaultDatabase : source;
+    if (!raw || raw.toLowerCase().startsWith('select')) {
+      return defaultDatabase;
+    }
+    return raw.includes('.') ? raw.split('.')[0] : raw;
+  }
+
+  /**
+   * Returns the table name when the adhoc source resolves to a specific
+   * `db.table`. Returns undefined when the source is a bare database or a
+   * free-form SELECT, since we can't safely probe Map keys across many
+   * tables without a dramatic fan-out.
+   */
+  private resolveAdhocSingleTable(): string | undefined {
+    const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
+    const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultDatabase() : source;
+    if (!raw || raw.toLowerCase().startsWith('select')) {
+      return undefined;
+    }
+    return raw.includes('.') ? raw.split('.')[1] : undefined;
   }
 
   async getTagValues({ key }: any): Promise<MetricFindValue[]> {
@@ -1056,13 +1206,52 @@ export class Datasource
       source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     }
 
-    const rawSql = `select distinct ${col} from ${source} limit 1000`;
+    // If `col` is of the form `<mapCol>.<mapKey>` and <mapCol> is known to
+    // be a Map-typed column, rewrite to bracket-access so the SELECT pulls
+    // distinct Map values rather than stringified Map objects (which the
+    // Grafana frame layer renders as `[object Object]`). The map key is
+    // escaped for CH string-literal embedding so that keys containing `'`
+    // or `\` produce valid SQL.
+    const mapAccess = this.asMapAccess(col, source);
+    const selectExpr = mapAccess ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']` : col;
+
+    const rawSql = `select distinct ${selectExpr} from ${source} limit 1000`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
     }
     const field = frame.fields[0];
     return this.fieldValuesToMetricFindValues(field);
+  }
+
+  /**
+   * Parses a dotted tag key and returns `{column, key}` when the leading
+   * segment refers to a Map-typed column in the given source. The source
+   * may be either `db.table` or a bare table name — we strip the `db.`
+   * prefix before lookup so the per-table cache (keyed by bare table name)
+   * is hit, rather than always falling back to the flattened union.
+   */
+  private asMapAccess(col: string, source: string): { column: string; key: string } | undefined {
+    if (!col.includes('.')) {
+      return undefined;
+    }
+    const parts = col.split('.');
+    const tableKey = source.includes('.') ? source.split('.')[1] : source;
+    const mapCols = this.mapColumnsByTable.get(tableKey) ?? this.getFlatMapColumnSet();
+    if (!mapCols.has(parts[0])) {
+      return undefined;
+    }
+    return { column: parts[0], key: parts.slice(1).join('.') };
+  }
+
+  private getFlatMapColumnSet(): Set<string> {
+    const flat = new Set<string>();
+    for (const set of this.mapColumnsByTable.values()) {
+      for (const c of set) {
+        flat.add(c);
+      }
+    }
+    return flat;
   }
 
   private async fetchTagValuesFromQuery(key: string): Promise<MetricFindValue[]> {
@@ -1435,6 +1624,26 @@ function getConnectionErrorHint(category: string, detail: string): string | unde
 enum TagType {
   query,
   schema,
+}
+
+/**
+ * Returns true when a ClickHouse type string describes a Map column
+ * (including `Nullable(Map(...))` and `LowCardinality(Map(...))` wrappers
+ * that callers may reasonably encounter).
+ */
+function isMapColumnType(type: string | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+  return /^(?:Nullable\(|LowCardinality\()?Map\(/.test(type);
+}
+
+// Escape a string for embedding inside a single-quoted ClickHouse string
+// literal: backslash and single quote are the only characters that need
+// escaping. Use when interpolating an untrusted identifier (e.g. a Map key
+// from system.columns) into raw SQL.
+function escapeCHStringLiteral(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
 enum AdHocFilterStatus {

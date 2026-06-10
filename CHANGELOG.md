@@ -69,7 +69,7 @@
 ### Fixes
 
 - Dependency updates
-  
+
 ## 4.14.0
 
 ### Features

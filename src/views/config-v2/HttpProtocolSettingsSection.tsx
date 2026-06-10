@@ -7,8 +7,10 @@ import { css } from '@emotion/css';
 import { onHttpHeadersChange } from 'views/CHConfigEditorHooks';
 import { HttpHeadersConfigV2 } from './HttpHeadersConfigV2';
 
-export interface HttpProtocolSettingsSectionProps
-  extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
+export interface HttpProtocolSettingsSectionProps extends DataSourcePluginOptionsEditorProps<
+  CHConfig,
+  CHSecureConfig
+> {}
 
 export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionProps) => {
   const { options, onOptionsChange } = props;

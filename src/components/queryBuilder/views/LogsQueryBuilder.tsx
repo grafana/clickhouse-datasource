@@ -61,9 +61,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         builderOptions.columns?.filter(
           (c) =>
             // Only select columns that don't have their own box
-            c.hint !== ColumnHint.Time &&
-            c.hint !== ColumnHint.LogLevel &&
-            c.hint !== ColumnHint.LogMessage
+            c.hint !== ColumnHint.Time && c.hint !== ColumnHint.LogLevel && c.hint !== ColumnHint.LogMessage
         ) || [],
       // liveView: builderOptions.meta?.liveView || false,
       filters: builderOptions.filters || [],

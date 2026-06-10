@@ -579,11 +579,7 @@ export class Lexer {
       // U+2018 LEFT SINGLE QUOTATION MARK — opens a StringLiteral,
       // closed by U+2019 RIGHT SINGLE QUOTATION MARK.
       case '\u2018':
-        return this.parseUnicodeQuotedString(
-          '\u2019',
-          TokenType.StringLiteral,
-          TokenType.ErrorSingleQuoteIsNotClosed
-        );
+        return this.parseUnicodeQuotedString('\u2019', TokenType.StringLiteral, TokenType.ErrorSingleQuoteIsNotClosed);
 
       // U+201C LEFT DOUBLE QUOTATION MARK — opens a QuotedIdentifier,
       // closed by U+201D RIGHT DOUBLE QUOTATION MARK.

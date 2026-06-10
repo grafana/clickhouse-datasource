@@ -16,6 +16,7 @@ import {
   getColumnIndexByHint,
   getColumnsByHints,
   isAggregateQuery,
+  JSON_SENTINEL_KEY,
 } from './sqlGenerator';
 
 describe('SQL Generator', () => {
@@ -237,6 +238,137 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
+  it('generates trace ID query with JSON-typed tags columns', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'JSON', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'JSON', hint: ColumnHint.TraceServiceTags },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+
+    expect(sql).toContain('"SpanAttributes" as tags');
+    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
+    expect(sql).not.toContain('mapKeys("SpanAttributes")');
+    expect(sql).not.toContain('mapKeys("ResourceAttributes")');
+    expect(sql).not.toContain('CAST');
+  });
+
+  it('generates trace ID query with JSON-typed tags and events/links columns, flatten nested disabled', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'JSON', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'JSON', hint: ColumnHint.TraceServiceTags },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: true,
+        otelVersion: 'latest',
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        flattenNested: false,
+        traceEventsColumnPrefix: 'Events',
+        traceLinksColumnPrefix: 'Links',
+        tagsAreJSON: true,
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+
+    expect(sql).toContain('"SpanAttributes" as tags');
+    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
+    // events/links attributes are passed as raw JSON and expanded client-side
+    expect(sql).toContain(`map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(attributes))`);
+    expect(sql).not.toContain('mapKeys(attributes)');
+    expect(sql).not.toContain('CAST');
+  });
+
+  it('generates trace ID query with JSON-typed tags and events/links columns, flatten nested enabled', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'SpanId', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'ParentSpanId', type: 'String', hint: ColumnHint.TraceParentSpanId },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'SpanName', type: 'LowCardinality(String)', hint: ColumnHint.TraceOperationName },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+        { name: 'SpanAttributes', type: 'JSON', hint: ColumnHint.TraceTags },
+        { name: 'ResourceAttributes', type: 'JSON', hint: ColumnHint.TraceServiceTags },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: true,
+        otelVersion: 'latest',
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        flattenNested: true,
+        traceEventsColumnPrefix: 'Events',
+        traceLinksColumnPrefix: 'Links',
+        tagsAreJSON: true,
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+
+    expect(sql).toContain('"SpanAttributes" as tags');
+    expect(sql).toContain('"ResourceAttributes" as serviceTags');
+    expect(sql).not.toContain('JSONAllPaths("SpanAttributes")');
+    expect(sql).not.toContain('JSONAllPaths("ResourceAttributes")');
+    // events/links attributes are passed as raw JSON and expanded client-side
+    expect(sql).toContain(`map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(event.Attributes))`);
+    expect(sql).toContain(`map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(link.Attributes))`);
+    expect(sql).not.toContain('mapKeys(event.Attributes)');
+    expect(sql).not.toContain('mapKeys(link.Attributes)');
+    expect(sql).not.toContain('CAST');
+  });
+
   it('generates trace ID query with additional fields, flatten nested disabled', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
@@ -286,7 +418,7 @@ describe('SQL Generator', () => {
       `mapKeys("SpanAttributes")) as tags,`,
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode,`,
-      `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap( key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))), "Events".Name, "Events".Timestamp, "Events".Attributes) AS logs,`,
+      `arrayMap((name, timestamp, attributes) -> tuple(name, toString(toUnixTimestamp64Milli(timestamp)), arrayMap(key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(name String, timestamp String, fields Array(Map(String, String))), "Events".Name, "Events".Timestamp, "Events".Attributes) AS logs,`,
       `arrayMap((traceID, spanID, attributes) -> tuple(traceID, spanID, arrayMap(key -> map('key', key, 'value', attributes[key]), mapKeys(attributes)))::Tuple(traceID String, spanID String, tags Array(Map(String, String))), "Links".TraceId, "Links".SpanId, "Links".Attributes) AS references,`,
       '"Kind" as kind,',
       '"StatusMessage" as statusMessage,',

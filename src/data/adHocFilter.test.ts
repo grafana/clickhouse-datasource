@@ -247,16 +247,20 @@ describe('AdHocManager', () => {
 
   it('converts Map column filter to proper filter syntax', () => {
     const ahm = new AdHocFilter();
-    const result = ahm.apply('SELECT * FROM foo', [
-      { key: "ResourceAttributes.cloud.region", operator: '=', value: 'test' },
-    ] as AdHocVariableFilter[], false);
+    const result = ahm.apply(
+      'SELECT * FROM foo',
+      [{ key: 'ResourceAttributes.cloud.region', operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      false
+    );
     expect(result).toContain("ResourceAttributes[\\\'cloud.region\\\']");
   });
   it('converts JSON column filter to proper filter syntax', () => {
     const ahm = new AdHocFilter();
-    const result = ahm.apply('SELECT * FROM foo', [
-      { key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' },
-    ] as AdHocVariableFilter[], true);
+    const result = ahm.apply(
+      'SELECT * FROM foo',
+      [{ key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      true
+    );
     expect(result).toContain('ResourceAttributes.cloud.region');
   });
 
@@ -318,5 +322,82 @@ describe('AdHocManager', () => {
       { key: 'TABLE.key.key2', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(`SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key.key2 = \\'val\\' '}`);
+  });
+
+  describe('schema-driven Map column detection (#1434)', () => {
+    it('rewrites dotted key access for user-registered Map columns (hideTableName)', () => {
+      // Mirrors the hideTableNameInAdhocFilters=true path: UI emits `col.key`
+      // with no table prefix. Without schema info, the default allowlist only
+      // covers OTel names; the setter extends it.
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['custom_tags']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: 'custom_tags.region', operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("custom_tags[\\'region\\']");
+    });
+
+    it('rewrites dotted key access for user-registered Map columns (table-prefixed)', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['custom_tags']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: 'foo.custom_tags.region', operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("custom_tags[\\'region\\']");
+    });
+
+    it('leaves non-Map dotted keys alone (strip table prefix only)', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['custom_tags']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: 'foo.plain_col', operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      // plain_col is not a Map → fall through to the existing table-prefix
+      // strip behavior.
+      expect(val).toContain(" plain_col = \\'x\\' ");
+    });
+
+    it('back-compat: OTel map columns still work without an explicit setMapColumns call', () => {
+      const ahm = new AdHocFilter();
+      // No setMapColumns — the default set ships with the OTel names so
+      // behavior does not regress for existing users.
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: 'ResourceAttributes.http.method', operator: '=', value: 'GET' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes[\\'http.method\\']");
+    });
+
+    it('setMapColumns preserves the OTel defaults (additive, not replacing)', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['custom_tags']));
+      expect(ahm.getMapColumns().has('custom_tags')).toBe(true);
+      expect(ahm.getMapColumns().has('LogAttributes')).toBe(true);
+      expect(ahm.getMapColumns().has('ResourceAttributes')).toBe(true);
+    });
+
+    it('escapes single quotes and backslashes in Map keys (two-layer SQL embedding)', () => {
+      // A Map key containing `'` must survive both the inner bracket-access
+      // string literal and the outer additional_table_filters string. Without
+      // escaping, `'` would close the outer string early and produce invalid
+      // SQL (or worse, allow injection through a crafted key).
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['labels']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: "labels.a'b", operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      // Outer-string bytes for `a'b` are `a\\\'b` (raw `\\\'` is the
+      // two-level escape of `'`). The surrounding `\\\\'` brackets remain
+      // the existing outer-escaped quote.
+      expect(val).toContain("labels[\\'a\\\\\\'b\\']");
+    });
+
+    it('escapes backslashes in Map keys', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['labels']));
+      const val = ahm.apply('SELECT * FROM foo', [
+        { key: 'labels.a\\b', operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("labels[\\'a\\\\\\\\b\\']");
+    });
   });
 });

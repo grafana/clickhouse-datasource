@@ -310,7 +310,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
           onChange={onTraceTimestampTableSuffixChange}
         />
       </ConfigSubSection>
-      <br/>
+      <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>
         <Switch
           label={labels.traceIdCorrelation.showTraceLinks.label}

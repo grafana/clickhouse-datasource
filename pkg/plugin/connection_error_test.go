@@ -4,12 +4,12 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net"
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
 )
 
