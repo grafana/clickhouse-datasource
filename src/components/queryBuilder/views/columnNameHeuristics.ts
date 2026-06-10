@@ -63,5 +63,5 @@ export const isStringLikeColumn = (column: TableColumn): boolean => {
 /** Type predicate: ClickHouse numeric duration columns (UInt*, Int*, Float*). */
 export const isNumericColumn = (column: TableColumn): boolean => {
   const type = (column.type || '').toLowerCase();
-  return type.startsWith('uint') || type.startsWith('int') || type.startsWith('float') || type.startsWith('decimal');
+  return type.includes('uint') || type.includes('int') || type.includes('float') || type.includes('decimal');
 };
