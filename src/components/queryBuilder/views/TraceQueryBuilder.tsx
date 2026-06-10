@@ -192,7 +192,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
         tooltip={labels.traceModeTooltip}
       />
 
-      <Collapse label={labels.columnsSection} collapsible isOpen={isColumnsOpen} onToggle={setColumnsOpen}>
+      <Collapse label={labels.columnsSection} isOpen={isColumnsOpen} onToggle={setColumnsOpen}>
         {configWarning}
         <ColumnRolesHelp
           text={labels.columnsHelp.text}
@@ -431,7 +431,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           />
         </div>
       </Collapse>
-      <Collapse label={labels.filtersSection} collapsible isOpen={isFiltersOpen} onToggle={setFiltersOpen}>
+      <Collapse label={labels.filtersSection} isOpen={isFiltersOpen} onToggle={setFiltersOpen}>
         <OrderByEditor
           orderByOptions={getOrderByOptions(builderOptions, allColumns)}
           orderBy={builderState.orderBy}
