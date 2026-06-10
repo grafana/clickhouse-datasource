@@ -138,6 +138,7 @@ export const AdditionalSettingsSection = (props: Props) => {
             !!jsonData.maxOpenConns ||
             !!jsonData.queryTimeout ||
             !!jsonData.validateSql ||
+            jsonData.enableMapKeysDiscovery === false ||
             !isEqual(logs, defaultLogs) ||
             !isEqual(traces, defaultTraces)
           );
@@ -189,6 +190,7 @@ export const AdditionalSettingsSection = (props: Props) => {
               maxOpenConns={jsonData.maxOpenConns}
               queryTimeout={jsonData.queryTimeout}
               validateSql={jsonData.validateSql}
+              enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
@@ -212,6 +214,10 @@ export const AdditionalSettingsSection = (props: Props) => {
               onValidateSqlChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
                 onUpdateDatasourceJsonDataOptionChecked(props, 'validateSql')(e);
+              }}
+              onEnableMapKeysDiscoveryChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ enableMapKeysDiscovery: e.currentTarget.checked });
+                onUpdateDatasourceJsonDataOptionChecked(props, 'enableMapKeysDiscovery')(e);
               }}
             />
             <Divider />
