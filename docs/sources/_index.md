@@ -20,28 +20,29 @@ The ClickHouse data source plugin allows you to query and visualize ClickHouse d
 
 ## Supported features
 
-| Feature | Supported |
-|---------|-----------|
-| Metrics | Yes |
-| Logs | Yes |
-| Traces | Yes |
-| Alerting and recording rules | Yes |
-| Annotations | Yes |
-| Template variables | Yes |
-| Ad hoc filters | Yes (ClickHouse 22.7+) |
-| Private Data Connect (PDC) | Yes (Grafana Cloud) |
+| Feature                      | Supported              |
+| ---------------------------- | ---------------------- |
+| Metrics                      | Yes                    |
+| Logs                         | Yes                    |
+| Traces                       | Yes                    |
+| Alerting and recording rules | Yes                    |
+| Annotations                  | Yes                    |
+| Template variables           | Yes                    |
+| Ad hoc filters               | Yes (ClickHouse 22.7+) |
+| Private Data Connect (PDC)   | Yes (Grafana Cloud)    |
 
 ## Requirements
 
-| Grafana version | Plugin version |
-|-----------------|----------------|
-| 11.6.0 and later | v4.15+ |
-| 9.x – 11.5.x | v4.0 – v4.14 |
+| Grafana version  | Plugin version |
+| ---------------- | -------------- |
+| 11.6.0 and later | v4.15+         |
+| 9.x – 11.5.x     | v4.0 – v4.14   |
 
 {{< admonition type="note" >}}
+
 - Ad hoc filters require ClickHouse 22.7 or later (from plugin v2.0 onward).
 - Log volume queries in the SQL editor require Grafana 12.4.0 or later.
-{{< /admonition >}}
+  {{< /admonition >}}
 
 ## Get started
 

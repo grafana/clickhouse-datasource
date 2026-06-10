@@ -375,7 +375,7 @@ describe('AdHocManager', () => {
       expect(ahm.getMapColumns().has('ResourceAttributes')).toBe(true);
     });
 
-    it("escapes single quotes and backslashes in Map keys (two-layer SQL embedding)", () => {
+    it('escapes single quotes and backslashes in Map keys (two-layer SQL embedding)', () => {
       // A Map key containing `'` must survive both the inner bracket-access
       // string literal and the outer additional_table_filters string. Without
       // escaping, `'` would close the outer string early and produce invalid

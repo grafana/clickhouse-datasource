@@ -107,7 +107,13 @@ export function splitLogsVolumeFrames(data: DataFrame[], logVolumePrefix: string
         length: timeField.values.length,
         fields: [
           { name: 'Time', type: FieldType.time, values: timeField.values, config: {} },
-          { name: 'Value', type: FieldType.number, values: levelField.values, labels: { level: levelName }, config: {} },
+          {
+            name: 'Value',
+            type: FieldType.number,
+            values: levelField.values,
+            labels: { level: levelName },
+            config: {},
+          },
         ],
       });
     }

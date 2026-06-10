@@ -208,8 +208,14 @@ export const FilterEditor = (props: {
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
-  const keysColumnName = isJSONType ? props.allColumns.find(c => c.name === filter.key + 'Keys')?.name : undefined;
-  const jsonPaths = useUniqueJSONPaths(props.datasource, isJSONType ? filter.key : '', props.database, props.table, keysColumnName);
+  const keysColumnName = isJSONType ? props.allColumns.find((c) => c.name === filter.key + 'Keys')?.name : undefined;
+  const jsonPaths = useUniqueJSONPaths(
+    props.datasource,
+    isJSONType ? filter.key : '',
+    props.database,
+    props.table,
+    keysColumnName
+  );
   const subKeyOptions = isJSONType
     ? jsonPaths.map((p) => ({ label: p, value: p }))
     : mapKeys.map((k) => ({ label: k, value: k }));
@@ -407,7 +413,11 @@ export const FilterEditor = (props: {
       {(isMapType || isJSONType) && (
         <Select
           value={filter.mapKey}
-          placeholder={isJSONType ? labels.components.FilterEditor.jsonPathPlaceholder : labels.components.FilterEditor.mapKeyPlaceholder}
+          placeholder={
+            isJSONType
+              ? labels.components.FilterEditor.jsonPathPlaceholder
+              : labels.components.FilterEditor.mapKeyPlaceholder
+          }
           width={40}
           className={styles.Common.inlineSelect}
           options={subKeyOptions}

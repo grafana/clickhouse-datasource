@@ -144,11 +144,13 @@ describe('applyTraceSearchFieldConfig', () => {
       startTime: 0,
     };
 
-    const data: DataFrame[] = [{
-      fields,
-      length: 1,
-      refId: 'A',
-    }];
+    const data: DataFrame[] = [
+      {
+        fields,
+        length: 1,
+        refId: 'A',
+      },
+    ];
     const response: DataQueryResponse = { data };
 
     return [request, response];
@@ -175,9 +177,7 @@ describe('applyTraceSearchFieldConfig', () => {
   });
 
   it('does not apply field configs to trace ID mode queries', () => {
-    const fields: Field[] = [
-      { name: 'duration', type: FieldType.number, config: {}, values: [] },
-    ];
+    const fields: Field[] = [{ name: 'duration', type: FieldType.number, config: {}, values: [] }];
 
     const [request, response] = buildTraceSearchRequestResponse(fields, {
       meta: { isTraceIdMode: true, traceId: 'abc123' },
@@ -188,9 +188,7 @@ describe('applyTraceSearchFieldConfig', () => {
   });
 
   it('does not apply field configs to non-trace queries', () => {
-    const fields: Field[] = [
-      { name: 'duration', type: FieldType.number, config: {}, values: [] },
-    ];
+    const fields: Field[] = [{ name: 'duration', type: FieldType.number, config: {}, values: [] }];
 
     const [request, response] = buildTraceSearchRequestResponse(fields, {
       queryType: QueryType.Table,
@@ -201,9 +199,7 @@ describe('applyTraceSearchFieldConfig', () => {
   });
 
   it('preserves existing field config properties', () => {
-    const fields: Field[] = [
-      { name: 'duration', type: FieldType.number, config: { decimals: 2 }, values: [] },
-    ];
+    const fields: Field[] = [{ name: 'duration', type: FieldType.number, config: { decimals: 2 }, values: [] }];
 
     const [request, response] = buildTraceSearchRequestResponse(fields);
     applyTraceSearchFieldConfig(request, response);
@@ -213,9 +209,7 @@ describe('applyTraceSearchFieldConfig', () => {
   });
 
   it('does not modify fields that have no matching config', () => {
-    const fields: Field[] = [
-      { name: 'customColumn', type: FieldType.string, config: {}, values: [] },
-    ];
+    const fields: Field[] = [{ name: 'customColumn', type: FieldType.string, config: {}, values: [] }];
 
     const [request, response] = buildTraceSearchRequestResponse(fields);
     applyTraceSearchFieldConfig(request, response);
@@ -437,8 +431,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       const [request, response] = buildTestRequestResponse(builderOptions);
       const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
-      const traceQuery = out?.data[0]?.fields[0]?.config?.links
-        ?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+      const traceQuery = out?.data[0]?.fields[0]?.config?.links?.find((link: any) => link.title === 'View trace')
+        ?.internal?.query as CHBuilderQuery;
 
       expect(traceQuery.rawSql).toContain('"SpanAttributes" as tags');
       expect(traceQuery.rawSql).not.toContain('JSONAllPaths("SpanAttributes")');
@@ -472,8 +466,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       const [request, response] = buildTestRequestResponse(builderOptions);
       const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
-      const traceQuery = out?.data[0]?.fields[0]?.config?.links
-        ?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+      const traceQuery = out?.data[0]?.fields[0]?.config?.links?.find((link: any) => link.title === 'View trace')
+        ?.internal?.query as CHBuilderQuery;
 
       // Live schema wins: Map SQL, not JSON-path SQL
       expect(traceQuery.builderOptions.meta?.tagsAreJSON).toBe(false);
@@ -690,7 +684,7 @@ describe('transformTraceTagFields', () => {
     // {"http":{"method":"GET","status_code":"200"}} instead of {"http.method":"GET"}.
     const nested = {
       http: { method: 'GET', status_code: '200' },
-      'service': { name: 'api' },
+      service: { name: 'api' },
     };
     const res = makeResponse(nested, { deployment: { environment: 'prod' } });
     transformTraceTagFields(makeRawSqlRequest(), res);

@@ -18,6 +18,7 @@ import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import {
   useDefaultFilters,
+  useDefaultLogColumnsByName,
   useDefaultTimeColumn,
   useLogDefaultsOnMount,
   useOtelColumns,
@@ -60,9 +61,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         builderOptions.columns?.filter(
           (c) =>
             // Only select columns that don't have their own box
-            c.hint !== ColumnHint.Time &&
-            c.hint !== ColumnHint.LogLevel &&
-            c.hint !== ColumnHint.LogMessage
+            c.hint !== ColumnHint.Time && c.hint !== ColumnHint.LogLevel && c.hint !== ColumnHint.LogMessage
         ) || [],
       // liveView: builderOptions.meta?.liveView || false,
       filters: builderOptions.filters || [],
@@ -108,6 +107,14 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     allColumns,
     builderOptions.table,
     builderState.timeColumn,
+    builderState.otelEnabled,
+    builderOptionsDispatch
+  );
+  useDefaultLogColumnsByName(
+    allColumns,
+    builderOptions.table,
+    builderState.messageColumn,
+    builderState.logLevelColumn,
     builderState.otelEnabled,
     builderOptionsDispatch
   );

@@ -209,15 +209,15 @@ When the user selects a column (for example, `status`) in the ad hoc filter key 
 
 Ad hoc filters support the following operators:
 
-| Operator | ClickHouse equivalent | Description |
-|----------|----------------------|-------------|
-| `=` | `=` | Equals |
-| `!=` | `!=` | Not equals |
-| `<` | `<` | Less than |
-| `>` | `>` | Greater than |
-| `=~` | `ILIKE` | Case-insensitive pattern match (use `%` as wildcard) |
-| `!~` | `NOT ILIKE` | Negated case-insensitive pattern match |
-| `IN` | `IN (...)` | Matches any value in a list |
+| Operator | ClickHouse equivalent | Description                                          |
+| -------- | --------------------- | ---------------------------------------------------- |
+| `=`      | `=`                   | Equals                                               |
+| `!=`     | `!=`                  | Not equals                                           |
+| `<`      | `<`                   | Less than                                            |
+| `>`      | `>`                   | Greater than                                         |
+| `=~`     | `ILIKE`               | Case-insensitive pattern match (use `%` as wildcard) |
+| `!~`     | `NOT ILIKE`           | Negated case-insensitive pattern match               |
+| `IN`     | `IN (...)`            | Matches any value in a list                          |
 
 ## Hide table name in ad hoc filter keys
 

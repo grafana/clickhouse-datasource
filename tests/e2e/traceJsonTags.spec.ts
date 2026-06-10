@@ -172,7 +172,10 @@ test.describe('JSON-typed trace attribute columns', () => {
     }
   });
 
-  test('(fixture) builder-shaped SQL with JSON sentinel pattern executes and returns event logs', async ({ page, explorePage }) => {
+  test('(fixture) builder-shaped SQL with JSON sentinel pattern executes and returns event logs', async ({
+    page,
+    explorePage,
+  }) => {
     // Validates the SQL shape the plugin generates for JSON-column OTel queries:
     // event attributes are wrapped in a single sentinel Map entry carrying the raw JSON blob;
     // the client-side expandJsonSentinel expands it into key-value pairs. mapKeys must NOT appear.

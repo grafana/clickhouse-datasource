@@ -198,9 +198,8 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // quotes from string values so every value lands as a plain string.
   const jsonAttrsToFields = (expr: string): string =>
     `[map('key', '${JSON_SENTINEL_KEY}', 'value', toJSONString(${expr}))]`;
-  const attrsToFields = (expr: string) => tagsAreJSON
-    ? jsonAttrsToFields(expr)
-    : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
+  const attrsToFields = (expr: string) =>
+    tagsAreJSON ? jsonAttrsToFields(expr) : `arrayMap(key -> map('key', key, 'value', ${expr}[key]), mapKeys(${expr}))`;
 
   const traceEventsPrefix = options.meta?.traceEventsColumnPrefix || '';
   if (traceEventsPrefix !== '') {
@@ -277,8 +276,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   // suffix) benefits from the narrowed time range.
   const hasTraceTimestampTable = options.meta?.hasTraceTimestampTable;
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
-  const applyTraceIdOptimization =
-    hasTraceTimestampTable && hasTraceIdFilter && traceStartTime !== undefined;
+  const applyTraceIdOptimization = hasTraceTimestampTable && hasTraceIdFilter && traceStartTime !== undefined;
   if (applyTraceIdOptimization) {
     const traceIdValue = options.meta!.traceId;
     const suffix = options.meta?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
@@ -458,7 +456,9 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
     selectNames.add(timeColumn.alias);
   }
 
-  const columnsExcludingTimeColumn = options.columns?.filter((c) => c.hint !== ColumnHint.Time && c.hint !== ColumnHint.FilterTime);
+  const columnsExcludingTimeColumn = options.columns?.filter(
+    (c) => c.hint !== ColumnHint.Time && c.hint !== ColumnHint.FilterTime
+  );
   columnsExcludingTimeColumn?.forEach((c) => {
     selectParts.push(getColumnIdentifier(c));
     selectNames.add(c.alias || c.name);

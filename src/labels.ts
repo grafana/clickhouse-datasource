@@ -551,13 +551,11 @@ export default {
         },
         statusMessage: {
           label: 'Status Message Column',
-          tooltip:
-            'Human-readable status description for the span. Common names: status_message. OTel: StatusMessage.',
+          tooltip: 'Human-readable status description for the span. Common names: status_message. OTel: StatusMessage.',
         },
         instrumentationLibraryName: {
           label: 'Library Name Column',
-          tooltip:
-            'Name of the instrumentation library (Optional). OTel: ScopeName or InstrumentationLibraryName.',
+          tooltip: 'Name of the instrumentation library (Optional). OTel: ScopeName or InstrumentationLibraryName.',
         },
         instrumentationLibraryVersion: {
           label: 'Library Version Column',

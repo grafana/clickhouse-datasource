@@ -294,8 +294,12 @@ export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: Dat
  */
 function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[]): SelectedColumn[] {
   return columns.map((col) => {
-    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) { return col; }
-    if (col.type?.startsWith('JSON')) { return col; }
+    if (col.hint !== ColumnHint.TraceTags && col.hint !== ColumnHint.TraceServiceTags) {
+      return col;
+    }
+    if (col.type?.startsWith('JSON')) {
+      return col;
+    }
     const colType = allCols.find((c) => c.name === col.name)?.type;
     return colType?.startsWith('JSON') ? { ...col, type: 'JSON' } : col;
   });

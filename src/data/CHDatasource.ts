@@ -414,7 +414,7 @@ export class Datasource
       }
 
       // Build filter entries for all tables
-      const tableFilters = tableNames.map(tableName => `'${tableName}': '${filterStr}'`).join(', ');
+      const tableFilters = tableNames.map((tableName) => `'${tableName}': '${filterStr}'`).join(', ');
       return `additional_table_filters={${tableFilters}}`;
     });
   }
@@ -984,14 +984,13 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
-    const targets = request.targets
-      .map((t) => ({
-        ...t,
-        meta: {
-          ...t?.meta,
-          timezone: this.getTimezone(request),
-        },
-      }));
+    const targets = request.targets.map((t) => ({
+      ...t,
+      meta: {
+        ...t?.meta,
+        timezone: this.getTimezone(request),
+      },
+    }));
 
     const hasLogsVolumeTargets = targets.some((t) => t.refId?.startsWith(Datasource.logVolumePrefix));
 
@@ -1214,9 +1213,7 @@ export class Datasource
     // escaped for CH string-literal embedding so that keys containing `'`
     // or `\` produce valid SQL.
     const mapAccess = this.asMapAccess(col, source);
-    const selectExpr = mapAccess
-      ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']`
-      : col;
+    const selectExpr = mapAccess ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']` : col;
 
     const rawSql = `select distinct ${selectExpr} from ${source} limit 1000`;
     const frame = await this.runQuery({ rawSql });

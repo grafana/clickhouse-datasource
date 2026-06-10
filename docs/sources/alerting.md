@@ -33,14 +33,14 @@ For an overview of alerting in Grafana, see [Alert rules](https://grafana.com/do
 
 Alert rules need numeric values to evaluate. Your ClickHouse query should return data that Grafana can use in a **Reduce** expression and then compare in a **Threshold** expression.
 
-| Query result | Use case |
-|--------------|----------|
+| Query result                                   | Use case                                                                                                                                                 |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Time series** (time column + numeric column) | Threshold alerts on a metric (e.g. average CPU, error count per interval). Use **Reduce** (Last, Max, Mean, etc.) to get a single value from the series. |
-| **Single row, numeric value** | Threshold alerts on an aggregate (e.g. `SELECT count() FROM errors WHERE ...`). Use **Reduce** > **Last** to use the value. |
+| **Single row, numeric value**                  | Threshold alerts on an aggregate (e.g. `SELECT count() FROM errors WHERE ...`). Use **Reduce** > **Last** to use the value.                              |
 
 Queries that return only text or non-numeric data cannot be used directly for threshold evaluation. Use `count()`, `avg()`, `sum()`, or similar in your SQL so the result is numeric.
 
-Use the **$__timeFilter(column)** macro in your WHERE clause so the query respects the alert rule’s evaluation interval and time range. See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section.
+Use the **$\_\_timeFilter(column)** macro in your WHERE clause so the query respects the alert rule’s evaluation interval and time range. See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section.
 
 ## Create an alert rule
 
@@ -118,7 +118,7 @@ If **Enable row limit** is turned on in the data source [configuration](/docs/pl
 
 1. **Use an appropriate evaluation interval** — Set the alert evaluation interval to match how often your data is written. Avoid intervals shorter than your data resolution to prevent flapping or missed data.
 2. **Reduce multiple series** — If your query returns multiple time series (e.g. one per host), use **Reduce** to aggregate: **Last**, **Max**, **Mean**, or **Sum** so Grafana can evaluate a single value.
-3. **Restrict the time range** — Use **$__timeFilter(column)** in your WHERE clause so the query only reads data in the evaluation window. Avoid full table scans.
+3. **Restrict the time range** — Use **$\_\_timeFilter(column)** in your WHERE clause so the query only reads data in the evaluation window. Avoid full table scans.
 4. **Handle no data** — In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (e.g. a heartbeat query).
 5. **Test the query first** — Run the query in **Explore** with the ClickHouse data source and confirm it returns the expected numeric data before saving the alert rule.
 

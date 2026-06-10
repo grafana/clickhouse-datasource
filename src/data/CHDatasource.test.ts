@@ -87,9 +87,7 @@ describe('ClickHouseDatasource', () => {
 
       await instance.metricFindQuery('SELECT 1', { scopedVars });
 
-      expect(querySpy).toHaveBeenCalledWith(
-        expect.objectContaining({ scopedVars })
-      );
+      expect(querySpy).toHaveBeenCalledWith(expect.objectContaining({ scopedVars }));
     });
   });
 
@@ -1839,9 +1837,7 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       // Force a single context column so we don't hit the "no columns" guard.
       jest.spyOn(ds, 'getLogContextColumnsFromLogRow').mockReturnValue([{ name: 'service', value: 'web' }]);
-      const querySpy = jest
-        .spyOn(ds, 'query')
-        .mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+      const querySpy = jest.spyOn(ds, 'query').mockImplementation((_req) => of({ data: [toDataFrame([])] }));
 
       const query = cloneDeep(baseQuery);
       await ds.getLogRowContext(makeRow(), contextOptions, query);
@@ -1854,13 +1850,9 @@ describe('ClickHouseDatasource', () => {
       // Primary entry is the time column (inserted by getLogRowContext).
       expect(orderBy[0]).toMatchObject({ hint: ColumnHint.Time });
       // User's secondary entry survives as a tiebreaker.
-      expect(orderBy).toContainEqual(
-        expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC })
-      );
+      expect(orderBy).toContainEqual(expect.objectContaining({ name: 'offset', dir: OrderByDirection.ASC }));
       // Original time-column entry is not duplicated.
-      const timeEntries = orderBy.filter(
-        (e) => e.hint === ColumnHint.Time || e.name === 'timestamp'
-      );
+      const timeEntries = orderBy.filter((e) => e.hint === ColumnHint.Time || e.name === 'timestamp');
       expect(timeEntries).toHaveLength(1);
     });
 

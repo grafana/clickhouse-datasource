@@ -144,10 +144,7 @@ test.describe('Ad-hoc regex operator filters', () => {
     // characters `^`, `(`, `|`, `)`, `$` are not wildcards in LIKE, and
     // there is no level literally equal to `^(info|warn)$`). If this test
     // ever sees zero rows, ILIKE is back.
-    await enterSql(
-      page,
-      "SELECT level FROM e2e_test.events WHERE level REGEXP '^(info|warn)$' ORDER BY timestamp"
-    );
+    await enterSql(page, "SELECT level FROM e2e_test.events WHERE level REGEXP '^(info|warn)$' ORDER BY timestamp");
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();

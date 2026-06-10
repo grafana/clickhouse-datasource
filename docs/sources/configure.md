@@ -65,8 +65,8 @@ The plugin's underlying client ([clickhouse-go](https://github.com/ClickHouse/cl
 
 At a minimum the user must be allowed to change the following settings:
 
-| Setting | Why the plugin needs it |
-|---------|------------------------|
+| Setting                | Why the plugin needs it                                   |
+| ---------------------- | --------------------------------------------------------- |
 | **max_execution_time** | Enforces the query timeout configured in the data source. |
 
 When `readonly = 1` is set, ClickHouse blocks all setting changes by default. To allow the required settings without disabling read-only mode:
@@ -95,12 +95,12 @@ The data source supports two transport protocols: **Native** (default) and **HTT
 
 ### Default ports
 
-| Protocol | TLS  | Port |
-|----------|------|------|
-| HTTP     | No   | 8123 |
-| HTTP     | Yes  | 8443 |
-| Native   | No   | 9000 |
-| Native   | Yes  | 9440 |
+| Protocol | TLS | Port |
+| -------- | --- | ---- |
+| HTTP     | No  | 8123 |
+| HTTP     | Yes | 8443 |
+| Native   | No  | 9000 |
+| Native   | Yes | 9440 |
 
 When you enable **Secure connection** in Grafana, you must also set the port to a TLS-enabled port. Grafana does not change the port automatically when TLS is toggled on.
 
@@ -120,18 +120,18 @@ After adding the data source, configure the following settings.
 
 ### Server settings
 
-| Setting | Description |
-|---------|-------------|
-| **Name** | The name used to refer to the data source in panels and queries. |
-| **Default** | Toggle to make this the default data source for new panels. |
-| **Server** | The ClickHouse server host (for example, `localhost`). |
-| **Protocol** | **Native** or **HTTP**. |
-| **Port** | Port number; depends on protocol and whether TLS is enabled (see default ports above). |
+| Setting               | Description                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**              | The name used to refer to the data source in panels and queries.                                                                                        |
+| **Default**           | Toggle to make this the default data source for new panels.                                                                                             |
+| **Server**            | The ClickHouse server host (for example, `localhost`).                                                                                                  |
+| **Protocol**          | **Native** or **HTTP**.                                                                                                                                 |
+| **Port**              | Port number; depends on protocol and whether TLS is enabled (see default ports above).                                                                  |
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
-| **Username** | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions). |
-| **Password** | ClickHouse user password. |
-| **Default database** | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`. |
-| **Default table** | The default table used by the query builder. |
+| **Username**          | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions).                                                                         |
+| **Password**          | ClickHouse user password.                                                                                                                               |
+| **Default database**  | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`.                                      |
+| **Default table**     | The default table used by the query builder.                                                                                                            |
 
 ### Default database guidance
 
@@ -146,32 +146,32 @@ If you are unsure which database to use, leave the field blank and select a data
 
 The following settings appear only when **Protocol** is set to **HTTP**:
 
-| Setting | Description |
-|---------|-------------|
-| **HTTP URL Path** | Additional URL path appended to HTTP requests (for example, `/clickhouse`). Defaults to `/`. |
-| **Custom HTTP headers** | Static headers sent with every request. Each header has a name, value, and an optional **Secure** toggle that stores the value in encrypted storage. |
+| Setting                          | Description                                                                                                                                                                                   |
+| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HTTP URL Path**                | Additional URL path appended to HTTP requests (for example, `/clickhouse`). Defaults to `/`.                                                                                                  |
+| **Custom HTTP headers**          | Static headers sent with every request. Each header has a name, value, and an optional **Secure** toggle that stores the value in encrypted storage.                                          |
 | **Forward Grafana HTTP headers** | When enabled, forwards Grafana request headers (such as authentication headers) to ClickHouse. Enables multi-connection mode so each unique set of forwarded headers gets its own connection. |
 
 ### TLS settings
 
 When **Secure connection** is enabled, the following TLS settings become available:
 
-| Setting | Description |
-|---------|-------------|
-| **Skip TLS Verify** | Skip server certificate verification. Use only for testing; not recommended for production. |
-| **TLS Client Auth** | Enable mutual TLS (mTLS) by providing a client certificate and key. |
-| **With CA Cert** | Provide a custom CA certificate for verifying the ClickHouse server's TLS certificate (required for self-signed certificates). |
-| **CA Cert** | PEM-encoded CA certificate. |
-| **Client Cert** | PEM-encoded client certificate (required when TLS Client Auth is enabled). |
-| **Client Key** | PEM-encoded client private key (required when TLS Client Auth is enabled). |
+| Setting             | Description                                                                                                                    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| **Skip TLS Verify** | Skip server certificate verification. Use only for testing; not recommended for production.                                    |
+| **TLS Client Auth** | Enable mutual TLS (mTLS) by providing a client certificate and key.                                                            |
+| **With CA Cert**    | Provide a custom CA certificate for verifying the ClickHouse server's TLS certificate (required for self-signed certificates). |
+| **CA Cert**         | PEM-encoded CA certificate.                                                                                                    |
+| **Client Cert**     | PEM-encoded client certificate (required when TLS Client Auth is enabled).                                                     |
+| **Client Key**      | PEM-encoded client private key (required when TLS Client Auth is enabled).                                                     |
 
 ### Additional settings
 
-| Setting | Description |
-|---------|-------------|
-| **Dial Timeout** | Timeout in seconds for establishing a connection. Default: `10`. |
-| **Query Timeout** | Timeout in seconds for read queries. Default: `60`. |
-| **Validate SQL** | When enabled, validates SQL syntax in the query editor. |
+| Setting              | Description                                                           |
+| -------------------- | --------------------------------------------------------------------- |
+| **Dial Timeout**     | Timeout in seconds for establishing a connection. Default: `10`.      |
+| **Query Timeout**    | Timeout in seconds for read queries. Default: `60`.                   |
+| **Validate SQL**     | When enabled, validates SQL syntax in the query editor.               |
 | **Enable row limit** | When enabled, applies the Grafana row limit setting to query results. |
 
 ### Custom ClickHouse settings
@@ -184,28 +184,28 @@ These settings are appended to each query's `SETTINGS` clause. They do not repla
 
 The data source includes a dedicated configuration section for log queries. These settings control the default column mappings used by the [logs query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#logs-query-builder):
 
-| Setting | Description |
-|---------|-------------|
-| **Default log database** | The default database for log queries. |
-| **Default log table** | The default table for log queries. |
-| **Use OTel** | When enabled, pre-fills column mappings for [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter) tables. Select the OTel schema version that matches your exporter. |
-| **Time column** | The high-precision timestamp column for sorting log rows. |
-| **Filter Time column** | A lower-precision time column for fast partition-based filtering. |
-| **Log Level column** | The column containing the log severity level. |
-| **Log Message column** | The column containing the log message body. |
-| **Context columns** | Comma-separated list of columns included alongside log messages for additional context. |
+| Setting                  | Description                                                                                                                                                                                                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Default log database** | The default database for log queries.                                                                                                                                                                                                                       |
+| **Default log table**    | The default table for log queries.                                                                                                                                                                                                                          |
+| **Use OTel**             | When enabled, pre-fills column mappings for [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter) tables. Select the OTel schema version that matches your exporter. |
+| **Time column**          | The high-precision timestamp column for sorting log rows.                                                                                                                                                                                                   |
+| **Filter Time column**   | A lower-precision time column for fast partition-based filtering.                                                                                                                                                                                           |
+| **Log Level column**     | The column containing the log severity level.                                                                                                                                                                                                               |
+| **Log Message column**   | The column containing the log message body.                                                                                                                                                                                                                 |
+| **Context columns**      | Comma-separated list of columns included alongside log messages for additional context.                                                                                                                                                                     |
 
 ### Traces configuration
 
 The data source includes a dedicated configuration section for trace queries. These settings control the default column mappings used by the [traces query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#traces-query-builder):
 
-| Setting | Description |
-|---------|-------------|
-| **Default trace database** | The default database for trace queries. |
-| **Default trace table** | The default table for trace queries. |
-| **Use OTel** | When enabled, pre-fills column mappings for OpenTelemetry tables. Select the OTel schema version that matches your exporter. |
-| **Duration unit** | The unit for the duration column (`seconds`, `milliseconds`, `microseconds`, or `nanoseconds`). |
-| **Flatten nested** | Enable if your traces table was created with `flatten_nested=1`. |
+| Setting                    | Description                                                                                                                  |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| **Default trace database** | The default database for trace queries.                                                                                      |
+| **Default trace table**    | The default table for trace queries.                                                                                         |
+| **Use OTel**               | When enabled, pre-fills column mappings for OpenTelemetry tables. Select the OTel schema version that matches your exporter. |
+| **Duration unit**          | The unit for the duration column (`seconds`, `milliseconds`, `microseconds`, or `nanoseconds`).                              |
+| **Flatten nested**         | Enable if your traces table was created with `flatten_nested=1`.                                                             |
 
 When **Use OTel** is disabled, you can manually configure columns for Trace ID, Span ID, Parent Span ID, Service Name, Operation Name, Start Time, Duration, Tags, Service Tags, Kind, Status Code, Status Message, State, and Instrumentation Library.
 
@@ -237,11 +237,11 @@ This setting is only available on the HTTP protocol. The native protocol does no
 
 When the toggle is on, the following headers are forwarded on each ClickHouse connection:
 
-| Header | Source |
-| ------ | ------ |
-| `X-Grafana-User` | The logged-in Grafana user's login. Populated from the plugin's request context, so you do not need to enable the Grafana `dataproxy.send_user_header` setting for this plugin. |
-| `X-Dashboard-Uid`, `X-Panel-Id`, `X-Panel-Plugin-Id`, `X-Dashboard-Title`, `X-Panel-Title` | Identifiers set by Grafana when the query originates from a dashboard panel. |
-| `X-Grafana-Org-Id`, `X-Query-Group-Id`, `X-Grafana-From-Expr`, `X-Datasource-Uid` | Request-context headers set by Grafana core. |
+| Header                                                                                     | Source                                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `X-Grafana-User`                                                                           | The logged-in Grafana user's login. Populated from the plugin's request context, so you do not need to enable the Grafana `dataproxy.send_user_header` setting for this plugin. |
+| `X-Dashboard-Uid`, `X-Panel-Id`, `X-Panel-Plugin-Id`, `X-Dashboard-Title`, `X-Panel-Title` | Identifiers set by Grafana when the query originates from a dashboard panel.                                                                                                    |
+| `X-Grafana-Org-Id`, `X-Query-Group-Id`, `X-Grafana-From-Expr`, `X-Datasource-Uid`          | Request-context headers set by Grafana core.                                                                                                                                    |
 
 ### Use cases
 

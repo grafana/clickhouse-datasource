@@ -666,9 +666,9 @@ Connection Pool Saturation (Sudden Slowness)
 2. Increase the connection pool limits by adding custom settings in the data source provisioning configuration:
    ```yaml
    jsonData:
-     maxOpenConns: "100"
-     maxIdleConns: "50"
-     connMaxLifetime: "10"
+     maxOpenConns: '100'
+     maxIdleConns: '50'
+     connMaxLifetime: '10'
    ```
 3. Monitor the ClickHouse server's `system.metrics` table (`CurrentMetric_TCPConnection`) to see whether the connection count from Grafana is approaching the server-side limit.
 4. If using HTTP protocol, check whether a reverse proxy between Grafana and ClickHouse has its own connection limits.

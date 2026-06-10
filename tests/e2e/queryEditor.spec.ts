@@ -54,7 +54,7 @@ function exploreUrl(opts: ExploreUrlOpts = {}): string {
       range: { from, to },
     },
   });
-  
+
   return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
 }
 
@@ -137,9 +137,7 @@ test.describe('Query editor', () => {
       await page.goto(exploreUrl());
       // The toolbar also has a "Run query" button — scope to the query editor row to
       // avoid a strict-mode violation from matching both.
-      await expect(
-        page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' })
-      ).toBeVisible();
+      await expect(page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' })).toBeVisible();
     });
 
     test('renders SQL editor code area', async ({ page }) => {
