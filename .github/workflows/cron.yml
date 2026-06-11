@@ -8,10 +8,11 @@ on:
   # Allow engineers to run Cloud E2E on-demand (useful for debugging)
   workflow_dispatch:
 
-# Top-level token is empty; the called workflow declares the scopes it needs.
-# `secrets: inherit` below intentionally exposes repo secrets to the shared
-# workflow — this is a trust delegation to grafana/data-sources-ci-workflows.
-permissions: {}
+# Reusable workflows can only narrow caller permissions, not escalate.
+# `id-token: write` is needed by the Vault OIDC step in playwright-cloud.yml.
+permissions:
+  contents: read
+  id-token: write
 
 jobs:
   playwright-cloud:
@@ -20,6 +21,9 @@ jobs:
     # policy (`grafana/*: any`); review periodically.
     uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@main
     secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
     with:
       pdc-network-name: datasources-pdc-network-aws-datasourcese2e
       repo-secrets: |
