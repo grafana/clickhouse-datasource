@@ -344,6 +344,68 @@ describe('ClickHouseDatasource', () => {
         "SELECT * FROM complex_table settings additional_table_filters={'table1': ' key = \\'val\\' ', 'table2': ' key = \\'val\\' ', 'table3': ' key = \\'val\\' '}"
       );
     });
+
+    describe('span link trace retarget (#1889)', () => {
+      const originalTraceId = 'a55d8be622a816047a902c60adedd776';
+      const linkedTraceId = '4ea6a6e0d0525ed05ecc350d3cdd66b6';
+
+      const traceIdBuilderQuery = (traceId: string, extra: Record<string, unknown> = {}): CHQuery =>
+        ({
+          pluginVersion: '',
+          editorType: EditorType.Builder,
+          rawSql: `SELECT "TraceId" as traceID FROM "otel"."otel_traces" WHERE traceID = '${traceId}'`,
+          builderOptions: {
+            database: 'otel',
+            table: 'otel_traces',
+            queryType: QueryType.Traces,
+            columns: [{ name: 'TraceId', hint: ColumnHint.TraceId }],
+            meta: { isTraceIdMode: true, traceId },
+          },
+          ...extra,
+        }) as unknown as CHQuery;
+
+      beforeEach(() => {
+        jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+        jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+      });
+
+      it('retargets rawSql to the linked trace id when core injects a top-level query', () => {
+        // Grafana core builds the span-link navigation target as { ...currentQuery, query: linkedTraceId }.
+        const query = traceIdBuilderQuery(originalTraceId, { query: linkedTraceId });
+
+        const result = createInstance({}).applyTemplateVariables(query, {}) as CHBuilderQuery;
+
+        expect(result.rawSql).toContain(linkedTraceId);
+        expect(result.rawSql).not.toContain(originalTraceId);
+        expect(result.builderOptions.meta?.traceId).toEqual(linkedTraceId);
+      });
+
+      it('leaves the normal trace view untouched when there is no injected query', () => {
+        const query = traceIdBuilderQuery(originalTraceId);
+
+        const result = createInstance({}).applyTemplateVariables(query, {});
+
+        expect(result.rawSql).toContain(originalTraceId);
+        expect(result.rawSql).not.toContain(linkedTraceId);
+      });
+
+      it('does not retarget when the injected query matches the current trace id', () => {
+        const query = traceIdBuilderQuery(originalTraceId, { query: originalTraceId });
+
+        const result = createInstance({}).applyTemplateVariables(query, {});
+
+        expect(result.rawSql).toContain(originalTraceId);
+      });
+
+      it('ignores a non-trace-id injected query value', () => {
+        const query = traceIdBuilderQuery(originalTraceId, { query: 'not-a-trace-id' });
+
+        const result = createInstance({}).applyTemplateVariables(query, {});
+
+        expect(result.rawSql).toContain(originalTraceId);
+        expect(result.rawSql).not.toContain('not-a-trace-id');
+      });
+    });
   });
 
   describe('Tag Keys', () => {
