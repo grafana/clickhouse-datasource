@@ -1944,6 +1944,22 @@ describe('ClickHouseDatasource', () => {
       expect(fetchSpy).toHaveBeenCalledTimes(2);
     });
 
+    it('re-checks once the TTL expires', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchSpy = jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // cached within TTL
+
+      nowSpy.mockReturnValue(2 * 60 * 1000 + 1); // advance past 2 min
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(fetchSpy).toHaveBeenCalledTimes(2); // re-fetched after expiry
+
+      nowSpy.mockRestore();
+    });
+
     it('honours a configured custom suffix', async () => {
       const ds = cloneDeep(mockDatasource);
       ds.settings = {

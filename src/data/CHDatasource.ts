@@ -81,10 +81,13 @@ export class Datasource
   // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
   // can pass either form.
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
+  private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
   // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
-  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes
-  // concurrent callers and lets cache hits resolve in a microtask.
-  private traceTimestampTableCache = new Map<string, Promise<boolean>>();
+  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes concurrent
+  // callers and lets cache hits resolve in a microtask. Entries expire after
+  // TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS so a companion table created after the datasource
+  // loaded is detected without a page reload.
+  private traceTimestampTableCache = new Map<string, { pending: Promise<boolean>; expiresAt: number }>();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -750,11 +753,16 @@ export class Datasource
     }
 
     const key = `${database}.${table}`;
+    const now = Date.now();
 
-    let pending = this.traceTimestampTableCache.get(key);
+    let entry = this.traceTimestampTableCache.get(key);
 
-    if (!pending) {
-      pending = (async () => {
+    if (entry) {
+      console.log({ expired: entry.expiresAt <= now });
+    }
+
+    if (!entry || entry.expiresAt <= now) {
+      const pending = (async () => {
         try {
           const tables = await this.fetchTables(database);
           return tables.includes(table + this.getTraceTimestampTableSuffix());
@@ -764,10 +772,11 @@ export class Datasource
         }
       })();
 
-      this.traceTimestampTableCache.set(key, pending);
+      entry = { pending, expiresAt: now + Datasource.TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS };
+      this.traceTimestampTableCache.set(key, entry);
     }
 
-    return pending;
+    return entry.pending;
   }
 
   /**
