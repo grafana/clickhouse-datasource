@@ -394,6 +394,11 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           false) ||
         (!fetchedLiveSchema && !typeKnown && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
+      const hasTraceTimestampTable = await datasource.hasTraceTimestampTable(
+        originalQuery.builderOptions.database || '',
+        originalQuery.builderOptions.table || ''
+      );
+
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
         columns,
@@ -407,6 +412,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           traceTimestampTableSuffix:
             originalQuery.builderOptions.meta?.traceTimestampTableSuffix || traceTimestampTableSuffix,
           tagsAreJSON: effectiveTagsAreJSON,
+          hasTraceTimestampTable,
         },
       };
     } else {
@@ -416,12 +422,17 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       const otelConfig = otel.getVersion(otelVersion);
       const traceEventsColumnPrefix = datasource.getDefaultTraceEventsColumnPrefix();
       const traceLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
+      const traceDatabase =
+        datasource.getDefaultTraceDatabase() ||
+        traceIdQuery.builderOptions.database ||
+        datasource.getDefaultDatabase() ||
+        '';
+      const traceTable =
+        datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table || '';
+      const hasTraceTimestampTable = await datasource.hasTraceTimestampTable(traceDatabase, traceTable);
       const options: QueryBuilderOptions = {
-        database:
-          datasource.getDefaultTraceDatabase() ||
-          traceIdQuery.builderOptions.database ||
-          datasource.getDefaultDatabase(),
-        table: datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table,
+        database: traceDatabase,
+        table: traceTable,
         queryType: QueryType.Traces,
         columns: [],
         filters: [],
@@ -435,7 +446,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           otelVersion: otelVersion,
           traceEventsColumnPrefix: traceEventsColumnPrefix,
           traceLinksColumnPrefix: traceLinksColumnPrefix,
-          hasTraceTimestampTable: Boolean(otelVersion),
+          hasTraceTimestampTable,
           traceTimestampTableSuffix,
           flattenNested: datasource.getDefaultTraceFlattenNested() || false,
         },
@@ -479,6 +490,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     // Trace ID queries don't contain $__fromTime/$__toTime time macros, so they're
     // safe to include (unlike trace search queries which would break data link detection).
     traceIdQuery.rawSql = generateSql(traceIdQuery.builderOptions);
+    traceIdQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceIdQuery.builderOptions);
 
     const traceLogsQuery: CHBuilderQuery = {
       datasource: datasource,
@@ -560,6 +572,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     } else {
       traceLogsQuery.rawSql = '';
     }
+    traceLogsQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceLogsQuery.builderOptions);
     traceField.config.links = [];
     if (datasource.settings.jsonData.traces?.showTraceLinks !== false) {
       traceField.config.links!.push({

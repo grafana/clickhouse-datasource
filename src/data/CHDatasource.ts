@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
+import { concatMap, firstValueFrom, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -81,6 +81,16 @@ export class Datasource
   // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
   // can pass either form.
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
+  private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
+  // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
+  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes concurrent
+  // callers and lets cache hits resolve in a microtask. Entries expire after
+  // TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS so a companion table created after the datasource
+  // loaded is detected without a page reload.
+  private traceTimestampTableCache = new Map<
+    string,
+    { pending: Promise<boolean>; resolved?: boolean; expiresAt: number }
+  >();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -735,6 +745,64 @@ export class Datasource
   }
 
   /**
+   * Resolves whether the `<table>_trace_id_ts` companion exists for the given
+   * (database, table). Caches the Promise so concurrent and repeat callers share
+   * a single `SHOW TABLES` round-trip; on failure, evicts so the next caller
+   * retries and meanwhile returns `false` (the safe, unoptimized path).
+   */
+  async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
+    if (!database || !table) {
+      return false;
+    }
+
+    const key = `${database}.${table}`;
+    const now = Date.now();
+
+    let entry = this.traceTimestampTableCache.get(key);
+
+    if (!entry || entry.expiresAt <= now) {
+      const pending = (async () => {
+        try {
+          const tables = await this.fetchTables(database);
+          return tables.includes(table + this.getTraceTimestampTableSuffix());
+        } catch {
+          this.traceTimestampTableCache.delete(key);
+          return false;
+        }
+      })();
+
+      entry = { pending, expiresAt: now + Datasource.TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS };
+      this.traceTimestampTableCache.set(key, entry);
+
+      // Record the settled value so peekTraceTimestampTable() can read it synchronously.
+      const created = entry;
+      pending.then((v) => {
+        created.resolved = v;
+      });
+    }
+
+    return entry.pending;
+  }
+
+  /**
+   * Synchronously read the cached trace timestamp table result without awaiting.
+   * Returns the resolved boolean when a non-expired cache entry has settled, or
+   * undefined when there is no entry, it is still pending, or it has expired.
+   * Lets the React hook seed its initial state from a warm cache and skip a
+   * false→true render that would briefly clobber a known-good meta value.
+   */
+  peekTraceTimestampTable(database: string, table: string): boolean | undefined {
+    if (!database || !table) {
+      return undefined;
+    }
+    const entry = this.traceTimestampTableCache.get(`${database}.${table}`);
+    if (!entry || entry.expiresAt <= Date.now()) {
+      return undefined;
+    }
+    return entry.resolved;
+  }
+
+  /**
    * Get the TraceId column name from traces configuration
    * Used when creating logs filter to correlate with trace data
    */
@@ -1000,16 +1068,13 @@ export class Datasource
         targets,
       })
       .pipe(
-        mergeMap((res: DataQueryResponse) =>
-          from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
-            map((transformed) => {
-              if (hasLogsVolumeTargets) {
-                return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
-              }
-              return transformed;
-            })
-          )
-        )
+        concatMap(async (res: DataQueryResponse) => {
+          const transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          if (hasLogsVolumeTargets) {
+            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+          }
+          return transformed;
+        })
       );
   }
 

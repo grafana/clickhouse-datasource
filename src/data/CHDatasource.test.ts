@@ -1886,4 +1886,144 @@ describe('ClickHouseDatasource', () => {
       );
     });
   });
+
+  describe('hasTraceTimestampTable', () => {
+    it('resolves false when database or table is empty', async () => {
+      const ds = cloneDeep(mockDatasource);
+      await expect(ds.hasTraceTimestampTable('', 'otel_traces')).resolves.toBe(false);
+      await expect(ds.hasTraceTimestampTable('otel', '')).resolves.toBe(false);
+    });
+
+    it('resolves true when the companion table exists', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(true);
+    });
+
+    it('resolves false when the companion table does not exist (#1842)', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
+
+      await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(false);
+    });
+
+    it('does not call fetchTables again once a result is cached', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchSpy = jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('dedupes concurrent calls to a single fetchTables', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchSpy = jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      const [a, b] = await Promise.all([
+        ds.hasTraceTimestampTable('otel', 'otel_traces'),
+        ds.hasTraceTimestampTable('otel', 'otel_traces'),
+      ]);
+
+      expect(a).toBe(true);
+      expect(b).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('resolves false on fetch failure and evicts the cache so the next call retries', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchSpy = jest
+        .spyOn(ds, 'fetchTables')
+        .mockRejectedValueOnce(new Error('connection refused'))
+        .mockResolvedValueOnce(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(false);
+      await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(true);
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-checks once the TTL expires', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const fetchSpy = jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(fetchSpy).toHaveBeenCalledTimes(1); // cached within TTL
+
+      nowSpy.mockReturnValue(30 * 1000 + 1); // advance past the 30s TTL
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(fetchSpy).toHaveBeenCalledTimes(2); // re-fetched after expiry
+
+      nowSpy.mockRestore();
+    });
+
+    it('honours a configured custom suffix', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings = {
+        ...ds.settings,
+        jsonData: {
+          ...ds.settings.jsonData,
+          traces: { ...(ds.settings.jsonData.traces || {}), traceTimestampTableSuffix: '_idx_ts' },
+        },
+      };
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['traces', 'traces_idx_ts']);
+
+      await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(true);
+    });
+  });
+
+  describe('peekTraceTimestampTable', () => {
+    it('returns undefined when database or table is empty', () => {
+      const ds = cloneDeep(mockDatasource);
+      expect(ds.peekTraceTimestampTable('', 'otel_traces')).toBeUndefined();
+      expect(ds.peekTraceTimestampTable('otel', '')).toBeUndefined();
+    });
+
+    it('returns undefined when nothing is cached', () => {
+      const ds = cloneDeep(mockDatasource);
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
+    });
+
+    it('returns undefined while the check is still pending', () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      // Kick off the async check but do not await it — the promise has not settled yet.
+      void ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
+    });
+
+    it('returns true once the check resolves true', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(true);
+    });
+
+    it('returns false once the check resolves false', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(false);
+    });
+
+    it('returns undefined once the TTL has expired', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(true);
+
+      nowSpy.mockReturnValue(30 * 1000 + 1); // advance past the 30s TTL
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
+
+      nowSpy.mockRestore();
+    });
+  });
 });

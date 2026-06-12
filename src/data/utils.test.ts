@@ -376,9 +376,12 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       return ds;
     };
 
-    it('trace→trace link has pre-generated rawSql with _trace_id_ts optimization', async () => {
+    it('trace→trace link queries the datasource for companion existence (not the stale meta value)', async () => {
+      // The original query has hasTraceTimestampTable: false in its meta, but
+      // the datasource cache resolves true — the link should use the fresh value.
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+      jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(true);
       const otelConfig = otel.getVersion('latest')!;
       const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
 
@@ -391,7 +394,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
           otelEnabled: true,
           otelVersion: 'latest',
           traceDurationUnit: TimeUnit.Nanoseconds,
-          hasTraceTimestampTable: true,
+          hasTraceTimestampTable: false, // stale / not yet set by editor
         },
       };
 
@@ -402,7 +405,6 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
       const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
 
-      expect(traceQuery.rawSql).not.toBe('');
       expect(traceQuery.rawSql).toContain('otel_traces_trace_id_ts');
       expect(traceQuery.rawSql).toContain('trace_start');
       expect(traceQuery.rawSql).toContain('trace_end');
@@ -475,9 +477,13 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).not.toContain('"SpanAttributes" as tags');
     });
 
-    it('logs→trace link with OTel sets hasTraceTimestampTable and generates optimized rawSql', async () => {
+    it('logs→trace link with OTel ships optimized rawSql on first click when the companion table exists', async () => {
+      // Confirms the #1705 behavior is preserved: the very first View Trace
+      // click after a fresh page load uses the _trace_id_ts optimization,
+      // because hasTraceTimestampTable is awaited before rawSql is generated.
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+      jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(true);
 
       const builderOptions: Partial<QueryBuilderOptions> = {
         queryType: QueryType.Logs,
@@ -492,10 +498,74 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
       expect(traceQuery.builderOptions.meta?.otelEnabled).toBe(true);
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(true);
-      expect(traceQuery.rawSql).not.toBe('');
       expect(traceQuery.rawSql).toContain('otel_traces_trace_id_ts');
       expect(traceQuery.rawSql).toContain('trace_start');
       expect(traceQuery.rawSql).toContain('trace_end');
+    });
+
+    it('sets format on the trace ID link query so Grafana picks the trace panel', async () => {
+      // Without `format: 3` the sqlds backend tags the response as TimeSeries and
+      // Grafana shows "Data is missing a time field" on first click, because the
+      // editor's setAllOptions hasn't run yet to set format.
+      const mockDatasource = newOtelMockDatasource();
+      jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);
+
+      const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const viewLogsLink = links?.find((link: any) => link.title === 'View logs');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+      const logsQuery = viewLogsLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.format).toBe(3); // Trace
+      expect(logsQuery.format).toBe(2); // Logs
+    });
+
+    it('logs→trace link with OTel ships unoptimized rawSql when the companion table is missing (#1842)', async () => {
+      // Regression guard for grafana/clickhouse-datasource#1842: when OTel is
+      // configured but the companion `_trace_id_ts` table does not exist, the
+      // optimistic pre-#1842 code shipped the optimized SQL and the query
+      // failed on first click with "Unknown table expression identifier".
+      const mockDatasource = newOtelMockDatasource();
+      jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        queryType: QueryType.Logs,
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.builderOptions.meta?.otelEnabled).toBe(true);
+      expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(false);
+      expect(traceQuery.rawSql).not.toBe('');
+      expect(traceQuery.rawSql).not.toContain('trace_id_ts');
+    });
+
+    it('table→trace link with OTel ships unoptimized rawSql when the companion table is missing (#1842 reproduction)', async () => {
+      const mockDatasource = newOtelMockDatasource();
+      jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);
+
+      const builderOptions: Partial<QueryBuilderOptions> = {
+        queryType: QueryType.Table,
+      };
+
+      const [request, response] = buildTestRequestResponse(builderOptions);
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const links = out?.data[0]?.fields[0]?.config?.links;
+      const viewTraceLink = links?.find((link: any) => link.title === 'View trace');
+      const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
+
+      expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(false);
+      expect(traceQuery.rawSql).not.toBe('');
+      expect(traceQuery.rawSql).not.toContain('trace_id_ts');
     });
 
     it('logs→trace link without OTel generates rawSql without _trace_id_ts optimization', async () => {
@@ -518,9 +588,10 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBeFalsy();
     });
 
-    it('trace→trace link without hasTraceTimestampTable generates rawSql without optimization', async () => {
+    it('trace→trace link generates unoptimized rawSql when companion does not exist', async () => {
       const mockDatasource = newOtelMockDatasource();
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+      jest.spyOn(mockDatasource, 'hasTraceTimestampTable').mockResolvedValue(false);
       const otelConfig = otel.getVersion('latest')!;
       const columns = Array.from(otelConfig.traceColumnMap, ([hint, name]) => ({ name, hint }));
 
@@ -533,7 +604,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
           otelEnabled: true,
           otelVersion: 'latest',
           traceDurationUnit: TimeUnit.Nanoseconds,
-          hasTraceTimestampTable: false,
+          hasTraceTimestampTable: true, // stale meta — should be overridden by datasource
         },
       };
 
