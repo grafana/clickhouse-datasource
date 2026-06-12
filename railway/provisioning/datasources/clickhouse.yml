@@ -1,0 +1,35 @@
+# Datasource provisioning for Railway PR preview environments.
+# Points the PR-built ClickHouse plugin at ClickHouse's public demo
+# (sql-clickhouse.clickhouse.com, read-only `otel_demo` user, no password), so
+# previews have working connectivity without any per-environment secrets.
+apiVersion: 1
+
+datasources:
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    uid: clickhouse-preview
+    access: proxy
+    orgId: 1
+    isDefault: true
+    editable: true
+    jsonData:
+      host: sql-clickhouse.clickhouse.com
+      port: 9440
+      protocol: native
+      secure: true
+      tlsSkipVerify: true
+      username: otel_demo
+      defaultDatabase: otel_v2
+      dialTimeout: '10'
+      queryTimeout: '60'
+      traces:
+        defaultDatabase: otel_v2
+        defaultTable: otel_traces
+        otelEnabled: true
+        otelVersion: '1.29.0'
+        durationUnit: nanoseconds
+      logs:
+        defaultDatabase: otel_v2
+        defaultTable: otel_logs
+        otelEnabled: true
+        otelVersion: '1.29.0'
