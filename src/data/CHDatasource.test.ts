@@ -856,6 +856,28 @@ describe('ClickHouseDatasource', () => {
       expect(sql).toContain('LIMIT 1000');
     });
 
+    it('bounds the probe via the OTel canon column map when otelEnabled is true', async () => {
+      // When otelEnabled flips on, getDefaultLogsColumns() returns the OTel
+      // version's logColumnMap instead of the manually configured columns.
+      // The probe must prefer FilterTime (TimestampTime in OTel 1.2.9) over
+      // Time, since that's what the rest of the logs pipeline uses for the
+      // hot path. This test would have missed the OTel path entirely if it
+      // weren't covered explicitly.
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: true,
+        otelVersion: '1.29.0',
+      };
+      const frame = arrayToDataFrame([{ keys: 'http.method' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchUniqueMapKeys('LogAttributes', 'otel', 'otel_logs');
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toContain(' WHERE "TimestampTime" >= now() - INTERVAL 6 HOUR');
+    });
+
     it('bounds the probe to the configured trace start-time column when target matches OTel traces table', async () => {
       const ds = cloneDeep(mockDatasource);
       ds.settings.jsonData.traces = {

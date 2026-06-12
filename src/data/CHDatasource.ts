@@ -881,7 +881,7 @@ export class Datasource
    * When false, `fetchUniqueMapKeys` resolves to an empty list and adhoc
    * tag-key expansion skips the fan-out.
    */
-  isMapKeysDiscoveryEnabled(): boolean {
+  private isMapKeysDiscoveryEnabled(): boolean {
     return this.settings.jsonData.enableMapKeysDiscovery ?? true;
   }
 
