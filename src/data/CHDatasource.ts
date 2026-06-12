@@ -87,7 +87,10 @@ export class Datasource
   // callers and lets cache hits resolve in a microtask. Entries expire after
   // TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS so a companion table created after the datasource
   // loaded is detected without a page reload.
-  private traceTimestampTableCache = new Map<string, { pending: Promise<boolean>; expiresAt: number }>();
+  private traceTimestampTableCache = new Map<
+    string,
+    { pending: Promise<boolean>; resolved?: boolean; expiresAt: number }
+  >();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -757,10 +760,6 @@ export class Datasource
 
     let entry = this.traceTimestampTableCache.get(key);
 
-    if (entry) {
-      console.log({ expired: entry.expiresAt <= now });
-    }
-
     if (!entry || entry.expiresAt <= now) {
       const pending = (async () => {
         try {
@@ -774,9 +773,33 @@ export class Datasource
 
       entry = { pending, expiresAt: now + Datasource.TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS };
       this.traceTimestampTableCache.set(key, entry);
+
+      // Record the settled value so peekTraceTimestampTable() can read it synchronously.
+      const created = entry;
+      pending.then((v) => {
+        created.resolved = v;
+      });
     }
 
     return entry.pending;
+  }
+
+  /**
+   * Synchronously read the cached trace timestamp table result without awaiting.
+   * Returns the resolved boolean when a non-expired cache entry has settled, or
+   * undefined when there is no entry, it is still pending, or it has expired.
+   * Lets the React hook seed its initial state from a warm cache and skip a
+   * false→true render that would briefly clobber a known-good meta value.
+   */
+  peekTraceTimestampTable(database: string, table: string): boolean | undefined {
+    if (!database || !table) {
+      return undefined;
+    }
+    const entry = this.traceTimestampTableCache.get(`${database}.${table}`);
+    if (!entry || entry.expiresAt <= Date.now()) {
+      return undefined;
+    }
+    return entry.resolved;
   }
 
   /**

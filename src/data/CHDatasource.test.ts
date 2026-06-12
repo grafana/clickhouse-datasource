@@ -1953,7 +1953,7 @@ describe('ClickHouseDatasource', () => {
       await ds.hasTraceTimestampTable('otel', 'otel_traces');
       expect(fetchSpy).toHaveBeenCalledTimes(1); // cached within TTL
 
-      nowSpy.mockReturnValue(2 * 60 * 1000 + 1); // advance past 2 min
+      nowSpy.mockReturnValue(30 * 1000 + 1); // advance past the 30s TTL
       await ds.hasTraceTimestampTable('otel', 'otel_traces');
       expect(fetchSpy).toHaveBeenCalledTimes(2); // re-fetched after expiry
 
@@ -1972,6 +1972,58 @@ describe('ClickHouseDatasource', () => {
       jest.spyOn(ds, 'fetchTables').mockResolvedValue(['traces', 'traces_idx_ts']);
 
       await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(true);
+    });
+  });
+
+  describe('peekTraceTimestampTable', () => {
+    it('returns undefined when database or table is empty', () => {
+      const ds = cloneDeep(mockDatasource);
+      expect(ds.peekTraceTimestampTable('', 'otel_traces')).toBeUndefined();
+      expect(ds.peekTraceTimestampTable('otel', '')).toBeUndefined();
+    });
+
+    it('returns undefined when nothing is cached', () => {
+      const ds = cloneDeep(mockDatasource);
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
+    });
+
+    it('returns undefined while the check is still pending', () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      // Kick off the async check but do not await it — the promise has not settled yet.
+      void ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
+    });
+
+    it('returns true once the check resolves true', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(true);
+    });
+
+    it('returns false once the check resolves false', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(false);
+    });
+
+    it('returns undefined once the TTL has expired', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+      const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0);
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(true);
+
+      nowSpy.mockReturnValue(30 * 1000 + 1); // advance past the 30s TTL
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
+
+      nowSpy.mockRestore();
     });
   });
 });
