@@ -122,6 +122,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       CHConfig,
       | 'secure'
       | 'validateSql'
+      | 'enableMapKeysDiscovery'
       | 'enableSecureSocksProxy'
       | 'forwardGrafanaHeaders'
       | 'enableRowLimit'
@@ -587,12 +588,14 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
               validateSql={jsonData.validateSql}
+              enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e)}
               onQueryTimeoutChange={(e) => onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e)}
               onConnMaxLifetimeChange={(e) => onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e)}
               onConnMaxIdleConnsChange={(e) => onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e)}
               onConnMaxOpenConnsChange={(e) => onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e)}
               onValidateSqlChange={(e) => onSwitchToggle('validateSql', e.currentTarget.checked)}
+              onEnableMapKeysDiscoveryChange={(e) => onSwitchToggle('enableMapKeysDiscovery', e.currentTarget.checked)}
             />
           </ConfigSection>
         </>
@@ -652,6 +655,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onValidateSqlChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ validateSql: e.currentTarget.checked });
                 onSwitchToggle('validateSql', e.currentTarget.checked);
+              }}
+              onEnableMapKeysDiscoveryChange={(e) => {
+                trackingV1.trackClickhouseConfigV1QuerySettings({ enableMapKeysDiscovery: e.currentTarget.checked });
+                onSwitchToggle('enableMapKeysDiscovery', e.currentTarget.checked);
               }}
             />
 

@@ -165,6 +165,13 @@ export default {
           label: 'Validate SQL',
           tooltip: 'Validate SQL in the editor.',
         },
+        enableMapKeysDiscovery: {
+          label: 'Suggest Map keys in filter editor',
+          tooltip:
+            'When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. ' +
+            'On large tables with high-cardinality maps this probe can scan billions of rows. ' +
+            'Disable to suppress the probe — operators can still type Map keys manually. Defaults to enabled.',
+        },
       },
       TracesConfig: {
         title: 'Traces configuration',

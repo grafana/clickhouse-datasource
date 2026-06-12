@@ -827,6 +827,117 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchUniqueMapKeys probe (#1843)', () => {
+    it('issues the bare LIMIT probe for free-form tables (no time column known)', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ keys: 'a' }, { keys: 'b' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const result = await ds.fetchUniqueMapKeys('labels', 'db', 'events');
+      expect(result).toEqual(['a', 'b']);
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toBe('SELECT DISTINCT arrayJoin("labels".keys) as keys FROM "db"."events" LIMIT 1000');
+    });
+
+    it('bounds the probe to the configured logs time column when target matches OTel logs table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const frame = arrayToDataFrame([{ keys: 'http.method' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchUniqueMapKeys('LogAttributes', 'otel', 'otel_logs');
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toContain(' WHERE "Timestamp" >= now() - INTERVAL 6 HOUR');
+      expect(sql).toContain('LIMIT 1000');
+    });
+
+    it('bounds the probe via the OTel canon column map when otelEnabled is true', async () => {
+      // When otelEnabled flips on, getDefaultLogsColumns() returns the OTel
+      // version's logColumnMap instead of the manually configured columns.
+      // The probe must prefer FilterTime (TimestampTime in OTel 1.2.9) over
+      // Time, since that's what the rest of the logs pipeline uses for the
+      // hot path. This test would have missed the OTel path entirely if it
+      // weren't covered explicitly.
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: true,
+        otelVersion: '1.29.0',
+      };
+      const frame = arrayToDataFrame([{ keys: 'http.method' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchUniqueMapKeys('LogAttributes', 'otel', 'otel_logs');
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toContain(' WHERE "TimestampTime" >= now() - INTERVAL 6 HOUR');
+    });
+
+    it('bounds the probe to the configured trace start-time column when target matches OTel traces table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.traces = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_traces',
+        otelEnabled: false,
+        startTimeColumn: 'Timestamp',
+      };
+      const frame = arrayToDataFrame([{ keys: 'k1' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchUniqueMapKeys('SpanAttributes', 'otel', 'otel_traces');
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toContain(' WHERE "Timestamp" >= now() - INTERVAL 6 HOUR');
+    });
+
+    it('omits the predicate when the target db/table does not match either OTel config', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const frame = arrayToDataFrame([{ keys: 'k' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchUniqueMapKeys('labels', 'analytics', 'events');
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).not.toContain('WHERE');
+    });
+
+    it('short-circuits to empty when discovery is disabled, without issuing a query', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spy = jest.spyOn(ds, 'query');
+
+      const result = await ds.fetchUniqueMapKeys('labels', 'db', 'events');
+      expect(result).toEqual([]);
+      expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('skips the getTagKeys fan-out when discovery is disabled', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [columnsFrame] }));
+
+      const keys = await ds.getTagKeys();
+      // No expansion, no fan-out — flat entry only.
+      expect(keys).toEqual([{ text: 'events.labels' }]);
+      // system.columns lookup is the single query — no per-column map-key probes.
+      const probeCalls = spy.mock.calls.filter((c) => (c[0].targets[0].rawSql ?? '').includes('arrayJoin'));
+      expect(probeCalls).toHaveLength(0);
+    });
+  });
+
   describe('Conditional All', () => {
     it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
       const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';

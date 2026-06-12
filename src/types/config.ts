@@ -54,6 +54,16 @@ export interface CHConfig extends DataSourceJsonData {
 
   hideTableNameInAdhocFilters?: boolean;
 
+  /**
+   * Controls the Map-column key discovery probe that populates the filter-key
+   * dropdown for `Map(...)` columns. The probe issues
+   * `SELECT DISTINCT arrayJoin(col.keys) FROM db.table LIMIT 1000` and can be
+   * expensive on large tables when the map has high key cardinality. Defaults
+   * to true to preserve existing UX; operators on large OTel logs/traces tables
+   * may want to disable it. See issue #1843.
+   */
+  enableMapKeysDiscovery?: boolean;
+
   pdcInjected?: boolean;
 
   /**

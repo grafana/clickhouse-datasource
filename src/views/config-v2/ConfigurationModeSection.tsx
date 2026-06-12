@@ -190,6 +190,7 @@ export const ConfigurationModeSection = (props: Props) => {
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
               validateSql={jsonData.validateSql}
+              enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
@@ -213,6 +214,10 @@ export const ConfigurationModeSection = (props: Props) => {
               onValidateSqlChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ validateSql: e.currentTarget.checked });
                 onUpdateDatasourceJsonDataOptionChecked(props, 'validateSql')(e);
+              }}
+              onEnableMapKeysDiscoveryChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ enableMapKeysDiscovery: e.currentTarget.checked });
+                onUpdateDatasourceJsonDataOptionChecked(props, 'enableMapKeysDiscovery')(e);
               }}
             />
           </>
