@@ -2,6 +2,16 @@ import { DataSourceJsonData, KeyValue } from '@grafana/data';
 import otel, { defaultLogsTable, defaultTraceTable } from 'otel';
 import { TimeUnit } from './queryBuilder';
 
+export type SignalType = 'logs' | 'traces';
+
+/**
+ * Configuration mode controls the datasource UI layout:
+ * - 'classic': Full access to all databases/tables.
+ * - 'single-table': Focused on one table. The user picks a signal type
+ *   and configures the schema inline.
+ */
+export type ConfigMode = 'classic' | 'single-table';
+
 export interface CHConfig extends DataSourceJsonData {
   /**
    * The version of the plugin this config was saved with
@@ -45,6 +55,17 @@ export interface CHConfig extends DataSourceJsonData {
   hideTableNameInAdhocFilters?: boolean;
 
   pdcInjected?: boolean;
+
+  /**
+   * Configuration mode: 'classic' (all databases) or 'single-table' (focused).
+   * Defaults to 'classic' when unset.
+   */
+  configMode?: ConfigMode;
+
+  /**
+   * Signal type for single-table mode. Declares what the configured table contains.
+   */
+  signalType?: SignalType;
 }
 
 interface CHSecureConfigProperties {

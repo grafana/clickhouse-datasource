@@ -169,6 +169,12 @@ export default {
       TracesConfig: {
         title: 'Traces configuration',
         description: '(Optional) Default settings for trace queries',
+        variants: {
+          singleTable: {
+            title: 'Traces Table & Schema',
+            description: 'Configure the database, table, and column mappings for trace queries.',
+          },
+        },
         defaultDatabase: {
           label: 'Default trace database',
           description: 'the default database used by the trace query builder',
@@ -275,6 +281,12 @@ export default {
       LogsConfig: {
         title: 'Logs configuration',
         description: '(Optional) default settings for log queries',
+        variants: {
+          singleTable: {
+            title: 'Logs Table & Schema',
+            description: 'Configure the database, table, and column mappings for log queries.',
+          },
+        },
         defaultDatabase: {
           label: 'Default log database',
           description: 'the default database used by the logs query builder',
