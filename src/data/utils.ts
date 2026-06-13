@@ -394,6 +394,11 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           false) ||
         (!fetchedLiveSchema && !typeKnown && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
+      const hasTraceTimestampTable = await datasource.hasTraceTimestampTable(
+        originalQuery.builderOptions.database || '',
+        originalQuery.builderOptions.table || ''
+      );
+
       traceIdQuery.builderOptions = {
         ...originalQuery.builderOptions,
         columns,
@@ -407,6 +412,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           traceTimestampTableSuffix:
             originalQuery.builderOptions.meta?.traceTimestampTableSuffix || traceTimestampTableSuffix,
           tagsAreJSON: effectiveTagsAreJSON,
+          hasTraceTimestampTable,
         },
       };
     } else {
@@ -416,12 +422,17 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       const otelConfig = otel.getVersion(otelVersion);
       const traceEventsColumnPrefix = datasource.getDefaultTraceEventsColumnPrefix();
       const traceLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
+      const traceDatabase =
+        datasource.getDefaultTraceDatabase() ||
+        traceIdQuery.builderOptions.database ||
+        datasource.getDefaultDatabase() ||
+        '';
+      const traceTable =
+        datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table || '';
+      const hasTraceTimestampTable = await datasource.hasTraceTimestampTable(traceDatabase, traceTable);
       const options: QueryBuilderOptions = {
-        database:
-          datasource.getDefaultTraceDatabase() ||
-          traceIdQuery.builderOptions.database ||
-          datasource.getDefaultDatabase(),
-        table: datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table,
+        database: traceDatabase,
+        table: traceTable,
         queryType: QueryType.Traces,
         columns: [],
         filters: [],
@@ -435,7 +446,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           otelVersion: otelVersion,
           traceEventsColumnPrefix: traceEventsColumnPrefix,
           traceLinksColumnPrefix: traceLinksColumnPrefix,
-          hasTraceTimestampTable: Boolean(otelVersion),
+          hasTraceTimestampTable,
           traceTimestampTableSuffix,
           flattenNested: datasource.getDefaultTraceFlattenNested() || false,
         },
@@ -479,6 +490,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     // Trace ID queries don't contain $__fromTime/$__toTime time macros, so they're
     // safe to include (unlike trace search queries which would break data link detection).
     traceIdQuery.rawSql = generateSql(traceIdQuery.builderOptions);
+    traceIdQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceIdQuery.builderOptions);
 
     const traceLogsQuery: CHBuilderQuery = {
       datasource: datasource,
@@ -560,8 +572,18 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     } else {
       traceLogsQuery.rawSql = '';
     }
+    traceLogsQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceLogsQuery.builderOptions);
     traceField.config.links = [];
-    if (datasource.settings.jsonData.traces?.showTraceLinks !== false) {
+    const canLinkToTraces =
+      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Traces
+        ? true
+        : canBuildTraceLink(datasource);
+    const canLinkToLogs =
+      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs
+        ? true
+        : canBuildLogsLink(datasource);
+
+    if (datasource.settings.jsonData.traces?.showTraceLinks !== false && canLinkToTraces) {
       traceField.config.links!.push({
         title: 'View trace',
         targetBlank: openInNewWindow,
@@ -578,7 +600,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
         },
       });
     }
-    if (datasource.settings.jsonData.logs?.showLogLinks !== false) {
+    if (datasource.settings.jsonData.logs?.showLogLinks !== false && canLinkToLogs) {
       traceField.config.links!.push({
         title: 'View logs',
         targetBlank: openInNewWindow,
@@ -593,6 +615,16 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
   }
 
   return res;
+};
+
+const canBuildTraceLink = (datasource: Datasource): boolean => {
+  const traceColumns = datasource.getDefaultTraceColumns();
+  return Boolean(datasource.getDefaultTraceTable() && traceColumns.get(ColumnHint.TraceId));
+};
+
+const canBuildLogsLink = (datasource: Datasource): boolean => {
+  const logColumns = datasource.getDefaultLogsColumns();
+  return Boolean(datasource.getDefaultLogsTable() && logColumns.get(ColumnHint.TraceId));
 };
 
 // The name of the dataframe field containing labels

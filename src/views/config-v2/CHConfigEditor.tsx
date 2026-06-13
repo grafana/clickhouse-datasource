@@ -12,6 +12,7 @@ import { AdditionalSettingsSection } from './AdditionalSettingsSection';
 import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
 import { TLSSSLSettingsSection } from './TLSSSLSettingsSection';
 import { createValidationAPI } from '../CHConfigEditorHooks';
+import { ConfigurationModeSection } from './ConfigurationModeSection';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
@@ -59,6 +60,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <ServerAndEncryptionSection onOptionsChange={onOptionsChange} options={options} validation={validation} />
         <DatabaseCredentialsSection onOptionsChange={onOptionsChange} options={options} validation={validation} />
         <TLSSSLSettingsSection onOptionsChange={onOptionsChange} options={options} />
+        <ConfigurationModeSection onOptionsChange={onOptionsChange} options={options} />
         <AdditionalSettingsSection onOptionsChange={onOptionsChange} options={options} />
       </Box>
       <Box width="20%" flex="0 0 20%">
