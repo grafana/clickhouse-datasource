@@ -80,6 +80,8 @@
     "PREWHERE",
     "proxying",
     "regexes",
+    "retarget",
+    "retargets",
     "schemacache",
     "schemads",
     "sdkconfig",
