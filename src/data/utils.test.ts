@@ -219,6 +219,25 @@ describe('applyTraceSearchFieldConfig', () => {
 });
 
 describe('transformQueryResponseWithTraceAndLogLinks', () => {
+  const configureOtelLogs = (datasource: Datasource) => {
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: 'latest',
+    };
+  };
+
+  const configureOtelTraces = (datasource: Datasource) => {
+    datasource.settings.jsonData.traces = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_traces',
+      otelEnabled: true,
+      otelVersion: 'latest',
+      durationUnit: TimeUnit.Nanoseconds,
+    };
+  };
+
   const buildTestRequestResponse = (
     builderOptions: Partial<QueryBuilderOptions>
   ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
@@ -267,6 +286,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
   it('inserts links into trace query. Copy trace columns, default log columns.', async () => {
     const mockDatasource = newMockDatasource();
+    configureOtelLogs(mockDatasource);
     const getDefaultTraceDatabase = jest.spyOn(mockDatasource, 'getDefaultTraceDatabase');
     const getDefaultTraceTable = jest.spyOn(mockDatasource, 'getDefaultTraceTable');
     const getDefaultTraceColumns = jest.spyOn(mockDatasource, 'getDefaultTraceColumns');
@@ -295,6 +315,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
   it('inserts links into logs query. Copy logs columns, default trace columns.', async () => {
     const mockDatasource = newMockDatasource();
+    configureOtelTraces(mockDatasource);
     jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
     const getDefaultTraceDatabase = jest.spyOn(mockDatasource, 'getDefaultTraceDatabase');
     const getDefaultTraceTable = jest.spyOn(mockDatasource, 'getDefaultTraceTable');
@@ -329,6 +350,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
   it('includes TraceId filter in View logs link query using configured column', async () => {
     const mockDatasource = newMockDatasource();
     // Mock that TraceId is configured
+    jest.spyOn(mockDatasource, 'getDefaultLogsTable').mockReturnValue('logs');
     jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(new Map([[ColumnHint.TraceId, 'TraceId']]));
 
     const builderOptions: Partial<QueryBuilderOptions> = {
@@ -570,6 +592,14 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
     it('logs→trace link without OTel generates rawSql without _trace_id_ts optimization', async () => {
       const mockDatasource = newMockDatasource();
+      mockDatasource.settings.jsonData.traces = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_traces',
+        traceIdColumn: 'TraceId',
+        startTimeColumn: 'Timestamp',
+        durationColumn: 'Duration',
+        durationUnit: TimeUnit.Nanoseconds,
+      };
       jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
 
       const builderOptions: Partial<QueryBuilderOptions> = {
@@ -623,6 +653,7 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
   it('does not inject "View trace" link when showTraceLinks is false', async () => {
     const mockDatasource = newMockDatasource();
+    configureOtelLogs(mockDatasource);
     mockDatasource.settings.jsonData.traces = { showTraceLinks: false };
 
     const builderOptions: Partial<QueryBuilderOptions> = {
@@ -653,6 +684,43 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
 
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
+  });
+
+  it('does not inject "View trace" for a logs-only single-table datasource', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.configMode = 'single-table';
+    mockDatasource.settings.jsonData.signalType = 'logs';
+    configureOtelLogs(mockDatasource);
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Logs,
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    expect(links?.find((link: any) => link.title === 'View trace')).toBeUndefined();
+    expect(links?.find((link: any) => link.title === 'View logs')).toBeDefined();
+  });
+
+  it('does not inject "View logs" for a traces-only single-table datasource', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.configMode = 'single-table';
+    mockDatasource.settings.jsonData.signalType = 'traces';
+    configureOtelTraces(mockDatasource);
+
+    const builderOptions: Partial<QueryBuilderOptions> = {
+      queryType: QueryType.Traces,
+      columns: [{ name: 'TraceId', hint: ColumnHint.TraceId }],
+    };
+
+    const [request, response] = buildTestRequestResponse(builderOptions);
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
   });

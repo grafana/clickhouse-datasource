@@ -331,6 +331,8 @@ export class Datasource
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars, filters: AdHocVariableFilter[] = []): CHQuery {
+    query = this.retargetSpanLinkTrace(query);
+
     let rawQuery = query.rawSql || '';
     const templateSrv = getTemplateSrv();
     const templateSrvVariables = templateSrv.getVariables() || [];
@@ -364,6 +366,48 @@ export class Datasource
     return {
       ...query,
       rawSql: rawQuery,
+    };
+  }
+
+  /**
+   * When a user follows a span link ("View Linked Span") in the trace view, Grafana core
+   * builds the navigation target by spreading the current trace query and overriding only the
+   * top-level `query` field with the linked trace id (the convention Tempo uses). The ClickHouse
+   * trace-id query executes off builderOptions.meta.traceId, which is baked into rawSql and still
+   * points at the originating trace, so the same trace would re-open. Detect that case and
+   * regenerate rawSql for the linked trace id so the link opens the linked span's trace.
+   * See https://github.com/grafana/clickhouse-datasource/issues/1889.
+   */
+  retargetSpanLinkTrace(query: CHQuery): CHQuery {
+    if (query.editorType !== EditorType.Builder) {
+      return query;
+    }
+
+    const meta = query.builderOptions.meta;
+    if (!meta?.isTraceIdMode) {
+      return query;
+    }
+
+    // `query` is not part of CHQuery; Grafana core sets it on the navigation target when a span
+    // link is followed. Detect it with the `in` operator so the field can be read without a cast.
+    if (!('query' in query)) {
+      return query;
+    }
+
+    const linkedTraceId = query.query;
+    if (typeof linkedTraceId !== 'string' || !/^[0-9a-fA-F]+$/.test(linkedTraceId) || linkedTraceId === meta.traceId) {
+      return query;
+    }
+
+    const builderOptions: QueryBuilderOptions = {
+      ...query.builderOptions,
+      meta: { ...meta, traceId: linkedTraceId },
+    };
+
+    return {
+      ...query,
+      builderOptions,
+      rawSql: generateSql(builderOptions),
     };
   }
 
@@ -833,15 +877,63 @@ export class Datasource
   }
 
   /**
+   * Whether the Map-key discovery probe is enabled. Defaults to true.
+   * When false, `fetchUniqueMapKeys` resolves to an empty list and adhoc
+   * tag-key expansion skips the fan-out.
+   */
+  private isMapKeysDiscoveryEnabled(): boolean {
+    return this.settings.jsonData.enableMapKeysDiscovery ?? true;
+  }
+
+  /**
+   * When the (db, table) matches the configured OTel logs or traces table,
+   * returns a time-column name suitable for bounding the Map-key probe.
+   * Returns undefined for free-form tables where the plugin can't know which
+   * column is the time column — those continue to use the bare LIMIT probe.
+   */
+  private getMapKeyProbeTimeColumn(db: string, table: string): string | undefined {
+    const logsDb = this.getDefaultLogsDatabase();
+    const logsTable = this.getDefaultLogsTable();
+    if (logsDb === db && logsTable === table) {
+      const cols = this.getDefaultLogsColumns();
+      const t = cols.get(ColumnHint.FilterTime) || cols.get(ColumnHint.Time);
+      if (t) {
+        return t;
+      }
+    }
+    const tracesDb = this.getDefaultTraceDatabase();
+    const tracesTable = this.getDefaultTraceTable();
+    if (tracesDb === db && tracesTable === table) {
+      const cols = this.getDefaultTraceColumns();
+      const t = cols.get(ColumnHint.Time);
+      if (t) {
+        return t;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Used to populate suggestions in the filter editor for Map columns.
    *
-   * Samples rows to get a unique set of keys for the map.
-   * May not include ALL keys for a given dataset.
+   * Samples rows to get a unique set of keys for the map. May not include ALL
+   * keys for a given dataset.
    *
-   * TODO: This query can be slow/expensive
+   * When the target matches the configured OTel logs/traces table, the probe
+   * is bounded to the last 6 hours via the known time column — on a
+   * partitioned-by-day MergeTree this prunes to a handful of parts and avoids
+   * full-column scans (see #1843). For free-form tables the predicate is
+   * omitted because the plugin doesn't know which column is the time column.
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    if (!this.isMapKeysDiscoveryEnabled()) {
+      return [];
+    }
+    const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
+    const whereClause = timeColumn
+      ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      : '';
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)}${whereClause} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1151,9 +1243,11 @@ export class Datasource
     // Map-key expansion only runs when the adhoc context points at a
     // specific `db.table` — otherwise we'd need to probe every table in a
     // database, which is too expensive to do on every dashboard render.
+    // The same opt-out that disables the per-filter probe also short-circuits
+    // this fan-out, so disabling the setting kills *all* probe traffic.
     const db = this.resolveAdhocDatabase(frame);
     const singleTable = this.resolveAdhocSingleTable();
-    if (!db || !singleTable || mapCols.length === 0) {
+    if (!db || !singleTable || mapCols.length === 0 || !this.isMapKeysDiscoveryEnabled()) {
       return keys;
     }
 
