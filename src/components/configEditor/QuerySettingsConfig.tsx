@@ -10,12 +10,14 @@ interface QuerySettingsConfigProps {
   maxOpenConns?: string;
   queryTimeout?: string;
   validateSql?: boolean;
+  enableMapKeysDiscovery?: boolean;
   onConnMaxIdleConnsChange: (e: FormEvent<HTMLInputElement>) => void;
   onConnMaxLifetimeChange: (e: FormEvent<HTMLInputElement>) => void;
   onConnMaxOpenConnsChange: (e: FormEvent<HTMLInputElement>) => void;
   onDialTimeoutChange: (e: FormEvent<HTMLInputElement>) => void;
   onQueryTimeoutChange: (e: FormEvent<HTMLInputElement>) => void;
   onValidateSqlChange: (e: FormEvent<HTMLInputElement>) => void;
+  onEnableMapKeysDiscoveryChange: (e: FormEvent<HTMLInputElement>) => void;
 }
 
 export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
@@ -26,12 +28,14 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
     maxOpenConns,
     queryTimeout,
     validateSql,
+    enableMapKeysDiscovery,
     onConnMaxIdleConnsChange,
     onConnMaxLifetimeChange,
     onConnMaxOpenConnsChange,
     onDialTimeoutChange,
     onQueryTimeoutChange,
     onValidateSqlChange,
+    onEnableMapKeysDiscoveryChange,
   } = props;
 
   const labels = allLabels.components.Config.QuerySettingsConfig;
@@ -101,6 +105,15 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
 
       <Field label={labels.validateSql.label} description={labels.validateSql.tooltip}>
         <Switch className="gf-form" value={validateSql || false} onChange={onValidateSqlChange} role="checkbox" />
+      </Field>
+
+      <Field label={labels.enableMapKeysDiscovery.label} description={labels.enableMapKeysDiscovery.tooltip}>
+        <Switch
+          className="gf-form"
+          value={enableMapKeysDiscovery ?? true}
+          onChange={onEnableMapKeysDiscoveryChange}
+          role="checkbox"
+        />
       </Field>
     </ConfigSection>
   );

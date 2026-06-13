@@ -27,7 +27,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { firstValueFrom, from, map, mergeMap, Observable } from 'rxjs';
+import { concatMap, firstValueFrom, Observable } from 'rxjs';
 import { CHConfig } from 'types/config';
 import {
   AggregateColumn,
@@ -82,6 +82,16 @@ export class Datasource
   // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
   // can pass either form.
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
+  private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
+  // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
+  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes concurrent
+  // callers and lets cache hits resolve in a microtask. Entries expire after
+  // TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS so a companion table created after the datasource
+  // loaded is detected without a page reload.
+  private traceTimestampTableCache = new Map<
+    string,
+    { pending: Promise<boolean>; resolved?: boolean; expiresAt: number }
+  >();
 
   constructor(instanceSettings: DataSourceInstanceSettings<CHConfig>) {
     super(instanceSettings);
@@ -323,6 +333,8 @@ export class Datasource
   }
 
   applyTemplateVariables(query: CHQuery, scoped: ScopedVars, filters: AdHocVariableFilter[] = []): CHQuery {
+    query = this.retargetSpanLinkTrace(query);
+
     let rawQuery = query.rawSql || '';
     const templateSrv = getTemplateSrv();
     const templateSrvVariables = templateSrv.getVariables() || [];
@@ -356,6 +368,48 @@ export class Datasource
     return {
       ...query,
       rawSql: rawQuery,
+    };
+  }
+
+  /**
+   * When a user follows a span link ("View Linked Span") in the trace view, Grafana core
+   * builds the navigation target by spreading the current trace query and overriding only the
+   * top-level `query` field with the linked trace id (the convention Tempo uses). The ClickHouse
+   * trace-id query executes off builderOptions.meta.traceId, which is baked into rawSql and still
+   * points at the originating trace, so the same trace would re-open. Detect that case and
+   * regenerate rawSql for the linked trace id so the link opens the linked span's trace.
+   * See https://github.com/grafana/clickhouse-datasource/issues/1889.
+   */
+  retargetSpanLinkTrace(query: CHQuery): CHQuery {
+    if (query.editorType !== EditorType.Builder) {
+      return query;
+    }
+
+    const meta = query.builderOptions.meta;
+    if (!meta?.isTraceIdMode) {
+      return query;
+    }
+
+    // `query` is not part of CHQuery; Grafana core sets it on the navigation target when a span
+    // link is followed. Detect it with the `in` operator so the field can be read without a cast.
+    if (!('query' in query)) {
+      return query;
+    }
+
+    const linkedTraceId = query.query;
+    if (typeof linkedTraceId !== 'string' || !/^[0-9a-fA-F]+$/.test(linkedTraceId) || linkedTraceId === meta.traceId) {
+      return query;
+    }
+
+    const builderOptions: QueryBuilderOptions = {
+      ...query.builderOptions,
+      meta: { ...meta, traceId: linkedTraceId },
+    };
+
+    return {
+      ...query,
+      builderOptions,
+      rawSql: generateSql(builderOptions),
     };
   }
 
@@ -737,6 +791,64 @@ export class Datasource
   }
 
   /**
+   * Resolves whether the `<table>_trace_id_ts` companion exists for the given
+   * (database, table). Caches the Promise so concurrent and repeat callers share
+   * a single `SHOW TABLES` round-trip; on failure, evicts so the next caller
+   * retries and meanwhile returns `false` (the safe, unoptimized path).
+   */
+  async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
+    if (!database || !table) {
+      return false;
+    }
+
+    const key = `${database}.${table}`;
+    const now = Date.now();
+
+    let entry = this.traceTimestampTableCache.get(key);
+
+    if (!entry || entry.expiresAt <= now) {
+      const pending = (async () => {
+        try {
+          const tables = await this.fetchTables(database);
+          return tables.includes(table + this.getTraceTimestampTableSuffix());
+        } catch {
+          this.traceTimestampTableCache.delete(key);
+          return false;
+        }
+      })();
+
+      entry = { pending, expiresAt: now + Datasource.TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS };
+      this.traceTimestampTableCache.set(key, entry);
+
+      // Record the settled value so peekTraceTimestampTable() can read it synchronously.
+      const created = entry;
+      pending.then((v) => {
+        created.resolved = v;
+      });
+    }
+
+    return entry.pending;
+  }
+
+  /**
+   * Synchronously read the cached trace timestamp table result without awaiting.
+   * Returns the resolved boolean when a non-expired cache entry has settled, or
+   * undefined when there is no entry, it is still pending, or it has expired.
+   * Lets the React hook seed its initial state from a warm cache and skip a
+   * false→true render that would briefly clobber a known-good meta value.
+   */
+  peekTraceTimestampTable(database: string, table: string): boolean | undefined {
+    if (!database || !table) {
+      return undefined;
+    }
+    const entry = this.traceTimestampTableCache.get(`${database}.${table}`);
+    if (!entry || entry.expiresAt <= Date.now()) {
+      return undefined;
+    }
+    return entry.resolved;
+  }
+
+  /**
    * Get the TraceId column name from traces configuration
    * Used when creating logs filter to correlate with trace data
    */
@@ -767,15 +879,63 @@ export class Datasource
   }
 
   /**
+   * Whether the Map-key discovery probe is enabled. Defaults to true.
+   * When false, `fetchUniqueMapKeys` resolves to an empty list and adhoc
+   * tag-key expansion skips the fan-out.
+   */
+  private isMapKeysDiscoveryEnabled(): boolean {
+    return this.settings.jsonData.enableMapKeysDiscovery ?? true;
+  }
+
+  /**
+   * When the (db, table) matches the configured OTel logs or traces table,
+   * returns a time-column name suitable for bounding the Map-key probe.
+   * Returns undefined for free-form tables where the plugin can't know which
+   * column is the time column — those continue to use the bare LIMIT probe.
+   */
+  private getMapKeyProbeTimeColumn(db: string, table: string): string | undefined {
+    const logsDb = this.getDefaultLogsDatabase();
+    const logsTable = this.getDefaultLogsTable();
+    if (logsDb === db && logsTable === table) {
+      const cols = this.getDefaultLogsColumns();
+      const t = cols.get(ColumnHint.FilterTime) || cols.get(ColumnHint.Time);
+      if (t) {
+        return t;
+      }
+    }
+    const tracesDb = this.getDefaultTraceDatabase();
+    const tracesTable = this.getDefaultTraceTable();
+    if (tracesDb === db && tracesTable === table) {
+      const cols = this.getDefaultTraceColumns();
+      const t = cols.get(ColumnHint.Time);
+      if (t) {
+        return t;
+      }
+    }
+    return undefined;
+  }
+
+  /**
    * Used to populate suggestions in the filter editor for Map columns.
    *
-   * Samples rows to get a unique set of keys for the map.
-   * May not include ALL keys for a given dataset.
+   * Samples rows to get a unique set of keys for the map. May not include ALL
+   * keys for a given dataset.
    *
-   * TODO: This query can be slow/expensive
+   * When the target matches the configured OTel logs/traces table, the probe
+   * is bounded to the last 6 hours via the known time column — on a
+   * partitioned-by-day MergeTree this prunes to a handful of parts and avoids
+   * full-column scans (see #1843). For free-form tables the predicate is
+   * omitted because the plugin doesn't know which column is the time column.
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    if (!this.isMapKeysDiscoveryEnabled()) {
+      return [];
+    }
+    const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
+    const whereClause = timeColumn
+      ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      : '';
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)}${whereClause} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1002,16 +1162,13 @@ export class Datasource
         targets,
       })
       .pipe(
-        mergeMap((res: DataQueryResponse) =>
-          from(transformQueryResponseWithTraceAndLogLinks(this, request, res)).pipe(
-            map((transformed) => {
-              if (hasLogsVolumeTargets) {
-                return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
-              }
-              return transformed;
-            })
-          )
-        )
+        concatMap(async (res: DataQueryResponse) => {
+          const transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          if (hasLogsVolumeTargets) {
+            return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
+          }
+          return transformed;
+        })
       );
   }
 
@@ -1088,9 +1245,11 @@ export class Datasource
     // Map-key expansion only runs when the adhoc context points at a
     // specific `db.table` — otherwise we'd need to probe every table in a
     // database, which is too expensive to do on every dashboard render.
+    // The same opt-out that disables the per-filter probe also short-circuits
+    // this fan-out, so disabling the setting kills *all* probe traffic.
     const db = this.resolveAdhocDatabase(frame);
     const singleTable = this.resolveAdhocSingleTable();
-    if (!db || !singleTable || mapCols.length === 0) {
+    if (!db || !singleTable || mapCols.length === 0 || !this.isMapKeysDiscoveryEnabled()) {
       return keys;
     }
 
