@@ -57,6 +57,7 @@ import {
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { CHVariableSupport } from './CHVariableSupport';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -96,6 +97,7 @@ export class Datasource
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+    this.variables = new CHVariableSupport(this);
   }
 
   static logVolumePrefix = 'log-volume-';
@@ -487,7 +489,7 @@ export class Datasource
       const isStringFilterAction = action.type === 'ADD_STRING_FILTER' || action.type === 'ADD_STRING_FILTER_OUT';
 
       if (isStringFilterAction) {
-        // has no key — resolve the column name from the log message hint.
+        // has no key, so resolve the column name from the log message hint.
         const logMessageColumn = getColumnByHint(query.builderOptions, ColumnHint.LogMessage);
         return logMessageColumn?.alias || logMessageColumn?.name || action.options.key || '';
       }
