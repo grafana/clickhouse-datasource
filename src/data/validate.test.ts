@@ -19,7 +19,7 @@ describe('Validate', () => {
     });
 
     it('handles ClickHouse SETTINGS', () => {
-      expect(validate("SELECT * FROM t SETTINGS max_rows_to_read = 1000").valid).toBe(true);
+      expect(validate('SELECT * FROM t SETTINGS max_rows_to_read = 1000').valid).toBe(true);
     });
 
     it('handles ClickHouse GLOBAL IN', () => {
@@ -113,7 +113,7 @@ describe('Validate', () => {
     });
 
     it('reports the correct line number for an error on line 2', () => {
-      const sql = 'SELECT *\nFROM t WHERE name = \'unclosed';
+      const sql = "SELECT *\nFROM t WHERE name = 'unclosed";
       const v = validate(sql);
       expect(v.valid).toBe(false);
       expect(v.error?.startLine).toBe(2);

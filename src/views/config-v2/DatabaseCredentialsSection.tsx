@@ -33,7 +33,11 @@ export const DatabaseCredentialsSection = (props: Props) => {
       return;
     }
     if (jsonData.username) {
-      setFieldErrors((prev) => { const next = { ...prev }; delete next.username; return next; });
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.username;
+        return next;
+      });
       validation.clearError('username');
     }
     return validation.registerValidation(() => {

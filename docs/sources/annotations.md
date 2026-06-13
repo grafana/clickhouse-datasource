@@ -48,14 +48,14 @@ To add a ClickHouse annotation to a dashboard:
 
 Your SQL query must return at least a time column and a text column. Grafana uses these to place and label each annotation.
 
-| Column | Required | Description |
-|--------|----------|-------------|
-| **Time** | Yes | The timestamp for the annotation. Grafana uses this to position the marker on the time axis. Use a DateTime or DateTime64 column, or an expression that Grafana can interpret as time. |
-| **TimeEnd** | Optional | A second timestamp column. When present, Grafana draws a **region annotation** (a shaded range) from Time to TimeEnd instead of a single vertical line. |
-| **Text** | Yes | The annotation text shown when you hover over or click the marker. |
-| **Tags** | Optional | Additional columns become annotation tags. Use them to filter or group annotations. |
+| Column      | Required | Description                                                                                                                                                                            |
+| ----------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Time**    | Yes      | The timestamp for the annotation. Grafana uses this to position the marker on the time axis. Use a DateTime or DateTime64 column, or an expression that Grafana can interpret as time. |
+| **TimeEnd** | Optional | A second timestamp column. When present, Grafana draws a **region annotation** (a shaded range) from Time to TimeEnd instead of a single vertical line.                                |
+| **Text**    | Yes      | The annotation text shown when you hover over or click the marker.                                                                                                                     |
+| **Tags**    | Optional | Additional columns become annotation tags. Use them to filter or group annotations.                                                                                                    |
 
-Always restrict the query to the dashboard time range so annotations load quickly. Use the **$__timeFilter(column)** macro in your WHERE clause. If your time column is `DateTime64` and you need sub-second precision, use **$__timeFilter_ms(column)** instead. See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section for the full list of available macros.
+Always restrict the query to the dashboard time range so annotations load quickly. Use the **$\_\_timeFilter(column)** macro in your WHERE clause. If your time column is `DateTime64` and you need sub-second precision, use **$\_\_timeFilter_ms(column)** instead. See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section for the full list of available macros.
 
 ## Annotation query examples
 

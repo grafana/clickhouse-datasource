@@ -65,11 +65,19 @@ export const ServerAndEncryptionSection = (props: Props) => {
     // Always clear errors eagerly when the user fills in a field, regardless of
     // whether the ValidationAPI is available
     if (jsonData.host) {
-      setFieldErrors((prev) => { const next = { ...prev }; delete next.host; return next; });
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.host;
+        return next;
+      });
       validation?.clearError('host');
     }
     if (jsonData.port) {
-      setFieldErrors((prev) => { const next = { ...prev }; delete next.port; return next; });
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next.port;
+        return next;
+      });
       validation?.clearError('port');
     }
     if (!validation) {

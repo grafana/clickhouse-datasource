@@ -6,13 +6,14 @@ import { ColumnHint, TimeUnit } from 'types/queryBuilder';
 import otel, { traceTimestampTableSuffix as defaultTraceTimestampTableSuffix } from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
-import { CHTracesConfig, defaultCHAdditionalSettingsConfig } from 'types/config';
+import { CHTracesConfig, ConfigMode, defaultCHAdditionalSettingsConfig } from 'types/config';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
 
 export interface TraceConfigProps {
   tracesConfig?: CHTracesConfig;
+  variant?: ConfigMode;
   onDefaultDatabaseChange: (v: string) => void;
   onDefaultTableChange: (v: string) => void;
   onOtelEnabledChange: (v: boolean) => void;
@@ -96,6 +97,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
     traceTimestampTableSuffix,
   } = (props.tracesConfig || {}) as CHTracesConfig;
   const labels = allLabels.components.Config.TracesConfig;
+  const sectionLabels = props.variant === 'single-table' ? labels.variants.singleTable : labels;
 
   const otelConfig = otel.getVersion(otelVersion);
   if (otelEnabled && otelConfig) {
@@ -121,7 +123,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
   }
 
   return (
-    <ConfigSection title={labels.title} description={labels.description}>
+    <ConfigSection title={sectionLabels.title} description={sectionLabels.description}>
       <div id="traces-config" />
       <Field label={labels.defaultDatabase.label} description={labels.defaultDatabase.description}>
         <Input
@@ -310,7 +312,7 @@ export const TracesConfig = (props: TraceConfigProps) => {
           onChange={onTraceTimestampTableSuffixChange}
         />
       </ConfigSubSection>
-      <br/>
+      <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>
         <Switch
           label={labels.traceIdCorrelation.showTraceLinks.label}

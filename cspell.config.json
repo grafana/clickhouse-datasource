@@ -52,6 +52,7 @@
     "ILIKE",
     "instancemgmt",
     "jsonencode",
+    "listbox",
     "lowcardinality",
     "magefile",
     "multiquery",
@@ -80,6 +81,8 @@
     "PREWHERE",
     "proxying",
     "regexes",
+    "retarget",
+    "retargets",
     "schemacache",
     "schemads",
     "sdkconfig",
@@ -92,6 +95,7 @@
     "sqlutil",
     "stagename",
     "stretchr",
+    "subkey",
     "subquery",
     "subqueries",
     "subresource",
@@ -117,6 +121,7 @@
     "uvcf",
     "vectorator",
     "WorkDir",
-    "varname"
+    "varname",
+    "zizmor"
   ]
 }

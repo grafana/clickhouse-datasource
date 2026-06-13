@@ -46,6 +46,8 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 - **Type-specific options** — Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
 - **SQL preview** — At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
 
+If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
+
 ## Build queries
 
 You can build queries using the **SQL editor** (raw SQL) or the **Query builder**. Queries can include macros for dynamic parts such as time range filters.
@@ -54,23 +56,23 @@ You can build queries using the **SQL editor** (raw SQL) or the **Query builder*
 
 When using the query builder, the available options depend on the selected **query type**:
 
-| Query type | Builder modes | Description |
-|------------|---------------|-------------|
-| **Table** | **List** or **Aggregate** | List returns raw rows. Aggregate lets you add functions like `count()`, `avg()`, and `GROUP BY`. |
-| **Time series** | **Trend** | Automatically groups by time using `$__timeInterval()` and applies aggregate functions. Select a time column, one or more value columns, and optional grouping columns. |
-| **Logs** | **List** or **Aggregate** | List returns log rows. Aggregate supports grouping for log volume histograms. |
-| **Traces** | **Trace ID** or **Trace search** | Trace ID fetches a single trace by ID. Trace search finds traces matching filters (service name, duration, time range). |
+| Query type      | Builder modes                    | Description                                                                                                                                                             |
+| --------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Table**       | **List** or **Aggregate**        | List returns raw rows. Aggregate lets you add functions like `count()`, `avg()`, and `GROUP BY`.                                                                        |
+| **Time series** | **Trend**                        | Automatically groups by time using `$__timeInterval()` and applies aggregate functions. Select a time column, one or more value columns, and optional grouping columns. |
+| **Logs**        | **List** or **Aggregate**        | List returns log rows. Aggregate supports grouping for log volume histograms.                                                                                           |
+| **Traces**      | **Trace ID** or **Trace search** | Trace ID fetches a single trace by ID. Trace search finds traces matching filters (service name, duration, time range).                                                 |
 
 ### Logs query builder
 
 The logs query builder provides structured fields for common log exploration patterns. When **Use OTel** is enabled, the builder pre-fills column mappings for [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter) tables.
 
-| Field | Description |
-|-------|-------------|
-| **Time column** | The high-precision timestamp column used for sorting log rows. |
+| Field                  | Description                                                                                                                                                                                                    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Time column**        | The high-precision timestamp column used for sorting log rows.                                                                                                                                                 |
 | **Filter Time column** | A lower-precision column for fast time range filtering (for example, a `Date` or `DateTime` column indexed for partition pruning). Using a separate filter column can significantly improve query performance. |
-| **Log Level column** | The column that contains the log severity level. |
-| **Log Message column** | The column that contains the log message body. |
+| **Log Level column**   | The column that contains the log severity level.                                                                                                                                                               |
+| **Log Message column** | The column that contains the log message body.                                                                                                                                                                 |
 
 You can also filter by log message text using the search field, and add column filters for resource, scope, or log attributes.
 
@@ -83,12 +85,35 @@ The traces query builder supports two modes:
 
 When **Use OTel** is enabled, column mappings are pre-filled for the OpenTelemetry schema. You can also configure:
 
-| Field | Description |
-|-------|-------------|
-| **Duration unit** | The unit for the duration column (`seconds`, `milliseconds`, `microseconds`, or `nanoseconds`). |
-| **Flatten nested** | Enable if your traces table was created with `flatten_nested=1`. |
-| **Events prefix** | Prefix for event columns (for example, `Events.Timestamp`, `Events.Name`). |
-| **Links prefix** | Prefix for link columns (for example, `Links.TraceId`, `Links.SpanId`). |
+| Field              | Description                                                                                     |
+| ------------------ | ----------------------------------------------------------------------------------------------- |
+| **Duration unit**  | The unit for the duration column (`seconds`, `milliseconds`, `microseconds`, or `nanoseconds`). |
+| **Flatten nested** | Enable if your traces table was created with `flatten_nested=1`.                                |
+| **Events prefix**  | Prefix for event columns (for example, `Events.Timestamp`, `Events.Name`).                      |
+| **Links prefix**   | Prefix for link columns (for example, `Links.TraceId`, `Links.SpanId`).                         |
+
+### JSON-type OTel attribute columns
+
+The [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/README.md#experimental-json-support) supports an experimental mode (enabled by setting `enable_json_type: true` in the collector config) that stores attribute maps — `SpanAttributes`, `ResourceAttributes`, `LogAttributes`, `ScopeAttributes`, and event/link attribute columns — as ClickHouse's native `JSON` type instead of `Map(String, String)`.
+
+The plugin auto-detects JSON-typed attribute columns at query time. No manual configuration is required.
+
+**How auto-detection works:**
+
+When you open a trace or log query in OTel mode, the plugin runs `DESC TABLE` on the target table and checks whether the attribute columns have a `JSON` type. If they do, the plugin:
+
+- Returns `SpanAttributes` and `ResourceAttributes` as raw JSON objects and flattens them client-side into `{key, value}` pairs. Nested keys produced by the ClickHouse JSON type (for example, `{"http": {"method": "GET"}}` from an original key of `http.method`) are rejoined with a dot.
+- Wraps event and link attribute columns in the SQL with `toJSONString()` and expands them client-side, avoiding the `mapKeys()` function that does not work on `JSON`-typed columns.
+
+If the table uses `Map(String, String)` attribute columns (the default for ClickHouse older than 26 or when `enable_json_type` is not set), the plugin uses the standard `mapKeys()` path and nothing changes.
+
+**Filter path discovery:**
+
+The [OTel ClickHouse exporter JSON schema](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/README.md#experimental-json-support) ships a companion `Array(LowCardinality(String))` column for each JSON attribute column (for example, `SpanAttributesKeys` alongside `SpanAttributes`). These pre-materialized key arrays have a bloom-filter index and are used by the plugin for fast filter path discovery. If the companion column is present, the plugin queries `arrayJoin(SpanAttributesKeys)` instead of `JSONAllPaths(SpanAttributes)`.
+
+{{< admonition type="note" >}}
+JSON-type attribute columns require ClickHouse 26 or later and the OTel Collector exporter configured with `enable_json_type: true`. The plugin detects the column type automatically and falls back to `Map(String, String)` handling for older schemas.
+{{< /admonition >}}
 
 ### Log volume and logs sample
 
@@ -142,7 +167,9 @@ When you don't have a `log_time` column, set **Format** to **Logs** to force log
 
 To use the Traces panel, your data must meet the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). Set **Format** to **Trace** when building the query (available from plugin version 2.2.0).
 
-If you use the [OpenTelemetry Collector and ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter), the following query returns the required column names (case sensitive). Replace the trace ID in the WHERE clause with your trace ID or a template variable (for example `$traceId`):
+If you use the [OpenTelemetry Collector and ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter), the following query returns the required column names (case sensitive). Replace the trace ID in the WHERE clause with your trace ID or a template variable (for example `$traceId`).
+
+For tables with **`Map(String, String)` attribute columns** (the default schema):
 
 ```sql
 SELECT
@@ -161,9 +188,32 @@ WHERE TraceId = '61d489320c01243966700e172ab37081'
 ORDER BY startTime ASC
 ```
 
+For tables with **`JSON`-type attribute columns** (ClickHouse 26+ with `enable_json_type: true`), select the attribute columns directly — `mapKeys()` does not work on the `JSON` type:
+
+```sql
+SELECT
+  TraceId AS traceID,
+  SpanId AS spanID,
+  SpanName AS operationName,
+  ParentSpanId AS parentSpanID,
+  ServiceName AS serviceName,
+  Duration / 1000000 AS duration,
+  Timestamp AS startTime,
+  SpanAttributes AS tags,
+  ResourceAttributes AS serviceTags,
+  if(StatusCode IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) AS statusCode
+FROM otel.otel_traces
+WHERE TraceId = '61d489320c01243966700e172ab37081'
+ORDER BY startTime ASC
+```
+
+{{< admonition type="tip" >}}
+When using the **Query builder** in OTel mode, the plugin detects the attribute column type automatically and generates the correct SQL for both `Map` and `JSON` schemas. You do not need to write the trace query manually.
+{{< /admonition >}}
+
 ## Column roles
 
-When you use the Query builder with the **Logs**, **Time series**, or **Traces** query type, each built-in column slot is mapped to a *semantic role*. The builder renames your columns to the fixed aliases Grafana's panels expect, so the same panel can visualize data from any ClickHouse schema once you tell it which columns play which roles.
+When you use the Query builder with the **Logs**, **Time series**, or **Traces** query type, each built-in column slot is mapped to a _semantic role_. The builder renames your columns to the fixed aliases Grafana's panels expect, so the same panel can visualize data from any ClickHouse schema once you tell it which columns play which roles.
 
 For example, choosing your `EventTime` column as the **Time** role for a Logs query produces `SELECT EventTime AS timestamp, ...`; the Logs panel then sorts on `timestamp` without needing to know your real column name.
 
@@ -206,7 +256,7 @@ Trace-panel column aliases are fixed; choose the table columns that play each ro
 
 Set the **Duration Unit** to match the units your column stores (OTel uses nanoseconds; other schemas often use milliseconds or seconds). The builder converts durations to milliseconds for the trace panel.
 
-To avoid re-mapping roles for every query, configure defaults under **Data source settings → Logs** and **Data source settings → Traces**. Enabling **OTel** mode populates every role with the OTel-conventional column name automatically.
+To avoid re-mapping roles for every query, configure defaults under **Data source settings → Logs** and **Data source settings → Traces**, or use **Single source** mode when a data source is dedicated to one logs or traces table. Enabling **OTel** mode populates every role with the OTel-conventional column name automatically.
 
 ## Macros
 
@@ -220,21 +270,21 @@ FROM test_data
 WHERE $__timeFilter(date_time)
 ```
 
-| Macro                                        | Description                                                                                      | Output example                                                                                        |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `$__dateFilter(columnName)`                  | Filters by the panel date range using the given column.                                          | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')`                                       |
-| `$__timeFilter(columnName)`                  | Filters by the panel time range (seconds).                                                       | `time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)`                                   |
-| `$__timeFilter_ms(columnName)`               | Filters by the panel time range (milliseconds).                                                  | `time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)` |
+| Macro                                        | Description                                                                                      | Output example                                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `$__dateFilter(columnName)`                  | Filters by the panel date range using the given column.                                          | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')`                                                                       |
+| `$__timeFilter(columnName)`                  | Filters by the panel time range (seconds).                                                       | `time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)`                                                                   |
+| `$__timeFilter_ms(columnName)`               | Filters by the panel time range (milliseconds).                                                  | `time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)`                                 |
 | `$__dateTimeFilter(dateColumn, timeColumn)`  | Combines date and time filters for separate Date and DateTime columns.                           | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23') AND time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)` |
-| `$__dt(dateColumn, timeColumn)`              | Shorthand alias for `$__dateTimeFilter`.                                                         | Same as `$__dateTimeFilter`.                                                                          |
-| `$__fromTime`                                | Start of the panel time range as `DateTime`.                                                     | `toDateTime(1415792726)`                                                                              |
-| `$__toTime`                                  | End of the panel time range as `DateTime`.                                                       | `toDateTime(1447328726)`                                                                              |
-| `$__fromTime_ms`                             | Start of the panel time range as `DateTime64(3)`.                                                | `fromUnixTimestamp64Milli(1415792726123)`                                                             |
-| `$__toTime_ms`                               | End of the panel time range as `DateTime64(3)`.                                                  | `fromUnixTimestamp64Milli(1447328726456)`                                                             |
-| `$__interval_s`                              | Panel interval in seconds.                                                                       | `20`                                                                                                  |
-| `$__timeInterval(columnName)`                | Interval from panel time range (seconds), for grouping.                                          | `toStartOfInterval(toDateTime(column), INTERVAL 20 second)`                                           |
-| `$__timeInterval_ms(columnName)`             | Interval from panel time range (milliseconds), for grouping.                                     | `toStartOfInterval(toDateTime64(column, 3), INTERVAL 20 millisecond)`                                 |
-| `$__conditionalAll(condition, $templateVar)` | Uses the first parameter when the template variable does not select all values; otherwise `1=1`. | `condition` or `1=1`                                                                                  |
+| `$__dt(dateColumn, timeColumn)`              | Shorthand alias for `$__dateTimeFilter`.                                                         | Same as `$__dateTimeFilter`.                                                                                                          |
+| `$__fromTime`                                | Start of the panel time range as `DateTime`.                                                     | `toDateTime(1415792726)`                                                                                                              |
+| `$__toTime`                                  | End of the panel time range as `DateTime`.                                                       | `toDateTime(1447328726)`                                                                                                              |
+| `$__fromTime_ms`                             | Start of the panel time range as `DateTime64(3)`.                                                | `fromUnixTimestamp64Milli(1415792726123)`                                                                                             |
+| `$__toTime_ms`                               | End of the panel time range as `DateTime64(3)`.                                                  | `fromUnixTimestamp64Milli(1447328726456)`                                                                                             |
+| `$__interval_s`                              | Panel interval in seconds.                                                                       | `20`                                                                                                                                  |
+| `$__timeInterval(columnName)`                | Interval from panel time range (seconds), for grouping.                                          | `toStartOfInterval(toDateTime(column), INTERVAL 20 second)`                                                                           |
+| `$__timeInterval_ms(columnName)`             | Interval from panel time range (milliseconds), for grouping.                                     | `toStartOfInterval(toDateTime64(column, 3), INTERVAL 20 millisecond)`                                                                 |
+| `$__conditionalAll(condition, $templateVar)` | Uses the first parameter when the template variable does not select all values; otherwise `1=1`. | `condition` or `1=1`                                                                                                                  |
 
 You can also use brace notation `{}` when the macro parameter must contain a query or other expression.
 

@@ -45,13 +45,13 @@ docker compose up -d clickhouse-server
 The seed inserts ~5M rows and takes around 30s on a laptop. Environment
 knobs:
 
-| Var | Default | Purpose |
-| --- | --- | --- |
-| `CH_HOST` | `localhost` | ClickHouse host |
-| `CH_PORT` | `9000` | Native protocol port |
-| `CH_DB` | `bench` | Benchmark database name |
-| `ROW_COUNT` | `5000000` | Noise rows to insert |
-| `MIN_READ_ROWS_RATIO` | `40` | Pass/fail floor for `slow_rows / fast_rows` |
+| Var                   | Default     | Purpose                                     |
+| --------------------- | ----------- | ------------------------------------------- |
+| `CH_HOST`             | `localhost` | ClickHouse host                             |
+| `CH_PORT`             | `9000`      | Native protocol port                        |
+| `CH_DB`               | `bench`     | Benchmark database name                     |
+| `ROW_COUNT`           | `5000000`   | Noise rows to insert                        |
+| `MIN_READ_ROWS_RATIO` | `40`        | Pass/fail floor for `slow_rows / fast_rows` |
 
 Observed output (5M seed, local Docker):
 

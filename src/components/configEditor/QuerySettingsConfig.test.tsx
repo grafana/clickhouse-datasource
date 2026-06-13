@@ -19,6 +19,7 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={() => {}}
         onQueryTimeoutChange={() => {}}
         onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -34,6 +35,7 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={onDialTimeout}
         onQueryTimeoutChange={() => {}}
         onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -56,6 +58,7 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={() => {}}
         onQueryTimeoutChange={onQueryTimeout}
         onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -78,15 +81,35 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={() => {}}
         onQueryTimeoutChange={() => {}}
         onValidateSqlChange={onValidateSqlChange}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const input = result.getByRole('checkbox');
-    expect(input).toBeInTheDocument();
-    fireEvent.click(input);
+    // Two switches: validateSql first, enableMapKeysDiscovery second.
+    const inputs = result.getAllByRole('checkbox');
+    fireEvent.click(inputs[0]);
     expect(onValidateSqlChange).toHaveBeenCalledTimes(1);
     expect(onValidateSqlChange).toHaveBeenCalledWith(expect.any(Object));
+  });
+
+  it('should call onEnableMapKeysDiscoveryChange when changed', () => {
+    const onEnableMapKeysDiscoveryChange = jest.fn();
+    const result = render(
+      <QuerySettingsConfig
+        onConnMaxIdleConnsChange={() => {}}
+        onConnMaxLifetimeChange={() => {}}
+        onConnMaxOpenConnsChange={() => {}}
+        onDialTimeoutChange={() => {}}
+        onQueryTimeoutChange={() => {}}
+        onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={onEnableMapKeysDiscoveryChange}
+      />
+    );
+    const inputs = result.getAllByRole('checkbox');
+    fireEvent.click(inputs[1]);
+    expect(onEnableMapKeysDiscoveryChange).toHaveBeenCalledTimes(1);
+    expect(onEnableMapKeysDiscoveryChange).toHaveBeenCalledWith(expect.any(Object));
   });
 
   it('should call onConnMaxIdleConnsChange when changed', () => {
@@ -99,6 +122,7 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={() => {}}
         onQueryTimeoutChange={() => {}}
         onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -121,6 +145,7 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={() => {}}
         onQueryTimeoutChange={() => {}}
         onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -145,6 +170,7 @@ describe('QuerySettingsConfig', () => {
         onDialTimeoutChange={() => {}}
         onQueryTimeoutChange={() => {}}
         onValidateSqlChange={() => {}}
+        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();

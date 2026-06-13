@@ -48,6 +48,7 @@ export const trackClickhouseConfigV1QuerySettings = (props: {
   maxOpenConns?: number;
   connMaxLifetime?: number;
   validateSql?: boolean;
+  enableMapKeysDiscovery?: boolean;
 }) => {
   reportInteraction('clickhouse_config_v1_query_settings', props);
 };

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select, Button, Input, HorizontalGroup } from '@grafana/ui';
+import { InlineFormLabel, Select, Button, Input, Stack } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
@@ -43,7 +43,7 @@ const Aggregate = (props: AggregateProps) => {
   }
 
   return (
-    <HorizontalGroup wrap align="flex-start" justify="flex-start">
+    <Stack direction="row" wrap="wrap" alignItems="flex-start" justifyContent="flex-start">
       <Select
         width={20}
         className={styles.Common.inlineSelect}
@@ -84,7 +84,7 @@ const Aggregate = (props: AggregateProps) => {
         onClick={() => removeAggregate(index)}
         aria-label="aggregate-remove-item"
       />
-    </HorizontalGroup>
+    </Stack>
   );
 };
 

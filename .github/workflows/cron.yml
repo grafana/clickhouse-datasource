@@ -8,10 +8,22 @@ on:
   # Allow engineers to run Cloud E2E on-demand (useful for debugging)
   workflow_dispatch:
 
+# Reusable workflows can only narrow caller permissions, not escalate.
+# `id-token: write` is needed by the Vault OIDC step in playwright-cloud.yml.
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   playwright-cloud:
+    # Intentionally pinned to @main: data-sources-ci-workflows does not
+    # publish versioned tags for this workflow yet. Allowed by the zizmor
+    # policy (`grafana/*: any`); review periodically.
     uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@main
     secrets: inherit
+    permissions:
+      contents: read
+      id-token: write
     with:
       pdc-network-name: datasources-pdc-network-aws-datasourcese2e
       repo-secrets: |

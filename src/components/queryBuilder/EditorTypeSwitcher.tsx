@@ -96,7 +96,6 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         body={switcher.body}
         confirmText={switcher.confirmText}
         dismissText={switcher.dismissText}
-        icon="exclamation-triangle"
         onConfirm={onConfirmEditorTypeChange}
         onDismiss={() => setConfirmModalState(false)}
       />
@@ -104,7 +103,6 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
         title={cannotConvert.title}
         body={`${errorMessage}\n${cannotConvert.message}`}
         isOpen={cannotConvertModalState}
-        icon="exclamation-triangle"
         onConfirm={onConfirmEditorTypeChange}
         confirmText={switcher.confirmText}
         onDismiss={() => setCannotConvertModalState(false)}

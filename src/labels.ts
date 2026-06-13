@@ -165,10 +165,23 @@ export default {
           label: 'Validate SQL',
           tooltip: 'Validate SQL in the editor.',
         },
+        enableMapKeysDiscovery: {
+          label: 'Suggest Map keys in filter editor',
+          tooltip:
+            'When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. ' +
+            'On large tables with high-cardinality maps this probe can scan billions of rows. ' +
+            'Disable to suppress the probe — operators can still type Map keys manually. Defaults to enabled.',
+        },
       },
       TracesConfig: {
         title: 'Traces configuration',
         description: '(Optional) Default settings for trace queries',
+        variants: {
+          singleTable: {
+            title: 'Traces Table & Schema',
+            description: 'Configure the database, table, and column mappings for trace queries.',
+          },
+        },
         defaultDatabase: {
           label: 'Default trace database',
           description: 'the default database used by the trace query builder',
@@ -275,6 +288,12 @@ export default {
       LogsConfig: {
         title: 'Logs configuration',
         description: '(Optional) default settings for log queries',
+        variants: {
+          singleTable: {
+            title: 'Logs Table & Schema',
+            description: 'Configure the database, table, and column mappings for log queries.',
+          },
+        },
         defaultDatabase: {
           label: 'Default log database',
           description: 'the default database used by the logs query builder',
@@ -400,6 +419,7 @@ export default {
       tooltip: `List of filters`,
       addLabel: 'Filter',
       mapKeyPlaceholder: 'map key',
+      jsonPathPlaceholder: 'json path',
     },
     GroupByEditor: {
       label: 'Group By',
@@ -550,13 +570,11 @@ export default {
         },
         statusMessage: {
           label: 'Status Message Column',
-          tooltip:
-            'Human-readable status description for the span. Common names: status_message. OTel: StatusMessage.',
+          tooltip: 'Human-readable status description for the span. Common names: status_message. OTel: StatusMessage.',
         },
         instrumentationLibraryName: {
           label: 'Library Name Column',
-          tooltip:
-            'Name of the instrumentation library (Optional). OTel: ScopeName or InstrumentationLibraryName.',
+          tooltip: 'Name of the instrumentation library (Optional). OTel: ScopeName or InstrumentationLibraryName.',
         },
         instrumentationLibraryVersion: {
           label: 'Library Version Column',

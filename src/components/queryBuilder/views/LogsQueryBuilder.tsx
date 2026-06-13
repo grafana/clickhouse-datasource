@@ -12,12 +12,13 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
-import { Alert, Button, InlineFormLabel, Input, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, InlineFormLabel, Input, Stack } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import {
   useDefaultFilters,
+  useDefaultLogColumnsByName,
   useDefaultTimeColumn,
   useLogDefaultsOnMount,
   useOtelColumns,
@@ -60,9 +61,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         builderOptions.columns?.filter(
           (c) =>
             // Only select columns that don't have their own box
-            c.hint !== ColumnHint.Time &&
-            c.hint !== ColumnHint.LogLevel &&
-            c.hint !== ColumnHint.LogMessage
+            c.hint !== ColumnHint.Time && c.hint !== ColumnHint.LogLevel && c.hint !== ColumnHint.LogMessage
         ) || [],
       // liveView: builderOptions.meta?.liveView || false,
       filters: builderOptions.filters || [],
@@ -111,11 +110,19 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     builderState.otelEnabled,
     builderOptionsDispatch
   );
+  useDefaultLogColumnsByName(
+    allColumns,
+    builderOptions.table,
+    builderState.messageColumn,
+    builderState.logLevelColumn,
+    builderState.otelEnabled,
+    builderOptionsDispatch
+  );
   useDefaultFilters(builderOptions.table, isNewQuery, builderOptionsDispatch);
 
   const configWarning = showConfigWarning && (
     <Alert title="" severity="warning" buttonContent="Close" onRemove={() => setConfigWarningOpen(false)}>
-      <VerticalGroup>
+      <Stack direction="column">
         <div>
           {'To speed up your query building, enter your default logs configuration in your '}
           <a
@@ -125,7 +132,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
             ClickHouse Data Source settings
           </a>
         </div>
-      </VerticalGroup>
+      </Stack>
     </Alert>
   );
 
