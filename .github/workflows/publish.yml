@@ -24,10 +24,6 @@ permissions: {}
 
 jobs:
   cd:
-    strategy:
-      fail-fast: false
-      matrix:
-        environment: [dev, ops, prod]
     name: CD
     uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v9.0.0
     permissions:
@@ -37,7 +33,7 @@ jobs:
       pull-requests: read
     with:
       branch: ${{ github.event.inputs.branch }}
-      environment: ${{ matrix.environment }}
+      environment: "prod"
       docs-only: ${{ fromJSON(github.event.inputs.docs-only) }}
       scopes: ${{ github.event.inputs.environment == 'cloud (recommended)' && 'grafana_cloud' || github.event.inputs.environment == 'on-prem (for emergencies fix to On Prem customers)' && 'universal' }}
       run-playwright: false
