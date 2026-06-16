@@ -145,7 +145,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -250,7 +250,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -330,7 +330,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -398,7 +398,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -584,7 +584,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "editorType": "sql",
           "format": 1,
@@ -689,7 +689,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -773,7 +773,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -877,7 +877,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -980,7 +980,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -1174,7 +1174,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "editorType": "sql",
           "format": 1,
@@ -1326,7 +1326,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -1556,7 +1556,7 @@
         {
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "editorType": "sql",
           "format": 1,
@@ -1785,7 +1785,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -1914,7 +1914,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -2021,7 +2021,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -2260,7 +2260,7 @@
           },
           "datasource": {
             "type": "grafana-clickhouse-datasource",
-            "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+            "uid": "${datasource}"
           },
           "format": 1,
           "meta": {
@@ -2352,7 +2352,7 @@
         "current": {},
         "datasource": {
           "type": "grafana-clickhouse-datasource",
-          "uid": "${DS_GRAFANA-CLICKHOUSE-DATASOURCE}"
+          "uid": "${datasource}"
         },
         "definition": "SELECT name FROM system.tables WHERE database IN (${database})",
         "includeAll": true,
