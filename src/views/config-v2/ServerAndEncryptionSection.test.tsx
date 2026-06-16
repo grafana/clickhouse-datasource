@@ -1,0 +1,169 @@
+import React from 'react';
+import { act, render, screen, fireEvent } from '@testing-library/react';
+
+import { ServerAndEncryptionSection } from './ServerAndEncryptionSection';
+import { createMockValidation, createTestProps } from './helpers';
+import { Protocol } from 'types/config';
+
+describe('ServerAndEncryptionSection', () => {
+  const onOptionsChangeMock = jest.fn();
+  let consoleSpy: jest.SpyInstance;
+
+  const defaultProps = createTestProps({
+    options: {
+      jsonData: {
+        host: '',
+        secure: false,
+        protocol: Protocol.Native,
+        port: undefined,
+        pdcInjected: false,
+      },
+      secureJsonData: {},
+      secureJsonFields: {},
+    },
+    mocks: {
+      onOptionsChange: onOptionsChangeMock,
+    },
+  });
+
+  beforeEach(() => {
+    // Mock console.error to suppress React act() warnings
+    consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    consoleSpy.mockRestore();
+  });
+
+  it('calls onOptionsChange when server host address is changed', () => {
+    render(<ServerAndEncryptionSection {...defaultProps} />);
+
+    const input = screen.getByTestId('clickhouse-v2-config-host-input');
+    fireEvent.change(input, { target: { value: 'clickhouse-example.com' } });
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+  });
+
+  it('updates protocol value on radio button toggle', () => {
+    render(<ServerAndEncryptionSection {...defaultProps} />);
+
+    const httpOption = screen.getByRole('radio', { name: /http/i });
+    fireEvent.click(httpOption);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    expect(onOptionsChangeMock.mock.lastCall[0].jsonData.protocol).toBe(Protocol.Http);
+  });
+
+  it('renders HTTPS label instead of HTTP when secure is enabled', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: {
+          host: '',
+          secure: true,
+          protocol: Protocol.Http,
+          port: undefined,
+          pdcInjected: false,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<ServerAndEncryptionSection {...props} />);
+
+    expect(screen.getByRole('radio', { name: /https/i })).toBeInTheDocument();
+  });
+
+  it('renders HTTPS secure port description', () => {
+    const props = createTestProps({
+      options: {
+        jsonData: {
+          host: '',
+          secure: true,
+          protocol: Protocol.Http,
+          port: undefined,
+          pdcInjected: false,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<ServerAndEncryptionSection {...props} />);
+
+    expect(screen.getByText(/default for HTTPS: 8443/i)).toBeInTheDocument();
+  });
+
+  it('calls onOptionsChange when server port is changed', () => {
+    render(<ServerAndEncryptionSection {...defaultProps} />);
+
+    const input = screen.getByTestId('clickhouse-v2-config-port-input');
+    fireEvent.change(input, { target: { value: 9000 } });
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+  });
+
+  it('updates secure state on switch toggle', async () => {
+    render(<ServerAndEncryptionSection {...defaultProps} />);
+
+    const secureSwitch = screen.getByRole('checkbox', { name: /secure connection/i });
+    await fireEvent.click(secureSwitch);
+
+    expect(onOptionsChangeMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ secure: true }),
+      })
+    );
+  });
+
+  describe('validation', () => {
+    const emptyProps = createTestProps({
+      options: {
+        jsonData: { host: '', port: undefined, protocol: Protocol.Native, secure: false },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: jest.fn() },
+    });
+
+    const filledProps = createTestProps({
+      options: {
+        jsonData: { host: 'clickhouse-server', port: 9000, protocol: Protocol.Native, secure: false },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: { onOptionsChange: jest.fn() },
+    });
+
+    it('shows inline errors for host and port when validator is called with empty values', async () => {
+      const validation = createMockValidation();
+      render(<ServerAndEncryptionSection {...emptyProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.getByText('Server address required')).toBeInTheDocument();
+      expect(screen.getByText('Port is required')).toBeInTheDocument();
+    });
+
+    it('shows no errors when all fields are filled', async () => {
+      const validation = createMockValidation();
+      render(<ServerAndEncryptionSection {...filledProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.queryByText('Server address required')).not.toBeInTheDocument();
+      expect(screen.queryByText('Port is required')).not.toBeInTheDocument();
+    });
+  });
+});

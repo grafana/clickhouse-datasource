@@ -1,0 +1,44 @@
+name: Plugins - CD
+run-name: Deploy ${{ inputs.branch }} to ${{ inputs.environment }} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to publish from. Can be used to deploy PRs to dev
+        default: main
+      environment:
+        description: Environment will always publish to all waves (dev + ops + prod). Cloud will publish scoped only to Grafana Cloud, On Prem will publish with Universal scope. Please use Cloud unless emergency fix needed for On Prem customer.
+        required: true
+        type: choice
+        default: "cloud (recommended)"
+        options:
+          - "cloud (recommended)"
+          - "on-prem (for emergencies fix to On Prem customers)"
+      docs-only:
+        description: Only publish docs, do not publish the plugin
+        default: false
+        type: boolean
+
+permissions: {}
+
+jobs:
+  cd:
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, ops, prod]
+    name: CD
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v9.0.0
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pull-requests: read
+    with:
+      branch: ${{ github.event.inputs.branch }}
+      environment: ${{ matrix.environment }}
+      docs-only: ${{ fromJSON(github.event.inputs.docs-only) }}
+      scopes: ${{ github.event.inputs.environment == 'cloud (recommended)' && 'grafana_cloud' || github.event.inputs.environment == 'on-prem (for emergencies fix to On Prem customers)' && 'universal' }}
+      run-playwright: false
+      github-draft-release: false

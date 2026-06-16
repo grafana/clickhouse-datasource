@@ -1,0 +1,69 @@
+services:
+  grafana:
+    extends:
+      file: .config/docker-compose-base.yaml
+      service: grafana
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+      e2e-data-loader:
+        condition: service_completed_successfully
+    networks:
+      - grafana
+    environment:
+      # splashScreen is disabled at runtime for E2E tests via @grafana/plugin-e2e's
+      # OFREP interception (>=3.5.0), but we also disable it at the server level so
+      # that manual `docker-compose up` + browsing doesn't trigger the onboarding modal.
+      - GF_FEATURE_TOGGLES_splashScreen=false
+      - GF_FEATURE_TOGGLES_dashboardNewLayouts=false
+      - GF_FEATURE_TOGGLES_newClickhouseConfigPageDesign=true
+      - GF_FEATURE_TOGGLES_clickHouseConfigValidation=true
+
+  clickhouse-server:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
+    container_name: clickhouse-server
+    ports:
+      - 8123:8123
+      - 9000:9000
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--host", "clickhouse-server", "--query", "SELECT 1"]
+      interval: 1m30s
+      timeout: 30s
+      retries: 5
+      start_period: 30s
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
+    networks:
+      - grafana
+
+  e2e-data-loader:
+    image: clickhouse/clickhouse-server:${CLICKHOUSE_VERSION:-latest-alpine}
+    container_name: e2e-data-loader
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+        # Load every *.sql fixture under /data in lexicographic order so new
+        # feature-specific fixtures can live alongside seed.sql without
+        # creating merge conflicts when multiple PRs add fixtures at once.
+        # $$f (not $f) so docker-compose passes a literal $ to the shell.
+        for f in /data/*.sql; do
+          echo "Loading fixture: $$f"
+          clickhouse-client --host clickhouse-server --multiquery < "$$f"
+        done
+    depends_on:
+      clickhouse-server:
+        condition: service_healthy
+    restart: no
+    volumes:
+      - ./tests/e2e/fixtures:/data:ro
+    networks:
+      - grafana
+
+networks:
+  grafana: 

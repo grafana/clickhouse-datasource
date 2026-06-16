@@ -1,0 +1,35 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run standalone plugin",
+      "type": "go",
+      "request": "launch",
+      "mode": "auto",
+      "program": "${workspaceFolder}/pkg/",
+      "env": {},
+      "args": ["--standalone=true"]
+    },
+    {
+      "name": "Debug in Container",
+      "type": "go",
+      "request": "attach",
+      "mode": "remote",
+      "remotePath": "/var/lib/grafana/plugins/grafana-k6-app/",
+      "port": 2345,
+      "host": "127.0.0.1",
+      "apiVersion": 1,
+      "trace": "verbose"
+    },
+    {
+      "name": "Debug Jest test",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "jest", "--runInBand", "${file}"],
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "port": 9229
+    }
+  ]
+}

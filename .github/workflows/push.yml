@@ -1,0 +1,62 @@
+name: Plugins - CI
+
+on:
+  # Run CI on all PRs
+  pull_request:
+
+  # Also run on pushes to main (used for publish + downstream automation)
+  push:
+    branches: [main]
+
+  # Allow manual re-runs from the Actions UI (useful for debugging failures)
+  workflow_dispatch:
+
+# Minimal top-level permissions; jobs can extend as needed
+
+# Prevent duplicate runs on the same ref.
+# For PRs: cancel older in-progress runs when new commits are pushed.
+# For main: do NOT cancel (publishing should complete once started).
+concurrency:
+  group: plugins-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  ci:
+    name: CI
+
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v9.0.0
+
+    # Only run CI job for PRs / non-main refs.
+    # Main publishing is handled by the CD workflow below.
+    if: github.ref != 'refs/heads/main'
+
+    # Required for checkout + OIDC in shared workflows
+    permissions:
+      contents: read
+      id-token: write
+
+    with:
+      # Ensure PR builds produce unique plugin versions.
+      # For PR events, suffix with the head SHA; otherwise leave empty.
+      plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+
+  publish-and-deploy:
+    name: Publish to Dev Catalog and Deploy
+
+    # Main-only: publish the latest build and trigger Argo deployment
+    if: github.ref == 'refs/heads/main'
+
+    # Intentionally pinned to @main: data-sources-ci-workflows does not
+    # publish versioned tags for cd-dev.yml yet. Allowed by the zizmor
+    # policy (`grafana/*: any`); review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main
+
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+      pull-requests: read
+
+    with:
+      go-version: "1.26.3"
+      golangci-lint-version: "2.10.1"

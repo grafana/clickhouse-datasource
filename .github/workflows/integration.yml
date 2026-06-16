@@ -1,0 +1,50 @@
+name: Integration tests
+
+on:
+  push:
+    branches:
+      - v1
+      - main
+  pull_request:
+    branches:
+      - v1
+      - main
+  schedule:
+    - cron: '0 9 1 * *'
+
+jobs:
+  run:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        clickhouse:
+          - 24.8
+          - 25.3
+          - 25.5
+          - 25.6
+          - 25.7
+          - latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Build backend
+        uses: magefile/mage-action@07f03e200d4d168576899f4d31ffebfa8fb195ff
+        with:
+          args: buildAll
+          version: latest
+
+      - name: Run integration tests
+        env:
+          CLICKHOUSE_VERSION: ${{ matrix.clickhouse }}
+        run: go test -v -tags=integration ./...
