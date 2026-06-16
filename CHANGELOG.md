@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add `1.3.0` OTel schema version to support `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0`+, which removed the `TimestampTime` column from `otel_logs`. The `latest` selector now points to this schema; existing data sources continue to use `1.2.9` until manually updated (#1882)
+
 ## 4.18.0
 
 ### Features
