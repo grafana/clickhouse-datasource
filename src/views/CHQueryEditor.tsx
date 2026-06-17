@@ -81,6 +81,15 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       return;
     }
 
+    // While the hook resolves on a cold cache it returns `undefined`. The
+    // response-transform path has already baked the authoritative value into
+    // `meta.hasTraceTimestampTable`, so leave it alone until we have a real
+    // answer — otherwise a transient `false` regenerates rawSql without the
+    // _trace_id_ts optimization (#1918).
+    if (hasTraceTimestampTable === undefined) {
+      return;
+    }
+
     if (hasTraceTimestampTable !== builderOptions.meta?.hasTraceTimestampTable) {
       builderOptionsDispatch(
         setOptions({
