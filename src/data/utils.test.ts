@@ -3,6 +3,7 @@ import {
   applyTraceSearchFieldConfig,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
+  getBuilderOptions,
   isBuilderOptionsRunnable,
   labelsFieldName,
   transformQueryResponseWithTraceAndLogLinks,
@@ -37,6 +38,50 @@ describe('isBuilderOptionsRunnable', () => {
 
     const runnable = isBuilderOptionsRunnable(opts);
     expect(runnable).toBe(true);
+  });
+});
+
+describe('getBuilderOptions', () => {
+  const builderOptions: QueryBuilderOptions = {
+    database: 'default',
+    table: 'test',
+    queryType: QueryType.Table,
+  };
+
+  it('returns top-level builderOptions for a builder query', () => {
+    const query: CHQuery = {
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      pluginVersion: '',
+      builderOptions,
+    };
+    expect(getBuilderOptions(query)).toBe(builderOptions);
+  });
+
+  it('returns the stashed meta.builderOptions for a raw-SQL query', () => {
+    const query: CHQuery = {
+      refId: 'A',
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT 1',
+      pluginVersion: '',
+      meta: { builderOptions },
+    };
+    expect(getBuilderOptions(query)).toBe(builderOptions);
+  });
+
+  it('returns undefined for a raw-SQL query with no builderOptions', () => {
+    const query: CHQuery = {
+      refId: 'A',
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT 1',
+      pluginVersion: '',
+    };
+    expect(getBuilderOptions(query)).toBeUndefined();
+  });
+
+  it('returns undefined when the query is undefined', () => {
+    expect(getBuilderOptions(undefined)).toBeUndefined();
   });
 });
 
@@ -376,6 +421,48 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     const traceIdFilter = logsQuery.builderOptions.filters?.find((f) => (f as any).hint === ColumnHint.TraceId) as any;
     expect(traceIdFilter).toBeDefined();
     expect(traceIdFilter.key).toBe('TraceId');
+  });
+
+  it('does not crash on a raw-SQL query with a trace_id column and no trace/table defaults (issue repro)', async () => {
+    const mockDatasource = newMockDatasource();
+    // Reproduce the customer environment: raw SQL, no trace defaults, and no default table,
+    // so the trace-link transform takes the "create from defaults" branch with empty db/table.
+    jest.spyOn(mockDatasource, 'getDefaultTraceDatabase').mockReturnValue('');
+    jest.spyOn(mockDatasource, 'getDefaultTraceTable').mockReturnValue('');
+    jest.spyOn(mockDatasource, 'getDefaultDatabase').mockReturnValue('');
+    jest.spyOn(mockDatasource, 'getDefaultTable').mockReturnValue('');
+
+    const sqlQuery: CHQuery = {
+      refId: 'A',
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT trace_id FROM some_table',
+      pluginVersion: '',
+    };
+
+    const request: DataQueryRequest<CHQuery> = {
+      requestId: '',
+      interval: '',
+      intervalMs: 0,
+      range: {} as any,
+      scopedVars: {} as any,
+      targets: [sqlQuery],
+      timezone: '',
+      app: CoreApp.Explore,
+      startTime: 0,
+    };
+
+    const response: DataQueryResponse = {
+      data: [
+        {
+          refId: 'A',
+          length: 1,
+          fields: [{ name: 'trace_id', type: FieldType.string, config: {}, values: ['abc123'] }],
+        } as DataFrame,
+      ],
+    };
+
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+    expect(out.data[0].fields[0].config.links ?? []).toHaveLength(0);
   });
 
   describe('trace ID link rawSql pre-generation', () => {
