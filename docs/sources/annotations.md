@@ -19,9 +19,9 @@ last_reviewed: 2026-04-27
 
 Annotations overlay event markers on your dashboard panels. You can use ClickHouse SQL queries to create annotations that mark deployments, alerts, errors, or other events from your data.
 
-The plugin uses Grafana’s default annotation support: you write a ClickHouse SQL query that returns a time column and a text column. Grafana positions each row as an annotation on the time axis and shows the text when you hover or click.
+The plugin provides an annotation editor with presets for common patterns. You choose an annotation type, and the editor generates a ClickHouse SQL query that returns a time column and a text column. Grafana positions each row as an annotation on the time axis and shows the text when you hover or click.
 
-Annotation queries use Grafana’s built-in annotation query editor (a SQL text field with column mappings), not the full ClickHouse query builder available in panels.
+The generated SQL is always visible and editable, so you can start from a preset and adjust it, or select **Custom SQL** and write the query yourself. Annotation queries do not use the full ClickHouse query builder available in panels.
 
 For an overview of annotations in Grafana, see [Annotate visualizations](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/annotate-visualizations/).
 
@@ -40,9 +40,52 @@ To add a ClickHouse annotation to a dashboard:
 4. Click **Add annotation query**.
 5. Enter a **Name** for the annotation (for example, "Deployments", "Errors").
 6. In the **Data source** drop-down, select your ClickHouse data source.
-7. In the **Query** field, enter a ClickHouse SQL query that returns the required columns (see [Query requirements](#query-requirements)).
+7. Choose an **Annotation Type**. Select **Custom SQL** to write your own query, or the **Change Detection** preset to generate one. See [Annotation presets](#annotation-presets) and [Query requirements](#query-requirements).
 8. Use the **Column mappings** section to map your query columns to **Time**, **Text**, and optionally **Tags** (if your column names differ from Grafana’s defaults).
 9. Click **Apply** to save.
+
+## Annotation presets
+
+The **Annotation Type** selector offers two options. Both produce standard annotation SQL that you can edit by hand at any time.
+
+### Custom SQL
+
+Write your own annotation query. This is the default and behaves like a plain SQL field. Use it when none of the other presets fit, or as a starting point for an arbitrary query.
+
+### Change Detection
+
+Detect when a column value changes over time, such as a deployment (`service.version`), a configuration value, or a feature flag. The builder walks you through the schema:
+
+- **Database** and **Table**: where the values live (for example, `otel_traces`).
+- **Watch Column**: the column to track. For OpenTelemetry data this is usually a `Map` column such as `ResourceAttributes`.
+- **Map Key**: shown when the watch column is a `Map`. Pick the key to track, such as `service.version`.
+- **Group By**: track each value of this column independently. Defaults to `ServiceName`.
+
+The generated query buckets rows into 30-second intervals, takes the dominant value in each bucket, and uses `lagInFrame()` to compare each bucket with the previous one per group. Taking the dominant value keeps a service that runs two versions at once, during a rolling deploy or canary, from flapping between them. It emits one annotation per transition, so a rollback (`v1.0` to `v1.1` back to `v1.0`) produces three annotations rather than two:
+
+```sql
+SELECT
+  time,
+  "ServiceName" AS tags,
+  concat("ServiceName", ': ResourceAttributes.service.version changed to ', version,
+    if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,
+  'ResourceAttributes.service.version change' AS title
+FROM (
+  SELECT
+    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,
+    "ServiceName",
+    topK(1)("ResourceAttributes"['service.version'])[1] AS version,
+    lagInFrame(topK(1)("ResourceAttributes"['service.version'])[1])
+      OVER (PARTITION BY "ServiceName" ORDER BY time) AS prev_version
+  FROM "otel"."otel_traces"
+  WHERE $__timeFilter(Timestamp)
+    AND "ResourceAttributes"['service.version'] != ''
+  GROUP BY "ServiceName", time
+  ORDER BY "ServiceName", time
+)
+WHERE prev_version != '' AND prev_version != version
+ORDER BY time
+```
 
 ## Query requirements
 
@@ -56,6 +99,26 @@ Your SQL query must return at least a time column and a text column. Grafana use
 | **Tags**    | Optional | Additional columns become annotation tags. Use them to filter or group annotations.                                                                                                    |
 
 Always restrict the query to the dashboard time range so annotations load quickly. Use the **$\_\_timeFilter(column)** macro in your WHERE clause. If your time column is `DateTime64` and you need sub-second precision, use **$\_\_timeFilter_ms(column)** instead. See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section for the full list of available macros.
+
+## Filter annotations by a dashboard variable
+
+To scope an annotation to the value currently selected in a dashboard variable, reference the variable in your WHERE clause. This is useful on a per-service dashboard, where you want deployment markers to follow the selected service rather than show every service at once.
+
+For a single-value variable:
+
+```sql
+WHERE $__timeFilter(Timestamp)
+  AND ServiceName = '$service'
+```
+
+For a multi-value variable with an **All** option, wrap the filter in **$\_\_conditionalAll** so the annotation shows every value when **All** is selected and narrows to the chosen values otherwise:
+
+```sql
+WHERE $__timeFilter(Timestamp)
+  AND $__conditionalAll(ServiceName IN ($service), $service)
+```
+
+The Change Detection preset keeps its generated SQL editable, so you can build the query with the preset and then add a variable filter for your dashboard.
 
 ## Annotation query examples
 
