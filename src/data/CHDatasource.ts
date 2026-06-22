@@ -57,6 +57,7 @@ import {
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { createAnnotationSupport } from './CHAnnotationSupport';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -65,8 +66,6 @@ export class Datasource
     DataSourceWithLogsContextSupport<CHQuery>,
     DataSourceWithQueryModificationSupport<CHQuery>
 {
-  // This enables default annotation support for 7.2+
-  annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   adHocFilter: AdHocFilter;
   skipAdHocFilter = false; // don't apply adhoc filters to the query
@@ -96,6 +95,7 @@ export class Datasource
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+    this.annotations = createAnnotationSupport(this);
   }
 
   static logVolumePrefix = 'log-volume-';
@@ -930,9 +930,7 @@ export class Datasource
       return [];
     }
     const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
-    const whereClause = timeColumn
-      ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
-      : '';
+    const whereClause = timeColumn ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR` : '';
     const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)}${whereClause} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
