@@ -194,7 +194,7 @@
         "y": 1
       },
       "id": 1,
-      "description": "Server spans per second for ${service}: incoming requests this service handles. The R in RED. Use Open in Explore to refine the query.",
+      "description": "Server spans per second for ${service}: incoming requests this service handles. The R in RED.",
       "title": "Request Rate (Server)",
       "type": "timeseries",
       "targets": [
@@ -210,11 +210,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, count() / \\\\\\\\$__interval_s AS rps FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -261,7 +256,7 @@
         "y": 1
       },
       "id": 2,
-      "description": "Fraction of Server spans for ${service} with StatusCode = 'Error'. The E in RED. Use Open in Explore to refine the query.",
+      "description": "Fraction of Server spans for ${service} with StatusCode = 'Error'. The E in RED.",
       "title": "Error Rate (Server)",
       "type": "timeseries",
       "targets": [
@@ -277,11 +272,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -336,7 +326,7 @@
         "y": 1
       },
       "id": 3,
-      "description": "P50, P90 (solid) and P99 (dashed orange) Server span duration for ${service}. The D in RED. Use Open in Explore to refine the query.",
+      "description": "P50, P90 (solid) and P99 (dashed orange) Server span duration for ${service}. The D in RED.",
       "title": "Duration Percentiles (Server)",
       "type": "timeseries",
       "targets": [
@@ -352,11 +342,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -422,7 +407,7 @@
         "y": 8
       },
       "id": 11,
-      "description": "Server operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer. Use Open in Explore to refine the query.",
+      "description": "Server operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer.",
       "options": {
         "showHeader": true
       },
@@ -441,11 +426,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -488,7 +468,7 @@
         "y": 16
       },
       "id": 12,
-      "description": "Client spans per second for ${service}: outgoing requests this service makes to its dependencies. The R in RED. Use Open in Explore to refine the query.",
+      "description": "Client spans per second for ${service}: outgoing requests this service makes to its dependencies. The R in RED.",
       "title": "Request Rate (Client)",
       "type": "timeseries",
       "targets": [
@@ -504,11 +484,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, count() / \\\\\\\\$__interval_s AS rps FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -555,7 +530,7 @@
         "y": 16
       },
       "id": 13,
-      "description": "Fraction of Client spans for ${service} with StatusCode = 'Error'. The E in RED. Use Open in Explore to refine the query.",
+      "description": "Fraction of Client spans for ${service} with StatusCode = 'Error'. The E in RED.",
       "title": "Error Rate (Client)",
       "type": "timeseries",
       "targets": [
@@ -571,11 +546,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -630,7 +600,7 @@
         "y": 16
       },
       "id": 14,
-      "description": "P50, P90 (solid) and P99 (dashed orange) Client span duration for ${service}. The D in RED. Use Open in Explore to refine the query.",
+      "description": "P50, P90 (solid) and P99 (dashed orange) Client span duration for ${service}. The D in RED.",
       "title": "Duration Percentiles (Client)",
       "type": "timeseries",
       "targets": [
@@ -646,11 +616,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -716,7 +681,7 @@
         "y": 23
       },
       "id": 15,
-      "description": "Client operations for ${service} ranked by P99 duration. Use these to spot slow dependencies. Click an operation to open the matching trace search in Traces Explorer. Use Open in Explore to refine the query.",
+      "description": "Client operations for ${service} ranked by P99 duration. Use these to spot slow dependencies. Click an operation to open the matching trace search in Traces Explorer.",
       "options": {
         "showHeader": true
       },
@@ -735,11 +700,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -806,7 +766,7 @@
         "y": 31
       },
       "id": 4,
-      "description": "Operations with errors for ${service}, ranked by error count, with the SpanKind that produced them. Click an operation to open the matching trace search in Traces Explorer. Use Open in Explore to refine the query.",
+      "description": "Operations with errors for ${service}, ranked by error count, with the SpanKind that produced them. Click an operation to open the matching trace search in Traces Explorer.",
       "options": {
         "showHeader": true
       },
@@ -825,11 +785,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, SpanKind AS Kind, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \\\"Last Seen\\\" FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName, SpanKind, StatusMessage ORDER BY Count DESC LIMIT 20\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -848,7 +803,7 @@
         "y": 31
       },
       "id": 6,
-      "description": "Recent logs for ${service}. Click a row to expand attributes. Use Open in Explore to refine the query.",
+      "description": "Recent logs for ${service}. Click a row to expand attributes.",
       "options": {
         "showTime": true,
         "showLabels": true,
@@ -872,11 +827,6 @@
         }
       ],
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId FROM otel_logs WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND \\\\$__conditionalAll(hasToken(Body, '$search'), $search) ORDER BY Timestamp DESC LIMIT 200\",\"refId\":\"A\",\"format\":2}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ]
     },
     {
@@ -918,7 +868,7 @@
             "y": 42
           },
           "id": 16,
-          "description": "Internal spans per second for ${service}: in-process work (function-level instrumentation, no network). Use Open in Explore to refine the query.",
+          "description": "Internal spans per second for ${service}: in-process work (function-level instrumentation, no network).",
           "title": "Request Rate (Internal)",
           "type": "timeseries",
           "targets": [
@@ -934,11 +884,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, count() / \\\\\\\\$__interval_s AS rps FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         },
         {
@@ -985,7 +930,7 @@
             "y": 42
           },
           "id": 17,
-          "description": "Fraction of Internal spans for ${service} with StatusCode = 'Error'. Use Open in Explore to refine the query.",
+          "description": "Fraction of Internal spans for ${service} with StatusCode = 'Error'.",
           "title": "Error Rate (Internal)",
           "type": "timeseries",
           "targets": [
@@ -1001,11 +946,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         },
         {
@@ -1060,7 +1000,7 @@
             "y": 42
           },
           "id": 18,
-          "description": "P50, P90 (solid) and P99 (dashed orange) Internal span duration for ${service}. Use Open in Explore to refine the query.",
+          "description": "P50, P90 (solid) and P99 (dashed orange) Internal span duration for ${service}.",
           "title": "Duration Percentiles (Internal)",
           "type": "timeseries",
           "targets": [
@@ -1076,11 +1016,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         },
         {
@@ -1146,7 +1081,7 @@
             "y": 49
           },
           "id": 19,
-          "description": "Internal operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer. Use Open in Explore to refine the query.",
+          "description": "Internal operations for ${service} ranked by P99 duration. Click an operation to open the matching trace search in Traces Explorer.",
           "options": {
             "showHeader": true
           },
@@ -1165,11 +1100,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         }
       ]
@@ -1213,7 +1143,7 @@
             "y": 57
           },
           "id": 20,
-          "description": "Async spans (Producer + Consumer) per second for ${service}: message production and consumption against queues / event buses. Use Open in Explore to refine the query.",
+          "description": "Async spans (Producer + Consumer) per second for ${service}: message production and consumption against queues / event buses.",
           "title": "Message Rate (Async)",
           "type": "timeseries",
           "targets": [
@@ -1229,11 +1159,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, count() / \\\\\\\\$__interval_s AS rps FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         },
         {
@@ -1280,7 +1205,7 @@
             "y": 57
           },
           "id": 21,
-          "description": "Fraction of Async (Producer + Consumer) spans for ${service} with StatusCode = 'Error'. Use Open in Explore to refine the query.",
+          "description": "Fraction of Async (Producer + Consumer) spans for ${service} with StatusCode = 'Error'.",
           "title": "Error Rate (Async)",
           "type": "timeseries",
           "targets": [
@@ -1296,11 +1221,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         },
         {
@@ -1355,7 +1275,7 @@
             "y": 57
           },
           "id": 22,
-          "description": "P50, P90 (solid) and P99 (dashed orange) Async span duration for ${service}. Use Open in Explore to refine the query.",
+          "description": "P50, P90 (solid) and P99 (dashed orange) Async span duration for ${service}.",
           "title": "Duration Percentiles (Async)",
           "type": "timeseries",
           "targets": [
@@ -1371,11 +1291,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\\\\\\\$__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         },
         {
@@ -1453,7 +1368,7 @@
             "y": 64
           },
           "id": 23,
-          "description": "Async (Producer + Consumer) operations for ${service} ranked by P99 duration. The Kind column tells you whether each row is a Producer or a Consumer. Use Open in Explore to refine the query.",
+          "description": "Async (Producer + Consumer) operations for ${service} ranked by P99 duration. The Kind column tells you whether each row is a Producer or a Consumer.",
           "options": {
             "showHeader": true
           },
@@ -1472,11 +1387,6 @@
             }
           ],
           "links": [
-            {
-              "title": "Open in Explore",
-              "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, SpanKind AS Kind, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND \\\\$__conditionalAll(SpanName IN ($operation), $operation) AND \\\\$__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName, SpanKind ORDER BY P99 DESC LIMIT 20\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-              "targetBlank": false
-            }
           ]
         }
       ]

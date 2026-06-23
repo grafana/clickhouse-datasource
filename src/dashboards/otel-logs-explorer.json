@@ -215,14 +215,9 @@
       },
       "gridPos": { "h": 5, "w": 24, "x": 0, "y": 12 },
       "id": 201,
-      "description": "Log volume by SeverityText for $service. Use Open in Explore to refine the query.",
+      "description": "Log volume by SeverityText for $service.",
       "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, SeverityText AS metric, count() AS count FROM otel_logs WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time, metric ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "Log Volume: $service",
       "targets": [
@@ -241,7 +236,7 @@
       "fieldConfig": { "defaults": {}, "overrides": [] },
       "gridPos": { "h": 14, "w": 24, "x": 0, "y": 17 },
       "id": 202,
-      "description": "Recent log lines for $service. Click a row to expand attributes. JSON-shaped bodies are pretty-printed. Use Open in Explore to refine the query or adjust filters.",
+      "description": "Recent log lines for $service. Click a row to expand attributes. JSON-shaped bodies are pretty-printed.",
       "options": {
         "showTime": true,
         "showLabels": true,
@@ -253,11 +248,6 @@
         "sortOrder": "Descending"
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId, ResourceAttributes['service.namespace'] AS namespace, ResourceAttributes['k8s.pod.name'] AS k8s_pod FROM otel_logs WHERE \\\\$__timeFilter(Timestamp) AND ServiceName = '${service}' ORDER BY Timestamp DESC LIMIT 200\",\"refId\":\"A\",\"format\":2}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "Log Samples: $service",
       "targets": [
