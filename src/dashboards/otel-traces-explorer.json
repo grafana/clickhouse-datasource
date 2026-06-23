@@ -439,7 +439,7 @@
       },
       "gridPos": { "h": 8, "w": 16, "x": 0, "y": 25 },
       "id": 301,
-      "description": "Span duration distribution over time for $service, log-scale. Sampled at 1-in-500 spans for performance. Use Open in Explore to refine the query.",
+      "description": "Span duration distribution over time for $service, log-scale. Sampled at 1-in-500 spans for performance.",
       "options": {
         "calculate": true,
         "calculation": {
@@ -463,11 +463,6 @@
         "legend": { "show": false }
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, Duration / 1000000 AS duration_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' AND cityHash64(SpanId) % 500 = 0 ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "Duration Distribution",
       "type": "heatmap",
@@ -489,7 +484,7 @@
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "text" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 25 },
       "id": 302,
-      "description": "Total span count for $service. Use Open in Explore to refine the query.",
+      "description": "Total span count for $service.",
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "none",
@@ -498,11 +493,6 @@
         "orientation": "horizontal"
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, count() AS Spans FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "",
       "transparent": true,
@@ -520,7 +510,7 @@
       "fieldConfig": { "defaults": { "color": { "mode": "fixed", "fixedColor": "red" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 27 },
       "id": 303,
-      "description": "Error span count for $service. Use Open in Explore to refine the query.",
+      "description": "Error span count for $service.",
       "options": {
         "reduceOptions": { "calcs": ["sum"] },
         "colorMode": "none",
@@ -529,11 +519,6 @@
         "orientation": "horizontal"
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "",
       "transparent": true,
@@ -551,7 +536,7 @@
       "fieldConfig": { "defaults": { "unit": "ms", "color": { "mode": "fixed", "fixedColor": "orange" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 29 },
       "id": 304,
-      "description": "P99 span duration for $service. Use Open in Explore to refine the query.",
+      "description": "P99 span duration for $service.",
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "none",
@@ -560,11 +545,6 @@
         "orientation": "horizontal"
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, quantile(0.99)(Duration) / 1000000 AS p99_ms FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "",
       "transparent": true,
@@ -587,7 +567,7 @@
       "fieldConfig": { "defaults": { "unit": "ms", "color": { "mode": "fixed", "fixedColor": "blue" } } },
       "gridPos": { "h": 2, "w": 8, "x": 16, "y": 31 },
       "id": 305,
-      "description": "Mean span duration for $service. Use Open in Explore to refine the query.",
+      "description": "Mean span duration for $service.",
       "options": {
         "reduceOptions": { "calcs": ["lastNotNull"] },
         "colorMode": "none",
@@ -596,11 +576,6 @@
         "textMode": "value_and_name"
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT toStartOfInterval(Timestamp, INTERVAL \\$__interval_s second) AS time, avg(Duration) / 1000000 AS \\\"Avg Duration\\\" FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY time ORDER BY time\",\"refId\":\"A\",\"format\":0}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "",
       "transparent": true,
@@ -726,7 +701,7 @@
       },
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 33 },
       "id": 306,
-      "description": "Operations for $service ranked by call count. Errors and Error % are colour-coded; click an operation to filter the dashboard. Use Open in Explore to refine the query.",
+      "description": "Operations for $service ranked by call count. Errors and Error % are colour-coded; click an operation to filter the dashboard.",
       "options": {
         "showHeader": true,
         "sortBy": [
@@ -739,11 +714,6 @@
         }
       },
       "links": [
-        {
-          "title": "Open in Explore",
-          "url": "/explore?orgId=1&left={\"datasource\":\"${datasource}\",\"queries\":[{\"datasource\":\"${datasource}\",\"editorType\":\"sql\",\"rawSql\":\"SELECT SpanName AS Operation, count() AS Count, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors, round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \\\"Error %\\\", quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE \\$__timeFilter(Timestamp) AND ServiceName = '${service}' GROUP BY Operation ORDER BY Count DESC LIMIT 50\",\"refId\":\"A\",\"format\":1}],\"range\":{\"from\":\"${__from}\",\"to\":\"${__to}\"}}",
-          "targetBlank": false
-        }
       ],
       "title": "Top Operations",
       "type": "table",
