@@ -100,6 +100,38 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, editorType: EditorType.SQL });
     });
+    it('resolves config macros to the configured logs/traces database and table', () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x?: string) => x ?? '');
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+      const ds = createInstance({});
+      ds.settings.jsonData = {
+        ...ds.settings.jsonData,
+        defaultDatabase: 'conn_default',
+        logs: { defaultDatabase: 'logs_db', defaultTable: 'logs_tbl' },
+        traces: { defaultDatabase: 'traces_db', defaultTable: 'traces_tbl' },
+      };
+      const query = {
+        rawSql:
+          'SELECT count() FROM $__logsDatabase.$__logsTable UNION ALL SELECT count() FROM $__tracesDatabase.$__tracesTable',
+        editorType: EditorType.SQL,
+      } as CHQuery;
+      const result = ds.applyTemplateVariables(query, {});
+      expect(result.rawSql).toBe(
+        'SELECT count() FROM logs_db.logs_tbl UNION ALL SELECT count() FROM traces_db.traces_tbl'
+      );
+    });
+    it('config macros fall back to the default database and conventional OTel tables when per-signal config is unset', () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x?: string) => x ?? '');
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+      const ds = createInstance({});
+      ds.settings.jsonData = { ...ds.settings.jsonData, defaultDatabase: 'conn_default', logs: {}, traces: {} };
+      const query = {
+        rawSql: 'SELECT 1 FROM $__logsDatabase.$__logsTable, $__tracesDatabase.$__tracesTable',
+        editorType: EditorType.SQL,
+      } as CHQuery;
+      const result = ds.applyTemplateVariables(query, {});
+      expect(result.rawSql).toBe('SELECT 1 FROM conn_default.otel_logs, conn_default.otel_traces');
+    });
     it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];

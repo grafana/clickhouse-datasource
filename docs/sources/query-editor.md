@@ -285,8 +285,14 @@ WHERE $__timeFilter(date_time)
 | `$__timeInterval(columnName)`                | Interval from panel time range (seconds), for grouping.                                          | `toStartOfInterval(toDateTime(column), INTERVAL 20 second)`                                                                           |
 | `$__timeInterval_ms(columnName)`             | Interval from panel time range (milliseconds), for grouping.                                     | `toStartOfInterval(toDateTime64(column, 3), INTERVAL 20 millisecond)`                                                                 |
 | `$__conditionalAll(condition, $templateVar)` | Uses the first parameter when the template variable does not select all values; otherwise `1=1`. | `condition` or `1=1`                                                                                                                  |
+| `$__logsDatabase`                            | Configured OTel logs database for this data source (or the default database when unset).         | `otel`                                                                                                                                |
+| `$__logsTable`                               | Configured OTel logs table for this data source (or `otel_logs` when unset).                     | `otel_logs`                                                                                                                           |
+| `$__tracesDatabase`                          | Configured OTel traces database for this data source (or the default database when unset).       | `otel`                                                                                                                                |
+| `$__tracesTable`                             | Configured OTel traces table for this data source (or `otel_traces` when unset).                 | `otel_traces`                                                                                                                         |
 
 You can also use brace notation `{}` when the macro parameter must contain a query or other expression.
+
+The `$__logsDatabase` / `$__logsTable` / `$__tracesDatabase` / `$__tracesTable` macros resolve to the database and table configured on the data source for that signal. Use them instead of hard-coding table names so a dashboard follows whatever the selected data source is configured for.
 
 ## Next steps
 
