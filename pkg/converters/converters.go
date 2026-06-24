@@ -356,13 +356,6 @@ var Converters = []Converter{
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
 	},
 	{
-		name:       "SimpleAggregateFunction()",
-		convert:    jsonConverter,
-		fieldType:  data.FieldTypeJSON,
-		matchRegex: matchRegexes["SimpleAggregateFunction()"],
-		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
-	},
-	{
 		name:       "Point",
 		convert:    pointConverter,
 		fieldType:  data.FieldTypeJSON,
@@ -389,7 +382,302 @@ func ClickHouseConverters() []sqlutil.Converter {
 	for _, converter := range Converters {
 		list = append(list, createConverter(converter))
 	}
+	list = append(list, generateSAFConverters()...)
+	// SAF catch-all for any remaining unrecognized inner types (e.g. custom types)
+	list = append(list, sqlutil.Converter{
+		Name:           "SimpleAggregateFunction()",
+		InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
+		InputTypeRegex: matchRegexes["SimpleAggregateFunction()"],
+		InputTypeName:  "SimpleAggregateFunction()",
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType:     data.FieldTypeJSON,
+			ConverterFunc: jsonConverter,
+		},
+	})
 	return list
+}
+
+// safTypeMapping defines inner types for which we generate native SAF converters.
+// Each entry maps a regex pattern for the inner type to the Grafana field type and
+// a converter function that extracts the native value from interface{}.
+type safTypeEntry struct {
+	innerPattern string         // regex for the inner type (after the function name)
+	fieldType    data.FieldType // Grafana field type to report
+	convert      func(in interface{}) (interface{}, error)
+}
+
+var safTypeMappings = []safTypeEntry{
+	// Non-nullable numeric types
+	{"UInt8", data.FieldTypeUint8, safConvertUint8},
+	{"UInt16", data.FieldTypeUint16, safConvertUint16},
+	{"UInt32", data.FieldTypeUint32, safConvertUint32},
+	{"UInt64", data.FieldTypeUint64, safConvertUint64},
+	{"Int8", data.FieldTypeInt8, safConvertInt8},
+	{"Int16", data.FieldTypeInt16, safConvertInt16},
+	{"Int32", data.FieldTypeInt32, safConvertInt32},
+	{"Int64", data.FieldTypeInt64, safConvertInt64},
+	{"Float32", data.FieldTypeFloat32, safConvertFloat32},
+	{"Float64", data.FieldTypeFloat64, safConvertFloat64},
+	{"Bool", data.FieldTypeBool, safConvertBool},
+	// Nullable numeric types
+	{"Nullable\\(UInt8\\)", data.FieldTypeNullableUint8, safConvertNullableUint8},
+	{"Nullable\\(UInt16\\)", data.FieldTypeNullableUint16, safConvertNullableUint16},
+	{"Nullable\\(UInt32\\)", data.FieldTypeNullableUint32, safConvertNullableUint32},
+	{"Nullable\\(UInt64\\)", data.FieldTypeNullableUint64, safConvertNullableUint64},
+	{"Nullable\\(Int8\\)", data.FieldTypeNullableInt8, safConvertNullableInt8},
+	{"Nullable\\(Int16\\)", data.FieldTypeNullableInt16, safConvertNullableInt16},
+	{"Nullable\\(Int32\\)", data.FieldTypeNullableInt32, safConvertNullableInt32},
+	{"Nullable\\(Int64\\)", data.FieldTypeNullableInt64, safConvertNullableInt64},
+	{"Nullable\\(Float32\\)", data.FieldTypeNullableFloat32, safConvertNullableFloat32},
+	{"Nullable\\(Float64\\)", data.FieldTypeNullableFloat64, safConvertNullableFloat64},
+	{"Nullable\\(Bool\\)", data.FieldTypeNullableBool, safConvertNullableBool},
+	// DateTime types
+	{"DateTime64\\(\\d+\\)", data.FieldTypeTime, safConvertTime},
+	{"DateTime", data.FieldTypeTime, safConvertTime},
+	{"Date", data.FieldTypeTime, safConvertTime},
+	{"Nullable\\(DateTime64\\(\\d+\\)\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(DateTime\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(Date\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+}
+
+func generateSAFConverters() []sqlutil.Converter {
+	var converters []sqlutil.Converter
+	for _, entry := range safTypeMappings {
+		pattern := `^SimpleAggregateFunction\([^,]+,\s*` + entry.innerPattern + `\)$`
+		converters = append(converters, sqlutil.Converter{
+			Name:           "SimpleAggregateFunction(" + entry.innerPattern + ")",
+			InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
+			InputTypeRegex: regexp.MustCompile(pattern),
+			InputTypeName:  "SimpleAggregateFunction(" + entry.innerPattern + ")",
+			FrameConverter: sqlutil.FrameConverter{
+				FieldType:     entry.fieldType,
+				ConverterFunc: entry.convert,
+			},
+		})
+	}
+	return converters
+}
+
+// SAF converter functions. The ClickHouse driver scans SAF values into interface{},
+// and the underlying value is the native Go type matching the inner column type.
+
+func safConvertUint8(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint8); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertUint16(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint16); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertUint32(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint32); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertUint64(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint64); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertInt8(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int8); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertInt16(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int16); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertInt32(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int32); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertInt64(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int64); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertFloat32(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(float32); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertFloat64(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(float64); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertBool(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(bool); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableUint8(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint8)(nil), nil
+	}
+	if val, ok := v.(*uint8); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableUint16(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint16)(nil), nil
+	}
+	if val, ok := v.(*uint16); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableUint32(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint32)(nil), nil
+	}
+	if val, ok := v.(*uint32); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableUint64(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint64)(nil), nil
+	}
+	if val, ok := v.(*uint64); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableInt8(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int8)(nil), nil
+	}
+	if val, ok := v.(*int8); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableInt16(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int16)(nil), nil
+	}
+	if val, ok := v.(*int16); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableInt32(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int32)(nil), nil
+	}
+	if val, ok := v.(*int32); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableInt64(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int64)(nil), nil
+	}
+	if val, ok := v.(*int64); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableFloat32(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*float32)(nil), nil
+	}
+	if val, ok := v.(*float32); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableFloat64(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*float64)(nil), nil
+	}
+	if val, ok := v.(*float64); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableBool(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*bool)(nil), nil
+	}
+	if val, ok := v.(*bool); ok {
+		return val, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertTime(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(time.Time); ok {
+		return v, nil
+	}
+	return jsonConverter(in)
+}
+
+func safConvertNullableTime(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*time.Time)(nil), nil
+	}
+	if val, ok := v.(*time.Time); ok {
+		return val, nil
+	}
+	if val, ok := v.(time.Time); ok {
+		return &val, nil
+	}
+	return jsonConverter(in)
 }
 
 // GetConverter returns a sqlutil.Converter for the given column type.
