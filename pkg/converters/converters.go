@@ -431,12 +431,14 @@ var safTypeMappings = []safTypeEntry{
 	{"Nullable\\(Float32\\)", data.FieldTypeNullableFloat32, safConvertNullableFloat32},
 	{"Nullable\\(Float64\\)", data.FieldTypeNullableFloat64, safConvertNullableFloat64},
 	{"Nullable\\(Bool\\)", data.FieldTypeNullableBool, safConvertNullableBool},
-	// DateTime types
-	{"DateTime64\\(\\d+\\)", data.FieldTypeTime, safConvertTime},
-	{"DateTime", data.FieldTypeTime, safConvertTime},
+	// DateTime types (patterns account for optional timezone parameter)
+	{"DateTime64\\(\\d+(,\\s*'[^']*')?\\)", data.FieldTypeTime, safConvertTime},
+	{"DateTime(\\('[^']*'\\))?", data.FieldTypeTime, safConvertTime},
+	{"Date32", data.FieldTypeTime, safConvertTime},
 	{"Date", data.FieldTypeTime, safConvertTime},
-	{"Nullable\\(DateTime64\\(\\d+\\)\\)", data.FieldTypeNullableTime, safConvertNullableTime},
-	{"Nullable\\(DateTime\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(DateTime64\\(\\d+(,\\s*'[^']*')?\\)\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(DateTime(\\('[^']*'\\))?\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(Date32\\)", data.FieldTypeNullableTime, safConvertNullableTime},
 	{"Nullable\\(Date\\)", data.FieldTypeNullableTime, safConvertNullableTime},
 }
 
