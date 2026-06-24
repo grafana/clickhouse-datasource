@@ -467,77 +467,77 @@ func safConvertUint8(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(uint8); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF uint8", *(in.(*interface{})))
 }
 
 func safConvertUint16(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(uint16); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF uint16", *(in.(*interface{})))
 }
 
 func safConvertUint32(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(uint32); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF uint32", *(in.(*interface{})))
 }
 
 func safConvertUint64(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(uint64); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF uint64", *(in.(*interface{})))
 }
 
 func safConvertInt8(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(int8); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF int8", *(in.(*interface{})))
 }
 
 func safConvertInt16(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(int16); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF int16", *(in.(*interface{})))
 }
 
 func safConvertInt32(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(int32); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF int32", *(in.(*interface{})))
 }
 
 func safConvertInt64(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(int64); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF int64", *(in.(*interface{})))
 }
 
 func safConvertFloat32(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(float32); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF float32", *(in.(*interface{})))
 }
 
 func safConvertFloat64(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(float64); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF float64", *(in.(*interface{})))
 }
 
 func safConvertBool(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(bool); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF bool", *(in.(*interface{})))
 }
 
 func safConvertNullableUint8(in interface{}) (interface{}, error) {
@@ -551,7 +551,7 @@ func safConvertNullableUint8(in interface{}) (interface{}, error) {
 	if val, ok := v.(uint8); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint8)", v)
 }
 
 func safConvertNullableUint16(in interface{}) (interface{}, error) {
@@ -565,7 +565,7 @@ func safConvertNullableUint16(in interface{}) (interface{}, error) {
 	if val, ok := v.(uint16); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint16)", v)
 }
 
 func safConvertNullableUint32(in interface{}) (interface{}, error) {
@@ -579,7 +579,7 @@ func safConvertNullableUint32(in interface{}) (interface{}, error) {
 	if val, ok := v.(uint32); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint32)", v)
 }
 
 func safConvertNullableUint64(in interface{}) (interface{}, error) {
@@ -593,7 +593,7 @@ func safConvertNullableUint64(in interface{}) (interface{}, error) {
 	if val, ok := v.(uint64); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint64)", v)
 }
 
 func safConvertNullableInt8(in interface{}) (interface{}, error) {
@@ -607,7 +607,7 @@ func safConvertNullableInt8(in interface{}) (interface{}, error) {
 	if val, ok := v.(int8); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int8)", v)
 }
 
 func safConvertNullableInt16(in interface{}) (interface{}, error) {
@@ -621,7 +621,7 @@ func safConvertNullableInt16(in interface{}) (interface{}, error) {
 	if val, ok := v.(int16); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int16)", v)
 }
 
 func safConvertNullableInt32(in interface{}) (interface{}, error) {
@@ -635,7 +635,7 @@ func safConvertNullableInt32(in interface{}) (interface{}, error) {
 	if val, ok := v.(int32); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int32)", v)
 }
 
 func safConvertNullableInt64(in interface{}) (interface{}, error) {
@@ -649,7 +649,7 @@ func safConvertNullableInt64(in interface{}) (interface{}, error) {
 	if val, ok := v.(int64); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int64)", v)
 }
 
 func safConvertNullableFloat32(in interface{}) (interface{}, error) {
@@ -663,7 +663,7 @@ func safConvertNullableFloat32(in interface{}) (interface{}, error) {
 	if val, ok := v.(float32); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(float32)", v)
 }
 
 func safConvertNullableFloat64(in interface{}) (interface{}, error) {
@@ -677,7 +677,7 @@ func safConvertNullableFloat64(in interface{}) (interface{}, error) {
 	if val, ok := v.(float64); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(float64)", v)
 }
 
 func safConvertNullableBool(in interface{}) (interface{}, error) {
@@ -691,14 +691,14 @@ func safConvertNullableBool(in interface{}) (interface{}, error) {
 	if val, ok := v.(bool); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(bool)", v)
 }
 
 func safConvertTime(in interface{}) (interface{}, error) {
 	if v, ok := (*(in.(*interface{}))).(time.Time); ok {
 		return v, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF time", *(in.(*interface{})))
 }
 
 func safConvertNullableTime(in interface{}) (interface{}, error) {
@@ -712,7 +712,7 @@ func safConvertNullableTime(in interface{}) (interface{}, error) {
 	if val, ok := v.(time.Time); ok {
 		return &val, nil
 	}
-	return jsonConverter(in)
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(time)", v)
 }
 
 // GetConverter returns a sqlutil.Converter for the given column type.
