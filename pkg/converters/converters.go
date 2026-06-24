@@ -548,6 +548,9 @@ func safConvertNullableUint8(in interface{}) (interface{}, error) {
 	if val, ok := v.(*uint8); ok {
 		return val, nil
 	}
+	if val, ok := v.(uint8); ok {
+		return &val, nil
+	}
 	return jsonConverter(in)
 }
 
@@ -558,6 +561,9 @@ func safConvertNullableUint16(in interface{}) (interface{}, error) {
 	}
 	if val, ok := v.(*uint16); ok {
 		return val, nil
+	}
+	if val, ok := v.(uint16); ok {
+		return &val, nil
 	}
 	return jsonConverter(in)
 }
@@ -570,6 +576,9 @@ func safConvertNullableUint32(in interface{}) (interface{}, error) {
 	if val, ok := v.(*uint32); ok {
 		return val, nil
 	}
+	if val, ok := v.(uint32); ok {
+		return &val, nil
+	}
 	return jsonConverter(in)
 }
 
@@ -580,6 +589,9 @@ func safConvertNullableUint64(in interface{}) (interface{}, error) {
 	}
 	if val, ok := v.(*uint64); ok {
 		return val, nil
+	}
+	if val, ok := v.(uint64); ok {
+		return &val, nil
 	}
 	return jsonConverter(in)
 }
@@ -592,6 +604,9 @@ func safConvertNullableInt8(in interface{}) (interface{}, error) {
 	if val, ok := v.(*int8); ok {
 		return val, nil
 	}
+	if val, ok := v.(int8); ok {
+		return &val, nil
+	}
 	return jsonConverter(in)
 }
 
@@ -602,6 +617,9 @@ func safConvertNullableInt16(in interface{}) (interface{}, error) {
 	}
 	if val, ok := v.(*int16); ok {
 		return val, nil
+	}
+	if val, ok := v.(int16); ok {
+		return &val, nil
 	}
 	return jsonConverter(in)
 }
@@ -614,6 +632,9 @@ func safConvertNullableInt32(in interface{}) (interface{}, error) {
 	if val, ok := v.(*int32); ok {
 		return val, nil
 	}
+	if val, ok := v.(int32); ok {
+		return &val, nil
+	}
 	return jsonConverter(in)
 }
 
@@ -624,6 +645,9 @@ func safConvertNullableInt64(in interface{}) (interface{}, error) {
 	}
 	if val, ok := v.(*int64); ok {
 		return val, nil
+	}
+	if val, ok := v.(int64); ok {
+		return &val, nil
 	}
 	return jsonConverter(in)
 }
@@ -636,6 +660,9 @@ func safConvertNullableFloat32(in interface{}) (interface{}, error) {
 	if val, ok := v.(*float32); ok {
 		return val, nil
 	}
+	if val, ok := v.(float32); ok {
+		return &val, nil
+	}
 	return jsonConverter(in)
 }
 
@@ -647,6 +674,9 @@ func safConvertNullableFloat64(in interface{}) (interface{}, error) {
 	if val, ok := v.(*float64); ok {
 		return val, nil
 	}
+	if val, ok := v.(float64); ok {
+		return &val, nil
+	}
 	return jsonConverter(in)
 }
 
@@ -657,6 +687,9 @@ func safConvertNullableBool(in interface{}) (interface{}, error) {
 	}
 	if val, ok := v.(*bool); ok {
 		return val, nil
+	}
+	if val, ok := v.(bool); ok {
+		return &val, nil
 	}
 	return jsonConverter(in)
 }
