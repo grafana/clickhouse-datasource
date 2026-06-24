@@ -791,6 +791,51 @@ func TestSimpleAggregateFunctionNativeConverterValues(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, true, v)
 	})
+
+	t.Run("Nullable(UInt16) bare value (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(UInt16))")
+		var val interface{} = uint16(42)
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		expected := uint16(42)
+		assert.Equal(t, &expected, v)
+	})
+
+	t.Run("Nullable(Float64) bare value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(Float64))")
+		var val interface{} = float64(9.81)
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		expected := float64(9.81)
+		assert.Equal(t, &expected, v)
+	})
+
+	t.Run("Nullable(Bool) bare value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(Bool))")
+		var val interface{} = true
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		expected := true
+		assert.Equal(t, &expected, v)
+	})
+
+	t.Run("DateTime value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(min, DateTime64(9))")
+		ts := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		var val interface{} = ts
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, ts, v)
+	})
+
+	t.Run("Nullable(DateTime) bare value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(DateTime64(9)))")
+		ts := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		var val interface{} = ts
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, &ts, v)
+	})
 }
 
 // TestSimpleAggregateFunctionGetConverter tests the GetConverter path which
