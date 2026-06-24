@@ -721,7 +721,14 @@ func TestSimpleAggregateFunctionNativeTypes(t *testing.T) {
 		{"Bool", "SimpleAggregateFunction(any, Bool)", data.FieldTypeBool},
 		{"Nullable(Bool)", "SimpleAggregateFunction(any, Nullable(Bool))", data.FieldTypeNullableBool},
 		{"DateTime64", "SimpleAggregateFunction(min, DateTime64(9))", data.FieldTypeTime},
+		{"DateTime64 with timezone", "SimpleAggregateFunction(min, DateTime64(9, 'UTC'))", data.FieldTypeTime},
+		{"DateTime", "SimpleAggregateFunction(any, DateTime)", data.FieldTypeTime},
+		{"DateTime with timezone", "SimpleAggregateFunction(any, DateTime('Europe/London'))", data.FieldTypeTime},
+		{"Date32", "SimpleAggregateFunction(any, Date32)", data.FieldTypeTime},
 		{"Nullable(DateTime64)", "SimpleAggregateFunction(any, Nullable(DateTime64(9)))", data.FieldTypeNullableTime},
+		{"Nullable(DateTime64 with tz)", "SimpleAggregateFunction(any, Nullable(DateTime64(9, 'UTC')))", data.FieldTypeNullableTime},
+		{"Nullable(DateTime with tz)", "SimpleAggregateFunction(any, Nullable(DateTime('Asia/Tokyo')))", data.FieldTypeNullableTime},
+		{"Nullable(Date32)", "SimpleAggregateFunction(any, Nullable(Date32))", data.FieldTypeNullableTime},
 		{"Array(String) falls to catch-all", "SimpleAggregateFunction(any, Array(String))", data.FieldTypeJSON},
 	}
 	for _, tc := range cases {
