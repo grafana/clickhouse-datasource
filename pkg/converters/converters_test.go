@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/paulmach/orb"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -660,14 +661,132 @@ func TestNullableIPv6ShouldBeNull(t *testing.T) {
 	require.Nil(t, v)
 }
 
-func TestSimpleAggregateFunction(t *testing.T) {
-	value := [][]int{{1, 2, 3}, {1, 2, 3}}
-	aggConverter := GetConverter("SimpleAggregateFunction()")
-	v, err := aggConverter.FrameConverter.ConverterFunc(&value)
+func TestSimpleAggregateFunctionString(t *testing.T) {
+	// The regex converter for SAF(*, String) uses the same scan type as plain String
+	value := "hello"
+	sut := GetConverter("SimpleAggregateFunction(any, String)")
+	require.NotNil(t, sut.InputScanType)
+	v, err := sut.FrameConverter.ConverterFunc(&value)
 	assert.Nil(t, err)
-	msg, err := toJson(value)
+	assert.Equal(t, "hello", v.(string))
+}
+
+func TestSimpleAggregateFunctionNullableString(t *testing.T) {
+	value := "world"
+	val := &value
+	sut := GetConverter("SimpleAggregateFunction(any, Nullable(String))")
+	require.NotNil(t, sut.InputScanType)
+	v, err := sut.FrameConverter.ConverterFunc(&val)
 	assert.Nil(t, err)
-	assert.Equal(t, msg, v.(json.RawMessage))
+	assert.Equal(t, "world", *v.(*string))
+}
+
+func TestSimpleAggregateFunctionNullableStringNil(t *testing.T) {
+	var val *string
+	sut := GetConverter("SimpleAggregateFunction(any, Nullable(String))")
+	require.NotNil(t, sut.InputScanType)
+	v, err := sut.FrameConverter.ConverterFunc(&val)
+	assert.Nil(t, err)
+	assert.Nil(t, v)
+}
+
+func TestSimpleAggregateFunctionNumericPreservesType(t *testing.T) {
+	// GetConverter extracts inner type, so Nullable(UInt16) gets its native converter
+	sut := GetConverter("SimpleAggregateFunction(any, Nullable(UInt16))")
+	require.NotNil(t, sut.InputScanType)
+	assert.Equal(t, data.FieldTypeNullableUint16, sut.FrameConverter.FieldType)
+}
+
+func TestSimpleAggregateFunctionArrayPreservesType(t *testing.T) {
+	// Arrays fall through to the regex catch-all (jsonConverter) which renders them correctly
+	sut := GetConverter("SimpleAggregateFunction(any, Array(String))")
+	require.NotNil(t, sut.InputScanType)
+	assert.Equal(t, data.FieldTypeJSON, sut.FrameConverter.FieldType)
+}
+
+// TestSimpleAggregateFunctionGetConverterPreservesTypes tests that GetConverter
+// extracts the inner type and delegates to typed converters.
+func TestSimpleAggregateFunctionGetConverterPreservesTypes(t *testing.T) {
+	cases := []struct {
+		name      string
+		typeName  string
+		input     interface{}
+		expected  interface{}
+	}{
+		{
+			name:     "String",
+			typeName: "SimpleAggregateFunction(any, String)",
+			input:    func() interface{} { s := "hello"; return &s }(),
+			expected: "hello",
+		},
+		{
+			name:     "Int64",
+			typeName: "SimpleAggregateFunction(anyLast, Int64)",
+			input:    func() interface{} { v := int64(12345); return &v }(),
+			expected: int64(12345),
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sut := GetConverter(tc.typeName)
+			require.NotNil(t, sut.InputScanType)
+			v, err := sut.FrameConverter.ConverterFunc(tc.input)
+			assert.Nil(t, err)
+			assert.Equal(t, tc.expected, v)
+		})
+	}
+}
+
+func TestExtractSimpleAggregateFunctionType(t *testing.T) {
+	cases := []struct {
+		inputType    string
+		expectedType string
+		expectedOk   bool
+	}{
+		{
+			inputType:    "SimpleAggregateFunction(any, String)",
+			expectedType: "String",
+			expectedOk:   true,
+		},
+		{
+			inputType:    "SimpleAggregateFunction(any, Nullable(String))",
+			expectedType: "Nullable(String)",
+			expectedOk:   true,
+		},
+		{
+			inputType:    "SimpleAggregateFunction(anyLast, Nullable(UInt16))",
+			expectedType: "Nullable(UInt16)",
+			expectedOk:   true,
+		},
+		{
+			inputType:    "SimpleAggregateFunction(any, Array(String))",
+			expectedType: "Array(String)",
+			expectedOk:   true,
+		},
+		{
+			inputType:    "SimpleAggregateFunction(any, Map(String, UInt64))",
+			expectedType: "Map(String, UInt64)",
+			expectedOk:   true,
+		},
+		{
+			inputType:    "String",
+			expectedType: "",
+			expectedOk:   false,
+		},
+		{
+			inputType:    "LowCardinality(String)",
+			expectedType: "",
+			expectedOk:   false,
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.inputType, func(t *testing.T) {
+			actualType, actualOk := extractSimpleAggregateFunctionType(c.inputType)
+			assert.Equal(t, c.expectedOk, actualOk)
+			assert.Equal(t, c.expectedType, actualType)
+		})
+	}
 }
 
 func TestPoint(t *testing.T) {

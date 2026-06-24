@@ -44,7 +44,9 @@ var matchRegexes = map[string]*regexp.Regexp{
 	"Nullable(IP)":              regexp.MustCompile(`^Nullable\(IP`),
 	"Nullable(String)":          regexp.MustCompile(`^Nullable\(String`),
 	"Point":                     regexp.MustCompile(`^Point`),
-	"SimpleAggregateFunction()": regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
+	"SimpleAggregateFunction(String)":           regexp.MustCompile(`^SimpleAggregateFunction\([^,]+,\s*String\)$`),
+	"SimpleAggregateFunction(Nullable(String))": regexp.MustCompile(`^SimpleAggregateFunction\([^,]+,\s*Nullable\(String\)\)$`),
+	"SimpleAggregateFunction()":                 regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
 	"Tuple()":                   regexp.MustCompile(`^Tuple\(.*\)`),
 	"Variant":                   regexp.MustCompile(`^Variant`),
 	"Dynamic":                   regexp.MustCompile(`^Dynamic`),
@@ -342,6 +344,18 @@ var Converters = []Converter{
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(net.IP{}))),
 	},
 	{
+		name:      "SimpleAggregateFunction(String)",
+		fieldType: data.FieldTypeString,
+		matchRegex: matchRegexes["SimpleAggregateFunction(String)"],
+		scanType:  reflect.PointerTo(reflect.TypeOf("")),
+	},
+	{
+		name:       "SimpleAggregateFunction(Nullable(String))",
+		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["SimpleAggregateFunction(Nullable(String))"],
+		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
+	},
+	{
 		name:       "SimpleAggregateFunction()",
 		convert:    jsonConverter,
 		fieldType:  data.FieldTypeJSON,
@@ -385,6 +399,11 @@ func GetConverter(columnType string) sqlutil.Converter {
 		return GetConverter(innerType)
 	}
 
+	// check for 'SimpleAggregateFunction()' type and get the converter for the inner type
+	if innerType, ok := extractSimpleAggregateFunctionType(columnType); ok {
+		return GetConverter(innerType)
+	}
+
 	// direct match by name
 	for _, converter := range Converters {
 		if converter.name == columnType {
@@ -405,6 +424,50 @@ const (
 func extractLowCardinalityType(columnType string) (string, bool) {
 	if strings.HasPrefix(columnType, lowCardinalityPrefix) && strings.HasSuffix(columnType, lowCardinalitySuffix) {
 		return columnType[len(lowCardinalityPrefix) : len(columnType)-len(lowCardinalitySuffix)], true
+	}
+
+	return "", false
+}
+
+const (
+	simpleAggregateFunctionPrefix = "SimpleAggregateFunction("
+	simpleAggregateFunctionSuffix = ")"
+)
+
+// extractSimpleAggregateFunctionType checks if the column type is a `SimpleAggregateFunction(func, <type>)` type
+// and returns the inner data type (the second argument after the function name).
+// For example: SimpleAggregateFunction(any, String) -> String
+//
+//	SimpleAggregateFunction(any, Nullable(String)) -> Nullable(String)
+//	SimpleAggregateFunction(anyLast, Array(String)) -> Array(String)
+func extractSimpleAggregateFunctionType(columnType string) (string, bool) {
+	if !strings.HasPrefix(columnType, simpleAggregateFunctionPrefix) || !strings.HasSuffix(columnType, simpleAggregateFunctionSuffix) {
+		return "", false
+	}
+
+	// Extract the content between "SimpleAggregateFunction(" and the final ")"
+	inner := columnType[len(simpleAggregateFunctionPrefix) : len(columnType)-len(simpleAggregateFunctionSuffix)]
+
+	// Find the first comma that is not inside nested parentheses.
+	// The first argument is the function name (e.g., "any", "anyLast"),
+	// and the second argument is the data type.
+	depth := 0
+	for i, ch := range inner {
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				// Everything after ", " is the inner type
+				innerType := strings.TrimSpace(inner[i+1:])
+				if innerType == "" {
+					return "", false
+				}
+				return innerType, true
+			}
+		}
 	}
 
 	return "", false
@@ -465,6 +528,7 @@ func jsonConverter(in any) (any, error) {
 
 	return json.RawMessage(jBytes), nil
 }
+
 
 func defaultConvert(in interface{}) (interface{}, error) {
 	if in == nil {
