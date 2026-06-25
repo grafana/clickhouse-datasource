@@ -16,6 +16,19 @@ import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
 import otel from 'otel';
 
 /**
+ * Resolves the QueryBuilderOptions for a query regardless of editor type. Builder queries
+ * store them at the top level; raw-SQL queries keep a converted copy under `meta.builderOptions`
+ * (and may have none at all — e.g. a hand-written, provisioned, or migrated SQL query).
+ * Returns undefined when absent, so callers must treat the result as optional.
+ */
+export const getBuilderOptions = (query?: CHQuery): QueryBuilderOptions | undefined => {
+  if (!query) {
+    return undefined;
+  }
+  return query.editorType === EditorType.Builder ? query.builderOptions : query.meta?.builderOptions;
+};
+
+/**
  * Returns true if the builder options contain enough information to start showing a query
  */
 export const isBuilderOptionsRunnable = (builderOptions: QueryBuilderOptions): boolean => {
@@ -151,7 +164,7 @@ const traceSearchFieldConfigs: Record<string, FieldConfig> = {
  */
 export const applyTraceSearchFieldConfig = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
   res.data.forEach((frame: DataFrame) => {
-    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId);
     if (!originalQuery) {
       return;
     }
@@ -225,7 +238,7 @@ const expandJsonSentinel = (fields: Array<{ key: string; value: string }>): Arra
 
 export const transformTraceTagFields = (req: DataQueryRequest<CHQuery>, res: DataQueryResponse): void => {
   res.data.forEach((frame: DataFrame) => {
-    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId);
 
     // For builder queries use the queryType directly — it's authoritative and avoids
     // false-positive matches on non-trace tables that happen to have a 'traceID' column.
@@ -331,10 +344,13 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
   const getCachedColumns = (db: string, tbl: string) => datasource.getColumnsCached(db, tbl);
 
   for (const frame of res.data as DataFrame[]) {
-    const originalQuery = req.targets.find((t) => t.refId === frame.refId) as CHBuilderQuery;
+    const originalQuery = req.targets.find((t) => t.refId === frame.refId);
+
     if (!originalQuery) {
       continue;
     }
+
+    const originalBuilderOptions = getBuilderOptions(originalQuery);
 
     const traceField = frame.fields.find(
       (field) => field.name.toLowerCase() === 'traceid' || field.name.toLowerCase() === 'trace_id'
@@ -480,7 +496,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
             c.type?.toLowerCase().startsWith('json')
         ) ??
           false) ||
-        (!fetchedLiveSchema && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
+        (!fetchedLiveSchema && Boolean(originalBuilderOptions?.meta?.tagsAreJSON));
 
       options.meta!.tagsAreJSON = detectedTagsAreJSON;
       traceIdQuery.builderOptions = options;
