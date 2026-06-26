@@ -1,5 +1,6 @@
 {
   "ignorePaths": [
+    "AGENTS.md",
     "node_modules/**",
     "coverage/**",
     "provisioning/**",
