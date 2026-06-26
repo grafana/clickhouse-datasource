@@ -4,7 +4,7 @@
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=24",
-    "npm": ">=11.12.1"
+    "npm": ">=11.6.2"
   },
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
