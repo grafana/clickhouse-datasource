@@ -143,6 +143,14 @@ test.describe('Config editor', () => {
     });
 
     test('invalid credentials should return an error', async ({ createDataSourceConfigPage, page }) => {
+      // save & test runs a health check against an ad-hoc datasource. On the shared Cloud
+      // instance the managed ClickHouse host is cluster-internal (reachable only via PDC /
+      // secure socks proxy), so a health check from an ad-hoc DS built out of the repo's
+      // `ds-instance` secret hangs instead of returning. Covered by local/PR CI.
+      test.skip(
+        isCloudRun,
+        'Ad-hoc save & test connectivity is not reliable on the shared Cloud instance; covered by local/PR CI.'
+      );
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
@@ -162,6 +170,13 @@ test.describe('Config editor', () => {
       test.skip(
         !process.env.CI && !process.env.DS_INSTANCE_HOST,
         'ClickHouse must be reachable from inside Grafana; set DS_INSTANCE_HOST or run in CI'
+      );
+      // On the shared Cloud instance the managed ClickHouse host is cluster-internal (PDC only);
+      // an ad-hoc DS built from the repo's `ds-instance` secret does not route there, so the
+      // health check hangs. The managed datasource's own connectivity is exercised by the query tests.
+      test.skip(
+        isCloudRun,
+        'Ad-hoc save & test connectivity is not reliable on the shared Cloud instance; covered by local/PR CI.'
       );
 
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });

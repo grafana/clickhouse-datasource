@@ -81,6 +81,18 @@ async function expectHasErrorMarker(page: Page) {
  * regression shows up as a failing test here rather than as a user complaint.
  */
 test.describe('SQL editor validation', () => {
+  // The managed Cloud datasource does not enable `validateSql`, so SqlEditor's validation
+  // pipeline (onKeyUp -> validate() -> setModelMarkers -> Monaco) never runs there: the
+  // "no false positive" cases pass vacuously and the genuine-error control case fails for
+  // want of a marker. The suite is only meaningful where validateSql is enabled — local/PR
+  // CI, where provisioning/datasources/clickhouse.yml sets validateSql: true.
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'validateSql is disabled on the managed Cloud datasource, making this suite inert; covered by local/PR CI.'
+    );
+  });
+
   const validClickhouseQueries: Array<{ name: string; sql: string }> = [
     { name: 'FINAL keyword', sql: 'SELECT * FROM test.events FINAL' },
     { name: 'PREWHERE clause', sql: 'SELECT * FROM t PREWHERE x > 1 WHERE y > 2' },
