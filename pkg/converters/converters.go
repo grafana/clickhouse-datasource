@@ -30,28 +30,30 @@ type Converter struct {
 // For example `^Date` and `^DateTime` could conflict when matching `DateTime64`
 var matchRegexes = map[string]*regexp.Regexp{
 	// for complex Arrays e.g. Array(Tuple)
-	"Array()":                   regexp.MustCompile(`^Array\(.*\)`),
-	"Date":                      regexp.MustCompile(`^Date\(?`),
-	"Decimal":                   regexp.MustCompile(`^Decimal`),
-	"FixedString()":             regexp.MustCompile(`^Nullable\(FixedString\(.*\)\)`),
-	"IP":                        regexp.MustCompile(`^IPv[4,6]`),
-	"LowCardinality()":          regexp.MustCompile(`^LowCardinality\(([^)]*)\)`),
-	"LowCardinality(Nullable)":  regexp.MustCompile(`^LowCardinality\(Nullable([^)]*)\)`),
-	"Map()":                     regexp.MustCompile(`^Map\(.*\)`),
-	"Nested()":                  regexp.MustCompile(`^Nested\(.*\)`),
-	"Nullable(Date)":            regexp.MustCompile(`^Nullable\(Date\(?`),
-	"Nullable(Decimal)":         regexp.MustCompile(`^Nullable\(Decimal`),
-	"Nullable(IP)":              regexp.MustCompile(`^Nullable\(IP`),
-	"Nullable(String)":          regexp.MustCompile(`^Nullable\(String`),
-	"Point":                     regexp.MustCompile(`^Point`),
-	"SimpleAggregateFunction()": regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
-	"Tuple()":                   regexp.MustCompile(`^Tuple\(.*\)`),
-	"Variant":                   regexp.MustCompile(`^Variant`),
-	"Dynamic":                   regexp.MustCompile(`^Dynamic`),
-	"JSON":                      regexp.MustCompile(`^JSON`),
-	"Nullable(JSON)":            regexp.MustCompile(`^Nullable\(JSON`),
-	"Enum":                      regexp.MustCompile(`^Enum(8|16)\(.*\)`),
-	"Nullable(Enum)":            regexp.MustCompile(`^Nullable\(Enum(8|16)\(.*\)\)`),
+	"Array()":                         regexp.MustCompile(`^Array\(.*\)`),
+	"Date":                            regexp.MustCompile(`^Date\(?`),
+	"Decimal":                         regexp.MustCompile(`^Decimal`),
+	"FixedString()":                   regexp.MustCompile(`^Nullable\(FixedString\(.*\)\)`),
+	"IP":                              regexp.MustCompile(`^IPv[4,6]`),
+	"LowCardinality()":                regexp.MustCompile(`^LowCardinality\(([^)]*)\)`),
+	"LowCardinality(Nullable)":        regexp.MustCompile(`^LowCardinality\(Nullable([^)]*)\)`),
+	"Map()":                           regexp.MustCompile(`^Map\(.*\)`),
+	"Nested()":                        regexp.MustCompile(`^Nested\(.*\)`),
+	"Nullable(Date)":                  regexp.MustCompile(`^Nullable\(Date\(?`),
+	"Nullable(Decimal)":               regexp.MustCompile(`^Nullable\(Decimal`),
+	"Nullable(IP)":                    regexp.MustCompile(`^Nullable\(IP`),
+	"Nullable(String)":                regexp.MustCompile(`^Nullable\(String`),
+	"Point":                           regexp.MustCompile(`^Point`),
+	"SimpleAggregateFunction(String)": regexp.MustCompile(`^SimpleAggregateFunction\([^,]+,\s*String\)$`),
+	"SimpleAggregateFunction(Nullable(String))": regexp.MustCompile(`^SimpleAggregateFunction\([^,]+,\s*Nullable\(String\)\)$`),
+	"SimpleAggregateFunction()":                 regexp.MustCompile(`^SimpleAggregateFunction\(.*\)`),
+	"Tuple()":                                   regexp.MustCompile(`^Tuple\(.*\)`),
+	"Variant":                                   regexp.MustCompile(`^Variant`),
+	"Dynamic":                                   regexp.MustCompile(`^Dynamic`),
+	"JSON":                                      regexp.MustCompile(`^JSON`),
+	"Nullable(JSON)":                            regexp.MustCompile(`^Nullable\(JSON`),
+	"Enum":                                      regexp.MustCompile(`^Enum(8|16)\(.*\)`),
+	"Nullable(Enum)":                            regexp.MustCompile(`^Nullable\(Enum(8|16)\(.*\)\)`),
 }
 
 // Converters defines a list of type converters.
@@ -342,11 +344,16 @@ var Converters = []Converter{
 		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(net.IP{}))),
 	},
 	{
-		name:       "SimpleAggregateFunction()",
-		convert:    jsonConverter,
-		fieldType:  data.FieldTypeJSON,
-		matchRegex: matchRegexes["SimpleAggregateFunction()"],
-		scanType:   reflect.TypeOf((*interface{})(nil)).Elem(),
+		name:       "SimpleAggregateFunction(String)",
+		fieldType:  data.FieldTypeString,
+		matchRegex: matchRegexes["SimpleAggregateFunction(String)"],
+		scanType:   reflect.PointerTo(reflect.TypeOf("")),
+	},
+	{
+		name:       "SimpleAggregateFunction(Nullable(String))",
+		fieldType:  data.FieldTypeNullableString,
+		matchRegex: matchRegexes["SimpleAggregateFunction(Nullable(String))"],
+		scanType:   reflect.PointerTo(reflect.PointerTo(reflect.TypeOf(""))),
 	},
 	{
 		name:       "Point",
@@ -375,13 +382,348 @@ func ClickHouseConverters() []sqlutil.Converter {
 	for _, converter := range Converters {
 		list = append(list, createConverter(converter))
 	}
+	list = append(list, generateSAFConverters()...)
+	// SAF catch-all for any remaining unrecognized inner types (e.g. custom types)
+	list = append(list, sqlutil.Converter{
+		Name:           "SimpleAggregateFunction()",
+		InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
+		InputTypeRegex: matchRegexes["SimpleAggregateFunction()"],
+		InputTypeName:  "SimpleAggregateFunction()",
+		FrameConverter: sqlutil.FrameConverter{
+			FieldType:     data.FieldTypeJSON,
+			ConverterFunc: jsonConverter,
+		},
+	})
 	return list
+}
+
+// safTypeMapping defines inner types for which we generate native SAF converters.
+// Each entry maps a regex pattern for the inner type to the Grafana field type and
+// a converter function that extracts the native value from interface{}.
+type safTypeEntry struct {
+	innerPattern string         // regex for the inner type (after the function name)
+	fieldType    data.FieldType // Grafana field type to report
+	convert      func(in interface{}) (interface{}, error)
+}
+
+var safTypeMappings = []safTypeEntry{
+	// Non-nullable numeric types
+	{"UInt8", data.FieldTypeUint8, safConvertUint8},
+	{"UInt16", data.FieldTypeUint16, safConvertUint16},
+	{"UInt32", data.FieldTypeUint32, safConvertUint32},
+	{"UInt64", data.FieldTypeUint64, safConvertUint64},
+	{"Int8", data.FieldTypeInt8, safConvertInt8},
+	{"Int16", data.FieldTypeInt16, safConvertInt16},
+	{"Int32", data.FieldTypeInt32, safConvertInt32},
+	{"Int64", data.FieldTypeInt64, safConvertInt64},
+	{"Float32", data.FieldTypeFloat32, safConvertFloat32},
+	{"Float64", data.FieldTypeFloat64, safConvertFloat64},
+	{"Bool", data.FieldTypeBool, safConvertBool},
+	// Nullable numeric types
+	{"Nullable\\(UInt8\\)", data.FieldTypeNullableUint8, safConvertNullableUint8},
+	{"Nullable\\(UInt16\\)", data.FieldTypeNullableUint16, safConvertNullableUint16},
+	{"Nullable\\(UInt32\\)", data.FieldTypeNullableUint32, safConvertNullableUint32},
+	{"Nullable\\(UInt64\\)", data.FieldTypeNullableUint64, safConvertNullableUint64},
+	{"Nullable\\(Int8\\)", data.FieldTypeNullableInt8, safConvertNullableInt8},
+	{"Nullable\\(Int16\\)", data.FieldTypeNullableInt16, safConvertNullableInt16},
+	{"Nullable\\(Int32\\)", data.FieldTypeNullableInt32, safConvertNullableInt32},
+	{"Nullable\\(Int64\\)", data.FieldTypeNullableInt64, safConvertNullableInt64},
+	{"Nullable\\(Float32\\)", data.FieldTypeNullableFloat32, safConvertNullableFloat32},
+	{"Nullable\\(Float64\\)", data.FieldTypeNullableFloat64, safConvertNullableFloat64},
+	{"Nullable\\(Bool\\)", data.FieldTypeNullableBool, safConvertNullableBool},
+	// DateTime types (patterns account for optional timezone parameter)
+	{"DateTime64\\(\\d+(,\\s*'[^']*')?\\)", data.FieldTypeTime, safConvertTime},
+	{"DateTime(\\('[^']*'\\))?", data.FieldTypeTime, safConvertTime},
+	{"Date32", data.FieldTypeTime, safConvertTime},
+	{"Date", data.FieldTypeTime, safConvertTime},
+	{"Nullable\\(DateTime64\\(\\d+(,\\s*'[^']*')?\\)\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(DateTime(\\('[^']*'\\))?\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(Date32\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(Date\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+}
+
+func generateSAFConverters() []sqlutil.Converter {
+	var converters []sqlutil.Converter
+	for _, entry := range safTypeMappings {
+		pattern := `^SimpleAggregateFunction\([^,]+,\s*` + entry.innerPattern + `\)$`
+		converters = append(converters, sqlutil.Converter{
+			Name:           "SimpleAggregateFunction(" + entry.innerPattern + ")",
+			InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
+			InputTypeRegex: regexp.MustCompile(pattern),
+			InputTypeName:  "SimpleAggregateFunction(" + entry.innerPattern + ")",
+			FrameConverter: sqlutil.FrameConverter{
+				FieldType:     entry.fieldType,
+				ConverterFunc: entry.convert,
+			},
+		})
+	}
+	return converters
+}
+
+// SAF converter functions. The ClickHouse driver scans SAF values into interface{},
+// and the underlying value is the native Go type matching the inner column type.
+
+func safConvertUint8(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint8); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF uint8", *(in.(*interface{})))
+}
+
+func safConvertUint16(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint16); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF uint16", *(in.(*interface{})))
+}
+
+func safConvertUint32(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint32); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF uint32", *(in.(*interface{})))
+}
+
+func safConvertUint64(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(uint64); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF uint64", *(in.(*interface{})))
+}
+
+func safConvertInt8(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int8); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF int8", *(in.(*interface{})))
+}
+
+func safConvertInt16(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int16); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF int16", *(in.(*interface{})))
+}
+
+func safConvertInt32(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int32); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF int32", *(in.(*interface{})))
+}
+
+func safConvertInt64(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(int64); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF int64", *(in.(*interface{})))
+}
+
+func safConvertFloat32(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(float32); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF float32", *(in.(*interface{})))
+}
+
+func safConvertFloat64(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(float64); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF float64", *(in.(*interface{})))
+}
+
+func safConvertBool(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(bool); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF bool", *(in.(*interface{})))
+}
+
+func safConvertNullableUint8(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint8)(nil), nil
+	}
+	if val, ok := v.(*uint8); ok {
+		return val, nil
+	}
+	if val, ok := v.(uint8); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint8)", v)
+}
+
+func safConvertNullableUint16(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint16)(nil), nil
+	}
+	if val, ok := v.(*uint16); ok {
+		return val, nil
+	}
+	if val, ok := v.(uint16); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint16)", v)
+}
+
+func safConvertNullableUint32(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint32)(nil), nil
+	}
+	if val, ok := v.(*uint32); ok {
+		return val, nil
+	}
+	if val, ok := v.(uint32); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint32)", v)
+}
+
+func safConvertNullableUint64(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*uint64)(nil), nil
+	}
+	if val, ok := v.(*uint64); ok {
+		return val, nil
+	}
+	if val, ok := v.(uint64); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(uint64)", v)
+}
+
+func safConvertNullableInt8(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int8)(nil), nil
+	}
+	if val, ok := v.(*int8); ok {
+		return val, nil
+	}
+	if val, ok := v.(int8); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int8)", v)
+}
+
+func safConvertNullableInt16(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int16)(nil), nil
+	}
+	if val, ok := v.(*int16); ok {
+		return val, nil
+	}
+	if val, ok := v.(int16); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int16)", v)
+}
+
+func safConvertNullableInt32(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int32)(nil), nil
+	}
+	if val, ok := v.(*int32); ok {
+		return val, nil
+	}
+	if val, ok := v.(int32); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int32)", v)
+}
+
+func safConvertNullableInt64(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*int64)(nil), nil
+	}
+	if val, ok := v.(*int64); ok {
+		return val, nil
+	}
+	if val, ok := v.(int64); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(int64)", v)
+}
+
+func safConvertNullableFloat32(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*float32)(nil), nil
+	}
+	if val, ok := v.(*float32); ok {
+		return val, nil
+	}
+	if val, ok := v.(float32); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(float32)", v)
+}
+
+func safConvertNullableFloat64(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*float64)(nil), nil
+	}
+	if val, ok := v.(*float64); ok {
+		return val, nil
+	}
+	if val, ok := v.(float64); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(float64)", v)
+}
+
+func safConvertNullableBool(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*bool)(nil), nil
+	}
+	if val, ok := v.(*bool); ok {
+		return val, nil
+	}
+	if val, ok := v.(bool); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(bool)", v)
+}
+
+func safConvertTime(in interface{}) (interface{}, error) {
+	if v, ok := (*(in.(*interface{}))).(time.Time); ok {
+		return v, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF time", *(in.(*interface{})))
+}
+
+func safConvertNullableTime(in interface{}) (interface{}, error) {
+	v := (*(in.(*interface{})))
+	if v == nil {
+		return (*time.Time)(nil), nil
+	}
+	if val, ok := v.(*time.Time); ok {
+		return val, nil
+	}
+	if val, ok := v.(time.Time); ok {
+		return &val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Nullable(time)", v)
 }
 
 // GetConverter returns a sqlutil.Converter for the given column type.
 func GetConverter(columnType string) sqlutil.Converter {
 	// check for 'LowCardinality()' type first and get the converter for the inner type
 	if innerType, ok := extractLowCardinalityType(columnType); ok {
+		return GetConverter(innerType)
+	}
+
+	// check for 'SimpleAggregateFunction()' type and get the converter for the inner type
+	if innerType, ok := extractSimpleAggregateFunctionType(columnType); ok {
 		return GetConverter(innerType)
 	}
 
@@ -405,6 +747,50 @@ const (
 func extractLowCardinalityType(columnType string) (string, bool) {
 	if strings.HasPrefix(columnType, lowCardinalityPrefix) && strings.HasSuffix(columnType, lowCardinalitySuffix) {
 		return columnType[len(lowCardinalityPrefix) : len(columnType)-len(lowCardinalitySuffix)], true
+	}
+
+	return "", false
+}
+
+const (
+	simpleAggregateFunctionPrefix = "SimpleAggregateFunction("
+	simpleAggregateFunctionSuffix = ")"
+)
+
+// extractSimpleAggregateFunctionType checks if the column type is a `SimpleAggregateFunction(func, <type>)` type
+// and returns the inner data type (the second argument after the function name).
+// For example: SimpleAggregateFunction(any, String) -> String
+//
+//	SimpleAggregateFunction(any, Nullable(String)) -> Nullable(String)
+//	SimpleAggregateFunction(anyLast, Array(String)) -> Array(String)
+func extractSimpleAggregateFunctionType(columnType string) (string, bool) {
+	if !strings.HasPrefix(columnType, simpleAggregateFunctionPrefix) || !strings.HasSuffix(columnType, simpleAggregateFunctionSuffix) {
+		return "", false
+	}
+
+	// Extract the content between "SimpleAggregateFunction(" and the final ")"
+	inner := columnType[len(simpleAggregateFunctionPrefix) : len(columnType)-len(simpleAggregateFunctionSuffix)]
+
+	// Find the first comma that is not inside nested parentheses.
+	// The first argument is the function name (e.g., "any", "anyLast"),
+	// and the second argument is the data type.
+	depth := 0
+	for i, ch := range inner {
+		switch ch {
+		case '(':
+			depth++
+		case ')':
+			depth--
+		case ',':
+			if depth == 0 {
+				// Everything after ", " is the inner type
+				innerType := strings.TrimSpace(inner[i+1:])
+				if innerType == "" {
+					return "", false
+				}
+				return innerType, true
+			}
+		}
 	}
 
 	return "", false
