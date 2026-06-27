@@ -103,7 +103,7 @@
       "description": "ClickHouse password.",
       "valueType": "string",
       "required": true,
-      "role": "password",
+      "role": "auth.basic.password",
       "target": "secureJsonData"
     },
     {
@@ -323,7 +323,7 @@
       "label": "Client Key",
       "description": "PEM-encoded client private key.",
       "valueType": "string",
-      "role": "token",
+      "role": "tls.clientKey",
       "target": "secureJsonData",
       "dependsOn": "jsonData.tlsAuth == true",
       "ui": {
@@ -1076,8 +1076,7 @@
             "isItemField": true,
             "ui": {
               "component": "input",
-              "placeholder": "(optional)",
-              "row": 1
+              "placeholder": "(optional)"
             }
           },
           {
@@ -1089,8 +1088,7 @@
             "required": true,
             "ui": {
               "component": "input",
-              "placeholder": "Target Table",
-              "row": 1
+              "placeholder": "Target Table"
             }
           },
           {
@@ -1101,8 +1099,7 @@
             "isItemField": true,
             "ui": {
               "component": "input",
-              "placeholder": "(optional)",
-              "row": 1
+              "placeholder": "(optional)"
             }
           },
           {
@@ -1114,8 +1111,7 @@
             "required": true,
             "ui": {
               "component": "input",
-              "placeholder": "Alias Table",
-              "row": 1
+              "placeholder": "Alias Table"
             }
           }
         ]
@@ -1359,6 +1355,12 @@
       "type": "pair",
       "fields": ["secureJsonData.tlsClientCert", "secureJsonData.tlsClientKey"],
       "description": "TLS client certificate and key"
+    }
+  ],
+  "instructions": [
+    {
+      "msg": "Supports no auth (default user), basic auth (username + password), TLS client certificate auth (tlsAuth — mutual TLS with client cert + key, optionally a CA cert), forwarding the signed-in user's Grafana auth/OAuth headers to ClickHouse (forwardGrafanaHeaders / oauthPassThru), and token-based schemes via custom HTTP headers (e.g. a bearer token or API key header, which can be stored securely) — ask which. But never ask for credentials themselves. Those should be entered in the UI",
+      "tags": ["llm"]
     }
   ]
 }
