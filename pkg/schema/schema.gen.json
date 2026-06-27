@@ -1,0 +1,401 @@
+{
+  "targetApiVersion": "v0alpha1",
+  "settings": {
+    "spec": {
+      "type": "object",
+      "properties": {
+        "jsonData": {
+          "type": "object",
+          "required": [
+            "host",
+            "port",
+            "protocol",
+            "username"
+          ],
+          "properties": {
+            "aliasTables": {
+              "description": "Alias tables with (alias String, select String, type String) schema for column selection.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "targetTable",
+                  "aliasTable"
+                ],
+                "properties": {
+                  "aliasDatabase": {
+                    "type": "string"
+                  },
+                  "aliasTable": {
+                    "type": "string"
+                  },
+                  "targetDatabase": {
+                    "type": "string"
+                  },
+                  "targetTable": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "connMaxLifetime": {
+              "description": "Maximum lifetime of a connection in minutes.",
+              "type": "string"
+            },
+            "customSettings": {
+              "description": "Key-value pairs appended to each query's SETTINGS clause.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "setting",
+                  "value"
+                ],
+                "properties": {
+                  "setting": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "defaultDatabase": {
+              "description": "The default database used by the query builder.",
+              "type": "string"
+            },
+            "defaultTable": {
+              "description": "The default table used by the query builder.",
+              "type": "string"
+            },
+            "dialTimeout": {
+              "description": "Timeout in seconds for establishing a connection. Default: 10.",
+              "type": "string",
+              "default": "10"
+            },
+            "enableRowLimit": {
+              "description": "Enable using the Grafana row limit setting to limit the number of rows returned from ClickHouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana \u003e= 11.0.0. Defaults to false.",
+              "type": "boolean"
+            },
+            "enableSecureSocksProxy": {
+              "description": "Enable proxying the datasource connection through the secure socks proxy to a different network.",
+              "type": "boolean"
+            },
+            "forwardGrafanaHeaders": {
+              "description": "Forward Grafana HTTP Headers to data source.",
+              "type": "boolean",
+              "x-dsconfig-depends-on": "jsonData.protocol == 'http'"
+            },
+            "hideTableNameInAdhocFilters": {
+              "description": "Show only column names in ad hoc filter keys instead of the full table.column format. This simplifies the filter interface when working with schemas that have many tables. Defaults to false.",
+              "type": "boolean"
+            },
+            "host": {
+              "description": "ClickHouse host address.",
+              "type": "string"
+            },
+            "httpHeaders": {
+              "description": "Add custom HTTP headers when querying the database.",
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "secure": {
+                    "description": "When enabled, the header value is stored in Grafana's encrypted secure storage instead of plain JSON.",
+                    "type": "boolean"
+                  },
+                  "value": {
+                    "type": "string"
+                  }
+                }
+              },
+              "x-dsconfig-depends-on": "jsonData.protocol == 'http'"
+            },
+            "logs": {
+              "type": "object",
+              "properties": {
+                "contextColumns": {
+                  "description": "Column names used for identifying a log's source context.",
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "defaultDatabase": {
+                  "description": "The default database used by the logs query builder.",
+                  "type": "string"
+                },
+                "defaultTable": {
+                  "description": "The default table used by the logs query builder.",
+                  "type": "string",
+                  "default": "otel_logs"
+                },
+                "filterTimeColumn": {
+                  "description": "Column for time-based partition filtering (lower precision).",
+                  "type": "string",
+                  "default": ""
+                },
+                "levelColumn": {
+                  "description": "Column for the log level.",
+                  "type": "string",
+                  "default": ""
+                },
+                "messageColumn": {
+                  "description": "Column for the log message body.",
+                  "type": "string",
+                  "default": ""
+                },
+                "otelEnabled": {
+                  "description": "Enable OpenTelemetry schema versioning for log column mappings.",
+                  "type": "boolean"
+                },
+                "otelVersion": {
+                  "description": "OpenTelemetry schema version for log columns. Select the version that matches your OTel ClickHouse exporter.",
+                  "type": "string",
+                  "default": "latest",
+                  "enum": [
+                    "latest",
+                    "1.29.0"
+                  ],
+                  "x-dsconfig-depends-on": "jsonData.logs.otelEnabled == true"
+                },
+                "selectContextColumns": {
+                  "description": "When enabled, always include context columns in log queries.",
+                  "type": "boolean",
+                  "default": true
+                },
+                "showLogLinks": {
+                  "description": "Show \"View logs\" links on trace_id fields for log-to-trace correlation.",
+                  "type": "boolean",
+                  "default": true
+                },
+                "timeColumn": {
+                  "description": "Column for the log timestamp.",
+                  "type": "string",
+                  "default": ""
+                }
+              }
+            },
+            "maxIdleConns": {
+              "description": "Maximum number of idle connections.",
+              "type": "string"
+            },
+            "maxOpenConns": {
+              "description": "Maximum number of open connections.",
+              "type": "string"
+            },
+            "path": {
+              "description": "Additional URL path for HTTP requests. Default: /",
+              "type": "string",
+              "x-dsconfig-depends-on": "jsonData.protocol == 'http'"
+            },
+            "port": {
+              "description": "ClickHouse server port.",
+              "type": "number",
+              "default": 9000
+            },
+            "protocol": {
+              "description": "Native is the default protocol.",
+              "type": "string",
+              "default": "native",
+              "enum": [
+                "native",
+                "http"
+              ]
+            },
+            "queryTimeout": {
+              "description": "Timeout in seconds for read queries. Default: 60.",
+              "type": "string",
+              "default": "60"
+            },
+            "secure": {
+              "description": "Check to connect securely with TLS.",
+              "type": "boolean"
+            },
+            "tlsAuth": {
+              "description": "Enable TLS client certificate authentication.",
+              "type": "boolean"
+            },
+            "tlsAuthWithCACert": {
+              "description": "Needed for verifying self-signed TLS Certs.",
+              "type": "boolean"
+            },
+            "tlsSkipVerify": {
+              "description": "Skip TLS certificate verification.",
+              "type": "boolean"
+            },
+            "traces": {
+              "type": "object",
+              "properties": {
+                "defaultDatabase": {
+                  "description": "The default database used by the trace query builder.",
+                  "type": "string"
+                },
+                "defaultTable": {
+                  "description": "The default table used by the trace query builder.",
+                  "type": "string",
+                  "default": "otel_traces"
+                },
+                "durationColumn": {
+                  "description": "Column for the span duration.",
+                  "type": "string",
+                  "default": ""
+                },
+                "durationUnit": {
+                  "description": "The unit of time used for the duration column.",
+                  "type": "string",
+                  "default": "nanoseconds",
+                  "enum": [
+                    "seconds",
+                    "milliseconds",
+                    "microseconds",
+                    "nanoseconds"
+                  ]
+                },
+                "flattenNested": {
+                  "description": "Enable if your traces table was created with flatten_nested=1.",
+                  "type": "boolean"
+                },
+                "instrumentationLibraryNameColumn": {
+                  "description": "Column for the instrumentation library name.",
+                  "type": "string"
+                },
+                "instrumentationLibraryVersionColumn": {
+                  "description": "Column for the instrumentation library version.",
+                  "type": "string"
+                },
+                "kindColumn": {
+                  "description": "Column for the span kind.",
+                  "type": "string",
+                  "default": ""
+                },
+                "operationNameColumn": {
+                  "description": "Column for the operation/span name.",
+                  "type": "string",
+                  "default": ""
+                },
+                "otelEnabled": {
+                  "description": "Enable OpenTelemetry schema versioning for trace column mappings.",
+                  "type": "boolean"
+                },
+                "otelVersion": {
+                  "description": "OpenTelemetry schema version for trace columns. Select the version that matches your OTel ClickHouse exporter.",
+                  "type": "string",
+                  "default": "latest",
+                  "enum": [
+                    "latest",
+                    "1.29.0"
+                  ],
+                  "x-dsconfig-depends-on": "jsonData.traces.otelEnabled == true"
+                },
+                "parentSpanIdColumn": {
+                  "description": "Column for the parent span ID.",
+                  "type": "string",
+                  "default": ""
+                },
+                "serviceNameColumn": {
+                  "description": "Column for the service name.",
+                  "type": "string",
+                  "default": ""
+                },
+                "serviceTagsColumn": {
+                  "description": "Column for the resource/service attributes.",
+                  "type": "string",
+                  "default": ""
+                },
+                "showTraceLinks": {
+                  "description": "Show \"View trace\" links on trace_id fields for trace correlation.",
+                  "type": "boolean",
+                  "default": true
+                },
+                "spanIdColumn": {
+                  "description": "Column for the span ID.",
+                  "type": "string",
+                  "default": ""
+                },
+                "startTimeColumn": {
+                  "description": "Column for the span start time.",
+                  "type": "string",
+                  "default": ""
+                },
+                "stateColumn": {
+                  "description": "Column for the trace state.",
+                  "type": "string",
+                  "default": ""
+                },
+                "statusCodeColumn": {
+                  "description": "Column for the span status code.",
+                  "type": "string",
+                  "default": ""
+                },
+                "statusMessageColumn": {
+                  "description": "Column for the span status message.",
+                  "type": "string",
+                  "default": ""
+                },
+                "tagsColumn": {
+                  "description": "Column for the span attributes/tags.",
+                  "type": "string",
+                  "default": ""
+                },
+                "traceEventsColumnPrefix": {
+                  "description": "Prefix for the events columns (Events.Timestamp, Events.Name, etc.).",
+                  "type": "string",
+                  "default": "Events"
+                },
+                "traceIdColumn": {
+                  "description": "Column for the trace ID.",
+                  "type": "string",
+                  "default": ""
+                },
+                "traceLinksColumnPrefix": {
+                  "description": "Prefix for the links columns (Links.TraceId, Links.TraceState, etc.).",
+                  "type": "string",
+                  "default": "Links"
+                }
+              }
+            },
+            "username": {
+              "description": "We recommend configuring a read-only user.",
+              "type": "string"
+            },
+            "validateSql": {
+              "description": "Validate SQL in the editor.",
+              "type": "boolean"
+            },
+            "version": {
+              "description": "Plugin version this config was saved with.",
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "secureValues": [
+      {
+        "key": "password",
+        "description": "ClickHouse password.",
+        "required": true
+      },
+      {
+        "key": "tlsCACert",
+        "description": "PEM-encoded CA certificate."
+      },
+      {
+        "key": "tlsClientCert",
+        "description": "PEM-encoded client certificate."
+      },
+      {
+        "key": "tlsClientKey",
+        "description": "PEM-encoded client private key."
+      }
+    ]
+  }
+}
