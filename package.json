@@ -93,7 +93,7 @@
     "react-router": "6.30.3",
     "react-router-dom-v5-compat": "6.30.3",
     "@remix-run/router": "1.23.2",
-    "immutable": "5.1.5"
+    "immutable": "5.1.7"
   },
   "dependencies": {
     "@emotion/css": "11.13.5",
