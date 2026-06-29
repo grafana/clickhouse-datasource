@@ -72,7 +72,7 @@ describe('generateVariableSql', () => {
       ''
     );
     expect(sql).toBe(
-      "SELECT DISTINCT ServiceName AS value FROM otel.otel_logs WHERE ServiceName IS NOT NULL ORDER BY value LIMIT 1000"
+      `SELECT DISTINCT "ServiceName" AS value FROM "otel"."otel_logs" WHERE "ServiceName" IS NOT NULL ORDER BY value LIMIT 1000`
     );
   });
 
@@ -89,7 +89,7 @@ describe('generateVariableSql', () => {
       ''
     );
     expect(sql).toBe(
-      "SELECT DISTINCT ResourceAttributes['service.version'] AS value FROM otel.otel_logs WHERE ResourceAttributes['service.version'] IS NOT NULL ORDER BY value LIMIT 1000"
+      `SELECT DISTINCT "ResourceAttributes"['service.version'] AS value FROM "otel"."otel_logs" WHERE "ResourceAttributes"['service.version'] IS NOT NULL ORDER BY value LIMIT 1000`
     );
   });
 
@@ -105,7 +105,41 @@ describe('generateVariableSql', () => {
       ''
     );
     expect(sql).toBe(
-      "SELECT DISTINCT ResourceAttributes AS value FROM otel.otel_logs WHERE ResourceAttributes IS NOT NULL ORDER BY value LIMIT 1000"
+      `SELECT DISTINCT "ResourceAttributes" AS value FROM "otel"."otel_logs" WHERE "ResourceAttributes" IS NOT NULL ORDER BY value LIMIT 1000`
+    );
+  });
+
+  it('escapes string literals and identifiers so picked values cannot break out of the query', () => {
+    // String-literal positions (system.tables / system.columns lookups): single
+    // quotes and backslashes are escaped.
+    expect(generateVariableSql(baseQuery({ queryType: 'tables', database: "o'; DROP TABLE x --" }), '')).toBe(
+      "SELECT name FROM system.tables WHERE database = 'o\\'; DROP TABLE x --' ORDER BY name"
+    );
+
+    // Identifier positions (column values FROM/SELECT/WHERE): wrapped in double
+    // quotes with internal double quotes doubled.
+    const idSql = generateVariableSql(
+      baseQuery({ queryType: 'columnValues', database: 'otel', table: 'otel_logs', column: 'Svc"Name' }),
+      ''
+    );
+    expect(idSql).toBe(
+      `SELECT DISTINCT "Svc""Name" AS value FROM "otel"."otel_logs" WHERE "Svc""Name" IS NOT NULL ORDER BY value LIMIT 1000`
+    );
+
+    // Map key is a string literal inside bracket access.
+    const mapSql = generateVariableSql(
+      baseQuery({
+        queryType: 'columnValues',
+        database: 'otel',
+        table: 'otel_logs',
+        column: 'ResourceAttributes',
+        mapKey: "a'b",
+        columnIsMap: true,
+      }),
+      ''
+    );
+    expect(mapSql).toBe(
+      `SELECT DISTINCT "ResourceAttributes"['a\\'b'] AS value FROM "otel"."otel_logs" WHERE "ResourceAttributes"['a\\'b'] IS NOT NULL ORDER BY value LIMIT 1000`
     );
   });
 

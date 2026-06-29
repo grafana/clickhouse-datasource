@@ -1836,7 +1836,7 @@ function isMapColumnType(type: string | undefined): boolean {
 // literal: backslash and single quote are the only characters that need
 // escaping. Use when interpolating an untrusted identifier (e.g. a Map key
 // from system.columns) into raw SQL.
-function escapeCHStringLiteral(s: string): string {
+export function escapeCHStringLiteral(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 

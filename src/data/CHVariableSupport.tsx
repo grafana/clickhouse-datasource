@@ -12,7 +12,8 @@ import { Observable, from, of } from 'rxjs';
 import { SchemaPicker, SchemaPickerLevel, SchemaPickerValue } from 'components/queryBuilder/SchemaPicker';
 import { CHConfig } from 'types/config';
 import { CHQuery } from 'types/sql';
-import { Datasource } from './CHDatasource';
+import { escapeIdentifier } from './sqlGenerator';
+import { Datasource, escapeCHStringLiteral } from './CHDatasource';
 
 /**
  * Variable query types. Each one renders a different combination of pickers and
@@ -74,20 +75,21 @@ export function generateVariableSql(query: CHVariableQuery, defaultDatabase: str
       return 'SELECT name FROM system.databases ORDER BY name';
     case 'tables':
       return db
-        ? `SELECT name FROM system.tables WHERE database = '${db}' ORDER BY name`
+        ? `SELECT name FROM system.tables WHERE database = '${escapeCHStringLiteral(db)}' ORDER BY name`
         : 'SELECT name FROM system.tables ORDER BY name';
     case 'columns':
       if (!db || !query.table) {
         return '';
       }
-      return `SELECT name FROM system.columns WHERE database = '${db}' AND table = '${query.table}' ORDER BY name`;
+      return `SELECT name FROM system.columns WHERE database = '${escapeCHStringLiteral(db)}' AND table = '${escapeCHStringLiteral(query.table)}' ORDER BY name`;
     case 'columnValues': {
       if (!db || !query.table || !query.column) {
         return '';
       }
+      const column = escapeIdentifier(query.column);
       const target =
-        query.columnIsMap && query.mapKey ? `${query.column}['${query.mapKey}']` : query.column;
-      return `SELECT DISTINCT ${target} AS value FROM ${db}.${query.table} WHERE ${target} IS NOT NULL ORDER BY value LIMIT 1000`;
+        query.columnIsMap && query.mapKey ? `${column}['${escapeCHStringLiteral(query.mapKey)}']` : column;
+      return `SELECT DISTINCT ${target} AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE ${target} IS NOT NULL ORDER BY value LIMIT 1000`;
     }
     case 'sql':
     default:
