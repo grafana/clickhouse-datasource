@@ -5,7 +5,7 @@ go 1.26.4
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.45.0
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/dsconfig/schema v0.0.7
+	github.com/grafana/dsconfig/schema v0.0.8
 	github.com/grafana/grafana-plugin-sdk-go v0.292.1
 	github.com/grafana/sqlds/v5 v5.1.1
 	github.com/moby/moby/api v1.54.2
@@ -49,7 +49,7 @@ require (
 	github.com/gogo/googleapis v1.4.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
 	github.com/grafana/dataplane/sdata v0.0.9 // indirect
-	github.com/grafana/dsconfig/dsconfig v0.0.7 // indirect
+	github.com/grafana/dsconfig/dsconfig v0.0.8 // indirect
 	github.com/grafana/otel-profiling-go v0.5.1 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.9 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/prometheus v1.1.0 // indirect

@@ -150,10 +150,10 @@ github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e h1:JKmoR8x90Iww1
 github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e/go.mod h1:wJfORRmW1u3UXTncJ5qlYoELFm8eSnnEO6hX4iZ3EWY=
 github.com/grafana/dataplane/sdata v0.0.9 h1:AGL1LZnCUG4MnQtnWpBPbQ8ZpptaZs14w6kE/MWfg7s=
 github.com/grafana/dataplane/sdata v0.0.9/go.mod h1:Jvs5ddpGmn6vcxT7tCTWAZ1mgi4sbcdFt9utQx5uMAU=
-github.com/grafana/dsconfig/dsconfig v0.0.7 h1:rh2PhwKLVrokMa2eTbS3zDfSIS8sOl54X/as082+Qgo=
-github.com/grafana/dsconfig/dsconfig v0.0.7/go.mod h1:orwL9W2Ea8Wjubn0Vw1or/uolFDSKSFfc404G2xrvEc=
-github.com/grafana/dsconfig/schema v0.0.7 h1:1Ixwzbgtpl9n469cPN+KBLhy3oqoSraw0FOQ4OCrz/w=
-github.com/grafana/dsconfig/schema v0.0.7/go.mod h1:Q6GdtQld4Y01S6cj8HAWzNuXQvpXyDx4o5y5HpfWHZM=
+github.com/grafana/dsconfig/dsconfig v0.0.8 h1:ctxD4/mLWSN2cxnib01Dy0PRbXnSbj5px6y5tpzJ8vE=
+github.com/grafana/dsconfig/dsconfig v0.0.8/go.mod h1:orwL9W2Ea8Wjubn0Vw1or/uolFDSKSFfc404G2xrvEc=
+github.com/grafana/dsconfig/schema v0.0.8 h1:H5ODC6ZDUIxT2c5Lqn9NvkxKoxRCjAnwTNdkjR13dnc=
+github.com/grafana/dsconfig/schema v0.0.8/go.mod h1:Q6GdtQld4Y01S6cj8HAWzNuXQvpXyDx4o5y5HpfWHZM=
 github.com/grafana/grafana-plugin-sdk-go v0.292.1 h1:8wvKUqIOtbHC43WIr6kheIGdV6q4SMyWU9+jxcUA6mE=
 github.com/grafana/grafana-plugin-sdk-go v0.292.1/go.mod h1:RM/Ku+hoyicIO/UVsGeFJfed/3/iXaCT3opiwE69THY=
 github.com/grafana/otel-profiling-go v0.5.1 h1:stVPKAFZSa7eGiqbYuG25VcqYksR6iWvF3YH66t4qL8=
