@@ -109,24 +109,6 @@ describe('generateVariableSql', () => {
     );
   });
 
-  it('generates the OTel services preset against the default database', () => {
-    expect(generateVariableSql(baseQuery({ queryType: 'otelServices' }), 'otel')).toBe(
-      "SELECT DISTINCT ServiceName FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName != '' ORDER BY ServiceName"
-    );
-  });
-
-  it('generates the OTel log levels preset', () => {
-    expect(generateVariableSql(baseQuery({ queryType: 'otelLevels' }), 'otel')).toBe(
-      "SELECT DISTINCT SeverityText FROM otel.otel_logs WHERE $__timeFilter(Timestamp) AND SeverityText != '' ORDER BY SeverityText"
-    );
-  });
-
-  it('generates the OTel operations preset', () => {
-    expect(generateVariableSql(baseQuery({ queryType: 'otelOperations' }), 'otel')).toBe(
-      "SELECT DISTINCT SpanName FROM otel.otel_traces WHERE $__timeFilter(Timestamp) AND SpanName != '' ORDER BY SpanName LIMIT 200"
-    );
-  });
-
   it('preserves the existing rawSql when the type is Custom SQL', () => {
     expect(
       generateVariableSql(baseQuery({ queryType: 'sql', rawSql: 'SELECT 1' }), 'default')
@@ -141,9 +123,6 @@ describe('pickerLevelFor', () => {
     ['tables', 'database'],
     ['columns', 'table'],
     ['columnValues', 'mapKey'],
-    ['otelServices', null],
-    ['otelLevels', null],
-    ['otelOperations', null],
   ];
   cases.forEach(([type, expected]) => {
     it(`returns ${expected} for ${type}`, () => {

@@ -23,10 +23,7 @@ export type CHVariableQueryType =
   | 'databases'
   | 'tables'
   | 'columns'
-  | 'columnValues'
-  | 'otelServices'
-  | 'otelLevels'
-  | 'otelOperations';
+  | 'columnValues';
 
 /** Variable query model. Persisted as part of the dashboard JSON. */
 export interface CHVariableQuery {
@@ -48,9 +45,6 @@ const VARIABLE_TYPE_OPTIONS: Array<{ label: string; value: CHVariableQueryType; 
   { label: 'List tables', value: 'tables', description: 'Tables inside a database' },
   { label: 'List columns', value: 'columns', description: 'Columns inside a table' },
   { label: 'Column values', value: 'columnValues', description: 'Distinct values of a column or Map key' },
-  { label: 'OTel services', value: 'otelServices', description: 'ServiceName values from otel_logs' },
-  { label: 'OTel log levels', value: 'otelLevels', description: 'SeverityText values from otel_logs' },
-  { label: 'OTel operations', value: 'otelOperations', description: 'SpanName values from otel_traces' },
 ];
 
 /** Returns the SchemaPicker depth for a query type, or null when no picker is needed. */
@@ -75,7 +69,6 @@ export function pickerLevelFor(queryType: CHVariableQueryType): SchemaPickerLeve
  */
 export function generateVariableSql(query: CHVariableQuery, defaultDatabase: string): string {
   const db = query.database || defaultDatabase || '';
-  const otelDb = defaultDatabase || db || 'default';
   switch (query.queryType) {
     case 'databases':
       return 'SELECT name FROM system.databases ORDER BY name';
@@ -96,12 +89,6 @@ export function generateVariableSql(query: CHVariableQuery, defaultDatabase: str
         query.columnIsMap && query.mapKey ? `${query.column}['${query.mapKey}']` : query.column;
       return `SELECT DISTINCT ${target} AS value FROM ${db}.${query.table} WHERE ${target} IS NOT NULL ORDER BY value LIMIT 1000`;
     }
-    case 'otelServices':
-      return `SELECT DISTINCT ServiceName FROM ${otelDb}.otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName != '' ORDER BY ServiceName`;
-    case 'otelLevels':
-      return `SELECT DISTINCT SeverityText FROM ${otelDb}.otel_logs WHERE $__timeFilter(Timestamp) AND SeverityText != '' ORDER BY SeverityText`;
-    case 'otelOperations':
-      return `SELECT DISTINCT SpanName FROM ${otelDb}.otel_traces WHERE $__timeFilter(Timestamp) AND SpanName != '' ORDER BY SpanName LIMIT 200`;
     case 'sql':
     default:
       return query.rawSql || '';
