@@ -307,4 +307,42 @@ describe('SchemaPicker', () => {
       expect(result.getByText('Column')).toBeInTheDocument();
     });
   });
+
+  describe('clearing a selection', () => {
+    const fullValue: SchemaPickerValue = {
+      database: 'default',
+      table: 'events',
+      column: 'attrs',
+      mapKey: 'service.name',
+    };
+
+    it('clears the database and every downstream field without throwing', async () => {
+      const datasource = buildDatasource();
+      const onChange = jest.fn();
+      const result = await waitFor(() =>
+        render(<SchemaPicker datasource={datasource} level="mapKey" value={fullValue} onChange={onChange} />)
+      );
+
+      const [databaseCombobox] = result.getAllByRole('combobox');
+      fireEvent.keyDown(databaseCombobox, { key: 'Backspace' });
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith({ database: '', table: '', column: '', mapKey: '' });
+    });
+
+    it('clears the column and its map key without disturbing the database or table', async () => {
+      const datasource = buildDatasource();
+      const onChange = jest.fn();
+      const result = await waitFor(() =>
+        render(<SchemaPicker datasource={datasource} level="mapKey" value={fullValue} onChange={onChange} />)
+      );
+
+      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(4));
+      const [, , columnCombobox] = result.getAllByRole('combobox');
+      fireEvent.keyDown(columnCombobox, { key: 'Backspace' });
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith({ database: 'default', table: 'events', column: '', mapKey: '' });
+    });
+  });
 });

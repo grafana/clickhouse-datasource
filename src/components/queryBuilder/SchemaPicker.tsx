@@ -1,13 +1,12 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { InlineField, InlineFieldRow, Select } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import useColumns from 'hooks/useColumns';
 import useDatabases from 'hooks/useDatabases';
 import useTables from 'hooks/useTables';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import labels from 'labels';
-import { styles } from 'styles';
 
 /**
  * How deep the cascading picker goes. Each level builds on the one above.
@@ -38,6 +37,7 @@ export interface SchemaPickerProps {
 
 const LEVEL_ORDER: SchemaPickerLevel[] = ['database', 'table', 'column', 'mapKey'];
 const MAP_TYPE_PREFIX = 'Map(';
+const LABEL_WIDTH = 20;
 
 function levelIndex(level: SchemaPickerLevel): number {
   return LEVEL_ORDER.indexOf(level);
@@ -65,22 +65,51 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
   const mapColumnName = isMapColumn && value.column ? value.column : '';
   const mapKeys = useUniqueMapKeys(datasource, mapColumnName, value.database || '', value.table || '');
 
+  // Build the option lists. The Select component drops the controlled value when
+  // it isn't present in the options, so append the current value if the fetched
+  // list doesn't include it (e.g. loading a saved query before the list resolves).
+  const databaseOptions: Array<SelectableValue<string>> = databases.map((d) => ({ label: d, value: d }));
+  if (value.database && !databases.includes(value.database)) {
+    databaseOptions.push({ label: value.database, value: value.database });
+  }
+
+  const tableOptions: Array<SelectableValue<string>> = tables.map((t) => ({ label: t, value: t }));
+  if (value.table && !tables.includes(value.table)) {
+    tableOptions.push({ label: value.table, value: value.table });
+  }
+
+  const columnOptions: Array<SelectableValue<string>> = columns.map((c) => ({
+    label: c.name,
+    value: c.name,
+    description: c.type,
+  }));
+  if (value.column && !columns.some((c) => c.name === value.column)) {
+    columnOptions.push({ label: value.column, value: value.column });
+  }
+
+  const mapKeyOptions: Array<SelectableValue<string>> = mapKeys.map((k) => ({ label: k, value: k }));
+  if (value.mapKey && !mapKeys.includes(value.mapKey)) {
+    mapKeyOptions.push({ label: value.mapKey, value: value.mapKey });
+  }
+
   const labelText = (key: SchemaPickerLevel, fallback: string): string => labelOverrides?.[key] ?? fallback;
 
-  const handleDatabaseChange = (selected: SelectableValue<string>) => {
-    onChange({ database: selected.value || '', table: '', column: '', mapKey: '' });
+  // Grafana passes `null` to onChange when a clearable Select is cleared, so guard
+  // the dereference. Clearing a parent also clears every downstream selection.
+  const handleDatabaseChange = (selected: SelectableValue<string> | null) => {
+    onChange({ database: selected?.value || '', table: '', column: '', mapKey: '' });
   };
 
-  const handleTableChange = (selected: SelectableValue<string>) => {
-    onChange({ ...value, table: selected.value || '', column: '', mapKey: '' });
+  const handleTableChange = (selected: SelectableValue<string> | null) => {
+    onChange({ ...value, table: selected?.value || '', column: '', mapKey: '' });
   };
 
-  const handleColumnChange = (selected: SelectableValue<string>) => {
-    onChange({ ...value, column: selected.value || '', mapKey: '' });
+  const handleColumnChange = (selected: SelectableValue<string> | null) => {
+    onChange({ ...value, column: selected?.value || '', mapKey: '' });
   };
 
-  const handleMapKeyChange = (selected: SelectableValue<string>) => {
-    onChange({ ...value, mapKey: selected.value || '' });
+  const handleMapKeyChange = (selected: SelectableValue<string> | null) => {
+    onChange({ ...value, mapKey: selected?.value || '' });
   };
 
   const databaseTooltip = labels.components.DatabaseSelect.tooltip;
@@ -92,80 +121,81 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
 
   return (
     <>
-      <div className="gf-form">
-        <InlineFormLabel width={10} className="query-keyword" tooltip={databaseTooltip}>
-          {labelText('database', labels.components.DatabaseSelect.label)}
-        </InlineFormLabel>
-        <Select
-          className={`width-15 ${styles.Common.inlineSelect}`}
-          options={databases.map((d) => ({ label: d, value: d }))}
-          value={value.database || null}
-          onChange={handleDatabaseChange}
-          menuPlacement={'bottom'}
-          allowCustomValue
-          isClearable
-          placeholder={labels.components.DatabaseSelect.empty}
-          aria-label={labelText('database', labels.components.DatabaseSelect.label)}
-        />
-      </div>
-
-      {showTable && (
-        <div className="gf-form">
-          <InlineFormLabel width={10} className="query-keyword" tooltip={tableTooltip}>
-            {labelText('table', labels.components.TableSelect.label)}
-          </InlineFormLabel>
+      <InlineFieldRow>
+        <InlineField
+          label={labelText('database', labels.components.DatabaseSelect.label)}
+          labelWidth={LABEL_WIDTH}
+          tooltip={databaseTooltip}
+          grow
+        >
           <Select
-            className={`width-15 ${styles.Common.inlineSelect}`}
-            options={tables.map((t) => ({ label: t, value: t }))}
-            value={value.table || null}
-            onChange={handleTableChange}
+            options={databaseOptions}
+            value={value.database || null}
+            onChange={handleDatabaseChange}
             menuPlacement={'bottom'}
             allowCustomValue
             isClearable
-            disabled={!value.database}
-            placeholder={labels.components.TableSelect.empty}
-            aria-label={labelText('table', labels.components.TableSelect.label)}
+            placeholder={labels.components.DatabaseSelect.empty}
+            aria-label={labelText('database', labels.components.DatabaseSelect.label)}
           />
-        </div>
+        </InlineField>
+      </InlineFieldRow>
+
+      {showTable && (
+        <InlineFieldRow>
+          <InlineField
+            label={labelText('table', labels.components.TableSelect.label)}
+            labelWidth={LABEL_WIDTH}
+            tooltip={tableTooltip}
+            disabled={!value.database}
+            grow
+          >
+            <Select
+              options={tableOptions}
+              value={value.table || null}
+              onChange={handleTableChange}
+              menuPlacement={'bottom'}
+              allowCustomValue
+              isClearable
+              placeholder={labels.components.TableSelect.empty}
+              aria-label={labelText('table', labels.components.TableSelect.label)}
+            />
+          </InlineField>
+        </InlineFieldRow>
       )}
 
       {showColumn && (
-        <div className="gf-form">
-          <InlineFormLabel width={10} className="query-keyword">
-            {labelText('column', 'Column')}
-          </InlineFormLabel>
-          <Select
-            className={`width-15 ${styles.Common.inlineSelect}`}
-            options={columns.map((c) => ({ label: c.name, value: c.name, description: c.type }))}
-            value={value.column || null}
-            onChange={handleColumnChange}
-            menuPlacement={'bottom'}
-            allowCustomValue
-            isClearable
-            disabled={!value.table}
-            placeholder={'<select column>'}
-            aria-label={labelText('column', 'Column')}
-          />
-        </div>
+        <InlineFieldRow>
+          <InlineField label={labelText('column', 'Column')} labelWidth={LABEL_WIDTH} disabled={!value.table} grow>
+            <Select
+              options={columnOptions}
+              value={value.column || null}
+              onChange={handleColumnChange}
+              menuPlacement={'bottom'}
+              allowCustomValue
+              isClearable
+              placeholder={'<select column>'}
+              aria-label={labelText('column', 'Column')}
+            />
+          </InlineField>
+        </InlineFieldRow>
       )}
 
       {showMapKey && (
-        <div className="gf-form">
-          <InlineFormLabel width={10} className="query-keyword">
-            {labelText('mapKey', 'Map Key')}
-          </InlineFormLabel>
-          <Select
-            className={`width-15 ${styles.Common.inlineSelect}`}
-            options={mapKeys.map((k) => ({ label: k, value: k }))}
-            value={value.mapKey || null}
-            onChange={handleMapKeyChange}
-            menuPlacement={'bottom'}
-            allowCustomValue
-            isClearable
-            placeholder={'<select key>'}
-            aria-label={labelText('mapKey', 'Map Key')}
-          />
-        </div>
+        <InlineFieldRow>
+          <InlineField label={labelText('mapKey', 'Map Key')} labelWidth={LABEL_WIDTH} grow>
+            <Select
+              options={mapKeyOptions}
+              value={value.mapKey || null}
+              onChange={handleMapKeyChange}
+              menuPlacement={'bottom'}
+              allowCustomValue
+              isClearable
+              placeholder={'<select key>'}
+              aria-label={labelText('mapKey', 'Map Key')}
+            />
+          </InlineField>
+        </InlineFieldRow>
       )}
     </>
   );
