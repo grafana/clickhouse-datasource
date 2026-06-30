@@ -101,11 +101,14 @@ type EditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig, CHVariableQue
 
 export const VariableQueryEditor = (props: EditorProps) => {
   const { query, onChange, datasource } = props;
+  // A saved variable query can be a legacy plain string instead of a
+  // CHVariableQuery object; treat that as the raw SQL.
+  const legacyRawSql = typeof query === 'string' ? query : undefined;
   const safeQuery: CHVariableQuery = useMemo(
     () => ({
       refId: query?.refId || 'var',
       queryType: query?.queryType || 'sql',
-      rawSql: query?.rawSql,
+      rawSql: legacyRawSql ?? query?.rawSql,
       database: query?.database,
       table: query?.table,
       column: query?.column,
@@ -113,6 +116,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
       columnIsMap: query?.columnIsMap,
     }),
     [
+      legacyRawSql,
       query?.refId,
       query?.queryType,
       query?.rawSql,
@@ -235,16 +239,29 @@ export class CHVariableSupport extends CustomVariableSupport<Datasource, CHVaria
 
   query(request: DataQueryRequest<CHVariableQuery>): Observable<DataQueryResponse> {
     const target = request.targets[0];
-    if (!target?.rawSql) {
+    // A saved variable query can be a legacy plain string instead of a
+    // CHVariableQuery object, so accept both shapes.
+    const rawSql = typeof target === 'string' ? target : target?.rawSql;
+    if (!rawSql) {
       return of({ data: [] });
     }
     // Pass rawSql as a string. metricFindQuery accepts (CHQuery | string) and
     // wraps a string into a minimal SQL-mode CHQuery internally; that keeps
     // pluginVersion / refId concerns where they already live.
     const promise = this.datasource
-      .metricFindQuery(target.rawSql, { range: request.range })
+      .metricFindQuery(rawSql, { range: request.range })
       .then((values: MetricFindValue[]) => ({
-        data: [toDataFrame({ fields: [{ name: 'text', values: values.map((v) => v.text) }] })],
+        // Emit text and value separately so a `SELECT value, label` query
+        // substitutes the value while displaying the label. Fall back to text
+        // when the query returns a single column.
+        data: [
+          toDataFrame({
+            fields: [
+              { name: 'text', values: values.map((v) => v.text) },
+              { name: 'value', values: values.map((v) => v.value ?? v.text) },
+            ],
+          }),
+        ],
       }));
     return from(promise);
   }

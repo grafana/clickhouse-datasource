@@ -260,6 +260,22 @@ describe('VariableQueryEditor', () => {
     );
     expect(result.getByText('Database')).toBeInTheDocument();
   });
+
+  it('loads a legacy string query into the SQL field', async () => {
+    const datasource = buildDatasource();
+    const onChange = jest.fn();
+    const result = await waitFor(() =>
+      render(
+        <VariableQueryEditor
+          datasource={datasource}
+          query={'SELECT name FROM system.databases' as unknown as CHVariableQuery}
+          onChange={onChange}
+          onRunQuery={() => {}}
+        />
+      )
+    );
+    expect(result.getByLabelText('SQL Query')).toHaveValue('SELECT name FROM system.databases');
+  });
 });
 
 describe('CHVariableSupport', () => {
@@ -276,7 +292,7 @@ describe('CHVariableSupport', () => {
     expect(response.data).toEqual([]);
   });
 
-  it('wraps metricFindQuery output into a DataFrame with a text field', async () => {
+  it('wraps metricFindQuery output into a DataFrame with text and value fields', async () => {
     const datasource = buildDatasource();
     const support = new CHVariableSupport(datasource);
     const request = {
@@ -298,9 +314,51 @@ describe('CHVariableSupport', () => {
     );
     expect(response.data).toHaveLength(1);
     const frame = response.data[0];
-    expect(frame.fields).toHaveLength(1);
+    expect(frame.fields).toHaveLength(2);
     expect(frame.fields[0].name).toBe('text');
     expect(frame.fields[0].values).toEqual(['foo', 'bar']);
+    expect(frame.fields[1].name).toBe('value');
+    expect(frame.fields[1].values).toEqual(['foo', 'bar']);
+  });
+
+  it('keeps value distinct from text for value/text pairs', async () => {
+    const datasource = buildDatasource({
+      metricFindQuery: jest.fn(() =>
+        Promise.resolve([
+          { text: 'Label A', value: 'id-a' },
+          { text: 'Label B', value: 'id-b' },
+        ])
+      ) as unknown as Datasource['metricFindQuery'],
+    });
+    const support = new CHVariableSupport(datasource);
+    const request = {
+      targets: [{ refId: 'v', queryType: 'sql' as CHVariableQueryType, rawSql: 'SELECT id, label FROM t' }],
+      range: { from: new Date(), to: new Date() },
+    };
+    const response = (await firstValueFrom(
+      support.query(request as unknown as DataQueryRequest<CHVariableQuery>)
+    )) as DataQueryResponse;
+    const frame = response.data[0];
+    expect(frame.fields[0].values).toEqual(['Label A', 'Label B']);
+    expect(frame.fields[1].name).toBe('value');
+    expect(frame.fields[1].values).toEqual(['id-a', 'id-b']);
+  });
+
+  it('resolves a legacy string target', async () => {
+    const datasource = buildDatasource();
+    const support = new CHVariableSupport(datasource);
+    const request = {
+      targets: ['SELECT name FROM system.databases'],
+      range: { from: new Date(), to: new Date() },
+    };
+    const response = (await firstValueFrom(
+      support.query(request as unknown as DataQueryRequest<CHVariableQuery>)
+    )) as DataQueryResponse;
+    expect(datasource.metricFindQuery).toHaveBeenCalledWith(
+      'SELECT name FROM system.databases',
+      expect.objectContaining({ range: expect.any(Object) })
+    );
+    expect(response.data[0].fields[0].values).toEqual(['foo', 'bar']);
   });
 });
 
