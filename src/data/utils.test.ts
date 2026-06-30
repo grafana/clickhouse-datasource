@@ -482,7 +482,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     });
     const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
 
-    const links = out?.data[0]?.fields[0]?.config?.links ?? [];
+    const frame = out.data[0] as DataFrame;
+    const links = frame.fields[0].config.links ?? [];
     const viewTrace = links.find((l) => l.title === 'View trace');
     const viewLogs = links.find((l) => l.title === 'View logs');
     expect(viewTrace).toBeDefined();
