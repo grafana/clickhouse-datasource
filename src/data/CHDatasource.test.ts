@@ -2293,4 +2293,498 @@ describe('ClickHouseDatasource', () => {
       nowSpy.mockRestore();
     });
   });
+
+  describe('queryHasFilter', () => {
+    const query: CHBuilderQuery = {
+      pluginVersion: '',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      builderOptions: {
+        database: 'default',
+        table: 'logs',
+        queryType: QueryType.Logs,
+        mode: BuilderMode.List,
+        columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes, type: 'Map(String, String)' }],
+      },
+    };
+
+    let datasource: Datasource;
+    beforeEach(() => {
+      datasource = cloneDeep(mockDatasource);
+    });
+
+    it('returns false for SQL mode queries', () => {
+      const sqlQuery: CHSqlQuery = { pluginVersion: '', refId: 'A', editorType: EditorType.SQL, rawSql: 'SELECT 1' };
+      expect(datasource.queryHasFilter(sqlQuery, { key: 'level', value: 'info' })).toBe(false);
+    });
+
+    it('returns false when no filters exist', () => {
+      expect(datasource.queryHasFilter(query, { key: 'level', value: 'info' })).toBe(false);
+    });
+
+    it('returns true when an Equals filter matches key and value', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'level', value: 'info' })).toBe(true);
+    });
+
+    it('returns true for an Equals filter whose value is an empty string', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: '',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'level', value: '' })).toBe(true);
+    });
+
+    it('returns false when value does not match', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'debug',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'level', value: 'info' })).toBe(false);
+    });
+
+    it('returns false for NotEquals filter (only Equals counts)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.NotEquals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'level', value: 'info' })).toBe(false);
+    });
+
+    it('returns true for hint-matched column via log alias', () => {
+      const queryWithLevel: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: '',
+              hint: ColumnHint.LogLevel,
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithLevel, { key: 'level', value: 'info' })).toBe(true);
+    });
+
+    it('returns true for OTel map key match', () => {
+      const queryWithMap: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'ResourceAttributes', type: 'Map(String, String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'ResourceAttributes',
+              mapKey: 'service.name',
+              type: 'Map(String, String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'my-service',
+            },
+          ],
+        },
+      };
+
+      expect(
+        datasource.queryHasFilter(queryWithMap, { key: 'ResourceAttributes.service.name', value: 'my-service' })
+      ).toBe(true);
+    });
+
+    it('returns false when key is missing', () => {
+      expect(datasource.queryHasFilter(query, { value: 'info' } as any)).toBe(false);
+    });
+  });
+
+  describe('toggleQueryFilter', () => {
+    const query: CHBuilderQuery = {
+      pluginVersion: '',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      rawSql: '',
+      builderOptions: {
+        database: 'default',
+        table: 'logs',
+        queryType: QueryType.Logs,
+        mode: BuilderMode.List,
+        columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes, type: 'Map(String, String)' }],
+      },
+    };
+
+    let datasource: Datasource;
+    beforeEach(() => {
+      datasource = cloneDeep(mockDatasource);
+    });
+
+    it('returns query unchanged for SQL mode', () => {
+      const sqlQuery: CHSqlQuery = { pluginVersion: '', refId: 'A', editorType: EditorType.SQL, rawSql: 'SELECT 1' };
+      const result = datasource.toggleQueryFilter(sqlQuery, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'info' },
+      });
+      expect(result).toBe(sqlQuery);
+    });
+
+    it('returns query unchanged when key is missing', () => {
+      const result = datasource.toggleQueryFilter(query, { type: 'FILTER_FOR', options: { value: 'info' } as any });
+      expect(result).toBe(query);
+    });
+
+    it('FILTER_FOR adds an Equals filter when none exists', () => {
+      const result = datasource.toggleQueryFilter(query, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'info' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'level',
+        operator: FilterOperator.Equals,
+        value: 'info',
+      });
+    });
+
+    it('FILTER_FOR removes existing Equals filter with same key+value (toggle off)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'info' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+
+    it('FILTER_FOR replaces existing NotEquals filter with Equals', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.NotEquals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'info' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        operator: FilterOperator.Equals,
+        value: 'info',
+      });
+    });
+
+    it('FILTER_FOR replaces existing Equals filter with a different value (no AND-ing)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'error' },
+      }) as CHBuilderQuery;
+
+      // Must NOT produce `level = 'info' AND level = 'error'` (zero rows); the old Equals is replaced.
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'level',
+        operator: FilterOperator.Equals,
+        value: 'error',
+      });
+    });
+
+    it('FILTER_FOR with empty-string value adds an Equals filter (not a no-op)', () => {
+      const result = datasource.toggleQueryFilter(query, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: '' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'level',
+        operator: FilterOperator.Equals,
+        value: '',
+      });
+    });
+
+    it('FILTER_OUT adds a NotEquals filter when none exists', () => {
+      const result = datasource.toggleQueryFilter(query, {
+        type: 'FILTER_OUT',
+        options: { key: 'level', value: 'error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'level',
+        operator: FilterOperator.NotEquals,
+        value: 'error',
+      });
+    });
+
+    it('FILTER_OUT accumulates multiple NotEquals filters with different values', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.NotEquals,
+              value: 'a',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_OUT',
+        options: { key: 'level', value: 'b' },
+      }) as CHBuilderQuery;
+
+      // `!= a AND != b` is valid and must be preserved.
+      expect(result.builderOptions.filters).toHaveLength(2);
+      expect(result.builderOptions.filters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ operator: FilterOperator.NotEquals, value: 'a' }),
+          expect.objectContaining({ operator: FilterOperator.NotEquals, value: 'b' }),
+        ])
+      );
+    });
+
+    it('FILTER_OUT removes existing NotEquals filter with same key+value (toggle off)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.NotEquals,
+              value: 'error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_OUT',
+        options: { key: 'level', value: 'error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+
+    it('FILTER_OUT replaces existing Equals filter with NotEquals', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_OUT',
+        options: { key: 'level', value: 'error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        operator: FilterOperator.NotEquals,
+        value: 'error',
+      });
+    });
+
+    it('works with hint-based columns via log alias', () => {
+      const queryWithLevel: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel, type: 'string' }],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithLevel, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'info' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: '',
+        hint: ColumnHint.LogLevel,
+        operator: FilterOperator.Equals,
+        value: 'info',
+      });
+    });
+
+    it('works with OTel map keys', () => {
+      const queryWithResource: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'ResourceAttributes', type: 'Map(String, String)' }],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithResource, {
+        type: 'FILTER_FOR',
+        options: { key: 'ResourceAttributes.service.name', value: 'my-service' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        mapKey: 'service.name',
+        type: 'Map(String, String)',
+        operator: FilterOperator.Equals,
+        value: 'my-service',
+      });
+    });
+
+    it('toggles off OTel map key filter when it already exists', () => {
+      const queryWithMapFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'ResourceAttributes', type: 'Map(String, String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'ResourceAttributes',
+              mapKey: 'service.name',
+              type: 'Map(String, String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'my-service',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithMapFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'ResourceAttributes.service.name', value: 'my-service' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+  });
 });
