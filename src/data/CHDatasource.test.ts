@@ -2344,6 +2344,27 @@ describe('ClickHouseDatasource', () => {
       expect(datasource.queryHasFilter(queryWithFilter, { key: 'level', value: 'info' })).toBe(true);
     });
 
+    it('returns true for an Equals filter whose value is an empty string', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: '',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'level', value: '' })).toBe(true);
+    });
+
     it('returns false when value does not match', () => {
       const queryWithFilter: CHBuilderQuery = {
         ...query,
@@ -2543,6 +2564,52 @@ describe('ClickHouseDatasource', () => {
       });
     });
 
+    it('FILTER_FOR replaces existing Equals filter with a different value (no AND-ing)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'info',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: 'error' },
+      }) as CHBuilderQuery;
+
+      // Must NOT produce `level = 'info' AND level = 'error'` (zero rows); the old Equals is replaced.
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'level',
+        operator: FilterOperator.Equals,
+        value: 'error',
+      });
+    });
+
+    it('FILTER_FOR with empty-string value adds an Equals filter (not a no-op)', () => {
+      const result = datasource.toggleQueryFilter(query, {
+        type: 'FILTER_FOR',
+        options: { key: 'level', value: '' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'level',
+        operator: FilterOperator.Equals,
+        value: '',
+      });
+    });
+
     it('FILTER_OUT adds a NotEquals filter when none exists', () => {
       const result = datasource.toggleQueryFilter(query, {
         type: 'FILTER_OUT',
@@ -2555,6 +2622,39 @@ describe('ClickHouseDatasource', () => {
         operator: FilterOperator.NotEquals,
         value: 'error',
       });
+    });
+
+    it('FILTER_OUT accumulates multiple NotEquals filters with different values', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          filters: [
+            {
+              condition: 'AND',
+              key: 'level',
+              type: 'string',
+              filterType: 'custom',
+              operator: FilterOperator.NotEquals,
+              value: 'a',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_OUT',
+        options: { key: 'level', value: 'b' },
+      }) as CHBuilderQuery;
+
+      // `!= a AND != b` is valid and must be preserved.
+      expect(result.builderOptions.filters).toHaveLength(2);
+      expect(result.builderOptions.filters).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ operator: FilterOperator.NotEquals, value: 'a' }),
+          expect.objectContaining({ operator: FilterOperator.NotEquals, value: 'b' }),
+        ])
+      );
     });
 
     it('FILTER_OUT removes existing NotEquals filter with same key+value (toggle off)', () => {

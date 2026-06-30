@@ -641,7 +641,8 @@ export class Datasource
 
     const key = filter.key;
     const value = filter.value;
-    if (!key || !value) {
+    // Guard on key only: an empty-string value is still a valid, filterable value.
+    if (!key) {
       return false;
     }
 
@@ -664,7 +665,8 @@ export class Datasource
 
     const key = filter.options.key;
     const value = filter.options.value;
-    if (!key || !value) {
+    // Guard on key only: an empty-string value is still a valid, filterable value.
+    if (!key) {
       return query;
     }
 
@@ -684,16 +686,33 @@ export class Datasource
       // Toggle off: remove the existing filter
       nextFilters.splice(exactMatchIndex, 1);
     } else {
-      // Remove any opposite filter with the same value
-      nextFilters = nextFilters.filter(
-        (f) =>
-          !(
-            filterMatchesColumn(f, resolved) &&
-            f.operator === oppositeOperator &&
-            'value' in f &&
-            String(f.value) === value
-          )
-      );
+      if (filter.type === 'FILTER_FOR') {
+        // Equals targets a single value, so remove any existing IsAnything/Equals/NotEquals
+        // on this column (mirrors modifyQuery's ADD_FILTER). Otherwise filtering for a new
+        // value while one is already set produces contradictory filters like
+        // `level = 'info' AND level = 'error'`, which match zero rows.
+        nextFilters = nextFilters.filter(
+          (f) =>
+            !(
+              filterMatchesColumn(f, resolved) &&
+              (f.operator === FilterOperator.IsAnything ||
+                f.operator === FilterOperator.Equals ||
+                f.operator === FilterOperator.NotEquals)
+            )
+        );
+      } else {
+        // NotEquals filters can accumulate (`!= a AND != b`), so only remove the opposite
+        // Equals filter at the same value.
+        nextFilters = nextFilters.filter(
+          (f) =>
+            !(
+              filterMatchesColumn(f, resolved) &&
+              f.operator === oppositeOperator &&
+              'value' in f &&
+              String(f.value) === value
+            )
+        );
+      }
 
       // Add the new filter
       nextFilters.push(buildFilter(resolved, targetOperator, value));
