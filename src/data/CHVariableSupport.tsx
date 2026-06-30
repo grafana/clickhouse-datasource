@@ -137,29 +137,22 @@ export const VariableQueryEditor = (props: EditorProps) => {
   );
 
   const onPickerChange = useCallback(
-    async (picked: SchemaPickerValue) => {
-      let columnIsMap = false;
-      if (safeQuery.queryType === 'columnValues' && picked.column && picked.database && picked.table) {
-        try {
-          const columns = await datasource.fetchColumns(picked.database, picked.table);
-          const sel = columns.find((c) => c.name === picked.column);
-          columnIsMap = sel ? sel.type.startsWith('Map(') : false;
-        } catch {
-          columnIsMap = false;
-        }
-      }
+    (picked: SchemaPickerValue) => {
       const next: CHVariableQuery = {
         ...safeQuery,
         database: picked.database || '',
         table: picked.table || '',
         column: picked.column || '',
         mapKey: picked.mapKey || '',
-        columnIsMap,
+        // SchemaPicker already knows the column type from the data it fetched
+        // for the column dropdown, so reuse its flag instead of refetching the
+        // column metadata here.
+        columnIsMap: picked.isMapColumn ?? false,
       };
       next.rawSql = generateVariableSql(next, defaultDatabase);
       onChange(next);
     },
-    [datasource, defaultDatabase, onChange, safeQuery]
+    [defaultDatabase, onChange, safeQuery]
   );
 
   const onSqlChange = useCallback(
