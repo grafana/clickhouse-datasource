@@ -63,6 +63,7 @@ import {
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
+import { createAnnotationSupport } from './CHAnnotationSupport';
 
 interface ResolvedColumn {
   columnName: string;
@@ -135,8 +136,6 @@ export class Datasource
     DataSourceWithQueryModificationSupport<CHQuery>,
     DataSourceWithToggleableQueryFiltersSupport<CHQuery>
 {
-  // This enables default annotation support for 7.2+
-  annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   adHocFilter: AdHocFilter;
   skipAdHocFilter = false; // don't apply adhoc filters to the query
@@ -167,6 +166,7 @@ export class Datasource
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
     this.variables = new CHVariableSupport(this);
+    this.annotations = createAnnotationSupport(this);
   }
 
   static logVolumePrefix = 'log-volume-';
