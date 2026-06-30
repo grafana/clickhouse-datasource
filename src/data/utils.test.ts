@@ -465,6 +465,39 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(out.data[0].fields[0].config.links ?? []).toHaveLength(0);
   });
 
+  it('embeds a serializable datasource ref (not the live instance) in trace/log link queries', async () => {
+    // The live Datasource instance contains a circular reference (datasource.variables.datasource
+    // === datasource, added with CustomVariableSupport). Embedding the instance in a data link's
+    // internal query makes Grafana's link scanner (getStringsFromObject) recurse infinitely on
+    // older Grafana, throwing "Maximum call stack size exceeded". The link must carry a plain
+    // { uid, type } ref instead.
+    const mockDatasource = newMockDatasource();
+    configureOtelLogs(mockDatasource);
+    configureOtelTraces(mockDatasource);
+    jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+    const [request, response] = buildTestRequestResponse({
+      queryType: QueryType.Traces,
+      columns: [{ name: 'a' }],
+    });
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links ?? [];
+    const viewTrace = links.find((l) => l.title === 'View trace');
+    const viewLogs = links.find((l) => l.title === 'View logs');
+    expect(viewTrace).toBeDefined();
+    expect(viewLogs).toBeDefined();
+
+    for (const link of [viewTrace!, viewLogs!]) {
+      const embedded = (link.internal!.query as CHBuilderQuery).datasource;
+      // Must be a plain ref, not the live instance (which is circular).
+      expect(embedded).not.toBe(mockDatasource);
+      expect(embedded).toEqual({ uid: 'clickhouse_ds', type: 'grafana-clickhouse-datasource' });
+      // The whole internal query must be JSON-serializable (no circular references reach Grafana).
+      expect(() => JSON.stringify(link.internal!.query)).not.toThrow();
+    }
+  });
+
   describe('trace ID link rawSql pre-generation', () => {
     const newOtelMockDatasource = (): Datasource => {
       const ds = newMockDatasource();
