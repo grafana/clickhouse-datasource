@@ -1,7 +1,12 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { AnnotationQuery } from '@grafana/data';
-import { createAnnotationSupport, generateChangeDetectionSQL, resolveTraceSchema } from './CHAnnotationSupport';
+import {
+  buildGroupByOptions,
+  createAnnotationSupport,
+  generateChangeDetectionSQL,
+  resolveTraceSchema,
+} from './CHAnnotationSupport';
 import { Datasource } from './CHDatasource';
 import { CHQuery, EditorType } from 'types/sql';
 import { TableColumn } from 'types/queryBuilder';
@@ -90,6 +95,65 @@ describe('generateChangeDetectionSQL', () => {
   });
 });
 
+describe('generateChangeDetectionSQL: guards and quoting', () => {
+  it('returns the placeholder for a Map watch column until a key is chosen', () => {
+    const sql = generateChangeDetectionSQL({
+      table: 'otel_traces',
+      column: 'ResourceAttributes',
+      columnType: 'Map(String, String)',
+    });
+    expect(sql).toContain('Select a table and column');
+    expect(sql).not.toContain('lagInFrame');
+  });
+
+  it('generates once a Map watch column has a key', () => {
+    const sql = generateChangeDetectionSQL({
+      table: 'otel_traces',
+      column: 'ResourceAttributes',
+      columnType: 'Map(String, String)',
+      mapKey: 'service.version',
+    });
+    expect(sql).toContain(`topK(1)("ResourceAttributes"['service.version'])[1]`);
+    expect(sql).toContain('lagInFrame');
+  });
+
+  it('does not require a key for a non-Map watch column', () => {
+    const sql = generateChangeDetectionSQL({ table: 'deploys', column: 'version', columnType: 'String' });
+    expect(sql).toContain('lagInFrame(topK(1)("version")[1])');
+  });
+
+  it('quotes the database and table via the shared identifier helper', () => {
+    expect(generateChangeDetectionSQL({ database: 'db', table: 't', column: 'c' })).toContain('FROM "db"."t"');
+    // No leading dot when the database is empty (single-table datasources).
+    expect(generateChangeDetectionSQL({ table: 't', column: 'c' })).toContain('FROM "t"');
+    expect(generateChangeDetectionSQL({ table: 't', column: 'c' })).not.toContain('FROM ".');
+  });
+});
+
+describe('buildGroupByOptions', () => {
+  it('lists ServiceName once even when it is a real column', () => {
+    expect(buildGroupByOptions(columns, undefined, undefined).filter((o) => o.value === 'ServiceName')).toHaveLength(1);
+  });
+
+  it('excludes Map columns, the timestamp, and the watched column', () => {
+    const values = buildGroupByOptions(columns, 'Environment', undefined).map((o) => o.value);
+    expect(values).not.toContain('ResourceAttributes');
+    expect(values).not.toContain('Timestamp');
+    expect(values).not.toContain('Environment');
+    expect(values).toContain('ServiceName');
+  });
+
+  it('keeps a saved group-by that the filter would drop (Map or timestamp)', () => {
+    expect(buildGroupByOptions(columns, undefined, 'Timestamp').map((o) => o.value)).toContain('Timestamp');
+  });
+
+  it('does not duplicate a saved group-by that is already an option', () => {
+    expect(
+      buildGroupByOptions(columns, undefined, 'ServiceName').filter((o) => o.value === 'ServiceName')
+    ).toHaveLength(1);
+  });
+});
+
 describe('resolveTraceSchema (compact vs complete datasource)', () => {
   it('uses the traces OTel config on a complete (classic) datasource', () => {
     const ds = buildDatasource({ defaultDb: 'fallback', tracesDb: 'otel', tracesTable: 'spans' });
@@ -159,19 +223,16 @@ describe('createAnnotationSupport: prepareAnnotation', () => {
 });
 
 describe('createAnnotationSupport: getDefaultQuery', () => {
-  it('returns a service.version deployment change-detection default', () => {
+  it('defaults to an empty Custom SQL query so the default query and editor mode agree', () => {
     const support = createAnnotationSupport(buildDatasource({ defaultDb: 'mydb' }));
     const query = support.getDefaultQuery?.();
     expect(query?.editorType).toBe(EditorType.SQL);
     expect(query?.refId).toBe('annotation');
-    expect(query?.rawSql).toContain(`"ResourceAttributes"['service.version']`);
-    expect(query?.rawSql).toContain('PARTITION BY "ServiceName"');
-    expect(query?.rawSql).toContain('FROM "mydb"."otel_traces"');
-  });
-
-  it('targets the configured trace table on a complete (classic) datasource', () => {
-    const support = createAnnotationSupport(buildDatasource({ tracesDb: 'otel', tracesTable: 'spans' }));
-    expect(support.getDefaultQuery?.().rawSql).toContain('FROM "otel"."spans"');
+    expect(query?.rawSql).toBe('');
+    // The editor opens in Custom SQL mode (preset undefined -> 'custom'), so the
+    // default query must not be a change-detection query the hidden builder cannot show.
+    expect(query?.rawSql).not.toContain('lagInFrame');
+    expect(query?.rawSql).not.toContain('topK(1)');
   });
 });
 
@@ -253,10 +314,10 @@ describe('AnnotationQueryEditor', () => {
     expect(() => fireEvent.change(result.getByRole('textbox'), { target: { value: 'SELECT 1' } })).not.toThrow();
   });
 
-  it('regenerates the SQL when switching to the change detection preset', async () => {
+  it('seeds a populated deployment query when switching to the change detection preset', async () => {
     const onAnnotationChange = jest.fn();
     const result = await renderEditor(
-      buildDatasource({ defaultDb: 'default' }),
+      buildDatasource({ tracesDb: 'otel', tracesTable: 'spans' }),
       annotationWith({ preset: 'custom' }),
       onAnnotationChange
     );
@@ -265,9 +326,58 @@ describe('AnnotationQueryEditor', () => {
     fireEvent.keyDown(presetSelect, { key: 'ArrowDown' });
     fireEvent.click(await result.findByText('Change Detection'));
 
-    expect(onAnnotationChange).toHaveBeenCalled();
     const emitted = onAnnotationChange.mock.calls[onAnnotationChange.mock.calls.length - 1][0];
     expect(emitted.preset).toBe('change_detection');
-    expect(emitted.target.rawSql).toContain('Select a table and column');
+    // The builder opens pre-filled with a runnable query, not the placeholder.
+    expect(emitted.changeDetection.table).toBe('spans');
+    expect(emitted.changeDetection.mapKey).toBe('service.version');
+    expect(emitted.target.rawSql).toContain('lagInFrame');
+    expect(emitted.target.rawSql).toContain('FROM "otel"."spans"');
+    expect(emitted.target.rawSql).not.toContain('Select a table and column');
+  });
+
+  it('stashes Custom SQL when entering Change Detection', async () => {
+    const onAnnotationChange = jest.fn();
+    const result = await renderEditor(
+      buildDatasource({ defaultDb: 'default' }),
+      annotationWith({ preset: 'custom', target: { ...baseQuery, rawSql: 'SELECT mine AS time' } }),
+      onAnnotationChange
+    );
+    const presetSelect = result.getAllByRole('combobox')[0];
+    fireEvent.keyDown(presetSelect, { key: 'ArrowDown' });
+    fireEvent.click(await result.findByText('Change Detection'));
+    const emitted = onAnnotationChange.mock.calls[onAnnotationChange.mock.calls.length - 1][0];
+    expect(emitted.customSql).toBe('SELECT mine AS time');
+  });
+
+  it('restores stashed Custom SQL when returning to the Custom preset', async () => {
+    const onAnnotationChange = jest.fn();
+    const result = await renderEditor(
+      buildDatasource({ defaultDb: 'default' }),
+      annotationWith({
+        preset: 'change_detection',
+        changeDetection: {
+          database: 'default',
+          table: 'otel_traces',
+          column: 'ResourceAttributes',
+          mapKey: 'service.version',
+        },
+        customSql: 'SELECT mine AS time',
+        target: { ...baseQuery, rawSql: 'SELECT generated AS time' },
+      }),
+      onAnnotationChange
+    );
+    const presetSelect = result.getAllByRole('combobox')[0];
+    fireEvent.keyDown(presetSelect, { key: 'ArrowDown' });
+    fireEvent.click(await result.findByText('Custom SQL'));
+    const emitted = onAnnotationChange.mock.calls[onAnnotationChange.mock.calls.length - 1][0];
+    expect(emitted.target.rawSql).toBe('SELECT mine AS time');
+  });
+
+  it('opens a fresh annotation (no preset) in Custom SQL mode', async () => {
+    const result = await renderEditor(buildDatasource(), annotationWith({}));
+    expect(result.getByText('Annotation Type')).toBeInTheDocument();
+    expect(result.queryByText('Database')).not.toBeInTheDocument();
+    expect(result.getByRole('textbox')).toBeInTheDocument();
   });
 });

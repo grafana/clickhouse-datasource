@@ -3,22 +3,30 @@ import { AnnotationQuery, AnnotationSupport, GrafanaTheme2, QueryEditorProps } f
 import { InlineFormLabel, Select, TextArea, useStyles2 } from '@grafana/ui';
 import { css } from '@emotion/css';
 import { Datasource } from './CHDatasource';
-import { escapeIdentifier } from './sqlGenerator';
+import { escapeIdentifier, getTableIdentifier } from './sqlGenerator';
 import { CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { SchemaPicker, SchemaPickerValue } from 'components/queryBuilder/SchemaPicker';
 import useColumns from 'hooks/useColumns';
+import { TableColumn } from 'types/queryBuilder';
 
 /** Annotation preset types. */
 type AnnotationPreset = 'custom' | 'change_detection';
 
-/** Builder state for the change-detection preset: a schema selection plus a group-by column. */
-type ChangeDetectionState = SchemaPickerValue & { groupBy?: string };
+/**
+ * Builder state for the change-detection preset: a schema selection, the watched
+ * column's type (so a Map column can require a key before generating), and a
+ * group-by column.
+ */
+type ChangeDetectionState = SchemaPickerValue & { groupBy?: string; columnType?: string };
 
 /** Annotation query extended with the builder state the editor needs to round-trip. */
 interface CHAnnotationQuery extends AnnotationQuery<CHQuery> {
   preset?: AnnotationPreset;
   changeDetection?: ChangeDetectionState;
+  // Custom SQL stashed when entering Change Detection, restored on return so a
+  // hand-written query is not lost by the round trip.
+  customSql?: string;
 }
 
 /** Props Grafana passes to an annotation QueryEditor (the base props plus annotation-specific ones). */
@@ -31,6 +39,9 @@ const ANNOTATION_REF_ID = 'annotation';
 
 /** Minimal defaults used only when Grafana mounts the editor without an existing annotation. */
 const DEFAULT_ANNOTATION: CHAnnotationQuery = { name: '', enable: true, iconColor: 'red' };
+
+/** Shown in the generated-SQL box until the builder has enough to produce a query. */
+const CHANGE_DETECTION_PLACEHOLDER = '-- Select a table and column above to generate the change detection query';
 
 /**
  * Escape a value for use inside a single-quoted ClickHouse string literal.
@@ -80,12 +91,18 @@ export function resolveTraceSchema(datasource: Datasource): { database: string; 
  * Identifiers are escaped; the watched map key is emitted as a quoted string literal.
  */
 export function generateChangeDetectionSQL(opts: ChangeDetectionState): string {
-  const { database, table, column, mapKey, groupBy } = opts;
+  const { database, table, column, mapKey, groupBy, columnType } = opts;
   if (!table || !column) {
-    return '-- Select a table and column above to generate the change detection query';
+    return CHANGE_DETECTION_PLACEHOLDER;
+  }
+  // A Map column is only usable once a key is chosen: without one the generated
+  // query would compare the whole Map to '' and ClickHouse rejects it (code 27).
+  // Wait for the key rather than emitting a query that cannot run.
+  if (columnType?.startsWith('Map(') && !mapKey) {
+    return CHANGE_DETECTION_PLACEHOLDER;
   }
 
-  const fullTable = database ? `${escapeIdentifier(database)}.${escapeIdentifier(table)}` : escapeIdentifier(table);
+  const fullTable = getTableIdentifier(database || '', table);
   const columnExpr = mapKey
     ? `${escapeIdentifier(column)}['${escapeStringContent(mapKey)}']`
     : escapeIdentifier(column);
@@ -115,6 +132,34 @@ export function generateChangeDetectionSQL(opts: ChangeDetectionState): string {
     "WHERE prev_version != '' AND prev_version != version",
     'ORDER BY time',
   ].join('\n');
+}
+
+/**
+ * Build the Group By options for the change-detection builder. ServiceName leads
+ * (the OTel convention and the default), followed by columns that make sense to
+ * group by: Map columns, the timestamp, the watched column itself, and a duplicate
+ * ServiceName are excluded. A saved group-by that the filter would drop (for
+ * example a Map or the timestamp from an older query) is appended so the Select
+ * shows the real value instead of rendering blank while the SQL still references it.
+ */
+export function buildGroupByOptions(
+  columns: readonly TableColumn[],
+  watchColumn: string | undefined,
+  savedGroupBy: string | undefined
+): Array<{ label: string; value: string }> {
+  const options = [
+    { label: 'ServiceName', value: 'ServiceName' },
+    ...columns
+      .filter(
+        (c) =>
+          !c.type.startsWith('Map(') && c.name !== 'Timestamp' && c.name !== 'ServiceName' && c.name !== watchColumn
+      )
+      .map((c) => ({ label: c.name, value: c.name })),
+  ];
+  if (savedGroupBy && !options.some((o) => o.value === savedGroupBy)) {
+    options.push({ label: savedGroupBy, value: savedGroupBy });
+  }
+  return options;
 }
 
 const PRESET_OPTIONS = [
@@ -156,9 +201,11 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
 
   const onSchemaChange = useCallback(
     (schemaValue: SchemaPickerValue) => {
-      updateChangeDetection(schemaValue);
+      // Carry the watched column's type so the generator can require a Map key.
+      const columnType = columns.find((c) => c.name === schemaValue.column)?.type;
+      updateChangeDetection({ ...schemaValue, columnType });
     },
-    [updateChangeDetection]
+    [updateChangeDetection, columns]
   );
 
   const onPresetChange = useCallback(
@@ -166,15 +213,37 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
       if (!onAnnotationChange) {
         return;
       }
-      const next: CHAnnotationQuery = { ...anno, preset: value };
       if (value === 'change_detection') {
-        next.target = buildTarget(anno.target, generateChangeDetectionSQL(cd));
+        // Seed sensible deployment defaults so the builder opens populated with a
+        // working query (instead of an empty builder and a placeholder), and stash
+        // the current Custom SQL so switching back restores it.
+        const seeded: ChangeDetectionState =
+          cd.table && cd.column
+            ? cd
+            : {
+                ...resolveTraceSchema(datasource),
+                column: 'ResourceAttributes',
+                columnType: 'Map(String, String)',
+                mapKey: 'service.version',
+                groupBy: 'ServiceName',
+              };
+        onAnnotationChange({
+          ...anno,
+          preset: value,
+          customSql: anno.target?.rawSql ?? '',
+          changeDetection: seeded,
+          target: buildTarget(anno.target, generateChangeDetectionSQL(seeded)),
+        });
       } else {
-        next.target = buildTarget(anno.target, anno.target?.rawSql || '');
+        // Restore the Custom SQL stashed when Change Detection was entered.
+        onAnnotationChange({
+          ...anno,
+          preset: value,
+          target: buildTarget(anno.target, anno.customSql ?? ''),
+        });
       }
-      onAnnotationChange(next);
     },
-    [anno, cd, onAnnotationChange]
+    [anno, cd, datasource, onAnnotationChange]
   );
 
   const onSqlChange = useCallback(
@@ -190,12 +259,7 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
     [anno, onAnnotationChange]
   );
 
-  const groupByOptions = [
-    { label: 'ServiceName', value: 'ServiceName' },
-    ...columns
-      .filter((c) => !c.type.startsWith('Map(') && c.name !== 'Timestamp' && c.name !== cd.column)
-      .map((c) => ({ label: c.name, value: c.name })),
-  ];
+  const groupByOptions = buildGroupByOptions(columns, cd.column, cd.groupBy);
 
   return (
     <div>
@@ -290,20 +354,14 @@ export function createAnnotationSupport(datasource: Datasource): AnnotationSuppo
       return json;
     },
 
-    getDefaultQuery: (): Partial<CHQuery> => {
-      const { database, table } = resolveTraceSchema(datasource);
-      return {
-        editorType: EditorType.SQL,
-        rawSql: generateChangeDetectionSQL({
-          database,
-          table,
-          column: 'ResourceAttributes',
-          mapKey: 'service.version',
-          groupBy: 'ServiceName',
-        }),
-        refId: ANNOTATION_REF_ID,
-      };
-    },
+    getDefaultQuery: (): Partial<CHQuery> => ({
+      // Open in Custom SQL mode (the editor's default preset) with an empty query so
+      // the default editor mode and the default query agree. Choosing Change
+      // Detection seeds a populated deployment-change builder.
+      editorType: EditorType.SQL,
+      rawSql: '',
+      refId: ANNOTATION_REF_ID,
+    }),
 
     QueryEditor: AnnotationQueryEditor,
   };

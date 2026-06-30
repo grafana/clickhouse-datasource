@@ -87,6 +87,8 @@ WHERE prev_version != '' AND prev_version != version
 ORDER BY time
 ```
 
+The builder uses `Timestamp` as the time column, the OpenTelemetry convention for the traces and logs tables. If your table stores time under a different column name, edit the generated query to match (the time column appears in `toStartOfInterval` and `$__timeFilter`), or write the query in Custom SQL.
+
 ## Query requirements
 
 Your SQL query must return at least a time column and a text column. Grafana uses these to place and label each annotation.

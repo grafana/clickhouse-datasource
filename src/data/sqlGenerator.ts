@@ -696,7 +696,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
   return colName;
 };
 
-const getTableIdentifier = (database: string, table: string): string => {
+export const getTableIdentifier = (database: string, table: string): string => {
   const sep = !database || !table ? '' : '.';
   return `${escapeIdentifier(database)}${sep}${escapeIdentifier(table)}`;
 };

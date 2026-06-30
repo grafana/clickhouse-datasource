@@ -2,6 +2,14 @@ import { useState, useEffect, useRef } from 'react';
 import { TableColumn } from 'types/queryBuilder';
 import { Datasource } from 'data/CHDatasource';
 
+// Shared in-flight requests keyed by datasource + database + table. When two
+// callers mount with the same arguments (for example the annotation editor and
+// the SchemaPicker it renders), they share a single fetchColumns request instead
+// of issuing one each with separate loading states. The entry is removed once the
+// request settles, so this only collapses overlapping fetches and never serves
+// stale schema.
+const inFlightColumns = new Map<string, Promise<readonly TableColumn[]>>();
+
 export default (datasource: Datasource, database: string, table: string): readonly TableColumn[] => {
   const [columns, setColumns] = useState<readonly TableColumn[]>([]);
 
@@ -11,13 +19,23 @@ export default (datasource: Datasource, database: string, table: string): readon
     }
 
     let ignore = false;
-    datasource
-      .fetchColumns(database, table)
-      .then((columns) => {
+    const key = `${datasource.uid} ${database} ${table}`;
+    let request = inFlightColumns.get(key);
+    if (!request) {
+      request = datasource.fetchColumns(database, table);
+      inFlightColumns.set(key, request);
+      request.finally(() => {
+        if (inFlightColumns.get(key) === request) {
+          inFlightColumns.delete(key);
+        }
+      });
+    }
+    request
+      .then((cols) => {
         if (ignore) {
           return;
         }
-        setColumns(columns);
+        setColumns(cols);
       })
       .catch((ex: any) => {
         console.error(ex);

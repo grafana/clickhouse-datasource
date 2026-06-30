@@ -45,12 +45,10 @@ test.describe('annotation editor', () => {
 
     await selectFromCombo(page, 'Annotation Type', 'Change Detection');
     await expect(comboFor(page, 'Database')).toBeVisible();
-    // Watch Column is a downstream cascade level: the row is revealed but the
-    // control stays disabled (no combobox) until a table is chosen, so assert
-    // the field label rather than an interactive combobox.
     await expect(page.getByText('Watch Column', { exact: true })).toBeVisible();
-    // Until a table and column are picked, the generator emits a placeholder comment.
-    await expect(sqlBox(page)).toHaveValue(/Select a table and column/);
+    // Selecting the preset seeds a populated builder, so the box holds a runnable
+    // change-detection query rather than the empty-state placeholder.
+    await expect(sqlBox(page)).toHaveValue(/lagInFrame/);
   });
 
   test('a custom SQL annotation query executes against ClickHouse', async ({
