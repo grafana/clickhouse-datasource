@@ -68,27 +68,11 @@
           "color": { "mode": "palette-classic" },
           "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 10000 }] }
         },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "Count" },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Filter dashboard to ${__data.fields.Service}",
-                    "url": "/d/otel-logs-explorer?var-service=${__data.fields.Service}&${__url_time_range}&var-datasource=${datasource}&var-level_filter=${level_filter}&var-search=${search}",
-                    "targetBlank": false
-                  }
-                ]
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": { "h": 5, "w": 7, "x": 0, "y": 6 },
       "id": 2,
-      "description": "Top 15 services by log volume in the time range. Click a bar to filter the dashboard to that service.",
+      "description": "Log volume per service in the current time range, honoring the Service, Level, and Search filters. Highest-volume first, up to 15.",
       "options": {
         "displayMode": "gradient",
         "orientation": "horizontal",
@@ -97,12 +81,12 @@
         "minVizHeight": 16,
         "minVizWidth": 80
       },
-      "title": "Services (click to filter)",
+      "title": "Services",
       "targets": [
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(hasToken(Body, '$search'), $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
           "refId": "A",
           "format": 0
         }

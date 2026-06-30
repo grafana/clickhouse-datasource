@@ -297,90 +297,20 @@
           {
             "matcher": { "id": "byName", "options": "TraceId" },
             "properties": [
-              { "id": "custom.width", "value": 290 },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "View trace",
-                    "url": "",
-                    "internal": {
-                      "datasourceUid": "${datasource}",
-                      "datasourceName": "ClickHouse",
-                      "query": {
-                        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
-                        "refId": "A",
-                        "editorType": "builder",
-                        "queryType": "traces",
-                        "builderOptions": {
-                          "database": "",
-                          "table": "otel_traces",
-                          "queryType": "traces",
-                          "columns": [
-                            { "name": "Timestamp", "hint": "time" },
-                            { "name": "TraceId", "hint": "trace_id" },
-                            { "name": "SpanId", "hint": "trace_span_id" },
-                            { "name": "ParentSpanId", "hint": "trace_parent_span_id" },
-                            { "name": "ServiceName", "hint": "trace_service_name" },
-                            { "name": "SpanName", "hint": "trace_operation_name" },
-                            { "name": "Duration", "hint": "trace_duration_time" },
-                            { "name": "SpanAttributes", "hint": "trace_tags" },
-                            { "name": "ResourceAttributes", "hint": "trace_service_tags" },
-                            { "name": "StatusCode", "hint": "trace_status_code" },
-                            { "name": "StatusMessage", "hint": "trace_status_message" },
-                            { "name": "SpanKind", "hint": "trace_kind" }
-                          ],
-                          "filters": [],
-                          "meta": {
-                            "isTraceIdMode": true,
-                            "traceId": "${__value.raw}",
-                            "traceDurationUnit": "nanoseconds",
-                            "otelEnabled": true,
-                            "otelVersion": "latest"
-                          }
-                        },
-                        "format": 3
-                      }
-                    }
-                  }
-                ]
-              }
+              { "id": "custom.width", "value": 290 }
             ]
           },
           {
             "matcher": { "id": "byName", "options": "Service" },
             "properties": [
-              { "id": "custom.width", "value": 170 },
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Service Dashboard",
-                    "url": "/d/otel-service-dashboard?var-service=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
-            "matcher": { "id": "byName", "options": "RootOperation" },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Filter to ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${__data.fields.Service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
-                  }
-                ]
-              }
+              { "id": "custom.width", "value": 170 }
             ]
           }
         ]
       },
       "gridPos": { "h": 12, "w": 24, "x": 0, "y": 12 },
       "id": 20,
-      "description": "Recent traces matching the variable filters. Click a TraceId to view the trace; click a Service to open the Service Dashboard; click an Operation to filter this view.",
+      "description": "Recent traces matching the variable filters. Click a TraceId to view the trace.",
       "options": {
         "showHeader": true,
         "sortBy": [
@@ -603,20 +533,6 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "Operation" },
-            "properties": [
-              {
-                "id": "links",
-                "value": [
-                  {
-                    "title": "Filter to ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
-                  }
-                ]
-              }
-            ]
-          },
-          {
             "matcher": { "id": "byName", "options": "Count" },
             "properties": [
               { "id": "custom.width", "value": 90 }
@@ -701,7 +617,7 @@
       },
       "gridPos": { "h": 7, "w": 24, "x": 0, "y": 33 },
       "id": 306,
-      "description": "Operations for $service ranked by call count. Errors and Error % are colour-coded; click an operation to filter the dashboard.",
+      "description": "Operations for $service ranked by call count. Errors and Error % are colour-coded.",
       "options": {
         "showHeader": true,
         "sortBy": [
@@ -729,31 +645,6 @@
           "refId": "A"
         }
       ]
-    },
-    {
-      "datasource": {
-        "type": "grafana-clickhouse-datasource",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 40 },
-      "id": 307,
-      "options": {
-        "mode": "markdown",
-        "content": "[**Service Dashboard >>**](/d/otel-service-dashboard?var-service=${service}&${__url_time_range}&var-datasource=${datasource})",
-        "code": {
-          "language": "plaintext",
-          "showLineNumbers": false,
-          "showMiniMap": false
-        }
-      },
-      "title": "",
-      "transparent": true,
-      "type": "text",
-      "targets": []
     }
   ]
 }
