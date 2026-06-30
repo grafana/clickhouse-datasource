@@ -58,6 +58,7 @@ import {
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { CHVariableSupport } from './CHVariableSupport';
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -98,6 +99,7 @@ export class Datasource
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+    this.variables = new CHVariableSupport(this);
   }
 
   static logVolumePrefix = 'log-volume-';
@@ -1834,7 +1836,7 @@ function isMapColumnType(type: string | undefined): boolean {
 // literal: backslash and single quote are the only characters that need
 // escaping. Use when interpolating an untrusted identifier (e.g. a Map key
 // from system.columns) into raw SQL.
-function escapeCHStringLiteral(s: string): string {
+export function escapeCHStringLiteral(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 

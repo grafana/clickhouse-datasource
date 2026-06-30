@@ -23,6 +23,9 @@ export interface SchemaPickerValue {
   table?: string;
   column?: string;
   mapKey?: string;
+  /** Whether the selected column is a Map(...) type. Emitted on change so
+   * consumers can reuse it instead of refetching the column metadata. */
+  isMapColumn?: boolean;
 }
 
 export interface SchemaPickerProps {
@@ -60,8 +63,11 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
   const tables = useTables(datasource, value.database || '');
   const columns = useColumns(datasource, value.database || '', value.table || '');
 
-  const selectedColumn = columns.find((c) => c.name === value.column);
-  const isMapColumn = selectedColumn ? selectedColumn.type.startsWith(MAP_TYPE_PREFIX) : false;
+  const columnIsMap = (name?: string): boolean => {
+    const col = columns.find((c) => c.name === name);
+    return col ? col.type.startsWith(MAP_TYPE_PREFIX) : false;
+  };
+  const isMapColumn = columnIsMap(value.column);
   const mapColumnName = isMapColumn && value.column ? value.column : '';
   const mapKeys = useUniqueMapKeys(datasource, mapColumnName, value.database || '', value.table || '');
 
@@ -97,19 +103,19 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
   // Grafana passes `null` to onChange when a clearable Select is cleared, so guard
   // the dereference. Clearing a parent also clears every downstream selection.
   const handleDatabaseChange = (selected: SelectableValue<string> | null) => {
-    onChange({ database: selected?.value || '', table: '', column: '', mapKey: '' });
+    onChange({ database: selected?.value || '', table: '', column: '', mapKey: '', isMapColumn: false });
   };
 
   const handleTableChange = (selected: SelectableValue<string> | null) => {
-    onChange({ ...value, table: selected?.value || '', column: '', mapKey: '' });
+    onChange({ ...value, table: selected?.value || '', column: '', mapKey: '', isMapColumn: false });
   };
 
   const handleColumnChange = (selected: SelectableValue<string> | null) => {
-    onChange({ ...value, column: selected?.value || '', mapKey: '' });
+    onChange({ ...value, column: selected?.value || '', mapKey: '', isMapColumn: columnIsMap(selected?.value) });
   };
 
   const handleMapKeyChange = (selected: SelectableValue<string> | null) => {
-    onChange({ ...value, mapKey: selected?.value || '' });
+    onChange({ ...value, mapKey: selected?.value || '', isMapColumn });
   };
 
   const databaseTooltip = labels.components.DatabaseSelect.tooltip;

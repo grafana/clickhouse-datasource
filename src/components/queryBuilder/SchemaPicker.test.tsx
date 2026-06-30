@@ -52,6 +52,7 @@ describe('SchemaPicker', () => {
         table: '',
         column: '',
         mapKey: '',
+        isMapColumn: false,
       });
     });
   });
@@ -99,6 +100,7 @@ describe('SchemaPicker', () => {
         table: '',
         column: '',
         mapKey: '',
+        isMapColumn: false,
       });
     });
 
@@ -120,6 +122,7 @@ describe('SchemaPicker', () => {
         table: 'events',
         column: '',
         mapKey: '',
+        isMapColumn: false,
       });
     });
   });
@@ -157,6 +160,7 @@ describe('SchemaPicker', () => {
         table: 'logs',
         column: '',
         mapKey: '',
+        isMapColumn: false,
       });
     });
   });
@@ -203,6 +207,7 @@ describe('SchemaPicker', () => {
         table: 'events',
         column: 'attrs',
         mapKey: 'service.name',
+        isMapColumn: true,
       });
     });
 
@@ -233,6 +238,7 @@ describe('SchemaPicker', () => {
           database: 'default',
           table: 'events',
           mapKey: '',
+          isMapColumn: false,
         })
       );
       const [emitted] = onChange.mock.calls[0];
@@ -265,6 +271,7 @@ describe('SchemaPicker', () => {
         table: '',
         column: '',
         mapKey: '',
+        isMapColumn: false,
       });
     });
   });
@@ -327,7 +334,7 @@ describe('SchemaPicker', () => {
       fireEvent.keyDown(databaseCombobox, { key: 'Backspace' });
 
       expect(onChange).toHaveBeenCalledTimes(1);
-      expect(onChange).toHaveBeenCalledWith({ database: '', table: '', column: '', mapKey: '' });
+      expect(onChange).toHaveBeenCalledWith({ database: '', table: '', column: '', mapKey: '', isMapColumn: false });
     });
 
     it('clears the column and its map key without disturbing the database or table', async () => {
@@ -342,7 +349,7 @@ describe('SchemaPicker', () => {
       fireEvent.keyDown(columnCombobox, { key: 'Backspace' });
 
       expect(onChange).toHaveBeenCalledTimes(1);
-      expect(onChange).toHaveBeenCalledWith({ database: 'default', table: 'events', column: '', mapKey: '' });
+      expect(onChange).toHaveBeenCalledWith({ database: 'default', table: 'events', column: '', mapKey: '', isMapColumn: false });
     });
   });
 });
