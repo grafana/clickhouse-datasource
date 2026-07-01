@@ -52,6 +52,43 @@ const createInstance = ({ queryResponse }: Partial<InstanceConfig> = {}) => {
 };
 
 describe('ClickHouseDatasource', () => {
+  describe('single-table configuration mode', () => {
+    it('defaults to classic mode when configMode and signalType are unset', () => {
+      const ds = createInstance({});
+
+      expect(ds.getSignalType()).toBeUndefined();
+      expect(ds.getConfigMode()).toBe('classic');
+      expect(ds.isSingleTableMode()).toBe(false);
+    });
+
+    it('uses explicit configMode and signalType', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+
+      expect(ds.getSignalType()).toBe('logs');
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(true);
+    });
+
+    it('infers single-table mode from legacy signalType', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.signalType = 'traces';
+
+      expect(ds.getSignalType()).toBe('traces');
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(true);
+    });
+
+    it('does not enter single-table mode without a signal type', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.configMode = 'single-table';
+
+      expect(ds.getConfigMode()).toBe('single-table');
+      expect(ds.isSingleTableMode()).toBe(false);
+    });
+  });
+
   describe('metricFindQuery', () => {
     it('fetches values', async () => {
       const mockedValues = [1, 100];
@@ -935,6 +972,34 @@ describe('ClickHouseDatasource', () => {
       // system.columns lookup is the single query — no per-column map-key probes.
       const probeCalls = spy.mock.calls.filter((c) => (c[0].targets[0].rawSql ?? '').includes('arrayJoin'));
       expect(probeCalls).toHaveLength(0);
+    });
+  });
+
+  describe('distinct value suggestions', () => {
+    it('escapes identifiers for distinct column values', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ value: 1 }, { value: 2 }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const result = await ds.fetchDistinctValues('some"col', 'db"name', 'events');
+
+      expect(result).toEqual([1, 2]);
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toBe('SELECT DISTINCT "some""col" FROM "db""name"."events" WHERE "some""col" IS NOT NULL LIMIT 1000');
+    });
+
+    it('escapes map identifiers and map key literals for distinct map values', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ value: 'alice' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const result = await ds.fetchDistinctMapValues('labels"map', "user's key", 'db', 'events');
+
+      expect(result).toEqual(['alice']);
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toBe(
+        'SELECT DISTINCT "labels""map"[\'user\\\'s key\'] FROM "db"."events" WHERE mapContains("labels""map", \'user\\\'s key\') LIMIT 1000'
+      );
     });
   });
 
@@ -1912,6 +1977,53 @@ describe('ClickHouseDatasource', () => {
           type: 'JSON',
           operator: FilterOperator.Equals,
           value: 'abc123',
+        });
+      });
+
+      it('splits legacy LogAttributes key even when the column is not selected', () => {
+        const queryWithoutLogAttributes: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithoutLogAttributes, {
+          type: 'ADD_FILTER',
+          options: { key: 'LogAttributes.foo.bar', value: 'baz' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'LogAttributes',
+          mapKey: 'foo.bar',
+          type: 'JSON',
+          operator: FilterOperator.Equals,
+          value: 'baz',
+        });
+      });
+
+      it('resolves normalized log attribute field names through column hints', () => {
+        const queryWithLogAttributes: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithLogAttributes, {
+          type: 'ADD_FILTER',
+          options: { key: 'log_attributes.log.file.path', value: '/var/log/pod.log' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: '',
+          hint: ColumnHint.LogAttributes,
+          mapKey: 'log.file.path',
+          type: 'JSON',
+          operator: FilterOperator.Equals,
+          value: '/var/log/pod.log',
         });
       });
     });

@@ -32,7 +32,7 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
-import { CHConfig } from 'types/config';
+import { CHConfig, ConfigMode, SignalType } from 'types/config';
 import {
   AggregateColumn,
   AggregateType,
@@ -73,16 +73,48 @@ interface ResolvedColumn {
   hasMapKey: boolean;
 }
 
+const attributeColumnHints = new Set([
+  ColumnHint.ResourceAttributes,
+  ColumnHint.ScopeAttributes,
+  ColumnHint.LogAttributes,
+]);
+const legacyAttributeColumns = new Set(['ResourceAttributes', 'ScopeAttributes', 'LogAttributes']);
+
+function getAttributeColumnByDisplayPrefix(
+  builderOptions: QueryBuilderOptions,
+  columnPrefix: string
+): SelectedColumn | undefined {
+  const normalizedPrefix = normalizeLogFieldName(columnPrefix);
+
+  return builderOptions.columns?.find((column) => {
+    const isAttributeHint = column.hint ? attributeColumnHints.has(column.hint) : false;
+    const isAttributeType = column.type?.startsWith('Map') || column.type?.startsWith('JSON');
+    if (!isAttributeHint && !isAttributeType) {
+      return false;
+    }
+
+    const candidates = isAttributeHint ? [column.name, column.alias, column.hint] : [column.name, column.alias];
+    return candidates.filter(isString).some((candidate) => normalizeLogFieldName(candidate) === normalizedPrefix);
+  });
+}
+
 /** Resolve a filter key to a column in the builder options, handling OTel map key splitting and alias/hint lookup. */
 function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): ResolvedColumn {
   let columnName = key;
   let mapKey = '';
 
-  // Convert flattened/merged OTel attributes into column+path pair
-  if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
-    const prefixIndex = columnName.indexOf('.');
-    mapKey = columnName.substring(prefixIndex + 1);
-    columnName = columnName.substring(0, prefixIndex);
+  // Convert flattened/merged OTel attributes into a column+path pair.
+  const prefixIndex = columnName.indexOf('.');
+  if (prefixIndex > -1) {
+    const columnPrefix = columnName.substring(0, prefixIndex);
+    const attributeColumn = getAttributeColumnByDisplayPrefix(builderOptions, columnPrefix);
+    if (attributeColumn) {
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = attributeColumn.alias || attributeColumn.name;
+    } else if (legacyAttributeColumns.has(columnPrefix)) {
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = columnPrefix;
+    }
   }
 
   // Find selected column by alias/name
@@ -774,6 +806,22 @@ export class Datasource
     return this.settings.jsonData.defaultTable;
   }
 
+  getSignalType(): SignalType | undefined {
+    return this.settings.jsonData.signalType;
+  }
+
+  getConfigMode(): ConfigMode {
+    if (this.settings.jsonData.configMode) {
+      return this.settings.jsonData.configMode;
+    }
+
+    return this.getSignalType() ? 'single-table' : 'classic';
+  }
+
+  isSingleTableMode(): boolean {
+    return this.getConfigMode() === 'single-table' && Boolean(this.getSignalType());
+  }
+
   getDefaultLogsDatabase(): string | undefined {
     return this.settings.jsonData.logs?.defaultDatabase;
   }
@@ -1050,6 +1098,24 @@ export class Datasource
     const rawSql = keysColumn
       ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
       : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctValues(column: string, db: string, table: string): Promise<Array<string | number | boolean>> {
+    const escapedColumn = escapeIdentifier(column);
+    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctMapValues(
+    mapColumn: string,
+    mapKey: string,
+    db: string,
+    table: string
+  ): Promise<Array<string | number | boolean>> {
+    const escapedMapColumn = escapeIdentifier(mapColumn);
+    const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
+    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1950,6 +2016,8 @@ enum AdHocFilterStatus {
   enabled,
   disabled,
 }
+
+const normalizeLogFieldName = (fieldName: string): string => fieldName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface Tags {
   type?: TagType;

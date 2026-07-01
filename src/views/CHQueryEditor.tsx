@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
-import { Button } from '@grafana/ui';
+import { Button, ConfirmModal, Stack } from '@grafana/ui';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -11,9 +11,12 @@ import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
 import { isBuilderOptionsRunnable, mapQueryBuilderOptionsToGrafanaFormat } from 'data/utils';
 import { setAllOptions, setOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { QueryBuilderOptions } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
 import useHasTraceTimestampTable from 'hooks/useHasTraceTimestampTable';
+import { buildCompactQueryDefaults, getCompactQueryType } from 'components/queryBuilder/compactQueryDefaults';
+import { isEqual } from 'lodash';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -23,6 +26,15 @@ export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
   const { datasource, query: savedQuery, onRunQuery } = props;
   const query = migrateCHQuery(savedQuery);
+  const singleTableMode = datasource.isSingleTableMode();
+
+  if (singleTableMode && query.editorType === EditorType.SQL) {
+    return <CompactSqlMode {...props} query={query} />;
+  }
+
+  if (singleTableMode) {
+    return <CHEditorByType {...props} query={query} />;
+  }
 
   return (
     <>
@@ -36,8 +48,10 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 };
 
 const CHEditorByType = (props: CHQueryEditorProps) => {
-  const { query, onChange, app } = props;
+  const { query, onChange, onRunQuery, app } = props;
   const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState((query as CHBuilderQuery).builderOptions);
+  const singleTableMode = props.datasource.isSingleTableMode();
+  const signalType = props.datasource.getSignalType();
 
   /**
    * Grafana will sometimes replace the builder options directly, so we need to sync in both directions.
@@ -60,10 +74,33 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   }
   lastEditorType.current = query.editorType;
 
-  // Prevent trying to run empty query on load
+  const propBuilderOptions =
+    query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
+  const lastPropBuilderOptions = useRef<QueryBuilderOptions | undefined>(propBuilderOptions);
+  useEffect(() => {
+    if (!propBuilderOptions) {
+      lastPropBuilderOptions.current = undefined;
+      return;
+    }
+
+    if (isEqual(propBuilderOptions, lastPropBuilderOptions.current)) {
+      return;
+    }
+
+    lastPropBuilderOptions.current = propBuilderOptions;
+    if (!isEqual(propBuilderOptions, builderOptions)) {
+      builderOptionsDispatch(setAllOptions(propBuilderOptions));
+    }
+  }, [builderOptions, builderOptionsDispatch, propBuilderOptions]);
+
+  // Prevent trying to run empty query on load, or stale query after datasource/signal switches.
   const shouldSkipChanges = useRef<boolean>(true);
   if (isBuilderOptionsRunnable(builderOptions)) {
-    shouldSkipChanges.current = false;
+    if (singleTableMode && signalType) {
+      shouldSkipChanges.current = builderOptions.queryType !== getCompactQueryType(signalType);
+    } else {
+      shouldSkipChanges.current = false;
+    }
   }
 
   // Resolve hasTraceTimestampTable for any trace ID query — not only OTel ones.
@@ -122,6 +159,46 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [builderOptions]);
 
+  const onQueryChange = useCallback(
+    (newOptions: QueryBuilderOptions) => {
+      onChange({
+        ...query,
+        pluginVersion,
+        editorType: EditorType.Builder,
+        rawSql: generateSql(newOptions),
+        builderOptions: newOptions,
+        format: mapQueryBuilderOptionsToGrafanaFormat(newOptions),
+      });
+    },
+    [onChange, query]
+  );
+
+  const onEditAsSql = useCallback(
+    (newOptions: QueryBuilderOptions) => {
+      const {
+        builderOptions: discardedBuilderOptions,
+        queryType: discardedQueryType,
+        ...baseQuery
+      } = query as CHBuilderQuery;
+      void discardedBuilderOptions;
+      void discardedQueryType;
+
+      onChange({
+        ...baseQuery,
+        pluginVersion,
+        editorType: EditorType.SQL,
+        rawSql: generateSql(newOptions),
+        queryType: newOptions.queryType,
+        meta: {
+          ...baseQuery.meta,
+          builderOptions: newOptions,
+        },
+        format: mapQueryBuilderOptionsToGrafanaFormat(newOptions),
+      });
+    },
+    [onChange, query]
+  );
+
   if (query.editorType === EditorType.SQL) {
     return (
       <div data-testid="query-editor-section-sql">
@@ -137,6 +214,63 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptionsDispatch={builderOptionsDispatch}
       generatedSql={query.rawSql}
       app={app}
+      onQueryChange={onQueryChange}
+      onEditAsSql={onEditAsSql}
+      onRunQuery={onRunQuery}
     />
+  );
+};
+
+const CompactSqlMode = (props: CHQueryEditorProps) => {
+  const { datasource, query, onChange, onRunQuery } = props;
+  const signalType = datasource.getSignalType();
+  const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
+
+  const switchToBuilder = (confirmed = false) => {
+    if (!signalType) {
+      return;
+    }
+
+    const builderOptions = buildCompactQueryDefaults(datasource, signalType);
+    const compactSql = generateSql(builderOptions);
+    if (!confirmed && query.rawSql.trim() && query.rawSql.trim() !== compactSql.trim()) {
+      setConfirmSwitchOpen(true);
+      return;
+    }
+
+    onChange({
+      ...query,
+      pluginVersion,
+      editorType: EditorType.Builder,
+      rawSql: compactSql,
+      builderOptions,
+      format: mapQueryBuilderOptionsToGrafanaFormat(builderOptions),
+    });
+  };
+
+  return (
+    <>
+      <Stack gap={1} alignItems="center" data-testid="compact-sql-toolbar">
+        <Button variant="secondary" onClick={() => switchToBuilder()}>
+          Switch to compact view
+        </Button>
+        <Button onClick={() => onRunQuery()}>Run Query</Button>
+      </Stack>
+      <ConfirmModal
+        isOpen={confirmSwitchOpen}
+        title="Discard SQL changes?"
+        body="Switching to compact view replaces the current SQL with generated compact query defaults."
+        confirmText="Discard SQL and switch"
+        dismissText="Cancel"
+        onConfirm={() => {
+          setConfirmSwitchOpen(false);
+          switchToBuilder(true);
+        }}
+        onDismiss={() => setConfirmSwitchOpen(false)}
+      />
+      <div data-testid="query-editor-section-sql">
+        <SqlEditor {...props} />
+      </div>
+    </>
   );
 };
