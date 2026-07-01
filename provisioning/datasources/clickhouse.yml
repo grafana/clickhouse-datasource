@@ -5,6 +5,10 @@ apiVersion: 1
 deleteDatasources:
   - name: ClickHouse
     orgId: 1
+  - name: ClickHouse Single Logs
+    orgId: 1
+  - name: ClickHouse Single Traces
+    orgId: 1
 
 datasources:
   - name: ClickHouse
@@ -15,13 +19,75 @@ datasources:
     orgId: 1
     jsonData:
       host: clickhouse-server
-      database: "test"
-      username: "default"
+      database: 'test'
+      username: 'default'
       port: 9000
       protocol: native
       # Enables the Monaco SQL validator in the query editor. Turned on in the
       # E2E datasource so tests/e2e/sqlValidation.spec.ts can regression-guard
       # against false positives on ClickHouse-specific syntax.
       validateSql: true
+    secureJsonData:
+      # password: ""
+  - name: ClickHouse Single Logs
+    uid: clickhouse-e2e-single-logs
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: clickhouse-server
+    orgId: 1
+    jsonData:
+      host: clickhouse-server
+      database: 'e2e_test'
+      username: 'default'
+      port: 9000
+      protocol: native
+      configMode: single-table
+      signalType: logs
+      logs:
+        defaultDatabase: 'e2e_test'
+        defaultTable: 'events'
+        filterTimeColumn: 'timestamp'
+        timeColumn: 'timestamp'
+        levelColumn: 'level'
+        messageColumn: 'message'
+        otelEnabled: false
+    secureJsonData:
+      # password: ""
+  - name: ClickHouse Single Traces
+    uid: clickhouse-e2e-single-traces
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: clickhouse-server
+    orgId: 1
+    jsonData:
+      host: clickhouse-server
+      database: 'e2e_test'
+      username: 'default'
+      port: 9000
+      protocol: native
+      configMode: single-table
+      signalType: traces
+      traces:
+        defaultDatabase: 'e2e_test'
+        defaultTable: 'trace_spans'
+        traceIdColumn: 'TraceId'
+        spanIdColumn: 'SpanId'
+        operationNameColumn: 'SpanName'
+        parentSpanIdColumn: 'ParentSpanId'
+        serviceNameColumn: 'ServiceName'
+        durationColumn: 'Duration'
+        durationUnit: 'nanoseconds'
+        startTimeColumn: 'Timestamp'
+        tagsColumn: 'SpanAttributes'
+        serviceTagsColumn: 'ResourceAttributes'
+        kindColumn: 'SpanKind'
+        statusCodeColumn: 'StatusCode'
+        statusMessageColumn: 'StatusMessage'
+        stateColumn: 'TraceState'
+        flattenNested: false
+        traceEventsColumnPrefix: 'Events'
+        traceLinksColumnPrefix: 'Links'
+        traceTimestampTableSuffix: '_trace_id_ts'
+        otelEnabled: false
     secureJsonData:
       # password: ""
