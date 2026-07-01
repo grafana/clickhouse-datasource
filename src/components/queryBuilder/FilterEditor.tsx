@@ -8,6 +8,7 @@ import { styles } from 'styles';
 import { Datasource } from 'data/CHDatasource';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
+import { getFilterOperatorsByType } from './filterOperatorOptions';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -16,27 +17,6 @@ const boolValues: Array<SelectableValue<boolean>> = [
 const conditions: Array<SelectableValue<'AND' | 'OR'>> = [
   { value: 'AND', label: 'AND' },
   { value: 'OR', label: 'OR' },
-];
-const filterOperators: Array<SelectableValue<FilterOperator>> = [
-  { value: FilterOperator.WithInGrafanaTimeRange, label: 'Within dashboard time range' },
-  { value: FilterOperator.OutsideGrafanaTimeRange, label: 'Outside dashboard time range' },
-  { value: FilterOperator.IsAnything, label: 'IS ANYTHING' },
-  { value: FilterOperator.Equals, label: '=' },
-  { value: FilterOperator.NotEquals, label: '!=' },
-  { value: FilterOperator.LessThan, label: '<' },
-  { value: FilterOperator.LessThanOrEqual, label: '<=' },
-  { value: FilterOperator.GreaterThan, label: '>' },
-  { value: FilterOperator.GreaterThanOrEqual, label: '>=' },
-  { value: FilterOperator.Like, label: 'LIKE' },
-  { value: FilterOperator.NotLike, label: 'NOT LIKE' },
-  { value: FilterOperator.ILike, label: 'ILIKE' },
-  { value: FilterOperator.NotILike, label: 'NOT ILIKE' },
-  { value: FilterOperator.IsEmpty, label: 'IS EMPTY' },
-  { value: FilterOperator.IsNotEmpty, label: 'IS NOT EMPTY' },
-  { value: FilterOperator.In, label: 'IN' },
-  { value: FilterOperator.NotIn, label: 'NOT IN' },
-  { value: FilterOperator.IsNull, label: 'IS NULL' },
-  { value: FilterOperator.IsNotNull, label: 'IS NOT NULL' },
 ];
 const standardTimeOptions: Array<SelectableValue<string>> = [
   { value: 'today()', label: 'TODAY' },
@@ -240,80 +220,6 @@ export const FilterEditor = (props: {
     }
     return values;
   };
-  const getFilterOperatorsByType = (type = 'string'): Array<SelectableValue<FilterOperator>> => {
-    if (utils.isBooleanType(type)) {
-      return filterOperators.filter((f) => [FilterOperator.Equals, FilterOperator.NotEquals].includes(f.value!));
-    } else if (utils.isNumberType(type)) {
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.LessThan,
-          FilterOperator.LessThanOrEqual,
-          FilterOperator.GreaterThan,
-          FilterOperator.GreaterThanOrEqual,
-        ].includes(f.value!)
-      );
-    } else if (utils.isDateType(type)) {
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.LessThan,
-          FilterOperator.LessThanOrEqual,
-          FilterOperator.GreaterThan,
-          FilterOperator.GreaterThanOrEqual,
-          FilterOperator.WithInGrafanaTimeRange,
-          FilterOperator.OutsideGrafanaTimeRange,
-        ].includes(f.value!)
-      );
-    } else if (isJSONType) {
-      // JSON sub-column values are strings; exclude IsEmpty/IsNotEmpty which are unreliable on JSON paths
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.Like,
-          FilterOperator.NotLike,
-          FilterOperator.ILike,
-          FilterOperator.NotILike,
-          FilterOperator.In,
-          FilterOperator.NotIn,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-        ].includes(f.value!)
-      );
-    } else {
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.Like,
-          FilterOperator.NotLike,
-          FilterOperator.ILike,
-          FilterOperator.NotILike,
-          FilterOperator.In,
-          FilterOperator.NotIn,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.IsEmpty,
-          FilterOperator.IsNotEmpty,
-          FilterOperator.LessThan,
-          FilterOperator.LessThanOrEqual,
-          FilterOperator.GreaterThan,
-          FilterOperator.GreaterThanOrEqual,
-        ].includes(f.value!)
-      );
-    }
-  };
   const onFilterNameChange = (fieldName: string) => {
     setIsOpen(false);
     const matchingField = fieldsList.find((f) => f.name === fieldName);
@@ -430,7 +336,7 @@ export const FilterEditor = (props: {
         value={filter.operator}
         width={40}
         className={styles.Common.inlineSelect}
-        options={getFilterOperatorsByType(filter.type)}
+        options={getFilterOperatorsByType(filter.type, isJSONType)}
         onChange={(e) => onFilterOperatorChange(e.value!)}
         menuPlacement={'bottom'}
       />

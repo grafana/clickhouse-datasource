@@ -1,19 +1,12 @@
 import { Datasource } from 'data/CHDatasource';
-import {
-  BuilderMode,
-  ColumnHint,
-  DateFilterWithoutValue,
-  Filter,
-  FilterOperator,
-  NumberFilter,
-  OrderBy,
-  OrderByDirection,
-  QueryBuilderOptions,
-  QueryType,
-  SelectedColumn,
-  StringFilter,
-} from 'types/queryBuilder';
+import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn } from 'types/queryBuilder';
 import { SignalType } from 'types/config';
+import {
+  getDefaultLogsFilters,
+  getDefaultLogsOrderBy,
+  getDefaultTraceFilters,
+  getDefaultTraceOrderBy,
+} from './defaultQueryOptions';
 
 export const getCompactQueryType = (signalType: SignalType): QueryType => {
   return signalType === 'logs' ? QueryType.Logs : QueryType.Traces;
@@ -57,8 +50,8 @@ const buildCompactLogsDefaults = (datasource: Datasource, fallbackTable: string)
     queryType: QueryType.Logs,
     mode: BuilderMode.List,
     columns,
-    filters: getLogsDefaultFilters(),
-    orderBy: getLogsDefaultOrderBy(),
+    filters: getDefaultLogsFilters(),
+    orderBy: getDefaultLogsOrderBy(),
     limit: 1000,
     meta: {
       otelEnabled: Boolean(otelVersion),
@@ -77,8 +70,8 @@ const buildCompactTracesDefaults = (datasource: Datasource, fallbackTable: strin
     table: defaultTable || '',
     queryType: QueryType.Traces,
     columns: getDefaultColumns(datasource.getDefaultTraceColumns()),
-    filters: getTracesDefaultFilters(),
-    orderBy: getTracesDefaultOrderBy(),
+    filters: getDefaultTraceFilters(),
+    orderBy: getDefaultTraceOrderBy(),
     limit: 1000,
     meta: {
       otelEnabled: Boolean(otelVersion),
@@ -119,71 +112,3 @@ const getDefaultColumns = (columns: Map<ColumnHint, string>): SelectedColumn[] =
   }
   return nextColumns;
 };
-
-const getLogsDefaultFilters = (): Filter[] => [
-  {
-    type: 'datetime',
-    operator: FilterOperator.WithInGrafanaTimeRange,
-    filterType: 'custom',
-    key: '',
-    hint: ColumnHint.FilterTime,
-    condition: 'AND',
-  } as DateFilterWithoutValue,
-  {
-    type: 'string',
-    operator: FilterOperator.IsAnything,
-    filterType: 'custom',
-    key: '',
-    hint: ColumnHint.LogLevel,
-    condition: 'AND',
-    value: '',
-  } as StringFilter,
-];
-
-const getLogsDefaultOrderBy = (): OrderBy[] => [
-  { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
-  { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
-];
-
-const getTracesDefaultFilters = (): Filter[] => [
-  {
-    type: 'datetime',
-    operator: FilterOperator.WithInGrafanaTimeRange,
-    filterType: 'custom',
-    key: '',
-    hint: ColumnHint.Time,
-    condition: 'AND',
-  } as DateFilterWithoutValue,
-  {
-    type: 'string',
-    operator: FilterOperator.IsEmpty,
-    filterType: 'custom',
-    key: '',
-    hint: ColumnHint.TraceParentSpanId,
-    condition: 'AND',
-    value: '',
-  } as StringFilter,
-  {
-    type: 'UInt64',
-    operator: FilterOperator.GreaterThan,
-    filterType: 'custom',
-    key: '',
-    hint: ColumnHint.TraceDurationTime,
-    condition: 'AND',
-    value: 0,
-  } as NumberFilter,
-  {
-    type: 'string',
-    operator: FilterOperator.IsAnything,
-    filterType: 'custom',
-    key: '',
-    hint: ColumnHint.TraceServiceName,
-    condition: 'AND',
-    value: '',
-  } as StringFilter,
-];
-
-const getTracesDefaultOrderBy = (): OrderBy[] => [
-  { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
-  { name: '', hint: ColumnHint.TraceDurationTime, dir: OrderByDirection.DESC, default: true },
-];

@@ -4,6 +4,8 @@ import { GrafanaTheme2, SelectableValue } from '@grafana/data';
 import { AsyncSelect, Button, Select, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { Filter, FilterOperator, NumberFilter, StringFilter, TableColumn } from 'types/queryBuilder';
+import { getFilterOperatorOptions } from './filterOperatorOptions';
+import * as utils from './utils';
 
 interface FilterPopoverProps {
   datasource: Datasource;
@@ -16,25 +18,30 @@ interface FilterPopoverProps {
 
 type FilterValueKind = 'number' | 'string';
 
-const numberOperatorOptions: Array<SelectableValue<FilterOperator>> = [
-  { label: '>', value: FilterOperator.GreaterThan },
-  { label: '<', value: FilterOperator.LessThan },
-  { label: '>=', value: FilterOperator.GreaterThanOrEqual },
-  { label: '<=', value: FilterOperator.LessThanOrEqual },
-  { label: '=', value: FilterOperator.Equals },
-  { label: '!=', value: FilterOperator.NotEquals },
-  { label: 'IS NULL', value: FilterOperator.IsNull },
-  { label: 'IS NOT NULL', value: FilterOperator.IsNotNull },
+const numberOperators = [
+  FilterOperator.GreaterThan,
+  FilterOperator.LessThan,
+  FilterOperator.GreaterThanOrEqual,
+  FilterOperator.LessThanOrEqual,
+  FilterOperator.Equals,
+  FilterOperator.NotEquals,
+  FilterOperator.IsNull,
+  FilterOperator.IsNotNull,
 ];
 
-const stringOperatorOptions: Array<SelectableValue<FilterOperator>> = [
-  { label: 'contains', value: FilterOperator.Like },
-  { label: 'does not contain', value: FilterOperator.NotLike },
-  { label: '=', value: FilterOperator.Equals },
-  { label: '!=', value: FilterOperator.NotEquals },
-  { label: 'IS NULL', value: FilterOperator.IsNull },
-  { label: 'IS NOT NULL', value: FilterOperator.IsNotNull },
+const stringOperators = [
+  FilterOperator.Like,
+  FilterOperator.NotLike,
+  FilterOperator.Equals,
+  FilterOperator.NotEquals,
+  FilterOperator.IsNull,
+  FilterOperator.IsNotNull,
 ];
+
+const compactOperatorLabels: Partial<Record<FilterOperator, string>> = {
+  [FilterOperator.Like]: 'contains',
+  [FilterOperator.NotLike]: 'does not contain',
+};
 
 const defaultOperatorByKind: Record<FilterValueKind, FilterOperator> = {
   number: FilterOperator.GreaterThan,
@@ -46,18 +53,13 @@ const getMapValueType = (type: string): string => {
 };
 
 export const getFilterValueKind = (type = ''): FilterValueKind => {
-  const normalizedType = getMapValueType(type)
-    .toLowerCase()
-    .replace(/\(/g, '')
-    .replace(/\)/g, '')
-    .replace(/nullable/g, '')
-    .replace(/lowcardinality/g, '');
+  const valueType = getMapValueType(type);
 
-  return ['int', 'float', 'decimal'].some((numberType) => normalizedType.includes(numberType)) ? 'number' : 'string';
+  return utils.isNumberType(valueType) ? 'number' : 'string';
 };
 
 export const getOperatorOptions = (kind: FilterValueKind): Array<SelectableValue<FilterOperator>> => {
-  return kind === 'number' ? numberOperatorOptions : stringOperatorOptions;
+  return getFilterOperatorOptions(kind === 'number' ? numberOperators : stringOperators, compactOperatorLabels);
 };
 
 export const toFilterValueOption = (

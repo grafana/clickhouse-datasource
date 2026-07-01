@@ -1,20 +1,10 @@
 import { Datasource } from 'data/CHDatasource';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import { useEffect, useMemo, useRef } from 'react';
-import {
-  ColumnHint,
-  DateFilterWithoutValue,
-  Filter,
-  FilterOperator,
-  OrderBy,
-  OrderByDirection,
-  QueryBuilderOptions,
-  SelectedColumn,
-  StringFilter,
-  TableColumn,
-} from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import otel from 'otel';
 import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
+import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOptions';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -248,36 +238,12 @@ export const useDefaultFilters = (
       return;
     }
 
-    const defaultFilters: Filter[] = [
-      {
-        type: 'datetime',
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.FilterTime,
-        condition: 'AND',
-      } as DateFilterWithoutValue,
-      {
-        type: 'string',
-        operator: FilterOperator.IsAnything,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.LogLevel,
-        condition: 'AND',
-      } as StringFilter,
-    ];
-
-    const defaultOrderBy: OrderBy[] = [
-      { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
-    ];
-
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
-        filters: defaultFilters,
-        orderBy: defaultOrderBy,
+        filters: getDefaultLogsFilters(),
+        orderBy: getDefaultLogsOrderBy(),
       })
     );
   }, [table, builderOptionsDispatch]);

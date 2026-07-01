@@ -1,19 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 import otel from 'otel';
-import {
-  ColumnHint,
-  DateFilterWithoutValue,
-  Filter,
-  FilterOperator,
-  NumberFilter,
-  OrderBy,
-  OrderByDirection,
-  QueryBuilderOptions,
-  SelectedColumn,
-  StringFilter,
-  TableColumn,
-} from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import {
   findColumnByNameHeuristic,
@@ -21,6 +9,7 @@ import {
   isNumericColumn,
   isStringLikeColumn,
 } from './columnNameHeuristics';
+import { getDefaultTraceFilters, getDefaultTraceOrderBy } from '../defaultQueryOptions';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -288,55 +277,12 @@ export const useDefaultFilters = (
       return;
     }
 
-    const defaultFilters: Filter[] = [
-      {
-        type: 'datetime',
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.Time,
-        condition: 'AND',
-      } as DateFilterWithoutValue, // Filter to dashboard time range
-      {
-        type: 'string',
-        operator: FilterOperator.IsEmpty,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.TraceParentSpanId,
-        condition: 'AND',
-        value: '',
-      } as StringFilter, // Only show top level spans
-      {
-        type: 'UInt64',
-        operator: FilterOperator.GreaterThan,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.TraceDurationTime,
-        condition: 'AND',
-        value: 0,
-      } as NumberFilter, // Only show spans where duration > 0
-      {
-        type: 'string',
-        operator: FilterOperator.IsAnything,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.TraceServiceName,
-        condition: 'AND',
-        value: '',
-      } as StringFilter, // Placeholder service name filter for convenience
-    ];
-
-    const defaultOrderBy: OrderBy[] = [
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
-      { name: '', hint: ColumnHint.TraceDurationTime, dir: OrderByDirection.DESC, default: true },
-    ];
-
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
-        filters: defaultFilters,
-        orderBy: defaultOrderBy,
+        filters: getDefaultTraceFilters(),
+        orderBy: getDefaultTraceOrderBy(),
       })
     );
   }, [table, isTraceIdMode, builderOptionsDispatch]);
