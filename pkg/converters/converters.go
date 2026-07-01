@@ -541,7 +541,7 @@ func defaultConvert(in interface{}) (interface{}, error) {
 	}
 
 	// handle pointers and dereference if possible
-	if val.Kind() == reflect.Ptr {
+	if val.Kind() == reflect.Pointer {
 		if val.IsNil() {
 			return nil, errors.New("nil pointer cannot be dereferenced in defaultConvert")
 		}
