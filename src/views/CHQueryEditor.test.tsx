@@ -172,6 +172,7 @@ describe('Query Editor', () => {
       />
     );
 
+    expect(screen.getByTestId('compact-sql-toolbar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Switch to compact view' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run Query' })).toBeInTheDocument();
     expect(screen.queryByText('Editor Type')).not.toBeInTheDocument();
@@ -179,6 +180,41 @@ describe('Query Editor', () => {
   });
 
   it('switches from compact SQL back to a configured logs builder query', () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    const onChange = jest.fn();
+
+    render(
+      <CHQueryEditor
+        query={{ pluginVersion: '', rawSql: '', refId: 'A', editorType: EditorType.SQL }}
+        onChange={onChange}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to compact view' }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editorType: EditorType.Builder,
+        builderOptions: expect.objectContaining({
+          database: 'otel_v2',
+          table: 'otel_logs',
+          queryType: QueryType.Logs,
+        }),
+      })
+    );
+  });
+
+  it('confirms before replacing hand-written SQL with compact defaults', async () => {
     const datasource = newMockDatasource();
     datasource.settings.jsonData.configMode = 'single-table';
     datasource.settings.jsonData.signalType = 'logs';
@@ -201,15 +237,22 @@ describe('Query Editor', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Switch to compact view' }));
 
-    expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({
-        editorType: EditorType.Builder,
-        builderOptions: expect.objectContaining({
-          database: 'otel_v2',
-          table: 'otel_logs',
-          queryType: QueryType.Logs,
-        }),
-      })
+    expect(onChange).not.toHaveBeenCalled();
+    expect(screen.getByText('Discard SQL changes?')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard SQL and switch' }));
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          editorType: EditorType.Builder,
+          builderOptions: expect.objectContaining({
+            database: 'otel_v2',
+            table: 'otel_logs',
+            queryType: QueryType.Logs,
+          }),
+        })
+      )
     );
   });
 

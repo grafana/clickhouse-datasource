@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
-import { Button } from '@grafana/ui';
+import { Button, ConfirmModal, Stack } from '@grafana/ui';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -224,18 +224,25 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 const CompactSqlMode = (props: CHQueryEditorProps) => {
   const { datasource, query, onChange, onRunQuery } = props;
   const signalType = datasource.getSignalType();
+  const [confirmSwitchOpen, setConfirmSwitchOpen] = useState(false);
 
-  const onSwitchToBuilder = () => {
+  const switchToBuilder = (confirmed = false) => {
     if (!signalType) {
       return;
     }
 
     const builderOptions = buildCompactQueryDefaults(datasource, signalType);
+    const compactSql = generateSql(builderOptions);
+    if (!confirmed && query.rawSql.trim() && query.rawSql.trim() !== compactSql.trim()) {
+      setConfirmSwitchOpen(true);
+      return;
+    }
+
     onChange({
       ...query,
       pluginVersion,
       editorType: EditorType.Builder,
-      rawSql: generateSql(builderOptions),
+      rawSql: compactSql,
       builderOptions,
       format: mapQueryBuilderOptionsToGrafanaFormat(builderOptions),
     });
@@ -243,12 +250,24 @@ const CompactSqlMode = (props: CHQueryEditorProps) => {
 
   return (
     <>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
-        <Button variant="secondary" onClick={onSwitchToBuilder}>
+      <Stack gap={1} alignItems="center" data-testid="compact-sql-toolbar">
+        <Button variant="secondary" onClick={() => switchToBuilder()}>
           Switch to compact view
         </Button>
         <Button onClick={() => onRunQuery()}>Run Query</Button>
-      </div>
+      </Stack>
+      <ConfirmModal
+        isOpen={confirmSwitchOpen}
+        title="Discard SQL changes?"
+        body="Switching to compact view replaces the current SQL with generated compact query defaults."
+        confirmText="Discard SQL and switch"
+        dismissText="Cancel"
+        onConfirm={() => {
+          setConfirmSwitchOpen(false);
+          switchToBuilder(true);
+        }}
+        onDismiss={() => setConfirmSwitchOpen(false)}
+      />
       <div data-testid="query-editor-section-sql">
         <SqlEditor {...props} />
       </div>
