@@ -36,6 +36,7 @@ import useColumns from 'hooks/useColumns';
 import { CompactModeBar } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
+import { isEqual } from 'lodash';
 
 interface QueryBuilderProps {
   app: CoreApp | undefined;
@@ -188,9 +189,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     lastInitializationKey.current = initializationKey;
 
     const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
-    builderOptionsDispatch(setAllOptions(nextOptions));
-    onQueryChangeRef.current?.(nextOptions);
-  }, [builderOptions.table, builderOptionsDispatch, datasource, needsInitialization, signalType]);
+    if (!isEqual(builderOptions, nextOptions)) {
+      builderOptionsDispatch(setAllOptions(nextOptions));
+      onQueryChangeRef.current?.(nextOptions);
+    }
+  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType]);
 
   const activeOptions = needsInitialization
     ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { CHQueryEditor } from './CHQueryEditor';
 import * as ui from '@grafana/ui';
@@ -256,7 +256,52 @@ describe('Query Editor', () => {
     );
   });
 
-  it('syncs compact builder state when query filters change externally', () => {
+  it('does not resync compact builder state for fresh equal builder options', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+    const builderOptions = {
+      database: 'otel_v2',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [{ name: 'SeverityText', hint: ColumnHint.LogLevel }],
+      filters: [],
+    };
+    const query = {
+      pluginVersion,
+      rawSql: 'SELECT 1',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions,
+    };
+    const onChange = jest.fn();
+
+    const result = render(
+      <CHQueryEditor query={query} onChange={onChange} onRunQuery={jest.fn()} datasource={datasource} />
+    );
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+
+    result.rerender(
+      <CHQueryEditor
+        query={{ ...query, builderOptions: { ...builderOptions, filters: [] } }}
+        onChange={onChange}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+  });
+
+  it('syncs compact builder state when query filters change externally', async () => {
     const datasource = newMockDatasource();
     datasource.settings.jsonData.configMode = 'single-table';
     datasource.settings.jsonData.signalType = 'logs';
@@ -312,7 +357,7 @@ describe('Query Editor', () => {
       />
     );
 
-    expect(screen.getByText('SeverityText')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('SeverityText')).toBeInTheDocument());
     expect(screen.getByText('error')).toBeInTheDocument();
   });
 });

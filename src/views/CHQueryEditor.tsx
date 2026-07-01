@@ -16,6 +16,7 @@ import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
 import useHasTraceTimestampTable from 'hooks/useHasTraceTimestampTable';
 import { buildCompactQueryDefaults, getCompactQueryType } from 'components/queryBuilder/compactQueryDefaults';
+import { isEqual } from 'lodash';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -76,12 +77,21 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const propBuilderOptions =
     query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
   const lastPropBuilderOptions = useRef<QueryBuilderOptions | undefined>(propBuilderOptions);
-  if (propBuilderOptions && propBuilderOptions !== lastPropBuilderOptions.current) {
+  useEffect(() => {
+    if (!propBuilderOptions) {
+      lastPropBuilderOptions.current = undefined;
+      return;
+    }
+
+    if (isEqual(propBuilderOptions, lastPropBuilderOptions.current)) {
+      return;
+    }
+
     lastPropBuilderOptions.current = propBuilderOptions;
-    if (propBuilderOptions !== builderOptions) {
+    if (!isEqual(propBuilderOptions, builderOptions)) {
       builderOptionsDispatch(setAllOptions(propBuilderOptions));
     }
-  }
+  }, [builderOptions, builderOptionsDispatch, propBuilderOptions]);
 
   // Prevent trying to run empty query on load, or stale query after datasource/signal switches.
   const shouldSkipChanges = useRef<boolean>(true);
