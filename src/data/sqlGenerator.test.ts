@@ -206,10 +206,17 @@ describe('SQL Generator', () => {
       ],
     };
 
+    // The FilterTime column (TimestampTime) is used verbatim in the WHERE clause and grouped with
+    // the Time column's alias ("timestamp") in the ORDER BY.
+    const expectedSqlParts = [
+      'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
+      'FROM "otel"."otel_logs"',
+      'WHERE ( TimestampTime >= $__fromTime AND TimestampTime <= $__toTime )',
+      'ORDER BY (TimestampTime, timestamp) DESC LIMIT 1000',
+    ];
+
     const sql = generateSql(opts);
-    // The Time column is aliased to "timestamp" in the SELECT and the alias is reused in ORDER BY.
-    expect(sql).toContain('WHERE ( TimestampTime >=');
-    expect(sql).toContain('(TimestampTime, timestamp) DESC');
+    expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
   it('generates simple time series query', () => {
