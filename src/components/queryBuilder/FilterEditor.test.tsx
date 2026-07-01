@@ -135,7 +135,8 @@ describe('FilterEditor', () => {
       );
       expect(result.container.firstChild).not.toBeNull();
     });
-    it('should have all provided fields in the select', async () => {
+    it('should select a provided field from the combobox', async () => {
+      const onFilterChange = jest.fn();
       const result = render(
         <FilterEditor
           allColumns={[
@@ -151,7 +152,7 @@ describe('FilterEditor', () => {
             filterType: 'custom',
           }}
           index={0}
-          onFilterChange={() => {}}
+          onFilterChange={onFilterChange}
           removeFilter={() => {}}
           datasource={mockDatasource}
           database=""
@@ -159,12 +160,16 @@ describe('FilterEditor', () => {
         />
       );
 
-      // expand the `fieldName` select box
-      await userEvent.type(result.getAllByRole('combobox')[0], '{ArrowDown}');
+      await userEvent.type(result.getAllByRole('combobox')[0], 'col2');
+      await userEvent.keyboard('{ArrowDown}{Enter}');
 
-      expect(result.getByText('col1')).toBeInTheDocument();
-      expect(result.getByText('col2')).toBeInTheDocument();
-      expect(result.getByText('col3')).toBeInTheDocument();
+      expect(onFilterChange).toHaveBeenCalledWith(0, {
+        condition: 'AND',
+        filterType: 'custom',
+        key: 'col2',
+        operator: FilterOperator.IsNotNull,
+        type: 'string',
+      });
     });
     it('should call onFilterChange when user adds correct custom filter for the field with Map type', async () => {
       const onFilterChange = jest.fn();
@@ -187,13 +192,13 @@ describe('FilterEditor', () => {
         />
       );
 
-      // type into the `fieldName` select box
-      await userEvent.type(result!.getAllByRole('combobox')[0], `colName[['keyName']`);
-      await userEvent.keyboard('{Enter}');
+      // select the Map field from the `fieldName` combobox
+      await userEvent.type(result!.getAllByRole('combobox')[0], 'colName');
+      await userEvent.keyboard('{ArrowDown}{Enter}');
 
       const expectedFilter: Filter = {
-        key: `colName['keyName']`,
-        type: 'String',
+        key: 'colName',
+        type: 'Map(String, String)',
         operator: FilterOperator.IsNotNull,
         condition: 'AND',
         filterType: 'custom',
@@ -363,7 +368,7 @@ describe('FilterEditor', () => {
       const result = render(<FilterValueEditor allColumns={[]} filter={filter} onFilterChange={onFilterChange} />);
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-date-value-container')).toBeInTheDocument();
-      expect(result.getByText('NOW')).toBeInTheDocument();
+      expect(result.getByDisplayValue('NOW')).toBeInTheDocument();
     });
     it('should render select filter for single value picklist', () => {
       const filter: StringFilter = {
@@ -394,7 +399,7 @@ describe('FilterEditor', () => {
       );
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-single-picklist-value-container')).toBeInTheDocument();
-      expect(result.getByText('Deal Won')).toBeInTheDocument();
+      expect(result.getByDisplayValue('Deal Won')).toBeInTheDocument();
       expect(result.queryByText('Discovery')).not.toBeInTheDocument();
     });
     it('should render select filter for multi value picklist', () => {
@@ -427,7 +432,7 @@ describe('FilterEditor', () => {
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-multi-picklist-value-container')).toBeInTheDocument();
       expect(result.getByText('Deal Won')).toBeInTheDocument();
-      expect(result.getByText('Deal Lost')).toBeInTheDocument();
+      expect(result.getByText('1')).toBeInTheDocument();
       expect(result.queryByText('Discovery')).not.toBeInTheDocument();
     });
     it('should render input filter for single value string', async () => {

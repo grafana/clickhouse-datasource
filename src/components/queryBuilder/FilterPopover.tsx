@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { css } from '@emotion/css';
-import { GrafanaTheme2, SelectableValue } from '@grafana/data';
-import { AsyncSelect, Button, Select, useStyles2 } from '@grafana/ui';
+import { GrafanaTheme2 } from '@grafana/data';
+import { Button, Combobox, ComboboxOption, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { Filter, FilterOperator, NumberFilter, StringFilter, TableColumn } from 'types/queryBuilder';
 import { getFilterOperatorOptions } from './filterOperatorOptions';
@@ -58,13 +58,18 @@ export const getFilterValueKind = (type = ''): FilterValueKind => {
   return utils.isNumberType(valueType) ? 'number' : 'string';
 };
 
-export const getOperatorOptions = (kind: FilterValueKind): Array<SelectableValue<FilterOperator>> => {
-  return getFilterOperatorOptions(kind === 'number' ? numberOperators : stringOperators, compactOperatorLabels);
+export const getOperatorOptions = (kind: FilterValueKind): Array<ComboboxOption<FilterOperator>> => {
+  return getFilterOperatorOptions(kind === 'number' ? numberOperators : stringOperators, compactOperatorLabels).map(
+    (option) => ({
+      label: String(option.label || option.value),
+      value: option.value!,
+    })
+  );
 };
 
 export const toFilterValueOption = (
   nextValue: string | number | boolean
-): SelectableValue<string> & { label: string; value: string } => {
+): ComboboxOption<string> & { label: string; value: string } => {
   const value = String(nextValue);
   return { label: value, value };
 };
@@ -120,14 +125,14 @@ export const FilterPopover = (props: FilterPopoverProps) => {
     }
   }, [datasource, database, table, selectedColumn, isMapColumn]);
 
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map((column) => ({
+  const columnOptions: Array<ComboboxOption<string>> = allColumns.map((column) => ({
     label: column.label || column.name,
     value: column.name,
     description: column.type,
   }));
 
   const loadValueOptions = useCallback(
-    async (inputValue: string): Promise<Array<SelectableValue<string>>> => {
+    async (inputValue: string): Promise<Array<ComboboxOption<string>>> => {
       if (!selectedColumn || !database || !table) {
         return [];
       }
@@ -189,10 +194,13 @@ export const FilterPopover = (props: FilterPopoverProps) => {
     <div className={styles.popover} data-testid="filter-popover">
       <div className={styles.field}>
         <span className={styles.fieldLabel}>Column</span>
-        <Select
+        <Combobox
           options={columnOptions}
-          value={selectedColumn}
+          value={selectedColumn || null}
           onChange={(option) => {
+            if (!option) {
+              return;
+            }
             const nextColumn = option.value || '';
             const nextColumnDef = allColumns.find((column) => column.name === nextColumn);
             const nextKind = getFilterValueKind(nextColumnDef?.type);
@@ -203,52 +211,49 @@ export const FilterPopover = (props: FilterPopoverProps) => {
           }}
           width={24}
           placeholder="Select column..."
-          menuPlacement="bottom"
         />
       </div>
 
       {isMapColumn && (
         <div className={styles.field}>
           <span className={styles.fieldLabel}>Map key</span>
-          <Select
+          <Combobox
             options={mapKeys.map((key) => ({ label: key, value: key }))}
-            value={selectedMapKey}
+            value={selectedMapKey || null}
             onChange={(option) => {
+              if (!option) {
+                return;
+              }
               setSelectedMapKey(option.value || '');
               setValue('');
             }}
             width={20}
             placeholder="Select key..."
-            menuPlacement="bottom"
           />
         </div>
       )}
 
       <div className={styles.field}>
         <span className={styles.fieldLabel}>Operator</span>
-        <Select
+        <Combobox
           options={currentOperatorOptions}
           value={operator}
-          onChange={(option) => setOperator(option.value || defaultOperatorByKind[filterKind])}
+          onChange={(option) => option && setOperator(option.value || defaultOperatorByKind[filterKind])}
           width={14}
-          menuPlacement="bottom"
         />
       </div>
 
       {!noValueNeeded && (
         <div className={styles.field}>
           <span className={styles.fieldLabel}>Value</span>
-          <AsyncSelect
+          <Combobox
             key={`${selectedColumn}-${selectedMapKey}`}
-            loadOptions={loadValueOptions}
-            defaultOptions={Boolean(selectedColumn)}
+            options={loadValueOptions}
             value={value ? { label: value, value } : undefined}
-            onChange={(option) => setValue(option?.value || '')}
-            allowCustomValue
-            onCreateOption={(nextValue) => setValue(nextValue)}
+            onChange={(option) => option && setValue(option.value || '')}
+            createCustomValue
             width={24}
             placeholder="Type or select..."
-            menuPlacement="bottom"
           />
         </div>
       )}

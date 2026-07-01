@@ -1,7 +1,7 @@
 import React from 'react';
 import { css } from '@emotion/css';
-import { GrafanaTheme2, SelectableValue } from '@grafana/data';
-import { Input, Select, useStyles2 } from '@grafana/ui';
+import { GrafanaTheme2 } from '@grafana/data';
+import { Combobox, ComboboxOption, Input, useStyles2 } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
 
 interface CompactAdvancedProps {
@@ -37,11 +37,11 @@ export const CompactAdvanced = (props: CompactAdvancedProps) => {
   const styles = useStyles2(getStyles);
   const orderBy = builderOptions.orderBy || [];
   const limit = builderOptions.limit || 1000;
-  const columnOptions: Array<SelectableValue<string>> = allColumns.map((column) => ({
+  const columnOptions: Array<ComboboxOption<string>> = allColumns.map((column) => ({
     label: column.label || column.name,
     value: column.name,
   }));
-  const directionOptions: Array<SelectableValue<OrderByDirection>> = [
+  const directionOptions: Array<ComboboxOption<OrderByDirection>> = [
     { label: 'ASC', value: OrderByDirection.ASC },
     { label: 'DESC', value: OrderByDirection.DESC },
   ];
@@ -52,29 +52,29 @@ export const CompactAdvanced = (props: CompactAdvancedProps) => {
     <div className={styles.row} data-testid="compact-advanced">
       <div className={styles.item}>
         <span className={styles.label}>Order by</span>
-        <Select
+        <Combobox
           options={columnOptions}
-          value={currentOrderCol}
+          value={currentOrderCol || null}
           onChange={(option) => {
-            if (option.value) {
+            if (option) {
               onOrderByChange([{ name: option.value, dir: currentOrderDir }]);
+            } else {
+              onOrderByChange([]);
             }
           }}
           width={20}
           placeholder="Column..."
           isClearable
-          menuPlacement="bottom"
         />
-        <Select
+        <Combobox
           options={directionOptions}
           value={currentOrderDir}
           onChange={(option) => {
-            if (currentOrderCol && option.value) {
+            if (currentOrderCol) {
               onOrderByChange([{ name: currentOrderCol, dir: option.value }]);
             }
           }}
           width={10}
-          menuPlacement="bottom"
         />
       </div>
 

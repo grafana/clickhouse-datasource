@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select, Stack } from '@grafana/ui';
+import {
+  Button,
+  Combobox,
+  ComboboxOption,
+  InlineFormLabel,
+  Input,
+  MultiCombobox,
+  RadioButtonGroup,
+  Stack,
+} from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
@@ -35,6 +44,17 @@ export const defaultNewFilter: NullFilter = {
 export interface PredefinedFilter {
   restrictToFields?: readonly TableColumn[];
 }
+
+const toComboboxOptions = <T extends string | number>(
+  options: Array<{ label?: unknown; value?: T }>
+): Array<ComboboxOption<T>> => {
+  return options
+    .filter((option): option is { label?: unknown; value: T } => option.value !== undefined)
+    .map((option) => ({
+      label: String(option.label || option.value),
+      value: option.value,
+    }));
+};
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
   const [value, setValue] = useState(props.value || 0);
@@ -120,12 +140,12 @@ export const FilterValueEditor = (props: {
 
     return (
       <div data-testid="query-builder-filters-date-value-container">
-        <Select
+        <Combobox
           value={filter.value || 'TODAY'}
-          onChange={(e) => onDateFilterValueChange(e.value!)}
-          options={dateOptions}
+          onChange={(option) => onDateFilterValueChange(option.value)}
+          options={toComboboxOptions(dateOptions)}
           width={40}
-          allowCustomValue
+          createCustomValue
         />
       </div>
     );
@@ -139,7 +159,11 @@ export const FilterValueEditor = (props: {
     ) {
       return (
         <div data-testid="query-builder-filters-single-picklist-value-container">
-          <Select value={filter.value} onChange={(e) => onStringFilterValueChange(e.value!)} options={getOptions()} />
+          <Combobox
+            value={filter.value}
+            onChange={(option) => onStringFilterValueChange(option.value)}
+            options={toComboboxOptions(getOptions())}
+          />
         </div>
       );
     }
@@ -159,10 +183,10 @@ export const FilterValueEditor = (props: {
     if (filter.type === 'picklist') {
       return (
         <div data-testid="query-builder-filters-multi-picklist-value-container">
-          <MultiSelect
+          <MultiCombobox
             value={filter.value}
-            options={getOptions()}
-            onChange={(e) => onMultiFilterValueChange(e.map((v) => v.value!))}
+            options={toComboboxOptions(getOptions())}
+            onChange={(options) => onMultiFilterValueChange(options.map((option) => option.value))}
           />
         </div>
       );
@@ -184,7 +208,6 @@ export const FilterEditor = (props: {
   table: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter } = props;
-  const [isOpen, setIsOpen] = useState(false);
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
@@ -221,7 +244,6 @@ export const FilterEditor = (props: {
     return values;
   };
   const onFilterNameChange = (fieldName: string) => {
-    setIsOpen(false);
     const matchingField = fieldsList.find((f) => f.name === fieldName);
     const filterData = {
       key: matchingField?.name || fieldName,
@@ -302,22 +324,17 @@ export const FilterEditor = (props: {
       {index !== 0 && (
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
-      <Select
+      <Combobox
         disabled={Boolean(filter.hint)}
         placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
         value={filter.key}
         width={40}
-        className={styles.Common.inlineSelect}
-        options={getFields()}
-        isOpen={isOpen}
-        onOpenMenu={() => setIsOpen(true)}
-        onCloseMenu={() => setIsOpen(false)}
-        onChange={(e) => onFilterNameChange(e.value!)}
-        allowCustomValue
-        menuPlacement={'bottom'}
+        options={toComboboxOptions(getFields())}
+        onChange={(option) => option && onFilterNameChange(option.value)}
+        createCustomValue
       />
       {(isMapType || isJSONType) && (
-        <Select
+        <Combobox
           value={filter.mapKey}
           placeholder={
             isJSONType
@@ -325,20 +342,16 @@ export const FilterEditor = (props: {
               : labels.components.FilterEditor.mapKeyPlaceholder
           }
           width={40}
-          className={styles.Common.inlineSelect}
-          options={subKeyOptions}
-          onChange={(e) => onFilterMapKeyChange(e.value!)}
-          allowCustomValue
-          menuPlacement={'bottom'}
+          options={toComboboxOptions(subKeyOptions)}
+          onChange={(option) => option && onFilterMapKeyChange(option.value)}
+          createCustomValue
         />
       )}
-      <Select
+      <Combobox
         value={filter.operator}
         width={40}
-        className={styles.Common.inlineSelect}
-        options={getFilterOperatorsByType(filter.type, isJSONType)}
-        onChange={(e) => onFilterOperatorChange(e.value!)}
-        menuPlacement={'bottom'}
+        options={toComboboxOptions(getFilterOperatorsByType(filter.type, isJSONType))}
+        onChange={(option) => option && onFilterOperatorChange(option.value)}
       />
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
       <Button
