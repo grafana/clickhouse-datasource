@@ -60,6 +60,13 @@ export const getOperatorOptions = (kind: FilterValueKind): Array<SelectableValue
   return kind === 'number' ? numberOperatorOptions : stringOperatorOptions;
 };
 
+export const toFilterValueOption = (
+  nextValue: string | number | boolean
+): SelectableValue<string> & { label: string; value: string } => {
+  const value = String(nextValue);
+  return { label: value, value };
+};
+
 const getStyles = (theme: GrafanaTheme2) => ({
   popover: css`
     display: flex;
@@ -130,9 +137,10 @@ export const FilterPopover = (props: FilterPopoverProps) => {
               ? await datasource.fetchDistinctValues(selectedColumn, database, table)
               : [];
 
+        const normalizedInput = inputValue.toLowerCase();
         return values
-          .filter((nextValue) => !inputValue || nextValue.toLowerCase().includes(inputValue.toLowerCase()))
-          .map((nextValue) => ({ label: nextValue, value: nextValue }));
+          .map(toFilterValueOption)
+          .filter((option) => !normalizedInput || option.value.toLowerCase().includes(normalizedInput));
       } catch (err) {
         console.error('FilterPopover: failed to load values for column', selectedColumn, err);
         return [];

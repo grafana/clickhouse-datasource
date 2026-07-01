@@ -1097,13 +1097,21 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
-  async fetchDistinctValues(column: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT "${column}" FROM "${db}"."${table}" WHERE "${column}" IS NOT NULL LIMIT 1000`;
+  async fetchDistinctValues(column: string, db: string, table: string): Promise<Array<string | number | boolean>> {
+    const escapedColumn = escapeIdentifier(column);
+    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
-  async fetchDistinctMapValues(mapColumn: string, mapKey: string, db: string, table: string): Promise<string[]> {
-    const rawSql = `SELECT DISTINCT ${mapColumn}['${mapKey}'] FROM "${db}"."${table}" WHERE mapContains(${mapColumn}, '${mapKey}') LIMIT 1000`;
+  async fetchDistinctMapValues(
+    mapColumn: string,
+    mapKey: string,
+    db: string,
+    table: string
+  ): Promise<Array<string | number | boolean>> {
+    const escapedMapColumn = escapeIdentifier(mapColumn);
+    const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
+    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 

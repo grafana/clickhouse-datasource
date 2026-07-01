@@ -975,6 +975,34 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('distinct value suggestions', () => {
+    it('escapes identifiers for distinct column values', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ value: 1 }, { value: 2 }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const result = await ds.fetchDistinctValues('some"col', 'db"name', 'events');
+
+      expect(result).toEqual([1, 2]);
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toBe('SELECT DISTINCT "some""col" FROM "db""name"."events" WHERE "some""col" IS NOT NULL LIMIT 1000');
+    });
+
+    it('escapes map identifiers and map key literals for distinct map values', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ value: 'alice' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const result = await ds.fetchDistinctMapValues('labels"map', "user's key", 'db', 'events');
+
+      expect(result).toEqual(['alice']);
+      const sql = spy.mock.calls[0][0].targets[0].rawSql!;
+      expect(sql).toBe(
+        'SELECT DISTINCT "labels""map"[\'user\\\'s key\'] FROM "db"."events" WHERE mapContains("labels""map", \'user\\\'s key\') LIMIT 1000'
+      );
+    });
+  });
+
   describe('Conditional All', () => {
     it('should replace $__conditionalAll with 1=1 when all is selected', async () => {
       const rawSql = 'select stuff from table where $__conditionalAll(fieldVal in ($fieldVal), $fieldVal);';

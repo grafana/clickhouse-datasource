@@ -1,5 +1,5 @@
 import { FilterOperator } from 'types/queryBuilder';
-import { getFilterValueKind, getOperatorOptions } from './FilterPopover';
+import { getFilterValueKind, getOperatorOptions, toFilterValueOption } from './FilterPopover';
 
 describe('FilterPopover', () => {
   it('infers number filter kind from ClickHouse numeric types', () => {
@@ -34,6 +34,14 @@ describe('FilterPopover', () => {
       FilterOperator.NotEquals,
       FilterOperator.IsNull,
       FilterOperator.IsNotNull,
+    ]);
+  });
+
+  it('converts distinct values to selectable string values', () => {
+    expect([1, 'error', true].map(toFilterValueOption)).toEqual([
+      { label: '1', value: '1' },
+      { label: 'error', value: 'error' },
+      { label: 'true', value: 'true' },
     ]);
   });
 });
