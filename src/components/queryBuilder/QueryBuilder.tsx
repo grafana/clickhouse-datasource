@@ -33,7 +33,7 @@ import allLabels from 'labels';
 import { buildCompactQueryDefaults, isDefaultOrMismatchedCompactQuery } from './compactQueryDefaults';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
-import { CompactModeBar } from './CompactModeBar';
+import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
 import { isEqual } from 'lodash';
@@ -226,13 +226,9 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   return (
     <div data-testid="query-editor-section-builder">
       <CompactModeBar
-        datasource={datasource}
-        signalType={signalType}
-        mode={signalType === 'logs' ? 'otel-logs' : 'otel-traces'}
-        onModeChange={() => {}}
+        mode={getDefaultCompactMode(signalType)}
         searchText={activeOptions.meta?.logMessageLike || ''}
         onSearchChange={(logMessageLike) => mergeActiveOptions({ meta: { logMessageLike } }, true)}
-        onSearchSubmit={() => {}}
       />
       <CompactFilterBar
         datasource={datasource}

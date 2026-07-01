@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
+import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
 import { BuilderMode, ColumnHint, QueryType, TimeUnit } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
@@ -74,6 +75,11 @@ describe('QueryBuilder', () => {
     );
 
     expect(filterColumns.map((column) => column.name)).toEqual(['Body', 'ingested_at']);
+  });
+
+  it('maps configured signal types to compact modes', () => {
+    expect(getDefaultCompactMode('logs')).toBe('otel-logs');
+    expect(getDefaultCompactMode('traces')).toBe('otel-traces');
   });
 
   it('renders correctly', async () => {
