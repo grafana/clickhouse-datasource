@@ -58,7 +58,7 @@ require (
 	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/olekukonko/cat v0.0.0-20250911104152-50322a0618f6 // indirect
-	github.com/olekukonko/errors v1.2.0 // indirect
+	github.com/olekukonko/errors v1.3.0 // indirect
 	github.com/olekukonko/ll v0.1.6 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/shirou/gopsutil/v4 v4.26.3 // indirect
