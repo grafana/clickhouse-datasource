@@ -4,7 +4,19 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack } from '@grafana/ui';
+import {
+  RadioButtonGroup,
+  Switch,
+  Input,
+  SecretInput,
+  Button,
+  Field,
+  Alert,
+  Stack,
+  TextLink,
+  Tooltip,
+  Icon,
+} from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -469,6 +481,39 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             isConfigured={(secureJsonFields && secureJsonFields.password) as boolean}
             onReset={onResetPassword}
             onChange={onUpdateDatasourceSecureJsonDataOption(props, 'password')}
+          />
+        </Field>
+        <Field label={labels.useJWTAuth.label} description={
+          <>
+            {'Authenticate using '}
+            <TextLink
+              variant="bodySmall"
+              href="https://clickhouse.com/docs/en/operations/external-authenticators/jwt"
+              external
+            >
+              JWT
+            </TextLink>
+            {' '}
+            <Tooltip content="ClickHouse Cloud only" placement="top">
+              <Icon name="info-circle" size="sm" />
+            </Tooltip>
+            {'. When enabled, credentials are only used for health checks.'}
+          </>
+        }>
+          <Switch
+            id="useJWTAuth"
+            className="gf-form"
+            value={jsonData.useJWTAuth || false}
+            onChange={(e) => {
+              const checked = e.currentTarget.checked;
+              onOptionsChange({
+                ...options,
+                jsonData: {
+                  ...jsonData,
+                  useJWTAuth: checked,
+                },
+              });
+            }}
           />
         </Field>
       </ConfigSection>

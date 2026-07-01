@@ -103,6 +103,63 @@ describe('DatabaseCredentialsSection', () => {
     });
   });
 
+  it('reflects useJWTAuth=true from jsonData', () => {
+    const jwtProps = createTestProps({
+      options: {
+        jsonData: {
+          username: 'default',
+          useJWTAuth: true,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<DatabaseCredentialsSection {...jwtProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /use jwt authentication/i });
+    expect(toggle).toBeChecked();
+  });
+
+  it('sets useJWTAuth when toggled on', () => {
+    render(<DatabaseCredentialsSection {...defaultProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /use jwt authentication/i });
+    fireEvent.click(toggle);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(lastArgs.jsonData?.useJWTAuth).toBe(true);
+  });
+
+  it('clears useJWTAuth when toggled off', () => {
+    const jwtProps = createTestProps({
+      options: {
+        jsonData: {
+          username: 'default',
+          useJWTAuth: true,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<DatabaseCredentialsSection {...jwtProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /use jwt authentication/i });
+    fireEvent.click(toggle);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(lastArgs.jsonData?.useJWTAuth).toBe(false);
+  });
+
   it('resets password when Reset is clicked (isConfigured=true)', () => {
     const configuredProps = createTestProps({
       options: {

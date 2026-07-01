@@ -130,6 +130,7 @@ After adding the data source, configure the following settings.
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
 | **Username**          | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions).                                                                         |
 | **Password**          | ClickHouse user password.                                                                                                                               |
+| **Use JWT Authentication** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings). See [JWT authentication](#jwt-authentication). |
 | **Default database**  | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`.                                      |
 | **Default table**     | The default table used by the query builder.                                                                                                            |
 
@@ -271,6 +272,25 @@ With header forwarding enabled, connections are keyed by the forwarded header se
 
 To forward headers other than the Grafana-set ones — for example, bearer tokens or tenant identifiers — add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
 
+## JWT authentication
+
+{{< admonition type="note" >}}
+JWT authentication requires server-side support for JSON Web Tokens, which is currently [ClickHouse Cloud only](https://clickhouse.com/docs/en/operations/external-authenticators/jwt). It is not available on self-hosted or open source ClickHouse.
+{{< /admonition >}}
+
+When **Use JWT Authentication** is enabled, the plugin forwards the logged-in Grafana user's OAuth access token to ClickHouse as a JSON Web Token (JWT). ClickHouse then authenticates each query as the real user rather than as a shared service account, so you can drive per-user access rights, [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), and query-log attribution from ClickHouse-side identities.
+
+For the token to be available, Grafana must be configured to forward the user's OAuth access token to the data source. For server-side setup, refer to [ClickHouse JWT authentication](https://clickhouse.com/docs/en/operations/external-authenticators/jwt).
+
+To enable it, turn on **Use JWT Authentication** in the **Database credentials** section of the data source configuration.
+
+### Requirements and behavior
+
+- **A secure (TLS) connection is required.** Enable **Secure connection** and set the **Port** to a TLS-enabled port. The plugin rejects the connection if JWT authentication is enabled without TLS.
+- **Credentials are suppressed on query connections.** When enabled, the configured username and password are not sent on per-query connections; the forwarded token is the sole credential.
+- **Health checks fall back to username and password.** **Save & test** and other health checks run outside a user request, where no user token is available, so they use the configured username and password. Keep valid credentials configured so the connection test can succeed.
+- **Connections are keyed per user.** Enabling JWT authentication automatically turns on header forwarding, so each Grafana user opens a separate ClickHouse connection. See [Connection pool implications](#connection-pool-implications) for sizing guidance.
+
 ## Provision the data source
 
 You can define the data source in YAML files as part of the Grafana provisioning system. For more information, refer to [Provisioning Grafana data sources](https://grafana.com/docs/grafana/latest/administration/provisioning/#data-sources).
@@ -308,6 +328,7 @@ datasources:
       # validateSql: <bool>
       # enableRowLimit: <bool>
       # forwardGrafanaHeaders: <bool>
+      # useJWTAuth: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
       # path: <string>  # HTTP URL path (HTTP protocol only)
       # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
@@ -350,6 +371,7 @@ resource "grafana_data_source" "clickhouse" {
     # queryTimeout    = "60"
     # validateSql     = true
     # enableRowLimit  = true
+    # useJWTAuth      = true  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure = true
   })
 
   secure_json_data_encoded = jsonencode({

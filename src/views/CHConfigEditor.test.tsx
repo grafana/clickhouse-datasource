@@ -132,6 +132,13 @@ describe('ConfigEditor', () => {
     expect(screen.getByTestId(labels.enableRowLimit.testid)).toBeChecked();
   });
 
+  it('reflects useJWTAuth=true from jsonData', () => {
+    render(<ConfigEditor {...mockConfigEditorProps({ useJWTAuth: true })} />);
+    const toggle = document.getElementById('useJWTAuth') as HTMLInputElement;
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.checked).toBe(true);
+  });
+
   it('renders single-table logs configuration', () => {
     render(
       <ConfigEditor

@@ -1,4 +1,16 @@
-import { Box, CollapsableSection, Field, Input, SecretInput, Text, TextLink, useStyles2 } from '@grafana/ui';
+import {
+  Box,
+  Checkbox,
+  CollapsableSection,
+  Field,
+  Icon,
+  Input,
+  SecretInput,
+  Text,
+  TextLink,
+  Tooltip,
+  useStyles2,
+} from '@grafana/ui';
 import React, { useEffect, useState } from 'react';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 import {
@@ -32,7 +44,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
     if (!validation) {
       return;
     }
-    if (jsonData.username) {
+    if (jsonData.username || jsonData.useJWTAuth) {
       setFieldErrors((prev) => {
         const next = { ...prev };
         delete next.username;
@@ -42,14 +54,14 @@ export const DatabaseCredentialsSection = (props: Props) => {
     }
     return validation.registerValidation(() => {
       const errors: Record<string, string> = {};
-      if (!jsonData.username) {
+      if (!jsonData.username && !jsonData.useJWTAuth) {
         errors.username = labels.username.error;
       }
       setFieldErrors(errors);
       Object.entries(errors).forEach(([field, msg]) => validation.setError(field, msg));
       return Object.keys(errors).length === 0;
     });
-  }, [jsonData.username, validation, labels.username.error]);
+  }, [jsonData.username, jsonData.useJWTAuth, validation, labels.username.error]);
 
   const onResetPassword = () => {
     onOptionsChange({
@@ -93,7 +105,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
                 </TextLink>
               </>
             }
-            required
+            required={!jsonData.useJWTAuth}
             invalid={!!fieldErrors.username}
             error={fieldErrors.username}
           >
@@ -130,6 +142,37 @@ export const DatabaseCredentialsSection = (props: Props) => {
             />
           </Field>
         </div>
+        <Checkbox
+          label={labels.useJWTAuth.label}
+          description={
+            <>
+              {'Authenticate using '}
+              <TextLink
+                variant="bodySmall"
+                href="https://clickhouse.com/docs/en/operations/external-authenticators/jwt"
+                external
+              >
+                JWT
+              </TextLink>
+              {' '}
+              <Tooltip content="ClickHouse Cloud only" placement="top">
+                <Icon name="info-circle" size="sm" />
+              </Tooltip>
+              {'. When enabled, credentials are only used for health checks.'}
+            </>
+          }
+          checked={jsonData.useJWTAuth || false}
+          onChange={(e) => {
+            const checked = e.currentTarget.checked;
+            onOptionsChange({
+              ...options,
+              jsonData: {
+                ...jsonData,
+                useJWTAuth: checked,
+              },
+            });
+          }}
+        />
       </CollapsableSection>
     </Box>
   );
