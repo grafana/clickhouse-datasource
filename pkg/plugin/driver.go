@@ -450,40 +450,38 @@ func expandMacros(req *backend.QueryDataRequest) *backend.QueryDataRequest {
 // instead of a cryptic DB syntax error on the unexpanded macro. We cannot
 // return an error from MutateQueryData directly — sqlds's hook signature
 // forbids it — so the DB round-trip is the only available error channel.
+//
+// The query JSON is decoded once into a map so the rewritten rawSql can
+// be written back while preserving plugin-specific fields (meta.timezone,
+// format, etc.). macropro only needs the raw SQL plus TimeRange/Interval, and
+// the latter come from the backend.DataQuery envelope rather than the JSON
+// body, so a full sqlutil.Query decode is unnecessary. On any (un)marshal
+// failure the original query is returned unchanged.
 func expandMacrosInQuery(q backend.DataQuery) backend.DataQuery {
-	var sqq sqlutil.Query
-	if err := json.Unmarshal(q.JSON, &sqq); err != nil {
-		return q
-	}
-	if sqq.RawSQL == "" {
-		return q
-	}
-	// TimeRange and Interval come from the backend.DataQuery envelope, not
-	// from the JSON body — populate them on the temporary sqlutil.Query so
-	// macros see the correct values.
-	sqq.TimeRange = q.TimeRange
-	sqq.Interval = q.Interval
-
-	expanded, err := macros.Interpolate(sqq.RawSQL, &sqq)
-	if err != nil {
-		backend.Logger.Error("failed to expand macros", "error", err.Error(), "refId", q.RefID)
-		return replaceRawSQL(q, macroErrorQuery(err))
-	}
-	if expanded == sqq.RawSQL {
-		return q
-	}
-	return replaceRawSQL(q, expanded)
-}
-
-// replaceRawSQL writes newRawSQL into q.JSON while preserving plugin-specific
-// fields (meta.timezone, format, etc.) that sqlutil.Query does not know about.
-// On any serialization failure the original query is returned unchanged.
-func replaceRawSQL(q backend.DataQuery, newRawSQL string) backend.DataQuery {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(q.JSON, &raw); err != nil {
 		return q
 	}
-	newRawSQLMsg, err := json.Marshal(newRawSQL)
+	var rawSQL string
+	if msg, ok := raw["rawSql"]; ok {
+		if err := json.Unmarshal(msg, &rawSQL); err != nil {
+			return q
+		}
+	}
+	if rawSQL == "" {
+		return q
+	}
+
+	sqq := sqlutil.Query{RawSQL: rawSQL, TimeRange: q.TimeRange, Interval: q.Interval}
+	expanded, err := macros.Interpolate(rawSQL, &sqq)
+	if err != nil {
+		backend.Logger.Error("failed to expand macros", "error", err.Error(), "refId", q.RefID)
+		expanded = macroErrorQuery(err)
+	} else if expanded == rawSQL {
+		return q
+	}
+
+	newRawSQLMsg, err := json.Marshal(expanded)
 	if err != nil {
 		return q
 	}
