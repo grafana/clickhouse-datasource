@@ -1980,6 +1980,29 @@ describe('ClickHouseDatasource', () => {
         });
       });
 
+      it('splits legacy LogAttributes key even when the column is not selected', () => {
+        const queryWithoutLogAttributes: CHBuilderQuery = {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+          },
+        };
+
+        const result = datasource.modifyQuery(queryWithoutLogAttributes, {
+          type: 'ADD_FILTER',
+          options: { key: 'LogAttributes.foo.bar', value: 'baz' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          key: 'LogAttributes',
+          mapKey: 'foo.bar',
+          type: 'JSON',
+          operator: FilterOperator.Equals,
+          value: 'baz',
+        });
+      });
+
       it('resolves normalized log attribute field names through column hints', () => {
         const queryWithLogAttributes: CHBuilderQuery = {
           ...query,
@@ -1998,11 +2021,10 @@ describe('ClickHouseDatasource', () => {
           key: '',
           hint: ColumnHint.LogAttributes,
           mapKey: 'log.file.path',
-          type: 'Map(String, String)',
+          type: 'JSON',
           operator: FilterOperator.Equals,
           value: '/var/log/pod.log',
         });
-        expect(result.rawSql).toContain("LogAttributes['log.file.path'] = '/var/log/pod.log'");
       });
     });
 

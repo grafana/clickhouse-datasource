@@ -78,6 +78,7 @@ const attributeColumnHints = new Set([
   ColumnHint.ScopeAttributes,
   ColumnHint.LogAttributes,
 ]);
+const legacyAttributeColumns = new Set(['ResourceAttributes', 'ScopeAttributes', 'LogAttributes']);
 
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
@@ -110,6 +111,9 @@ function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): 
     if (attributeColumn) {
       mapKey = columnName.substring(prefixIndex + 1);
       columnName = attributeColumn.alias || attributeColumn.name;
+    } else if (legacyAttributeColumns.has(columnPrefix)) {
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = columnPrefix;
     }
   }
 
@@ -137,7 +141,7 @@ function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'
     key: resolved.column?.hint ? '' : resolved.columnName,
     hint: resolved.column?.hint || undefined,
     mapKey: resolved.hasMapKey ? resolved.mapKey : undefined,
-    type: resolved.hasMapKey ? (resolved.columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'string',
+    type: resolved.hasMapKey ? (resolved.columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'string',
     filterType: 'custom',
     operator,
     value,
