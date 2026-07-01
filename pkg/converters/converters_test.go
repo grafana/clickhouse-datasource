@@ -836,6 +836,42 @@ func TestSimpleAggregateFunctionNativeConverterValues(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, &ts, v)
 	})
+
+	t.Run("UInt16 pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, UInt16)")
+		u := uint16(200)
+		var val interface{} = &u
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, uint16(200), v)
+	})
+
+	t.Run("Float64 pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Float64)")
+		f := float64(3.14)
+		var val interface{} = &f
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, float64(3.14), v)
+	})
+
+	t.Run("Bool pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Bool)")
+		b := true
+		var val interface{} = &b
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, true, v)
+	})
+
+	t.Run("DateTime pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(min, DateTime64(9))")
+		ts := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		var val interface{} = &ts
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, ts, v)
+	})
 }
 
 // TestSimpleAggregateFunctionGetConverter tests the GetConverter path which

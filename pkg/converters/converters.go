@@ -402,55 +402,57 @@ func ClickHouseConverters() []sqlutil.Converter {
 // a converter function that extracts the native value from interface{}.
 type safTypeEntry struct {
 	innerPattern string         // regex for the inner type (after the function name)
+	displayName  string         // human-readable label for logs/debugging
 	fieldType    data.FieldType // Grafana field type to report
 	convert      func(in interface{}) (interface{}, error)
 }
 
 var safTypeMappings = []safTypeEntry{
 	// Non-nullable numeric types
-	{"UInt8", data.FieldTypeUint8, safConvertUint8},
-	{"UInt16", data.FieldTypeUint16, safConvertUint16},
-	{"UInt32", data.FieldTypeUint32, safConvertUint32},
-	{"UInt64", data.FieldTypeUint64, safConvertUint64},
-	{"Int8", data.FieldTypeInt8, safConvertInt8},
-	{"Int16", data.FieldTypeInt16, safConvertInt16},
-	{"Int32", data.FieldTypeInt32, safConvertInt32},
-	{"Int64", data.FieldTypeInt64, safConvertInt64},
-	{"Float32", data.FieldTypeFloat32, safConvertFloat32},
-	{"Float64", data.FieldTypeFloat64, safConvertFloat64},
-	{"Bool", data.FieldTypeBool, safConvertBool},
+	{"UInt8", "UInt8", data.FieldTypeUint8, safConvertUint8},
+	{"UInt16", "UInt16", data.FieldTypeUint16, safConvertUint16},
+	{"UInt32", "UInt32", data.FieldTypeUint32, safConvertUint32},
+	{"UInt64", "UInt64", data.FieldTypeUint64, safConvertUint64},
+	{"Int8", "Int8", data.FieldTypeInt8, safConvertInt8},
+	{"Int16", "Int16", data.FieldTypeInt16, safConvertInt16},
+	{"Int32", "Int32", data.FieldTypeInt32, safConvertInt32},
+	{"Int64", "Int64", data.FieldTypeInt64, safConvertInt64},
+	{"Float32", "Float32", data.FieldTypeFloat32, safConvertFloat32},
+	{"Float64", "Float64", data.FieldTypeFloat64, safConvertFloat64},
+	{"Bool", "Bool", data.FieldTypeBool, safConvertBool},
 	// Nullable numeric types
-	{"Nullable\\(UInt8\\)", data.FieldTypeNullableUint8, safConvertNullableUint8},
-	{"Nullable\\(UInt16\\)", data.FieldTypeNullableUint16, safConvertNullableUint16},
-	{"Nullable\\(UInt32\\)", data.FieldTypeNullableUint32, safConvertNullableUint32},
-	{"Nullable\\(UInt64\\)", data.FieldTypeNullableUint64, safConvertNullableUint64},
-	{"Nullable\\(Int8\\)", data.FieldTypeNullableInt8, safConvertNullableInt8},
-	{"Nullable\\(Int16\\)", data.FieldTypeNullableInt16, safConvertNullableInt16},
-	{"Nullable\\(Int32\\)", data.FieldTypeNullableInt32, safConvertNullableInt32},
-	{"Nullable\\(Int64\\)", data.FieldTypeNullableInt64, safConvertNullableInt64},
-	{"Nullable\\(Float32\\)", data.FieldTypeNullableFloat32, safConvertNullableFloat32},
-	{"Nullable\\(Float64\\)", data.FieldTypeNullableFloat64, safConvertNullableFloat64},
-	{"Nullable\\(Bool\\)", data.FieldTypeNullableBool, safConvertNullableBool},
+	{"Nullable\\(UInt8\\)", "Nullable(UInt8)", data.FieldTypeNullableUint8, safConvertNullableUint8},
+	{"Nullable\\(UInt16\\)", "Nullable(UInt16)", data.FieldTypeNullableUint16, safConvertNullableUint16},
+	{"Nullable\\(UInt32\\)", "Nullable(UInt32)", data.FieldTypeNullableUint32, safConvertNullableUint32},
+	{"Nullable\\(UInt64\\)", "Nullable(UInt64)", data.FieldTypeNullableUint64, safConvertNullableUint64},
+	{"Nullable\\(Int8\\)", "Nullable(Int8)", data.FieldTypeNullableInt8, safConvertNullableInt8},
+	{"Nullable\\(Int16\\)", "Nullable(Int16)", data.FieldTypeNullableInt16, safConvertNullableInt16},
+	{"Nullable\\(Int32\\)", "Nullable(Int32)", data.FieldTypeNullableInt32, safConvertNullableInt32},
+	{"Nullable\\(Int64\\)", "Nullable(Int64)", data.FieldTypeNullableInt64, safConvertNullableInt64},
+	{"Nullable\\(Float32\\)", "Nullable(Float32)", data.FieldTypeNullableFloat32, safConvertNullableFloat32},
+	{"Nullable\\(Float64\\)", "Nullable(Float64)", data.FieldTypeNullableFloat64, safConvertNullableFloat64},
+	{"Nullable\\(Bool\\)", "Nullable(Bool)", data.FieldTypeNullableBool, safConvertNullableBool},
 	// DateTime types (patterns account for optional timezone parameter)
-	{"DateTime64\\(\\d+(,\\s*'[^']*')?\\)", data.FieldTypeTime, safConvertTime},
-	{"DateTime(\\('[^']*'\\))?", data.FieldTypeTime, safConvertTime},
-	{"Date32", data.FieldTypeTime, safConvertTime},
-	{"Date", data.FieldTypeTime, safConvertTime},
-	{"Nullable\\(DateTime64\\(\\d+(,\\s*'[^']*')?\\)\\)", data.FieldTypeNullableTime, safConvertNullableTime},
-	{"Nullable\\(DateTime(\\('[^']*'\\))?\\)", data.FieldTypeNullableTime, safConvertNullableTime},
-	{"Nullable\\(Date32\\)", data.FieldTypeNullableTime, safConvertNullableTime},
-	{"Nullable\\(Date\\)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"DateTime64\\(\\d+(,\\s*'[^']*')?\\)", "DateTime64", data.FieldTypeTime, safConvertTime},
+	{"DateTime(\\('[^']*'\\))?", "DateTime", data.FieldTypeTime, safConvertTime},
+	{"Date32", "Date32", data.FieldTypeTime, safConvertTime},
+	{"Date", "Date", data.FieldTypeTime, safConvertTime},
+	{"Nullable\\(DateTime64\\(\\d+(,\\s*'[^']*')?\\)\\)", "Nullable(DateTime64)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(DateTime(\\('[^']*'\\))?\\)", "Nullable(DateTime)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(Date32\\)", "Nullable(Date32)", data.FieldTypeNullableTime, safConvertNullableTime},
+	{"Nullable\\(Date\\)", "Nullable(Date)", data.FieldTypeNullableTime, safConvertNullableTime},
 }
 
 func generateSAFConverters() []sqlutil.Converter {
 	var converters []sqlutil.Converter
 	for _, entry := range safTypeMappings {
 		pattern := `^SimpleAggregateFunction\([^,]+,\s*` + entry.innerPattern + `\)$`
+		label := "SimpleAggregateFunction(*, " + entry.displayName + ")"
 		converters = append(converters, sqlutil.Converter{
-			Name:           "SimpleAggregateFunction(" + entry.innerPattern + ")",
+			Name:           label,
 			InputScanType:  reflect.TypeOf((*interface{})(nil)).Elem(),
 			InputTypeRegex: regexp.MustCompile(pattern),
-			InputTypeName:  "SimpleAggregateFunction(" + entry.innerPattern + ")",
+			InputTypeName:  label,
 			FrameConverter: sqlutil.FrameConverter{
 				FieldType:     entry.fieldType,
 				ConverterFunc: entry.convert,
@@ -464,80 +466,124 @@ func generateSAFConverters() []sqlutil.Converter {
 // and the underlying value is the native Go type matching the inner column type.
 
 func safConvertUint8(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(uint8); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(uint8); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF uint8", *(in.(*interface{})))
+	if val, ok := v.(*uint8); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF UInt8", v)
 }
 
 func safConvertUint16(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(uint16); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(uint16); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF uint16", *(in.(*interface{})))
+	if val, ok := v.(*uint16); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF UInt16", v)
 }
 
 func safConvertUint32(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(uint32); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(uint32); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF uint32", *(in.(*interface{})))
+	if val, ok := v.(*uint32); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF UInt32", v)
 }
 
 func safConvertUint64(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(uint64); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(uint64); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF uint64", *(in.(*interface{})))
+	if val, ok := v.(*uint64); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF UInt64", v)
 }
 
 func safConvertInt8(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(int8); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(int8); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF int8", *(in.(*interface{})))
+	if val, ok := v.(*int8); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Int8", v)
 }
 
 func safConvertInt16(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(int16); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(int16); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF int16", *(in.(*interface{})))
+	if val, ok := v.(*int16); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Int16", v)
 }
 
 func safConvertInt32(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(int32); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(int32); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF int32", *(in.(*interface{})))
+	if val, ok := v.(*int32); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Int32", v)
 }
 
 func safConvertInt64(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(int64); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(int64); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF int64", *(in.(*interface{})))
+	if val, ok := v.(*int64); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Int64", v)
 }
 
 func safConvertFloat32(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(float32); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(float32); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF float32", *(in.(*interface{})))
+	if val, ok := v.(*float32); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Float32", v)
 }
 
 func safConvertFloat64(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(float64); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(float64); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF float64", *(in.(*interface{})))
+	if val, ok := v.(*float64); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Float64", v)
 }
 
 func safConvertBool(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(bool); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(bool); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF bool", *(in.(*interface{})))
+	if val, ok := v.(*bool); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF Bool", v)
 }
 
 func safConvertNullableUint8(in interface{}) (interface{}, error) {
@@ -695,10 +741,14 @@ func safConvertNullableBool(in interface{}) (interface{}, error) {
 }
 
 func safConvertTime(in interface{}) (interface{}, error) {
-	if v, ok := (*(in.(*interface{}))).(time.Time); ok {
-		return v, nil
+	v := (*(in.(*interface{})))
+	if val, ok := v.(time.Time); ok {
+		return val, nil
 	}
-	return nil, fmt.Errorf("unexpected type %T for SAF time", *(in.(*interface{})))
+	if val, ok := v.(*time.Time); ok {
+		return *val, nil
+	}
+	return nil, fmt.Errorf("unexpected type %T for SAF DateTime", v)
 }
 
 func safConvertNullableTime(in interface{}) (interface{}, error) {
