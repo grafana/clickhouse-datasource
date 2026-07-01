@@ -1,4 +1,14 @@
-import { parseFirst, Statement, SelectFromStatement, astMapper, toSql, ExprRef } from 'pgsql-ast-parser';
+import { parseFirst, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
+import { Lexer } from 'ch-parser/lexer';
+import { Token } from 'ch-parser/types';
+import {
+  FromQueryNode,
+  parseSelectQueryNode,
+  QueryNode,
+  QueryNodeParser,
+  QueryNodeType,
+  SelectQueryNode,
+} from 'ch-parser/parser';
 
 interface ReplacePart {
   startIndex: number;
@@ -123,26 +133,92 @@ export function sqlToStatement(rawSql: string): Statement {
   return mapper.statement(ast)!;
 }
 
+/**
+ * Tokenizes `sql` with the in-repo ClickHouse lexer and builds the shallow
+ * select-query node tree. Returns null when the input is not a SELECT (or
+ * WITH ... SELECT) statement.
+ */
+function parseSelect(sql: string): SelectQueryNode | null {
+  const lexer = new Lexer(sql);
+  const tokens: Token[] = [];
+  for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
+    if (token.isSignificant()) {
+      tokens.push(token);
+    }
+  }
+  return parseSelectQueryNode(new QueryNodeParser(tokens));
+}
+
+// Strip backtick / double-quote identifier quoting so the name matches the
+// physical table name `additional_table_filters` keys on. `apply()` already
+// strips double quotes from the query before matching (see adHocFilter.ts).
+function unquoteIdentifier(name: string): string {
+  return name.replace(/^["`]|["`]$/g, '');
+}
+
+function qualifiedTableName(node: FromQueryNode): string | undefined {
+  if (!node.table) {
+    return undefined;
+  }
+  const table = unquoteIdentifier(node.table);
+  return node.database ? `${unquoteIdentifier(node.database)}.${table}` : table;
+}
+
+function isFromNode(node: QueryNode): node is FromQueryNode {
+  return node.type === QueryNodeType.From;
+}
+
+function isSelectNode(node: QueryNode): node is SelectQueryNode {
+  return node.type === QueryNodeType.Select;
+}
+
+/**
+ * Walks the select-query node tree in document order and returns the first
+ * physical table referenced by a FROM / JOIN clause, descending into
+ * subqueries and CTE bodies. We resolve to the underlying physical table
+ * rather than a subquery/CTE alias because that is what
+ * `additional_table_filters` keys on. Returns undefined when no physical
+ * table is present.
+ */
+function firstPhysicalTable(node: SelectQueryNode): string | undefined {
+  if (!node.children) {
+    return undefined;
+  }
+  for (const child of node.children) {
+    if (isFromNode(child)) {
+      const name = qualifiedTableName(child);
+      if (name) {
+        return name;
+      }
+    } else if (isSelectNode(child)) {
+      const nested = firstPhysicalTable(child);
+      if (nested) {
+        return nested;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Returns the physical table an ad-hoc filter should target for `sql`, or ''
+ * when none can be found.
+ *
+ * Previously this parsed with `pgsql-ast-parser`, a Postgres grammar that
+ * throws on valid ClickHouse syntax (SAMPLE, INTERVAL, lambdas, an existing
+ * SETTINGS clause, ...). On a throw it returned '', so the ad-hoc filter was
+ * silently dropped (grafana/clickhouse-datasource#958, #714). This uses the
+ * in-repo ClickHouse lexer and parser already shipping for query
+ * autocomplete, so ClickHouse syntax tokenizes instead of failing. The
+ * contract is unchanged: the first FROM table (descending into a leading
+ * subquery or CTE), preserving its original casing, and '' when none exists.
+ */
 export function getTable(sql: string): string {
-  const stm = sqlToStatement(sql);
-  if (stm.type !== 'select' || !stm.from?.length || stm.from?.length <= 0) {
+  const root = parseSelect(sql);
+  if (!root) {
     return '';
   }
-  switch (stm.from![0].type) {
-    case 'table': {
-      const table = stm.from![0];
-      const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
-      // clickhouse table names are case-sensitive and pgsql parser removes casing,
-      // so we need to get the casing from the raw sql
-      const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
-      return s ? s[0] : tableName;
-    }
-    case 'statement': {
-      const table = stm.from![0];
-      return getTable(toSql.statement(table.statement));
-    }
-  }
-  return '';
+  return firstPhysicalTable(root) ?? '';
 }
 
 export function getFields(sql: string): string[] {
