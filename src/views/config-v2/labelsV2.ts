@@ -40,6 +40,9 @@ export default {
           placeholder: 'Enter password',
           tooltip: 'ClickHouse password',
         },
+        useJWTAuth: {
+          label: 'Use JWT Authentication',
+        },
         tlsSkipVerify: {
           label: 'Skip TLS Verify',
           tooltip: 'Skip TLS Verify',

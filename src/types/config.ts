@@ -47,6 +47,7 @@ export interface CHConfig extends DataSourceJsonData {
 
   httpHeaders?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
+  useJWTAuth?: boolean;
 
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;

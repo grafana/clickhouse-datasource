@@ -500,3 +500,162 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
 }
+
+func TestSettingsForwardHeadersWithJWT(t *testing.T) {
+	h := &Clickhouse{}
+
+	t.Run("ForwardHeaders is true when useJWTAuth is enabled", func(t *testing.T) {
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "useJWTAuth": true, "forwardGrafanaHeaders": false}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.True(t, ds.ForwardHeaders)
+	})
+
+	t.Run("ForwardHeaders is true when forwardGrafanaHeaders is enabled", func(t *testing.T) {
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "useJWTAuth": false, "forwardGrafanaHeaders": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.True(t, ds.ForwardHeaders)
+	})
+
+	t.Run("ForwardHeaders is false when both are disabled", func(t *testing.T) {
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.False(t, ds.ForwardHeaders)
+	})
+}
+
+func TestExtractForwardedHeadersWithAuthorization(t *testing.T) {
+	t.Run("extracts Authorization header from message", func(t *testing.T) {
+		message := json.RawMessage(`{
+			"grafana-http-headers": {
+				"Authorization": ["Bearer test-token-123"],
+				"X-Grafana-User": ["alice"]
+			}
+		}`)
+		headers, err := extractForwardedHeadersFromMessage(message)
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer test-token-123", headers["Authorization"])
+		assert.Equal(t, "alice", headers["X-Grafana-User"])
+	})
+
+	t.Run("returns empty map when message is nil", func(t *testing.T) {
+		headers, err := extractForwardedHeadersFromMessage(nil)
+		assert.NoError(t, err)
+		assert.Empty(t, headers)
+	})
+}
+
+func TestResolveJWTAuth(t *testing.T) {
+	baseSettings := Settings{
+		DefaultDatabase: "default",
+		Username:        "admin",
+		Password:        "secret",
+	}
+
+	t.Run("JWT enabled clears credentials and moves token to GetJWT", func(t *testing.T) {
+		s := baseSettings
+		s.UseJWTAuth = true
+		headers := map[string]string{"Authorization": "Bearer my-jwt-token"}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Empty(t, auth.Username)
+		assert.Empty(t, auth.Password)
+		assert.Equal(t, "default", auth.Database)
+		assert.NotNil(t, getJWT)
+
+		token, err := getJWT(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "my-jwt-token", token)
+
+		_, exists := headers["Authorization"]
+		assert.False(t, exists, "Authorization header should be removed from httpHeaders")
+	})
+
+	t.Run("JWT enabled but no token falls back to credentials", func(t *testing.T) {
+		s := baseSettings
+		s.UseJWTAuth = true
+		headers := map[string]string{}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Equal(t, "admin", auth.Username)
+		assert.Equal(t, "secret", auth.Password)
+		assert.Nil(t, getJWT)
+	})
+
+	t.Run("JWT disabled uses credentials regardless of token", func(t *testing.T) {
+		s := baseSettings
+		s.UseJWTAuth = false
+		headers := map[string]string{"Authorization": "Bearer some-token"}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Equal(t, "admin", auth.Username)
+		assert.Equal(t, "secret", auth.Password)
+		assert.Nil(t, getJWT)
+		assert.Equal(t, "Bearer some-token", headers["Authorization"])
+	})
+}
+
+func TestBuildClickHouseOptionsJWTBothProtocols(t *testing.T) {
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	for _, protocol := range []string{"native", "http"} {
+		t.Run(protocol, func(t *testing.T) {
+			settings := Settings{
+				Host:         "localhost",
+				Port:         9440,
+				Protocol:     protocol,
+				Secure:       true,
+				UseJWTAuth:   true,
+				Username:     "svc",
+				Password:     "fallback",
+				DialTimeout:  "5",
+				QueryTimeout: "30",
+			}
+
+			opts, err := buildClickHouseOptions(t.Context(), settings, message)
+			assert.NoError(t, err)
+
+			assert.NotNil(t, opts.GetJWT, "GetJWT must be set for %s protocol", protocol)
+			token, err := opts.GetJWT(context.Background())
+			assert.NoError(t, err)
+			assert.Equal(t, "my-jwt-token", token)
+
+			assert.Empty(t, opts.Auth.Username, "username must be cleared when JWT is active")
+			assert.Empty(t, opts.Auth.Password, "password must be cleared when JWT is active")
+		})
+	}
+}
+
+func TestBuildClickHouseOptionsJWTFallbackWithoutToken(t *testing.T) {
+	message := json.RawMessage(`{}`)
+
+	settings := Settings{
+		Host:         "localhost",
+		Port:         9440,
+		Protocol:     "native",
+		Secure:       true,
+		UseJWTAuth:   true,
+		Username:     "svc",
+		Password:     "fallback",
+		DialTimeout:  "5",
+		QueryTimeout: "30",
+	}
+
+	opts, err := buildClickHouseOptions(t.Context(), settings, message)
+	assert.NoError(t, err)
+
+	assert.Nil(t, opts.GetJWT, "GetJWT must be nil when no token is forwarded")
+	assert.Equal(t, "svc", opts.Auth.Username)
+	assert.Equal(t, "fallback", opts.Auth.Password)
+}

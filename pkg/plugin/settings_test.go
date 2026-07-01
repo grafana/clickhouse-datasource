@@ -382,3 +382,34 @@ func TestLoadSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadSettingsUseJWTAuth(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse useJWTAuth as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "useJWTAuth": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.UseJWTAuth)
+	})
+
+	t.Run("should parse useJWTAuth as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "useJWTAuth": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.UseJWTAuth)
+	})
+
+	t.Run("should default useJWTAuth to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.UseJWTAuth)
+	})
+}

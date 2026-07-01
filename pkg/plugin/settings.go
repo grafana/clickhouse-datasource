@@ -43,6 +43,7 @@ type Settings struct {
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	UseJWTAuth            bool              `json:"useJWTAuth,omitempty"`
 	CustomSettings        []CustomSetting   `json:"customSettings"`
 	ProxyOptions          *proxy.Options
 
@@ -206,6 +207,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
+		}
+	}
+
+	if jsonData["useJWTAuth"] != nil {
+		if useJWTAuth, ok := jsonData["useJWTAuth"].(string); ok {
+			settings.UseJWTAuth, err = strconv.ParseBool(useJWTAuth)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse useJWTAuth value: %w", err))
+			}
+		} else {
+			settings.UseJWTAuth = jsonData["useJWTAuth"].(bool)
 		}
 	}
 
