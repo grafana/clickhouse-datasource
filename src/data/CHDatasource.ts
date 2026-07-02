@@ -80,6 +80,11 @@ const attributeColumnHints = new Set([
 ]);
 const legacyAttributeColumns = new Set(['ResourceAttributes', 'ScopeAttributes', 'LogAttributes']);
 
+// Columns the trace-ID optimization's WITH clause reads from the
+// `<table><suffix>` companion table. The optimization is only safe when the
+// companion actually exposes all of them.
+const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
+
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
   columnPrefix: string
@@ -948,10 +953,16 @@ export class Datasource
   }
 
   /**
-   * Resolves whether the `<table>_trace_id_ts` companion exists for the given
-   * (database, table). Caches the Promise so concurrent and repeat callers share
-   * a single `SHOW TABLES` round-trip; on failure, evicts so the next caller
-   * retries and meanwhile returns `false` (the safe, unoptimized path).
+   * Resolves whether the `<table>_trace_id_ts` companion is usable for the
+   * trace-ID lookup optimization: it must exist AND expose the Start/End/TraceId
+   * columns that the generated WITH clause hardcodes. A companion that merely
+   * matches the suffix but has differently named columns (e.g. a non-OTel schema
+   * with trace_id/start_time/end_time) would produce an UNKNOWN_IDENTIFIER error,
+   * so it is rejected here and the query falls back to the plain filter.
+   *
+   * Caches the Promise so concurrent and repeat callers share a single
+   * round-trip; on failure, evicts so the next caller retries and meanwhile
+   * returns `false` (the safe, unoptimized path).
    */
   async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
     if (!database || !table) {
@@ -966,8 +977,14 @@ export class Datasource
     if (!entry || entry.expiresAt <= now) {
       const pending = (async () => {
         try {
+          const companionTable = table + this.getTraceTimestampTableSuffix();
           const tables = await this.fetchTables(database);
-          return tables.includes(table + this.getTraceTimestampTableSuffix());
+          if (!tables.includes(companionTable)) {
+            return false;
+          }
+          const columns = await this.fetchColumns(database, companionTable);
+          const columnNames = new Set(columns.map((c) => c.name));
+          return TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS.every((c) => columnNames.has(c));
         } catch {
           this.traceTimestampTableCache.delete(key);
           return false;
