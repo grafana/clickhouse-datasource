@@ -317,3 +317,53 @@ func TestInterpolate(t *testing.T) {
 		})
 	}
 }
+
+// TestInterpolateBackslashEscapedStringLiterals guards against macropro's
+// comment-stripping pass mis-terminating a ClickHouse string literal at a
+// backslash-escaped quote (\'), which would let a following -- or /* token be
+// treated as a comment and blank out any macro after it. ClickHouse enables
+// C-style backslash escapes in string literals by default, so \' is a valid,
+// common way to embed a quote and must not corrupt macro expansion.
+func TestInterpolateBackslashEscapedStringLiterals(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.123Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.456Z")
+
+	type test struct {
+		name   string
+		input  string
+		output string
+	}
+
+	tests := []test{
+		{
+			name:   "backslash-escaped quote with -- inside the literal keeps the trailing macro",
+			input:  `select * from foo where msg = 'it\'s -- fine' and $__fromTime`,
+			output: `select * from foo where msg = 'it\'s -- fine' and toDateTime(1415792726)`,
+		},
+		{
+			name:   "backslash-escaped quote with /* inside the literal keeps the trailing macro",
+			input:  `select * from foo where msg = 'a\'/*x' and $__toTime`,
+			output: `select * from foo where msg = 'a\'/*x' and toDateTime(1447328726)`,
+		},
+		{
+			name:   "doubled-quote escape is still preserved",
+			input:  `select * from foo where msg = 'it''s' and $__fromTime`,
+			output: `select * from foo where msg = 'it''s' and toDateTime(1415792726)`,
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
+			query := &sqlutil.Query{
+				RawSQL: tc.input,
+				TimeRange: backend.TimeRange{
+					From: from,
+					To:   to,
+				},
+			}
+			interpolatedQuery, err := Interpolate(tc.input, query)
+			require.Nil(t, err)
+			assert.Equal(t, tc.output, interpolatedQuery)
+		})
+	}
+}
