@@ -30,7 +30,7 @@ jobs:
     # Main publishing is handled by the CD workflow below.
     if: github.ref != 'refs/heads/main'
 
-    # Required for checkout + OIDC in shared workflows
+    # Required for checkout + OIDC in shared workflows.
     permissions:
       contents: read
       id-token: write
