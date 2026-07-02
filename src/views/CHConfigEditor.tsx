@@ -96,6 +96,16 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const fieldErrors = validation?.getErrors() ?? {};
 
+  // When the clickHouseConfigValidation feature toggle is off (the default),
+  // `validation` is undefined and `fieldErrors` is always empty — which dropped
+  // the inline required-field indicator that shipped in v4.17.0. Fall back to a
+  // structural empty check so the required host/port fields still surface an
+  // inline error on the default install, before Save & Test round-trips.
+  const hostInvalid = validation ? Boolean(fieldErrors.host) : !jsonData.host;
+  const hostError = validation ? fieldErrors.host : jsonData.host ? undefined : labels.serverAddress.error;
+  const portInvalid = validation ? Boolean(fieldErrors.port) : !jsonData.port;
+  const portError = validation ? fieldErrors.port : jsonData.port ? undefined : labels.serverPort.error;
+
   const onPortChange = (port: string) => {
     onOptionsChange({
       ...options,
@@ -294,8 +304,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           required
           label={labels.serverAddress.label}
           description={labels.serverAddress.tooltip}
-          invalid={!!fieldErrors.host}
-          error={fieldErrors.host}
+          invalid={hostInvalid}
+          error={hostError}
         >
           <Input
             name="host"
@@ -312,8 +322,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           required
           label={labels.serverPort.label}
           description={portDescription}
-          invalid={!!fieldErrors.port}
-          error={fieldErrors.port}
+          invalid={portInvalid}
+          error={portError}
         >
           <Input
             name="port"
