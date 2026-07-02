@@ -21,6 +21,7 @@
     "buildinfo",
     "CHSQL",
     "ClickHouse",
+    "clickhouseexporter",
     "closedate",
     "codefile",
     "combobox",

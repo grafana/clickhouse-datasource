@@ -129,6 +129,96 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
+  // Regression test for #1882: opentelemetry-collector-contrib clickhouseexporter v0.151.0
+  // dropped the TimestampTime column from otel_logs. The default WHERE filter and ORDER BY
+  // entries the logs query builder installs reference ColumnHint.FilterTime; when that hint
+  // isn't mapped (the 1.3.0 OTel schema), the generator must fall back to ColumnHint.Time and
+  // emit `Timestamp`, not `TimestampTime`.
+  it('falls back to Time column when FilterTime is unmapped (collector-contrib v0.151.0+ schema)', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'SeverityText', type: 'String', hint: ColumnHint.LogLevel },
+        { name: 'Body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          type: 'datetime',
+          key: '',
+          condition: 'AND',
+          hint: ColumnHint.FilterTime,
+          operator: FilterOperator.WithInGrafanaTimeRange,
+        },
+      ],
+      orderBy: [
+        { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
+        { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
+      ],
+    };
+
+    const expectedSqlParts = [
+      'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
+      'FROM "otel"."otel_logs"',
+      'WHERE ( timestamp >= $__fromTime AND timestamp <= $__toTime )',
+      'ORDER BY timestamp DESC LIMIT 1000',
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+    expect(sql).not.toContain('TimestampTime');
+  });
+
+  // Companion to the v0.151.0 test above: when both FilterTime and Time are mapped (the older
+  // 1.2.9 schema where otel_logs has both `TimestampTime` and `Timestamp` columns), the grouped
+  // ORDER BY must still emit `(TimestampTime, Timestamp) DESC` and the WHERE filter must use
+  // `TimestampTime`. Locks in the pre-0.151 behavior so re-pointing `latest` to 1.3.0 doesn't
+  // silently regress users on the older schema.
+  it('emits TimestampTime when FilterTime is mapped (collector-contrib v0.150.x and earlier schema)', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [
+        { name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.FilterTime },
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'SeverityText', type: 'String', hint: ColumnHint.LogLevel },
+        { name: 'Body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          type: 'datetime',
+          key: '',
+          condition: 'AND',
+          hint: ColumnHint.FilterTime,
+          operator: FilterOperator.WithInGrafanaTimeRange,
+        },
+      ],
+      orderBy: [
+        { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
+        { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
+      ],
+    };
+
+    // The FilterTime column (TimestampTime) is used verbatim in the WHERE clause and grouped with
+    // the Time column's alias ("timestamp") in the ORDER BY.
+    const expectedSqlParts = [
+      'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
+      'FROM "otel"."otel_logs"',
+      'WHERE ( TimestampTime >= $__fromTime AND TimestampTime <= $__toTime )',
+      'ORDER BY (TimestampTime, timestamp) DESC LIMIT 1000',
+    ];
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
   it('generates simple time series query', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
