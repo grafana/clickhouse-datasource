@@ -29,7 +29,7 @@ import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { trackClickhouseHealthCheckFailed } from 'tracking';
 import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isEmpty, isString } from 'lodash';
-import otel from 'otel';
+import otel, { defaultLogsTable, defaultTraceTable } from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
 import { CHConfig, ConfigMode, SignalType } from 'types/config';
@@ -442,6 +442,7 @@ export class Datasource
 
     // resolve template variables
     rawQuery = this.applyConditionalAll(rawQuery, templateSrvVariables);
+    rawQuery = this.applyConfigMacros(rawQuery);
     rawQuery = this.replace(rawQuery, scoped) || '';
 
     if (!this.skipAdHocFilter) {
@@ -512,6 +513,31 @@ export class Datasource
       builderOptions,
       rawSql: generateSql(builderOptions),
     };
+  }
+
+  /**
+   * Resolve datasource-config macros to the configured per-signal database and
+   * table. Lets queries and dashboards reference the datasource's OTel
+   * configuration instead of hard-coding names, so a single-table datasource
+   * binds to its configured table and a classic datasource binds to its
+   * configured logs/traces defaults. Falls back to the connection default
+   * database and the conventional OTel table names when a per-signal value is
+   * unset.
+   */
+  applyConfigMacros(rawQuery: string): string {
+    if (!rawQuery) {
+      return rawQuery;
+    }
+    const macros: Record<string, string> = {
+      $__logsDatabase: this.getDefaultLogsDatabase() || this.getDefaultDatabase(),
+      $__logsTable: this.getDefaultLogsTable() || defaultLogsTable,
+      $__tracesDatabase: this.getDefaultTraceDatabase() || this.getDefaultDatabase(),
+      $__tracesTable: this.getDefaultTraceTable() || defaultTraceTable,
+    };
+    for (const [macro, value] of Object.entries(macros)) {
+      rawQuery = rawQuery.split(macro).join(value);
+    }
+    return rawQuery;
   }
 
   applyConditionalAll(rawQuery: string, templateVars: TypedVariableModel[]): string {
