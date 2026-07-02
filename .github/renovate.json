@@ -63,6 +63,13 @@
       "matchDepTypes": ["devDependencies"],
       "automerge": true,
       "labels": ["automerge-minor"]
+    },
+    {
+      "description": "Batch all non-major updates (minor, patch, pin, digest) into a single PR to reduce rebase/merge churn; major updates stay in separate PRs for individual review",
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "matchPackageNames": ["*"],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-non-major"
     }
   ]
 }
