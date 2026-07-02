@@ -8,7 +8,7 @@ require (
 	github.com/grafana/grafana-plugin-sdk-go v0.292.1
 	github.com/grafana/macropro v1.0.0
 	github.com/grafana/sqlds/v5 v5.1.1
-	github.com/moby/moby/api v1.54.2
+	github.com/moby/moby/api v1.55.0
 	github.com/paulmach/orb v0.13.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/stretchr/testify v1.11.1
