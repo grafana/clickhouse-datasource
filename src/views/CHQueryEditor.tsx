@@ -233,7 +233,11 @@ const CompactSqlMode = (props: CHQueryEditorProps) => {
 
     const builderOptions = buildCompactQueryDefaults(datasource, signalType);
     const compactSql = generateSql(builderOptions);
-    if (!confirmed && query.rawSql.trim() && query.rawSql.trim() !== compactSql.trim()) {
+    // rawSql may be undefined for provisioned / hand-authored / alert query
+    // models that carry only { editorType: 'sql' }; migrateCHQuery leaves those
+    // unchanged, so guard before calling .trim().
+    const currentSql = (query.rawSql ?? '').trim();
+    if (!confirmed && currentSql && currentSql !== compactSql.trim()) {
       setConfirmSwitchOpen(true);
       return;
     }
