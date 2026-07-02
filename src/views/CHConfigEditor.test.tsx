@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { ConfigEditor } from './CHConfigEditor';
 import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
 import '@testing-library/jest-dom';
-import { Protocol } from 'types/config';
+import { CHConfig, Protocol } from 'types/config';
 import allLabels from 'labels';
 
 jest.mock('@grafana/runtime', () => {
@@ -130,6 +130,19 @@ describe('ConfigEditor', () => {
     expect(screen.getByDisplayValue(jsonDataOverrides.customSettings[0].value)).toBeInTheDocument();
     expect(screen.getByText(labels.enableRowLimit.label)).toBeInTheDocument();
     expect(screen.getByTestId(labels.enableRowLimit.testid)).toBeChecked();
+  });
+
+  it('shows the required-field error on an empty host when config validation is not enabled', () => {
+    // On a default install the clickHouseConfigValidation feature toggle is off,
+    // so `validation` is undefined. The required host field must still show an
+    // inline error when empty (structural fallback), as it did in v4.17.0.
+    render(<ConfigEditor {...mockConfigEditorProps({ host: '' } as Partial<CHConfig>)} />);
+    expect(screen.getByText(labels.serverAddress.error)).toBeInTheDocument();
+  });
+
+  it('hides the required-field error once the host is filled (no validation toggle)', () => {
+    render(<ConfigEditor {...mockConfigEditorProps({ host: 'localhost' } as Partial<CHConfig>)} />);
+    expect(screen.queryByText(labels.serverAddress.error)).not.toBeInTheDocument();
   });
 
   it('renders single-table logs configuration', () => {
