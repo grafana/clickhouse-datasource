@@ -10,6 +10,7 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/paulmach/orb"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -696,17 +697,181 @@ func TestSimpleAggregateFunctionNullableStringNilRegex(t *testing.T) {
 	assert.Nil(t, v)
 }
 
-func TestSimpleAggregateFunctionNumericUsesJSON(t *testing.T) {
-	// In the production regex path, non-string SAF types match the catch-all and use jsonConverter
-	sut := findConverterWithRegex("SimpleAggregateFunction(any, Nullable(UInt16))")
-	require.NotNil(t, sut.InputScanType)
-	assert.Equal(t, data.FieldTypeJSON, sut.FrameConverter.FieldType)
+func TestSimpleAggregateFunctionNativeTypes(t *testing.T) {
+	// Generated SAF converters resolve numeric/bool/date types to native Grafana types
+	converters := ClickHouseConverters()
+	find := func(typeName string) sqlutil.Converter {
+		for _, c := range converters {
+			if c.InputTypeRegex != nil && c.InputTypeRegex.MatchString(typeName) {
+				return c
+			}
+		}
+		return sqlutil.Converter{}
+	}
+
+	cases := []struct {
+		name      string
+		typeName  string
+		fieldType data.FieldType
+	}{
+		{"UInt16", "SimpleAggregateFunction(any, UInt16)", data.FieldTypeUint16},
+		{"Nullable(UInt16)", "SimpleAggregateFunction(any, Nullable(UInt16))", data.FieldTypeNullableUint16},
+		{"Int64", "SimpleAggregateFunction(anyLast, Int64)", data.FieldTypeInt64},
+		{"Float64", "SimpleAggregateFunction(any, Float64)", data.FieldTypeFloat64},
+		{"Bool", "SimpleAggregateFunction(any, Bool)", data.FieldTypeBool},
+		{"Nullable(Bool)", "SimpleAggregateFunction(any, Nullable(Bool))", data.FieldTypeNullableBool},
+		{"DateTime64", "SimpleAggregateFunction(min, DateTime64(9))", data.FieldTypeTime},
+		{"DateTime64 with timezone", "SimpleAggregateFunction(min, DateTime64(9, 'UTC'))", data.FieldTypeTime},
+		{"DateTime", "SimpleAggregateFunction(any, DateTime)", data.FieldTypeTime},
+		{"DateTime with timezone", "SimpleAggregateFunction(any, DateTime('Europe/London'))", data.FieldTypeTime},
+		{"Date32", "SimpleAggregateFunction(any, Date32)", data.FieldTypeTime},
+		{"Nullable(DateTime64)", "SimpleAggregateFunction(any, Nullable(DateTime64(9)))", data.FieldTypeNullableTime},
+		{"Nullable(DateTime64 with tz)", "SimpleAggregateFunction(any, Nullable(DateTime64(9, 'UTC')))", data.FieldTypeNullableTime},
+		{"Nullable(DateTime with tz)", "SimpleAggregateFunction(any, Nullable(DateTime('Asia/Tokyo')))", data.FieldTypeNullableTime},
+		{"Nullable(Date32)", "SimpleAggregateFunction(any, Nullable(Date32))", data.FieldTypeNullableTime},
+		{"Array(String) falls to catch-all", "SimpleAggregateFunction(any, Array(String))", data.FieldTypeJSON},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			sut := find(tc.typeName)
+			require.NotNil(t, sut.InputScanType, "converter not found for %s", tc.typeName)
+			assert.Equal(t, tc.fieldType, sut.FrameConverter.FieldType)
+		})
+	}
 }
 
-func TestSimpleAggregateFunctionArrayUsesJSON(t *testing.T) {
-	sut := findConverterWithRegex("SimpleAggregateFunction(any, Array(String))")
-	require.NotNil(t, sut.InputScanType)
-	assert.Equal(t, data.FieldTypeJSON, sut.FrameConverter.FieldType)
+func TestSimpleAggregateFunctionNativeConverterValues(t *testing.T) {
+	converters := ClickHouseConverters()
+	find := func(typeName string) sqlutil.Converter {
+		for _, c := range converters {
+			if c.InputTypeRegex != nil && c.InputTypeRegex.MatchString(typeName) {
+				return c
+			}
+		}
+		return sqlutil.Converter{}
+	}
+
+	t.Run("UInt16 value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, UInt16)")
+		var val interface{} = uint16(200)
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, uint16(200), v)
+	})
+
+	t.Run("Nullable(UInt16) value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(UInt16))")
+		u := uint16(200)
+		var val interface{} = &u
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, &u, v)
+	})
+
+	t.Run("Nullable(UInt16) nil", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(UInt16))")
+		var val interface{} = nil
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Nil(t, v)
+	})
+
+	t.Run("Float64 value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Float64)")
+		var val interface{} = float64(3.14)
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, float64(3.14), v)
+	})
+
+	t.Run("Bool value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Bool)")
+		var val interface{} = true
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, true, v)
+	})
+
+	t.Run("Nullable(UInt16) bare value (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(UInt16))")
+		var val interface{} = uint16(42)
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		expected := uint16(42)
+		assert.Equal(t, &expected, v)
+	})
+
+	t.Run("Nullable(Float64) bare value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(Float64))")
+		var val interface{} = float64(9.81)
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		expected := float64(9.81)
+		assert.Equal(t, &expected, v)
+	})
+
+	t.Run("Nullable(Bool) bare value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(Bool))")
+		var val interface{} = true
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		expected := true
+		assert.Equal(t, &expected, v)
+	})
+
+	t.Run("DateTime value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(min, DateTime64(9))")
+		ts := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		var val interface{} = ts
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, ts, v)
+	})
+
+	t.Run("Nullable(DateTime) bare value", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Nullable(DateTime64(9)))")
+		ts := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		var val interface{} = ts
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, &ts, v)
+	})
+
+	t.Run("UInt16 pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, UInt16)")
+		u := uint16(200)
+		var val interface{} = &u
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, uint16(200), v)
+	})
+
+	t.Run("Float64 pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Float64)")
+		f := float64(3.14)
+		var val interface{} = &f
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, float64(3.14), v)
+	})
+
+	t.Run("Bool pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(any, Bool)")
+		b := true
+		var val interface{} = &b
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, true, v)
+	})
+
+	t.Run("DateTime pointer form (driver inconsistency)", func(t *testing.T) {
+		sut := find("SimpleAggregateFunction(min, DateTime64(9))")
+		ts := time.Date(2026, 6, 24, 10, 0, 0, 0, time.UTC)
+		var val interface{} = &ts
+		v, err := sut.FrameConverter.ConverterFunc(&val)
+		assert.Nil(t, err)
+		assert.Equal(t, ts, v)
+	})
 }
 
 // TestSimpleAggregateFunctionGetConverter tests the GetConverter path which

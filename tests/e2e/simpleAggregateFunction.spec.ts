@@ -59,7 +59,11 @@ function getFrameValues(body: any): any[][] {
   return body?.results?.A?.frames?.[0]?.data?.values ?? [];
 }
 
-test.describe('SimpleAggregateFunction string type handling', () => {
+function getFrameFields(body: any): any[] {
+  return body?.results?.A?.frames?.[0]?.schema?.fields ?? [];
+}
+
+test.describe('SimpleAggregateFunction type handling', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(() => {
@@ -98,24 +102,95 @@ test.describe('SimpleAggregateFunction string type handling', () => {
     expect(values[0]).toEqual(['first', null, 'third', 'fourth', null]);
   });
 
-  test('table panel renders both SAF string columns together', async ({ page, explorePage }) => {
+  test('SimpleAggregateFunction(any, Float64) returns numeric values', async ({ page, explorePage }) => {
+    await page.goto(exploreUrl());
+    await enterSql(page, 'SELECT value FROM e2e_test.simple_aggregate_events ORDER BY timestamp');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+
+    await responsePromise;
+    const values = getFrameValues(getBody());
+    expect(values.length).toBeGreaterThan(0);
+    expect(values[0]).toEqual([1.5, 2.0, 3.5, 4.0, 5.5]);
+  });
+
+  test('SimpleAggregateFunction(any, Nullable(Float64)) returns numbers with nulls', async ({
+    page,
+    explorePage,
+  }) => {
+    await page.goto(exploreUrl());
+    await enterSql(page, 'SELECT nullable_value FROM e2e_test.simple_aggregate_events ORDER BY timestamp');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+
+    await responsePromise;
+    const values = getFrameValues(getBody());
+    expect(values.length).toBeGreaterThan(0);
+    expect(values[0]).toEqual([1.5, null, 3.5, null, 5.5]);
+  });
+
+  test('SimpleAggregateFunction(sum, UInt64) returns integer values', async ({ page, explorePage }) => {
+    await page.goto(exploreUrl());
+    await enterSql(page, 'SELECT count FROM e2e_test.simple_aggregate_events ORDER BY timestamp');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+
+    await responsePromise;
+    const values = getFrameValues(getBody());
+    expect(values.length).toBeGreaterThan(0);
+    expect(values[0]).toEqual([10, 20, 30, 40, 50]);
+  });
+
+  test('SimpleAggregateFunction(any, Bool) returns boolean values', async ({ page, explorePage }) => {
+    await page.goto(exploreUrl());
+    await enterSql(page, 'SELECT is_active FROM e2e_test.simple_aggregate_events ORDER BY timestamp');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+
+    await responsePromise;
+    const values = getFrameValues(getBody());
+    expect(values.length).toBeGreaterThan(0);
+    expect(values[0]).toEqual([true, false, true, true, false]);
+  });
+
+  test('SimpleAggregateFunction(max, DateTime64) returns time values', async ({ page, explorePage }) => {
+    await page.goto(exploreUrl());
+    await enterSql(page, 'SELECT last_seen FROM e2e_test.simple_aggregate_events ORDER BY timestamp');
+
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+
+    await responsePromise;
+    const fields = getFrameFields(getBody());
+    const lastSeenField = fields.find((f: any) => f.name === 'last_seen');
+    expect(lastSeenField?.typeInfo?.frame).toBe('time.Time');
+  });
+
+  test('table panel renders all SAF types with correct field metadata', async ({ page, explorePage }) => {
     await page.goto(exploreUrl());
     await enterSql(
       page,
-      'SELECT timestamp, name, label FROM e2e_test.simple_aggregate_events ORDER BY timestamp'
+      'SELECT timestamp, name, label, value, nullable_value, count, is_active, last_seen FROM e2e_test.simple_aggregate_events ORDER BY timestamp'
     );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
 
     await responsePromise;
-    const body = getBody() as any;
-    const fields = body?.results?.A?.frames?.[0]?.schema?.fields ?? [];
-    expect(fields.length).toBe(3);
+    const fields = getFrameFields(getBody());
+    expect(fields.length).toBe(8);
 
-    const nameField = fields.find((f: any) => f.name === 'name');
-    const labelField = fields.find((f: any) => f.name === 'label');
-    expect(nameField?.typeInfo?.frame).toBe('string');
-    expect(labelField?.typeInfo?.frame).toMatch(/string/);
+    const fieldByName = (n: string) => fields.find((f: any) => f.name === n);
+    expect(fieldByName('name')?.typeInfo?.frame).toBe('string');
+    expect(fieldByName('label')?.typeInfo?.frame).toMatch(/string/);
+    expect(fieldByName('value')?.typeInfo?.frame).toBe('float64');
+    expect(fieldByName('nullable_value')?.typeInfo?.frame).toMatch(/float64/);
+    expect(fieldByName('count')?.typeInfo?.frame).toMatch(/uint64|int64|float64/);
+    expect(fieldByName('is_active')?.typeInfo?.frame).toBe('bool');
+    expect(fieldByName('last_seen')?.typeInfo?.frame).toBe('time.Time');
   });
 });
