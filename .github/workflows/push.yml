@@ -49,7 +49,7 @@ jobs:
     # Intentionally pinned to @main: data-sources-ci-workflows does not
     # publish versioned tags for cd-dev.yml yet. Allowed by the zizmor
     # policy (`grafana/*: any`); review periodically.
-    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@d0cd847270085524b96b0e1aebc0cb3efd121c40 # main
 
     permissions:
       attestations: write
