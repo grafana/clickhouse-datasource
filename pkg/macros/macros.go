@@ -216,10 +216,19 @@ var ClickHouseMacros = macropro.MergeMacros(
 	},
 )
 
+// clickHouseComments is the comment/quote style macropro uses when stripping
+// comments before macro expansion. It keeps the standard -- and /* */
+// stripping (which protects against macros hidden inside comments) but adds
+// BackslashEscape so that ClickHouse's default C-style string escapes (e.g.
+// 'O\'Brien') are handled. Without it, macropro mis-reads a \' as the
+// closing quote, treats the trailing text as a comment, and silently drops any
+// macro that follows — corrupting the emitted SQL with no error.
+const clickHouseComments = macropro.LineComment | macropro.BlockComment | macropro.BackslashEscape
+
 // Interpolate expands all $__ macros in rawSQL using macropro's parsing engine.
 // Unknown macros are left unchanged; a handler error returns the original query and the error.
 func Interpolate(rawSQL string, q *sqlutil.Query) (string, error) {
-	return macropro.Interpolate(rawSQL, ClickHouseMacros, contextFrom(q))
+	return macropro.Interpolate(rawSQL, ClickHouseMacros, contextFrom(q), macropro.WithComments(clickHouseComments))
 }
 
 // RemoveQuotesInArgs removes all quotes from macro arguments.
