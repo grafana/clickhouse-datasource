@@ -866,7 +866,12 @@ describe('ClickHouseDatasource', () => {
   });
 
   describe('fetchUniqueMapKeys probe (#1843)', () => {
-    it('issues the bare LIMIT probe for free-form tables (no time column known)', async () => {
+    it('bounds the probe to a row-sampled subquery for free-form tables (no time column known)', async () => {
+      // Without a known time column the probe can't prune by partition, so it
+      // reads the map column from a bounded row sample. A bare LIMIT 1000 on
+      // DISTINCT + arrayJoin does NOT bound the scan when the map has fewer than
+      // 1000 distinct keys (the common case) — DISTINCT must read every row
+      // before LIMIT applies, i.e. a full-column scan on huge tables (#5).
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([{ keys: 'a' }, { keys: 'b' }]);
       const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
@@ -874,7 +879,9 @@ describe('ClickHouseDatasource', () => {
       const result = await ds.fetchUniqueMapKeys('labels', 'db', 'events');
       expect(result).toEqual(['a', 'b']);
       const sql = spy.mock.calls[0][0].targets[0].rawSql!;
-      expect(sql).toBe('SELECT DISTINCT arrayJoin("labels".keys) as keys FROM "db"."events" LIMIT 1000');
+      expect(sql).toBe(
+        'SELECT DISTINCT arrayJoin("labels".keys) as keys FROM (SELECT "labels" FROM "db"."events" LIMIT 100000) LIMIT 1000'
+      );
     });
 
     it('bounds the probe to the configured logs time column when target matches OTel logs table', async () => {
@@ -2596,6 +2603,45 @@ describe('ClickHouseDatasource', () => {
 
       expect(
         datasource.queryHasFilter(queryWithMap, { key: 'ResourceAttributes.service.name', value: 'my-service' })
+      ).toBe(true);
+    });
+
+    it('does not match a map-key filter stored against a different attribute column with the same key', () => {
+      // Two attribute columns share the map key "service.name". A filter stored
+      // against LogAttributes must NOT be reported as present for the sibling
+      // ResourceAttributes.service.name row, otherwise the Log Details "filter
+      // for" button lights up on the wrong column and toggling it drops the
+      // LogAttributes filter.
+      const queryWithTwoMaps: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [
+            { name: 'ResourceAttributes', hint: ColumnHint.ResourceAttributes, type: 'Map(String, String)' },
+            { name: 'LogAttributes', hint: ColumnHint.LogAttributes, type: 'Map(String, String)' },
+          ],
+          filters: [
+            {
+              condition: 'AND',
+              key: '',
+              hint: ColumnHint.LogAttributes,
+              mapKey: 'service.name',
+              type: 'Map(String, String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'my-service',
+            },
+          ],
+        },
+      };
+
+      // Sibling column with the same key/value: must be reported as NOT filtered.
+      expect(
+        datasource.queryHasFilter(queryWithTwoMaps, { key: 'ResourceAttributes.service.name', value: 'my-service' })
+      ).toBe(false);
+      // The column the filter is actually stored against still matches.
+      expect(
+        datasource.queryHasFilter(queryWithTwoMaps, { key: 'LogAttributes.service.name', value: 'my-service' })
       ).toBe(true);
     });
 
