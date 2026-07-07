@@ -99,9 +99,12 @@ function buildOtelColumns(
  * A single Effect handles both the "toggle on" path and the "saved query schema
  * correction" path to avoid a double-dispatch race window:
  *
- * - Fresh toggle: waits for allColumns to load so the first dispatch always
- *   carries the correct tagsAreJSON value. No transient Map-path SQL is sent
- *   to a JSON-typed table.
+ * - Fresh toggle: dispatches the OTel column map immediately. If allColumns is
+ *   already loaded the dispatch carries the correct tagsAreJSON value; if the
+ *   schema has not loaded (still loading, or the fetch failed — e.g. permission
+ *   denied / dropped table) the column map is still applied so the query is
+ *   never left without OTel columns, and JSON type detection is deferred to the
+ *   correction path once the schema arrives.
  * - Saved query: dispatches a correction only when allColumns loads and the
  *   schema is JSON-typed (Map schemas: no extra render).
  * - Version change: prevOtelVersion ref detects the change and resets flags so
@@ -134,12 +137,6 @@ export const useOtelColumns = (
       return;
     }
 
-    // Fresh toggle: wait for allColumns to load so the single dispatch is correct.
-    // Without a table the query can't run, so deferring is harmless.
-    if (!didSetColumns.current && allColumns.length === 0) {
-      return;
-    }
-
     // Both initial dispatch and JSON type detection are already done.
     if (didSetColumns.current && didDetectColumnTypes.current) {
       return;
@@ -163,7 +160,13 @@ export const useOtelColumns = (
       return;
     }
 
-    // Fresh toggle path: single dispatch with the correct tagsAreJSON from the start.
+    // Fresh toggle path: dispatch the OTel column map. When the schema is
+    // already loaded, tagsAreJSON is authoritative and JSON detection is done.
+    // When the schema has not loaded yet (still loading, or the fetch failed),
+    // we still apply the column map so the query is never left without OTel
+    // columns — but leave JSON detection pending so a later schema load can
+    // stamp type:'JSON' via the correction path above.
+    const schemaLoaded = allColumns.length > 0;
     builderOptionsDispatch(
       setOptions({
         columns,
@@ -177,7 +180,7 @@ export const useOtelColumns = (
       })
     );
     didSetColumns.current = true;
-    didDetectColumnTypes.current = true;
+    didDetectColumnTypes.current = schemaLoaded;
   }, [otelEnabled, otelVersion, allColumns, builderOptionsDispatch]);
 };
 

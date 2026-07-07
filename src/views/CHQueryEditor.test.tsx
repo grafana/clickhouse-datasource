@@ -214,6 +214,45 @@ describe('Query Editor', () => {
     );
   });
 
+  it('switches to compact view without crashing when the saved SQL query has no rawSql', () => {
+    // Provisioned / hand-authored / alert query models can carry
+    // { editorType: 'sql' } with no rawSql field; migrateCHQuery returns them
+    // unchanged (rawSql undefined). switchToBuilder must not dereference
+    // rawSql.trim() on undefined.
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    const onChange = jest.fn();
+
+    render(
+      <CHQueryEditor
+        query={{ pluginVersion: '', refId: 'A', editorType: EditorType.SQL } as any}
+        onChange={onChange}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to compact view' }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editorType: EditorType.Builder,
+        builderOptions: expect.objectContaining({
+          database: 'otel_v2',
+          table: 'otel_logs',
+          queryType: QueryType.Logs,
+        }),
+      })
+    );
+  });
+
   it('confirms before replacing hand-written SQL with compact defaults', async () => {
     const datasource = newMockDatasource();
     datasource.settings.jsonData.configMode = 'single-table';
