@@ -64,7 +64,7 @@ async function switchToBuilderMode(page: Page, queryType?: QueryType) {
  * is scoped inside page.getByRole('listbox').
  */
 async function selectFromCombobox(page: Page, label: string, value: string) {
-  const row = page.locator('div.gf-form', {
+  const row = page.locator('div[class*="form-row"]', {
     has: page.locator('label.query-keyword', { hasText: new RegExp(`^${label}$`) }),
   });
 
@@ -87,14 +87,15 @@ async function selectFromCombobox(page: Page, label: string, value: string) {
 }
 
 /**
- * Returns the innermost row (`div.gf-form`) that contains a specific
- * column-role label. The builder nests `div.gf-form` wrappers, so the
+ * Returns the innermost form row (emotion class labelled `form-row`, the
+ * plugin's replacement for the removed .gf-form global) that contains a
+ * specific column-role label. The builder nests row wrappers, so the
  * `has:` locator matches both the outer grouping and the inner row — we
  * use `.last()` to pick the innermost, which is the single-field row.
  */
 function columnRow(page: Page, label: string): Locator {
   return page
-    .locator('div.gf-form', {
+    .locator('div[class*="form-row"]', {
       has: page.locator('label.query-keyword', { hasText: new RegExp(`^${label}$`) }),
     })
     .last();

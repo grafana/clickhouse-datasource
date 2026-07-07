@@ -2,6 +2,7 @@ import React, { FormEvent } from 'react';
 import { Switch, Input, Field } from '@grafana/ui';
 import { ConfigSection } from 'components/experimental/ConfigSection';
 import allLabels from 'labels';
+import { styles } from 'styles';
 
 interface QuerySettingsConfigProps {
   connMaxLifetime?: string;
@@ -104,12 +105,17 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
       </Field>
 
       <Field label={labels.validateSql.label} description={labels.validateSql.tooltip}>
-        <Switch className="gf-form" value={validateSql || false} onChange={onValidateSqlChange} role="checkbox" />
+        <Switch
+          className={styles.Common.formRowSwitch}
+          value={validateSql || false}
+          onChange={onValidateSqlChange}
+          role="checkbox"
+        />
       </Field>
 
       <Field label={labels.enableMapKeysDiscovery.label} description={labels.enableMapKeysDiscovery.tooltip}>
         <Switch
-          className="gf-form"
+          className={styles.Common.formRowSwitch}
           value={enableMapKeysDiscovery ?? true}
           onChange={onEnableMapKeysDiscoveryChange}
           role="checkbox"

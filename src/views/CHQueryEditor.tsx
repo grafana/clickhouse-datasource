@@ -3,7 +3,7 @@ import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
-import { Button, ConfirmModal, Stack } from '@grafana/ui';
+import { Button, ConfirmModal, InlineFieldRow, Stack } from '@grafana/ui';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -38,10 +38,10 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
   return (
     <>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <InlineFieldRow className={`${styles.Common.formRow} ${styles.QueryEditor.queryType}`}>
         <EditorTypeSwitcher {...props} query={query} datasource={datasource} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
-      </div>
+      </InlineFieldRow>
       <CHEditorByType {...props} query={query} />
     </>
   );

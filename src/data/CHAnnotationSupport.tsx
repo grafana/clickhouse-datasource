@@ -1,7 +1,8 @@
 import React, { useCallback, useMemo } from 'react';
 import { AnnotationQuery, AnnotationSupport, GrafanaTheme2, QueryEditorProps } from '@grafana/data';
-import { InlineFormLabel, Select, TextArea, useStyles2 } from '@grafana/ui';
+import { InlineFieldRow, InlineFormLabel, Select, TextArea, useStyles2 } from '@grafana/ui';
 import { css } from '@emotion/css';
+import { styles as sharedStyles } from 'styles';
 import { Datasource } from './CHDatasource';
 import { escapeIdentifier, getTableIdentifier } from './sqlGenerator';
 import { CHQuery, CHSqlQuery, EditorType } from 'types/sql';
@@ -263,7 +264,7 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
 
   return (
     <div>
-      <div className="gf-form" style={{ marginBottom: 8 }}>
+      <InlineFieldRow className={sharedStyles.Common.formRow} style={{ marginBottom: 8 }}>
         <InlineFormLabel width={10} tooltip="Select an annotation preset or write custom SQL">
           Annotation Type
         </InlineFormLabel>
@@ -273,7 +274,7 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
           value={preset}
           onChange={(v) => onPresetChange(v.value || 'custom')}
         />
-      </div>
+      </InlineFieldRow>
 
       {preset === 'change_detection' && (
         <>
@@ -286,7 +287,7 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
           />
 
           {cd.column && (
-            <div className="gf-form" style={{ marginBottom: 4 }}>
+            <InlineFieldRow className={sharedStyles.Common.formRow} style={{ marginBottom: 4 }}>
               <InlineFormLabel
                 width={10}
                 tooltip="Group changes by this column. Each unique value is tracked independently."
@@ -299,12 +300,12 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
                 value={cd.groupBy || 'ServiceName'}
                 onChange={(v) => updateChangeDetection({ groupBy: v.value || 'ServiceName' })}
               />
-            </div>
+            </InlineFieldRow>
           )}
         </>
       )}
 
-      <div className="gf-form" style={{ marginBottom: 4 }}>
+      <InlineFieldRow className={sharedStyles.Common.formRow} style={{ marginBottom: 4 }}>
         <InlineFormLabel width={10}>SQL Query</InlineFormLabel>
         <TextArea
           className={styles.sqlInput}
@@ -313,7 +314,7 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
           onChange={onSqlChange}
           placeholder="SELECT Timestamp AS time, Body AS text, ServiceName AS tags FROM otel_logs WHERE $__timeFilter(Timestamp)"
         />
-      </div>
+      </InlineFieldRow>
 
       <div className={styles.helpText}>
         {preset === 'change_detection'

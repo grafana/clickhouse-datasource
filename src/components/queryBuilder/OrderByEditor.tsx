@@ -1,6 +1,6 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Select } from '@grafana/ui';
+import { Button, InlineFieldRow, InlineFormLabel, Select } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { styles } from 'styles';
@@ -102,7 +102,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
       {orderBy.map((orderByItem, index) => {
         const key = `${index}-${orderByItem.name}-${orderByItem.hint || ''}-${orderByItem.dir}`;
         return (
-          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
+          <InlineFieldRow className={styles.Common.formRow} key={key} data-testid="query-builder-orderby-item-wrapper">
             {index === 0 ? fieldLabel : fieldSpacer}
             <OrderByItem
               columnOptions={orderByOptions}
@@ -111,11 +111,11 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
               updateOrderByItem={updateOrderByItem}
               removeOrderByItem={removeOrderByItem}
             />
-          </div>
+          </InlineFieldRow>
         );
       })}
 
-      <div className="gf-form">
+      <InlineFieldRow className={styles.Common.formRow}>
         {orderBy.length === 0 ? fieldLabel : fieldSpacer}
         <Button
           data-testid="query-builder-orderby-add-button"
@@ -127,7 +127,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
         >
           {addLabel}
         </Button>
-      </div>
+      </InlineFieldRow>
     </>
   );
 };

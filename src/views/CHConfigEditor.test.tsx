@@ -206,7 +206,7 @@ describe('ConfigEditor', () => {
     const showLogLinksLabel = screen.getByText(
       allLabels.components.Config.LogsConfig.traceIdCorrelation.showLogLinks.label
     );
-    const showLogLinksInput = showLogLinksLabel.closest('.gf-form')?.querySelector('input');
+    const showLogLinksInput = showLogLinksLabel.closest('[class*="form-row"]')?.querySelector('input');
 
     expect(showLogLinksInput).toBeChecked();
     fireEvent.click(showLogLinksInput!);

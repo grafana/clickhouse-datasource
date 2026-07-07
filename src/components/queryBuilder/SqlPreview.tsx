@@ -1,7 +1,8 @@
 import React from 'react';
 import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
-import { Button, Icon, InlineFormLabel, useStyles2 } from '@grafana/ui';
+import { Button, Icon, InlineFieldRow, InlineFormLabel, useStyles2 } from '@grafana/ui';
+import { styles as sharedStyles } from 'styles';
 import labels from 'labels';
 
 interface SqlPreviewProps {
@@ -88,11 +89,11 @@ export const SqlPreview = (props: SqlPreviewProps) => {
   }
 
   return (
-    <div className="gf-form">
+    <InlineFieldRow className={sharedStyles.Common.formRow}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
       <pre>{sql}</pre>
-    </div>
+    </InlineFieldRow>
   );
 };

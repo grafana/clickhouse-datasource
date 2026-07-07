@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { InlineFieldRow, InlineFormLabel, Select } from '@grafana/ui';
 import { Datasource } from '../../data/CHDatasource';
 import labels from 'labels';
 import { styles } from '../../styles';
@@ -106,9 +106,9 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
   const { datasource, database, onDatabaseChange, table, onTableChange } = props;
 
   return (
-    <div className="gf-form">
+    <InlineFieldRow className={styles.Common.formRow}>
       <DatabaseSelect datasource={datasource} database={database} onDatabaseChange={onDatabaseChange} />
       <TableSelect datasource={datasource} database={database} table={table} onTableChange={onTableChange} />
-    </div>
+    </InlineFieldRow>
   );
 };

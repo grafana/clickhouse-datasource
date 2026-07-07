@@ -12,7 +12,7 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
-import { Alert, Button, InlineFormLabel, Input, Stack } from '@grafana/ui';
+import { Alert, Button, InlineFieldRow, InlineFormLabel, Input, Stack } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
@@ -158,7 +158,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
       />
-      <div className="gf-form">
+      <InlineFieldRow className={styles.Common.formRow}>
         <ColumnSelect
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
@@ -182,8 +182,8 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           tooltip={labels.logLevelColumn.tooltip}
           inline
         />
-      </div>
-      <div className="gf-form">
+      </InlineFieldRow>
+      <InlineFieldRow className={styles.Common.formRow}>
         <ColumnSelect
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
@@ -195,7 +195,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           label={labels.logMessageColumn.label}
           tooltip={labels.logMessageColumn.tooltip}
         />
-      </div>
+      </InlineFieldRow>
       <OrderByEditor
         orderByOptions={getOrderByOptions(builderOptions, allColumns)}
         orderBy={builderState.orderBy}
@@ -230,7 +230,7 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   }, [logMessageLike]);
 
   return (
-    <div className="gf-form">
+    <InlineFieldRow className={styles.Common.formRow}>
       <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
         {label}
       </InlineFormLabel>
@@ -253,6 +253,6 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
           {clearButton}
         </Button>
       )}
-    </div>
+    </InlineFieldRow>
   );
 };

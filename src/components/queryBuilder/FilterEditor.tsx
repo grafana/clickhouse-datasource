@@ -4,6 +4,7 @@ import {
   Button,
   Combobox,
   ComboboxOption,
+  InlineFieldRow,
   InlineFormLabel,
   Input,
   MultiCombobox,
@@ -394,7 +395,7 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div className="gf-form">
+        <InlineFieldRow className={styles.Common.formRow}>
           <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
             {label}
           </InlineFormLabel>
@@ -408,11 +409,11 @@ export const FiltersEditor = (props: {
           >
             {addLabel}
           </Button>
-        </div>
+        </InlineFieldRow>
       )}
       {filters.map((filter, index) => {
         return (
-          <div className="gf-form" key={index}>
+          <InlineFieldRow className={styles.Common.formRow} key={index}>
             {index === 0 ? (
               <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
                 {label}
@@ -430,11 +431,11 @@ export const FiltersEditor = (props: {
               database={database}
               table={table}
             />
-          </div>
+          </InlineFieldRow>
         );
       })}
       {filters.length !== 0 && (
-        <div className="gf-form">
+        <InlineFieldRow className={styles.Common.formRow}>
           <div className={`width-8 ${styles.Common.firstLabel}`}></div>
           <Button
             data-testid="query-builder-filters-inline-add-button"
@@ -446,7 +447,7 @@ export const FiltersEditor = (props: {
           >
             {addLabel}
           </Button>
-        </div>
+        </InlineFieldRow>
       )}
     </>
   );

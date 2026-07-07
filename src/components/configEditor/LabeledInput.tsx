@@ -1,5 +1,6 @@
 import React from 'react';
-import { Input, InlineFormLabel } from '@grafana/ui';
+import { InlineFieldRow, Input, InlineFormLabel } from '@grafana/ui';
+import { styles } from 'styles';
 
 interface LabeledInputProps {
   label: string;
@@ -14,7 +15,7 @@ export function LabeledInput(props: LabeledInputProps) {
   const { label, tooltip, placeholder, disabled, value, onChange } = props;
 
   return (
-    <div className="gf-form">
+    <InlineFieldRow className={styles.Common.formRow}>
       <InlineFormLabel width={12} className="query-keyword" tooltip={tooltip || label}>
         {label}
       </InlineFormLabel>
@@ -25,6 +26,6 @@ export function LabeledInput(props: LabeledInputProps) {
         onChange={(e) => onChange(e.currentTarget.value)}
         placeholder={placeholder}
       />
-    </div>
+    </InlineFieldRow>
   );
 }

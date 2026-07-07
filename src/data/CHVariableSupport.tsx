@@ -7,7 +7,8 @@ import {
   QueryEditorProps,
   toDataFrame,
 } from '@grafana/data';
-import { InlineFormLabel, Select, TextArea } from '@grafana/ui';
+import { InlineFieldRow, InlineFormLabel, Select, TextArea } from '@grafana/ui';
+import { styles } from 'styles';
 import { Observable, from, of } from 'rxjs';
 import { SchemaPicker, SchemaPickerLevel, SchemaPickerValue } from 'components/queryBuilder/SchemaPicker';
 import { CHConfig } from 'types/config';
@@ -178,7 +179,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
 
   return (
     <div>
-      <div className="gf-form">
+      <InlineFieldRow className={styles.Common.formRow}>
         <InlineFormLabel
           width={10}
           className="query-keyword"
@@ -193,7 +194,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
           onChange={(v) => onTypeChange((v.value as CHVariableQueryType) || 'sql')}
           aria-label="Variable type"
         />
-      </div>
+      </InlineFieldRow>
 
       {pickerLevel && (
         <SchemaPicker
@@ -204,7 +205,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
         />
       )}
 
-      <div className="gf-form">
+      <InlineFieldRow className={styles.Common.formRow}>
         <InlineFormLabel
           width={10}
           className="query-keyword"
@@ -219,7 +220,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
           placeholder="SELECT DISTINCT column FROM database.table"
           aria-label="SQL Query"
         />
-      </div>
+      </InlineFieldRow>
     </div>
   );
 };

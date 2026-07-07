@@ -72,7 +72,7 @@ export const HttpHeadersConfig = (props: HttpHeadersConfigProps) => {
       <Field label={labels.forwardGrafanaHeaders.label} description={labels.forwardGrafanaHeaders.tooltip}>
         <Switch
           data-testid={selectors.forwardGrafanaHeadersSwitch}
-          className={'gf-form'}
+          className={styles.Common.formRowSwitch}
           value={forwardGrafanaHeaders}
           onChange={(e) => updateForwardGrafanaHeaders(e.currentTarget.checked)}
         />
@@ -155,7 +155,7 @@ const HttpHeaderEditor = (props: HttpHeaderEditorProps) => {
           <Field label={labels.secureLabel}>
             <Switch
               data-testid={selectors.headerSecureSwitch}
-              className="gf-form"
+              className={styles.Common.formRowSwitch}
               value={secure}
               onChange={(e) => setSecure(e.currentTarget.checked)}
               onBlur={() => onUpdate()}

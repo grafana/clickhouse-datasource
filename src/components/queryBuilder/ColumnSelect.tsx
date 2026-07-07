@@ -1,6 +1,6 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { InlineFieldRow, InlineFormLabel, Select } from '@grafana/ui';
 import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { styles } from 'styles';
 
@@ -71,7 +71,7 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div className="gf-form">
+    <InlineFieldRow className={styles.Common.formRow}>
       <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
         {label}
       </InlineFormLabel>
@@ -87,6 +87,6 @@ export const ColumnSelect = (props: ColumnSelectProps) => {
         isClearable={clearable === undefined || clearable}
         allowCustomValue
       />
-    </div>
+    </InlineFieldRow>
   );
 };

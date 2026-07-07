@@ -5,6 +5,7 @@ import {
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
 import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack } from '@grafana/ui';
+import { styles } from 'styles';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -352,7 +353,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Field label={labels.secure.label} description={labels.secure.tooltip}>
           <Switch
             id="secure"
-            className="gf-form"
+            className={styles.Common.formRowSwitch}
             value={jsonData.secure || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked({
@@ -394,7 +395,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <ConfigSection title="TLS / SSL Settings">
         <Field label={labels.tlsSkipVerify.label} description={labels.tlsSkipVerify.tooltip}>
           <Switch
-            className="gf-form"
+            className={styles.Common.formRowSwitch}
             value={jsonData.tlsSkipVerify || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked({
@@ -406,7 +407,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         </Field>
         <Field label={labels.tlsClientAuth.label} description={labels.tlsClientAuth.tooltip}>
           <Switch
-            className="gf-form"
+            className={styles.Common.formRowSwitch}
             value={jsonData.tlsAuth || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked({
@@ -418,7 +419,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         </Field>
         <Field label={labels.tlsAuthWithCACert.label} description={labels.tlsAuthWithCACert.tooltip}>
           <Switch
-            className="gf-form"
+            className={styles.Common.formRowSwitch}
             value={jsonData.tlsAuthWithCACert || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1WithCACertToggleClicked({ caCertToggle: e.currentTarget.checked });
@@ -829,7 +830,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             <Divider />
             <Field label={labels.enableRowLimit.label} description={labels.enableRowLimit.tooltip}>
               <Switch
-                className="gf-form"
+                className={styles.Common.formRowSwitch}
                 value={jsonData.enableRowLimit || false}
                 data-testid={labels.enableRowLimit.testid}
                 onChange={(e) => {
@@ -843,7 +844,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               description={labels.hideTableNameInAdhocFilters.tooltip}
             >
               <Switch
-                className="gf-form"
+                className={styles.Common.formRowSwitch}
                 value={jsonData.hideTableNameInAdhocFilters || false}
                 data-testid={labels.hideTableNameInAdhocFilters.testid}
                 onChange={(e) => {
@@ -854,7 +855,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
               <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
                 <Switch
-                  className="gf-form"
+                  className={styles.Common.formRowSwitch}
                   value={jsonData.enableSecureSocksProxy || false}
                   onChange={(e) => onSwitchToggle('enableSecureSocksProxy', e.currentTarget.checked)}
                 />

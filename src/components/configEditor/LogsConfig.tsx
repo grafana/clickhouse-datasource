@@ -1,6 +1,7 @@
 import React from 'react';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
-import { Input, Field, InlineFormLabel, TagsInput } from '@grafana/ui';
+import { Input, Field, InlineFieldRow, InlineFormLabel, TagsInput } from '@grafana/ui';
+import { styles } from 'styles';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
 import otel from 'otel';
@@ -152,7 +153,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={onSelectContextColumnsChange}
           wide
         />
-        <div className="gf-form">
+        <InlineFieldRow className={styles.Common.formRow}>
           <InlineFormLabel width={12} className="query-keyword" tooltip={labels.contextColumns.columns.tooltip}>
             {labels.contextColumns.columns.label}
           </InlineFormLabel>
@@ -162,7 +163,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
             onChange={onContextColumnsChangeTrimmed}
             width={60}
           />
-        </div>
+        </InlineFieldRow>
       </ConfigSubSection>
     </ConfigSection>
   );
