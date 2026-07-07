@@ -19,6 +19,7 @@ import {
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
+  TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { AdHocFilter } from './adHocFilter';
@@ -2266,6 +2267,14 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  // Companion `<table>_trace_id_ts` columns the trace-ID optimization requires.
+  const timestampColumns = () =>
+    [
+      { name: 'TraceId', type: 'String', label: 'TraceId', picklistValues: [] },
+      { name: 'Start', type: 'DateTime64(9)', label: 'Start', picklistValues: [] },
+      { name: 'End', type: 'DateTime64(9)', label: 'End', picklistValues: [] },
+    ] as TableColumn[];
+
   describe('hasTraceTimestampTable', () => {
     it('resolves false when database or table is empty', async () => {
       const ds = cloneDeep(mockDatasource);
@@ -2273,9 +2282,10 @@ describe('ClickHouseDatasource', () => {
       await expect(ds.hasTraceTimestampTable('otel', '')).resolves.toBe(false);
     });
 
-    it('resolves true when the companion table exists', async () => {
+    it('resolves true when the companion table exists with Start/End/TraceId columns', async () => {
       const ds = cloneDeep(mockDatasource);
       jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
 
       await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(true);
     });
@@ -2285,6 +2295,23 @@ describe('ClickHouseDatasource', () => {
       jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces']);
 
       await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(false);
+    });
+
+    it('resolves false when the companion exists but lacks the Start/End/TraceId columns (#6)', async () => {
+      // A non-OTel table can have a companion matching the default suffix whose
+      // columns are named differently (e.g. trace_id/start_time/end_time). The
+      // optimization's WITH clause hardcodes min(Start)/max(End)/TraceId, so
+      // enabling it there produces UNKNOWN_IDENTIFIER instead of loading the
+      // trace. The gate must reject a companion that lacks those columns.
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['custom_traces', 'custom_traces_trace_id_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue([
+        { name: 'trace_id', type: 'String', label: 'trace_id', picklistValues: [] },
+        { name: 'start_time', type: 'DateTime64(9)', label: 'start_time', picklistValues: [] },
+        { name: 'end_time', type: 'DateTime64(9)', label: 'end_time', picklistValues: [] },
+      ] as TableColumn[]);
+
+      await expect(ds.hasTraceTimestampTable('default', 'custom_traces')).resolves.toBe(false);
     });
 
     it('does not call fetchTables again once a result is cached', async () => {
@@ -2300,6 +2327,7 @@ describe('ClickHouseDatasource', () => {
     it('dedupes concurrent calls to a single fetchTables', async () => {
       const ds = cloneDeep(mockDatasource);
       const fetchSpy = jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
 
       const [a, b] = await Promise.all([
         ds.hasTraceTimestampTable('otel', 'otel_traces'),
@@ -2317,6 +2345,7 @@ describe('ClickHouseDatasource', () => {
         .spyOn(ds, 'fetchTables')
         .mockRejectedValueOnce(new Error('connection refused'))
         .mockResolvedValueOnce(['otel_traces', 'otel_traces_trace_id_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
 
       await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(false);
       await expect(ds.hasTraceTimestampTable('otel', 'otel_traces')).resolves.toBe(true);
@@ -2349,6 +2378,7 @@ describe('ClickHouseDatasource', () => {
         },
       };
       jest.spyOn(ds, 'fetchTables').mockResolvedValue(['traces', 'traces_idx_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
 
       await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(true);
     });
@@ -2378,6 +2408,7 @@ describe('ClickHouseDatasource', () => {
     it('returns true once the check resolves true', async () => {
       const ds = cloneDeep(mockDatasource);
       jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
 
       await ds.hasTraceTimestampTable('otel', 'otel_traces');
       expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBe(true);
@@ -2394,6 +2425,7 @@ describe('ClickHouseDatasource', () => {
     it('returns undefined once the TTL has expired', async () => {
       const ds = cloneDeep(mockDatasource);
       jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_trace_id_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
       const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(0);
 
       await ds.hasTraceTimestampTable('otel', 'otel_traces');
