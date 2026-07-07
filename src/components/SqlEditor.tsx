@@ -114,7 +114,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   return (
     <>
-      <InlineFieldRow className={`${styles.Common.formRow} ${styles.QueryEditor.queryType}`}>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={queryType} onChange={(queryType) => saveChanges({ queryType })} sqlEditor />
       </InlineFieldRow>
       <div className={styles.Common.wrapper}>

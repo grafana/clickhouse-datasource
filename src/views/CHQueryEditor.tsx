@@ -38,7 +38,7 @@ export const CHQueryEditor = (props: CHQueryEditorProps) => {
 
   return (
     <>
-      <InlineFieldRow className={`${styles.Common.formRow} ${styles.QueryEditor.queryType}`}>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <EditorTypeSwitcher {...props} query={query} datasource={datasource} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </InlineFieldRow>

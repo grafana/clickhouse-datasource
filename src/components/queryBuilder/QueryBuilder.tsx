@@ -86,7 +86,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   return (
     <div data-testid="query-editor-section-builder">
-      <InlineFieldRow className={`${styles.Common.formRow} ${styles.QueryEditor.queryType}`}>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <DatabaseTableSelect
           datasource={datasource}
           database={builderOptions.database}
@@ -95,7 +95,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           onTableChange={onTableChange}
         />
       </InlineFieldRow>
-      <InlineFieldRow className={`${styles.Common.formRow} ${styles.QueryEditor.queryType}`}>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </InlineFieldRow>
 

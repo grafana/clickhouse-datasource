@@ -1,8 +1,7 @@
 import React, { useCallback, useMemo } from 'react';
 import { AnnotationQuery, AnnotationSupport, GrafanaTheme2, QueryEditorProps } from '@grafana/data';
-import { InlineFieldRow, InlineFormLabel, Select, TextArea, useStyles2 } from '@grafana/ui';
+import { Box, InlineField, InlineFormLabel, Select, Text, TextArea, useStyles2 } from '@grafana/ui';
 import { css } from '@emotion/css';
-import { styles as sharedStyles } from 'styles';
 import { Datasource } from './CHDatasource';
 import { escapeIdentifier, getTableIdentifier } from './sqlGenerator';
 import { CHQuery, CHSqlQuery, EditorType } from 'types/sql';
@@ -264,17 +263,21 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
 
   return (
     <div>
-      <InlineFieldRow className={sharedStyles.Common.formRow} style={{ marginBottom: 8 }}>
-        <InlineFormLabel width={10} tooltip="Select an annotation preset or write custom SQL">
-          Annotation Type
-        </InlineFormLabel>
+      <InlineField
+        label={
+          <InlineFormLabel width={10} tooltip="Select an annotation preset or write custom SQL">
+            Annotation Type
+          </InlineFormLabel>
+        }
+        style={{ marginBottom: 8 }}
+      >
         <Select
           width={40}
           options={PRESET_OPTIONS}
           value={preset}
           onChange={(v) => onPresetChange(v.value || 'custom')}
         />
-      </InlineFieldRow>
+      </InlineField>
 
       {preset === 'change_detection' && (
         <>
@@ -287,40 +290,45 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
           />
 
           {cd.column && (
-            <InlineFieldRow className={sharedStyles.Common.formRow} style={{ marginBottom: 4 }}>
-              <InlineFormLabel
-                width={10}
-                tooltip="Group changes by this column. Each unique value is tracked independently."
-              >
-                Group By
-              </InlineFormLabel>
+            <InlineField
+              label={
+                <InlineFormLabel
+                  width={10}
+                  tooltip="Group changes by this column. Each unique value is tracked independently."
+                >
+                  Group By
+                </InlineFormLabel>
+              }
+            >
               <Select
                 width={30}
                 options={groupByOptions}
                 value={cd.groupBy || 'ServiceName'}
                 onChange={(v) => updateChangeDetection({ groupBy: v.value || 'ServiceName' })}
               />
-            </InlineFieldRow>
+            </InlineField>
           )}
         </>
       )}
 
-      <InlineFieldRow className={sharedStyles.Common.formRow} style={{ marginBottom: 4 }}>
-        <InlineFormLabel width={10}>SQL Query</InlineFormLabel>
-        <TextArea
-          className={styles.sqlInput}
-          rows={8}
-          value={anno.target?.rawSql || ''}
-          onChange={onSqlChange}
-          placeholder="SELECT Timestamp AS time, Body AS text, ServiceName AS tags FROM otel_logs WHERE $__timeFilter(Timestamp)"
-        />
-      </InlineFieldRow>
-
-      <div className={styles.helpText}>
-        {preset === 'change_detection'
-          ? 'Annotations appear when the watched value changes per group, including rollbacks.'
-          : 'Return columns: time (required), text, title, tags. Standard Grafana annotation mapping.'}
-      </div>
+      <InlineField label={<InlineFormLabel width={10}>SQL Query</InlineFormLabel>} grow shrink>
+        <Box>
+          <TextArea
+            className={styles.sqlInput}
+            rows={8}
+            value={anno.target?.rawSql || ''}
+            onChange={onSqlChange}
+            placeholder="SELECT Timestamp AS time, Body AS text, ServiceName AS tags FROM otel_logs WHERE $__timeFilter(Timestamp)"
+          />
+          <Box marginTop={0.5} marginBottom={1}>
+            <Text color="secondary" variant="bodySmall">
+              {preset === 'change_detection'
+                ? 'Annotations appear when the watched value changes per group, including rollbacks.'
+                : 'Return columns: time (required), text, title, tags. Standard Grafana annotation mapping.'}
+            </Text>
+          </Box>
+        </Box>
+      </InlineField>
     </div>
   );
 };
@@ -329,12 +337,6 @@ const getStyles = (theme: GrafanaTheme2) => ({
   sqlInput: css({
     fontFamily: theme.typography.fontFamilyMonospace,
     fontSize: theme.typography.bodySmall.fontSize,
-  }),
-  helpText: css({
-    color: theme.colors.text.secondary,
-    fontSize: theme.typography.bodySmall.fontSize,
-    marginLeft: 88,
-    marginBottom: theme.spacing(1),
   }),
 });
 

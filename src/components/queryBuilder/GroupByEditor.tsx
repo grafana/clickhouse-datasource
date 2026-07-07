@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { InlineFieldRow, InlineFormLabel, MultiSelect } from '@grafana/ui';
+import { InlineField, InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
@@ -24,10 +24,14 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
   };
 
   return (
-    <InlineFieldRow className={styles.Common.formRow}>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+      grow
+    >
       <div
         data-testid={selectors.components.QueryBuilder.GroupByEditor.multiSelectWrapper}
         className={styles.Common.selectWrapper}
@@ -43,6 +47,6 @@ export const GroupByEditor = (props: GroupByEditorProps) => {
           menuPlacement={'bottom'}
         />
       </div>
-    </InlineFieldRow>
+    </InlineField>
   );
 };

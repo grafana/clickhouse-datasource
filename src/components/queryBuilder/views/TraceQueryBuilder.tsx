@@ -8,7 +8,6 @@ import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'data/sqlGenerator';
 import { Alert, Collapse, InlineFieldRow, Stack } from '@grafana/ui';
-import { styles } from 'styles';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
@@ -209,7 +208,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           onVersionChange={(v) => builderOptionsDispatch(setOtelVersion(v))}
           wide
         />
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -234,7 +233,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -259,7 +258,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -284,7 +283,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -303,7 +302,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -328,7 +327,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -353,7 +352,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -378,7 +377,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -403,7 +402,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             inline
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <Switch
             disabled={builderState.otelEnabled}
             label={labels.columns.flattenNested.label}
@@ -413,7 +412,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <LabeledInput
             disabled={builderState.otelEnabled}
             label={labels.columns.eventsPrefix.label}
@@ -422,7 +421,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             onChange={onOptionChange('traceEventsColumnPrefix')}
           />
         </InlineFieldRow>
-        <InlineFieldRow className={styles.Common.formRow}>
+        <InlineFieldRow>
           <LabeledInput
             disabled={builderState.otelEnabled}
             label={labels.columns.linksPrefix.label}

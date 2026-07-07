@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import allLabels from 'labels';
-import { InlineFieldRow, InlineFormLabel, Input } from '@grafana/ui';
+import { InlineField, InlineFormLabel, Input } from '@grafana/ui';
 import { selectors } from 'selectors';
-import { styles } from 'styles';
 
 interface TraceIdInputProps {
   traceId: string;
@@ -20,20 +19,23 @@ const TraceIdInput = (props: TraceIdInputProps) => {
   }, [traceId]);
 
   return (
-    <InlineFieldRow className={styles.Common.formRow}>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+      disabled={disabled}
+    >
       <Input
         data-testid={selectors.components.QueryBuilder.TraceIdInput.input}
         width={40}
         value={inputId}
-        disabled={disabled}
         type="string"
         onChange={(e) => setInputId(e.currentTarget.value)}
         onBlur={() => onChange(inputId)}
       />
-    </InlineFieldRow>
+    </InlineField>
   );
 };
 

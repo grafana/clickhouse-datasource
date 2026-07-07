@@ -16,13 +16,13 @@ const sqlBox = (page: Page) => page.getByPlaceholder(/SELECT Timestamp AS time/)
 // Two field shapes appear in this editor. The SchemaPicker fields (Database,
 // Table, Watch Column, Map Key) expose the label as the combobox's accessible
 // name. The editor's own Select rows (Annotation Type, Group By) render an
-// InlineFormLabel inside a form row (emotion class labelled `form-row`, the
-// plugin's replacement for the removed .gf-form global) with no accessible
-// name on the control. Match either shape so one helper covers both.
+// InlineFormLabel inside a grafana-ui InlineField with no accessible name on
+// the control — the InlineField container is the label's direct parent, so
+// anchor on the label. Match either shape so one helper covers both.
 const comboFor = (page: Page, label: string) =>
   page
     .getByRole('combobox', { name: label })
-    .or(page.locator('[class*="form-row"]', { hasText: label }).getByRole('combobox'))
+    .or(page.locator('label', { hasText: label }).locator('xpath=..').getByRole('combobox'))
     .first();
 
 async function selectFromCombo(page: Page, label: string, optionText: string) {

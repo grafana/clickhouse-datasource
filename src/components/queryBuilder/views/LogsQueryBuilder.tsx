@@ -12,7 +12,7 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
-import { Alert, Button, InlineFieldRow, InlineFormLabel, Input, Stack } from '@grafana/ui';
+import { Alert, Button, InlineField, InlineFieldRow, InlineFormLabel, Input, Stack } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
@@ -158,7 +158,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
       />
-      <InlineFieldRow className={styles.Common.formRow}>
+      <InlineFieldRow>
         <ColumnSelect
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
@@ -183,7 +183,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
           inline
         />
       </InlineFieldRow>
-      <InlineFieldRow className={styles.Common.formRow}>
+      <InlineFieldRow>
         <ColumnSelect
           disabled={builderState.otelEnabled}
           allColumns={allColumns}
@@ -230,17 +230,23 @@ const LogMessageLikeInput = (props: LogMessageLikeInputProps) => {
   }, [logMessageLike]);
 
   return (
-    <InlineFieldRow className={styles.Common.formRow}>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <Input
-        width={200}
-        value={input}
-        type="string"
-        onChange={(e) => setInput(e.currentTarget.value)}
-        onBlur={() => onChange(input)}
-      />
+    <InlineFieldRow>
+      <InlineField
+        label={
+          <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+            {label}
+          </InlineFormLabel>
+        }
+        shrink
+      >
+        <Input
+          width={200}
+          value={input}
+          type="string"
+          onChange={(e) => setInput(e.currentTarget.value)}
+          onBlur={() => onChange(input)}
+        />
+      </InlineField>
       {logMessageLike && (
         <Button
           data-testid={allSelectors.QueryBuilder.LogsQueryBuilder.LogMessageLikeInput.input}

@@ -1,6 +1,5 @@
 import React from 'react';
-import { RadioButtonGroup, InlineFieldRow, InlineFormLabel } from '@grafana/ui';
-import { styles } from 'styles';
+import { RadioButtonGroup, InlineField, InlineFormLabel } from '@grafana/ui';
 
 export interface ModeSwitchProps {
   labelA: string;
@@ -29,11 +28,14 @@ export const ModeSwitch = (props: ModeSwitchProps) => {
   ];
 
   return (
-    <InlineFieldRow className={styles.Common.formRow}>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+    >
       <RadioButtonGroup<boolean> options={options} value={value} onChange={(v) => onChange(v)} />
-    </InlineFieldRow>
+    </InlineField>
   );
 };

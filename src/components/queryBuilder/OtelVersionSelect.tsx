@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFieldRow, InlineFormLabel, Select, Switch as GrafanaSwitch, useTheme } from '@grafana/ui';
+import { InlineField, InlineFieldRow, InlineFormLabel, Select, Switch as GrafanaSwitch, useTheme } from '@grafana/ui';
 import otel from 'otel';
 import selectors from 'labels';
-import { styles } from 'styles';
 
 interface OtelVersionSelectProps {
   enabled: boolean;
@@ -37,18 +36,22 @@ export const OtelVersionSelect = (props: OtelVersionSelectProps) => {
   };
 
   return (
-    <InlineFieldRow className={styles.Common.formRow}>
-      <InlineFormLabel width={wide ? 12 : 8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <div style={switchContainerStyle}>
-        <GrafanaSwitch
-          className={styles.Common.formRowSwitch}
-          value={enabled}
-          onChange={(e) => onEnabledChange(e.currentTarget.checked)}
-          role="checkbox"
-        />
-      </div>
+    <InlineFieldRow>
+      <InlineField
+        label={
+          <InlineFormLabel width={wide ? 12 : 8} className="query-keyword" tooltip={tooltip}>
+            {label}
+          </InlineFormLabel>
+        }
+      >
+        <div style={switchContainerStyle}>
+          <GrafanaSwitch
+            value={enabled}
+            onChange={(e) => onEnabledChange(e.currentTarget.checked)}
+            role="checkbox"
+          />
+        </div>
+      </InlineField>
       <Select
         disabled={!enabled}
         options={options}
