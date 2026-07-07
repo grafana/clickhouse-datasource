@@ -85,6 +85,10 @@ const legacyAttributeColumns = new Set(['ResourceAttributes', 'ScopeAttributes',
 // companion actually exposes all of them.
 const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
 
+// Row cap for the Map-key discovery probe on free-form tables (no known time
+// column to prune by). Bounds the scan to a sample instead of the whole column.
+const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
+
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
   columnPrefix: string
@@ -155,13 +159,17 @@ function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'
 
 /** Check whether a filter targets the same column as a resolved column reference. */
 function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
+  // Compare the owning column the same way in both branches: by hint when both
+  // sides carry one, otherwise by key/name. Without this, a map-key filter
+  // matches on key + type family alone, so a filter stored against one
+  // attribute column (e.g. LogAttributes) collides with a different attribute
+  // column that happens to share the same map key (e.g. ResourceAttributes).
+  const sameColumn =
+    resolved.column?.hint && f.hint ? f.hint === resolved.column.hint : f.key === resolved.columnName;
   if (resolved.hasMapKey) {
-    return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey;
+    return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey && sameColumn;
   }
-  return (
-    f.type === 'string' &&
-    (resolved.column?.hint && f.hint ? f.hint === resolved.column.hint : f.key === resolved.columnName)
-  );
+  return f.type === 'string' && sameColumn;
 }
 
 export class Datasource
@@ -1098,16 +1106,24 @@ export class Datasource
    * When the target matches the configured OTel logs/traces table, the probe
    * is bounded to the last 6 hours via the known time column — on a
    * partitioned-by-day MergeTree this prunes to a handful of parts and avoids
-   * full-column scans (see #1843). For free-form tables the predicate is
-   * omitted because the plugin doesn't know which column is the time column.
+   * full-column scans (see #1843). For free-form tables the time column is
+   * unknown, so the probe instead reads the map column from a bounded row
+   * sample: a bare `LIMIT 1000` does NOT bound `DISTINCT arrayJoin(...)` when
+   * the map has fewer than 1000 distinct keys (the common case for labels),
+   * because DISTINCT must read every row before the limit applies — a
+   * full-column scan on very large tables.
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
     if (!this.isMapKeysDiscoveryEnabled()) {
       return [];
     }
+    const escapedColumn = escapeIdentifier(mapColumn);
+    const tableIdentifier = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
     const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
-    const whereClause = timeColumn ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR` : '';
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)}${whereClause} LIMIT 1000`;
+    const source = timeColumn
+      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapedColumn}.keys) as keys FROM ${source} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
