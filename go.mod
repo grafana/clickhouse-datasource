@@ -7,7 +7,7 @@ require (
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.292.2
 	github.com/grafana/macropro v1.0.0
-	github.com/grafana/sqlds/v5 v5.2.0
+	github.com/grafana/sqlds/v5 v5.3.0
 	github.com/moby/moby/api v1.55.0
 	github.com/paulmach/orb v0.13.0
 	github.com/shopspring/decimal v1.4.0
