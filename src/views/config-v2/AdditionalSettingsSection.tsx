@@ -189,6 +189,7 @@ export const AdditionalSettingsSection = (props: Props) => {
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
               queryTimeout={jsonData.queryTimeout}
+              rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
               enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => {
@@ -198,6 +199,10 @@ export const AdditionalSettingsSection = (props: Props) => {
               onQueryTimeoutChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
+              }}
+              onRowCapacityHintChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ rowCapacityHint: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'rowCapacityHint')(e);
               }}
               onConnMaxLifetimeChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });

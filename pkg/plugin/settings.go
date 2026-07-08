@@ -49,6 +49,15 @@ type Settings struct {
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
 
+	// RowCapacityHint is an optional expected row count passed to sqlds as
+	// DriverSettings.RowCapacityHint. sqlds pre-allocates each data.Frame's
+	// fields to this value before scanning, avoiding per-column slice growth on large
+	// results. It is applied to every query, so leave it at 0 (the default,
+	// disabled) unless queries from this datasource reliably return a similar,
+	// large number of rows. A value larger than the typical result wastes
+	// memory.
+	RowCapacityHint int64 `json:"rowCapacityHint,omitempty"`
+
 	// EnableSchemaCache gates the in-process cache that memoizes
 	// system.tables / system.columns / DISTINCT column-value lookups used
 	// by the query builder. Defaults to true.
@@ -249,6 +258,23 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	}
 	if settings.SchemaCacheTTLSeconds <= 0 {
 		settings.SchemaCacheTTLSeconds = 60
+	}
+
+	if raw, ok := jsonData["rowCapacityHint"]; ok && raw != nil {
+		switch v := raw.(type) {
+		case float64:
+			settings.RowCapacityHint = int64(v)
+		case string:
+			if parsed, parseErr := strconv.ParseInt(v, 10, 64); parseErr == nil {
+				settings.RowCapacityHint = parsed
+			} else {
+				backend.Logger.Warn("Failed to parse rowCapacityHint value, defaulting to 0", "error", parseErr)
+			}
+		}
+	}
+	// A negative hint is meaningless; treat it as disabled.
+	if settings.RowCapacityHint < 0 {
+		settings.RowCapacityHint = 0
 	}
 
 	// Set default values
