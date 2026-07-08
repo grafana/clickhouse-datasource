@@ -58,9 +58,34 @@ const otel129: OtelVersion = {
   traceLinksColumnPrefix: 'Links',
 };
 
+// otel130 tracks the otel_logs schema produced by opentelemetry-collector-contrib's
+// clickhouseexporter starting in v0.151.0, which dropped the TimestampTime column
+// (the table now orders/partitions directly on Timestamp). FilterTime is intentionally
+// omitted from logColumnMap — sqlGenerator's getFilters() falls back to ColumnHint.Time
+// when FilterTime is unmapped, and getOrderBy() drops orderBy entries whose hint
+// doesn't resolve. See:
+//   https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720
+//   https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/48770
+// otel_traces and otel_traces_trace_id_ts schemas were not changed.
+const otel130: OtelVersion = {
+  ...otel129,
+  name: '1.3.0',
+  version: '1.30.0',
+  logColumnMap: new Map<ColumnHint, string>([
+    [ColumnHint.Time, 'Timestamp'],
+    [ColumnHint.LogMessage, 'Body'],
+    [ColumnHint.LogLevel, 'SeverityText'],
+    [ColumnHint.TraceId, 'TraceId'],
+    [ColumnHint.ResourceAttributes, 'ResourceAttributes'],
+    [ColumnHint.ScopeAttributes, 'ScopeAttributes'],
+    [ColumnHint.LogAttributes, 'LogAttributes'],
+  ]),
+};
+
 export const versions: readonly OtelVersion[] = [
   // When selected, will always keep OTEL config up to date as new versions are added
-  { ...otel129, name: `latest (${otel129.name})`, version: 'latest' },
+  { ...otel130, name: `latest (${otel130.name})`, version: 'latest' },
+  otel130,
   otel129,
 ];
 
