@@ -87,7 +87,7 @@ func buildRegistry() (base, saf []sqlutil.Converter) {
 		jsonType("Array()", `^Array\(.*\)`),
 		jsonType("Map()", `^Map\(.*\)`),
 		regexConverter("FixedString()", `^Nullable\(FixedString\(.*\)\)`, reflect.TypeFor[**string](), data.FieldTypeNullableString, defaultConvert),
-		regexConverter("IP", `^IPv[4,6]`, reflect.TypeFor[*net.IP](), data.FieldTypeString, ipConverter),
+		regexConverter("IP", `^IPv[46]`, reflect.TypeFor[*net.IP](), data.FieldTypeString, ipConverter),
 		regexConverter("Nullable(IP)", `^Nullable\(IP`, reflect.TypeFor[**net.IP](), data.FieldTypeNullableString, ipNullConverter),
 		regexConverter("SimpleAggregateFunction(String)", `^SimpleAggregateFunction\([^,]+,\s*String\)$`, reflect.TypeFor[*string](), data.FieldTypeString, defaultConvert),
 		regexConverter("SimpleAggregateFunction(Nullable(String))", `^SimpleAggregateFunction\([^,]+,\s*Nullable\(String\)\)$`, reflect.TypeFor[**string](), data.FieldTypeNullableString, defaultConvert),

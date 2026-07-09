@@ -99,15 +99,15 @@ func TestScalarValueRoundTrip(t *testing.T) {
 	}{
 		{"Bool", ref(true), true},
 		{"Float64", ref(1.1), 1.1},
-		{"Float32", ref(1.1), 1.1},
+		{"Float32", ref(float32(1.1)), float32(1.1)},
 		{"Int8", ref(int8(1)), int8(1)},
 		{"Int16", ref(int16(1)), int16(1)},
 		{"Int32", ref(int32(1)), int32(1)},
 		{"Int64", ref(int64(1)), int64(1)},
 		{"UInt8", ref(uint8(1)), uint8(1)},
-		{"UInt16", ref(ref(uint16(100))), ref(uint16(100))},
-		{"UInt32", ref(ref(uint32(100))), ref(uint32(100))},
-		{"UInt64", ref(ref(uint64(100))), ref(uint64(100))},
+		{"UInt16", ref(uint16(100)), uint16(100)},
+		{"UInt32", ref(uint32(100)), uint32(100)},
+		{"UInt64", ref(uint64(100)), uint64(100)},
 		{"Int128", ref(big.NewInt(128)), bigFloat(128)},
 		{"Int256", ref(big.NewInt(128)), bigFloat(128)},
 		{"UInt128", ref(big.NewInt(128)), bigFloat(128)},
@@ -292,15 +292,20 @@ func TestStringConverters(t *testing.T) {
 	})
 	t.Run("Nullable(FixedString)", func(t *testing.T) {
 		value := "2"
-		assert.Equal(t, value, runConverter(t, "Nullable(FixedString(2))", &value))
+		assert.Equal(t, &value, runConverter(t, "Nullable(FixedString(2))", ref(&value)))
+	})
+	t.Run("Nullable(FixedString) nil", func(t *testing.T) {
+		assert.Equal(t, (*string)(nil), runConverter(t, "Nullable(FixedString(2))", ref((*string)(nil))))
 	})
 	t.Run("LowCardinality(String)", func(t *testing.T) {
+		// Delegates to the String converter, which scans *string.
 		value := "value"
-		// LowCardinality delegates to the String converter, which handles a bare string.
-		assert.Equal(t, value, runConverter(t, "LowCardinality(String)", value))
+		assert.Equal(t, value, runConverter(t, "LowCardinality(String)", &value))
 	})
 	t.Run("LowCardinality(Nullable(String))", func(t *testing.T) {
+		// Delegates to the Nullable(String) converter, which scans **string and
+		// yields *string for present values.
 		value := "value"
-		assert.Equal(t, value, runConverter(t, "LowCardinality(Nullable(String))", &value))
+		assert.Equal(t, &value, runConverter(t, "LowCardinality(Nullable(String))", ref(&value)))
 	})
 }
