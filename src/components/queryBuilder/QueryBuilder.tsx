@@ -27,7 +27,7 @@ import {
   setTable,
 } from 'hooks/useBuilderOptionsState';
 import TraceIdInput from './TraceIdInput';
-import { Alert, Button, Stack } from '@grafana/ui';
+import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
 import { buildCompactQueryDefaults, isDefaultOrMismatchedCompactQuery } from './compactQueryDefaults';
@@ -86,7 +86,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   return (
     <div data-testid="query-editor-section-builder">
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <DatabaseTableSelect
           datasource={datasource}
           database={builderOptions.database}
@@ -94,10 +94,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           table={builderOptions.table}
           onTableChange={onTableChange}
         />
-      </div>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      </InlineFieldRow>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
-      </div>
+      </InlineFieldRow>
 
       {builderOptions.queryType === QueryType.Table && (
         <TableQueryBuilder

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
-import { Input, Field, InlineFormLabel, TagsInput } from '@grafana/ui';
+import { Input, Field, InlineField, InlineFormLabel, TagsInput } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
 import { ColumnHint } from 'types/queryBuilder';
 import otel from 'otel';
@@ -152,17 +152,20 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={onSelectContextColumnsChange}
           wide
         />
-        <div className="gf-form">
-          <InlineFormLabel width={12} className="query-keyword" tooltip={labels.contextColumns.columns.tooltip}>
-            {labels.contextColumns.columns.label}
-          </InlineFormLabel>
+        <InlineField
+          label={
+            <InlineFormLabel width={12} className="query-keyword" tooltip={labels.contextColumns.columns.tooltip}>
+              {labels.contextColumns.columns.label}
+            </InlineFormLabel>
+          }
+        >
           <TagsInput
             placeholder={labels.contextColumns.columns.placeholder}
             tags={contextColumns || []}
             onChange={onContextColumnsChangeTrimmed}
             width={60}
           />
-        </div>
+        </InlineField>
       </ConfigSubSection>
     </ConfigSection>
   );

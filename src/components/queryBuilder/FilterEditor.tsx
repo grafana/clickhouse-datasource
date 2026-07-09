@@ -4,6 +4,7 @@ import {
   Button,
   Combobox,
   ComboboxOption,
+  InlineField,
   InlineFormLabel,
   Input,
   MultiCombobox,
@@ -394,10 +395,13 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div className="gf-form">
-          <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-            {label}
-          </InlineFormLabel>
+        <InlineField
+          label={
+            <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+              {label}
+            </InlineFormLabel>
+          }
+        >
           <Button
             data-testid="query-builder-filters-add-button"
             icon="plus-circle"
@@ -408,18 +412,23 @@ export const FiltersEditor = (props: {
           >
             {addLabel}
           </Button>
-        </div>
+        </InlineField>
       )}
       {filters.map((filter, index) => {
         return (
-          <div className="gf-form" key={index}>
-            {index === 0 ? (
-              <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-                {label}
-              </InlineFormLabel>
-            ) : (
-              <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-            )}
+          <InlineField
+            key={index}
+            label={
+              index === 0 ? (
+                <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+                  {label}
+                </InlineFormLabel>
+              ) : (
+                <div className={`width-8 ${styles.Common.firstLabel}`}></div>
+              )
+            }
+            shrink
+          >
             <FilterEditor
               allColumns={fieldsList}
               filter={filter}
@@ -430,12 +439,11 @@ export const FiltersEditor = (props: {
               database={database}
               table={table}
             />
-          </div>
+          </InlineField>
         );
       })}
       {filters.length !== 0 && (
-        <div className="gf-form">
-          <div className={`width-8 ${styles.Common.firstLabel}`}></div>
+        <InlineField label={<div className={`width-8 ${styles.Common.firstLabel}`}></div>}>
           <Button
             data-testid="query-builder-filters-inline-add-button"
             icon="plus-circle"
@@ -446,7 +454,7 @@ export const FiltersEditor = (props: {
           >
             {addLabel}
           </Button>
-        </div>
+        </InlineField>
       )}
     </>
   );

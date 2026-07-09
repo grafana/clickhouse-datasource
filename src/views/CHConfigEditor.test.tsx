@@ -206,7 +206,9 @@ describe('ConfigEditor', () => {
     const showLogLinksLabel = screen.getByText(
       allLabels.components.Config.LogsConfig.traceIdCorrelation.showLogLinks.label
     );
-    const showLogLinksInput = showLogLinksLabel.closest('.gf-form')?.querySelector('input');
+    // The switch is a grafana-ui InlineField: its container div is the direct
+    // parent of the label, with the input in a sibling child container.
+    const showLogLinksInput = showLogLinksLabel.closest('div')?.querySelector('input');
 
     expect(showLogLinksInput).toBeChecked();
     fireEvent.click(showLogLinksInput!);

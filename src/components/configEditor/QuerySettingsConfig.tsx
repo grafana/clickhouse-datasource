@@ -104,12 +104,15 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
       </Field>
 
       <Field label={labels.validateSql.label} description={labels.validateSql.tooltip}>
-        <Switch className="gf-form" value={validateSql || false} onChange={onValidateSqlChange} role="checkbox" />
+        <Switch
+          value={validateSql || false}
+          onChange={onValidateSqlChange}
+          role="checkbox"
+        />
       </Field>
 
       <Field label={labels.enableMapKeysDiscovery.label} description={labels.enableMapKeysDiscovery.tooltip}>
         <Switch
-          className="gf-form"
           value={enableMapKeysDiscovery ?? true}
           onChange={onEnableMapKeysDiscoveryChange}
           role="checkbox"

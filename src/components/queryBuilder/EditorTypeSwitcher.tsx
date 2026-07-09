@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { RadioButtonGroup, ConfirmModal, InlineFormLabel } from '@grafana/ui';
+import { RadioButtonGroup, ConfirmModal, InlineField, InlineFormLabel } from '@grafana/ui';
 import { getQueryOptionsFromSql } from '../queryBuilder/utils';
 import { generateSql } from 'data/sqlGenerator';
 import labels from 'labels';
@@ -86,10 +86,15 @@ export const EditorTypeSwitcher = (props: CHEditorTypeSwitcherProps) => {
   };
   return (
     <span>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
-      <RadioButtonGroup options={options} value={editorType} onChange={(e) => onEditorTypeChange(e)} />
+      <InlineField
+        label={
+          <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+            {label}
+          </InlineFormLabel>
+        }
+      >
+        <RadioButtonGroup options={options} value={editorType} onChange={(e) => onEditorTypeChange(e)} />
+      </InlineField>
       <ConfirmModal
         isOpen={confirmModalState}
         title={switcher.title}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
-import { Button, Icon, InlineFormLabel, useStyles2 } from '@grafana/ui';
+import { Button, Icon, InlineField, InlineFormLabel, useStyles2 } from '@grafana/ui';
 import labels from 'labels';
 
 interface SqlPreviewProps {
@@ -88,11 +88,15 @@ export const SqlPreview = (props: SqlPreviewProps) => {
   }
 
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+      shrink
+    >
       <pre>{sql}</pre>
-    </div>
+    </InlineField>
   );
 };

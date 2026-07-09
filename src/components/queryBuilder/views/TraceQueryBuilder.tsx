@@ -7,7 +7,7 @@ import { FiltersEditor } from '../FilterEditor';
 import allLabels from 'labels';
 import { ModeSwitch } from '../ModeSwitch';
 import { getColumnByHint } from 'data/sqlGenerator';
-import { Alert, Collapse, Stack } from '@grafana/ui';
+import { Alert, Collapse, InlineFieldRow, Stack } from '@grafana/ui';
 import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
@@ -208,7 +208,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           onVersionChange={(v) => builderOptionsDispatch(setOtelVersion(v))}
           wide
         />
-        <div className="gf-form">
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -232,8 +232,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -257,8 +257,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -282,8 +282,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -301,8 +301,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             onChange={onOptionChange('durationUnit')}
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -326,8 +326,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -351,8 +351,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -376,8 +376,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <ColumnSelect
             disabled={builderState.otelEnabled}
             allColumns={allColumns}
@@ -401,8 +401,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             wide
             inline
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <Switch
             disabled={builderState.otelEnabled}
             label={labels.columns.flattenNested.label}
@@ -411,8 +411,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             onChange={onOptionChange('flattenNested')}
             wide
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <LabeledInput
             disabled={builderState.otelEnabled}
             label={labels.columns.eventsPrefix.label}
@@ -420,8 +420,8 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             value={builderState.traceEventsColumnPrefix || ''}
             onChange={onOptionChange('traceEventsColumnPrefix')}
           />
-        </div>
-        <div className="gf-form">
+        </InlineFieldRow>
+        <InlineFieldRow>
           <LabeledInput
             disabled={builderState.otelEnabled}
             label={labels.columns.linksPrefix.label}
@@ -429,7 +429,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
             value={builderState.traceLinksColumnPrefix || ''}
             onChange={onOptionChange('traceLinksColumnPrefix')}
           />
-        </div>
+        </InlineFieldRow>
       </Collapse>
       <Collapse label={labels.filtersSection} isOpen={isFiltersOpen} onToggle={setFiltersOpen}>
         <OrderByEditor

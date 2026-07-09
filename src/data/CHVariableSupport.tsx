@@ -7,7 +7,7 @@ import {
   QueryEditorProps,
   toDataFrame,
 } from '@grafana/data';
-import { InlineFormLabel, Select, TextArea } from '@grafana/ui';
+import { InlineField, InlineFormLabel, Select, TextArea } from '@grafana/ui';
 import { Observable, from, of } from 'rxjs';
 import { SchemaPicker, SchemaPickerLevel, SchemaPickerValue } from 'components/queryBuilder/SchemaPicker';
 import { CHConfig } from 'types/config';
@@ -178,14 +178,17 @@ export const VariableQueryEditor = (props: EditorProps) => {
 
   return (
     <div>
-      <div className="gf-form">
-        <InlineFormLabel
-          width={10}
-          className="query-keyword"
-          tooltip="Pick a guided variable type, or keep Custom SQL to write your own query."
-        >
-          Variable type
-        </InlineFormLabel>
+      <InlineField
+        label={
+          <InlineFormLabel
+            width={10}
+            className="query-keyword"
+            tooltip="Pick a guided variable type, or keep Custom SQL to write your own query."
+          >
+            Variable type
+          </InlineFormLabel>
+        }
+      >
         <Select
           width={40}
           options={VARIABLE_TYPE_OPTIONS}
@@ -193,7 +196,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
           onChange={(v) => onTypeChange((v.value as CHVariableQueryType) || 'sql')}
           aria-label="Variable type"
         />
-      </div>
+      </InlineField>
 
       {pickerLevel && (
         <SchemaPicker
@@ -204,14 +207,19 @@ export const VariableQueryEditor = (props: EditorProps) => {
         />
       )}
 
-      <div className="gf-form">
-        <InlineFormLabel
-          width={10}
-          className="query-keyword"
-          tooltip="Generated SQL. You can edit it; the runtime variable resolver uses this exact query."
-        >
-          SQL Query
-        </InlineFormLabel>
+      <InlineField
+        label={
+          <InlineFormLabel
+            width={10}
+            className="query-keyword"
+            tooltip="Generated SQL. You can edit it; the runtime variable resolver uses this exact query."
+          >
+            SQL Query
+          </InlineFormLabel>
+        }
+        grow
+        shrink
+      >
         <TextArea
           rows={3}
           value={safeQuery.rawSql || ''}
@@ -219,7 +227,7 @@ export const VariableQueryEditor = (props: EditorProps) => {
           placeholder="SELECT DISTINCT column FROM database.table"
           aria-label="SQL Query"
         />
-      </div>
+      </InlineField>
     </div>
   );
 };

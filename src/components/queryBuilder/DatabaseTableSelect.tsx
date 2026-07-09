@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { InlineField, InlineFieldRow, InlineFormLabel, Select } from '@grafana/ui';
 import { Datasource } from '../../data/CHDatasource';
 import labels from 'labels';
 import { styles } from '../../styles';
@@ -34,10 +34,13 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
   }, [datasource, database, onDatabaseChange]);
 
   return (
-    <>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+    >
       <Select
         className={`width-15 ${styles.Common.inlineSelect}`}
         options={options}
@@ -46,7 +49,7 @@ export const DatabaseSelect = (props: DatabaseSelectProps) => {
         menuPlacement={'bottom'}
         allowCustomValue
       ></Select>
-    </>
+    </InlineField>
   );
 };
 
@@ -78,10 +81,13 @@ export const TableSelect = (props: TableSelectProps) => {
   }, [database, table, tables, datasource, onTableChange]);
 
   return (
-    <>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+    >
       <Select
         className={`width-15 ${styles.Common.inlineSelect}`}
         options={options}
@@ -90,7 +96,7 @@ export const TableSelect = (props: TableSelectProps) => {
         menuPlacement={'bottom'}
         allowCustomValue
       ></Select>
-    </>
+    </InlineField>
   );
 };
 
@@ -106,9 +112,9 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
   const { datasource, database, onDatabaseChange, table, onTableChange } = props;
 
   return (
-    <div className="gf-form">
+    <InlineFieldRow>
       <DatabaseSelect datasource={datasource} database={database} onDatabaseChange={onDatabaseChange} />
       <TableSelect datasource={datasource} database={database} table={table} onTableChange={onTableChange} />
-    </div>
+    </InlineFieldRow>
   );
 };
