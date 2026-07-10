@@ -12,6 +12,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/sqlds/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -544,4 +545,36 @@ func TestInterpolateMacros(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "SELECT 1", got)
 	})
+
+	t.Run("returns a downstream error from macropro default handlers", func(t *testing.T) {
+		// macropro's own $__table / $__column handlers return plain errors
+		// with no backend error source, unlike our handlers which wrap
+		// backend.DownstreamError themselves. The interpolator must classify
+		// these downstream too: every interpolation failure originates from
+		// the user's query text, never from a plugin bug.
+		q := &sqlutil.Query{RawSQL: "SELECT * FROM $__table", TimeRange: timeRange}
+		_, err := interpolateMacros(t.Context(), q, nil)
+		require.Error(t, err)
+		assert.True(t, backend.IsDownstreamError(err))
+	})
+}
+
+// TestMissingTableMacroIsDownstream proves the downstream classification
+// survives the full sqlds.QueryData path: the interpolator error must land on
+// the query response with ErrorSourceDownstream, not the plugin default.
+func TestMissingTableMacroIsDownstream(t *testing.T) {
+	ds := sqlds.NewDatasource(&Clickhouse{})
+	ds.Interpolator = interpolateMacros
+
+	resp, err := ds.QueryData(t.Context(), &backend.QueryDataRequest{
+		Queries: []backend.DataQuery{{
+			RefID: "A",
+			JSON:  []byte(`{"rawSql":"SELECT * FROM $__table"}`),
+		}},
+	})
+	require.NoError(t, err)
+
+	got := resp.Responses["A"]
+	require.Error(t, got.Error)
+	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }

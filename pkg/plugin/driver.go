@@ -428,11 +428,22 @@ func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest)
 // macropro owns macro parsing end-to-end and handlers receive the fully
 // parsed query — including Table and Column, which the previous
 // MutateQueryData pre-expansion never carried. Expansion errors return
-// straight to the query response (classified downstream via
-// backend.DownstreamError inside the handlers) rather than being smuggled
-// through a throwIf() rewrite that failed at execution time.
+// straight to the query response rather than being smuggled through a
+// throwIf() rewrite that failed at execution time.
+//
+// Every error is wrapped as a downstream error: interpolation failures
+// originate from the user's query text (bad macro arguments, missing
+// table/column context, parse errors), never from a plugin bug. Our own
+// handlers already wrap backend.DownstreamError, but macropro's default
+// handlers ($__table, $__column) return plain errors, and sqlds only
+// downstream-classifies bad-argument-count and bracket errors on its own —
+// so without this wrap those would be miscounted as plugin errors.
 func interpolateMacros(_ context.Context, query *sqlutil.Query, _ json.RawMessage) (string, error) {
-	return macros.Interpolate(query.RawSQL, query)
+	sql, err := macros.Interpolate(query.RawSQL, query)
+	if err != nil {
+		return "", backend.DownstreamError(err)
+	}
+	return sql, nil
 }
 
 func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
