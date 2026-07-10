@@ -1391,10 +1391,10 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 
 // TestQueryDataMacroExpansion exercises the macropro-driven macro pipeline end to
 // end against a live ClickHouse: it goes through NewDatasource → sqlds.SQLDatasource.QueryData
-// rather than calling expandMacrosInQuery directly, so it covers the bits the
-// unit tests cannot — that sqlds with an empty Macros() map round-trips cleanly,
-// that the rewritten rawSql actually executes, and that the throwIf() error path
-// surfaces the real macro error to the caller.
+// rather than calling interpolateMacros directly, so it covers the bits the
+// unit tests cannot — that the macropro-backed sqlds.Interpolator is actually
+// installed, that the expanded rawSql executes, and that a macro error is
+// returned on the query response as a downstream error without touching the DB.
 func TestQueryDataMacroExpansion(t *testing.T) {
 	port := getEnv("CLICKHOUSE_PORT", "9000")
 	host := getEnv("CLICKHOUSE_HOST", "localhost")
@@ -1458,9 +1458,10 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 
 	t.Run("macro expansion failure surfaces a downstream error", func(t *testing.T) {
 		// $__timeFilter() takes one argument; calling it with zero triggers
-		// badArgsErr, which the driver rewrites into SELECT throwIf(...) so
-		// the user sees the real reason rather than a syntax error on the
-		// raw $__ token.
+		// badArgsErr. The interpolator returns the error to sqlds, which
+		// attaches it to the query response before any DB round-trip, so the
+		// user sees the real reason rather than a syntax error on the raw
+		// $__ token.
 		req := &backend.QueryDataRequest{
 			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
 			Queries: []backend.DataQuery{
@@ -1477,16 +1478,13 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		require.Contains(t, resp.Responses, "A")
 
 		respErr := resp.Responses["A"].Error
-		require.Error(t, respErr, "expected query to fail at the DB with the macro error")
-		// The macro error message is embedded in the throwIf payload, which
-		// ClickHouse echoes back in the Exception's Message field. The macro
-		// name appears without its $__ prefix because macroErrorQuery scrubs
-		// the prefix to keep sqlutil.DefaultMacros from re-scanning it.
-		assert.Contains(t, respErr.Error(), "macro expansion failed")
+		require.Error(t, respErr, "expected the macro error on the query response")
+		// sqlds wraps interpolator errors as "Could not apply macros: …",
+		// keeping the original macro name and argument-count message intact.
+		assert.Contains(t, respErr.Error(), "Could not apply macros")
 		assert.Contains(t, respErr.Error(), "timeFilter")
-		// MutateQueryError classifies any ClickHouse Exception as downstream,
-		// so the raised throwIf must come back tagged as user input rather
-		// than a plugin bug.
+		// badArgsErr wraps backend.DownstreamError, so sqlds must classify
+		// the failure as user input rather than a plugin bug.
 		assert.Equal(t, backend.ErrorSourceDownstream, resp.Responses["A"].ErrorSource)
 	})
 }

@@ -295,11 +295,12 @@ func (h *Clickhouse) Converters() []sqlutil.Converter {
 	return converters.ClickhouseConverters
 }
 
-// Macros returns an empty macro map. ClickHouse macros are expanded upstream
-// by macropro in MutateQueryData, so by the time sqlds's own Interpolate runs
-// there is nothing left for it to find. The empty map also prevents duplicate
-// expansion via sqlutil.DefaultMacros, since macropro.DefaultMacros is
-// already merged into macros.ClickHouseMacros.
+// Macros returns an empty macro map. ClickHouse macros are expanded by the
+// macropro-backed sqlds.Interpolator installed in NewDatasource, which
+// replaces sqlds's sqlutil.Interpolate pipeline entirely, so this map is
+// never consulted on the query path. macropro.DefaultMacros is already
+// merged into macros.ClickHouseMacros, so nothing is lost by leaving it
+// empty.
 func (h *Clickhouse) Macros() sqlds.Macros {
 	return sqlds.Macros{}
 }
@@ -395,7 +396,6 @@ func (h *Clickhouse) MutateQueryData(
 	injectGrafanaUserHeader(ctx, req)
 
 	req = preprocessGrafanaSQL(req)
-	req = expandMacros(req)
 	return ctx, req
 }
 
@@ -423,93 +423,27 @@ func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest)
 	req.SetHTTPHeader("X-Grafana-User", user.Login)
 }
 
-// expandMacros rewrites every query's rawSql with all $__ macros expanded.
-// Running this before sqlds's own query pipeline means macropro owns macro
-// parsing end-to-end; by the time sqlds.Interpolate runs it finds no tokens
-// and becomes a no-op.
-func expandMacros(req *backend.QueryDataRequest) *backend.QueryDataRequest {
-	if req == nil || len(req.Queries) == 0 {
-		return req
-	}
-	queries := make([]backend.DataQuery, 0, len(req.Queries))
-	for _, q := range req.Queries {
-		queries = append(queries, expandMacrosInQuery(q))
-	}
-	return &backend.QueryDataRequest{
-		PluginContext: req.PluginContext,
-		Headers:       req.Headers,
-		Queries:       queries,
-	}
-}
-
-// expandMacrosInQuery expands macros in a single query. When macro
-// expansion fails the rawSql is rewritten to a ClickHouse throwIf() call
-// that surfaces the macro error at execution time: ClickHouse raises an
-// Exception carrying our message, MutateQueryError classifies it as
-// downstream, and the user sees the real reason their query failed
-// instead of a cryptic DB syntax error on the unexpanded macro. We cannot
-// return an error from MutateQueryData directly — sqlds's hook signature
-// forbids it — so the DB round-trip is the only available error channel.
+// interpolateMacros is the sqlds.Interpolator installed by NewDatasource. It
+// replaces sqlds's default sqlutil.Interpolate pipeline with macropro, so
+// macropro owns macro parsing end-to-end and handlers receive the fully
+// parsed query — including Table and Column, which the previous
+// MutateQueryData pre-expansion never carried. Expansion errors return
+// straight to the query response rather than being smuggled through a
+// throwIf() rewrite that failed at execution time.
 //
-// The query JSON is decoded once into a map so the rewritten rawSql can
-// be written back while preserving plugin-specific fields (meta.timezone,
-// format, etc.). macropro only needs the raw SQL plus TimeRange/Interval, and
-// the latter come from the backend.DataQuery envelope rather than the JSON
-// body, so a full sqlutil.Query decode is unnecessary. On any (un)marshal
-// failure the original query is returned unchanged.
-func expandMacrosInQuery(q backend.DataQuery) backend.DataQuery {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(q.JSON, &raw); err != nil {
-		return q
-	}
-	var rawSQL string
-	if msg, ok := raw["rawSql"]; ok {
-		if err := json.Unmarshal(msg, &rawSQL); err != nil {
-			return q
-		}
-	}
-	if rawSQL == "" {
-		return q
-	}
-
-	sqq := sqlutil.Query{RawSQL: rawSQL, TimeRange: q.TimeRange, Interval: q.Interval}
-	expanded, err := macros.Interpolate(rawSQL, &sqq)
+// Every error is wrapped as a downstream error: interpolation failures
+// originate from the user's query text (bad macro arguments, missing
+// table/column context, parse errors), never from a plugin bug. Our own
+// handlers already wrap backend.DownstreamError, but macropro's default
+// handlers ($__table, $__column) return plain errors, and sqlds only
+// downstream-classifies bad-argument-count and bracket errors on its own —
+// so without this wrap those would be miscounted as plugin errors.
+func interpolateMacros(_ context.Context, query *sqlutil.Query, _ json.RawMessage) (string, error) {
+	sql, err := macros.Interpolate(query.RawSQL, query)
 	if err != nil {
-		backend.Logger.Error("failed to expand macros", "error", err.Error(), "refId", q.RefID)
-		expanded = macroErrorQuery(err)
-	} else if expanded == rawSQL {
-		return q
+		return "", backend.DownstreamError(err)
 	}
-
-	newRawSQLMsg, err := json.Marshal(expanded)
-	if err != nil {
-		return q
-	}
-	raw["rawSql"] = newRawSQLMsg
-	newJSON, err := json.Marshal(raw)
-	if err != nil {
-		return q
-	}
-	q.JSON = newJSON
-	return q
-}
-
-// macroErrorQuery turns a macro expansion error into a ClickHouse query that
-// fails at execution with the error message attached. ClickHouse's throwIf()
-// raises an Exception carrying the literal string, which is then classified
-// as a downstream error by MutateQueryError and surfaced to the user.
-//
-// sqlds runs sqlutil.Interpolate AFTER MutateQueryData and that function
-// always merges sqlutil.DefaultMacros — meaning any "$__" tokens left in the
-// rewritten rawSql (including inside the throwIf string literal) are
-// re-scanned and may trigger the stock macro handlers, hiding our throwIf
-// behind a "Could not apply macros" error. Strip the "$" prefix to neutralize
-// the scanner while keeping macro names readable.
-func macroErrorQuery(err error) string {
-	msg := strings.ReplaceAll(err.Error(), "$__", "__")
-	// ClickHouse single-quoted string literals escape ' as ''.
-	msg = strings.ReplaceAll(msg, "'", "''")
-	return fmt.Sprintf("SELECT throwIf(1, 'macro expansion failed: %s')", msg)
+	return sql, nil
 }
 
 func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {

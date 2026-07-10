@@ -5,13 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/sqlds/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -504,72 +505,76 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	})
 }
 
-func TestExpandMacrosInQuery(t *testing.T) {
+func TestInterpolateMacros(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	timeRange := backend.TimeRange{From: from, To: to}
 
-	t.Run("expands macros and preserves sibling JSON fields", func(t *testing.T) {
-		q := backend.DataQuery{
-			RefID:     "A",
-			JSON:      []byte(`{"rawSql":"SELECT $__fromTime","format":1,"meta":{"timezone":"UTC"}}`),
-			TimeRange: backend.TimeRange{From: from, To: to},
-		}
-		out := expandMacrosInQuery(q)
-
-		var body struct {
-			RawSQL string `json:"rawSql"`
-			Format int    `json:"format"`
-			Meta   struct {
-				Timezone string `json:"timezone"`
-			} `json:"meta"`
-		}
-		require.NoError(t, json.Unmarshal(out.JSON, &body))
-		assert.Equal(t, "SELECT toDateTime(1415792726)", body.RawSQL)
-		assert.Equal(t, 1, body.Format)
-		assert.Equal(t, "UTC", body.Meta.Timezone)
+	t.Run("expands macros from the parsed query", func(t *testing.T) {
+		q := &sqlutil.Query{RawSQL: "SELECT $__fromTime", TimeRange: timeRange}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT toDateTime(1415792726)", got)
 	})
 
-	t.Run("rewrites rawSql to throwIf on macro error", func(t *testing.T) {
-		// $__timeFilter with zero args triggers a badArgsErr.
-		q := backend.DataQuery{
-			RefID:     "A",
-			JSON:      []byte(`{"rawSql":"SELECT $__timeFilter()"}`),
-			TimeRange: backend.TimeRange{From: from, To: to},
-		}
-		out := expandMacrosInQuery(q)
-
-		var body struct {
-			RawSQL string `json:"rawSql"`
-		}
-		require.NoError(t, json.Unmarshal(out.JSON, &body))
-		assert.True(t, strings.HasPrefix(body.RawSQL, "SELECT throwIf(1, 'macro expansion failed: "))
-		assert.Contains(t, body.RawSQL, "timeFilter")
-		// $__ tokens leaking into the throwIf payload would be re-expanded by
-		// sqlutil.DefaultMacros downstream and hide the throwIf behind a
-		// "Could not apply macros" error, so the rewrite must scrub them.
-		assert.NotContains(t, body.RawSQL, "$__")
+	t.Run("expands table and column from query context", func(t *testing.T) {
+		// Table/Column only flow into macro handlers now that interpolation
+		// runs on the parsed sqlutil.Query; the old MutateQueryData
+		// pre-expansion never carried them.
+		q := &sqlutil.Query{RawSQL: "SELECT $__column FROM $__table", TimeRange: timeRange, Table: "logs", Column: "ts"}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT ts FROM logs", got)
 	})
 
-	t.Run("escapes single quotes and scrubs $__ in throwIf message", func(t *testing.T) {
-		// ClickHouse string literals escape ' as ''. macroErrorQuery must
-		// double every single quote so a message containing one can't
-		// prematurely close the literal, and strip $__ prefixes so
-		// sqlutil's downstream macro scan doesn't mistake them for macros.
-		got := macroErrorQuery(errors.New("$__timeFilter failed: oh 'no' it broke"))
-		assert.Equal(t, "SELECT throwIf(1, 'macro expansion failed: __timeFilter failed: oh ''no'' it broke')", got)
+	t.Run("returns a downstream error on bad macro arguments", func(t *testing.T) {
+		// $__timeFilter with zero args triggers a badArgsErr. The error goes
+		// back to sqlds, which puts it on the query response; it must be
+		// classified downstream so a user typo isn't counted as a plugin bug.
+		q := &sqlutil.Query{RawSQL: "SELECT $__timeFilter()", TimeRange: timeRange}
+		_, err := interpolateMacros(t.Context(), q, nil)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, sqlutil.ErrorBadArgumentCount)
+		assert.True(t, backend.IsDownstreamError(err))
+		assert.Contains(t, err.Error(), "timeFilter")
 	})
 
-	t.Run("returns query unchanged when there are no macros", func(t *testing.T) {
-		raw := []byte(`{"rawSql":"SELECT 1","format":1}`)
-		q := backend.DataQuery{RefID: "A", JSON: raw}
-		out := expandMacrosInQuery(q)
-		assert.JSONEq(t, string(raw), string(out.JSON))
+	t.Run("returns SQL unchanged when there are no macros", func(t *testing.T) {
+		q := &sqlutil.Query{RawSQL: "SELECT 1", TimeRange: timeRange}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT 1", got)
 	})
 
-	t.Run("returns query unchanged when rawSql is empty", func(t *testing.T) {
-		raw := []byte(`{"rawSql":""}`)
-		q := backend.DataQuery{RefID: "A", JSON: raw}
-		out := expandMacrosInQuery(q)
-		assert.JSONEq(t, string(raw), string(out.JSON))
+	t.Run("returns a downstream error from macropro default handlers", func(t *testing.T) {
+		// macropro's own $__table / $__column handlers return plain errors
+		// with no backend error source, unlike our handlers which wrap
+		// backend.DownstreamError themselves. The interpolator must classify
+		// these downstream too: every interpolation failure originates from
+		// the user's query text, never from a plugin bug.
+		q := &sqlutil.Query{RawSQL: "SELECT * FROM $__table", TimeRange: timeRange}
+		_, err := interpolateMacros(t.Context(), q, nil)
+		require.Error(t, err)
+		assert.True(t, backend.IsDownstreamError(err))
 	})
+}
+
+// TestMissingTableMacroIsDownstream proves the downstream classification
+// survives the full sqlds.QueryData path: the interpolator error must land on
+// the query response with ErrorSourceDownstream, not the plugin default.
+func TestMissingTableMacroIsDownstream(t *testing.T) {
+	ds := sqlds.NewDatasource(&Clickhouse{})
+	ds.Interpolator = interpolateMacros
+
+	resp, err := ds.QueryData(t.Context(), &backend.QueryDataRequest{
+		Queries: []backend.DataQuery{{
+			RefID: "A",
+			JSON:  []byte(`{"rawSql":"SELECT * FROM $__table"}`),
+		}},
+	})
+	require.NoError(t, err)
+
+	got := resp.Responses["A"]
+	require.Error(t, got.Error)
+	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }
