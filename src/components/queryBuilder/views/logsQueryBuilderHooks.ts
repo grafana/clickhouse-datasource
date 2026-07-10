@@ -90,7 +90,15 @@ export const useOtelColumns = (
       return;
     }
 
-    const otelConfig = otel.getVersion(otelVersion);
+    let otelConfig = otel.getVersion(otelVersion);
+    // The "latest" alias resolves against the actual table instead of a fixed
+    // schema: pre-v0.151.0 collector tables keep their TimestampTime column,
+    // newer ones don't, and both exist in the wild (see #1900). allColumns is
+    // already fetched for the builder, so detection costs no extra round-trip.
+    // Pinned versions (1.29.0, 1.30.0, ...) are honoured as-is.
+    if (otelConfig?.version === 'latest') {
+      otelConfig = otel.detectLogsVersion(allColumns.map((c) => c.name));
+    }
     const logColumnMap = otelConfig?.logColumnMap;
     if (!logColumnMap) {
       return;

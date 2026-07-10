@@ -401,7 +401,8 @@ export default {
     },
     OtelVersionSelect: {
       label: 'Use OTel',
-      tooltip: 'Enables Open Telemetry schema versioning',
+      tooltip:
+        'Enables Open Telemetry schema versioning. The auto option matches the logs schema version to the table columns. Pick a specific version to override.',
     },
     LimitEditor: {
       label: 'Limit',

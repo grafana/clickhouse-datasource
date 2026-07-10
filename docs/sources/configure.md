@@ -228,13 +228,13 @@ When **Configuration mode** is set to **Single source** and **Signal type** is s
 
 The plugin ships built-in column maps for the OpenTelemetry ClickHouse exporter's default schemas. Pick the version that matches the exporter that wrote your data:
 
-- **`latest`** — always tracks the newest schema below. Recommended for new data sources.
+- **`auto (latest)`** — detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
 - **`1.3.0`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
 - **`1.2.9`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
 
-The trace tables (`otel_traces`, `otel_traces_trace_id_ts`) and metric tables are unchanged across these versions; only the `otel_logs` schema changed.
+The trace tables (`otel_traces`, `otel_traces_trace_id_ts`) and metric tables are unchanged across these versions; only the `otel_logs` schema changed. Detection therefore only applies to logs, and traces always use the selected version's map.
 
-If queries fail with an `Unknown identifier 'TimestampTime'` error after upgrading the exporter, switch the schema version to `1.3.0` (or `latest`).
+If queries fail with an `Unknown identifier 'TimestampTime'` error after upgrading the exporter, leave the version on `auto (latest)` and rebuild the query, or pin the schema version to `1.3.0`.
 
 ### Private data source connect
 
