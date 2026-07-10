@@ -381,4 +381,29 @@ func TestLoadSettings(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("should parse rowCapacityHint", func(t *testing.T) {
+		ctx := context.Background()
+		tests := []struct {
+			description string
+			jsonData    string
+			want        int64
+		}{
+			{description: "absent defaults to 0", jsonData: `{"host": "foo", "port": 443}`, want: 0},
+			{description: "numeric value", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": 50000}`, want: 50000},
+			{description: "string value", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": "50000"}`, want: 50000},
+			{description: "negative clamps to 0", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": -1}`, want: 0},
+			{description: "invalid string defaults to 0", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": "abc"}`, want: 0},
+		}
+		for _, tc := range tests {
+			t.Run(tc.description, func(t *testing.T) {
+				got, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+					JSONData:                []byte(tc.jsonData),
+					DecryptedSecureJSONData: map[string]string{},
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, tc.want, got.RowCapacityHint)
+			})
+		}
+	})
 }

@@ -593,6 +593,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               connMaxLifetime={jsonData.connMaxLifetime}
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
+              rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
               enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e)}
@@ -600,6 +601,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onConnMaxLifetimeChange={(e) => onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e)}
               onConnMaxIdleConnsChange={(e) => onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e)}
               onConnMaxOpenConnsChange={(e) => onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e)}
+              onRowCapacityHintChange={(e) => onUpdateDatasourceJsonDataOption(props, 'rowCapacityHint')(e)}
               onValidateSqlChange={(e) => onSwitchToggle('validateSql', e.currentTarget.checked)}
               onEnableMapKeysDiscoveryChange={(e) => onSwitchToggle('enableMapKeysDiscovery', e.currentTarget.checked)}
             />
@@ -637,6 +639,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
               queryTimeout={jsonData.queryTimeout}
+              rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
               onDialTimeoutChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
@@ -645,6 +648,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onQueryTimeoutChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
+              }}
+              onRowCapacityHintChange={(e) => {
+                trackingV1.trackClickhouseConfigV1QuerySettings({ rowCapacityHint: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'rowCapacityHint')(e);
               }}
               onConnMaxLifetimeChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });

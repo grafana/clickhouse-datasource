@@ -373,7 +373,8 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders: settings.ForwardGrafanaHeaders,
+		ForwardHeaders:  settings.ForwardGrafanaHeaders,
+		RowCapacityHint: settings.RowCapacityHint,
 	}
 }
 

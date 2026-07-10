@@ -52,6 +52,15 @@ export interface CHConfig extends DataSourceJsonData {
   enableSecureSocksProxy?: boolean;
   enableRowLimit?: boolean;
 
+  /**
+   * Optional expected row count passed to sqlds as DriverSettings.RowCapacityHint.
+   * sqlds pre-allocates each frame's fields to this value before scanning, avoiding
+   * per-column slice growth on large results. Applied to every query, so leave
+   * unset (0, disabled) unless queries reliably return a similar, large number
+   * of rows. A value larger than the typical result wastes memory.
+   */
+  rowCapacityHint?: string;
+
   hideTableNameInAdhocFilters?: boolean;
 
   /**
