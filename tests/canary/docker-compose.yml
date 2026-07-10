@@ -1,0 +1,35 @@
+# Canary stack for the scheduled OTel schema drift workflow (#1901).
+#
+# The real opentelemetry-collector-contrib writes its clickhouseexporter
+# schema into a fresh ClickHouse, and compare-schema.mjs then diffs the
+# created tables against expected-columns.json. Both images are intentionally
+# unpinned (:latest), because detecting drift in the exporter's generated
+# schema against a current ClickHouse is the whole point of the canary.
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    ports:
+      - 8123:8123
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
+    healthcheck:
+      test: ['CMD', 'clickhouse-client', '--query', 'SELECT 1']
+      interval: 2s
+      timeout: 10s
+      retries: 30
+      start_period: 5s
+
+  collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ['--config=/etc/otelcol/config.yaml']
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - 4318:4318
+    depends_on:
+      clickhouse:
+        condition: service_healthy
