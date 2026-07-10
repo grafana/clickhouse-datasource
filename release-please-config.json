@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "skip-github-release": true,
+  "bootstrap-sha": "eef5ef85e9aa5027a1612efad89b4cceb5938c9a",
+  "changelog-sections": [
+    { "type": "feat", "section": "🎉 Features" },
+    { "type": "fix", "section": "🐛 Bug Fixes" },
+    { "type": "perf", "section": "⚡ Performance Improvements" },
+    { "type": "refactor", "section": "♻️ Code Refactoring" },
+    { "type": "docs", "section": "📝 Documentation" },
+    { "type": "test", "section": "✅ Tests" },
+    { "type": "build", "section": "🏗️ Builds" },
+    { "type": "ci", "section": "🤖 Continuous Integration" },
+    { "type": "revert", "section": "⏪ Reverts" },
+    { "type": "chore", "section": "🔧 Chores", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "clickhouse-datasource"
+    }
+  }
+}
