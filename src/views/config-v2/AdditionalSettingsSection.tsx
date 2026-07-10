@@ -137,6 +137,7 @@ export const AdditionalSettingsSection = (props: Props) => {
             !!jsonData.maxIdleConns ||
             !!jsonData.maxOpenConns ||
             !!jsonData.queryTimeout ||
+            !!jsonData.rowCapacityHint ||
             !!jsonData.validateSql ||
             jsonData.enableMapKeysDiscovery === false ||
             !isEqual(logs, defaultLogs) ||
