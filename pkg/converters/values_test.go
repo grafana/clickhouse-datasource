@@ -2,10 +2,13 @@ package converters
 
 import (
 	"encoding/json"
+	"math"
 	"math/big"
 	"net"
 	"testing"
+	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2/lib/chcol"
 	"github.com/paulmach/orb"
 	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
@@ -69,6 +72,58 @@ func TestJSONConverter(t *testing.T) {
 	})
 	t.Run("marshal error", func(t *testing.T) {
 		_, err := jsonConverter(make(chan int))
+		assert.Error(t, err)
+	})
+}
+
+func TestJSONConverterNaNInf(t *testing.T) {
+	// encoding/json rejects NaN/±Inf, which ClickHouse Tuple/Map/Nested/Variant/JSON
+	// columns can contain. jsonConverter must sanitize those to null rather than error.
+	// See https://github.com/grafana/clickhouse-datasource/issues/1049.
+	t.Run("nested slice and map", func(t *testing.T) {
+		in := []any{1.0, math.NaN(), []any{math.Inf(1), math.Inf(-1)}}
+		v, err := jsonConverter(in)
+		require.NoError(t, err)
+		assert.Equal(t, json.RawMessage(`[1,null,[null,null]]`), v)
+	})
+	t.Run("string-keyed map", func(t *testing.T) {
+		in := map[string]any{"a": math.NaN(), "b": 2.0}
+		v, err := jsonConverter(in)
+		require.NoError(t, err)
+		assert.Equal(t, json.RawMessage(`{"a":null,"b":2}`), v)
+	})
+	t.Run("clean values are untouched", func(t *testing.T) {
+		in := map[string]any{"a": 1.5, "b": []any{2.0, 3.0}}
+		v, err := jsonConverter(in)
+		require.NoError(t, err)
+		assert.Equal(t, json.RawMessage(`{"a":1.5,"b":[2,3]}`), v)
+	})
+	t.Run("Variant with NaN", func(t *testing.T) {
+		v, err := jsonConverter(chcol.NewVariant(math.NaN()))
+		require.NoError(t, err)
+		assert.Equal(t, json.RawMessage(`null`), v)
+	})
+	t.Run("JSON with NaN at path", func(t *testing.T) {
+		j := chcol.NewJSON()
+		j.SetValueAtPath("a", math.NaN())
+		j.SetValueAtPath("b", 2.0)
+		v, err := jsonConverter(j)
+		require.NoError(t, err)
+		assert.Equal(t, json.RawMessage(`{"a":null,"b":2}`), v)
+	})
+	t.Run("non-string map keys keep encoding/json format", func(t *testing.T) {
+		// A Map(DateTime, Float64) scans into time.Time keys. Sanitized rows must
+		// render keys via encoding.TextMarshaler (RFC3339), matching clean rows.
+		ts := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+		in := map[time.Time]float64{ts: math.NaN()}
+		v, err := jsonConverter(in)
+		require.NoError(t, err)
+		assert.Equal(t, json.RawMessage(`{"2024-01-01T00:00:00Z":null}`), v)
+	})
+	t.Run("unrelated marshal error is not retried", func(t *testing.T) {
+		// A channel produces json.UnsupportedTypeError, not UnsupportedValueError,
+		// so it must surface immediately rather than trigger the sanitize retry.
+		_, err := jsonConverter(map[string]any{"a": make(chan int)})
 		assert.Error(t, err)
 	})
 }
