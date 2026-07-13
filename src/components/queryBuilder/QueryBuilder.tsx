@@ -236,6 +236,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         table={activeOptions.table}
         filters={activeOptions.filters || []}
         allColumns={filterColumns}
+        selectedColumns={activeOptions.columns || []}
         onFiltersChange={(filters: Filter[]) => mergeActiveOptions({ filters }, true)}
         onToggleAdvanced={() => setAdvancedOpen(!advancedOpen)}
         advancedOpen={advancedOpen}

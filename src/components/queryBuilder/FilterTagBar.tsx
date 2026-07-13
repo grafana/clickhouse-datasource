@@ -2,10 +2,11 @@ import React from 'react';
 import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Icon, Tooltip, useStyles2 } from '@grafana/ui';
-import { Filter, FilterOperator } from 'types/queryBuilder';
+import { Filter, FilterOperator, SelectedColumn } from 'types/queryBuilder';
 
 interface FilterTagBarProps {
   filters: Filter[];
+  selectedColumns?: readonly SelectedColumn[];
   onRemoveFilter: (index: number) => void;
 }
 
@@ -70,10 +71,14 @@ const getStyles = (theme: GrafanaTheme2) => ({
   `,
 });
 
-const getFilterDisplayName = (filter: Filter): string => {
-  const key = filter.key || (filter.hint ? filter.hint.replace(/_/g, ' ') : '?');
+export const getFilterDisplayName = (filter: Filter, selectedColumns: readonly SelectedColumn[] = []): string => {
+  // Resolve a hinted filter (the log-view "+" stores { key: '', hint }) back to its actual
+  // column name so the chip reads e.g. "LogAttributes.event.name", matching the log viewer
+  // and the Add filter path instead of the friendlier hint label ("log attributes").
+  const hintedColumn = filter.hint ? selectedColumns.find((c) => c.hint === filter.hint) : undefined;
+  const base = filter.key || hintedColumn?.name || (filter.hint ? filter.hint.replace(/_/g, ' ') : '?');
   const mapSuffix = 'mapKey' in filter && filter.mapKey ? `.${filter.mapKey}` : '';
-  return `${key}${mapSuffix}`;
+  return `${base}${mapSuffix}`;
 };
 
 const getFilterDisplayValue = (filter: Filter): string => {
@@ -117,7 +122,7 @@ const getOperatorDisplay = (operator: FilterOperator): string => {
 };
 
 export const FilterTagBar = (props: FilterTagBarProps) => {
-  const { filters, onRemoveFilter } = props;
+  const { filters, selectedColumns, onRemoveFilter } = props;
   const styles = useStyles2(getStyles);
 
   const activeFilters = filters.filter(
@@ -145,7 +150,7 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
           return null;
         }
 
-        const name = getFilterDisplayName(filter);
+        const name = getFilterDisplayName(filter, selectedColumns);
         const operator = getOperatorDisplay(filter.operator);
         const value = getFilterDisplayValue(filter);
 
