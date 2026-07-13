@@ -107,8 +107,17 @@ function getAttributeColumnByDisplayPrefix(
   });
 }
 
-/** Resolve a filter key to a column in the builder options, handling OTel map key splitting and alias/hint lookup. */
-function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): ResolvedColumn {
+/**
+ * Resolve a filter key to a column in the builder options, handling OTel map key
+ * splitting and alias/hint lookup. `knownColumns` (the live table schema, when
+ * available) lets us split and type any Map/JSON attribute column, including ones
+ * the selected-column list stores without a type.
+ */
+function resolveFilterColumn(
+  builderOptions: QueryBuilderOptions,
+  key: string,
+  knownColumns?: readonly TableColumn[]
+): ResolvedColumn {
   let columnName = key;
   let mapKey = '';
 
@@ -123,6 +132,14 @@ function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): 
     } else if (legacyAttributeColumns.has(columnPrefix)) {
       mapKey = columnName.substring(prefixIndex + 1);
       columnName = columnPrefix;
+    } else if (
+      knownColumns?.some((c) => c.name === columnPrefix && (c.type?.startsWith('Map') || c.type?.startsWith('JSON')))
+    ) {
+      // Split any Map/JSON attribute column detected from the live schema (e.g.
+      // traces' SpanAttributes or a non-OTel Map column), even when the selected
+      // column carries no type.
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = columnPrefix;
     }
   }
 
@@ -134,11 +151,16 @@ function resolveFilterColumn(builderOptions: QueryBuilderOptions, key: string): 
     : undefined;
   const column = lookupByAlias || lookupByName || lookupByLogsAlias;
 
+  // Prefer the selected column's type, but fall back to the live schema type so
+  // map-key filters resolve Map vs JSON authoritatively even when the selected
+  // column is stored without a type (the default OTel columns are).
+  const columnType = column?.type || knownColumns?.find((c) => c.name === columnName)?.type || '';
+
   return {
     columnName,
     mapKey,
     column,
-    columnType: column ? column.type || '' : '',
+    columnType,
     hasMapKey: mapKey !== '',
   };
 }
@@ -150,7 +172,10 @@ function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'
     key: resolved.column?.hint ? '' : resolved.columnName,
     hint: resolved.column?.hint || undefined,
     mapKey: resolved.hasMapKey ? resolved.mapKey : undefined,
-    type: resolved.hasMapKey ? (resolved.columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'string',
+    // Map columns use bracket access (`col['key']`); only genuine JSON columns use
+    // the dot-path branch. Default an unknown-type attribute filter to Map, which
+    // matches the standard OTel schema and avoids emitting invalid `col.key` SQL.
+    type: resolved.hasMapKey ? (resolved.columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'string',
     filterType: 'custom',
     operator,
     value,
@@ -164,8 +189,7 @@ function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
   // matches on key + type family alone, so a filter stored against one
   // attribute column (e.g. LogAttributes) collides with a different attribute
   // column that happens to share the same map key (e.g. ResourceAttributes).
-  const sameColumn =
-    resolved.column?.hint && f.hint ? f.hint === resolved.column.hint : f.key === resolved.columnName;
+  const sameColumn = resolved.column?.hint && f.hint ? f.hint === resolved.column.hint : f.key === resolved.columnName;
   if (resolved.hasMapKey) {
     return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey && sameColumn;
   }
@@ -616,7 +640,8 @@ export class Datasource
     }
 
     const actionValue = action.options.value;
-    const resolved = resolveFilterColumn(query.builderOptions, columnName);
+    const knownColumns = this.getCachedColumns(query.builderOptions.database, query.builderOptions.table);
+    const resolved = resolveFilterColumn(query.builderOptions, columnName, knownColumns);
 
     let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
     if (action.type === 'ADD_FILTER') {
@@ -715,7 +740,8 @@ export class Datasource
       return query;
     }
 
-    const resolved = resolveFilterColumn(query.builderOptions, key);
+    const knownColumns = this.getCachedColumns(query.builderOptions.database, query.builderOptions.table);
+    const resolved = resolveFilterColumn(query.builderOptions, key, knownColumns);
     const targetOperator = filter.type === 'FILTER_FOR' ? FilterOperator.Equals : FilterOperator.NotEquals;
     const oppositeOperator = filter.type === 'FILTER_FOR' ? FilterOperator.NotEquals : FilterOperator.Equals;
 
@@ -1324,8 +1350,27 @@ export class Datasource
    * The cache lives for the lifetime of the datasource instance, which is reset on
    * config save or page reload — short enough that stale schema is not a concern.
    */
+  private columnCacheKey(database: string | undefined, table: string): string {
+    return `${database ?? ''}\0${table}`;
+  }
+
+  /**
+   * Synchronous read of the column cache populated by getColumnsCached. Returns
+   * undefined when the schema for this table has not been fetched yet, so callers
+   * must treat the result as best-effort.
+   */
+  private getCachedColumns(
+    database: string | undefined,
+    table: string | undefined
+  ): readonly TableColumn[] | undefined {
+    if (!table) {
+      return undefined;
+    }
+    return this._columnCache.get(this.columnCacheKey(database, table));
+  }
+
   async getColumnsCached(database: string | undefined, table: string): Promise<TableColumn[]> {
-    const key = `${database ?? ''}\0${table}`;
+    const key = this.columnCacheKey(database, table);
     if (!this._columnCache.has(key)) {
       this._columnCache.set(key, await this.fetchColumns(database, table));
     }

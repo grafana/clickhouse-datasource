@@ -1609,6 +1609,93 @@ describe('ClickHouseDatasource', () => {
       expect((result as CHBuilderQuery).builderOptions.filters![0].mapKey).toBe('service_name');
     });
 
+    describe('map-key attribute filter type resolution', () => {
+      // Default OTel columns are stored without a type; a query loaded from the
+      // Explore URL keeps them untyped. The attribute filter must still resolve
+      // to Map bracket access, not the JSON dot path (which crashes ClickHouse).
+      const untypedQuery: CHBuilderQuery = {
+        pluginVersion: '',
+        refId: 'A',
+        editorType: EditorType.Builder,
+        rawSql: '',
+        builderOptions: {
+          database: 'default',
+          table: 'otel_logs',
+          queryType: QueryType.Logs,
+          mode: BuilderMode.List,
+          columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes }],
+        },
+      };
+
+      it('ADD_FILTER on an untyped log attribute uses Map bracket access', () => {
+        const result = datasource.modifyQuery(untypedQuery, {
+          type: 'ADD_FILTER',
+          options: { key: 'LogAttributes.method', value: 'F' },
+        } as any) as CHBuilderQuery;
+
+        const filter = result.builderOptions.filters![0] as any;
+        expect(filter.mapKey).toBe('method');
+        expect(filter.type).toBe('Map(String, String)');
+        expect(result.rawSql).toContain("LogAttributes['method']");
+        expect(result.rawSql).not.toContain('LogAttributes.`method`');
+      });
+
+      it('toggleQueryFilter FILTER_FOR on an untyped log attribute uses Map bracket access', () => {
+        const result = datasource.toggleQueryFilter(untypedQuery, {
+          type: 'FILTER_FOR',
+          options: { key: 'LogAttributes.method', value: 'F' },
+        } as any) as CHBuilderQuery;
+
+        const filter = result.builderOptions.filters![0] as any;
+        expect(filter.mapKey).toBe('method');
+        expect(filter.type).toBe('Map(String, String)');
+      });
+
+      it('preserves JSON dot access when the attribute column is a JSON type', () => {
+        const jsonQuery: CHBuilderQuery = {
+          ...untypedQuery,
+          builderOptions: {
+            ...untypedQuery.builderOptions,
+            columns: [{ name: 'LogAttributes', hint: ColumnHint.LogAttributes, type: 'JSON' }],
+          },
+        };
+
+        const result = datasource.modifyQuery(jsonQuery, {
+          type: 'ADD_FILTER',
+          options: { key: 'LogAttributes.method', value: 'F' },
+        } as any) as CHBuilderQuery;
+
+        const filter = result.builderOptions.filters![0] as any;
+        expect(filter.type).toBe('JSON');
+        expect(result.rawSql).toContain('LogAttributes.`method`');
+      });
+
+      it('splits and types a non-selected Map attribute column from the fetched schema cache', () => {
+        const traceQuery: CHBuilderQuery = {
+          ...untypedQuery,
+          builderOptions: {
+            ...untypedQuery.builderOptions,
+            table: 'otel_traces',
+            columns: [{ name: 'Timestamp', hint: ColumnHint.Time }],
+          },
+        };
+        // Prime the schema cache the way getColumnsCached would (key is db\0table).
+        (datasource as any)._columnCache.set((datasource as any).columnCacheKey('default', 'otel_traces'), [
+          { name: 'SpanAttributes', type: 'Map(String, String)' },
+        ]);
+
+        const result = datasource.modifyQuery(traceQuery, {
+          type: 'ADD_FILTER',
+          options: { key: 'SpanAttributes.http.method', value: 'GET' },
+        } as any) as CHBuilderQuery;
+
+        const filter = result.builderOptions.filters![0] as any;
+        expect(filter.mapKey).toBe('http.method');
+        expect(filter.type).toBe('Map(String, String)');
+        expect(result.rawSql).toContain("SpanAttributes['http.method']");
+      });
+    });
+
     describe('ADD_FILTER', () => {
       it('adds an Equals filter for the given field', () => {
         const result = datasource.modifyQuery(query, {
@@ -2005,7 +2092,9 @@ describe('ClickHouseDatasource', () => {
         expect(result.builderOptions.filters![0]).toMatchObject({
           key: 'LogAttributes',
           mapKey: 'foo.bar',
-          type: 'JSON',
+          // LogAttributes is a Map column; an untyped/unselected attribute filter
+          // must resolve to Map bracket access, not the JSON dot path (which crashes).
+          type: 'Map(String, String)',
           operator: FilterOperator.Equals,
           value: 'baz',
         });
@@ -2029,7 +2118,7 @@ describe('ClickHouseDatasource', () => {
           key: '',
           hint: ColumnHint.LogAttributes,
           mapKey: 'log.file.path',
-          type: 'JSON',
+          type: 'Map(String, String)',
           operator: FilterOperator.Equals,
           value: '/var/log/pod.log',
         });
