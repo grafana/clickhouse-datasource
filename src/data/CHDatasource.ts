@@ -80,6 +80,10 @@ const attributeColumnHints = new Set([
 ]);
 const legacyAttributeColumns = new Set(['ResourceAttributes', 'ScopeAttributes', 'LogAttributes']);
 
+// A Map or JSON column can hold OTel attribute map keys; both are treated as attribute
+// columns for map-key splitting and value typing. Shared so the checks stay in sync.
+const isAttributeColumnType = (type?: string): boolean => Boolean(type?.startsWith('Map') || type?.startsWith('JSON'));
+
 // Columns the trace-ID optimization's WITH clause reads from the
 // `<table><suffix>` companion table. The optimization is only safe when the
 // companion actually exposes all of them.
@@ -97,7 +101,7 @@ function getAttributeColumnByDisplayPrefix(
 
   return builderOptions.columns?.find((column) => {
     const isAttributeHint = column.hint ? attributeColumnHints.has(column.hint) : false;
-    const isAttributeType = column.type?.startsWith('Map') || column.type?.startsWith('JSON');
+    const isAttributeType = isAttributeColumnType(column.type);
     if (!isAttributeHint && !isAttributeType) {
       return false;
     }
@@ -132,9 +136,7 @@ function resolveFilterColumn(
     } else if (legacyAttributeColumns.has(columnPrefix)) {
       mapKey = columnName.substring(prefixIndex + 1);
       columnName = columnPrefix;
-    } else if (
-      knownColumns?.some((c) => c.name === columnPrefix && (c.type?.startsWith('Map') || c.type?.startsWith('JSON')))
-    ) {
+    } else if (knownColumns?.some((c) => c.name === columnPrefix && isAttributeColumnType(c.type))) {
       // Split any Map/JSON attribute column detected from the live schema (e.g.
       // traces' SpanAttributes or a non-OTel Map column), even when the selected
       // column carries no type.
@@ -151,10 +153,12 @@ function resolveFilterColumn(
     : undefined;
   const column = lookupByAlias || lookupByName || lookupByLogsAlias;
 
-  // Prefer the selected column's type, but fall back to the live schema type so
-  // map-key filters resolve Map vs JSON authoritatively even when the selected
-  // column is stored without a type (the default OTel columns are).
-  const columnType = column?.type || knownColumns?.find((c) => c.name === columnName)?.type || '';
+  // Prefer the selected column's type, but fall back to the live schema type so map-key
+  // filters resolve Map vs JSON authoritatively even when the selected column is stored
+  // without a type (the default OTel columns are). Look up by the real column name, not
+  // `columnName`, which may be an alias and would miss the schema.
+  const schemaLookupName = column?.name ?? columnName;
+  const columnType = column?.type || knownColumns?.find((c) => c.name === schemaLookupName)?.type || '';
 
   return {
     columnName,

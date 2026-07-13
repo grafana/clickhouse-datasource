@@ -104,13 +104,22 @@ describe('QueryBuilder', () => {
     expect(result.container.firstChild).not.toBeNull();
   });
 
-  it('shows the raw attribute column name in the compact filter chip for a hinted "+" filter', async () => {
-    const originalGetSignalType = mockDs.getSignalType;
-    const originalIsSingleTableMode = mockDs.isSingleTableMode;
-    // Compact editor renders only when the datasource is single-table with a signal type.
-    mockDs.getSignalType = jest.fn(() => 'logs' as any);
-    mockDs.isSingleTableMode = jest.fn(() => true);
-    try {
+  describe('compact filter chip label', () => {
+    let getSignalTypeSpy: jest.SpyInstance;
+    let isSingleTableModeSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // Compact editor renders only when the datasource is single-table with a signal type.
+      getSignalTypeSpy = jest.spyOn(mockDs, 'getSignalType').mockReturnValue('logs' as any);
+      isSingleTableModeSpy = jest.spyOn(mockDs, 'isSingleTableMode').mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      getSignalTypeSpy.mockRestore();
+      isSingleTableModeSpy.mockRestore();
+    });
+
+    it('shows the raw attribute column name in the compact filter chip for a hinted "+" filter', async () => {
       render(
         <QueryBuilder
           app={CoreApp.PanelEditor}
@@ -143,15 +152,12 @@ describe('QueryBuilder', () => {
         />
       );
 
-      // The log-view "+" stores { key: '', hint }, so the chip must resolve the hint to
-      // the column name and read "LogAttributes.user.tier" (matching the Add filter path),
-      // not the friendly hint label "log attributes.user.tier".
+      // The log-view "+" stores { key: '', hint }, so the chip must resolve the hint to the
+      // column name and read "LogAttributes.user.tier" (matching the Add filter path), not the
+      // friendly hint label "log attributes.user.tier".
       expect(await screen.findByText('LogAttributes.user.tier')).toBeInTheDocument();
       expect(screen.queryByText('log attributes.user.tier')).not.toBeInTheDocument();
-    } finally {
-      mockDs.getSignalType = originalGetSignalType;
-      mockDs.isSingleTableMode = originalIsSingleTableMode;
-    }
+    });
   });
 
   it('renders TableQueryBuilder when queryType is Table', () => {

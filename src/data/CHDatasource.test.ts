@@ -1670,7 +1670,7 @@ describe('ClickHouseDatasource', () => {
         expect(result.rawSql).toContain('LogAttributes.`method`');
       });
 
-      it('splits and types a non-selected Map attribute column from the fetched schema cache', () => {
+      it('splits and types a non-selected Map attribute column from the fetched schema cache', async () => {
         const traceQuery: CHBuilderQuery = {
           ...untypedQuery,
           builderOptions: {
@@ -1679,10 +1679,11 @@ describe('ClickHouseDatasource', () => {
             columns: [{ name: 'Timestamp', hint: ColumnHint.Time }],
           },
         };
-        // Prime the schema cache the way getColumnsCached would (key is db\0table).
-        (datasource as any)._columnCache.set((datasource as any).columnCacheKey('default', 'otel_traces'), [
-          { name: 'SpanAttributes', type: 'Map(String, String)' },
-        ]);
+        // Prime the cache through the public path (getColumnsCached -> fetchColumns).
+        jest
+          .spyOn(datasource, 'fetchColumns')
+          .mockResolvedValue([{ name: 'SpanAttributes', type: 'Map(String, String)' }] as any);
+        await datasource.getColumnsCached('default', 'otel_traces');
 
         const result = datasource.modifyQuery(traceQuery, {
           type: 'ADD_FILTER',
@@ -1693,6 +1694,29 @@ describe('ClickHouseDatasource', () => {
         expect(filter.mapKey).toBe('http.method');
         expect(filter.type).toBe('Map(String, String)');
         expect(result.rawSql).toContain("SpanAttributes['http.method']");
+      });
+
+      it('types an aliased attribute column from the schema by its real name, not the alias', async () => {
+        const aliasQuery: CHBuilderQuery = {
+          ...untypedQuery,
+          builderOptions: {
+            ...untypedQuery.builderOptions,
+            columns: [{ name: 'LogAttributes', alias: 'attrs', hint: ColumnHint.LogAttributes }],
+          },
+        };
+        // Selected column is aliased and untyped; the live schema reports it as JSON.
+        jest.spyOn(datasource, 'fetchColumns').mockResolvedValue([{ name: 'LogAttributes', type: 'JSON' }] as any);
+        await datasource.getColumnsCached('default', 'otel_logs');
+
+        const result = datasource.modifyQuery(aliasQuery, {
+          type: 'ADD_FILTER',
+          options: { key: 'attrs.method', value: 'F' },
+        } as any) as CHBuilderQuery;
+
+        const filter = result.builderOptions.filters![0] as any;
+        // Resolved via the real name (LogAttributes) to JSON, so dot access, not the Map default.
+        expect(filter.type).toBe('JSON');
+        expect(result.rawSql).toContain('::Nullable(String)');
       });
     });
 
