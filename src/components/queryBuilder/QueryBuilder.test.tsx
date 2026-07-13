@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, ColumnHint, QueryType, TimeUnit } from 'types/queryBuilder';
+import { BuilderMode, ColumnHint, FilterOperator, QueryType, TimeUnit } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 
 jest.mock('./views/TableQueryBuilder', () => ({
@@ -102,6 +102,56 @@ describe('QueryBuilder', () => {
       )
     );
     expect(result.container.firstChild).not.toBeNull();
+  });
+
+  it('shows the raw attribute column name in the compact filter chip for a hinted "+" filter', async () => {
+    const originalGetSignalType = mockDs.getSignalType;
+    const originalIsSingleTableMode = mockDs.isSingleTableMode;
+    // Compact editor renders only when the datasource is single-table with a signal type.
+    mockDs.getSignalType = jest.fn(() => 'logs' as any);
+    mockDs.isSingleTableMode = jest.fn(() => true);
+    try {
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={{
+            queryType: QueryType.Logs,
+            mode: BuilderMode.List,
+            database: 'otel_v2',
+            table: 'otel_logs',
+            columns: [
+              { name: 'Timestamp', hint: ColumnHint.Time },
+              { name: 'Body', hint: ColumnHint.LogMessage },
+              { name: 'LogAttributes', hint: ColumnHint.LogAttributes },
+            ],
+            filters: [
+              {
+                condition: 'AND',
+                filterType: 'custom',
+                key: '',
+                hint: ColumnHint.LogAttributes,
+                mapKey: 'user.tier',
+                type: 'Map(String, String)',
+                operator: FilterOperator.Equals,
+                value: 'basic',
+              } as any,
+            ],
+          }}
+          builderOptionsDispatch={() => {}}
+          datasource={mockDs}
+          generatedSql=""
+        />
+      );
+
+      // The log-view "+" stores { key: '', hint }, so the chip must resolve the hint to
+      // the column name and read "LogAttributes.user.tier" (matching the Add filter path),
+      // not the friendly hint label "log attributes.user.tier".
+      expect(await screen.findByText('LogAttributes.user.tier')).toBeInTheDocument();
+      expect(screen.queryByText('log attributes.user.tier')).not.toBeInTheDocument();
+    } finally {
+      mockDs.getSignalType = originalGetSignalType;
+      mockDs.isSingleTableMode = originalIsSingleTableMode;
+    }
   });
 
   it('renders TableQueryBuilder when queryType is Table', () => {
