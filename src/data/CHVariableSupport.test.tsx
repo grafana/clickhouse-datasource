@@ -1,7 +1,7 @@
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { firstValueFrom } from 'rxjs';
-import { DataQueryRequest, DataQueryResponse } from '@grafana/data';
+import { DataQueryRequest, DataQueryResponse, FieldType } from '@grafana/data';
 import {
   CHVariableQuery,
   CHVariableQueryType,
@@ -279,6 +279,21 @@ describe('VariableQueryEditor', () => {
 });
 
 describe('CHVariableSupport', () => {
+  type RawMetricValue = { text: unknown; value?: unknown };
+  const runWith = async (values: RawMetricValue[]): Promise<DataQueryResponse> => {
+    const datasource = buildDatasource({
+      metricFindQuery: jest.fn(() => Promise.resolve(values)) as unknown as Datasource['metricFindQuery'],
+    });
+    const support = new CHVariableSupport(datasource);
+    const request = {
+      targets: [{ refId: 'v', queryType: 'sql' as CHVariableQueryType, rawSql: 'SELECT x' }],
+      range: { from: new Date(), to: new Date() },
+    };
+    return (await firstValueFrom(
+      support.query(request as unknown as DataQueryRequest<CHVariableQuery>)
+    )) as DataQueryResponse;
+  };
+
   it('returns an empty frame when no rawSql is present', async () => {
     const datasource = buildDatasource();
     const support = new CHVariableSupport(datasource);
@@ -316,8 +331,10 @@ describe('CHVariableSupport', () => {
     const frame = response.data[0];
     expect(frame.fields).toHaveLength(2);
     expect(frame.fields[0].name).toBe('text');
+    expect(frame.fields[0].type).toBe(FieldType.string);
     expect(frame.fields[0].values).toEqual(['foo', 'bar']);
     expect(frame.fields[1].name).toBe('value');
+    expect(frame.fields[1].type).toBe(FieldType.string);
     expect(frame.fields[1].values).toEqual(['foo', 'bar']);
   });
 
@@ -359,6 +376,48 @@ describe('CHVariableSupport', () => {
       expect.objectContaining({ range: expect.any(Object) })
     );
     expect(response.data[0].fields[0].values).toEqual(['foo', 'bar']);
+  });
+
+  it('types numeric-looking string values as string so the variable resolves', async () => {
+    const response = await runWith([{ text: '1783512125' }, { text: '1783511702' }]);
+    const frame = response.data[0];
+    expect(frame.fields[0].type).toBe(FieldType.string);
+    expect(frame.fields[1].type).toBe(FieldType.string);
+    expect(frame.fields[0].values).toEqual(['1783512125', '1783511702']);
+    expect(frame.fields[1].values).toEqual(['1783512125', '1783511702']);
+  });
+
+  it('stringifies numeric values and types them as string', async () => {
+    const response = await runWith([{ text: 200 }, { text: 404 }]);
+    const frame = response.data[0];
+    expect(frame.fields[0].type).toBe(FieldType.string);
+    expect(frame.fields[1].type).toBe(FieldType.string);
+    expect(frame.fields[0].values).toEqual(['200', '404']);
+    expect(frame.fields[1].values).toEqual(['200', '404']);
+  });
+
+  it('keeps ordinary string values string-typed', async () => {
+    const response = await runWith([{ text: 'foo' }, { text: 'bar' }]);
+    const frame = response.data[0];
+    expect(frame.fields[0].type).toBe(FieldType.string);
+    expect(frame.fields[1].type).toBe(FieldType.string);
+    expect(frame.fields[0].values).toEqual(['foo', 'bar']);
+    expect(frame.fields[1].values).toEqual(['foo', 'bar']);
+  });
+
+  it('preserves an explicit value of 0 (nullish fallback, not falsy) and stringifies it', async () => {
+    const response = await runWith([{ text: 'Zero', value: 0 }]);
+    const frame = response.data[0];
+    expect(frame.fields[0].values).toEqual(['Zero']);
+    expect(frame.fields[1].values).toEqual(['0']);
+  });
+
+  it('passes null values through without turning them into the string "null"', async () => {
+    const response = await runWith([{ text: null }]);
+    const frame = response.data[0];
+    expect(frame.fields[0].type).toBe(FieldType.string);
+    expect(frame.fields[0].values).toEqual([null]);
+    expect(frame.fields[1].values).toEqual([null]);
   });
 });
 
