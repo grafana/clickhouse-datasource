@@ -51,4 +51,15 @@ describe('getFilterDisplayName', () => {
     } as Filter;
     expect(getFilterDisplayName(filter, selectedColumns)).toBe('SeverityText');
   });
+
+  it('resolves trace attribute columns to their names (traces use TraceTags/TraceServiceTags hints)', () => {
+    const traceColumns: SelectedColumn[] = [
+      { name: 'SpanAttributes', hint: ColumnHint.TraceTags },
+      { name: 'ResourceAttributes', hint: ColumnHint.TraceServiceTags },
+    ];
+    const spanFilter = mapKeyFilter({ key: '', hint: ColumnHint.TraceTags, mapKey: 'http.method' });
+    const resourceFilter = mapKeyFilter({ key: '', hint: ColumnHint.TraceServiceTags, mapKey: 'service.name' });
+    expect(getFilterDisplayName(spanFilter, traceColumns)).toBe('SpanAttributes.http.method');
+    expect(getFilterDisplayName(resourceFilter, traceColumns)).toBe('ResourceAttributes.service.name');
+  });
 });
