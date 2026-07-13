@@ -3,7 +3,7 @@ import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Button, Tooltip, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
-import { Filter, TableColumn } from 'types/queryBuilder';
+import { Filter, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { FilterPopover } from './FilterPopover';
 import { FilterTagBar } from './FilterTagBar';
 
@@ -13,6 +13,7 @@ interface CompactFilterBarProps {
   table: string;
   filters: Filter[];
   allColumns: readonly TableColumn[];
+  selectedColumns?: readonly SelectedColumn[];
   onFiltersChange: (filters: Filter[]) => void;
   onToggleAdvanced?: () => void;
   advancedOpen?: boolean;
@@ -44,7 +45,17 @@ const getStyles = (theme: GrafanaTheme2) => ({
 });
 
 export const CompactFilterBar = (props: CompactFilterBarProps) => {
-  const { datasource, database, table, filters, allColumns, onFiltersChange, onToggleAdvanced, advancedOpen } = props;
+  const {
+    datasource,
+    database,
+    table,
+    filters,
+    allColumns,
+    selectedColumns,
+    onFiltersChange,
+    onToggleAdvanced,
+    advancedOpen,
+  } = props;
   const styles = useStyles2(getStyles);
   const [showPopover, setShowPopover] = useState(false);
 
@@ -60,7 +71,7 @@ export const CompactFilterBar = (props: CompactFilterBarProps) => {
     <div data-testid="compact-filter-bar">
       <div className={styles.row}>
         <div className={styles.filters}>
-          <FilterTagBar filters={filters} onRemoveFilter={onRemoveFilter} />
+          <FilterTagBar filters={filters} selectedColumns={selectedColumns} onRemoveFilter={onRemoveFilter} />
           <Button icon="plus" variant="secondary" size="sm" fill="text" onClick={() => setShowPopover(!showPopover)}>
             Add filter
           </Button>
