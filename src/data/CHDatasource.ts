@@ -1774,8 +1774,17 @@ export class Datasource
   private async canUseAdhocFilters(): Promise<AdHocFilterStatus> {
     this.skipAdHocFilter = true;
     const data = await this.fetchData(`SELECT version()`);
+    const versionValue = data[0];
+    if (typeof versionValue !== 'string') {
+      // `SELECT version()` occasionally returns no rows (e.g. a transient/racey
+      // empty response right after Grafana loads). Leaving the status
+      // unresolved lets it be re-checked on the next query instead of throwing
+      // and breaking variable/template loading. See #1061.
+      console.warn('Unable to determine ClickHouse version: empty version() response');
+      return AdHocFilterStatus.none;
+    }
     try {
-      const verString = (data[0] as unknown as string).split('.');
+      const verString = versionValue.split('.');
       const ver = { major: Number.parseInt(verString[0], 10), minor: Number.parseInt(verString[1], 10) };
       return ver.major > this.adHocCHVerReq.major ||
         (ver.major === this.adHocCHVerReq.major && ver.minor >= this.adHocCHVerReq.minor)
@@ -1783,7 +1792,7 @@ export class Datasource
         : AdHocFilterStatus.disabled;
     } catch (err) {
       console.error(`Unable to parse ClickHouse version: ${err}`);
-      throw err;
+      return AdHocFilterStatus.none;
     }
   }
 
