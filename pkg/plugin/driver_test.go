@@ -832,3 +832,56 @@ func TestMissingTableMacroIsDownstream(t *testing.T) {
 	require.Error(t, got.Error)
 	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }
+
+func TestBuildConnectionAddresses(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		port     int64
+		expected []string
+	}{
+		{
+			name:     "single host uses shared port",
+			host:     "localhost",
+			port:     9000,
+			expected: []string{"localhost:9000"},
+		},
+		{
+			name:     "comma-separated hosts share port",
+			host:     "ch1,ch2,ch3",
+			port:     9000,
+			expected: []string{"ch1:9000", "ch2:9000", "ch3:9000"},
+		},
+		{
+			name:     "whitespace around hosts is trimmed",
+			host:     " ch1 , ch2 ",
+			port:     9000,
+			expected: []string{"ch1:9000", "ch2:9000"},
+		},
+		{
+			name:     "per-host port overrides shared port",
+			host:     "ch1:9001,ch2",
+			port:     9000,
+			expected: []string{"ch1:9001", "ch2:9000"},
+		},
+		{
+			name:     "empty entries are skipped",
+			host:     "ch1,,ch2,",
+			port:     9000,
+			expected: []string{"ch1:9000", "ch2:9000"},
+		},
+		{
+			name:     "bracketed IPv6 with port is preserved",
+			host:     "[::1]:9000,ch2",
+			port:     9440,
+			expected: []string{"[::1]:9000", "ch2:9440"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := buildConnectionAddresses(tt.host, tt.port)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
