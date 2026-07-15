@@ -1,4 +1,11 @@
-import otel, { defaultLogsTable, defaultTraceTable, getLatestVersion, getVersion, versions } from 'otel';
+import otel, {
+  defaultLogsTable,
+  defaultTraceTable,
+  detectLogsVersion,
+  getLatestVersion,
+  getVersion,
+  versions,
+} from 'otel';
 import { ColumnHint } from 'types/queryBuilder';
 
 describe('otel versions', () => {
@@ -61,6 +68,24 @@ describe('otel trace schema (unchanged in v0.151.0)', () => {
     expect(Array.from(v130.traceColumnMap.entries())).toEqual(Array.from(v129.traceColumnMap.entries()));
     expect(v130.traceTable).toBe(v129.traceTable);
     expect(v130.traceTable).toBe(defaultTraceTable);
+  });
+});
+
+describe('detectLogsVersion', () => {
+  it('picks the 1.29.0 schema when the table has a TimestampTime column', () => {
+    const detected = detectLogsVersion(['Timestamp', 'TimestampTime', 'Body', 'SeverityText']);
+    expect(detected.version).toBe('1.29.0');
+    expect(detected.logColumnMap.get(ColumnHint.FilterTime)).toBe('TimestampTime');
+  });
+
+  it('picks the 1.30.0 schema when the table has no TimestampTime column', () => {
+    const detected = detectLogsVersion(['Timestamp', 'Body', 'SeverityText']);
+    expect(detected.version).toBe('1.30.0');
+    expect(detected.logColumnMap.has(ColumnHint.FilterTime)).toBe(false);
+  });
+
+  it('falls back to the 1.30.0 schema for an empty column list', () => {
+    expect(detectLogsVersion([]).version).toBe('1.30.0');
   });
 });
 
