@@ -19,7 +19,7 @@ jobs:
     # Intentionally pinned to @main: data-sources-ci-workflows does not
     # publish versioned tags for this workflow yet. Allowed by the zizmor
     # policy (`grafana/*: any`); review periodically.
-    uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@main
+    uses: grafana/data-sources-ci-workflows/.github/workflows/playwright-cloud.yml@114cbb9613108e37d1b44789a8277118b48d48d0 # main
     secrets: inherit
     permissions:
       contents: read
