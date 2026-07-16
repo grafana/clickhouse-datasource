@@ -589,55 +589,73 @@ func TestMissingTableMacroIsDownstream(t *testing.T) {
 	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }
 
-func TestBuildConnectionAddresses(t *testing.T) {
+func TestConnectionAddresses(t *testing.T) {
 	tests := []struct {
 		name     string
-		host     string
-		port     int64
+		settings Settings
 		expected []string
 	}{
 		{
-			name:     "single host uses shared port",
-			host:     "localhost",
-			port:     9000,
+			name:     "single host falls back to Host/Port",
+			settings: Settings{Host: "localhost", Port: 9000},
 			expected: []string{"localhost:9000"},
 		},
 		{
-			name:     "comma-separated hosts share port",
-			host:     "ch1,ch2,ch3",
-			port:     9000,
+			name: "hosts share the top-level port",
+			settings: Settings{
+				Port:  9000,
+				Hosts: []HostAddress{{Host: "ch1"}, {Host: "ch2"}, {Host: "ch3"}},
+			},
 			expected: []string{"ch1:9000", "ch2:9000", "ch3:9000"},
 		},
 		{
-			name:     "whitespace around hosts is trimmed",
-			host:     " ch1 , ch2 ",
-			port:     9000,
-			expected: []string{"ch1:9000", "ch2:9000"},
-		},
-		{
-			name:     "per-host port overrides shared port",
-			host:     "ch1:9001,ch2",
-			port:     9000,
+			name: "per-host port overrides the shared port",
+			settings: Settings{
+				Port:  9000,
+				Hosts: []HostAddress{{Host: "ch1", Port: 9001}, {Host: "ch2"}},
+			},
 			expected: []string{"ch1:9001", "ch2:9000"},
 		},
 		{
-			name:     "empty entries are skipped",
-			host:     "ch1,,ch2,",
-			port:     9000,
-			expected: []string{"ch1:9000", "ch2:9000"},
+			name: "hosts take precedence over Host/Port",
+			settings: Settings{
+				Host:  "legacy",
+				Port:  9000,
+				Hosts: []HostAddress{{Host: "ch1", Port: 9440}},
+			},
+			expected: []string{"ch1:9440"},
 		},
 		{
-			name:     "bracketed IPv6 with port is preserved",
-			host:     "[::1]:9000,ch2",
-			port:     9440,
+			name: "IPv6 hosts are bracketed by the caller",
+			settings: Settings{
+				Port:  9440,
+				Hosts: []HostAddress{{Host: "[::1]", Port: 9000}, {Host: "ch2"}},
+			},
 			expected: []string{"[::1]:9000", "ch2:9440"},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := buildConnectionAddresses(tt.host, tt.port)
+			got := connectionAddresses(tt.settings)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+// The TLS config is handed to clickhouse-go once and reused for every address
+// it dials, so pinning ServerName would break verification on all but one host.
+// crypto/tls infers the name per connection from the address instead.
+func TestGetTLSConfigLeavesServerNameUnset(t *testing.T) {
+	tlsConfig, err := getTLSConfig(Settings{
+		Host: "ch1",
+		Port: 9000,
+		Hosts: []HostAddress{
+			{Host: "ch1"},
+			{Host: "ch2"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, tlsConfig.ServerName)
 }
