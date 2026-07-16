@@ -40,9 +40,42 @@ type grafanaHeaders struct {
 	RuleUID      string
 }
 
+// enforcedSettingsCtxKeyType is the key type for storing the enforced
+// clickhouse.Settings in the context, used by tests to verify attachment.
+type enforcedSettingsCtxKeyType struct{}
+
+var enforcedSettingsCtxKey = enforcedSettingsCtxKeyType{}
+
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct {
-	SchemaDatasource *schemas.SchemaDatasource
+	SchemaDatasource   *schemas.SchemaDatasource
+	enforceReadOnly    bool
+	enforcedChSettings clickhouse.Settings // pre-built at instance creation; nil when empty
+}
+
+// buildEnforcedChSettings constructs the clickhouse.Settings map that must be
+// injected on every query when enforced settings or readonly=1 are configured.
+// Returns nil when neither applies. Never mutate the returned map.
+func buildEnforcedChSettings(s Settings) clickhouse.Settings {
+	m := s.enforcedSettings()
+	if !s.shouldForceReadOnly() && len(m) == 0 {
+		return nil
+	}
+	cs := make(clickhouse.Settings, len(m)+1)
+	for k, v := range m {
+		cs[k] = v
+	}
+	if s.shouldForceReadOnly() {
+		cs["readonly"] = uint8(1)
+	}
+	return cs
+}
+
+// enforcedSettingsFromContext returns the enforced clickhouse.Settings stored
+// in ctx by MutateQuery. Returns nil when none were attached. Used by tests.
+func enforcedSettingsFromContext(ctx context.Context) clickhouse.Settings {
+	s, _ := ctx.Value(enforcedSettingsCtxKey).(clickhouse.Settings)
+	return s
 }
 
 // getTLSConfig returns tlsConfig from settings
@@ -198,7 +231,9 @@ func (h *Clickhouse) Connect(
 	customSettings := make(clickhouse.Settings)
 	if settings.CustomSettings != nil {
 		for _, setting := range settings.CustomSettings {
-			customSettings[setting.Setting] = setting.Value
+			if !setting.Enforced {
+				customSettings[setting.Setting] = setting.Value
+			}
 		}
 	}
 
@@ -305,8 +340,18 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 	return sqlds.Macros{}
 }
 
-// MutateQueryError marks ClickHouse errors as downstream errors
+// MutateQueryError marks ClickHouse errors as downstream errors.
+// When EnforceReadOnly is active, READONLY errors (code 164) are rewritten
+// with a friendlier message explaining that readonly=1 is enforced.
 func (h *Clickhouse) MutateQueryError(err error) backend.ErrorWithSource {
+	var ex *clickhouse.Exception
+	if errors.As(err, &ex) && ex.Code == 164 && h.enforceReadOnly {
+		friendly := fmt.Sprintf(
+			"query rejected: this datasource enforces server-side ClickHouse settings and runs queries under readonly=1; "+
+				"SET/SETTINGS clauses that change server settings are not allowed. Original error: %s", err)
+		combined := errors.Join(errors.New(friendly), err)
+		return backend.NewErrorWithSource(combined, backend.ErrorSourceDownstream)
+	}
 	// Check if any error in the error chain (including multi-errors) is a clickhouse.Exception
 	if containsClickHouseException(err) {
 		return backend.NewErrorWithSource(err, backend.ErrorSourceDownstream)
@@ -502,6 +547,15 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 	))
 
 	defer span.End()
+
+	// Attach enforced settings (including readonly=1 when configured) to the
+	// query context so the clickhouse-go driver sends them per query, after
+	// the user's SQL is parsed. This means ClickHouse enforces readonly before
+	// it can parse any SETTINGS / SET clauses in the user's SQL.
+	if len(h.enforcedChSettings) > 0 {
+		ctx = clickhouse.Context(ctx, clickhouse.WithSettings(h.enforcedChSettings))
+		ctx = context.WithValue(ctx, enforcedSettingsCtxKey, h.enforcedChSettings)
+	}
 
 	comments := make([]string, 0, 4)
 

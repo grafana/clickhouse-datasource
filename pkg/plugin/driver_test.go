@@ -578,3 +578,193 @@ func TestMissingTableMacroIsDownstream(t *testing.T) {
 	require.Error(t, got.Error)
 	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2: enforced settings helpers
+// ---------------------------------------------------------------------------
+
+func TestEnforcedSettings(t *testing.T) {
+	t.Run("one enforced setting returns it in the map", func(t *testing.T) {
+		s := Settings{
+			CustomSettings: []CustomSetting{
+				{Setting: "custom_tenant", Value: "t1", Enforced: true},
+			},
+			EnforceReadOnly: true,
+		}
+		got := s.enforcedSettings()
+		require.NotNil(t, got)
+		assert.Equal(t, clickhouse.CustomSetting{Value: "t1"}, got["custom_tenant"])
+		assert.Len(t, got, 1)
+	})
+
+	t.Run("non-enforced entries are absent", func(t *testing.T) {
+		s := Settings{
+			CustomSettings: []CustomSetting{
+				{Setting: "advisory", Value: "x", Enforced: false},
+				{Setting: "custom_tenant", Value: "t1", Enforced: true},
+			},
+			EnforceReadOnly: true,
+		}
+		got := s.enforcedSettings()
+		assert.NotContains(t, got, "advisory")
+		assert.Contains(t, got, "custom_tenant")
+	})
+
+	t.Run("no enforced entries returns nil", func(t *testing.T) {
+		s := Settings{
+			CustomSettings: []CustomSetting{
+				{Setting: "advisory", Value: "x"},
+			},
+			EnforceReadOnly: false,
+		}
+		assert.Nil(t, s.enforcedSettings())
+	})
+}
+
+func TestShouldForceReadOnly(t *testing.T) {
+	t.Run("EnforceReadOnly true with no enforced settings", func(t *testing.T) {
+		s := Settings{EnforceReadOnly: true}
+		assert.True(t, s.shouldForceReadOnly())
+		assert.Nil(t, s.enforcedSettings())
+	})
+
+	t.Run("enforced setting auto-enables shouldForceReadOnly", func(t *testing.T) {
+		s := Settings{
+			CustomSettings: []CustomSetting{
+				{Setting: "custom_tenant", Value: "t1", Enforced: true},
+			},
+			EnforceReadOnly: true, // set by Phase 1 load logic
+		}
+		assert.True(t, s.shouldForceReadOnly())
+	})
+
+	t.Run("no enforced settings and EnforceReadOnly false", func(t *testing.T) {
+		s := Settings{}
+		assert.False(t, s.shouldForceReadOnly())
+		assert.Nil(t, s.enforcedSettings())
+	})
+
+	t.Run("non-enforced settings do not trigger shouldForceReadOnly", func(t *testing.T) {
+		s := Settings{
+			CustomSettings: []CustomSetting{
+				{Setting: "advisory", Value: "x", Enforced: false},
+			},
+		}
+		assert.False(t, s.shouldForceReadOnly())
+	})
+}
+
+func TestBuildEnforcedChSettings(t *testing.T) {
+	t.Run("enforced setting + readonly=1 included", func(t *testing.T) {
+		s := Settings{
+			CustomSettings:  []CustomSetting{{Setting: "custom_tenant", Value: "t1", Enforced: true}},
+			EnforceReadOnly: true,
+		}
+		got := buildEnforcedChSettings(s)
+		require.NotNil(t, got)
+		assert.Equal(t, clickhouse.CustomSetting{Value: "t1"}, got["custom_tenant"])
+		assert.Equal(t, uint8(1), got["readonly"])
+	})
+
+	t.Run("EnforceReadOnly only (no custom enforced) includes readonly=1", func(t *testing.T) {
+		s := Settings{EnforceReadOnly: true}
+		got := buildEnforcedChSettings(s)
+		require.NotNil(t, got)
+		assert.Equal(t, uint8(1), got["readonly"])
+		assert.Len(t, got, 1)
+	})
+
+	t.Run("neither flag returns nil", func(t *testing.T) {
+		s := Settings{}
+		assert.Nil(t, buildEnforcedChSettings(s))
+	})
+
+	t.Run("non-enforced settings are absent from the map", func(t *testing.T) {
+		s := Settings{
+			CustomSettings: []CustomSetting{
+				{Setting: "advisory", Value: "x", Enforced: false},
+			},
+			EnforceReadOnly: true,
+		}
+		got := buildEnforcedChSettings(s)
+		assert.NotContains(t, got, "advisory")
+	})
+}
+
+func TestEnforcedSettingsContextAttachment(t *testing.T) {
+	t.Run("MutateQuery attaches enforced settings to context", func(t *testing.T) {
+		s := Settings{
+			CustomSettings:  []CustomSetting{{Setting: "custom_tenant", Value: "t1", Enforced: true}},
+			EnforceReadOnly: true,
+		}
+		h := &Clickhouse{
+			enforceReadOnly:    s.EnforceReadOnly,
+			enforcedChSettings: buildEnforcedChSettings(s),
+		}
+
+		newCtx, _ := h.MutateQuery(t.Context(), backend.DataQuery{JSON: []byte(`{}`)})
+
+		got := enforcedSettingsFromContext(newCtx)
+		require.NotNil(t, got)
+		assert.Equal(t, clickhouse.CustomSetting{Value: "t1"}, got["custom_tenant"])
+		assert.Equal(t, uint8(1), got["readonly"])
+	})
+
+	t.Run("no enforced settings leaves context clean", func(t *testing.T) {
+		h := &Clickhouse{}
+		newCtx, _ := h.MutateQuery(t.Context(), backend.DataQuery{JSON: []byte(`{}`)})
+		assert.Nil(t, enforcedSettingsFromContext(newCtx))
+	})
+}
+
+func TestMutateQueryError_ReadOnly(t *testing.T) {
+	ex164 := &clickhouse.Exception{Code: 164, Message: "cannot execute query in readonly mode"}
+
+	t.Run("code 164 with EnforceReadOnly=true returns friendly DownstreamError", func(t *testing.T) {
+		h := &Clickhouse{enforceReadOnly: true}
+		result := h.MutateQueryError(ex164)
+
+		assert.True(t, backend.IsDownstreamError(result))
+		assert.Contains(t, result.Error(), "query rejected")
+		assert.Contains(t, result.Error(), "readonly=1")
+		assert.Contains(t, result.Error(), ex164.Error())
+
+		// original exception still accessible in chain
+		var got *clickhouse.Exception
+		assert.True(t, errors.As(result, &got))
+		assert.Equal(t, int32(164), got.Code)
+	})
+
+	t.Run("code 164 with EnforceReadOnly=false is NOT rewritten", func(t *testing.T) {
+		h := &Clickhouse{enforceReadOnly: false}
+		result := h.MutateQueryError(ex164)
+
+		assert.True(t, backend.IsDownstreamError(result))
+		assert.Equal(t, ex164.Error(), result.Error())
+	})
+
+	t.Run("non-164 exception is not rewritten", func(t *testing.T) {
+		ex60 := &clickhouse.Exception{Code: 60, Message: "Unknown table"}
+		h := &Clickhouse{enforceReadOnly: true}
+		result := h.MutateQueryError(ex60)
+
+		assert.True(t, backend.IsDownstreamError(result))
+		assert.Equal(t, ex60.Error(), result.Error())
+	})
+
+	t.Run("non-clickhouse error is plugin error", func(t *testing.T) {
+		h := &Clickhouse{enforceReadOnly: true}
+		err := errors.New("connection timeout")
+		result := h.MutateQueryError(err)
+		assert.False(t, backend.IsDownstreamError(result))
+	})
+
+	t.Run("wrapped 164 exception with EnforceReadOnly=true is rewritten", func(t *testing.T) {
+		h := &Clickhouse{enforceReadOnly: true}
+		wrapped := fmt.Errorf("query failed: %w", ex164)
+		result := h.MutateQueryError(wrapped)
+
+		assert.True(t, backend.IsDownstreamError(result))
+		assert.Contains(t, result.Error(), "query rejected")
+	})
+}

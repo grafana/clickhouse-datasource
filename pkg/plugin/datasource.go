@@ -27,7 +27,12 @@ func (i *clickhouseInstance) Dispose() {
 
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	clickhousePlugin := Clickhouse{}
+	if s, err := LoadSettings(ctx, settings); err == nil {
+		clickhousePlugin.enforceReadOnly = s.EnforceReadOnly
+		clickhousePlugin.enforcedChSettings = buildEnforcedChSettings(s)
+	}
 	ds := sqlds.NewDatasource(&clickhousePlugin)
+
 	// Replace sqlds's default sqlutil.Interpolate pipeline with the
 	// macropro-backed interpolator; see interpolateMacros in driver.go.
 	ds.Interpolator = interpolateMacros
