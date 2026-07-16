@@ -13,20 +13,36 @@ on:
     - cron: '0 9 1 * *'
 
 jobs:
+  versions:
+    name: Get supported ClickHouse versions
+    permissions: {}
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.parse.outputs.versions }}
+    steps:
+      - name: Parse supported versions from the ClickHouse security policy
+        id: parse
+        run: |
+          versions=$(curl -sSf --retry 3 https://raw.githubusercontent.com/ClickHouse/ClickHouse/master/SECURITY.md \
+            | sed -nE 's/^\| ([0-9]+\.[0-9]+) \| ✔️ \|$/\1/p' \
+            | sort -t. -k1,1n -k2,2n \
+            | jq -R . | jq -sc '. + ["latest"]')
+          if [ "$versions" = '["latest"]' ]; then
+            echo 'No supported versions found in SECURITY.md, the table format may have changed' >&2
+            exit 1
+          fi
+          echo "Testing against ClickHouse versions: $versions"
+          echo "versions=$versions" >> "$GITHUB_OUTPUT"
+
   run:
+    needs: versions
     permissions:
       contents: read
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
       matrix:
-        clickhouse:
-          - 24.8
-          - 25.3
-          - 25.5
-          - 25.6
-          - 25.7
-          - latest
+        clickhouse: ${{ fromJSON(needs.versions.outputs.versions) }}
 
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7

@@ -3,6 +3,7 @@ import {
   CustomVariableSupport,
   DataQueryRequest,
   DataQueryResponse,
+  FieldType,
   MetricFindValue,
   QueryEditorProps,
   toDataFrame,
@@ -233,6 +234,16 @@ export const VariableQueryEditor = (props: EditorProps) => {
 };
 
 /**
+ * Coerce a metric-find value into a string for a template variable option,
+ * preserving null/undefined as null (not the literal string "null"). Variable
+ * options are always strings, so this keeps the emitted DataFrame fields
+ * string-typed whether the query returned numbers or numeric-looking strings.
+ */
+function toVariableString(value: unknown): string | null {
+  return value == null ? null : String(value);
+}
+
+/**
  * CustomVariableSupport binding. Registers the guided editor and runs the
  * resolved `rawSql` through the existing `metricFindQuery` path so all the
  * macro expansion (template variables, time filter, ad-hoc filters) stays in
@@ -261,12 +272,16 @@ export class CHVariableSupport extends CustomVariableSupport<Datasource, CHVaria
       .then((values: MetricFindValue[]) => ({
         // Emit text and value separately so a `SELECT value, label` query
         // substitutes the value while displaying the label. Fall back to text
-        // when the query returns a single column.
+        // when the query returns a single column. Force string typing:
+        // metricFindQuery yields raw column values (numbers, or numeric-looking
+        // strings like toString(toUnixTimestamp(...))), and an untyped
+        // toDataFrame would guess FieldType.number, which makes Grafana's
+        // toMetricFindValues fail to resolve the variable.
         data: [
           toDataFrame({
             fields: [
-              { name: 'text', values: values.map((v) => v.text) },
-              { name: 'value', values: values.map((v) => v.value ?? v.text) },
+              { name: 'text', type: FieldType.string, values: values.map((v) => toVariableString(v.text)) },
+              { name: 'value', type: FieldType.string, values: values.map((v) => toVariableString(v.value ?? v.text)) },
             ],
           }),
         ],

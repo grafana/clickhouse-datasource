@@ -5,6 +5,11 @@
 ### Features
 
 - Add `1.3.0` OTel schema version to support `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0`+, which removed the `TimestampTime` column from `otel_logs`. The `latest` selector now points to this schema; existing data sources continue to use `1.2.9` until manually updated (#1882)
+- Auto-detect the OTel logs schema version from the table's columns when the version selector is on `auto (latest)`, removing the manual version pick for the common case. Pinned versions are unchanged (#1900)
+
+### Fixes
+
+- Fix dashboard query variables that return numeric or numeric-looking string values (for example `toString(toUnixTimestamp(...))`) failing to resolve with "Couldn't find any field of type string in the results" (#2021)
 
 ## 4.19.0
 

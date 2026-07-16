@@ -49,6 +49,48 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
+  it('uses bracket access for a Map map-key filter and dot access for a JSON map-key filter', () => {
+    const mapOpts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_logs',
+      queryType: QueryType.Table,
+      columns: [{ name: 'Body', type: 'String' }],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'method',
+          type: 'Map(String, String)',
+          condition: 'AND',
+          operator: FilterOperator.Equals,
+          value: 'F',
+        },
+      ],
+      orderBy: [],
+    };
+    const mapSql = generateSql(mapOpts);
+    expect(mapSql).toContain("LogAttributes['method'] = 'F'");
+    expect(mapSql).not.toContain('LogAttributes.`method`');
+
+    const jsonOpts: QueryBuilderOptions = {
+      ...mapOpts,
+      filters: [
+        {
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'method',
+          type: 'JSON',
+          condition: 'AND',
+          operator: FilterOperator.Equals,
+          value: 'F',
+        },
+      ],
+    };
+    const jsonSql = generateSql(jsonOpts);
+    expect(jsonSql).toContain('LogAttributes.`method`');
+  });
+
   it('generates aggregate table query', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
