@@ -407,3 +407,74 @@ func TestLoadSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadSettingsHosts(t *testing.T) {
+	t.Run("parses hosts with per-node and shared ports", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "ch1"}, {"host": "ch2", "port": 9440}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1"}, {Host: "ch2", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("accepts a port given as a string", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "ch1", "port": "9440"}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("trims whitespace and skips entries without a host", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "  ch1  "}, {"host": "   "}, {"port": 9440}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1"}}, settings.Hosts)
+	})
+
+	t.Run("existing host/port configs keep working untouched", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "ch1", "port": 9000}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Empty(t, settings.Hosts)
+		assert.Equal(t, "ch1", settings.Host)
+		assert.Equal(t, int64(9000), settings.Port)
+	})
+
+	t.Run("hosts alone satisfy validation without host/port", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1", "port": 9000}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("a host without any port is rejected", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1"}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.NotNil(t, err)
+	})
+
+	t.Run("a malformed hosts value is reported, not panicked on", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": "ch1,ch2"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.NotNil(t, err)
+	})
+}
