@@ -1,12 +1,11 @@
 module github.com/grafana/clickhouse-datasource
 
 go 1.26.4
-go 1.26.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.47.0
 	github.com/docker/go-units v0.5.0
-	github.com/grafana/dsconfig/schema v0.0.8
+	github.com/grafana/dsconfig/schema v0.0.12
 	github.com/grafana/grafana-plugin-sdk-go v0.292.2
 	github.com/grafana/macropro v1.0.0
 	github.com/grafana/sqlds/v5 v5.3.0
@@ -78,6 +77,7 @@ require (
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.69.0 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.37.1 // indirect
+	go.yaml.in/yaml/v2 v2.4.4 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	k8s.io/kube-openapi v0.0.0-20260706235625-cdb1db5517a0 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect

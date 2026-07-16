@@ -147,6 +147,10 @@ github.com/gopherjs/gopherjs v1.17.2 h1:fQnZVsXk8uxXIStYb0N4bGk7jeyTalG/wsZjQ25d
 github.com/gopherjs/gopherjs v1.17.2/go.mod h1:pRRIvn/QzFLrKfvEz3qUuEhtE/zLCWfreZ6J5gM2i+k=
 github.com/grafana/dataplane/sdata v0.0.9 h1:AGL1LZnCUG4MnQtnWpBPbQ8ZpptaZs14w6kE/MWfg7s=
 github.com/grafana/dataplane/sdata v0.0.9/go.mod h1:Jvs5ddpGmn6vcxT7tCTWAZ1mgi4sbcdFt9utQx5uMAU=
+github.com/grafana/dsconfig/dsconfig v0.0.8 h1:ctxD4/mLWSN2cxnib01Dy0PRbXnSbj5px6y5tpzJ8vE=
+github.com/grafana/dsconfig/dsconfig v0.0.8/go.mod h1:orwL9W2Ea8Wjubn0Vw1or/uolFDSKSFfc404G2xrvEc=
+github.com/grafana/dsconfig/schema v0.0.12 h1:WQFlKzJtACotG3fcNnU+RcnBMDXxgSAuAphkF2nlyz0=
+github.com/grafana/dsconfig/schema v0.0.12/go.mod h1:kBZ/uoNZw6QjYU/eCS2wdBckerbv7zTWLtgy+9Hm8LQ=
 github.com/grafana/grafana-plugin-sdk-go v0.292.2 h1:6xrNZpe905vzX1pY33Fyet7Oxw5xULcAHm2b8dvNZNY=
 github.com/grafana/grafana-plugin-sdk-go v0.292.2/go.mod h1:MPviZeixuZDc5T3f62FBCCPSOJ51/JocZH5+ZiQ1DmM=
 github.com/grafana/macropro v1.0.0 h1:R4/CgSgRrNQXpqk1JCHolg1/8Fz5g5CVW/C86AMz9Zw=
