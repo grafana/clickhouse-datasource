@@ -114,17 +114,17 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:               "test",
-					Port:               443,
-					Path:               "custom-path",
-					InsecureSkipVerify: true,
-					TlsClientAuth:      true,
-					TlsAuthWithCACert:  true,
-					ConnMaxLifetime:    "5",
-					DialTimeout:        "10",
-					MaxIdleConns:       "25",
-					MaxOpenConns:       "50",
-					QueryTimeout:       "60",
+					Host:                  "test",
+					Port:                  443,
+					Path:                  "custom-path",
+					InsecureSkipVerify:    true,
+					TlsClientAuth:         true,
+					TlsAuthWithCACert:     true,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
+					QueryTimeout:          "60",
 					ProxyOptions:          nil,
 					EnableRowLimit:        true,
 					RowLimit:              1000000,
@@ -143,12 +143,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "10",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "60",
 					RowLimit:              1000000,
 					EnableRowLimit:        true,
@@ -234,12 +234,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "15",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "15",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "120",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -257,12 +257,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "25",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "25",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "60",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -280,12 +280,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "10",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "60",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -467,5 +467,76 @@ func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.False(t, settings.OAuthPassThruAllowFallback)
+	})
+}
+
+func TestLoadSettingsHosts(t *testing.T) {
+	t.Run("parses hosts with per-node and shared ports", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "ch1"}, {"host": "ch2", "port": 9440}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1"}, {Host: "ch2", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("accepts a port given as a string", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "ch1", "port": "9440"}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("trims whitespace and skips entries without a host", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "  ch1  "}, {"host": "   "}, {"port": 9440}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1"}}, settings.Hosts)
+	})
+
+	t.Run("existing host/port configs keep working untouched", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "ch1", "port": 9000}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Empty(t, settings.Hosts)
+		assert.Equal(t, "ch1", settings.Host)
+		assert.Equal(t, int64(9000), settings.Port)
+	})
+
+	t.Run("hosts alone satisfy validation without host/port", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1", "port": 9000}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("a host without any port is rejected", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1"}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.NotNil(t, err)
+	})
+
+	t.Run("a malformed hosts value is reported, not panicked on", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": "ch1,ch2"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.NotNil(t, err)
 	})
 }
