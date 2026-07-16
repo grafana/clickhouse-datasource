@@ -1776,7 +1776,7 @@ export class Datasource
     const data = await this.fetchData(`SELECT version()`);
     const versionValue = data[0];
     if (typeof versionValue !== 'string') {
-      // `SELECT version()` occasionally returns no rows (e.g. a transient/racey
+      // `SELECT version()` occasionally returns no rows (e.g. a transient
       // empty response right after Grafana loads). Leaving the status
       // unresolved lets it be re-checked on the next query instead of throwing
       // and breaking variable/template loading. See #1061.
