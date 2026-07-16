@@ -13,10 +13,6 @@
       "valueType": "string",
       "target": "jsonData",
       "required": true,
-      "storage": {
-        "type": "computed",
-        "read": "jsonData.server"
-      },
       "ui": {
         "component": "input",
         "placeholder": "Enter server address"
