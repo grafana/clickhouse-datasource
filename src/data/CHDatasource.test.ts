@@ -127,6 +127,19 @@ describe('ClickHouseDatasource', () => {
 
       expect(querySpy).toHaveBeenCalledWith(expect.objectContaining({ scopedVars }));
     });
+
+    it('does not throw when SELECT version() returns no rows (#1061)', async () => {
+      const instance = cloneDeep(mockDatasource);
+      instance.adHocFiltersStatus = 0; // AdHocFilterStatus.none -> forces the CH version check
+      const metricFrame = toDataFrame({ fields: [{ name: 'field', type: 'string', values: ['a'] }] });
+      jest.spyOn(instance, 'query').mockImplementation((request) =>
+        request.targets[0].rawSql === 'SELECT version()'
+          ? of({ data: [toDataFrame([])] }) // empty version() response (transient / race)
+          : of({ data: [metricFrame] })
+      );
+
+      await expect(instance.metricFindQuery('SELECT 1', {})).resolves.toEqual([{ text: 'a', value: 'a' }]);
+    });
   });
 
   describe('applyTemplateVariables', () => {
