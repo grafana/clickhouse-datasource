@@ -1,27 +1,35 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import { QueryBuilder } from './QueryBuilder';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
+import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, QueryType, TimeUnit } from 'types/queryBuilder';
+import { BuilderMode, ColumnHint, FilterOperator, QueryType, TimeUnit } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 
 jest.mock('./views/TableQueryBuilder', () => ({
   TableQueryBuilder: () => <div data-testid="table-component" />,
 }));
 jest.mock('./views/LogsQueryBuilder', () => ({
-  LogsQueryBuilder: () => <div data-testid="logs-component" />,
+  LogsQueryBuilder: ({ builderOptions }: any) => (
+    <div data-testid="logs-component" data-database={builderOptions.database} data-table={builderOptions.table} />
+  ),
 }));
 jest.mock('./views/TimeSeriesQueryBuilder', () => ({
   TimeSeriesQueryBuilder: () => <div data-testid="time-series-component" />,
 }));
 jest.mock('./views/TraceQueryBuilder', () => ({
-  TraceQueryBuilder: () => <div data-testid="trace-component" />,
+  TraceQueryBuilder: ({ builderOptions }: any) => (
+    <div data-testid="trace-component" data-database={builderOptions.database} data-table={builderOptions.table} />
+  ),
 }));
 
 describe('QueryBuilder', () => {
   const setState = jest.fn();
   const mockDs = { settings: { jsonData: {} } } as Datasource;
 
+  mockDs.getSignalType = jest.fn(() => undefined);
+  mockDs.getConfigMode = jest.fn(() => 'classic');
+  mockDs.isSingleTableMode = jest.fn(() => false);
   mockDs.fetchDatabases = jest.fn(() => Promise.resolve([]));
   mockDs.fetchTables = jest.fn((_db?: string) => Promise.resolve([]));
   mockDs.getDefaultLogsColumns = jest.fn((_db?: string) => new Map());
@@ -39,9 +47,39 @@ describe('QueryBuilder', () => {
   mockDs.getDefaultTraceFlattenNested = jest.fn((_db?: string) => false);
   mockDs.getDefaultTraceEventsColumnPrefix = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceLinksColumnPrefix = jest.fn((_db?: string) => '');
+  mockDs.getTraceTimestampTableSuffix = jest.fn((_db?: string) => '_trace_id_ts');
+  mockDs.getLogContextColumnNames = jest.fn(() => []);
   mockDs.fetchColumns = jest.fn(() => {
     setState();
     return Promise.resolve([]);
+  });
+
+  it('omits compact time columns from filter column options', () => {
+    const filterColumns = getCompactFilterColumns(
+      [
+        { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+        { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+        { name: 'Body', type: 'String', picklistValues: [] },
+        { name: 'ingested_at', type: 'DateTime', picklistValues: [] },
+      ],
+      {
+        database: 'otel_v2',
+        table: 'otel_logs',
+        queryType: QueryType.Logs,
+        columns: [
+          { name: 'TimestampTime', hint: ColumnHint.FilterTime },
+          { name: 'Timestamp', hint: ColumnHint.Time },
+          { name: 'Body', hint: ColumnHint.LogMessage },
+        ],
+      }
+    );
+
+    expect(filterColumns.map((column) => column.name)).toEqual(['Body', 'ingested_at']);
+  });
+
+  it('maps configured signal types to compact modes', () => {
+    expect(getDefaultCompactMode('logs')).toBe('otel-logs');
+    expect(getDefaultCompactMode('traces')).toBe('otel-traces');
   });
 
   it('renders correctly', async () => {
@@ -64,6 +102,62 @@ describe('QueryBuilder', () => {
       )
     );
     expect(result.container.firstChild).not.toBeNull();
+  });
+
+  describe('compact filter chip label', () => {
+    let getSignalTypeSpy: jest.SpyInstance;
+    let isSingleTableModeSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      // Compact editor renders only when the datasource is single-table with a signal type.
+      getSignalTypeSpy = jest.spyOn(mockDs, 'getSignalType').mockReturnValue('logs' as any);
+      isSingleTableModeSpy = jest.spyOn(mockDs, 'isSingleTableMode').mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      getSignalTypeSpy.mockRestore();
+      isSingleTableModeSpy.mockRestore();
+    });
+
+    it('shows the raw attribute column name in the compact filter chip for a hinted "+" filter', async () => {
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={{
+            queryType: QueryType.Logs,
+            mode: BuilderMode.List,
+            database: 'otel_v2',
+            table: 'otel_logs',
+            columns: [
+              { name: 'Timestamp', hint: ColumnHint.Time },
+              { name: 'Body', hint: ColumnHint.LogMessage },
+              { name: 'LogAttributes', hint: ColumnHint.LogAttributes },
+            ],
+            filters: [
+              {
+                condition: 'AND',
+                filterType: 'custom',
+                key: '',
+                hint: ColumnHint.LogAttributes,
+                mapKey: 'user.tier',
+                type: 'Map(String, String)',
+                operator: FilterOperator.Equals,
+                value: 'basic',
+              } as any,
+            ],
+          }}
+          builderOptionsDispatch={() => {}}
+          datasource={mockDs}
+          generatedSql=""
+        />
+      );
+
+      // The log-view "+" stores { key: '', hint }, so the chip must resolve the hint to the
+      // column name and read "LogAttributes.user.tier" (matching the Add filter path), not the
+      // friendly hint label "log attributes.user.tier".
+      expect(await screen.findByText('LogAttributes.user.tier')).toBeInTheDocument();
+      expect(screen.queryByText('log attributes.user.tier')).not.toBeInTheDocument();
+    });
   });
 
   it('renders TableQueryBuilder when queryType is Table', () => {
@@ -150,5 +244,136 @@ describe('QueryBuilder', () => {
     await waitFor(() => {
       expect(screen.getByTestId('trace-component')).toBeInTheDocument();
     });
+  });
+
+  it('renders logs compact mode without database/table or query type selectors', async () => {
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'otel_logs'),
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['filter_time', 'TimestampTime'],
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => '1.29.0'),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+    } as unknown as Datasource;
+    const builderOptionsDispatch = jest.fn();
+    const onQueryChange = jest.fn();
+    const onEditAsSql = jest.fn();
+    const onRunQuery = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.Table,
+          mode: BuilderMode.List,
+          database: '',
+          table: '',
+          columns: [],
+          filters: [],
+        }}
+        builderOptionsDispatch={builderOptionsDispatch}
+        datasource={compactDs}
+        generatedSql=""
+        onQueryChange={onQueryChange}
+        onEditAsSql={onEditAsSql}
+        onRunQuery={onRunQuery}
+      />
+    );
+
+    expect(screen.getByTestId('compact-mode-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('compact-filter-bar')).toBeInTheDocument();
+    expect(screen.queryByText('Database')).not.toBeInTheDocument();
+    expect(screen.queryByText('Query Type')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Search log body text...'), { target: { value: 'error' } });
+    fireEvent.blur(screen.getByPlaceholderText('Search log body text...'));
+    expect(screen.getByRole('button', { name: 'Add filter' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Order by' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Open query history' })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }))
+    );
+    expect(onQueryChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        database: 'otel_v2',
+        table: 'otel_logs',
+        queryType: QueryType.Logs,
+      })
+    );
+    expect(onQueryChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meta: expect.objectContaining({ logMessageLike: 'error' }),
+      })
+    );
+    expect(onRunQuery).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Open in SQL editor' }));
+    expect(onEditAsSql).toHaveBeenCalledWith(
+      expect.objectContaining({
+        database: 'otel_v2',
+        table: 'otel_logs',
+        queryType: QueryType.Logs,
+      })
+    );
+  });
+
+  it('renders traces compact mode without database/table or query type selectors', async () => {
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'traces'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultTraceDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultTraceTable: jest.fn(() => 'otel_traces'),
+      getDefaultTraceColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['trace_id', 'TraceId'],
+            ['trace_span_id', 'SpanId'],
+          ])
+      ),
+      getTraceOtelVersion: jest.fn(() => '1.29.0'),
+      getDefaultTraceDurationUnit: jest.fn(() => TimeUnit.Nanoseconds),
+      getDefaultTraceFlattenNested: jest.fn(() => false),
+      getDefaultTraceEventsColumnPrefix: jest.fn(() => 'Events'),
+      getDefaultTraceLinksColumnPrefix: jest.fn(() => 'Links'),
+      getTraceTimestampTableSuffix: jest.fn(() => '_trace_id_ts'),
+    } as unknown as Datasource;
+    const builderOptionsDispatch = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.Logs,
+          mode: BuilderMode.List,
+          database: 'logs_db',
+          table: 'logs_table',
+          columns: [],
+          filters: [],
+        }}
+        builderOptionsDispatch={builderOptionsDispatch}
+        datasource={compactDs}
+        generatedSql=""
+      />
+    );
+
+    expect(screen.queryByTestId('compact-mode-bar')).not.toBeInTheDocument();
+    expect(screen.getByTestId('compact-filter-bar')).toBeInTheDocument();
+    expect(screen.queryByText('Database')).not.toBeInTheDocument();
+    expect(screen.queryByText('Query Type')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }))
+    );
   });
 });

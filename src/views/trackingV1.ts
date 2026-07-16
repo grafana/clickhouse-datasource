@@ -47,6 +47,7 @@ export const trackClickhouseConfigV1QuerySettings = (props: {
   maxIdleConns?: number;
   maxOpenConns?: number;
   connMaxLifetime?: number;
+  rowCapacityHint?: number;
   validateSql?: boolean;
   enableMapKeysDiscovery?: boolean;
 }) => {

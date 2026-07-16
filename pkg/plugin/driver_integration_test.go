@@ -1388,3 +1388,103 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		assert.Equal(t, nil, err)
 	})
 }
+
+// TestQueryDataMacroExpansion exercises the macropro-driven macro pipeline end to
+// end against a live ClickHouse: it goes through NewDatasource → sqlds.SQLDatasource.QueryData
+// rather than calling interpolateMacros directly, so it covers the bits the
+// unit tests cannot — that the macropro-backed sqlds.Interpolator is actually
+// installed, that the expanded rawSql executes, and that a macro error is
+// returned on the query response as a downstream error without touching the DB.
+func TestQueryDataMacroExpansion(t *testing.T) {
+	port := getEnv("CLICKHOUSE_PORT", "9000")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl := getEnv("CLICKHOUSE_SSL", "false")
+
+	ctx := context.Background()
+	ctx = backend.WithGrafanaConfig(ctx, backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+
+	settings := backend.DataSourceInstanceSettings{
+		JSONData:                []byte(fmt.Sprintf(`{"server":"%s","port":%s,"username":"%s","secure":%s}`, host, port, username, ssl)),
+		DecryptedSecureJSONData: map[string]string{"password": password},
+	}
+	dsInstance, err := NewDatasource(ctx, settings)
+	require.NoError(t, err)
+	// NewDatasource returns a *clickhouseInstance that embeds *sqlds.SQLDatasource
+	// (promoting QueryData), or the bare *sqlds.SQLDatasource on the defensive
+	// fallback path. Assert on the QueryDataHandler interface so either works.
+	ds, ok := dsInstance.(backend.QueryDataHandler)
+	require.True(t, ok)
+
+	// A 24h window centred on 2014-11-12T11:45:26Z so $__fromTime / $__toTime
+	// expand to known toDateTime() values that we can assert on.
+	from, _ := time.Parse(time.RFC3339, "2014-11-12T00:00:00Z")
+	to, _ := time.Parse(time.RFC3339, "2014-11-13T00:00:00Z")
+	timeRange := backend.TimeRange{From: from, To: to}
+
+	t.Run("expanded macro query returns expected values", func(t *testing.T) {
+		req := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Queries: []backend.DataQuery{
+				{
+					RefID:     "A",
+					TimeRange: timeRange,
+					JSON:      []byte(`{"rawSql":"SELECT toUnixTimestamp($__fromTime) AS f, toUnixTimestamp($__toTime) AS t"}`),
+				},
+			},
+		}
+
+		resp, err := ds.QueryData(ctx, req)
+		require.NoError(t, err)
+		require.Contains(t, resp.Responses, "A")
+		require.NoError(t, resp.Responses["A"].Error, "macro-expanded query should run cleanly")
+
+		frames := resp.Responses["A"].Frames
+		require.Len(t, frames, 1)
+		require.Equal(t, 2, len(frames[0].Fields))
+		// $__fromTime / $__toTime expand to toDateTime(<unix>) so toUnixTimestamp
+		// on those should round-trip back to from.Unix() / to.Unix().
+		gotFrom, _ := frames[0].Fields[0].ConcreteAt(0)
+		gotTo, _ := frames[0].Fields[1].ConcreteAt(0)
+		assert.EqualValues(t, from.Unix(), gotFrom)
+		assert.EqualValues(t, to.Unix(), gotTo)
+	})
+
+	t.Run("macro expansion failure surfaces a downstream error", func(t *testing.T) {
+		// $__timeFilter() takes one argument; calling it with zero triggers
+		// badArgsErr. The interpolator returns the error to sqlds, which
+		// attaches it to the query response before any DB round-trip, so the
+		// user sees the real reason rather than a syntax error on the raw
+		// $__ token.
+		req := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Queries: []backend.DataQuery{
+				{
+					RefID:     "A",
+					TimeRange: timeRange,
+					JSON:      []byte(`{"rawSql":"SELECT $__timeFilter()"}`),
+				},
+			},
+		}
+
+		resp, err := ds.QueryData(ctx, req)
+		require.NoError(t, err)
+		require.Contains(t, resp.Responses, "A")
+
+		respErr := resp.Responses["A"].Error
+		require.Error(t, respErr, "expected the macro error on the query response")
+		// sqlds wraps interpolator errors as "Could not apply macros: …",
+		// keeping the original macro name and argument-count message intact.
+		assert.Contains(t, respErr.Error(), "Could not apply macros")
+		assert.Contains(t, respErr.Error(), "timeFilter")
+		// badArgsErr wraps backend.DownstreamError, so sqlds must classify
+		// the failure as user input rather than a plugin bug.
+		assert.Equal(t, backend.ErrorSourceDownstream, resp.Responses["A"].ErrorSource)
+	})
+}

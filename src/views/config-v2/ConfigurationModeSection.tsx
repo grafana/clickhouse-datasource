@@ -99,7 +99,7 @@ export const ConfigurationModeSection = (props: Props) => {
           />
         </Field>
         {isSingleTableMode && (
-          <Field label="Signal type" description="What kind of data does this table contain????">
+          <Field label="Signal type" description="What kind of data does this table contain?">
             <RadioButtonGroup<SignalType>
               options={[
                 { label: 'Logs', value: 'logs', description: 'Log search with severity, message, and attributes' },
@@ -189,6 +189,7 @@ export const ConfigurationModeSection = (props: Props) => {
               connMaxLifetime={jsonData.connMaxLifetime}
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
+              rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
               enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => {
@@ -198,6 +199,10 @@ export const ConfigurationModeSection = (props: Props) => {
               onQueryTimeoutChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
+              }}
+              onRowCapacityHintChange={(e) => {
+                trackClickhouseConfigV2QuerySettings({ rowCapacityHint: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'rowCapacityHint')(e);
               }}
               onConnMaxLifetimeChange={(e) => {
                 trackClickhouseConfigV2QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });

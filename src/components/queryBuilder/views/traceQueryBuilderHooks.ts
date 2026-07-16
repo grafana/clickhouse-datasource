@@ -1,19 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Datasource } from 'data/CHDatasource';
 import otel from 'otel';
-import {
-  ColumnHint,
-  DateFilterWithoutValue,
-  Filter,
-  FilterOperator,
-  NumberFilter,
-  OrderBy,
-  OrderByDirection,
-  QueryBuilderOptions,
-  SelectedColumn,
-  StringFilter,
-  TableColumn,
-} from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import {
   findColumnByNameHeuristic,
@@ -21,6 +9,7 @@ import {
   isNumericColumn,
   isStringLikeColumn,
 } from './columnNameHeuristics';
+import { getDefaultTraceFilters, getDefaultTraceOrderBy } from '../defaultQueryOptions';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -110,9 +99,12 @@ function buildOtelColumns(
  * A single Effect handles both the "toggle on" path and the "saved query schema
  * correction" path to avoid a double-dispatch race window:
  *
- * - Fresh toggle: waits for allColumns to load so the first dispatch always
- *   carries the correct tagsAreJSON value. No transient Map-path SQL is sent
- *   to a JSON-typed table.
+ * - Fresh toggle: dispatches the OTel column map immediately. If allColumns is
+ *   already loaded the dispatch carries the correct tagsAreJSON value; if the
+ *   schema has not loaded (still loading, or the fetch failed — e.g. permission
+ *   denied / dropped table) the column map is still applied so the query is
+ *   never left without OTel columns, and JSON type detection is deferred to the
+ *   correction path once the schema arrives.
  * - Saved query: dispatches a correction only when allColumns loads and the
  *   schema is JSON-typed (Map schemas: no extra render).
  * - Version change: prevOtelVersion ref detects the change and resets flags so
@@ -145,12 +137,6 @@ export const useOtelColumns = (
       return;
     }
 
-    // Fresh toggle: wait for allColumns to load so the single dispatch is correct.
-    // Without a table the query can't run, so deferring is harmless.
-    if (!didSetColumns.current && allColumns.length === 0) {
-      return;
-    }
-
     // Both initial dispatch and JSON type detection are already done.
     if (didSetColumns.current && didDetectColumnTypes.current) {
       return;
@@ -174,7 +160,13 @@ export const useOtelColumns = (
       return;
     }
 
-    // Fresh toggle path: single dispatch with the correct tagsAreJSON from the start.
+    // Fresh toggle path: dispatch the OTel column map. When the schema is
+    // already loaded, tagsAreJSON is authoritative and JSON detection is done.
+    // When the schema has not loaded yet (still loading, or the fetch failed),
+    // we still apply the column map so the query is never left without OTel
+    // columns — but leave JSON detection pending so a later schema load can
+    // stamp type:'JSON' via the correction path above.
+    const schemaLoaded = allColumns.length > 0;
     builderOptionsDispatch(
       setOptions({
         columns,
@@ -188,7 +180,7 @@ export const useOtelColumns = (
       })
     );
     didSetColumns.current = true;
-    didDetectColumnTypes.current = true;
+    didDetectColumnTypes.current = schemaLoaded;
   }, [otelEnabled, otelVersion, allColumns, builderOptionsDispatch]);
 };
 
@@ -288,55 +280,12 @@ export const useDefaultFilters = (
       return;
     }
 
-    const defaultFilters: Filter[] = [
-      {
-        type: 'datetime',
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.Time,
-        condition: 'AND',
-      } as DateFilterWithoutValue, // Filter to dashboard time range
-      {
-        type: 'string',
-        operator: FilterOperator.IsEmpty,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.TraceParentSpanId,
-        condition: 'AND',
-        value: '',
-      } as StringFilter, // Only show top level spans
-      {
-        type: 'UInt64',
-        operator: FilterOperator.GreaterThan,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.TraceDurationTime,
-        condition: 'AND',
-        value: 0,
-      } as NumberFilter, // Only show spans where duration > 0
-      {
-        type: 'string',
-        operator: FilterOperator.IsAnything,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.TraceServiceName,
-        condition: 'AND',
-        value: '',
-      } as StringFilter, // Placeholder service name filter for convenience
-    ];
-
-    const defaultOrderBy: OrderBy[] = [
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
-      { name: '', hint: ColumnHint.TraceDurationTime, dir: OrderByDirection.DESC, default: true },
-    ];
-
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
-        filters: defaultFilters,
-        orderBy: defaultOrderBy,
+        filters: getDefaultTraceFilters(),
+        orderBy: getDefaultTraceOrderBy(),
       })
     );
   }, [table, isTraceIdMode, builderOptionsDispatch]);

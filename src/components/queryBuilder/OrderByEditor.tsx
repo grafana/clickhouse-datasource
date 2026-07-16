@@ -1,6 +1,6 @@
 import React from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Select } from '@grafana/ui';
+import { Button, InlineField, InlineFormLabel, Select, Stack } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
 import allLabels from 'labels';
 import { styles } from 'styles';
@@ -23,7 +23,7 @@ const OrderByItem = (props: OrderByItemProps) => {
   const { columnOptions, index, orderByItem, updateOrderByItem, removeOrderByItem } = props;
 
   return (
-    <>
+    <Stack direction="row" wrap="wrap" alignItems="flex-start" justifyContent="flex-start" gap={0}>
       <Select
         disabled={Boolean(orderByItem.hint)}
         placeholder={orderByItem.hint ? allLabels.types.ColumnHint[orderByItem.hint] : undefined}
@@ -52,7 +52,7 @@ const OrderByItem = (props: OrderByItemProps) => {
         onClick={() => removeOrderByItem(index)}
         aria-label="order-by-remove-item"
       />
-    </>
+    </Stack>
   );
 };
 
@@ -102,8 +102,11 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
       {orderBy.map((orderByItem, index) => {
         const key = `${index}-${orderByItem.name}-${orderByItem.hint || ''}-${orderByItem.dir}`;
         return (
-          <div className="gf-form" key={key} data-testid="query-builder-orderby-item-wrapper">
-            {index === 0 ? fieldLabel : fieldSpacer}
+          <InlineField
+            label={index === 0 ? fieldLabel : fieldSpacer}
+            key={key}
+            data-testid="query-builder-orderby-item-wrapper"
+          >
             <OrderByItem
               columnOptions={orderByOptions}
               index={index}
@@ -111,12 +114,11 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
               updateOrderByItem={updateOrderByItem}
               removeOrderByItem={removeOrderByItem}
             />
-          </div>
+          </InlineField>
         );
       })}
 
-      <div className="gf-form">
-        {orderBy.length === 0 ? fieldLabel : fieldSpacer}
+      <InlineField label={orderBy.length === 0 ? fieldLabel : fieldSpacer}>
         <Button
           data-testid="query-builder-orderby-add-button"
           icon="plus-circle"
@@ -127,7 +129,7 @@ export const OrderByEditor = (props: OrderByEditorProps) => {
         >
           {addLabel}
         </Button>
-      </div>
+      </InlineField>
     </>
   );
 };

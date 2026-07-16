@@ -9,6 +9,7 @@ interface QuerySettingsConfigProps {
   maxIdleConns?: string;
   maxOpenConns?: string;
   queryTimeout?: string;
+  rowCapacityHint?: string;
   validateSql?: boolean;
   enableMapKeysDiscovery?: boolean;
   onConnMaxIdleConnsChange: (e: FormEvent<HTMLInputElement>) => void;
@@ -16,6 +17,7 @@ interface QuerySettingsConfigProps {
   onConnMaxOpenConnsChange: (e: FormEvent<HTMLInputElement>) => void;
   onDialTimeoutChange: (e: FormEvent<HTMLInputElement>) => void;
   onQueryTimeoutChange: (e: FormEvent<HTMLInputElement>) => void;
+  onRowCapacityHintChange: (e: FormEvent<HTMLInputElement>) => void;
   onValidateSqlChange: (e: FormEvent<HTMLInputElement>) => void;
   onEnableMapKeysDiscoveryChange: (e: FormEvent<HTMLInputElement>) => void;
 }
@@ -27,6 +29,7 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
     maxIdleConns,
     maxOpenConns,
     queryTimeout,
+    rowCapacityHint,
     validateSql,
     enableMapKeysDiscovery,
     onConnMaxIdleConnsChange,
@@ -34,6 +37,7 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
     onConnMaxOpenConnsChange,
     onDialTimeoutChange,
     onQueryTimeoutChange,
+    onRowCapacityHintChange,
     onValidateSqlChange,
     onEnableMapKeysDiscoveryChange,
   } = props;
@@ -102,14 +106,30 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
           type="number"
         />
       </Field>
+      <Field label={labels.rowCapacityHint.label} description={labels.rowCapacityHint.tooltip}>
+        <Input
+          name={labels.rowCapacityHint.name}
+          width={40}
+          value={rowCapacityHint || ''}
+          onChange={onRowCapacityHintChange}
+          label={labels.rowCapacityHint.label}
+          aria-label={labels.rowCapacityHint.label}
+          placeholder={labels.rowCapacityHint.placeholder}
+          type="number"
+          min={0}
+        />
+      </Field>
 
       <Field label={labels.validateSql.label} description={labels.validateSql.tooltip}>
-        <Switch className="gf-form" value={validateSql || false} onChange={onValidateSqlChange} role="checkbox" />
+        <Switch
+          value={validateSql || false}
+          onChange={onValidateSqlChange}
+          role="checkbox"
+        />
       </Field>
 
       <Field label={labels.enableMapKeysDiscovery.label} description={labels.enableMapKeysDiscovery.tooltip}>
         <Switch
-          className="gf-form"
           value={enableMapKeysDiscovery ?? true}
           onChange={onEnableMapKeysDiscoveryChange}
           role="checkbox"

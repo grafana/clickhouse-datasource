@@ -139,6 +139,6 @@ describe('DatabaseTableSelect', () => {
       )
     );
     expect(result.container.firstChild).not.toBeNull();
-    expect(result.container.firstChild?.childNodes).toHaveLength(2 * 2); // 2 components with a fragment of 2 components
+    expect(result.container.firstChild?.childNodes).toHaveLength(2); // 2 InlineFields (database + table)
   });
 });

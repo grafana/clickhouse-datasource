@@ -64,9 +64,11 @@ async function switchToBuilderMode(page: Page, queryType?: QueryType) {
  * is scoped inside page.getByRole('listbox').
  */
 async function selectFromCombobox(page: Page, label: string, value: string) {
-  const row = page.locator('div.gf-form', {
-    has: page.locator('label.query-keyword', { hasText: new RegExp(`^${label}$`) }),
-  });
+  // The builder renders each field as a grafana-ui InlineField whose container
+  // div is the direct parent of the InlineFormLabel, so anchor on the label.
+  const row = page
+    .locator('label.query-keyword', { hasText: new RegExp(`^${label}$`) })
+    .locator('xpath=..');
 
   // Race: either the field auto-populates to `value` within a short window, or
   // we need to open the listbox and click the option ourselves. `isVisible()`
@@ -87,17 +89,12 @@ async function selectFromCombobox(page: Page, label: string, value: string) {
 }
 
 /**
- * Returns the innermost row (`div.gf-form`) that contains a specific
- * column-role label. The builder nests `div.gf-form` wrappers, so the
- * `has:` locator matches both the outer grouping and the inner row — we
- * use `.last()` to pick the innermost, which is the single-field row.
+ * Returns the single-field row that contains a specific column-role label.
+ * Each field is a grafana-ui InlineField whose container div is the direct
+ * parent of the InlineFormLabel, so the label's parent IS the field row.
  */
 function columnRow(page: Page, label: string): Locator {
-  return page
-    .locator('div.gf-form', {
-      has: page.locator('label.query-keyword', { hasText: new RegExp(`^${label}$`) }),
-    })
-    .last();
+  return page.locator('label.query-keyword', { hasText: new RegExp(`^${label}$`) }).locator('xpath=..');
 }
 
 test.describe('Column auto-detection (Layer 2)', () => {

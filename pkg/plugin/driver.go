@@ -295,9 +295,14 @@ func (h *Clickhouse) Converters() []sqlutil.Converter {
 	return converters.ClickhouseConverters
 }
 
-// Macros returns list of macro functions convert the macros of raw query
+// Macros returns an empty macro map. ClickHouse macros are expanded by the
+// macropro-backed sqlds.Interpolator installed in NewDatasource, which
+// replaces sqlds's sqlutil.Interpolate pipeline entirely, so this map is
+// never consulted on the query path. macropro.DefaultMacros is already
+// merged into macros.ClickHouseMacros, so nothing is lost by leaving it
+// empty.
 func (h *Clickhouse) Macros() sqlds.Macros {
-	return macros.Macros
+	return sqlds.Macros{}
 }
 
 // MutateQueryError marks ClickHouse errors as downstream errors
@@ -368,7 +373,8 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders: settings.ForwardGrafanaHeaders,
+		ForwardHeaders:  settings.ForwardGrafanaHeaders,
+		RowCapacityHint: settings.RowCapacityHint,
 	}
 }
 
@@ -416,6 +422,29 @@ func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest)
 		return
 	}
 	req.SetHTTPHeader("X-Grafana-User", user.Login)
+}
+
+// interpolateMacros is the sqlds.Interpolator installed by NewDatasource. It
+// replaces sqlds's default sqlutil.Interpolate pipeline with macropro, so
+// macropro owns macro parsing end-to-end and handlers receive the fully
+// parsed query — including Table and Column, which the previous
+// MutateQueryData pre-expansion never carried. Expansion errors return
+// straight to the query response rather than being smuggled through a
+// throwIf() rewrite that failed at execution time.
+//
+// Every error is wrapped as a downstream error: interpolation failures
+// originate from the user's query text (bad macro arguments, missing
+// table/column context, parse errors), never from a plugin bug. Our own
+// handlers already wrap backend.DownstreamError, but macropro's default
+// handlers ($__table, $__column) return plain errors, and sqlds only
+// downstream-classifies bad-argument-count and bracket errors on its own —
+// so without this wrap those would be miscounted as plugin errors.
+func interpolateMacros(_ context.Context, query *sqlutil.Query, _ json.RawMessage) (string, error) {
+	sql, err := macros.Interpolate(query.RawSQL, query)
+	if err != nil {
+		return "", backend.DownstreamError(err)
+	}
+	return sql, nil
 }
 
 func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {

@@ -6,11 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
+	"github.com/grafana/sqlds/v5"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMergeOpenTelemetryLabels(t *testing.T) {
@@ -499,4 +503,78 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
+}
+
+func TestInterpolateMacros(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
+	timeRange := backend.TimeRange{From: from, To: to}
+
+	t.Run("expands macros from the parsed query", func(t *testing.T) {
+		q := &sqlutil.Query{RawSQL: "SELECT $__fromTime", TimeRange: timeRange}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT toDateTime(1415792726)", got)
+	})
+
+	t.Run("expands table and column from query context", func(t *testing.T) {
+		// Table/Column only flow into macro handlers now that interpolation
+		// runs on the parsed sqlutil.Query; the old MutateQueryData
+		// pre-expansion never carried them.
+		q := &sqlutil.Query{RawSQL: "SELECT $__column FROM $__table", TimeRange: timeRange, Table: "logs", Column: "ts"}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT ts FROM logs", got)
+	})
+
+	t.Run("returns a downstream error on bad macro arguments", func(t *testing.T) {
+		// $__timeFilter with zero args triggers a badArgsErr. The error goes
+		// back to sqlds, which puts it on the query response; it must be
+		// classified downstream so a user typo isn't counted as a plugin bug.
+		q := &sqlutil.Query{RawSQL: "SELECT $__timeFilter()", TimeRange: timeRange}
+		_, err := interpolateMacros(t.Context(), q, nil)
+		require.Error(t, err)
+		assert.ErrorIs(t, err, sqlutil.ErrorBadArgumentCount)
+		assert.True(t, backend.IsDownstreamError(err))
+		assert.Contains(t, err.Error(), "timeFilter")
+	})
+
+	t.Run("returns SQL unchanged when there are no macros", func(t *testing.T) {
+		q := &sqlutil.Query{RawSQL: "SELECT 1", TimeRange: timeRange}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT 1", got)
+	})
+
+	t.Run("returns a downstream error from macropro default handlers", func(t *testing.T) {
+		// macropro's own $__table / $__column handlers return plain errors
+		// with no backend error source, unlike our handlers which wrap
+		// backend.DownstreamError themselves. The interpolator must classify
+		// these downstream too: every interpolation failure originates from
+		// the user's query text, never from a plugin bug.
+		q := &sqlutil.Query{RawSQL: "SELECT * FROM $__table", TimeRange: timeRange}
+		_, err := interpolateMacros(t.Context(), q, nil)
+		require.Error(t, err)
+		assert.True(t, backend.IsDownstreamError(err))
+	})
+}
+
+// TestMissingTableMacroIsDownstream proves the downstream classification
+// survives the full sqlds.QueryData path: the interpolator error must land on
+// the query response with ErrorSourceDownstream, not the plugin default.
+func TestMissingTableMacroIsDownstream(t *testing.T) {
+	ds := sqlds.NewDatasource(&Clickhouse{})
+	ds.Interpolator = interpolateMacros
+
+	resp, err := ds.QueryData(t.Context(), &backend.QueryDataRequest{
+		Queries: []backend.DataQuery{{
+			RefID: "A",
+			JSON:  []byte(`{"rawSql":"SELECT * FROM $__table"}`),
+		}},
+	})
+	require.NoError(t, err)
+
+	got := resp.Responses["A"]
+	require.Error(t, got.Error)
+	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }

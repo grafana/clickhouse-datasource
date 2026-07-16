@@ -161,6 +161,15 @@ export default {
           placeholder: '60',
           tooltip: 'Timeout in seconds for read queries',
         },
+        rowCapacityHint: {
+          label: 'Row Capacity Hint',
+          name: 'rowCapacityHint',
+          placeholder: '0',
+          tooltip:
+            'Expected number of rows per query response. Pre-allocates data frames before scanning to avoid repeated ' +
+            'reallocation on large results. Applied to every query, so leave at 0 (disabled) unless queries reliably ' +
+            'return a similar, large number of rows. A value larger than the typical result wastes memory.',
+        },
         validateSql: {
           label: 'Validate SQL',
           tooltip: 'Validate SQL in the editor.',
@@ -392,7 +401,8 @@ export default {
     },
     OtelVersionSelect: {
       label: 'Use OTel',
-      tooltip: 'Enables Open Telemetry schema versioning',
+      tooltip:
+        'Enables Open Telemetry schema versioning. The auto option matches the logs schema version to the table columns. Pick a specific version to override.',
     },
     LimitEditor: {
       label: 'Limit',

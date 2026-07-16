@@ -28,8 +28,18 @@
     },
     {
       "type": "dashboard",
-      "name": "ClickHouse OTel Dashboard",
-      "path": "dashboards/opentelemetry-clickhouse.json"
+      "name": "OpenTelemetry Logs Explorer",
+      "path": "dashboards/otel-logs-explorer.json"
+    },
+    {
+      "type": "dashboard",
+      "name": "OpenTelemetry Traces Explorer",
+      "path": "dashboards/otel-traces-explorer.json"
+    },
+    {
+      "type": "dashboard",
+      "name": "OpenTelemetry Service Dashboard",
+      "path": "dashboards/otel-service-dashboard.json"
     },
     {
       "type": "dashboard",

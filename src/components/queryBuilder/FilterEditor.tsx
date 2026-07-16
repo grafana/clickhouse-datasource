@@ -1,6 +1,16 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { Button, InlineFormLabel, Input, MultiSelect, RadioButtonGroup, Select, Stack } from '@grafana/ui';
+import {
+  Button,
+  Combobox,
+  ComboboxOption,
+  InlineField,
+  InlineFormLabel,
+  Input,
+  MultiCombobox,
+  RadioButtonGroup,
+  Stack,
+} from '@grafana/ui';
 import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
@@ -8,6 +18,7 @@ import { styles } from 'styles';
 import { Datasource } from 'data/CHDatasource';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
+import { getFilterOperatorsByType } from './filterOperatorOptions';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -16,27 +27,6 @@ const boolValues: Array<SelectableValue<boolean>> = [
 const conditions: Array<SelectableValue<'AND' | 'OR'>> = [
   { value: 'AND', label: 'AND' },
   { value: 'OR', label: 'OR' },
-];
-const filterOperators: Array<SelectableValue<FilterOperator>> = [
-  { value: FilterOperator.WithInGrafanaTimeRange, label: 'Within dashboard time range' },
-  { value: FilterOperator.OutsideGrafanaTimeRange, label: 'Outside dashboard time range' },
-  { value: FilterOperator.IsAnything, label: 'IS ANYTHING' },
-  { value: FilterOperator.Equals, label: '=' },
-  { value: FilterOperator.NotEquals, label: '!=' },
-  { value: FilterOperator.LessThan, label: '<' },
-  { value: FilterOperator.LessThanOrEqual, label: '<=' },
-  { value: FilterOperator.GreaterThan, label: '>' },
-  { value: FilterOperator.GreaterThanOrEqual, label: '>=' },
-  { value: FilterOperator.Like, label: 'LIKE' },
-  { value: FilterOperator.NotLike, label: 'NOT LIKE' },
-  { value: FilterOperator.ILike, label: 'ILIKE' },
-  { value: FilterOperator.NotILike, label: 'NOT ILIKE' },
-  { value: FilterOperator.IsEmpty, label: 'IS EMPTY' },
-  { value: FilterOperator.IsNotEmpty, label: 'IS NOT EMPTY' },
-  { value: FilterOperator.In, label: 'IN' },
-  { value: FilterOperator.NotIn, label: 'NOT IN' },
-  { value: FilterOperator.IsNull, label: 'IS NULL' },
-  { value: FilterOperator.IsNotNull, label: 'IS NOT NULL' },
 ];
 const standardTimeOptions: Array<SelectableValue<string>> = [
   { value: 'today()', label: 'TODAY' },
@@ -55,6 +45,17 @@ export const defaultNewFilter: NullFilter = {
 export interface PredefinedFilter {
   restrictToFields?: readonly TableColumn[];
 }
+
+const toComboboxOptions = <T extends string | number>(
+  options: Array<{ label?: unknown; value?: T }>
+): Array<ComboboxOption<T>> => {
+  return options
+    .filter((option): option is { label?: unknown; value: T } => option.value !== undefined)
+    .map((option) => ({
+      label: String(option.label || option.value),
+      value: option.value,
+    }));
+};
 
 const FilterValueNumberItem = (props: { value: number; onChange: (value: number) => void }) => {
   const [value, setValue] = useState(props.value || 0);
@@ -140,12 +141,12 @@ export const FilterValueEditor = (props: {
 
     return (
       <div data-testid="query-builder-filters-date-value-container">
-        <Select
+        <Combobox
           value={filter.value || 'TODAY'}
-          onChange={(e) => onDateFilterValueChange(e.value!)}
-          options={dateOptions}
+          onChange={(option) => onDateFilterValueChange(option.value)}
+          options={toComboboxOptions(dateOptions)}
           width={40}
-          allowCustomValue
+          createCustomValue
         />
       </div>
     );
@@ -159,7 +160,11 @@ export const FilterValueEditor = (props: {
     ) {
       return (
         <div data-testid="query-builder-filters-single-picklist-value-container">
-          <Select value={filter.value} onChange={(e) => onStringFilterValueChange(e.value!)} options={getOptions()} />
+          <Combobox
+            value={filter.value}
+            onChange={(option) => onStringFilterValueChange(option.value)}
+            options={toComboboxOptions(getOptions())}
+          />
         </div>
       );
     }
@@ -179,10 +184,10 @@ export const FilterValueEditor = (props: {
     if (filter.type === 'picklist') {
       return (
         <div data-testid="query-builder-filters-multi-picklist-value-container">
-          <MultiSelect
+          <MultiCombobox
             value={filter.value}
-            options={getOptions()}
-            onChange={(e) => onMultiFilterValueChange(e.map((v) => v.value!))}
+            options={toComboboxOptions(getOptions())}
+            onChange={(options) => onMultiFilterValueChange(options.map((option) => option.value))}
           />
         </div>
       );
@@ -204,7 +209,6 @@ export const FilterEditor = (props: {
   table: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter } = props;
-  const [isOpen, setIsOpen] = useState(false);
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
@@ -240,82 +244,7 @@ export const FilterEditor = (props: {
     }
     return values;
   };
-  const getFilterOperatorsByType = (type = 'string'): Array<SelectableValue<FilterOperator>> => {
-    if (utils.isBooleanType(type)) {
-      return filterOperators.filter((f) => [FilterOperator.Equals, FilterOperator.NotEquals].includes(f.value!));
-    } else if (utils.isNumberType(type)) {
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.LessThan,
-          FilterOperator.LessThanOrEqual,
-          FilterOperator.GreaterThan,
-          FilterOperator.GreaterThanOrEqual,
-        ].includes(f.value!)
-      );
-    } else if (utils.isDateType(type)) {
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.LessThan,
-          FilterOperator.LessThanOrEqual,
-          FilterOperator.GreaterThan,
-          FilterOperator.GreaterThanOrEqual,
-          FilterOperator.WithInGrafanaTimeRange,
-          FilterOperator.OutsideGrafanaTimeRange,
-        ].includes(f.value!)
-      );
-    } else if (isJSONType) {
-      // JSON sub-column values are strings; exclude IsEmpty/IsNotEmpty which are unreliable on JSON paths
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.Like,
-          FilterOperator.NotLike,
-          FilterOperator.ILike,
-          FilterOperator.NotILike,
-          FilterOperator.In,
-          FilterOperator.NotIn,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-        ].includes(f.value!)
-      );
-    } else {
-      return filterOperators.filter((f) =>
-        [
-          FilterOperator.IsAnything,
-          FilterOperator.Like,
-          FilterOperator.NotLike,
-          FilterOperator.ILike,
-          FilterOperator.NotILike,
-          FilterOperator.In,
-          FilterOperator.NotIn,
-          FilterOperator.IsNull,
-          FilterOperator.IsNotNull,
-          FilterOperator.Equals,
-          FilterOperator.NotEquals,
-          FilterOperator.IsEmpty,
-          FilterOperator.IsNotEmpty,
-          FilterOperator.LessThan,
-          FilterOperator.LessThanOrEqual,
-          FilterOperator.GreaterThan,
-          FilterOperator.GreaterThanOrEqual,
-        ].includes(f.value!)
-      );
-    }
-  };
   const onFilterNameChange = (fieldName: string) => {
-    setIsOpen(false);
     const matchingField = fieldsList.find((f) => f.name === fieldName);
     const filterData = {
       key: matchingField?.name || fieldName,
@@ -396,22 +325,17 @@ export const FilterEditor = (props: {
       {index !== 0 && (
         <RadioButtonGroup options={conditions} value={filter.condition} onChange={(e) => onFilterConditionChange(e!)} />
       )}
-      <Select
+      <Combobox
         disabled={Boolean(filter.hint)}
         placeholder={filter.hint ? labels.types.ColumnHint[filter.hint] : undefined}
         value={filter.key}
         width={40}
-        className={styles.Common.inlineSelect}
-        options={getFields()}
-        isOpen={isOpen}
-        onOpenMenu={() => setIsOpen(true)}
-        onCloseMenu={() => setIsOpen(false)}
-        onChange={(e) => onFilterNameChange(e.value!)}
-        allowCustomValue
-        menuPlacement={'bottom'}
+        options={toComboboxOptions(getFields())}
+        onChange={(option) => option && onFilterNameChange(option.value)}
+        createCustomValue
       />
       {(isMapType || isJSONType) && (
-        <Select
+        <Combobox
           value={filter.mapKey}
           placeholder={
             isJSONType
@@ -419,20 +343,16 @@ export const FilterEditor = (props: {
               : labels.components.FilterEditor.mapKeyPlaceholder
           }
           width={40}
-          className={styles.Common.inlineSelect}
-          options={subKeyOptions}
-          onChange={(e) => onFilterMapKeyChange(e.value!)}
-          allowCustomValue
-          menuPlacement={'bottom'}
+          options={toComboboxOptions(subKeyOptions)}
+          onChange={(option) => option && onFilterMapKeyChange(option.value)}
+          createCustomValue
         />
       )}
-      <Select
+      <Combobox
         value={filter.operator}
         width={40}
-        className={styles.Common.inlineSelect}
-        options={getFilterOperatorsByType(filter.type)}
-        onChange={(e) => onFilterOperatorChange(e.value!)}
-        menuPlacement={'bottom'}
+        options={toComboboxOptions(getFilterOperatorsByType(filter.type, isJSONType))}
+        onChange={(option) => option && onFilterOperatorChange(option.value)}
       />
       <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
       <Button
@@ -475,10 +395,13 @@ export const FiltersEditor = (props: {
   return (
     <>
       {filters.length === 0 && (
-        <div className="gf-form">
-          <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-            {label}
-          </InlineFormLabel>
+        <InlineField
+          label={
+            <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+              {label}
+            </InlineFormLabel>
+          }
+        >
           <Button
             data-testid="query-builder-filters-add-button"
             icon="plus-circle"
@@ -489,18 +412,23 @@ export const FiltersEditor = (props: {
           >
             {addLabel}
           </Button>
-        </div>
+        </InlineField>
       )}
       {filters.map((filter, index) => {
         return (
-          <div className="gf-form" key={index}>
-            {index === 0 ? (
-              <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-                {label}
-              </InlineFormLabel>
-            ) : (
-              <div className={`width-8 ${styles.Common.firstLabel}`}></div>
-            )}
+          <InlineField
+            key={index}
+            label={
+              index === 0 ? (
+                <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
+                  {label}
+                </InlineFormLabel>
+              ) : (
+                <div className={`width-8 ${styles.Common.firstLabel}`}></div>
+              )
+            }
+            shrink
+          >
             <FilterEditor
               allColumns={fieldsList}
               filter={filter}
@@ -511,12 +439,11 @@ export const FiltersEditor = (props: {
               database={database}
               table={table}
             />
-          </div>
+          </InlineField>
         );
       })}
       {filters.length !== 0 && (
-        <div className="gf-form">
-          <div className={`width-8 ${styles.Common.firstLabel}`}></div>
+        <InlineField label={<div className={`width-8 ${styles.Common.firstLabel}`}></div>}>
           <Button
             data-testid="query-builder-filters-inline-add-button"
             icon="plus-circle"
@@ -527,7 +454,7 @@ export const FiltersEditor = (props: {
           >
             {addLabel}
           </Button>
-        </div>
+        </InlineField>
       )}
     </>
   );

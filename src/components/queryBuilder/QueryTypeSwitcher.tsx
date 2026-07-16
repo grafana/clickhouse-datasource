@@ -1,5 +1,5 @@
 import React from 'react';
-import { RadioButtonGroup, InlineFormLabel } from '@grafana/ui';
+import { RadioButtonGroup, InlineField, InlineFormLabel } from '@grafana/ui';
 import labels from 'labels';
 import { QueryType } from 'types/queryBuilder';
 
@@ -36,11 +36,14 @@ export const QueryTypeSwitcher = (props: QueryTypeSwitcherProps) => {
   const { label, tooltip, sqlTooltip } = labels.components.QueryTypeSwitcher;
 
   return (
-    <span>
-      <InlineFormLabel width={8} className="query-keyword" tooltip={sqlEditor ? sqlTooltip : tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={8} className="query-keyword" tooltip={sqlEditor ? sqlTooltip : tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+    >
       <RadioButtonGroup options={options} value={queryType} onChange={onChange} />
-    </span>
+    </InlineField>
   );
 };

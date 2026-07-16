@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"sync"
@@ -255,7 +256,7 @@ func quoteIdentifier(s string) string {
 // forwarded auth tokens that do not change the schema ClickHouse sees for
 // the same datasource. If we ever need per-user schema filtering this
 // assumption must be revisited.
-func (p *SchemaProvider) cachedFetchColumns(ctx context.Context, tables []string, headers map[string]string) (map[string][]schemas.Column, error) {
+func (p *SchemaProvider) cachedFetchColumns(ctx context.Context, tables []string, headers http.Header) (map[string][]schemas.Column, error) {
 	if p.columnsCache == nil {
 		return p.fetchColumnsForAllTables(ctx, tables, headers)
 	}
@@ -269,7 +270,7 @@ func (p *SchemaProvider) cachedFetchColumns(ctx context.Context, tables []string
 }
 
 // fetchColumnsForAllTables queries system.columns once for all tables and returns columns keyed by "database.table".
-func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []string, headers map[string]string) (map[string][]schemas.Column, error) {
+func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []string, headers http.Header) (map[string][]schemas.Column, error) {
 	result := make(map[string][]schemas.Column)
 	if len(tables) == 0 {
 		return result, nil
@@ -360,7 +361,7 @@ func (p *SchemaProvider) fetchColumnsForAllTables(ctx context.Context, tables []
 }
 
 // fetchColumnsForTable runs DESCRIBE TABLE for the given table and returns schema columns.
-func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string, headers map[string]string) ([]schemas.Column, error) {
+func (p *SchemaProvider) fetchColumnsForTable(ctx context.Context, table string, headers http.Header) ([]schemas.Column, error) {
 	database, table := splitTable(table)
 	rawSQL := fmt.Sprintf("DESCRIBE TABLE \"%s\".\"%s\"", database, table)
 	ds, err := p.getDB(ctx)

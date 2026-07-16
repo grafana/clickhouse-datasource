@@ -1,7 +1,7 @@
 import React from 'react';
 import { TimeUnit } from 'types/queryBuilder';
 import allLabels from 'labels';
-import { InlineFormLabel, Select } from '@grafana/ui';
+import { InlineField, InlineFormLabel, Select } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { styles } from 'styles';
 
@@ -24,22 +24,25 @@ export const DurationUnitSelect = (props: DurationUnitSelectProps) => {
   const { label, tooltip } = allLabels.components.TraceQueryBuilder.columns.durationUnit;
 
   return (
-    <div className="gf-form">
-      <InlineFormLabel
-        width={12}
-        className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`}
-        tooltip={tooltip}
-      >
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel
+          width={12}
+          className={`query-keyword ${inline ? styles.QueryEditor.inlineField : ''}`}
+          tooltip={tooltip}
+        >
+          {label}
+        </InlineFormLabel>
+      }
+      disabled={disabled}
+    >
       <Select<TimeUnit>
-        disabled={disabled}
         options={durationUnitOptions as Array<SelectableValue<TimeUnit>>}
         value={unit}
         onChange={(v) => onChange(v.value!)}
         width={inline ? 25 : 30}
         menuPlacement={'bottom'}
       />
-    </div>
+    </InlineField>
   );
 };

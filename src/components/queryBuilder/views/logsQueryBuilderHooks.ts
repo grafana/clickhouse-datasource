@@ -1,20 +1,10 @@
 import { Datasource } from 'data/CHDatasource';
 import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import { useEffect, useMemo, useRef } from 'react';
-import {
-  ColumnHint,
-  DateFilterWithoutValue,
-  Filter,
-  FilterOperator,
-  OrderBy,
-  OrderByDirection,
-  QueryBuilderOptions,
-  SelectedColumn,
-  StringFilter,
-  TableColumn,
-} from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import otel from 'otel';
 import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
+import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOptions';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -100,7 +90,15 @@ export const useOtelColumns = (
       return;
     }
 
-    const otelConfig = otel.getVersion(otelVersion);
+    let otelConfig = otel.getVersion(otelVersion);
+    // The "latest" alias resolves against the actual table instead of a fixed
+    // schema: pre-v0.151.0 collector tables keep their TimestampTime column,
+    // newer ones don't, and both exist in the wild (see #1900). allColumns is
+    // already fetched for the builder, so detection costs no extra round-trip.
+    // Pinned versions (1.29.0, 1.30.0, ...) are honoured as-is.
+    if (otelConfig?.version === 'latest') {
+      otelConfig = otel.detectLogsVersion(allColumns.map((c) => c.name));
+    }
     const logColumnMap = otelConfig?.logColumnMap;
     if (!logColumnMap) {
       return;
@@ -248,36 +246,12 @@ export const useDefaultFilters = (
       return;
     }
 
-    const defaultFilters: Filter[] = [
-      {
-        type: 'datetime',
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.FilterTime,
-        condition: 'AND',
-      } as DateFilterWithoutValue,
-      {
-        type: 'string',
-        operator: FilterOperator.IsAnything,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.LogLevel,
-        condition: 'AND',
-      } as StringFilter,
-    ];
-
-    const defaultOrderBy: OrderBy[] = [
-      { name: '', hint: ColumnHint.FilterTime, dir: OrderByDirection.DESC, default: true },
-      { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC, default: true },
-    ];
-
     lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
-        filters: defaultFilters,
-        orderBy: defaultOrderBy,
+        filters: getDefaultLogsFilters(),
+        orderBy: getDefaultLogsOrderBy(),
       })
     );
   }, [table, builderOptionsDispatch]);

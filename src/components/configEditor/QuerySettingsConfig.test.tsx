@@ -3,23 +3,31 @@ import { render, fireEvent } from '@testing-library/react';
 import { QuerySettingsConfig } from './QuerySettingsConfig';
 import allLabels from 'labels';
 
+const noop = () => {};
+
+const baseProps = {
+  onConnMaxIdleConnsChange: noop,
+  onConnMaxLifetimeChange: noop,
+  onConnMaxOpenConnsChange: noop,
+  onDialTimeoutChange: noop,
+  onQueryTimeoutChange: noop,
+  onRowCapacityHintChange: noop,
+  onValidateSqlChange: noop,
+  onEnableMapKeysDiscoveryChange: noop,
+};
+
 describe('QuerySettingsConfig', () => {
   it('should render', () => {
     const result = render(
       <QuerySettingsConfig
+        {...baseProps}
         connMaxLifetime={'5'}
         dialTimeout={'5'}
         maxIdleConns={'5'}
         maxOpenConns={'5'}
         queryTimeout={'5'}
+        rowCapacityHint={'5000'}
         validateSql={true}
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -27,17 +35,7 @@ describe('QuerySettingsConfig', () => {
 
   it('should call onDialTimeout when changed', () => {
     const onDialTimeout = jest.fn();
-    const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={onDialTimeout}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={() => {}}
-      />
-    );
+    const result = render(<QuerySettingsConfig {...baseProps} onDialTimeoutChange={onDialTimeout} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText(allLabels.components.Config.QuerySettingsConfig.dialTimeout.placeholder);
@@ -50,17 +48,7 @@ describe('QuerySettingsConfig', () => {
 
   it('should call onQueryTimeout when changed', () => {
     const onQueryTimeout = jest.fn();
-    const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={onQueryTimeout}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={() => {}}
-      />
-    );
+    const result = render(<QuerySettingsConfig {...baseProps} onQueryTimeoutChange={onQueryTimeout} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText(allLabels.components.Config.QuerySettingsConfig.queryTimeout.placeholder);
@@ -71,19 +59,24 @@ describe('QuerySettingsConfig', () => {
     expect(onQueryTimeout).toHaveBeenCalledWith(expect.any(Object));
   });
 
+  it('should call onRowCapacityHintChange when changed', () => {
+    const onRowCapacityHintChange = jest.fn();
+    const result = render(<QuerySettingsConfig {...baseProps} onRowCapacityHintChange={onRowCapacityHintChange} />);
+    expect(result.container.firstChild).not.toBeNull();
+
+    const input = result.getByPlaceholderText(
+      allLabels.components.Config.QuerySettingsConfig.rowCapacityHint.placeholder
+    );
+    expect(input).toBeInTheDocument();
+    fireEvent.change(input, { target: { value: '50000' } });
+    fireEvent.blur(input);
+    expect(onRowCapacityHintChange).toHaveBeenCalledTimes(1);
+    expect(onRowCapacityHintChange).toHaveBeenCalledWith(expect.any(Object));
+  });
+
   it('should call onValidateSqlChange when changed', () => {
     const onValidateSqlChange = jest.fn();
-    const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={onValidateSqlChange}
-        onEnableMapKeysDiscoveryChange={() => {}}
-      />
-    );
+    const result = render(<QuerySettingsConfig {...baseProps} onValidateSqlChange={onValidateSqlChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     // Two switches: validateSql first, enableMapKeysDiscovery second.
@@ -96,15 +89,7 @@ describe('QuerySettingsConfig', () => {
   it('should call onEnableMapKeysDiscoveryChange when changed', () => {
     const onEnableMapKeysDiscoveryChange = jest.fn();
     const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={onEnableMapKeysDiscoveryChange}
-      />
+      <QuerySettingsConfig {...baseProps} onEnableMapKeysDiscoveryChange={onEnableMapKeysDiscoveryChange} />
     );
     const inputs = result.getAllByRole('checkbox');
     fireEvent.click(inputs[1]);
@@ -114,17 +99,7 @@ describe('QuerySettingsConfig', () => {
 
   it('should call onConnMaxIdleConnsChange when changed', () => {
     const onConnMaxIdleConnsChange = jest.fn();
-    const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={onConnMaxIdleConnsChange}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={() => {}}
-      />
-    );
+    const result = render(<QuerySettingsConfig {...baseProps} onConnMaxIdleConnsChange={onConnMaxIdleConnsChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText(allLabels.components.Config.QuerySettingsConfig.maxIdleConns.placeholder);
@@ -137,17 +112,7 @@ describe('QuerySettingsConfig', () => {
 
   it('should call onConnMaxLifetimeChange when changed', () => {
     const onConnMaxLifetimeChange = jest.fn();
-    const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={onConnMaxLifetimeChange}
-        onConnMaxOpenConnsChange={() => {}}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={() => {}}
-      />
-    );
+    const result = render(<QuerySettingsConfig {...baseProps} onConnMaxLifetimeChange={onConnMaxLifetimeChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText(
@@ -162,17 +127,7 @@ describe('QuerySettingsConfig', () => {
 
   it('should call onConnMaxOpenConnsChange when changed', () => {
     const onConnMaxOpenConnsChange = jest.fn();
-    const result = render(
-      <QuerySettingsConfig
-        onConnMaxIdleConnsChange={() => {}}
-        onConnMaxLifetimeChange={() => {}}
-        onConnMaxOpenConnsChange={onConnMaxOpenConnsChange}
-        onDialTimeoutChange={() => {}}
-        onQueryTimeoutChange={() => {}}
-        onValidateSqlChange={() => {}}
-        onEnableMapKeysDiscoveryChange={() => {}}
-      />
-    );
+    const result = render(<QuerySettingsConfig {...baseProps} onConnMaxOpenConnsChange={onConnMaxOpenConnsChange} />);
     expect(result.container.firstChild).not.toBeNull();
 
     const input = result.getByPlaceholderText(allLabels.components.Config.QuerySettingsConfig.maxOpenConns.placeholder);

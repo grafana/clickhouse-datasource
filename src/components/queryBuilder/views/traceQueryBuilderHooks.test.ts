@@ -186,9 +186,14 @@ describe('useOtelColumns', () => {
     expect(serviceTagsCol?.type).toBeUndefined();
   });
 
-  it('should defer dispatch until allColumns loads when OTel is toggled on', async () => {
-    // When OTel is toggled on with empty allColumns (schema still loading),
-    // no dispatch occurs. Once allColumns loads the Effect re-runs and dispatches once.
+  it('dispatches OTel columns immediately when toggled on even if the schema has not loaded', async () => {
+    // Regression guard: when the table schema cannot be fetched (permission
+    // denied, dropped/renamed table) allColumns stays [] indefinitely. The
+    // toggle must still apply the OTel column map so the query is not left
+    // without any column mappings — otherwise flipping OTel on is a no-op with
+    // no recovery path (every manual column selector is disabled while OTel is
+    // on). JSON detection is deferred to a later correction when/if the schema
+    // arrives.
     const builderOptionsDispatch = jest.fn();
 
     type Props = { enabled: boolean; cols: TableColumn[] };
@@ -197,13 +202,41 @@ describe('useOtelColumns', () => {
       { initialProps: { enabled: false, cols: [] as TableColumn[] } }
     );
 
-    // Toggle on but schema hasn't arrived yet
+    // Toggle on while the schema is still empty (loading or fetch failed).
     hook.rerender({ enabled: true, cols: [] });
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
-
-    // Schema loads — single dispatch with correct tagsAreJSON
-    hook.rerender({ enabled: true, cols: makeAllColumns() });
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+
+    const payload = builderOptionsDispatch.mock.calls[0][0].payload;
+    const dispatchedColumns: SelectedColumn[] = payload.columns;
+    expect(dispatchedColumns.find((c) => c.hint === ColumnHint.TraceId)).toBeDefined();
+    expect(payload.meta.tagsAreJSON).toBe(false);
+  });
+
+  it('stamps JSON via a correction once the schema loads after an empty toggle', async () => {
+    // After the immediate empty-schema dispatch, JSON type detection is still
+    // pending, so when the schema later arrives with JSON-typed tag columns a
+    // second dispatch corrects the column types.
+    const builderOptionsDispatch = jest.fn();
+    const tagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceTags)!;
+    const serviceTagsName = testOtelVersion.traceColumnMap.get(ColumnHint.TraceServiceTags)!;
+
+    type Props = { enabled: boolean; cols: TableColumn[] };
+    const hook = renderHook(
+      ({ enabled, cols }: Props) => useOtelColumns(enabled, testOtelVersion.version, cols, builderOptionsDispatch),
+      { initialProps: { enabled: false, cols: [] as TableColumn[] } }
+    );
+
+    // Toggle on with an empty schema: immediate dispatch, no JSON types yet.
+    hook.rerender({ enabled: true, cols: [] });
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+
+    // Schema arrives with JSON-typed tags: a correction dispatch stamps JSON.
+    hook.rerender({ enabled: true, cols: makeAllColumns({ [tagsName]: 'JSON', [serviceTagsName]: 'JSON' }) });
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(2);
+
+    const correctedColumns: SelectedColumn[] = builderOptionsDispatch.mock.calls[1][0].payload.columns;
+    expect(correctedColumns.find((c) => c.hint === ColumnHint.TraceTags)?.type).toBe('JSON');
+    expect(correctedColumns.find((c) => c.hint === ColumnHint.TraceServiceTags)?.type).toBe('JSON');
   });
 
   it('should re-dispatch columns when otelVersion changes while OTel is enabled', async () => {

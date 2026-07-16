@@ -18,6 +18,8 @@ const isCloudRun = !!process.env.GRAFANA_URL;
 const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
 const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
 const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
+const LOCAL_SINGLE_LOGS_UID = 'clickhouse-e2e-single-logs';
+const LOCAL_SINGLE_TRACES_UID = 'clickhouse-e2e-single-traces';
 
 // Time range that fully covers the seed fixture data in tests/e2e/fixtures/seed.sql
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
@@ -26,6 +28,7 @@ const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 interface ExploreUrlOpts {
   queryType?: QueryType;
   editorType?: EditorType;
+  datasourceUid?: string;
   from?: string;
   to?: string;
 }
@@ -37,11 +40,11 @@ interface ExploreUrlOpts {
  * queryType IS restored via the query's top-level queryType field (used by SQL mode).
  */
 function exploreUrl(opts: ExploreUrlOpts = {}): string {
-  const { from = 'now-1h', to = 'now' } = opts;
+  const { datasourceUid = DATASOURCE_UID, from = 'now-1h', to = 'now' } = opts;
 
   const query: Record<string, unknown> = {
     refId: 'A',
-    datasource: { type: PLUGIN_TYPE, uid: DATASOURCE_UID },
+    datasource: { type: PLUGIN_TYPE, uid: datasourceUid },
     editorType: 'sql',
     pluginVersion: '',
     rawSql: '',
@@ -49,7 +52,7 @@ function exploreUrl(opts: ExploreUrlOpts = {}): string {
 
   const panes = JSON.stringify({
     explore: {
-      datasource: DATASOURCE_UID,
+      datasource: datasourceUid,
       queries: [query],
       range: { from, to },
     },
@@ -163,6 +166,75 @@ test.describe('Query editor', () => {
       await expect(page.getByText('Builder Mode')).toBeVisible();
       await expect(page.getByRole('radio', { name: 'Simple' })).toBeVisible();
       await expect(page.getByRole('radio', { name: 'Aggregate' })).toBeVisible();
+    });
+  });
+
+  test.describe('Compact query mode', () => {
+    test.beforeEach(() => {
+      test.skip(
+        isCloudRun,
+        'Compact mode E2E uses local provisioned single-source datasources and seeded ClickHouse fixture tables.'
+      );
+    });
+
+    test('renders compact logs editor for single-source datasource', async ({ page, explorePage }) => {
+      await page.goto(
+        exploreUrl({
+          datasourceUid: LOCAL_SINGLE_LOGS_UID,
+          from: FIXTURE_FROM_ISO,
+          to: FIXTURE_TO_ISO,
+        })
+      );
+
+      await page.getByRole('button', { name: 'Switch to compact view' }).click();
+
+      const queryEditor = page.locator('[data-testid="query-editor-section-builder"]');
+      await expect(queryEditor.locator('[data-testid="compact-filter-bar"]')).toBeVisible();
+      await expect(page.getByPlaceholder('Search log body text...')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Add filter' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Order by' })).toBeVisible();
+      await expect(queryEditor.getByRole('button', { name: 'SQL', exact: true })).toBeVisible();
+
+      const databaseLabel = page.locator('.query-editor-row').locator('label.query-keyword', { hasText: 'Database' });
+      await expect(databaseLabel).toHaveCount(0);
+      await expect(page.getByRole('radio', { name: 'Table' })).toHaveCount(0);
+      await expect(queryEditor.locator('pre')).toHaveCount(0);
+      await expect(
+        page.getByText(/React error #185|Maximum update depth exceeded|An unexpected error occurred/i)
+      ).toHaveCount(0);
+
+      const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+      await page.getByPlaceholder('Search log body text...').fill('error');
+      await page.keyboard.press('Enter');
+      await responsePromise;
+      expect((getBody() as any)?.results?.A?.frames?.length).toBeGreaterThan(0);
+    });
+
+    test('renders compact traces editor for single-source datasource', async ({ page }) => {
+      await page.goto(
+        exploreUrl({
+          datasourceUid: LOCAL_SINGLE_TRACES_UID,
+          from: FIXTURE_FROM_ISO,
+          to: FIXTURE_TO_ISO,
+        })
+      );
+
+      await page.getByRole('button', { name: 'Switch to compact view' }).click();
+
+      const queryEditor = page.locator('[data-testid="query-editor-section-builder"]');
+      await expect(queryEditor.locator('[data-testid="compact-filter-bar"]')).toBeVisible();
+      await expect(page.getByPlaceholder('Search log body text...')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Add filter' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Order by' })).toBeVisible();
+      await expect(queryEditor.getByRole('button', { name: 'SQL', exact: true })).toBeVisible();
+
+      const databaseLabel = page.locator('.query-editor-row').locator('label.query-keyword', { hasText: 'Database' });
+      await expect(databaseLabel).toHaveCount(0);
+      await expect(page.getByRole('radio', { name: 'Table' })).toHaveCount(0);
+      await expect(queryEditor.locator('pre')).toHaveCount(0);
+      await expect(
+        page.getByText(/React error #185|Maximum update depth exceeded|An unexpected error occurred/i)
+      ).toHaveCount(0);
     });
   });
 

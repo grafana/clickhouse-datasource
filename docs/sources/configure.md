@@ -169,12 +169,12 @@ When **Secure connection** is enabled, the following TLS settings become availab
 
 Use **Configuration mode** to choose how the data source is used by the query builder.
 
-| Mode | Description |
-|------|-------------|
+| Mode              | Description                                                                                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **All databases** | Allows queries against any database and table the ClickHouse user can read. Use this mode for general exploration and dashboards that query multiple tables. |
-| **Single source** | Focuses the data source on one logs or traces table. Choose a **Signal type**, then configure the database, table, and column mappings for that source. |
+| **Single source** | Focuses the data source on one logs or traces table. Choose a **Signal type**, then configure the database, table, and column mappings for that source.      |
 
-Use **Single source** when the data source is dedicated to one logs or traces table, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query.
+Use **Single source** when the data source is dedicated to one logs or traces table, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query. Single source data sources use the [compact query mode](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#compact-query-mode) in the query editor.
 
 ### Additional settings
 
@@ -201,7 +201,7 @@ The data source includes a dedicated configuration section for log queries. Thes
 | **Default log table**    | The default table for log queries.                                                                                                                                                                                                                          |
 | **Use OTel**             | When enabled, pre-fills column mappings for [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter) tables. Select the OTel schema version that matches your exporter. |
 | **Time column**          | The high-precision timestamp column for sorting log rows.                                                                                                                                                                                                   |
-| **Filter Time column**   | A lower-precision time column for fast partition-based filtering.                                                                                                                                                                                           |
+| **Filter Time column**   | A lower-precision time column for fast partition-based filtering. Used with the `1.2.9` schema only.                                                                                                                                                        |
 | **Log Level column**     | The column containing the log severity level.                                                                                                                                                                                                               |
 | **Log Message column**   | The column containing the log message body.                                                                                                                                                                                                                 |
 | **Context columns**      | Comma-separated list of columns included alongside log messages for additional context.                                                                                                                                                                     |
@@ -223,6 +223,18 @@ The data source includes a dedicated configuration section for trace queries. Th
 When **Use OTel** is disabled, you can manually configure columns for Trace ID, Span ID, Parent Span ID, Service Name, Operation Name, Start Time, Duration, Tags, Service Tags, Kind, Status Code, Status Message, State, and Instrumentation Library.
 
 When **Configuration mode** is set to **Single source** and **Signal type** is set to **Traces**, these settings define the focused traces source.
+
+### OTel schema versions
+
+The plugin ships built-in column maps for the OpenTelemetry ClickHouse exporter's default schemas. Pick the version that matches the exporter that wrote your data:
+
+- **`auto (latest)`** — detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
+- **`1.3.0`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
+- **`1.2.9`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
+
+The trace tables (`otel_traces`, `otel_traces_trace_id_ts`) and metric tables are unchanged across these versions; only the `otel_logs` schema changed. Detection therefore only applies to logs, and traces always use the selected version's map.
+
+If queries fail with an `Unknown identifier 'TimestampTime'` error after upgrading the exporter, leave the version on `auto (latest)` and rebuild the query, or pin the schema version to `1.3.0`.
 
 ### Private data source connect
 

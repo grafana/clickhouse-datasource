@@ -58,13 +58,52 @@ const otel129: OtelVersion = {
   traceLinksColumnPrefix: 'Links',
 };
 
+// otel130 tracks the otel_logs schema produced by opentelemetry-collector-contrib's
+// clickhouseexporter starting in v0.151.0, which dropped the TimestampTime column
+// (the table now orders/partitions directly on Timestamp). FilterTime is intentionally
+// omitted from logColumnMap — sqlGenerator's getFilters() falls back to ColumnHint.Time
+// when FilterTime is unmapped, and getOrderBy() drops orderBy entries whose hint
+// doesn't resolve. See:
+//   https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720
+//   https://github.com/open-telemetry/opentelemetry-collector-contrib/issues/48770
+// otel_traces and otel_traces_trace_id_ts schemas were not changed.
+const otel130: OtelVersion = {
+  ...otel129,
+  name: '1.3.0',
+  version: '1.30.0',
+  logColumnMap: new Map<ColumnHint, string>([
+    [ColumnHint.Time, 'Timestamp'],
+    [ColumnHint.LogMessage, 'Body'],
+    [ColumnHint.LogLevel, 'SeverityText'],
+    [ColumnHint.TraceId, 'TraceId'],
+    [ColumnHint.ResourceAttributes, 'ResourceAttributes'],
+    [ColumnHint.ScopeAttributes, 'ScopeAttributes'],
+    [ColumnHint.LogAttributes, 'LogAttributes'],
+  ]),
+};
+
 export const versions: readonly OtelVersion[] = [
-  // When selected, will always keep OTEL config up to date as new versions are added
-  { ...otel129, name: `latest (${otel129.name})`, version: 'latest' },
+  // When selected, the log schema version is detected from the table's columns
+  // (see detectLogsVersion). The static map here is the fallback for paths that
+  // can't inspect the table, and always tracks the newest schema.
+  { ...otel130, name: 'auto (latest)', version: 'latest' },
+  otel130,
   otel129,
 ];
 
 export const getLatestVersion = (): OtelVersion => versions[0];
+
+/**
+ * Picks the log schema version that matches an actual table's columns.
+ * The collector's migration is non-destructive, so both schema generations
+ * coexist in the wild: tables created before clickhouseexporter v0.151.0 keep
+ * their TimestampTime column, tables created after don't have it.
+ * TimestampTime is the only column that distinguishes the two, so its
+ * presence is the whole probe. Callers that pin an explicit version bypass
+ * this entirely.
+ */
+export const detectLogsVersion = (columnNames: readonly string[]): OtelVersion =>
+  columnNames.includes('TimestampTime') ? otel129 : otel130;
 export const getVersion = (version: string | undefined): OtelVersion | undefined => {
   if (!version) {
     return;
@@ -76,6 +115,7 @@ export const getVersion = (version: string | undefined): OtelVersion | undefined
 export default {
   traceTimestampTableSuffix,
   versions,
+  detectLogsVersion,
   getLatestVersion,
   getVersion,
 };

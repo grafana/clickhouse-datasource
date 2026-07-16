@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { QueryEditorProps } from '@grafana/data';
-import { CodeEditor, monacoTypes } from '@grafana/ui';
+import { CodeEditor, InlineFieldRow, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
 import { CHConfig } from 'types/config';
@@ -114,9 +114,9 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   return (
     <>
-      <div className={'gf-form ' + styles.QueryEditor.queryType}>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={queryType} onChange={(queryType) => saveChanges({ queryType })} sqlEditor />
-      </div>
+      </InlineFieldRow>
       <div className={styles.Common.wrapper}>
         <CodeEditor
           aria-label="SQL Editor"

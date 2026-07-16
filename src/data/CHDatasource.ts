@@ -9,6 +9,7 @@ import {
   DataSourceWithLogsLabelTypesSupport,
   DataSourceWithQueryModificationSupport,
   DataSourceWithSupplementaryQueriesSupport,
+  DataSourceWithToggleableQueryFiltersSupport,
   Field,
   getTimeZone,
   getTimeZoneInfo,
@@ -16,10 +17,12 @@ import {
   LogRowContextQueryDirection,
   LogRowModel,
   MetricFindValue,
+  QueryFilterOptions,
   QueryFixAction,
   ScopedVars,
   SupplementaryQueryOptions,
   SupplementaryQueryType,
+  ToggleFilterAction,
   TypedVariableModel,
 } from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
@@ -29,7 +32,7 @@ import { cloneDeep, isEmpty, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
-import { CHConfig } from 'types/config';
+import { CHConfig, ConfigMode, SignalType } from 'types/config';
 import {
   AggregateColumn,
   AggregateType,
@@ -39,6 +42,7 @@ import {
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
+  StringFilter,
   QueryType,
   SelectedColumn,
   SqlFunction,
@@ -58,6 +62,143 @@ import {
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { CHVariableSupport } from './CHVariableSupport';
+import { createAnnotationSupport } from './CHAnnotationSupport';
+
+interface ResolvedColumn {
+  columnName: string;
+  mapKey: string;
+  column: SelectedColumn | undefined;
+  columnType: string;
+  hasMapKey: boolean;
+}
+
+const attributeColumnHints = new Set([
+  ColumnHint.ResourceAttributes,
+  ColumnHint.ScopeAttributes,
+  ColumnHint.LogAttributes,
+]);
+const legacyAttributeColumns = new Set(['ResourceAttributes', 'ScopeAttributes', 'LogAttributes']);
+
+// A Map or JSON column can hold OTel attribute map keys; both are treated as attribute
+// columns for map-key splitting and value typing. Shared so the checks stay in sync.
+const isAttributeColumnType = (type?: string): boolean => Boolean(type?.startsWith('Map') || type?.startsWith('JSON'));
+
+// Columns the trace-ID optimization's WITH clause reads from the
+// `<table><suffix>` companion table. The optimization is only safe when the
+// companion actually exposes all of them.
+const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
+
+// Row cap for the Map-key discovery probe on free-form tables (no known time
+// column to prune by). Bounds the scan to a sample instead of the whole column.
+const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
+
+function getAttributeColumnByDisplayPrefix(
+  builderOptions: QueryBuilderOptions,
+  columnPrefix: string
+): SelectedColumn | undefined {
+  const normalizedPrefix = normalizeLogFieldName(columnPrefix);
+
+  return builderOptions.columns?.find((column) => {
+    const isAttributeHint = column.hint ? attributeColumnHints.has(column.hint) : false;
+    const isAttributeType = isAttributeColumnType(column.type);
+    if (!isAttributeHint && !isAttributeType) {
+      return false;
+    }
+
+    const candidates = isAttributeHint ? [column.name, column.alias, column.hint] : [column.name, column.alias];
+    return candidates.filter(isString).some((candidate) => normalizeLogFieldName(candidate) === normalizedPrefix);
+  });
+}
+
+/**
+ * Resolve a filter key to a column in the builder options, handling OTel map key
+ * splitting and alias/hint lookup. `knownColumns` (the live table schema, when
+ * available) lets us split and type any Map/JSON attribute column, including ones
+ * the selected-column list stores without a type.
+ */
+function resolveFilterColumn(
+  builderOptions: QueryBuilderOptions,
+  key: string,
+  knownColumns?: readonly TableColumn[]
+): ResolvedColumn {
+  let columnName = key;
+  let mapKey = '';
+
+  // Convert flattened/merged OTel attributes into a column+path pair.
+  const prefixIndex = columnName.indexOf('.');
+  if (prefixIndex > -1) {
+    const columnPrefix = columnName.substring(0, prefixIndex);
+    const attributeColumn = getAttributeColumnByDisplayPrefix(builderOptions, columnPrefix);
+    if (attributeColumn) {
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = attributeColumn.alias || attributeColumn.name;
+    } else if (legacyAttributeColumns.has(columnPrefix)) {
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = columnPrefix;
+    } else if (knownColumns?.some((c) => c.name === columnPrefix && isAttributeColumnType(c.type))) {
+      // Split any Map/JSON attribute column detected from the live schema (e.g.
+      // traces' SpanAttributes or a non-OTel Map column), even when the selected
+      // column carries no type.
+      mapKey = columnName.substring(prefixIndex + 1);
+      columnName = columnPrefix;
+    }
+  }
+
+  // Find selected column by alias/name
+  const lookupByAlias = builderOptions.columns?.find((c) => c.alias === columnName);
+  const lookupByName = builderOptions.columns?.find((c) => c.name === columnName);
+  const lookupByLogsAlias = logAliasToColumnHints.has(columnName)
+    ? getColumnByHint(builderOptions, logAliasToColumnHints.get(columnName)!)
+    : undefined;
+  const column = lookupByAlias || lookupByName || lookupByLogsAlias;
+
+  // Prefer the selected column's type, but fall back to the live schema type so map-key
+  // filters resolve Map vs JSON authoritatively even when the selected column is stored
+  // without a type (the default OTel columns are). Look up by the real column name, not
+  // `columnName`, which may be an alias and would miss the schema.
+  const schemaLookupName = column?.name ?? columnName;
+  const columnType = column?.type || knownColumns?.find((c) => c.name === schemaLookupName)?.type || '';
+
+  return {
+    columnName,
+    mapKey,
+    column,
+    columnType,
+    hasMapKey: mapKey !== '',
+  };
+}
+
+/** Build a filter object from resolved column info. */
+function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'], value: string): Filter {
+  return {
+    condition: 'AND',
+    key: resolved.column?.hint ? '' : resolved.columnName,
+    hint: resolved.column?.hint || undefined,
+    mapKey: resolved.hasMapKey ? resolved.mapKey : undefined,
+    // Map columns use bracket access (`col['key']`); only genuine JSON columns use
+    // the dot-path branch. Default an unknown-type attribute filter to Map, which
+    // matches the standard OTel schema and avoids emitting invalid `col.key` SQL.
+    type: resolved.hasMapKey ? (resolved.columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'string',
+    filterType: 'custom',
+    operator,
+    value,
+  };
+}
+
+/** Check whether a filter targets the same column as a resolved column reference. */
+function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
+  // Compare the owning column the same way in both branches: by hint when both
+  // sides carry one, otherwise by key/name. Without this, a map-key filter
+  // matches on key + type family alone, so a filter stored against one
+  // attribute column (e.g. LogAttributes) collides with a different attribute
+  // column that happens to share the same map key (e.g. ResourceAttributes).
+  const sameColumn = resolved.column?.hint && f.hint ? f.hint === resolved.column.hint : f.key === resolved.columnName;
+  if (resolved.hasMapKey) {
+    return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey && sameColumn;
+  }
+  return f.type === 'string' && sameColumn;
+}
 
 export class Datasource
   extends DataSourceWithBackend<CHQuery, CHConfig>
@@ -65,10 +206,9 @@ export class Datasource
     DataSourceWithSupplementaryQueriesSupport<CHQuery>,
     DataSourceWithLogsContextSupport<CHQuery>,
     DataSourceWithLogsLabelTypesSupport,
-    DataSourceWithQueryModificationSupport<CHQuery>
+    DataSourceWithQueryModificationSupport<CHQuery>,
+    DataSourceWithToggleableQueryFiltersSupport<CHQuery>
 {
-  // This enables default annotation support for 7.2+
-  annotations = {};
   settings: DataSourceInstanceSettings<CHConfig>;
   adHocFilter: AdHocFilter;
   skipAdHocFilter = false; // don't apply adhoc filters to the query
@@ -98,6 +238,8 @@ export class Datasource
     super(instanceSettings);
     this.settings = instanceSettings;
     this.adHocFilter = new AdHocFilter();
+    this.variables = new CHVariableSupport(this);
+    this.annotations = createAnnotationSupport(this);
   }
 
   static logVolumePrefix = 'log-volume-';
@@ -502,24 +644,8 @@ export class Datasource
     }
 
     const actionValue = action.options.value;
-    let mapKey = '';
-
-    // Convert flattened/merged OTel attributes into column+path pair
-    if (['ResourceAttributes', 'ScopeAttributes', 'LogAttributes'].includes(columnName.split('.')[0])) {
-      const prefixIndex = columnName.indexOf('.');
-      mapKey = columnName.substring(prefixIndex + 1);
-      columnName = columnName.substring(0, prefixIndex);
-    }
-
-    // Find selected column by alias/name
-    const lookupByAlias = query.builderOptions.columns?.find((c) => c.alias === columnName); // Check all aliases first,
-    const lookupByName = query.builderOptions.columns?.find((c) => c.name === columnName); // then try matching column name
-    const lookupByLogsAlias = logAliasToColumnHints.has(columnName)
-      ? getColumnByHint(query.builderOptions, logAliasToColumnHints.get(columnName)!)
-      : undefined;
-    const column = lookupByAlias || lookupByName || lookupByLogsAlias;
-    const columnType = column ? column.type || '' : '';
-    const hasMapKey = mapKey !== '';
+    const knownColumns = this.getCachedColumns(query.builderOptions.database, query.builderOptions.table);
+    const resolved = resolveFilterColumn(query.builderOptions, columnName, knownColumns);
 
     let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
     if (action.type === 'ADD_FILTER') {
@@ -528,33 +654,14 @@ export class Datasource
       nextFilters = nextFilters.filter(
         (f) =>
           !(
-            f.type === 'string' &&
-            (column && column.hint && f.hint ? f.hint === column.hint : f.key === columnName) &&
-            (f.operator === FilterOperator.IsAnything ||
-              f.operator === FilterOperator.Equals ||
-              f.operator === FilterOperator.NotEquals)
-          ) &&
-          !(
-            (f.type.startsWith('Map') || f.type.startsWith('JSON')) &&
-            column &&
-            hasMapKey &&
-            f.mapKey === mapKey &&
+            filterMatchesColumn(f, resolved) &&
             (f.operator === FilterOperator.IsAnything ||
               f.operator === FilterOperator.Equals ||
               f.operator === FilterOperator.NotEquals)
           )
       );
 
-      nextFilters.push({
-        condition: 'AND',
-        key: column && column.hint ? '' : columnName,
-        hint: column && column.hint ? column.hint : undefined,
-        mapKey: hasMapKey ? mapKey : undefined,
-        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
-        filterType: 'custom',
-        operator: FilterOperator.Equals,
-        value: actionValue,
-      });
+      nextFilters.push(buildFilter(resolved, FilterOperator.Equals, actionValue));
     } else if (action.type === 'ADD_FILTER_OUT') {
       // with this we might want to add multiple values as NE filters
       // for example, `level != info` AND `level != debug`
@@ -562,36 +669,20 @@ export class Datasource
       nextFilters = nextFilters.filter(
         (f) =>
           !(
-            (f.type === 'string' &&
-              (column && column.hint && f.hint ? f.hint === column.hint : f.key === columnName) &&
+            (filterMatchesColumn(f, resolved) &&
               'value' in f &&
               f.value === actionValue &&
               (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.NotEquals)) ||
-            (f.type === 'string' &&
-              (column && column.hint && f.hint ? f.hint === column.hint : f.key === columnName) &&
-              (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals)) ||
-            ((f.type.startsWith('Map') || f.type.startsWith('JSON')) &&
-              column &&
-              hasMapKey &&
-              f.mapKey === mapKey &&
+            (filterMatchesColumn(f, resolved) &&
               (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals))
           )
       );
 
-      nextFilters.push({
-        condition: 'AND',
-        key: column && column.hint ? '' : columnName,
-        hint: column && column.hint ? column.hint : undefined,
-        mapKey: hasMapKey ? mapKey : undefined,
-        type: hasMapKey ? (columnType.startsWith('Map') ? 'Map(String, String)' : 'JSON') : 'String',
-        filterType: 'custom',
-        operator: FilterOperator.NotEquals,
-        value: actionValue,
-      });
+      nextFilters.push(buildFilter(resolved, FilterOperator.NotEquals, actionValue));
     } else if (action.type === 'ADD_STRING_FILTER') {
       nextFilters.push({
         condition: 'AND',
-        key: columnName,
+        key: resolved.columnName,
         filterType: 'custom',
         type: 'string',
         operator: FilterOperator.ILike,
@@ -600,7 +691,7 @@ export class Datasource
     } else if (action.type === 'ADD_STRING_FILTER_OUT') {
       nextFilters.push({
         condition: 'AND',
-        key: columnName,
+        key: resolved.columnName,
         filterType: 'custom',
         type: 'string',
         operator: FilterOperator.NotILike,
@@ -609,6 +700,99 @@ export class Datasource
     }
 
     // the query is updated to trigger the URL update and propagation to the panels
+    const nextOptions = { ...query.builderOptions, filters: nextFilters };
+    return {
+      ...query,
+      rawSql: generateSql(nextOptions),
+      builderOptions: nextOptions,
+    };
+  }
+
+  queryHasFilter(query: CHQuery, filter: QueryFilterOptions): boolean {
+    if (query.editorType !== EditorType.Builder) {
+      return false;
+    }
+
+    const key = filter.key;
+    const value = filter.value;
+    // Guard on key only: an empty-string value is still a valid, filterable value.
+    if (!key) {
+      return false;
+    }
+
+    const resolved = resolveFilterColumn(query.builderOptions, key);
+    const filters = query.builderOptions.filters || [];
+
+    return filters.some(
+      (f) =>
+        filterMatchesColumn(f, resolved) &&
+        f.operator === FilterOperator.Equals &&
+        'value' in f &&
+        String(f.value) === value
+    );
+  }
+
+  toggleQueryFilter(query: CHQuery, filter: ToggleFilterAction): CHQuery {
+    if (query.editorType !== EditorType.Builder) {
+      return query;
+    }
+
+    const key = filter.options.key;
+    const value = filter.options.value;
+    // Guard on key only: an empty-string value is still a valid, filterable value.
+    if (!key) {
+      return query;
+    }
+
+    const knownColumns = this.getCachedColumns(query.builderOptions.database, query.builderOptions.table);
+    const resolved = resolveFilterColumn(query.builderOptions, key, knownColumns);
+    const targetOperator = filter.type === 'FILTER_FOR' ? FilterOperator.Equals : FilterOperator.NotEquals;
+    const oppositeOperator = filter.type === 'FILTER_FOR' ? FilterOperator.NotEquals : FilterOperator.Equals;
+
+    let nextFilters: Filter[] = query.builderOptions.filters?.slice() || [];
+
+    // Check if the exact filter already exists (toggle off)
+    const exactMatchIndex = nextFilters.findIndex(
+      (f) =>
+        filterMatchesColumn(f, resolved) && f.operator === targetOperator && 'value' in f && String(f.value) === value
+    );
+
+    if (exactMatchIndex !== -1) {
+      // Toggle off: remove the existing filter
+      nextFilters.splice(exactMatchIndex, 1);
+    } else {
+      if (filter.type === 'FILTER_FOR') {
+        // Equals targets a single value, so remove any existing IsAnything/Equals/NotEquals
+        // on this column (mirrors modifyQuery's ADD_FILTER). Otherwise filtering for a new
+        // value while one is already set produces contradictory filters like
+        // `level = 'info' AND level = 'error'`, which match zero rows.
+        nextFilters = nextFilters.filter(
+          (f) =>
+            !(
+              filterMatchesColumn(f, resolved) &&
+              (f.operator === FilterOperator.IsAnything ||
+                f.operator === FilterOperator.Equals ||
+                f.operator === FilterOperator.NotEquals)
+            )
+        );
+      } else {
+        // NotEquals filters can accumulate (`!= a AND != b`), so only remove the opposite
+        // Equals filter at the same value.
+        nextFilters = nextFilters.filter(
+          (f) =>
+            !(
+              filterMatchesColumn(f, resolved) &&
+              f.operator === oppositeOperator &&
+              'value' in f &&
+              String(f.value) === value
+            )
+        );
+      }
+
+      // Add the new filter
+      nextFilters.push(buildFilter(resolved, targetOperator, value));
+    }
+
     const nextOptions = { ...query.builderOptions, filters: nextFilters };
     return {
       ...query,
@@ -663,6 +847,22 @@ export class Datasource
 
   getDefaultTable(): string | undefined {
     return this.settings.jsonData.defaultTable;
+  }
+
+  getSignalType(): SignalType | undefined {
+    return this.settings.jsonData.signalType;
+  }
+
+  getConfigMode(): ConfigMode {
+    if (this.settings.jsonData.configMode) {
+      return this.settings.jsonData.configMode;
+    }
+
+    return this.getSignalType() ? 'single-table' : 'classic';
+  }
+
+  isSingleTableMode(): boolean {
+    return this.getConfigMode() === 'single-table' && Boolean(this.getSignalType());
   }
 
   getDefaultLogsDatabase(): string | undefined {
@@ -791,10 +991,16 @@ export class Datasource
   }
 
   /**
-   * Resolves whether the `<table>_trace_id_ts` companion exists for the given
-   * (database, table). Caches the Promise so concurrent and repeat callers share
-   * a single `SHOW TABLES` round-trip; on failure, evicts so the next caller
-   * retries and meanwhile returns `false` (the safe, unoptimized path).
+   * Resolves whether the `<table>_trace_id_ts` companion is usable for the
+   * trace-ID lookup optimization: it must exist AND expose the Start/End/TraceId
+   * columns that the generated WITH clause hardcodes. A companion that merely
+   * matches the suffix but has differently named columns (e.g. a non-OTel schema
+   * with trace_id/start_time/end_time) would produce an UNKNOWN_IDENTIFIER error,
+   * so it is rejected here and the query falls back to the plain filter.
+   *
+   * Caches the Promise so concurrent and repeat callers share a single
+   * round-trip; on failure, evicts so the next caller retries and meanwhile
+   * returns `false` (the safe, unoptimized path).
    */
   async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
     if (!database || !table) {
@@ -809,8 +1015,14 @@ export class Datasource
     if (!entry || entry.expiresAt <= now) {
       const pending = (async () => {
         try {
+          const companionTable = table + this.getTraceTimestampTableSuffix();
           const tables = await this.fetchTables(database);
-          return tables.includes(table + this.getTraceTimestampTableSuffix());
+          if (!tables.includes(companionTable)) {
+            return false;
+          }
+          const columns = await this.fetchColumns(database, companionTable);
+          const columnNames = new Set(columns.map((c) => c.name));
+          return TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS.every((c) => columnNames.has(c));
         } catch {
           this.traceTimestampTableCache.delete(key);
           return false;
@@ -924,18 +1136,24 @@ export class Datasource
    * When the target matches the configured OTel logs/traces table, the probe
    * is bounded to the last 6 hours via the known time column — on a
    * partitioned-by-day MergeTree this prunes to a handful of parts and avoids
-   * full-column scans (see #1843). For free-form tables the predicate is
-   * omitted because the plugin doesn't know which column is the time column.
+   * full-column scans (see #1843). For free-form tables the time column is
+   * unknown, so the probe instead reads the map column from a bounded row
+   * sample: a bare `LIMIT 1000` does NOT bound `DISTINCT arrayJoin(...)` when
+   * the map has fewer than 1000 distinct keys (the common case for labels),
+   * because DISTINCT must read every row before the limit applies — a
+   * full-column scan on very large tables.
    */
   async fetchUniqueMapKeys(mapColumn: string, db: string, table: string): Promise<string[]> {
     if (!this.isMapKeysDiscoveryEnabled()) {
       return [];
     }
+    const escapedColumn = escapeIdentifier(mapColumn);
+    const tableIdentifier = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
     const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
-    const whereClause = timeColumn
-      ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
-      : '';
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapeIdentifier(mapColumn)}.keys) as keys FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)}${whereClause} LIMIT 1000`;
+    const source = timeColumn
+      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
+    const rawSql = `SELECT DISTINCT arrayJoin(${escapedColumn}.keys) as keys FROM ${source} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -943,6 +1161,24 @@ export class Datasource
     const rawSql = keysColumn
       ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
       : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctValues(column: string, db: string, table: string): Promise<Array<string | number | boolean>> {
+    const escapedColumn = escapeIdentifier(column);
+    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  async fetchDistinctMapValues(
+    mapColumn: string,
+    mapKey: string,
+    db: string,
+    table: string
+  ): Promise<Array<string | number | boolean>> {
+    const escapedMapColumn = escapeIdentifier(mapColumn);
+    const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
+    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1118,8 +1354,27 @@ export class Datasource
    * The cache lives for the lifetime of the datasource instance, which is reset on
    * config save or page reload — short enough that stale schema is not a concern.
    */
+  private columnCacheKey(database: string | undefined, table: string): string {
+    return `${database ?? ''}\0${table}`;
+  }
+
+  /**
+   * Synchronous read of the column cache populated by getColumnsCached. Returns
+   * undefined when the schema for this table has not been fetched yet, so callers
+   * must treat the result as best-effort.
+   */
+  private getCachedColumns(
+    database: string | undefined,
+    table: string | undefined
+  ): readonly TableColumn[] | undefined {
+    if (!table) {
+      return undefined;
+    }
+    return this._columnCache.get(this.columnCacheKey(database, table));
+  }
+
   async getColumnsCached(database: string | undefined, table: string): Promise<TableColumn[]> {
-    const key = `${database ?? ''}\0${table}`;
+    const key = this.columnCacheKey(database, table);
     if (!this._columnCache.has(key)) {
       this._columnCache.set(key, await this.fetchColumns(database, table));
     }
@@ -1519,8 +1774,17 @@ export class Datasource
   private async canUseAdhocFilters(): Promise<AdHocFilterStatus> {
     this.skipAdHocFilter = true;
     const data = await this.fetchData(`SELECT version()`);
+    const versionValue = data[0];
+    if (typeof versionValue !== 'string') {
+      // `SELECT version()` occasionally returns no rows (e.g. a transient
+      // empty response right after Grafana loads). Leaving the status
+      // unresolved lets it be re-checked on the next query instead of throwing
+      // and breaking variable/template loading. See #1061.
+      console.warn('Unable to determine ClickHouse version: empty version() response');
+      return AdHocFilterStatus.none;
+    }
     try {
-      const verString = (data[0] as unknown as string).split('.');
+      const verString = versionValue.split('.');
       const ver = { major: Number.parseInt(verString[0], 10), minor: Number.parseInt(verString[1], 10) };
       return ver.major > this.adHocCHVerReq.major ||
         (ver.major === this.adHocCHVerReq.major && ver.minor >= this.adHocCHVerReq.minor)
@@ -1528,7 +1792,7 @@ export class Datasource
         : AdHocFilterStatus.disabled;
     } catch (err) {
       console.error(`Unable to parse ClickHouse version: ${err}`);
-      throw err;
+      return AdHocFilterStatus.none;
     }
   }
 
@@ -1834,7 +2098,7 @@ function isMapColumnType(type: string | undefined): boolean {
 // literal: backslash and single quote are the only characters that need
 // escaping. Use when interpolating an untrusted identifier (e.g. a Map key
 // from system.columns) into raw SQL.
-function escapeCHStringLiteral(s: string): string {
+export function escapeCHStringLiteral(s: string): string {
   return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
@@ -1843,6 +2107,8 @@ enum AdHocFilterStatus {
   enabled,
   disabled,
 }
+
+const normalizeLogFieldName = (fieldName: string): string => fieldName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
 interface Tags {
   type?: TagType;

@@ -39,3 +39,6 @@ pkg/__debug_bin
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Local dev harness (provisioning, dashboards, screenshots)
+.harness/

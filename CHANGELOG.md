@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased
+
+### Features
+
+- Add `1.3.0` OTel schema version to support `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0`+, which removed the `TimestampTime` column from `otel_logs`. The `latest` selector now points to this schema; existing data sources continue to use `1.2.9` until manually updated (#1882)
+- Auto-detect the OTel logs schema version from the table's columns when the version selector is on `auto (latest)`, removing the manual version pick for the common case. Pinned versions are unchanged (#1900)
+
+### Fixes
+
+- Fix dashboard query variables that return numeric or numeric-looking string values (for example `toString(toUnixTimestamp(...))`) failing to resolve with "Couldn't find any field of type string in the results" (#2021)
+
+## 4.19.0
+
+### Features
+
+- Compact query mode for single-table data sources (#1841)
+- Pre-built OpenTelemetry dashboards for logs, traces, and per-service deep dives (#1869)
+- Guided variable editor with column values and Map-key support (#1868)
+- Preset-driven annotation editor with change detection (#1922)
+- SchemaPicker for cascading schema navigation in the query builder (#1828)
+- Group OTel attributes in log details (#1829)
+- Native type support for SimpleAggregateFunction numeric/bool/date columns (#1928)
+- Implement DataSourceWithToggleableQueryFiltersSupport interface (#1824)
+
+### Fixes
+
+- Ad-hoc: stop Map-key filters colliding across columns; bound free-form Map-key probe (#1993)
+- Traces: recover OTel columns on schema-fetch failure and guard compact SQL switch (#1992)
+- Traces: only apply the trace-ID timestamp optimization when the companion has Start/End/TraceId columns (#1994)
+- Traces: prevent crash when running Traces queries on older Grafana (#1937)
+- Traces: preserve trace-ID link optimization on cold cache (#1919)
+- Traces: prevent crash on raw-SQL queries with a trace_id column (#1920)
+- Macros: preserve macros in queries with backslash-escaped string literals (#1991)
+- Config: restore inline required-field validation for host/port on default installs (#1995)
+- Render SimpleAggregateFunction string columns correctly (#1927)
+- Fix datasource variable refs in Data Analysis dashboard (#1896)
+
+### Refactors
+
+- Config: migrate the ClickHouse config page design to OpenFeature (#1921)
+- Macros: adopt grafana/macropro as the macro engine (#1802)
+
 ## 4.18.0
 
 ### Features

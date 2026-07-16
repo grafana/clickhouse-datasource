@@ -1,5 +1,5 @@
 import React from 'react';
-import { InlineFormLabel, Switch as GrafanaSwitch, useTheme } from '@grafana/ui';
+import { InlineField, InlineFormLabel, Switch as GrafanaSwitch, useTheme } from '@grafana/ui';
 import { styles } from 'styles';
 
 interface SwitchProps {
@@ -26,19 +26,21 @@ export const Switch = (props: SwitchProps) => {
   const labelStyle = 'query-keyword ' + (inline ? styles.QueryEditor.inlineField : '');
 
   return (
-    <div className="gf-form">
-      <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
-        {label}
-      </InlineFormLabel>
+    <InlineField
+      label={
+        <InlineFormLabel width={wide ? 12 : 8} className={labelStyle} tooltip={tooltip}>
+          {label}
+        </InlineFormLabel>
+      }
+    >
       <div style={switchContainerStyle}>
         <GrafanaSwitch
           disabled={disabled}
-          className="gf-form"
           value={value}
           onChange={(e) => onChange(e.currentTarget.checked)}
           aria-label={label}
         />
       </div>
-    </div>
+    </InlineField>
   );
 };

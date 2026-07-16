@@ -96,6 +96,16 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const fieldErrors = validation?.getErrors() ?? {};
 
+  // When the clickHouseConfigValidation feature toggle is off (the default),
+  // `validation` is undefined and `fieldErrors` is always empty — which dropped
+  // the inline required-field indicator that shipped in v4.17.0. Fall back to a
+  // structural empty check so the required host/port fields still surface an
+  // inline error on the default install, before Save & Test round-trips.
+  const hostInvalid = validation ? Boolean(fieldErrors.host) : !jsonData.host;
+  const hostError = validation ? fieldErrors.host : jsonData.host ? undefined : labels.serverAddress.error;
+  const portInvalid = validation ? Boolean(fieldErrors.port) : !jsonData.port;
+  const portError = validation ? fieldErrors.port : jsonData.port ? undefined : labels.serverPort.error;
+
   const onPortChange = (port: string) => {
     onOptionsChange({
       ...options,
@@ -294,8 +304,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           required
           label={labels.serverAddress.label}
           description={labels.serverAddress.tooltip}
-          invalid={!!fieldErrors.host}
-          error={fieldErrors.host}
+          invalid={hostInvalid}
+          error={hostError}
         >
           <Input
             name="host"
@@ -312,8 +322,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
           required
           label={labels.serverPort.label}
           description={portDescription}
-          invalid={!!fieldErrors.port}
-          error={fieldErrors.port}
+          invalid={portInvalid}
+          error={portError}
         >
           <Input
             name="port"
@@ -342,7 +352,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         <Field label={labels.secure.label} description={labels.secure.tooltip}>
           <Switch
             id="secure"
-            className="gf-form"
             value={jsonData.secure || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1SecureConnectionToggleClicked({
@@ -384,7 +393,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       <ConfigSection title="TLS / SSL Settings">
         <Field label={labels.tlsSkipVerify.label} description={labels.tlsSkipVerify.tooltip}>
           <Switch
-            className="gf-form"
             value={jsonData.tlsSkipVerify || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1SkipTLSVerifyToggleClicked({
@@ -396,7 +404,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         </Field>
         <Field label={labels.tlsClientAuth.label} description={labels.tlsClientAuth.tooltip}>
           <Switch
-            className="gf-form"
             value={jsonData.tlsAuth || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1TLSClientAuthToggleClicked({
@@ -408,7 +415,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         </Field>
         <Field label={labels.tlsAuthWithCACert.label} description={labels.tlsAuthWithCACert.tooltip}>
           <Switch
-            className="gf-form"
             value={jsonData.tlsAuthWithCACert || false}
             onChange={(e) => {
               trackingV1.trackClickhouseConfigV1WithCACertToggleClicked({ caCertToggle: e.currentTarget.checked });
@@ -587,6 +593,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               connMaxLifetime={jsonData.connMaxLifetime}
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
+              rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
               enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e)}
@@ -594,6 +601,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onConnMaxLifetimeChange={(e) => onUpdateDatasourceJsonDataOption(props, 'connMaxLifetime')(e)}
               onConnMaxIdleConnsChange={(e) => onUpdateDatasourceJsonDataOption(props, 'maxIdleConns')(e)}
               onConnMaxOpenConnsChange={(e) => onUpdateDatasourceJsonDataOption(props, 'maxOpenConns')(e)}
+              onRowCapacityHintChange={(e) => onUpdateDatasourceJsonDataOption(props, 'rowCapacityHint')(e)}
               onValidateSqlChange={(e) => onSwitchToggle('validateSql', e.currentTarget.checked)}
               onEnableMapKeysDiscoveryChange={(e) => onSwitchToggle('enableMapKeysDiscovery', e.currentTarget.checked)}
             />
@@ -631,6 +639,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               maxIdleConns={jsonData.maxIdleConns}
               maxOpenConns={jsonData.maxOpenConns}
               queryTimeout={jsonData.queryTimeout}
+              rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
               onDialTimeoutChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
@@ -639,6 +648,10 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onQueryTimeoutChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ queryTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'queryTimeout')(e);
+              }}
+              onRowCapacityHintChange={(e) => {
+                trackingV1.trackClickhouseConfigV1QuerySettings({ rowCapacityHint: Number(e.currentTarget.value) });
+                onUpdateDatasourceJsonDataOption(props, 'rowCapacityHint')(e);
               }}
               onConnMaxLifetimeChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ connMaxLifetime: Number(e.currentTarget.value) });
@@ -819,7 +832,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             <Divider />
             <Field label={labels.enableRowLimit.label} description={labels.enableRowLimit.tooltip}>
               <Switch
-                className="gf-form"
                 value={jsonData.enableRowLimit || false}
                 data-testid={labels.enableRowLimit.testid}
                 onChange={(e) => {
@@ -833,7 +845,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               description={labels.hideTableNameInAdhocFilters.tooltip}
             >
               <Switch
-                className="gf-form"
                 value={jsonData.hideTableNameInAdhocFilters || false}
                 data-testid={labels.hideTableNameInAdhocFilters.testid}
                 onChange={(e) => {
@@ -844,7 +855,6 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             {config.secureSocksDSProxyEnabled && versionGte(config.buildInfo.version, '10.0.0') && (
               <Field label={labels.secureSocksProxy.label} description={labels.secureSocksProxy.tooltip}>
                 <Switch
-                  className="gf-form"
                   value={jsonData.enableSecureSocksProxy || false}
                   onChange={(e) => onSwitchToggle('enableSecureSocksProxy', e.currentTarget.checked)}
                 />

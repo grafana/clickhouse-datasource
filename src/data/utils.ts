@@ -366,7 +366,10 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
 
     const traceIdQuery: CHBuilderQuery = {
-      datasource: datasource,
+      // Embed only a datasource ref ({ uid, type }), never the live Datasource instance:
+      // the instance is circular (datasource.variables.datasource === datasource) and Grafana's
+      // data-link scanner recurses into it, overflowing the stack on older Grafana.
+      datasource: { uid: datasource.uid, type: datasource.type },
       editorType: EditorType.Builder,
       rawSql: '',
       builderOptions: {} as QueryBuilderOptions,
@@ -509,7 +512,10 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     traceIdQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceIdQuery.builderOptions);
 
     const traceLogsQuery: CHBuilderQuery = {
-      datasource: datasource,
+      // Embed only a datasource ref ({ uid, type }), never the live Datasource instance:
+      // the instance is circular (datasource.variables.datasource === datasource) and Grafana's
+      // data-link scanner recurses into it, overflowing the stack on older Grafana.
+      datasource: { uid: datasource.uid, type: datasource.type },
       editorType: EditorType.Builder,
       rawSql: '',
       builderOptions: {} as QueryBuilderOptions,

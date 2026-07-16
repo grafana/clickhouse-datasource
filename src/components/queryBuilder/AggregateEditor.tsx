@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
-import { InlineFormLabel, Select, Button, Input, Stack } from '@grafana/ui';
+import { InlineField, InlineFormLabel, Select, Button, Input, Stack } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
@@ -138,12 +138,11 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
       {aggregates.map((aggregate, index) => {
         const key = `${index}-${aggregate.column}-${aggregate.aggregateType}-${aggregate.alias}`;
         return (
-          <div
-            className="gf-form"
+          <InlineField
+            label={index === 0 ? fieldLabel : fieldSpacer}
             key={key}
             data-testid={selectors.components.QueryBuilder.AggregateEditor.itemWrapper}
           >
-            {index === 0 ? fieldLabel : fieldSpacer}
             <Aggregate
               columnOptions={columnOptions}
               index={index}
@@ -151,12 +150,11 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
               updateAggregate={updateAggregate}
               removeAggregate={removeAggregate}
             />
-          </div>
+          </InlineField>
         );
       })}
 
-      <div className="gf-form">
-        {aggregates.length === 0 ? fieldLabel : fieldSpacer}
+      <InlineField label={aggregates.length === 0 ? fieldLabel : fieldSpacer}>
         <Button
           data-testid={selectors.components.QueryBuilder.AggregateEditor.addButton}
           icon="plus-circle"
@@ -167,7 +165,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
         >
           {addLabel}
         </Button>
-      </div>
+      </InlineField>
     </>
   );
 };
