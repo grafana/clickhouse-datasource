@@ -21,7 +21,7 @@ import { runSqlAndGetBody } from '../helpers/sqlEditor';
 // column provisioning that isn't currently wired into the e2e setup.
 // Unit tests cover the builder side.
 
-// The trace_spans fixture in tests/e2e/fixtures/trace_spans.sql seeds five
+// The trace_spans fixture in tests/fixtures/trace_spans.sql seeds five
 // spans for this trace at 2024-03-15 10:00:00–10:00:04 UTC.
 const TRACE_ID = 'e2e-trace-a';
 const EXPECTED_SPAN_COUNT = 5;

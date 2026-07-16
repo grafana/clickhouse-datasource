@@ -24,7 +24,7 @@ import {
 } from '../helpers/queryResponse';
 import { runQuery } from '../helpers/sqlEditor';
 
-// Seed table from tests/e2e/fixtures/seed.sql: 10 rows spanning
+// Seed table from tests/fixtures/seed.sql: 10 rows spanning
 // 2024-03-15 10:00-10:09 UTC with levels info (5), debug (2), warn (1)
 // and error (2).
 const SEED_DATABASE = 'e2e_test';

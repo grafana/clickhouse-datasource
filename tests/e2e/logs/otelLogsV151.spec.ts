@@ -11,7 +11,7 @@ import { runSqlAndGetBody } from '../helpers/sqlEditor';
 // default ORDER BY.
 //
 // This test exercises the SQL the plugin generates against a real otel_logs-shaped
-// table matching the v0.151.0 layout (tests/e2e/fixtures/otel_logs_v0151.sql) and
+// table matching the v0.151.0 layout (tests/fixtures/otel_logs_v0151.sql) and
 // asserts:
 //   1. The query succeeds (no "Unknown identifier 'TimestampTime'" error)
 //   2. Rows are returned for the seeded data

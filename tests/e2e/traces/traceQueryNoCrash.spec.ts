@@ -55,7 +55,7 @@ function collectClientErrors(page: Page): { getErrors: () => string[] } {
 }
 
 // Builder options for a Traces query against trace_spans (fixture
-// tests/e2e/fixtures/trace_spans.sql seeds spans for e2e-trace-a and
+// tests/fixtures/trace_spans.sql seeds spans for e2e-trace-a and
 // e2e-trace-b between 2024-03-15 10:00:00 and 10:00:10 UTC). A builder query
 // (queryType=traces) is used deliberately: it always attaches the View trace /
 // View logs data links — the exact path that crashed — without needing

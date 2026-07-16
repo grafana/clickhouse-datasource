@@ -14,7 +14,7 @@ import { frameValues, QueryDataBody, rowCount } from '../helpers/queryResponse';
 // $__conditionalAll historically broke when the variable state shape changed
 // (#262: empty/All values must collapse to a no-op predicate).
 //
-// The dashboard under test is tests/e2e/dashboards/variables-dashboard.json,
+// The dashboard under test is tests/fixtures/dashboards/variables-dashboard.json,
 // imported fresh via the HTTP API in beforeEach so saved state from a prior
 // run can never leak in. Variable values are set through the dashboard URL
 // (var-service=...), which is stable across Grafana versions, rather than by
@@ -25,7 +25,7 @@ const DASHBOARD_UID = 'e2e-variables-dash';
 // Parsed once per worker. resolveJsonModule is not relied on because the
 // e2e specs sit outside the tsconfig include set.
 const dashboardJson = JSON.parse(
-  readFileSync(join(__dirname, '..', 'dashboards', 'variables-dashboard.json'), 'utf-8')
+  readFileSync(join(__dirname, '..', '..', 'fixtures', 'dashboards', 'variables-dashboard.json'), 'utf-8')
 ) as Record<string, unknown>;
 
 // Shape of the /api/ds/query POST body this spec drills into: one target per
@@ -94,7 +94,7 @@ function dashboardParams(...serviceValues: string[]): URLSearchParams {
   return params;
 }
 
-// Seeded service counts in e2e_test.events (tests/e2e/fixtures/seed.sql):
+// Seeded service counts in e2e_test.events (tests/fixtures/seed.sql):
 // api=3, worker=3, cache=1, scheduler=2, db=1; 10 rows in total.
 
 test.describe('Dashboard variable interpolation', () => {

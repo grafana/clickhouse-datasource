@@ -11,7 +11,7 @@ import { runSqlAndGetBody } from '../helpers/sqlEditor';
 //   Optimised  – WITH __gf_trace_id / __gf_trace_start / __gf_trace_end + Timestamp bounds
 //   Fallback   – plain WHERE traceID = '<id>'
 //
-// Fixture: tests/e2e/fixtures/trace_id_ts.sql creates
+// Fixture: tests/fixtures/trace_id_ts.sql creates
 //   e2e_test.trace_ts_spans            (5 spans for trace-a, 1 for trace-b)
 //   e2e_test.trace_ts_spans_trace_id_ts (companion entry for trace-a ONLY)
 //

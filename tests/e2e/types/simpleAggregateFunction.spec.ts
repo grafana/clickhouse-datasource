@@ -8,7 +8,7 @@ import { runSqlAndGetBody } from '../helpers/sqlEditor';
 // unwrap SimpleAggregateFunction(fn, T) to the inner type T when converting
 // rows to frames. Unit tests cover the type-mapping table; only a query against
 // a real ClickHouse AggregatingMergeTree confirms the driver round-trip for
-// each inner type (tests/e2e/fixtures/simple_aggregate_functions.sql seeds
+// each inner type (tests/fixtures/simple_aggregate_functions.sql seeds
 // e2e_test.simple_aggregate_events with 5 rows).
 
 test.describe('SimpleAggregateFunction type handling', () => {

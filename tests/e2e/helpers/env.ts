@@ -24,18 +24,18 @@ export const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFA
 export const SINGLE_LOGS_DATASOURCE_UID = 'clickhouse-e2e-single-logs';
 export const SINGLE_TRACES_DATASOURCE_UID = 'clickhouse-e2e-single-traces';
 
-// Time range that fully covers the seed fixture data in tests/e2e/fixtures/
+// Time range that fully covers the seed fixture data in tests/fixtures/
 // (all fixture rows sit at 2024-03-15 10:00-10:09 UTC).
 export const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 export const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 
 /**
  * Skip fixture-dependent tests on Cloud runs. Call from a test.beforeEach in
- * any suite that queries tables seeded by tests/e2e/fixtures/*.sql.
+ * any suite that queries tables seeded by tests/fixtures/*.sql.
  */
 export function skipFixtureTestsOnCloud(fixtureFile: string) {
   test.skip(
     isCloudRun,
-    `Fixture-data tests depend on tables seeded by tests/e2e/fixtures/${fixtureFile} via the local e2e-data-loader Docker service, which is not available on Cloud.`
+    `Fixture-data tests depend on tables seeded by tests/fixtures/${fixtureFile} via the local e2e-data-loader Docker service, which is not available on Cloud.`
   );
 }

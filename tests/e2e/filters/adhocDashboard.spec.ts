@@ -20,7 +20,7 @@ import { QueryDataBody, rowCount } from '../helpers/queryResponse';
 // This spec covers that end-to-end loop, asserting on the outgoing
 // /api/ds/query bodies and exact fixture row counts.
 //
-// The dashboard under test lives in tests/e2e/dashboards/adhoc-dashboard.json
+// The dashboard under test lives in tests/fixtures/dashboards/adhoc-dashboard.json
 // and is imported through the HTTP API in a beforeEach. Its saved time range
 // pins the seed fixture window, so no Explore URL plumbing is needed.
 //
@@ -31,7 +31,7 @@ import { QueryDataBody, rowCount } from '../helpers/queryResponse';
 // ---------------------------------------------------------------------------
 
 const DASHBOARD_UID = 'e2e-adhoc-dash';
-const DASHBOARD_JSON_PATH = join(__dirname, '..', 'dashboards', 'adhoc-dashboard.json');
+const DASHBOARD_JSON_PATH = join(__dirname, '..', '..', 'fixtures', 'dashboards', 'adhoc-dashboard.json');
 
 // Label of the adhoc variable in the dashboard JSON; used to anchor the
 // picker input the same way Grafana core's own adhoc Playwright tests do.

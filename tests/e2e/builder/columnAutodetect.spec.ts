@@ -10,7 +10,7 @@ import { builderFieldRow, pickBuilderSelect, switchToBuilderMode } from '../help
 import { FIXTURE_FROM_ISO, FIXTURE_TO_ISO, skipFixtureTestsOnCloud } from '../helpers/env';
 import { exploreUrl } from '../helpers/explore';
 
-// Seed database + table from tests/e2e/fixtures/seed.sql. Chosen deliberately so the
+// Seed database + table from tests/fixtures/seed.sql. Chosen deliberately so the
 // column names (`timestamp`, `message`, `level`) match the Layer 2 heuristics.
 const SEED_DATABASE = 'e2e_test';
 const SEED_TABLE = 'events';

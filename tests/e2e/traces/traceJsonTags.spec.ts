@@ -20,7 +20,7 @@ import { runSqlAndGetBody } from '../helpers/sqlEditor';
 //   B. The tags/serviceTags values in the response body are non-null JSON
 //      objects (confirming ClickHouse returned JSON data, not an error).
 //
-// Fixture data is in tests/e2e/fixtures/trace_spans_json.sql (3 spans for
+// Fixture data is in tests/fixtures/trace_spans_json.sql (3 spans for
 // trace 'e2e-json-trace-a').
 
 const TRACE_ID = 'e2e-json-trace-a';

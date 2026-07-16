@@ -13,7 +13,7 @@ import { runSqlAndGetBody } from '../helpers/sqlEditor';
 // and calculated interval into the query context, nor that ClickHouse parses
 // and executes the expanded SQL. Each test here runs a macro through the full
 // Explore round trip and asserts exact row counts and values against the
-// seeded fixture (tests/e2e/fixtures/macro_events.sql: 12 rows spaced 30
+// seeded fixture (tests/fixtures/macro_events.sql: 12 rows spaced 30
 // seconds apart from 2024-03-15 10:00:00 UTC, values counting up 1..12).
 
 // Epoch milliseconds for the pinned fixture window bounds. $__fromTime and
