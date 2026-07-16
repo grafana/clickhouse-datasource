@@ -1,14 +1,15 @@
 import { expect, test } from '@grafana/plugin-e2e';
-import { Page } from '@playwright/test';
-import { CHConfig } from '../../src/types/config';
+import type { Page } from '@playwright/test';
+import { CHConfig } from '../../../src/types/config';
+import { isCloudRun, PLUGIN_TYPE } from '../helpers/env';
 
-const PLUGIN_UID = 'grafana-clickhouse-datasource';
+// E2E coverage for the datasource config editor: section rendering across the
+// V1 and V2 (newClickhouseConfigPageDesign) layouts, provisioned values, and
+// save & test health checks against a real ClickHouse instance. Unit tests
+// cover the editor's change handlers; only E2E can confirm the full
+// Grafana-to-backend health check round-trip and the rendered form behaviour.
+
 const PROVISIONING_FILE = 'clickhouse.yml';
-
-// GRAFANA_URL is set only by the Cloud cron workflow (playwright-cloud). Local and PR CI
-// don't set it, so its presence is a reliable signal that we're running against a shared
-// Cloud instance where the local provisioning/datasources/clickhouse.yml is not applied.
-const isCloudRun = !!process.env.GRAFANA_URL;
 
 function resolveClickhouseUrl(env = process.env) {
   const { CI, DS_INSTANCE_HOST } = env;
@@ -35,8 +36,8 @@ async function isV2Editor(page: Page): Promise<boolean> {
 
 test.describe('Config editor', () => {
   test.describe('rendering', () => {
-    test('smoke: should render config editor', { tag: ['@plugins'] }, async ({ createDataSourceConfigPage, page }) => {
-      await createDataSourceConfigPage({ type: PLUGIN_UID });
+    test('smoke: renders config editor', { tag: ['@plugins'] }, async ({ createDataSourceConfigPage, page }) => {
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       // V2 renders section titles inside CollapsableSection: the toggle button gets
       // aria-label pointing to the label div, so getByRole('button') is the right selector.
@@ -47,8 +48,8 @@ test.describe('Config editor', () => {
       ).toBeVisible();
     });
 
-    test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
-      await createDataSourceConfigPage({ type: PLUGIN_UID });
+    test('renders Server section', async ({ createDataSourceConfigPage, page }) => {
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await expect(
         isV2
@@ -61,8 +62,8 @@ test.describe('Config editor', () => {
       await expect(page.getByRole('radio', { name: 'HTTP' })).toBeVisible();
     });
 
-    test('should render TLS / SSL Settings section', async ({ createDataSourceConfigPage, page }) => {
-      await createDataSourceConfigPage({ type: PLUGIN_UID });
+    test('renders TLS / SSL Settings section', async ({ createDataSourceConfigPage, page }) => {
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       if (isV2) {
         await expect(page.getByRole('button', { name: 'TLS/SSL settings' })).toBeVisible();
@@ -77,8 +78,8 @@ test.describe('Config editor', () => {
       await expect(page.getByText('TLS Client Auth').first()).toBeVisible();
     });
 
-    test('should render Credentials section', async ({ createDataSourceConfigPage, page }) => {
-      await createDataSourceConfigPage({ type: PLUGIN_UID });
+    test('renders Credentials section', async ({ createDataSourceConfigPage, page }) => {
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await expect(
         isV2
@@ -151,7 +152,7 @@ test.describe('Config editor', () => {
         isCloudRun,
         'Ad-hoc save & test connectivity is not reliable on the shared Cloud instance; covered by local/PR CI.'
       );
-      const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
       if (isV2) {
@@ -179,7 +180,7 @@ test.describe('Config editor', () => {
         'Ad-hoc save & test connectivity is not reliable on the shared Cloud instance; covered by local/PR CI.'
       );
 
-      const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
       await page.getByPlaceholder(isV2 ? 'Enter server port' : '9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
@@ -196,8 +197,77 @@ test.describe('Config editor', () => {
       await expect(configPage).toHaveAlert('success', { hasNotText: 'Datasource updated' });
     });
 
+    test('health check passes over the HTTP protocol', async ({ createDataSourceConfigPage, page }) => {
+      // Requires ClickHouse to be reachable FROM INSIDE the Grafana container.
+      // In Docker Compose, set DS_INSTANCE_HOST=clickhouse-server. Skipped otherwise.
+      test.skip(
+        !process.env.CI && !process.env.DS_INSTANCE_HOST,
+        'ClickHouse must be reachable from inside Grafana; set DS_INSTANCE_HOST or run in CI'
+      );
+      // Same Cloud constraint as the valid-credentials test: the managed ClickHouse host is
+      // cluster-internal (PDC only), so an ad-hoc save & test health check hangs.
+      test.skip(
+        isCloudRun,
+        'Ad-hoc save & test connectivity is not reliable on the shared Cloud instance; covered by local/PR CI.'
+      );
+
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+      const isV2 = await isV2Editor(page);
+      await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
+      // The V1 port placeholder tracks the protocol's default port, so after
+      // switching protocol we target the input by its accessible name instead.
+      await page.getByRole('radio', { name: 'HTTP' }).click();
+      // 8123 is ClickHouse's default HTTP interface port, which the e2e
+      // clickhouse-server container listens on alongside native 9000.
+      await page.getByRole('spinbutton', { name: 'Server port' }).fill('8123');
+      await page
+        .getByPlaceholder(isV2 ? 'Enter username' : 'default')
+        .fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
+      await page.getByPlaceholder(isV2 ? 'Enter password' : 'password').fill(process.env.DS_INSTANCE_PASSWORD ?? '');
+
+      if (process.env.DS_PDC_NETWORK_NAME) {
+        await configurePDC(page, process.env.DS_PDC_NETWORK_NAME);
+      }
+
+      await configPage.saveAndTest();
+      await expect(configPage).toHaveAlert('success', { hasNotText: 'Datasource updated' });
+    });
+
+    test('switching protocol updates the default port', async ({ createDataSourceConfigPage, page }) => {
+      // Pure UI test: no health check runs, so no connectivity or Cloud skip is needed.
+      // Neither editor writes the default into the stored port value on protocol change
+      // (onProtocolToggle in CHConfigEditor.tsx and ServerAndEncryptionSection.tsx only
+      // sets jsonData.protocol). V1 surfaces the default as the port input's placeholder,
+      // V2 keeps a static placeholder and surfaces it in the field description text.
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+      const isV2 = await isV2Editor(page);
+
+      // Fresh datasource: useConfigDefaults (CHConfigEditorHooks.ts) applies
+      // protocol=native and leaves secure connection off, so the suggested
+      // default port starts in the insecure Native family (9000).
+      await expect(page.getByRole('radio', { name: 'Native' })).toBeChecked();
+      const portInput = page.getByRole('spinbutton', { name: 'Server port' });
+
+      if (isV2) {
+        await expect(page.getByText('(default for Native: 9000)')).toBeVisible();
+        await page.getByRole('radio', { name: 'HTTP' }).click();
+        await expect(page.getByText('(default for HTTP: 8123)')).toBeVisible();
+        await page.getByRole('radio', { name: 'Native' }).click();
+        await expect(page.getByText('(default for Native: 9000)')).toBeVisible();
+      } else {
+        await expect(portInput).toHaveAttribute('placeholder', '9000');
+        await page.getByRole('radio', { name: 'HTTP' }).click();
+        await expect(portInput).toHaveAttribute('placeholder', '8123');
+        await page.getByRole('radio', { name: 'Native' }).click();
+        await expect(portInput).toHaveAttribute('placeholder', '9000');
+      }
+
+      // The stored port value itself is never auto-filled by a protocol flip.
+      await expect(portInput).toHaveValue('');
+    });
+
     test('mandatory fields should show error if left empty', async ({ createDataSourceConfigPage, page }) => {
-      const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      await createDataSourceConfigPage({ type: PLUGIN_TYPE });
 
       // This test requires the V2 config editor (newClickhouseConfigPageDesign feature toggle).
       // The V2 editor shows inline validation errors on blur; V1 only shows them after save.
