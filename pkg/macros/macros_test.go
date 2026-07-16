@@ -318,6 +318,57 @@ func TestInterpolate(t *testing.T) {
 	}
 }
 
+// TestInterpolateNestedMacros guards against the regression introduced by the
+// macropro migration, where a macro passed as an argument to another macro
+// stopped expanding. The inner token reached ClickHouse verbatim and every
+// such query failed with UNKNOWN_IDENTIFIER at runtime, with no error at
+// build time. Nested macros must expand innermost-first, restoring the
+// behaviour these query shapes had before the migration.
+func TestInterpolateNestedMacros(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.123Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.456Z")
+
+	type test struct {
+		name   string
+		input  string
+		output string
+	}
+
+	tests := []test{
+		{
+			name:   "macro as sole argument of another macro (#2038 repro)",
+			input:  "SELECT $__timeInterval($__fromTime) AS from_time",
+			output: "SELECT toStartOfInterval(toDateTime(toDateTime(1415792726)), INTERVAL 60 second) AS from_time",
+		},
+		{
+			name:   "millisecond variants nest the same way",
+			input:  "SELECT $__timeInterval_ms($__fromTime_ms)",
+			output: "SELECT toStartOfInterval(toDateTime64(fromUnixTimestamp64Milli(1415792726123), 3), INTERVAL 60000 millisecond)",
+		},
+		{
+			name:   "macro nested inside a larger argument expression",
+			input:  "select * from foo where $__timeFilter(coalesce(closed_at, $__toTime))",
+			output: "select * from foo where coalesce(closed_at, toDateTime(1447328726)) >= toDateTime(1415792726) AND coalesce(closed_at, toDateTime(1447328726)) <= toDateTime(1447328726)",
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
+			query := &sqlutil.Query{
+				RawSQL:   tc.input,
+				Interval: time.Minute,
+				TimeRange: backend.TimeRange{
+					From: from,
+					To:   to,
+				},
+			}
+			interpolatedQuery, err := Interpolate(tc.input, query)
+			require.Nil(t, err)
+			assert.Equal(t, tc.output, interpolatedQuery)
+		})
+	}
+}
+
 // TestInterpolateBackslashEscapedStringLiterals guards against macropro's
 // comment-stripping pass mis-terminating a ClickHouse string literal at a
 // backslash-escaped quote (\'), which would let a following -- or /* token be

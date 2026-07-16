@@ -6,7 +6,7 @@ require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.47.0
 	github.com/docker/go-units v0.5.0
 	github.com/grafana/grafana-plugin-sdk-go v0.292.2
-	github.com/grafana/macropro v1.0.0
+	github.com/grafana/macropro v1.0.1-0.20260716172249-a6e57b732fd3
 	github.com/grafana/sqlds/v5 v5.3.0
 	github.com/moby/moby/api v1.55.0
 	github.com/paulmach/orb v0.13.0
