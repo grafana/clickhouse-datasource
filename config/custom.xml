@@ -7,5 +7,6 @@
         <console>1</console>
     </logger>
     <timezone>UTC</timezone>
-
+    <!-- Allow custom_* settings so enforced-tenant tests can use custom_visible_tenants. -->
+    <custom_settings_prefixes>custom_</custom_settings_prefixes>
 </clickhouse>

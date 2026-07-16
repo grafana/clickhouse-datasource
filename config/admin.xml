@@ -5,6 +5,14 @@
         <default>
             <!-- Allows us to create replicated databases. -->
             <allow_experimental_database_replicated>1</allow_experimental_database_replicated>
+            <constraints>
+                <!-- Allow per-query tuning of max_threads even under readonly=1.
+                     This lets users adjust query parallelism from the Grafana query editor
+                     without breaking enforced tenant settings. -->
+                <max_threads>
+                    <changeable_in_readonly/>
+                </max_threads>
+            </constraints>
         </default>
     </profiles>
     <users>

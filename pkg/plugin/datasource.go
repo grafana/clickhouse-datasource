@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"strings"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
@@ -27,11 +28,18 @@ func (i *clickhouseInstance) Dispose() {
 
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	clickhousePlugin := Clickhouse{}
-	if s, err := LoadSettings(ctx, settings); err == nil {
+	s, settingsErr := LoadSettings(ctx, settings)
+	if settingsErr == nil {
 		clickhousePlugin.enforceReadOnly = s.EnforceReadOnly
 		clickhousePlugin.enforcedChSettings = buildEnforcedChSettings(s)
+		logEnforcedSettingsStartup(s)
 	}
 	ds := sqlds.NewDatasource(&clickhousePlugin)
+
+	// Wire enforced-settings health probes to run after the basic connectivity check.
+	if settingsErr == nil && s.shouldForceReadOnly() {
+		ds.PostCheckHealth = makeEnforcedSettingsHealthCheck(s, settings)
+	}
 
 	// Replace sqlds's default sqlutil.Interpolate pipeline with the
 	// macropro-backed interpolator; see interpolateMacros in driver.go.
@@ -65,4 +73,23 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return inst, nil
 	}
 	return &clickhouseInstance{SQLDatasource: sqlInst, schema: schemaProvider}, nil
+}
+
+// logEnforcedSettingsStartup emits a single Info line summarising the enforced-settings
+// configuration at datasource instance creation time. Names only — no values.
+func logEnforcedSettingsStartup(s Settings) {
+	if !s.shouldForceReadOnly() {
+		return
+	}
+	names := make([]string, 0)
+	for _, cs := range s.CustomSettings {
+		if cs.Enforced {
+			names = append(names, cs.Setting)
+		}
+	}
+	backend.Logger.Info("clickhouse datasource: enforced settings active",
+		"enforced_setting_count", len(names),
+		"enforced_setting_names", strings.Join(names, ","),
+		"enforce_readonly", s.EnforceReadOnly,
+	)
 }

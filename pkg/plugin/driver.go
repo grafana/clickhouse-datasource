@@ -555,6 +555,18 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 	if len(h.enforcedChSettings) > 0 {
 		ctx = clickhouse.Context(ctx, clickhouse.WithSettings(h.enforcedChSettings))
 		ctx = context.WithValue(ctx, enforcedSettingsCtxKey, h.enforcedChSettings)
+
+		// Record the number of user-configured enforced settings (not counting
+		// readonly=1 itself) and whether read-only enforcement is active.
+		// Values are intentionally omitted — they can encode tenant identity.
+		userSettingCount := len(h.enforcedChSettings)
+		if h.enforceReadOnly {
+			userSettingCount--
+		}
+		span.SetAttributes(
+			attribute.Int("clickhouse.enforced_settings.count", userSettingCount),
+			attribute.Bool("clickhouse.enforced_readonly", h.enforceReadOnly),
+		)
 	}
 
 	comments := make([]string, 0, 4)

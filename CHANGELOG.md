@@ -4,6 +4,14 @@
 
 ### Features
 
+- **Enforced server-side ClickHouse settings with per-query `readonly=1`**: Operators can now mark individual Custom Settings as "Enforced" in the datasource configuration. When any setting is enforced, the plugin injects the enforced values together with `readonly=1` on every query via the clickhouse-go per-query settings channel — without SQL rewriting and without a persistent ClickHouse session. This makes all queries through this datasource read-only (no INSERT/DDL from Grafana). The mechanism relies on two ClickHouse invariants: (1) `readonly` can only be tightened per query, never loosened; (2) under `readonly=1`, any `SETTINGS`/`SET` clause in user SQL that tries to change a non-whitelisted setting is rejected before the SQL is executed.
+
+  **Recommended combination with ClickHouse row policies**: pair an enforced `custom_visible_tenants='t1,t2'` setting with a server-side row policy such as `CREATE ROW POLICY … USING has(splitByChar(',', getSetting('custom_visible_tenants')), tenant_id) TO ALL`. Because the tenant variable is injected out-of-band and cannot be overridden by the end user's SQL, the row policy filters are tamper-resistant from Grafana's query editor.
+
+  **Important: this is a defence-in-depth layer.** The actual enforcement lives in ClickHouse; the plugin's role is to reliably inject the settings on every query and to surface mis-configuration early via the datasource health check.
+
+  **`CHANGEABLE_IN_READONLY` escape hatch**: ClickHouse operators can mark specific server tunables — such as `max_threads` or `max_memory_usage` — as `<changeable_in_readonly/>` in their settings profile constraints. This lets users still tune those knobs per query from the Grafana query editor without breaking the enforced tenant settings. The enforced tenant settings themselves must **not** be marked `CHANGEABLE_IN_READONLY`, or the guarantee collapses. The datasource health check will surface this mis-configuration with an actionable error message.
+
 - Add `1.3.0` OTel schema version to support `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0`+, which removed the `TimestampTime` column from `otel_logs`. The `latest` selector now points to this schema; existing data sources continue to use `1.2.9` until manually updated (#1882)
 - Auto-detect the OTel logs schema version from the table's columns when the version selector is on `auto (latest)`, removing the manual version pick for the common case. Pinned versions are unchanged (#1900)
 
