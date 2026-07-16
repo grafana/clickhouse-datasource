@@ -118,8 +118,10 @@ async function assertAllPanelsHealthy(
 ): Promise<void> {
   // Scenes lazy-renders below-fold panels, and all three dashboards are
   // several screens tall; scrollAll reveals every row so each panel's query
-  // fires before the wait resolves.
-  await dashboardPage.waitForPanelsQueriesToComplete({ scrollAll: true });
+  // fires before the wait resolves. The default 30s predicate timeout is
+  // marginal on a freshly started stack (cold plugin backend, empty caches),
+  // so give these dashboard-wide waits the same headroom as the slow() tests.
+  await dashboardPage.waitForPanelsQueriesToComplete({ scrollAll: true, timeout: 60_000 });
 
   // Backend truth first: every /api/ds/query must have come back error-free.
   // A regressed bundled rawSql (#535) fails here with the offending refId and
