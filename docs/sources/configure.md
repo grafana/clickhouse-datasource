@@ -191,6 +191,41 @@ You can pass arbitrary ClickHouse `SETTINGS` with every query by adding key-valu
 
 These settings are appended to each query's `SETTINGS` clause. They do not replace any settings that the plugin sets internally (such as `max_execution_time`).
 
+### Enforcing server-side settings (multi-tenancy)
+
+The **Enforced** checkbox on each Custom Setting row enables a tamper-resistant mode: the datasource sends the setting alongside `readonly=1` on every query, so the end user's SQL cannot override it with a `SETTINGS` or `SET` clause.
+
+When any custom setting is marked **Enforced**, the **Enforce read-only on all queries** toggle is automatically enabled. You can also enable that toggle independently to make the datasource fully read-only (SELECT/SHOW only) without any enforced settings.
+
+**How it works (no SQL rewriting, no dedicated DB user):**
+
+The plugin injects the enforced settings and `readonly=1` as per-query settings out-of-band with the SQL — via HTTP query-string parameters or the Native protocol's per-query settings block. ClickHouse enforces two invariants that make this tamper-resistant:
+
+1. `readonly` can only be increased per query; a user's `SETTINGS readonly=0` is rejected once it is already `1`.
+2. Under `readonly=1`, any `SETTINGS foo=…` or `SET foo=…` in the user's SQL that attempts to change a non-whitelisted setting is rejected outright.
+
+**Worked example — row-level multi-tenancy:**
+
+```sql
+-- 1. Create a row policy that reads the enforced setting
+CREATE ROW POLICY tenant_filter ON mydb.events
+  USING has(splitByChar(',', getSetting('custom_visible_tenants')), tenant_id)
+  TO grafana_user;
+
+-- 2. In the datasource config, add a Custom Setting:
+--    setting = custom_visible_tenants
+--    value   = t1,t2          (the tenants this datasource instance may see)
+--    enforced = ✓ (checked)
+```
+
+With `readonly=1` active, the user cannot change `custom_visible_tenants` in their query, so the row policy always filters on the operator-supplied tenant list.
+
+**Important caveats:**
+
+- **Enforced settings must NOT be marked `CHANGEABLE_IN_READONLY` on the ClickHouse server.** If they are, a user can override them even under `readonly=1`, which collapses the enforcement guarantee. The `<changeable_in_readonly/>` server-side tag is intended only for tunables like `max_threads` and `max_memory_usage` that operators want to allow users to tune per query.
+- Enabling this feature makes the datasource **read-only**: INSERT, CREATE, ALTER, and other write statements from Grafana will be rejected by ClickHouse.
+- The connecting DB user must start at `readonly=0` (or `readonly=2`). If the user's server profile already enforces `readonly=1`, the plugin cannot inject the enforced setting values before that restriction takes effect.
+
 ### Logs configuration
 
 The data source includes a dedicated configuration section for log queries. These settings control the default column mappings used by the [logs query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#logs-query-builder):

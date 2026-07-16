@@ -58,6 +58,14 @@ type Settings struct {
 	// memory.
 	RowCapacityHint int64 `json:"rowCapacityHint,omitempty"`
 
+	// EnforceReadOnly forces readonly=1 on every query executed via this datasource,
+	// making it read-only (INSERT/DDL from Grafana will be blocked). It is
+	// automatically set to true when any CustomSetting has Enforced=true. Server
+	// tunables that operators want users to still adjust per query (e.g. max_threads)
+	// should be marked <changeable_in_readonly/> server-side; the enforced tenant
+	// settings must NOT be marked that way.
+	EnforceReadOnly bool `json:"enforceReadOnly,omitempty"`
+
 	// EnableSchemaCache gates the in-process cache that memoizes
 	// system.tables / system.columns / DISTINCT column-value lookups used
 	// by the query builder. Defaults to true.
@@ -69,8 +77,9 @@ type Settings struct {
 }
 
 type CustomSetting struct {
-	Setting string `json:"setting"`
-	Value   string `json:"value"`
+	Setting  string `json:"setting"`
+	Value    string `json:"value"`
+	Enforced bool   `json:"enforced,omitempty"`
 }
 
 const secureHeaderKeyPrefix = "secureHttpHeaders."
@@ -83,6 +92,46 @@ func (settings *Settings) isValid() (err error) {
 		return backend.DownstreamError(ErrorMessageInvalidPort)
 	}
 	return nil
+}
+
+// enforcedSettings returns a clickhouse.Settings map containing only the
+// CustomSettings entries marked Enforced. Returns nil if none are enforced.
+//
+// Values for setting names beginning with "custom_" are wrapped in
+// clickhouse.CustomSetting{Value}. That wrapper is required by clickhouse-go's
+// Native protocol to send user-defined (custom_*) settings; without it the
+// server rejects them with code 115 "Unknown setting". HTTP tolerates plain
+// strings via URL params, but the wrapper is also accepted there, so we always
+// wrap for consistency across protocols.
+func (s Settings) enforcedSettings() clickhouse.Settings {
+	var m clickhouse.Settings
+	for _, cs := range s.CustomSettings {
+		if cs.Enforced {
+			if m == nil {
+				m = make(clickhouse.Settings)
+			}
+			m[cs.Setting] = wrapCustomSettingValue(cs.Setting, cs.Value)
+		}
+	}
+	return m
+}
+
+// wrapCustomSettingValue wraps values for custom_-prefixed settings in
+// clickhouse.CustomSetting so clickhouse-go's Native protocol serializer
+// tags them as user-defined rather than as built-in server settings.
+func wrapCustomSettingValue(name, value string) interface{} {
+	if strings.HasPrefix(name, "custom_") {
+		return clickhouse.CustomSetting{Value: value}
+	}
+	return value
+}
+
+// shouldForceReadOnly reports whether readonly=1 must be injected on every
+// query. Phase 1 auto-enables EnforceReadOnly when any CustomSetting is
+// Enforced, so in practice this is just s.EnforceReadOnly; the len check
+// is kept as defense-in-depth.
+func (s Settings) shouldForceReadOnly() bool {
+	return s.EnforceReadOnly || len(s.enforcedSettings()) > 0
 }
 
 // LoadSettings will read and validate Settings from the DataSourceConfig
@@ -199,10 +248,23 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 		for i, raw := range customSettingsRaw {
 			rawMap := raw.(map[string]interface{})
-			customSettings[i] = CustomSetting{
+			cs := CustomSetting{
 				Setting: rawMap["setting"].(string),
 				Value:   rawMap["value"].(string),
 			}
+			if rawMap["enforced"] != nil {
+				switch v := rawMap["enforced"].(type) {
+				case bool:
+					cs.Enforced = v
+				case string:
+					if parsed, parseErr := strconv.ParseBool(v); parseErr == nil {
+						cs.Enforced = parsed
+					} else {
+						backend.Logger.Warn("Failed to parse enforced value for custom setting, defaulting to false", "setting", cs.Setting, "error", parseErr)
+					}
+				}
+			}
+			customSettings[i] = cs
 		}
 
 		settings.CustomSettings = customSettings
@@ -226,6 +288,30 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.EnableRowLimit = jsonData["enableRowLimit"].(bool)
+		}
+	}
+
+	if raw, ok := jsonData["enforceReadOnly"]; ok && raw != nil {
+		switch v := raw.(type) {
+		case bool:
+			settings.EnforceReadOnly = v
+		case string:
+			if parsed, parseErr := strconv.ParseBool(v); parseErr == nil {
+				settings.EnforceReadOnly = parsed
+			} else {
+				backend.Logger.Warn("Failed to parse enforceReadOnly value, defaulting to false", "error", parseErr)
+			}
+		}
+	}
+
+	// If any custom setting is marked enforced, force EnforceReadOnly on.
+	if !settings.EnforceReadOnly {
+		for _, cs := range settings.CustomSettings {
+			if cs.Enforced {
+				settings.EnforceReadOnly = true
+				backend.Logger.Info("enforceReadOnly implicitly enabled because at least one custom setting is marked enforced")
+				break
+			}
 		}
 	}
 

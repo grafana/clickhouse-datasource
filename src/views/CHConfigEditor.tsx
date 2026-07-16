@@ -4,7 +4,7 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack } from '@grafana/ui';
+import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack, Checkbox, Tooltip } from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -136,6 +136,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       | 'enableSecureSocksProxy'
       | 'forwardGrafanaHeaders'
       | 'enableRowLimit'
+      | 'enforceReadOnly'
       | 'hideTableNameInAdhocFilters'
     >,
     value: boolean
@@ -243,6 +244,9 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   };
 
   const [customSettings, setCustomSettings] = useState(jsonData.customSettings || []);
+
+  // True when at least one custom setting row has enforced=true; drives the enforceReadOnly toggle state.
+  const anyEnforced = customSettings.some((s) => s.enforced);
 
   const hasAdditionalSettings = Boolean(
     window.location.hash || // if trying to link to section on page, open all settings (React breaks this?)
@@ -861,16 +865,30 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               </Field>
             )}
             <ConfigSubSection title="Custom Settings">
-              {customSettings.map(({ setting, value }, i) => {
+              <Alert title="" severity="info">
+                <ul style={{ margin: 0, paddingLeft: '1.25em' }}>
+                  <li>Enabling read-only enforcement blocks INSERT and DDL queries from Grafana.</li>
+                  <li>
+                    Enforced settings <strong>must NOT</strong> be marked{' '}
+                    <code>CHANGEABLE_IN_READONLY</code> on the ClickHouse server — doing so would let
+                    users override them and break the enforcement guarantee.
+                  </li>
+                  <li>
+                    Use ClickHouse row policies with{' '}
+                    <code>{`getSetting('custom_x')`}</code> to gate data access on enforced settings.
+                  </li>
+                </ul>
+              </Alert>
+              {customSettings.map(({ setting, value, enforced }, i) => {
                 return (
-                  <Stack key={i} direction="row">
+                  <Stack key={i} direction="row" alignItems="flex-end">
                     <Field label={`Setting`} aria-label={`Setting`}>
                       <Input
                         value={setting}
                         placeholder={'Setting'}
                         onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
                           let newSettings = customSettings.concat();
-                          newSettings[i] = { setting: changeEvent.target.value, value };
+                          newSettings[i] = { setting: changeEvent.target.value, value, enforced };
                           setCustomSettings(newSettings);
                         }}
                         onBlur={() => {
@@ -885,13 +903,31 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                         placeholder={'Value'}
                         onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
                           let newSettings = customSettings.concat();
-                          newSettings[i] = { setting, value: changeEvent.target.value };
+                          newSettings[i] = { setting, value: changeEvent.target.value, enforced };
                           setCustomSettings(newSettings);
                         }}
                         onBlur={() => {
                           onCustomSettingsChange(customSettings);
                         }}
                       ></Input>
+                    </Field>
+                    <Field
+                      label={
+                        <Tooltip content="Send with readonly=1 so the user's SQL cannot override it.">
+                          <span>Enforced</span>
+                        </Tooltip>
+                      }
+                      aria-label={`Enforced`}
+                    >
+                      <Checkbox
+                        value={enforced || false}
+                        onChange={(changeEvent: ChangeEvent<HTMLInputElement>) => {
+                          let newSettings = customSettings.concat();
+                          newSettings[i] = { setting, value, enforced: changeEvent.target.checked };
+                          setCustomSettings(newSettings);
+                          onCustomSettingsChange(newSettings);
+                        }}
+                      />
                     </Field>
                   </Stack>
                 );
@@ -907,6 +943,34 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 Add custom setting
               </Button>
             </ConfigSubSection>
+            <Field
+              label="Enforce read-only on all queries"
+              description={
+                anyEnforced
+                  ? 'Automatically enabled because at least one custom setting is marked Enforced.'
+                  : 'Forces readonly=1 on every query. Blocks INSERT/DDL from Grafana. Enable when you want read-only lockdown without enforced settings.'
+              }
+            >
+              <Tooltip
+                content={
+                  anyEnforced
+                    ? 'Disabled because enforceReadOnly is automatically on when any custom setting is marked Enforced.'
+                    : ''
+                }
+                placement="top"
+              >
+                <Switch
+                  value={anyEnforced || jsonData.enforceReadOnly || false}
+                  disabled={anyEnforced}
+                  onChange={(e) => {
+                    if (!anyEnforced) {
+                      onSwitchToggle('enforceReadOnly', e.currentTarget.checked);
+                    }
+                  }}
+                />
+              </Tooltip>
+            </Field>
+
           </ConfigSection>
         </>
       )}

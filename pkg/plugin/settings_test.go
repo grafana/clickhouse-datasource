@@ -406,4 +406,114 @@ func TestLoadSettings(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("should parse enforced flag on custom settings", func(t *testing.T) {
+		ctx := context.Background()
+		tests := []struct {
+			description    string
+			jsonData       string
+			wantEnforced   []bool
+			wantReadOnly   bool
+		}{
+			{
+				description:  "enforced absent defaults to false",
+				jsonData:     `{"host": "foo", "port": 443, "customSettings": [{"setting": "s1", "value": "v1"}]}`,
+				wantEnforced: []bool{false},
+				wantReadOnly: false,
+			},
+			{
+				description:  "enforced as bool true",
+				jsonData:     `{"host": "foo", "port": 443, "customSettings": [{"setting": "s1", "value": "v1", "enforced": true}]}`,
+				wantEnforced: []bool{true},
+				wantReadOnly: true,
+			},
+			{
+				description:  "enforced as bool false",
+				jsonData:     `{"host": "foo", "port": 443, "customSettings": [{"setting": "s1", "value": "v1", "enforced": false}]}`,
+				wantEnforced: []bool{false},
+				wantReadOnly: false,
+			},
+			{
+				description:  `enforced as string "true"`,
+				jsonData:     `{"host": "foo", "port": 443, "customSettings": [{"setting": "s1", "value": "v1", "enforced": "true"}]}`,
+				wantEnforced: []bool{true},
+				wantReadOnly: true,
+			},
+			{
+				description:  `enforced as string "false"`,
+				jsonData:     `{"host": "foo", "port": 443, "customSettings": [{"setting": "s1", "value": "v1", "enforced": "false"}]}`,
+				wantEnforced: []bool{false},
+				wantReadOnly: false,
+			},
+			{
+				description:  "mixed: only one enforced triggers EnforceReadOnly",
+				jsonData:     `{"host": "foo", "port": 443, "customSettings": [{"setting": "s1", "value": "v1", "enforced": true}, {"setting": "s2", "value": "v2"}]}`,
+				wantEnforced: []bool{true, false},
+				wantReadOnly: true,
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.description, func(t *testing.T) {
+				got, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+					JSONData:                []byte(tc.jsonData),
+					DecryptedSecureJSONData: map[string]string{},
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantReadOnly, got.EnforceReadOnly, "EnforceReadOnly mismatch")
+				for i, wantEnforced := range tc.wantEnforced {
+					assert.Equal(t, wantEnforced, got.CustomSettings[i].Enforced, "Enforced mismatch at index %d", i)
+				}
+			})
+		}
+	})
+
+	t.Run("should parse enforceReadOnly at top level", func(t *testing.T) {
+		ctx := context.Background()
+		tests := []struct {
+			description  string
+			jsonData     string
+			wantReadOnly bool
+		}{
+			{
+				description:  "absent defaults to false",
+				jsonData:     `{"host": "foo", "port": 443}`,
+				wantReadOnly: false,
+			},
+			{
+				description:  "bool true",
+				jsonData:     `{"host": "foo", "port": 443, "enforceReadOnly": true}`,
+				wantReadOnly: true,
+			},
+			{
+				description:  "bool false",
+				jsonData:     `{"host": "foo", "port": 443, "enforceReadOnly": false}`,
+				wantReadOnly: false,
+			},
+			{
+				description:  `string "true"`,
+				jsonData:     `{"host": "foo", "port": 443, "enforceReadOnly": "true"}`,
+				wantReadOnly: true,
+			},
+			{
+				description:  `string "false"`,
+				jsonData:     `{"host": "foo", "port": 443, "enforceReadOnly": "false"}`,
+				wantReadOnly: false,
+			},
+			{
+				description:  "enforceReadOnly false + enforced setting true => auto-true",
+				jsonData:     `{"host": "foo", "port": 443, "enforceReadOnly": false, "customSettings": [{"setting": "s1", "value": "v1", "enforced": true}]}`,
+				wantReadOnly: true,
+			},
+		}
+		for _, tc := range tests {
+			t.Run(tc.description, func(t *testing.T) {
+				got, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+					JSONData:                []byte(tc.jsonData),
+					DecryptedSecureJSONData: map[string]string{},
+				})
+				assert.NoError(t, err)
+				assert.Equal(t, tc.wantReadOnly, got.EnforceReadOnly, "EnforceReadOnly mismatch")
+			})
+		}
+	})
 }

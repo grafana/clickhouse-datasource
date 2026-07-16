@@ -51,6 +51,8 @@ export interface CHConfig extends DataSourceJsonData {
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;
   enableRowLimit?: boolean;
+  /** Forces readonly=1 on every query, blocking INSERT/DDL. Auto-enabled when any customSetting has enforced=true. */
+  enforceReadOnly?: boolean;
 
   /**
    * Optional expected row count passed to sqlds as DriverSettings.RowCapacityHint.
@@ -105,6 +107,8 @@ export interface CHHttpHeader {
 export interface CHCustomSetting {
   setting: string;
   value: string;
+  /** When true, the setting is sent alongside readonly=1 on every query so the user's SQL cannot override it. */
+  enforced?: boolean;
 }
 
 export interface CHLogsConfig {
