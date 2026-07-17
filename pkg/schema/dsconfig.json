@@ -1,0 +1,1193 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/dsconfig/refs/tags/dsconfig/v0.0.12/dsconfig/schema.json",
+  "schemaVersion": "v1",
+  "pluginType": "grafana-clickhouse-datasource",
+  "pluginName": "ClickHouse",
+  "docURL": "https://grafana.com/grafana/plugins/grafana-clickhouse-datasource/",
+  "fields": [
+    {
+      "id": "jsonData_host",
+      "key": "host",
+      "label": "Server address",
+      "description": "Enter server address",
+      "valueType": "string",
+      "target": "jsonData",
+      "role": "endpoint.domain",
+      "required": true,
+      "ui": {
+        "component": "input",
+        "placeholder": "Server address"
+      }
+    },
+    {
+      "id": "jsonData_port",
+      "key": "port",
+      "label": "Server port",
+      "description": "ClickHouse server port",
+      "valueType": "number",
+      "target": "jsonData",
+      "role": "endpoint.port",
+      "required": true,
+      "defaultValue": 9000,
+      "help": {
+        "markdown": "ClickHouse supports two server protocols: Native TCP and HTTP. Both protocols can be secured with TLS. <br/>[Native TCP](https://clickhouse.com/docs/interfaces/tcp) is the default and recommended option.<br/>[HTTP](https://clickhouse.com/docs/interfaces/http) is for servers configured to accept HTTP connections."
+      },
+      "ui": {
+        "component": "input"
+      },
+      "overrides": [
+        {
+          "when": "jsonData_protocol == 'native' && jsonData_secure != true",
+          "description": "ClickHouse server port (default for Native: 9000).",
+          "defaultValue": 9000
+        },
+        {
+          "when": "jsonData_protocol == 'native' && jsonData_secure == true",
+          "description": "ClickHouse server port (default for Native (secure): 9440).",
+          "defaultValue": 9440
+        },
+        {
+          "when": "jsonData_protocol == 'http' && jsonData_secure != true",
+          "description": "ClickHouse server port (default for HTTP: 8123).",
+          "defaultValue": 8123
+        },
+        {
+          "when": "jsonData_protocol == 'http' && jsonData_secure == true",
+          "description": "ClickHouse server port (default for HTTPS: 8443).",
+          "defaultValue": 8443
+        }
+      ]
+    },
+    {
+      "id": "jsonData_protocol",
+      "key": "protocol",
+      "label": "Protocol",
+      "description": "Native or HTTP for server protocol",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "native",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["native", "http"]
+        }
+      ],
+      "ui": {
+        "component": "radio",
+        "options": [
+          {
+            "label": "Native",
+            "value": "native"
+          },
+          {
+            "label": "HTTP",
+            "value": "http"
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_secure",
+      "key": "secure",
+      "label": "Secure Connection",
+      "description": "Toggle on if the connection is secure",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_path",
+      "key": "path",
+      "label": "HTTP URL Path",
+      "description": "Additional URL path for HTTP requests",
+      "valueType": "string",
+      "target": "jsonData",
+      "dependsOn": "jsonData_protocol == 'http'",
+      "ui": {
+        "component": "input",
+        "placeholder": "additional-path"
+      }
+    },
+    {
+      "id": "jsonData_username",
+      "key": "username",
+      "label": "Username",
+      "description": "We recommend configuring a read-only user.",
+      "valueType": "string",
+      "target": "jsonData",
+      "role": "auth.basic.username",
+      "ui": {
+        "component": "input",
+        "placeholder": "default"
+      }
+    },
+    {
+      "id": "secureJsonData_password",
+      "key": "password",
+      "label": "Password",
+      "description": "ClickHouse password",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "auth.basic.password",
+      "ui": {
+        "component": "input",
+        "placeholder": "password"
+      }
+    },
+    {
+      "id": "jsonData_tlsSkipVerify",
+      "key": "tlsSkipVerify",
+      "label": "Skip TLS Verify",
+      "description": "Skip TLS Verify",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "role": "transport.tlsSkipVerify",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_tlsAuth",
+      "key": "tlsAuth",
+      "label": "TLS Client Auth",
+      "description": "TLS Client Auth",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_tlsAuthWithCACert",
+      "key": "tlsAuthWithCACert",
+      "label": "With CA Cert",
+      "description": "Needed for verifying self-signed TLS Certs",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "secureJsonData_tlsCACert",
+      "key": "tlsCACert",
+      "label": "CA Cert",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "tls.caCert",
+      "dependsOn": "jsonData_tlsAuthWithCACert == true",
+      "ui": {
+        "component": "textarea",
+        "multiline": true,
+        "rows": 7,
+        "placeholder": "CA Cert. Begins with -----BEGIN CERTIFICATE-----"
+      }
+    },
+    {
+      "id": "secureJsonData_tlsClientCert",
+      "key": "tlsClientCert",
+      "label": "Client Cert",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "tls.clientCert",
+      "dependsOn": "jsonData_tlsAuth == true",
+      "ui": {
+        "component": "textarea",
+        "multiline": true,
+        "rows": 7,
+        "placeholder": "Client Cert. Begins with -----BEGIN CERTIFICATE-----"
+      }
+    },
+    {
+      "id": "secureJsonData_tlsClientKey",
+      "key": "tlsClientKey",
+      "label": "Client Key",
+      "valueType": "string",
+      "target": "secureJsonData",
+      "role": "tls.clientKey",
+      "dependsOn": "jsonData_tlsAuth == true",
+      "ui": {
+        "component": "textarea",
+        "multiline": true,
+        "rows": 7,
+        "placeholder": "Client Key. Begins with -----BEGIN RSA PRIVATE KEY-----"
+      }
+    },
+    {
+      "id": "jsonData_configMode",
+      "key": "configMode",
+      "label": "Mode",
+      "description": "Choose how this datasource is used. 'Single table' provides a focused, compact query editor for one table. 'All databases' gives full access to explore any database and table.",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "classic",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["classic", "single-table"]
+        }
+      ],
+      "ui": {
+        "component": "radio",
+        "options": [
+          {
+            "label": "All databases",
+            "value": "classic"
+          },
+          {
+            "label": "Single table",
+            "value": "single-table"
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_signalType",
+      "key": "signalType",
+      "label": "Signal type",
+      "description": "What kind of data does this table contain?",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "logs",
+      "dependsOn": "jsonData_configMode == 'single-table'",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["logs", "traces"]
+        }
+      ],
+      "ui": {
+        "component": "radio",
+        "options": [
+          {
+            "label": "Logs",
+            "value": "logs",
+            "description": "Log search with severity, message, and attributes"
+          },
+          {
+            "label": "Traces",
+            "value": "traces",
+            "description": "Distributed tracing with spans and service maps"
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_defaultDatabase",
+      "key": "defaultDatabase",
+      "label": "Default database",
+      "description": "the default database used by the query builder",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input",
+        "placeholder": "default"
+      }
+    },
+    {
+      "id": "jsonData_defaultTable",
+      "key": "defaultTable",
+      "label": "Default table",
+      "description": "the default table used by the query builder",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input",
+        "placeholder": "table"
+      }
+    },
+    {
+      "id": "jsonData_dialTimeout",
+      "key": "dialTimeout",
+      "label": "Dial Timeout (seconds)",
+      "description": "Timeout in seconds for connection",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "10",
+      "ui": {
+        "component": "input",
+        "placeholder": "10"
+      }
+    },
+    {
+      "id": "jsonData_queryTimeout",
+      "key": "queryTimeout",
+      "label": "Query Timeout (seconds)",
+      "description": "Timeout in seconds for read queries",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "60",
+      "ui": {
+        "component": "input",
+        "placeholder": "60"
+      }
+    },
+    {
+      "id": "jsonData_connMaxLifetime",
+      "key": "connMaxLifetime",
+      "label": "Connection Max Lifetime (minutes)",
+      "description": "Maximum lifetime of a connection in minutes",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "5",
+      "ui": {
+        "component": "input",
+        "placeholder": "5"
+      }
+    },
+    {
+      "id": "jsonData_maxIdleConns",
+      "key": "maxIdleConns",
+      "label": "Max Idle Connections",
+      "description": "Maximum number of idle connections",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "25",
+      "ui": {
+        "component": "input",
+        "placeholder": "25"
+      }
+    },
+    {
+      "id": "jsonData_maxOpenConns",
+      "key": "maxOpenConns",
+      "label": "Max Open Connections",
+      "description": "Maximum number of open connections",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "50",
+      "ui": {
+        "component": "input",
+        "placeholder": "50"
+      }
+    },
+    {
+      "id": "jsonData_validateSql",
+      "key": "validateSql",
+      "label": "Validate SQL",
+      "description": "Validate SQL in the editor.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_enableMapKeysDiscovery",
+      "key": "enableMapKeysDiscovery",
+      "label": "Suggest Map keys in filter editor",
+      "description": "When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. On large tables with high-cardinality maps this probe can scan billions of rows. Disable to suppress the probe — operators can still type Map keys manually. Defaults to enabled.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": true,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_logs_defaultDatabase",
+      "key": "defaultDatabase",
+      "section": "logs",
+      "label": "Default log database",
+      "description": "the default database used by the logs query builder",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input",
+        "placeholder": "default"
+      }
+    },
+    {
+      "id": "jsonData_logs_defaultTable",
+      "key": "defaultTable",
+      "section": "logs",
+      "label": "Default log table",
+      "description": "the default table used by the logs query builder",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_logs",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_logs_otelEnabled",
+      "key": "otelEnabled",
+      "section": "logs",
+      "label": "Use OTel",
+      "description": "Enables Open Telemetry schema versioning",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_logs_otelVersion",
+      "key": "otelVersion",
+      "section": "logs",
+      "label": "OTel version",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "latest",
+      "ui": {
+        "component": "select",
+        "allowCustom": false
+      }
+    },
+    {
+      "id": "jsonData_logs_filterTimeColumn",
+      "key": "filterTimeColumn",
+      "section": "logs",
+      "label": "Filter Time column",
+      "description": "A lower precision column for filtering logs by timestamp",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_logs_timeColumn",
+      "key": "timeColumn",
+      "section": "logs",
+      "label": "Time column",
+      "description": "Column for the log timestamp, used for high precision sorting",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_logs_levelColumn",
+      "key": "levelColumn",
+      "section": "logs",
+      "label": "Log Level column",
+      "description": "Column for the log level",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_logs_messageColumn",
+      "key": "messageColumn",
+      "section": "logs",
+      "label": "Log Message column",
+      "description": "Column for log message",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_logs_selectContextColumns",
+      "key": "selectContextColumns",
+      "section": "logs",
+      "label": "Auto-Select Columns",
+      "description": "When enabled, will always include context columns in log queries",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": true,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_logs_contextColumns",
+      "key": "contextColumns",
+      "section": "logs",
+      "label": "Context Columns",
+      "description": "Comma separated list of column names to use for identifying a log's source",
+      "valueType": "array",
+      "target": "jsonData",
+      "item": {
+        "valueType": "string"
+      },
+      "ui": {
+        "component": "list",
+        "placeholder": "Column name (enter key to add)"
+      }
+    },
+    {
+      "id": "jsonData_logs_showLogLinks",
+      "key": "showLogLinks",
+      "section": "logs",
+      "label": "Show \"View logs\" links",
+      "description": "Show \"View logs\" links on trace_id/traceid fields.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_traces_defaultDatabase",
+      "key": "defaultDatabase",
+      "section": "traces",
+      "label": "Default trace database",
+      "description": "the default database used by the trace query builder",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input",
+        "placeholder": "default"
+      }
+    },
+    {
+      "id": "jsonData_traces_defaultTable",
+      "key": "defaultTable",
+      "section": "traces",
+      "label": "Default trace table",
+      "description": "the default table used by the trace query builder",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "otel_traces",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_otelEnabled",
+      "key": "otelEnabled",
+      "section": "traces",
+      "label": "Use OTel",
+      "description": "Enables Open Telemetry schema versioning",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_traces_otelVersion",
+      "key": "otelVersion",
+      "section": "traces",
+      "label": "OTel version",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "latest",
+      "ui": {
+        "component": "select",
+        "allowCustom": false
+      }
+    },
+    {
+      "id": "jsonData_traces_traceIdColumn",
+      "key": "traceIdColumn",
+      "section": "traces",
+      "label": "Trace ID column",
+      "description": "Column for the trace ID",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_spanIdColumn",
+      "key": "spanIdColumn",
+      "section": "traces",
+      "label": "Span ID column",
+      "description": "Column for the span ID",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_operationNameColumn",
+      "key": "operationNameColumn",
+      "section": "traces",
+      "label": "Operation Name column",
+      "description": "Column for the operation name",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_parentSpanIdColumn",
+      "key": "parentSpanIdColumn",
+      "section": "traces",
+      "label": "Parent Span ID column",
+      "description": "Column for the parent span ID",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_serviceNameColumn",
+      "key": "serviceNameColumn",
+      "section": "traces",
+      "label": "Service Name column",
+      "description": "Column for the service name",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_durationColumn",
+      "key": "durationColumn",
+      "section": "traces",
+      "label": "Duration Time column",
+      "description": "Column for the duration time",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_durationUnit",
+      "key": "durationUnit",
+      "section": "traces",
+      "label": "Duration Unit",
+      "description": "Unit used by your Duration column. OTel stores nanoseconds; other schemas often use milliseconds or seconds.",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "nanoseconds",
+      "validations": [
+        {
+          "type": "allowedValues",
+          "values": ["nanoseconds", "microseconds", "milliseconds", "seconds"]
+        }
+      ],
+      "ui": {
+        "component": "select",
+        "options": [
+          {
+            "label": "Nanoseconds",
+            "value": "nanoseconds"
+          },
+          {
+            "label": "Microseconds",
+            "value": "microseconds"
+          },
+          {
+            "label": "Milliseconds",
+            "value": "milliseconds"
+          },
+          {
+            "label": "Seconds",
+            "value": "seconds"
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_traces_startTimeColumn",
+      "key": "startTimeColumn",
+      "section": "traces",
+      "label": "Start Time column",
+      "description": "Column for the start time",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_tagsColumn",
+      "key": "tagsColumn",
+      "section": "traces",
+      "label": "Tags column",
+      "description": "Column for the trace tags",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_serviceTagsColumn",
+      "key": "serviceTagsColumn",
+      "section": "traces",
+      "label": "Service Tags column",
+      "description": "Column for the service tags",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_kindColumn",
+      "key": "kindColumn",
+      "section": "traces",
+      "label": "Kind column",
+      "description": "Column for the trace kind",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_statusCodeColumn",
+      "key": "statusCodeColumn",
+      "section": "traces",
+      "label": "Status Code column",
+      "description": "Column for the trace status code",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_statusMessageColumn",
+      "key": "statusMessageColumn",
+      "section": "traces",
+      "label": "Status Message column",
+      "description": "Column for the trace status message",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_stateColumn",
+      "key": "stateColumn",
+      "section": "traces",
+      "label": "State column",
+      "description": "Column for the trace state",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_instrumentationLibraryNameColumn",
+      "key": "instrumentationLibraryNameColumn",
+      "section": "traces",
+      "label": "Library Name column",
+      "description": "Column for the instrumentation library name",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_instrumentationLibraryVersionColumn",
+      "key": "instrumentationLibraryVersionColumn",
+      "section": "traces",
+      "label": "Library Version column",
+      "description": "Column for the instrumentation library version",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_flattenNested",
+      "key": "flattenNested",
+      "section": "traces",
+      "label": "Use Flatten Nested",
+      "description": "Enable if your traces table was created with flatten_nested=1",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_traces_traceEventsColumnPrefix",
+      "key": "traceEventsColumnPrefix",
+      "section": "traces",
+      "label": "Events prefix",
+      "description": "Prefix for the events column (Events.Timestamp, Events.Name, etc.)",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_traceLinksColumnPrefix",
+      "key": "traceLinksColumnPrefix",
+      "section": "traces",
+      "label": "Links prefix",
+      "description": "Prefix for the trace references column (Links.TraceId, Links.TraceState, etc.)",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
+      "id": "jsonData_traces_showTraceLinks",
+      "key": "showTraceLinks",
+      "section": "traces",
+      "label": "Show \"View trace\" links",
+      "description": "Show \"View trace\" links on trace_id/traceid fields.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_traces_traceTimestampTableSuffix",
+      "key": "traceTimestampTableSuffix",
+      "section": "traces",
+      "label": "Trace timestamp table suffix",
+      "description": "Suffix appended to the traces table name to locate a companion index keyed by TraceId with Start/End columns. When such a table exists, trace ID lookups narrow the main query to a small time window instead of scanning the whole table. Leave blank to use the OTel default (_trace_id_ts).",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input",
+        "placeholder": "_trace_id_ts"
+      }
+    },
+    {
+      "id": "jsonData_httpHeaders",
+      "key": "httpHeaders",
+      "label": "Custom HTTP Headers",
+      "description": "Add Custom HTTP headers when querying the database",
+      "valueType": "array",
+      "target": "jsonData",
+      "dependsOn": "jsonData_protocol == 'http'",
+      "item": {
+        "valueType": "object",
+        "fields": [
+          {
+            "id": "jsonData_httpHeaders.item.name",
+            "key": "name",
+            "label": "Header Name",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "X-Custom-Header"
+            }
+          },
+          {
+            "id": "jsonData_httpHeaders.item.value",
+            "key": "value",
+            "label": "Header Value",
+            "description": "Empty when the header is stored securely; the encrypted value lives in secureJsonData under secureHttpHeaders.<Header Name>.",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "Header Value"
+            }
+          },
+          {
+            "id": "jsonData_httpHeaders.item.secure",
+            "key": "secure",
+            "label": "Secure",
+            "valueType": "boolean",
+            "isItemField": true,
+            "ui": {
+              "component": "switch"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_forwardGrafanaHeaders",
+      "key": "forwardGrafanaHeaders",
+      "label": "Forward Grafana HTTP Headers",
+      "description": "Forward Grafana HTTP Headers to datasource.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "dependsOn": "jsonData_protocol == 'http'",
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_customSettings",
+      "key": "customSettings",
+      "label": "Custom Settings",
+      "description": "Additional ClickHouse settings sent with every query as SETTINGS name=value.",
+      "valueType": "array",
+      "target": "jsonData",
+      "item": {
+        "valueType": "object",
+        "fields": [
+          {
+            "id": "jsonData_customSettings.item.setting",
+            "key": "setting",
+            "label": "Setting",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "Setting"
+            }
+          },
+          {
+            "id": "jsonData_customSettings.item.value",
+            "key": "value",
+            "label": "Value",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "Value"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_aliasTables",
+      "key": "aliasTables",
+      "label": "Column Alias Tables",
+      "description": "Provide alias tables with a (`alias` String, `select` String, `type` String) schema to use as a source for column selection.",
+      "valueType": "array",
+      "target": "jsonData",
+      "item": {
+        "valueType": "object",
+        "fields": [
+          {
+            "id": "jsonData_aliasTables.item.targetDatabase",
+            "key": "targetDatabase",
+            "label": "Target Database",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "(optional)"
+            }
+          },
+          {
+            "id": "jsonData_aliasTables.item.targetTable",
+            "key": "targetTable",
+            "label": "Target Table",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input"
+            }
+          },
+          {
+            "id": "jsonData_aliasTables.item.aliasDatabase",
+            "key": "aliasDatabase",
+            "label": "Alias Database",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input",
+              "placeholder": "(optional)"
+            }
+          },
+          {
+            "id": "jsonData_aliasTables.item.aliasTable",
+            "key": "aliasTable",
+            "label": "Alias Table",
+            "valueType": "string",
+            "isItemField": true,
+            "ui": {
+              "component": "input"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "jsonData_enableRowLimit",
+      "key": "enableRowLimit",
+      "label": "Enable row limit",
+      "description": "Enable using the Grafana row limit setting to limit the number of rows returned from Clickhouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_rowLimit",
+      "key": "rowLimit",
+      "label": "Row Limit",
+      "description": "Row Limit",
+      "valueType": "number",
+      "target": "jsonData"
+    },
+    {
+      "id": "jsonData_hideTableNameInAdhocFilters",
+      "key": "hideTableNameInAdhocFilters",
+      "label": "Hide table name in ad hoc filters",
+      "description": "Show only column names in ad hoc filter keys instead of the full \"table.column\" format. This simplifies the filter interface when working with schemas that have many tables. Defaults to false.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_version",
+      "key": "version",
+      "description": "Plugin version that last wrote this configuration. Stamped by the config editor's useConfigDefaults hook on every save; frontend-only.",
+      "valueType": "string",
+      "target": "jsonData",
+      "tags": ["frontend-only"]
+    },
+    {
+      "id": "jsonData_enableSchemaCache",
+      "key": "enableSchemaCache",
+      "description": "Gates the in-process cache that memoizes system.tables / system.columns / DISTINCT column-value lookups used by the query builder. Not exposed in the configuration editor; backend defaults it to true when unset.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": true,
+      "tags": ["backend-only"]
+    },
+    {
+      "id": "jsonData_schemaCacheTTLSeconds",
+      "key": "schemaCacheTTLSeconds",
+      "description": "Controls how long schema-introspection results are considered fresh. Not exposed in the configuration editor; backend defaults it to 60 when unset or <=0.",
+      "valueType": "number",
+      "target": "jsonData",
+      "defaultValue": 60,
+      "tags": ["backend-only"]
+    }
+  ],
+  "groups": [
+    {
+      "id": "server",
+      "title": "Server",
+      "order": 1,
+      "fieldRefs": [
+        "jsonData_host",
+        "jsonData_port",
+        "jsonData_protocol",
+        "jsonData_secure",
+        "jsonData_path",
+        "jsonData_httpHeaders",
+        "jsonData_forwardGrafanaHeaders"
+      ]
+    },
+    {
+      "id": "tls-ssl",
+      "title": "TLS / SSL Settings",
+      "order": 2,
+      "fieldRefs": [
+        "jsonData_tlsSkipVerify",
+        "jsonData_tlsAuth",
+        "jsonData_tlsAuthWithCACert",
+        "secureJsonData_tlsCACert",
+        "secureJsonData_tlsClientCert",
+        "secureJsonData_tlsClientKey"
+      ]
+    },
+    {
+      "id": "credentials",
+      "title": "Credentials",
+      "order": 3,
+      "fieldRefs": ["jsonData_username", "secureJsonData_password"]
+    },
+    {
+      "id": "configuration-mode",
+      "title": "Configuration Mode",
+      "order": 4,
+      "fieldRefs": [
+        "jsonData_configMode",
+        "jsonData_signalType",
+        "jsonData_logs_defaultDatabase",
+        "jsonData_logs_defaultTable",
+        "jsonData_logs_otelEnabled",
+        "jsonData_logs_otelVersion",
+        "jsonData_logs_filterTimeColumn",
+        "jsonData_logs_timeColumn",
+        "jsonData_logs_levelColumn",
+        "jsonData_logs_messageColumn",
+        "jsonData_logs_selectContextColumns",
+        "jsonData_logs_contextColumns",
+        "jsonData_logs_showLogLinks",
+        "jsonData_traces_defaultDatabase",
+        "jsonData_traces_defaultTable",
+        "jsonData_traces_otelEnabled",
+        "jsonData_traces_otelVersion",
+        "jsonData_traces_traceIdColumn",
+        "jsonData_traces_spanIdColumn",
+        "jsonData_traces_operationNameColumn",
+        "jsonData_traces_parentSpanIdColumn",
+        "jsonData_traces_serviceNameColumn",
+        "jsonData_traces_durationColumn",
+        "jsonData_traces_durationUnit",
+        "jsonData_traces_startTimeColumn",
+        "jsonData_traces_tagsColumn",
+        "jsonData_traces_serviceTagsColumn",
+        "jsonData_traces_kindColumn",
+        "jsonData_traces_statusCodeColumn",
+        "jsonData_traces_statusMessageColumn",
+        "jsonData_traces_stateColumn",
+        "jsonData_traces_instrumentationLibraryNameColumn",
+        "jsonData_traces_instrumentationLibraryVersionColumn",
+        "jsonData_traces_flattenNested",
+        "jsonData_traces_traceEventsColumnPrefix",
+        "jsonData_traces_traceLinksColumnPrefix",
+        "jsonData_traces_showTraceLinks",
+        "jsonData_traces_traceTimestampTableSuffix"
+      ]
+    },
+    {
+      "id": "default-db-table",
+      "title": "Default DB and table",
+      "order": 5,
+      "optional": true,
+      "fieldRefs": ["jsonData_defaultDatabase", "jsonData_defaultTable"]
+    },
+    {
+      "id": "query-settings",
+      "title": "Query settings",
+      "order": 6,
+      "optional": true,
+      "fieldRefs": [
+        "jsonData_dialTimeout",
+        "jsonData_queryTimeout",
+        "jsonData_connMaxLifetime",
+        "jsonData_maxIdleConns",
+        "jsonData_maxOpenConns",
+        "jsonData_validateSql",
+        "jsonData_enableMapKeysDiscovery"
+      ]
+    },
+    {
+      "id": "additional-settings",
+      "title": "Additional settings",
+      "order": 7,
+      "optional": true,
+      "fieldRefs": [
+        "jsonData_aliasTables",
+        "jsonData_customSettings",
+        "jsonData_enableRowLimit",
+        "jsonData_hideTableNameInAdhocFilters"
+      ]
+    }
+  ],
+  "instructions": [
+    {
+      "msg": "Authentication is username + password over the ClickHouse native TCP protocol (port 9000 / 9440) or HTTP protocol (port 8123 / 8443). Minimal payload: {\"jsonData\":{\"host\":\"<host>\",\"port\":9000,\"protocol\":\"native\",\"secure\":false,\"username\":\"default\"},\"secureJsonData\":{\"password\":\"<password>\"}}. host and port are required — the backend hard-fails with 'invalid host' / 'invalid port' otherwise. protocol defaults to 'native' when unset; secure defaults to false. Grant the ClickHouse user only the SELECT privileges Grafana should query — the backend does not sandbox SQL, so any statement will run.",
+      "tags": ["llm", "auth"]
+    }
+  ]
+}
