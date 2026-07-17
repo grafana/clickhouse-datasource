@@ -323,7 +323,7 @@ func TestInterpolate(t *testing.T) {
 // stopped expanding. The inner token reached ClickHouse verbatim and every
 // such query failed with UNKNOWN_IDENTIFIER at runtime, with no error at
 // build time. Nested macros must expand innermost-first, restoring the
-// behaviour these query shapes had before the migration.
+// behavior these query shapes had before the migration.
 func TestInterpolateNestedMacros(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.123Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.456Z")
