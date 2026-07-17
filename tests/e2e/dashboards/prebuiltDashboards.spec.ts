@@ -34,6 +34,8 @@ interface QueryDataResults {
 interface QueryErrorCollector {
   /** Waits for all in-flight body parses, then returns the collected errors. */
   flush(): Promise<string[]>;
+  /** Milliseconds since the last /api/ds/query request, response or abort. */
+  msSinceLastQueryActivity(): number;
 }
 
 /**
@@ -74,10 +76,28 @@ async function importPluginDashboard(page: Page, fileName: string): Promise<stri
 function collectDataSourceQueryErrors(page: Page): QueryErrorCollector {
   const errors: string[] = [];
   const parsing: Array<Promise<void>> = [];
+  // Grafana 12.4+ Scenes cancels in-flight panel queries when a lazily
+  // rendered panel scrolls back out of the viewport. An aborted request never
+  // emits a response event, only requestfailed, so anything that pairs
+  // requests with responses (like plugin-e2e's pendingQueryCount) wedges
+  // permanently once a cancellation happens. Track last-activity time across
+  // all three event types instead, and let callers wait for quiescence.
+  let lastActivity = Date.now();
+  page.on('request', (request) => {
+    if (request.url().includes('/api/ds/query')) {
+      lastActivity = Date.now();
+    }
+  });
+  page.on('requestfailed', (request) => {
+    if (request.url().includes('/api/ds/query')) {
+      lastActivity = Date.now();
+    }
+  });
   page.on('response', (response) => {
     if (!response.url().includes('/api/ds/query')) {
       return;
     }
+    lastActivity = Date.now();
     if (!response.ok()) {
       errors.push(`HTTP ${response.status()} from ${response.url()}`);
     }
@@ -103,7 +123,41 @@ function collectDataSourceQueryErrors(page: Page): QueryErrorCollector {
       await Promise.all(parsing);
       return errors;
     },
+    msSinceLastQueryActivity: () => Date.now() - lastActivity,
   };
+}
+
+/**
+ * Scroll the dashboard viewport-by-viewport so Scenes' IntersectionObserver
+ * mounts every lazily rendered row and its panels fire their queries. The
+ * 500ms pause per step gives the observer time to fire before moving on.
+ */
+async function scrollToRevealAllPanels(page: Page): Promise<void> {
+  const viewportHeight = await page.evaluate(() => window.innerHeight);
+  let scrollY = 0;
+  for (;;) {
+    const scrollHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+    if (scrollY >= scrollHeight) {
+      break;
+    }
+    scrollY = Math.min(scrollY + viewportHeight, scrollHeight);
+    await page.evaluate((y) => window.scrollTo(0, y), scrollY);
+    await page.waitForTimeout(500);
+  }
+}
+
+/**
+ * Wait until no /api/ds/query activity (request, response or abort) has been
+ * observed for a settle window. Unlike request/response pairing this cannot
+ * wedge on queries Scenes cancels mid-flight.
+ */
+async function waitForQueryQuiescence(queryErrors: QueryErrorCollector, timeout = 60_000): Promise<void> {
+  await expect
+    .poll(() => queryErrors.msSinceLastQueryActivity() >= 1_500, {
+      timeout,
+      message: 'expected /api/ds/query traffic to go quiet after revealing all panels',
+    })
+    .toBe(true);
 }
 
 /**
@@ -117,11 +171,12 @@ async function assertAllPanelsHealthy(
   anchorPanelTitle: string
 ): Promise<void> {
   // Scenes lazy-renders below-fold panels, and all three dashboards are
-  // several screens tall; scrollAll reveals every row so each panel's query
-  // fires before the wait resolves. The default 30s predicate timeout is
-  // marginal on a freshly started stack (cold plugin backend, empty caches),
-  // so give these dashboard-wide waits the same headroom as the slow() tests.
-  await dashboardPage.waitForPanelsQueriesToComplete({ scrollAll: true, timeout: 60_000 });
+  // several screens tall; scrolling reveals every row so each panel's query
+  // fires. Quiescence (rather than plugin-e2e's request/response pairing,
+  // which wedges when 12.4+ cancels queries on panel unmount) then tells us
+  // the dashboard has finished querying.
+  await scrollToRevealAllPanels(page);
+  await waitForQueryQuiescence(queryErrors);
 
   // Backend truth first: every /api/ds/query must have come back error-free.
   // A regressed bundled rawSql (#535) fails here with the offending refId and
@@ -139,8 +194,12 @@ async function assertAllPanelsHealthy(
 
   // scrollAll finishes with the viewport at the bottom of the dashboard and
   // Scenes has unmounted the above-fold rows, so scroll back to the top to
-  // remount them before asserting on the anchor panel.
+  // remount them before asserting on the anchor panel. Remounting re-fires
+  // those panels' queries, so wait for quiet again and re-flush the collector
+  // before the final error assertions.
   await page.evaluate(() => window.scrollTo(0, 0));
+  await waitForQueryQuiescence(queryErrors);
+  expect(await queryErrors.flush()).toEqual([]);
 
   // A known above-the-fold panel being visible proves the dashboard body
   // actually rendered, so the zero-error counts cannot pass vacuously
