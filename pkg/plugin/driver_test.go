@@ -527,6 +527,16 @@ func TestInterpolateMacros(t *testing.T) {
 		assert.Equal(t, "SELECT ts FROM logs", got)
 	})
 
+	t.Run("expands macros nested in another macro's arguments", func(t *testing.T) {
+		// Regression guard: after the macropro migration the inner macro was
+		// left verbatim ($__timeInterval($__fromTime) → toDateTime($__fromTime))
+		// and the query failed at runtime with UNKNOWN_IDENTIFIER.
+		q := &sqlutil.Query{RawSQL: "SELECT $__timeInterval($__fromTime) AS from_time", TimeRange: timeRange, Interval: time.Minute}
+		got, err := interpolateMacros(t.Context(), q, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "SELECT toStartOfInterval(toDateTime(toDateTime(1415792726)), INTERVAL 60 second) AS from_time", got)
+	})
+
 	t.Run("returns a downstream error on bad macro arguments", func(t *testing.T) {
 		// $__timeFilter with zero args triggers a badArgsErr. The error goes
 		// back to sqlds, which puts it on the query response; it must be

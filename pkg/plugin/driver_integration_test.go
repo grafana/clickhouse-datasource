@@ -1456,6 +1456,36 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		assert.EqualValues(t, to.Unix(), gotTo)
 	})
 
+	t.Run("nested macro expands before execution", func(t *testing.T) {
+		// Regression guard: $__timeInterval($__fromTime) must expand the
+		// inner macro too. After the macropro migration it reached ClickHouse
+		// verbatim and the query failed with UNKNOWN_IDENTIFIER. The window
+		// starts exactly on a minute boundary, so flooring it to the interval
+		// start is the identity and the value round-trips.
+		req := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Queries: []backend.DataQuery{
+				{
+					RefID:     "A",
+					TimeRange: timeRange,
+					Interval:  time.Minute,
+					JSON:      []byte(`{"rawSql":"SELECT toUnixTimestamp($__timeInterval($__fromTime)) AS f"}`),
+				},
+			},
+		}
+
+		resp, err := ds.QueryData(ctx, req)
+		require.NoError(t, err)
+		require.Contains(t, resp.Responses, "A")
+		require.NoError(t, resp.Responses["A"].Error, "nested-macro query should run cleanly")
+
+		frames := resp.Responses["A"].Frames
+		require.Len(t, frames, 1)
+		require.Equal(t, 1, len(frames[0].Fields))
+		gotFrom, _ := frames[0].Fields[0].ConcreteAt(0)
+		assert.EqualValues(t, from.Unix(), gotFrom)
+	})
+
 	t.Run("macro expansion failure surfaces a downstream error", func(t *testing.T) {
 		// $__timeFilter() takes one argument; calling it with zero triggers
 		// badArgsErr. The interpolator returns the error to sqlds, which
