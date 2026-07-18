@@ -39,6 +39,27 @@ describe('OTel dashboards', () => {
     });
   });
 
+  describe('otel-logs-explorer.json annotations', () => {
+    // Traces-backed annotations must ship disabled so logs-only installations
+    // do not hit UNKNOWN_TABLE errors on every dashboard load.
+    it('ships traces-backed annotations disabled but not hidden', () => {
+      const filepath = path.join(DASHBOARDS_DIR, 'otel-logs-explorer.json');
+      const dashboard = JSON.parse(fs.readFileSync(filepath, 'utf8')) as {
+        annotations?: {
+          list?: Array<{ name?: string; enable?: boolean; hide?: boolean; target?: { rawSql?: string } }>;
+        };
+      };
+      const tracesAnnotations = (dashboard.annotations?.list ?? []).filter((annotation) =>
+        annotation.target?.rawSql?.includes('otel_traces')
+      );
+      expect(tracesAnnotations.length).toBeGreaterThan(0);
+      tracesAnnotations.forEach((annotation) => {
+        expect(annotation.enable).toBe(false);
+        expect(annotation.hide).toBe(false);
+      });
+    });
+  });
+
   describe('plugin.json registration', () => {
     const pluginJson = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')) as {
       includes: Array<{ type: string; name: string; path: string }>;
