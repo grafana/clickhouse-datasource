@@ -259,10 +259,10 @@
       },
       {
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
-        "enable": true,
+        "enable": false,
         "hide": false,
         "iconColor": "#73BF69",
-        "name": "Deployments (service.version)",
+        "name": "Deployments (service.version, requires traces)",
         "preset": "deployment_detection",
         "target": {
           "editorType": "sql",
