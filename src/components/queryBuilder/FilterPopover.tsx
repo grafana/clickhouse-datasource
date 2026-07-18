@@ -160,9 +160,10 @@ export const FilterPopover = (props: FilterPopoverProps) => {
   const numericValue = Number(value);
   const isNumberValueInvalid =
     filterKind === 'number' && !noValueNeeded && (value.trim() === '' || isNaN(numericValue));
+  const isMapKeyMissing = isMapColumn && !selectedMapKey;
 
   const handleAdd = () => {
-    if (!selectedColumn || isNumberValueInvalid) {
+    if (!selectedColumn || isMapKeyMissing || isNumberValueInvalid) {
       return;
     }
 
@@ -227,8 +228,9 @@ export const FilterPopover = (props: FilterPopoverProps) => {
               setSelectedMapKey(option.value || '');
               setValue('');
             }}
+            createCustomValue
             width={20}
-            placeholder="Select key..."
+            placeholder="Type or select key..."
           />
         </div>
       )}
@@ -259,7 +261,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       )}
 
       <div className={styles.actions}>
-        <Button size="sm" onClick={handleAdd} disabled={!selectedColumn || isNumberValueInvalid}>
+        <Button size="sm" onClick={handleAdd} disabled={!selectedColumn || isMapKeyMissing || isNumberValueInvalid}>
           Add
         </Button>
         <Button size="sm" variant="secondary" onClick={onClose}>
