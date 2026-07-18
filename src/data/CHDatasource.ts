@@ -64,7 +64,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { applyMinIntervalToScopedVars } from './queryInterval';
-import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { escapeIdentifier, generateSql, getColumnByHint, isStringType, logAliasToColumnHints } from './sqlGenerator';
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
@@ -211,7 +211,10 @@ function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
   if (resolved.hasMapKey) {
     return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey && sameColumn;
   }
-  return f.type === 'string' && sameColumn;
+  // Log-view toggles store the 'string' sentinel type, but the filter editors store the
+  // real column type ('String', 'LowCardinality(String)', ...). Accept any string-like
+  // type so editor-created filters toggle off instead of gaining a contradictory duplicate.
+  return isStringType(f.type) && sameColumn;
 }
 
 export class Datasource
