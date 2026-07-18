@@ -4,6 +4,7 @@ import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
 import { BuilderMode, ColumnHint, FilterOperator, QueryType, TimeUnit } from 'types/queryBuilder';
+import { setColumnByHint } from 'hooks/useBuilderOptionsState';
 import { CoreApp } from '@grafana/data';
 
 jest.mock('./views/TableQueryBuilder', () => ({
@@ -375,5 +376,88 @@ describe('QueryBuilder', () => {
     await waitFor(() =>
       expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }))
     );
+  });
+
+  describe('compact logs message column detection', () => {
+    const buildCompactLogsDs = (defaultColumns: Map<ColumnHint, string>): Datasource =>
+      ({
+        ...mockDs,
+        getSignalType: jest.fn(() => 'logs'),
+        getConfigMode: jest.fn(() => 'single-table'),
+        isSingleTableMode: jest.fn(() => true),
+        getDefaultLogsDatabase: jest.fn(() => 'default'),
+        getDefaultLogsTable: jest.fn(() => 'app_logs'),
+        getDefaultLogsColumns: jest.fn(() => defaultColumns),
+        getLogsOtelVersion: jest.fn(() => ''),
+        shouldSelectLogContextColumns: jest.fn(() => false),
+        getLogContextColumnNames: jest.fn(() => []),
+        fetchColumns: jest.fn(() =>
+          Promise.resolve([
+            { name: 'timestamp', type: 'DateTime', picklistValues: [] },
+            { name: 'message', type: 'String', picklistValues: [] },
+            { name: 'level', type: 'LowCardinality(String)', picklistValues: [] },
+          ])
+        ),
+      }) as unknown as Datasource;
+
+    const initialBuilderOptions = {
+      queryType: QueryType.Table,
+      mode: BuilderMode.List,
+      database: '',
+      table: '',
+      columns: [],
+      filters: [],
+    };
+
+    it('detects LogMessage and LogLevel columns by name when config has no columns', async () => {
+      const datasource = buildCompactLogsDs(new Map());
+      const builderOptionsDispatch = jest.fn();
+
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={initialBuilderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+        />
+      );
+
+      await waitFor(() =>
+        expect(builderOptionsDispatch).toHaveBeenCalledWith(
+          setColumnByHint({ name: 'message', type: 'String', hint: ColumnHint.LogMessage })
+        )
+      );
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(
+        setColumnByHint({ name: 'level', type: 'LowCardinality(String)', hint: ColumnHint.LogLevel })
+      );
+    });
+
+    it('never overrides an explicitly configured message column', async () => {
+      const datasource = buildCompactLogsDs(new Map([[ColumnHint.LogMessage, 'my_msg_col']]));
+      const builderOptionsDispatch = jest.fn();
+
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={initialBuilderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+        />
+      );
+
+      // The level slot is not configured, so detection has run once this dispatch appears
+      await waitFor(() =>
+        expect(builderOptionsDispatch).toHaveBeenCalledWith(
+          setColumnByHint({ name: 'level', type: 'LowCardinality(String)', hint: ColumnHint.LogLevel })
+        )
+      );
+
+      const logMessageDispatches = builderOptionsDispatch.mock.calls.filter(
+        ([action]) => action.type === 'set_column_by_hint' && action.payload?.column?.hint === ColumnHint.LogMessage
+      );
+      expect(logMessageDispatches).toHaveLength(0);
+    });
   });
 });

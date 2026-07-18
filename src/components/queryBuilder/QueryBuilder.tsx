@@ -31,6 +31,8 @@ import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
 import { buildCompactQueryDefaults, isDefaultOrMismatchedCompactQuery } from './compactQueryDefaults';
+import { useDefaultLogColumnsByName } from './views/logsQueryBuilderHooks';
+import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
@@ -200,6 +202,21 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     : builderOptions;
   const allColumns = useColumns(datasource, activeOptions.database, activeOptions.table);
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
+
+  // Compact defaults take columns from datasource config only, so a non-OTel
+  // table without a configured Message column would leave the search box inert
+  // (generateLogsQuery drops meta.logMessageLike unless a column carries the
+  // LogMessage hint). Reuse the classic builder's conventional-name heuristic
+  // to fill the empty Message and Level slots once table columns are fetched.
+  // Configured columns already carry the hint, so they are never overridden.
+  useDefaultLogColumnsByName(
+    signalType === 'logs' ? allColumns : [],
+    activeOptions.table,
+    getColumnByHint(activeOptions, ColumnHint.LogMessage),
+    getColumnByHint(activeOptions, ColumnHint.LogLevel),
+    activeOptions.meta?.otelEnabled || false,
+    builderOptionsDispatch
+  );
 
   const onActiveOptionsChange = (nextOptions: QueryBuilderOptions, shouldRunQuery = false) => {
     builderOptionsDispatch(setAllOptions(nextOptions));
