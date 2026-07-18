@@ -641,6 +641,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               queryTimeout={jsonData.queryTimeout}
               rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
+              enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
