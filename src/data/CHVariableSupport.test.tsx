@@ -361,6 +361,47 @@ describe('CHVariableSupport', () => {
     expect(frame.fields[1].values).toEqual(['id-a', 'id-b']);
   });
 
+  it('forwards scopedVars from the request into metricFindQuery so scoped variables resolve', async () => {
+    const datasource = buildDatasource();
+    const support = new CHVariableSupport(datasource);
+    const scopedVars = {
+      namespace: { text: 'prod', value: 'prod' },
+      __searchFilter: { text: 'foo', value: 'foo' },
+    };
+    const request = {
+      targets: [
+        {
+          refId: 'v',
+          queryType: 'sql' as CHVariableQueryType,
+          rawSql: 'SELECT name FROM t WHERE ns = ${namespace} AND name LIKE $__searchFilter',
+        },
+      ],
+      range: { from: new Date(), to: new Date() },
+      scopedVars,
+    };
+    await firstValueFrom(support.query(request as unknown as DataQueryRequest<CHVariableQuery>));
+    expect(datasource.metricFindQuery).toHaveBeenCalledWith(
+      'SELECT name FROM t WHERE ns = ${namespace} AND name LIKE $__searchFilter',
+      expect.objectContaining({ scopedVars })
+    );
+  });
+
+  it('forwards scopedVars for a legacy string target', async () => {
+    const datasource = buildDatasource();
+    const support = new CHVariableSupport(datasource);
+    const scopedVars = { namespace: { text: 'prod', value: 'prod' } };
+    const request = {
+      targets: ['SELECT name FROM t WHERE ns = ${namespace}'],
+      range: { from: new Date(), to: new Date() },
+      scopedVars,
+    };
+    await firstValueFrom(support.query(request as unknown as DataQueryRequest<CHVariableQuery>));
+    expect(datasource.metricFindQuery).toHaveBeenCalledWith(
+      'SELECT name FROM t WHERE ns = ${namespace}',
+      expect.objectContaining({ scopedVars })
+    );
+  });
+
   it('resolves a legacy string target', async () => {
     const datasource = buildDatasource();
     const support = new CHVariableSupport(datasource);
