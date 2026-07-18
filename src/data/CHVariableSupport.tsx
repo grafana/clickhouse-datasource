@@ -88,9 +88,14 @@ export function generateVariableSql(query: CHVariableQuery, defaultDatabase: str
         return '';
       }
       const column = escapeIdentifier(query.column);
-      const target =
-        query.columnIsMap && query.mapKey ? `${column}['${escapeCHStringLiteral(query.mapKey)}']` : column;
-      return `SELECT DISTINCT ${target} AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE ${target} IS NOT NULL ORDER BY value LIMIT 1000`;
+      if (query.columnIsMap && query.mapKey) {
+        // Map subscript on a missing key returns the value type's default
+        // (e.g. '' for String), never NULL, so an IS NOT NULL guard would be a
+        // no-op and add a spurious empty entry. Guard with mapContains instead.
+        const mapKey = `'${escapeCHStringLiteral(query.mapKey)}'`;
+        return `SELECT DISTINCT ${column}[${mapKey}] AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE mapContains(${column}, ${mapKey}) ORDER BY value LIMIT 1000`;
+      }
+      return `SELECT DISTINCT ${column} AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE ${column} IS NOT NULL ORDER BY value LIMIT 1000`;
     }
     case 'sql':
     default:
