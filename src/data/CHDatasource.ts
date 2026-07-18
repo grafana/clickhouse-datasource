@@ -1204,7 +1204,10 @@ export class Datasource
     const source = timeColumn
       ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
       : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapedColumn}.keys) as keys FROM ${source} LIMIT 1000`;
+    // mapKeys() rather than the `.keys` sub-column: ClickHouse's old analyzer
+    // (the default before 24.3) cannot resolve sub-columns on subquery results
+    // and fails with UNKNOWN_IDENTIFIER, silently breaking key discovery.
+    const rawSql = `SELECT DISTINCT arrayJoin(mapKeys(${escapedColumn})) as keys FROM ${source} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
