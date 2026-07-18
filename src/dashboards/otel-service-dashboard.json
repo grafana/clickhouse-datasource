@@ -85,6 +85,33 @@
         "type": "datasource"
       },
       {
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "current": {
+          "selected": false,
+          "text": "auto",
+          "value": "$__auto_interval_interval"
+        },
+        "hide": 0,
+        "label": "Min interval",
+        "name": "interval",
+        "options": [
+          { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": false, "text": "1m", "value": "1m" },
+          { "selected": false, "text": "5m", "value": "5m" },
+          { "selected": false, "text": "10m", "value": "10m" },
+          { "selected": false, "text": "30m", "value": "30m" },
+          { "selected": false, "text": "1h", "value": "1h" },
+          { "selected": false, "text": "6h", "value": "6h" },
+          { "selected": false, "text": "12h", "value": "12h" },
+          { "selected": false, "text": "1d", "value": "1d" }
+        ],
+        "query": "1m,5m,10m,30m,1h,6h,12h,1d",
+        "refresh": 2,
+        "type": "interval"
+      },
+      {
         "current": {},
         "datasource": {
           "type": "grafana-clickhouse-datasource",
@@ -195,6 +222,7 @@
         "y": 1
       },
       "id": 1,
+      "interval": "${interval}",
       "description": "Server spans per second for ${service}: incoming requests this service handles. The R in RED.",
       "title": "Request Rate (Server)",
       "type": "timeseries",
@@ -257,6 +285,7 @@
         "y": 1
       },
       "id": 2,
+      "interval": "${interval}",
       "description": "Fraction of Server spans for ${service} with StatusCode = 'Error'. The E in RED.",
       "title": "Error Rate (Server)",
       "type": "timeseries",
@@ -327,6 +356,7 @@
         "y": 1
       },
       "id": 3,
+      "interval": "${interval}",
       "description": "P50, P90 (solid) and P99 (dashed orange) Server span duration for ${service}. The D in RED.",
       "title": "Duration Percentiles (Server)",
       "type": "timeseries",
@@ -469,6 +499,7 @@
         "y": 16
       },
       "id": 12,
+      "interval": "${interval}",
       "description": "Client spans per second for ${service}: outgoing requests this service makes to its dependencies. The R in RED.",
       "title": "Request Rate (Client)",
       "type": "timeseries",
@@ -531,6 +562,7 @@
         "y": 16
       },
       "id": 13,
+      "interval": "${interval}",
       "description": "Fraction of Client spans for ${service} with StatusCode = 'Error'. The E in RED.",
       "title": "Error Rate (Client)",
       "type": "timeseries",
@@ -601,6 +633,7 @@
         "y": 16
       },
       "id": 14,
+      "interval": "${interval}",
       "description": "P50, P90 (solid) and P99 (dashed orange) Client span duration for ${service}. The D in RED.",
       "title": "Duration Percentiles (Client)",
       "type": "timeseries",
@@ -869,6 +902,7 @@
             "y": 42
           },
           "id": 16,
+          "interval": "${interval}",
           "description": "Internal spans per second for ${service}: in-process work (function-level instrumentation, no network).",
           "title": "Request Rate (Internal)",
           "type": "timeseries",
@@ -931,6 +965,7 @@
             "y": 42
           },
           "id": 17,
+          "interval": "${interval}",
           "description": "Fraction of Internal spans for ${service} with StatusCode = 'Error'.",
           "title": "Error Rate (Internal)",
           "type": "timeseries",
@@ -1001,6 +1036,7 @@
             "y": 42
           },
           "id": 18,
+          "interval": "${interval}",
           "description": "P50, P90 (solid) and P99 (dashed orange) Internal span duration for ${service}.",
           "title": "Duration Percentiles (Internal)",
           "type": "timeseries",
@@ -1144,6 +1180,7 @@
             "y": 57
           },
           "id": 20,
+          "interval": "${interval}",
           "description": "Async spans (Producer + Consumer) per second for ${service}: message production and consumption against queues / event buses.",
           "title": "Message Rate (Async)",
           "type": "timeseries",
@@ -1206,6 +1243,7 @@
             "y": 57
           },
           "id": 21,
+          "interval": "${interval}",
           "description": "Fraction of Async (Producer + Consumer) spans for ${service} with StatusCode = 'Error'.",
           "title": "Error Rate (Async)",
           "type": "timeseries",
@@ -1276,6 +1314,7 @@
             "y": 57
           },
           "id": 22,
+          "interval": "${interval}",
           "description": "P50, P90 (solid) and P99 (dashed orange) Async span duration for ${service}.",
           "title": "Duration Percentiles (Async)",
           "type": "timeseries",
