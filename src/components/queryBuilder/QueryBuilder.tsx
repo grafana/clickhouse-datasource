@@ -30,7 +30,11 @@ import TraceIdInput from './TraceIdInput';
 import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
-import { buildCompactQueryDefaults, isDefaultOrMismatchedCompactQuery } from './compactQueryDefaults';
+import {
+  buildCompactQueryDefaults,
+  isCompactQueryTypeMismatch,
+  shouldBuildCompactQueryDefaults,
+} from './compactQueryDefaults';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
@@ -70,18 +74,27 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   }
 
   if (singleTableMode && signalType) {
-    return (
-      <CompactQueryEditor
-        datasource={datasource}
-        builderOptions={builderOptions}
-        builderOptionsDispatch={builderOptionsDispatch}
-        generatedSql={generatedSql}
-        signalType={signalType}
-        onQueryChange={onQueryChange}
-        onEditAsSql={onEditAsSql}
-        onRunQuery={onRunQuery}
-      />
-    );
+    // An authored query whose type does not match the datasource signal falls through to
+    // the classic builder, so switching a datasource to single-table mode never silently
+    // replaces the saved options of pre-existing queries.
+    const preserveAuthoredQuery =
+      isCompactQueryTypeMismatch(builderOptions, signalType) &&
+      !shouldBuildCompactQueryDefaults(builderOptions, signalType);
+
+    if (!preserveAuthoredQuery) {
+      return (
+        <CompactQueryEditor
+          datasource={datasource}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          generatedSql={generatedSql}
+          signalType={signalType}
+          onQueryChange={onQueryChange}
+          onEditAsSql={onEditAsSql}
+          onRunQuery={onRunQuery}
+        />
+      );
+    }
   }
 
   return (
@@ -168,7 +181,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     onEditAsSql,
     onRunQuery,
   } = props;
-  const needsInitialization = isDefaultOrMismatchedCompactQuery(builderOptions, signalType);
+  const needsInitialization = shouldBuildCompactQueryDefaults(builderOptions, signalType);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const lastInitializationKey = useRef<string>();
   const onQueryChangeRef = useRef(onQueryChange);

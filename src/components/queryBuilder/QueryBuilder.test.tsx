@@ -3,7 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, ColumnHint, FilterOperator, QueryType, TimeUnit } from 'types/queryBuilder';
+import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryType, TimeUnit } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 
 jest.mock('./views/TableQueryBuilder', () => ({
@@ -324,6 +324,56 @@ describe('QueryBuilder', () => {
         queryType: QueryType.Logs,
       })
     );
+  });
+
+  it('preserves an authored query when its type does not match the datasource signal', async () => {
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'otel_logs'),
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => '1.29.0'),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+    } as unknown as Datasource;
+    const builderOptionsDispatch = jest.fn();
+    const onQueryChange = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.TimeSeries,
+          mode: BuilderMode.Trend,
+          database: 'metrics_db',
+          table: 'requests',
+          columns: [{ name: 'created_at', hint: ColumnHint.Time }, { name: 'requests_count' }],
+          filters: [],
+          orderBy: [{ name: 'created_at', dir: OrderByDirection.ASC }],
+        }}
+        builderOptionsDispatch={builderOptionsDispatch}
+        datasource={compactDs}
+        generatedSql=""
+        onQueryChange={onQueryChange}
+      />
+    );
+
+    // The authored time series query falls back to the classic builder instead of being
+    // replaced with compact logs defaults.
+    expect(await screen.findByTestId('time-series-component')).toBeInTheDocument();
+    expect(screen.queryByTestId('compact-mode-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('compact-filter-bar')).not.toBeInTheDocument();
+    expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+    expect(onQueryChange).not.toHaveBeenCalled();
   });
 
   it('renders traces compact mode without database/table or query type selectors', async () => {
