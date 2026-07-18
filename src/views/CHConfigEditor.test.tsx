@@ -190,6 +190,44 @@ describe('ConfigEditor', () => {
     );
   });
 
+  describe('classic mode map keys discovery switch', () => {
+    // dialTimeout keeps the collapsible "Additional settings" section
+    // initially open so the query settings render.
+    const overrides: Partial<CHConfig> = { dialTimeout: '10', enableMapKeysDiscovery: false };
+
+    const getMapKeysSwitch = (): HTMLInputElement => {
+      const labelText = screen.getByText(allLabels.components.Config.QuerySettingsConfig.enableMapKeysDiscovery.label);
+      // The switch is inside a grafana-ui Field: the input lives in a sibling
+      // of the label element, under the shared field container.
+      const input = labelText.closest('label')?.parentElement?.parentElement?.querySelector('input[type="checkbox"]');
+      if (!(input instanceof HTMLInputElement)) {
+        throw new Error('map keys discovery switch not found');
+      }
+      return input;
+    };
+
+    it('reflects a stored enableMapKeysDiscovery=false', () => {
+      render(<ConfigEditor {...mockConfigEditorProps(overrides)} />);
+      expect(getMapKeysSwitch()).not.toBeChecked();
+    });
+
+    it('writes true when toggled back on', () => {
+      const props = mockConfigEditorProps(overrides);
+      render(<ConfigEditor {...props} />);
+
+      (props.onOptionsChange as jest.Mock).mockClear();
+      fireEvent.click(getMapKeysSwitch());
+
+      expect(props.onOptionsChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jsonData: expect.objectContaining({
+            enableMapKeysDiscovery: true,
+          }),
+        })
+      );
+    });
+  });
+
   it('persists the single-table logs trace correlation setting', () => {
     const props = mockConfigEditorProps({
       configMode: 'single-table',
