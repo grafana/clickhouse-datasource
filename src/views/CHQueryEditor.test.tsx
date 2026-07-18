@@ -7,6 +7,7 @@ import { mockDatasource, newMockDatasource } from '__mocks__/datasource';
 import { EditorType } from 'types/sql';
 import { ColumnHint, FilterOperator, QueryType } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
+import { selectors } from 'selectors';
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
@@ -441,5 +442,88 @@ describe('Query Editor', () => {
 
     await waitFor(() => expect(screen.getByText('SeverityText')).toBeInTheDocument());
     expect(screen.getByText('error')).toBeInTheDocument();
+  });
+
+  // Regression guard for the one-shot span-link `query` field (#1889 follow-up):
+  // Grafana core injects a top-level `query` field when a span link is followed.
+  // The editor must fold that trace id into the builder options and never spread
+  // the injected field back out through onChange, otherwise the saved model stays
+  // pinned to the linked trace after the user targets a different trace id.
+  describe('span link one-shot query field', () => {
+    const originalTraceId = 'a55d8be622a816047a902c60adedd776';
+    const linkedTraceId = '4ea6a6e0d0525ed05ecc350d3cdd66b6';
+    const userTraceId = 'c3b5f0a1d2e4968877665544332211ff';
+
+    const spanLinkQuery = () => ({
+      pluginVersion,
+      refId: 'A',
+      editorType: EditorType.Builder as const,
+      rawSql: `SELECT "TraceId" as traceID FROM "otel"."otel_traces" WHERE traceID = '${originalTraceId}'`,
+      builderOptions: {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns: [{ name: 'TraceId', hint: ColumnHint.TraceId }],
+        meta: { isTraceIdMode: true, traceId: originalTraceId },
+      },
+      // Grafana core builds the span-link navigation target as { ...currentQuery, query: linkedTraceId }.
+      query: linkedTraceId,
+    });
+
+    const newTraceDatasource = () => {
+      const datasource = newMockDatasource();
+      datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+      datasource.fetchDatabases = jest.fn(() => Promise.resolve([]));
+      datasource.fetchTables = jest.fn(() => Promise.resolve([]));
+      jest.spyOn(datasource, 'peekTraceTimestampTable').mockReturnValue(false);
+      jest.spyOn(datasource, 'hasTraceTimestampTable').mockResolvedValue(false);
+      return datasource;
+    };
+
+    it('retargets a freshly injected span-link trace id and strips the one-shot field', async () => {
+      const onChange = jest.fn();
+
+      render(
+        <CHQueryEditor
+          query={spanLinkQuery()}
+          onChange={onChange}
+          onRunQuery={jest.fn()}
+          datasource={newTraceDatasource()}
+        />
+      );
+      await act(async () => {});
+
+      expect(onChange).toHaveBeenCalled();
+      const [propagated] = onChange.mock.calls[onChange.mock.calls.length - 1];
+      expect('query' in propagated).toBe(false);
+      expect(propagated.builderOptions?.meta?.traceId).toEqual(linkedTraceId);
+      expect(propagated.rawSql).toContain(linkedTraceId);
+      expect(propagated.rawSql).not.toContain(originalTraceId);
+    });
+
+    it('follows the user trace id after an edit instead of re-pinning the linked trace', async () => {
+      const onChange = jest.fn();
+
+      render(
+        <CHQueryEditor
+          query={spanLinkQuery()}
+          onChange={onChange}
+          onRunQuery={jest.fn()}
+          datasource={newTraceDatasource()}
+        />
+      );
+      await act(async () => {});
+
+      const traceIdInput = screen.getByTestId(selectors.components.QueryBuilder.TraceIdInput.input);
+      fireEvent.change(traceIdInput, { target: { value: userTraceId } });
+      fireEvent.blur(traceIdInput);
+      await act(async () => {});
+
+      const [propagated] = onChange.mock.calls[onChange.mock.calls.length - 1];
+      expect('query' in propagated).toBe(false);
+      expect(propagated.builderOptions?.meta?.traceId).toEqual(userTraceId);
+      expect(propagated.rawSql).toContain(userTraceId);
+      expect(propagated.rawSql).not.toContain(linkedTraceId);
+    });
   });
 });

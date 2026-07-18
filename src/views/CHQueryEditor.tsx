@@ -21,28 +21,49 @@ import { isEqual } from 'lodash';
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 /**
+ * Grafana core injects a one-shot top-level `query` field into the pane query when a span
+ * link is followed (see Datasource.retargetSpanLinkTrace). The injected value must only
+ * apply until the user next edits the query, so drop it from every change the editor
+ * propagates. Otherwise it survives in the saved model and pins every run to the linked
+ * trace, even after the user targets a different trace id.
+ */
+const removeSpanLinkQueryField = (query: CHQuery): CHQuery => {
+  if (!('query' in query)) {
+    return query;
+  }
+
+  const { query: discardedSpanLinkQuery, ...rest } = query;
+  void discardedSpanLinkQuery;
+  return rest;
+};
+
+/**
  * Top level query editor component
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { datasource, query: savedQuery, onRunQuery } = props;
-  const query = migrateCHQuery(savedQuery);
+  const { datasource, query: savedQuery, onChange, onRunQuery } = props;
+  // Fold a span-link injected trace id into the builder options before rendering, so the
+  // editor shows the linked trace and the first propagated change keeps targeting it once
+  // removeSpanLinkQueryField drops the one-shot field.
+  const query = datasource.retargetSpanLinkTrace(migrateCHQuery(savedQuery));
+  const handleChange = useCallback((nextQuery: CHQuery) => onChange(removeSpanLinkQueryField(nextQuery)), [onChange]);
   const singleTableMode = datasource.isSingleTableMode();
 
   if (singleTableMode && query.editorType === EditorType.SQL) {
-    return <CompactSqlMode {...props} query={query} />;
+    return <CompactSqlMode {...props} query={query} onChange={handleChange} />;
   }
 
   if (singleTableMode) {
-    return <CHEditorByType {...props} query={query} />;
+    return <CHEditorByType {...props} query={query} onChange={handleChange} />;
   }
 
   return (
     <>
       <InlineFieldRow className={styles.QueryEditor.queryType}>
-        <EditorTypeSwitcher {...props} query={query} datasource={datasource} />
+        <EditorTypeSwitcher {...props} query={query} onChange={handleChange} datasource={datasource} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </InlineFieldRow>
-      <CHEditorByType {...props} query={query} />
+      <CHEditorByType {...props} query={query} onChange={handleChange} />
     </>
   );
 };
