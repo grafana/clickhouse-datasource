@@ -110,7 +110,10 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const hasTraceTimestampTable = useHasTraceTimestampTable(
     props.datasource,
     needsTraceTableCheck ? builderOptions.database || '' : '',
-    needsTraceTableCheck ? builderOptions.table || '' : ''
+    needsTraceTableCheck ? builderOptions.table || '' : '',
+    // Probe the companion table the generated SQL will reference: a saved
+    // query's baked suffix wins over the current datasource config suffix.
+    builderOptions.meta?.traceTimestampTableSuffix
   );
 
   useEffect(() => {

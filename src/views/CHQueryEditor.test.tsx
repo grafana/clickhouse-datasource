@@ -152,6 +152,49 @@ describe('Query Editor', () => {
     }
   });
 
+  it('validates the companion table named by the query meta suffix on trace ID deep-links', async () => {
+    // A saved deep-link query can bake a meta.traceTimestampTableSuffix that
+    // differs from the current datasource config suffix. The editor's check
+    // must probe the companion the generated SQL will reference (the query's
+    // suffix), otherwise it validates one table while the emitted SQL joins
+    // against another.
+    const ds = newMockDatasource();
+    jest.spyOn(ds, 'peekTraceTimestampTable').mockReturnValue(undefined);
+    const hasSpy = jest.spyOn(ds, 'hasTraceTimestampTable').mockResolvedValue(true);
+
+    render(
+      <CHQueryEditor
+        query={{
+          pluginVersion,
+          refId: 'Trace ID',
+          editorType: EditorType.Builder,
+          rawSql: '',
+          builderOptions: {
+            database: 'otel',
+            table: 'otel_traces',
+            queryType: QueryType.Traces,
+            columns: [
+              { name: 'Timestamp', hint: ColumnHint.Time },
+              { name: 'TraceId', hint: ColumnHint.TraceId },
+            ],
+            meta: {
+              minimized: true,
+              isTraceIdMode: true,
+              traceId: 'abc',
+              traceTimestampTableSuffix: '_saved_ts',
+            },
+          },
+        }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={ds}
+      />
+    );
+    await act(async () => {});
+
+    expect(hasSpy).toHaveBeenCalledWith('otel', 'otel_traces', '_saved_ts');
+  });
+
   it('renders compact SQL chrome for single-table datasources', () => {
     const datasource = newMockDatasource();
     datasource.settings.jsonData.configMode = 'single-table';
