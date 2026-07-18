@@ -168,10 +168,21 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     onEditAsSql,
     onRunQuery,
   } = props;
-  const needsInitialization = isDefaultOrMismatchedCompactQuery(builderOptions, signalType);
+  // Defaults are built in two passes: database and table never depend on the
+  // table's columns, so a build without column names locates the table for the
+  // columns fetch, and the fetched column names then feed the OTel logs schema
+  // detection inside buildCompactQueryDefaults. Treating a query that still
+  // equals the base defaults as needing initialization lets that detection
+  // correct the defaults once the columns arrive, without clobbering edits.
+  const baseDefaults = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+  const needsInitialization =
+    isDefaultOrMismatchedCompactQuery(builderOptions, signalType) || isEqual(builderOptions, baseDefaults);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const lastInitializationKey = useRef<string>();
   const onQueryChangeRef = useRef(onQueryChange);
+  const locationOptions = needsInitialization ? baseDefaults : builderOptions;
+  const allColumns = useColumns(datasource, locationOptions.database, locationOptions.table);
+  const tableColumnNames = useMemo(() => allColumns.map((column) => column.name), [allColumns]);
 
   useEffect(() => {
     onQueryChangeRef.current = onQueryChange;
@@ -182,23 +193,22 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
       return;
     }
 
-    const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}`;
+    const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}:${tableColumnNames.length > 0}`;
     if (lastInitializationKey.current === initializationKey) {
       return;
     }
     lastInitializationKey.current = initializationKey;
 
-    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table, tableColumnNames);
     if (!isEqual(builderOptions, nextOptions)) {
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
     }
-  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType]);
+  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType, tableColumnNames]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table)
+    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, tableColumnNames)
     : builderOptions;
-  const allColumns = useColumns(datasource, activeOptions.database, activeOptions.table);
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 
   const onActiveOptionsChange = (nextOptions: QueryBuilderOptions, shouldRunQuery = false) => {
