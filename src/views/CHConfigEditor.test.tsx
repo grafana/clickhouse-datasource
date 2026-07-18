@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { config } from '@grafana/runtime';
 import { ConfigEditor } from './CHConfigEditor';
+import { createValidationAPI } from './CHConfigEditorHooks';
 import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
 import '@testing-library/jest-dom';
 import { CHConfig, Protocol } from 'types/config';
@@ -10,7 +12,7 @@ jest.mock('@grafana/runtime', () => {
   const original = jest.requireActual('@grafana/runtime');
   return {
     ...original,
-    config: { buildInfo: { version: '10.0.0' }, secureSocksDSProxyEnabled: true },
+    config: { buildInfo: { version: '10.0.0' }, secureSocksDSProxyEnabled: true, featureToggles: {} },
   };
 });
 
@@ -143,6 +145,44 @@ describe('ConfigEditor', () => {
   it('hides the required-field error once the host is filled (no validation toggle)', () => {
     render(<ConfigEditor {...mockConfigEditorProps({ host: 'localhost' } as Partial<CHConfig>)} />);
     expect(screen.queryByText(labels.serverAddress.error)).not.toBeInTheDocument();
+  });
+
+  describe('with the clickHouseConfigValidation feature toggle enabled', () => {
+    const featureToggles = config.featureToggles as Record<string, boolean | undefined>;
+
+    beforeEach(() => {
+      featureToggles.clickHouseConfigValidation = true;
+    });
+
+    afterEach(() => {
+      delete featureToggles.clickHouseConfigValidation;
+    });
+
+    it('shows the required-field error on an empty host', () => {
+      // Before Grafana 13.1 nothing calls validate() on the local
+      // ValidationAPI, so field errors never populate. The structural empty
+      // check must still surface the inline error.
+      render(<ConfigEditor {...mockConfigEditorProps({ host: '' } as Partial<CHConfig>)} />);
+      expect(screen.getByText(labels.serverAddress.error)).toBeInTheDocument();
+    });
+
+    it('shows the required-field error on an empty port', () => {
+      render(<ConfigEditor {...mockConfigEditorProps({ host: 'localhost', port: 0 } as Partial<CHConfig>)} />);
+      expect(screen.getByText(labels.serverPort.error)).toBeInTheDocument();
+    });
+
+    it('hides the required-field error once the host is filled', () => {
+      render(<ConfigEditor {...mockConfigEditorProps({ host: 'localhost' } as Partial<CHConfig>)} />);
+      expect(screen.queryByText(labels.serverAddress.error)).not.toBeInTheDocument();
+    });
+
+    it('prefers the validation API error message when one is set', () => {
+      const validation = createValidationAPI();
+      validation.setError('host', 'Custom validation error');
+      render(<ConfigEditor {...mockConfigEditorProps({ host: '' } as Partial<CHConfig>)} validation={validation} />);
+      expect(screen.getByText('Custom validation error')).toBeInTheDocument();
+      expect(screen.queryByText(labels.serverAddress.error)).not.toBeInTheDocument();
+    });
   });
 
   it('renders single-table logs configuration', () => {
