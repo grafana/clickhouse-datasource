@@ -2,6 +2,7 @@ import { Datasource } from 'data/CHDatasource';
 import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn } from 'types/queryBuilder';
 import { SignalType } from 'types/config';
 import { isBuilderOptionsRunnable } from 'data/utils';
+import otel from 'otel';
 import {
   getDefaultLogsFilters,
   getDefaultLogsOrderBy,
@@ -48,18 +49,23 @@ export const shouldBuildCompactQueryDefaults = (
 export function buildCompactQueryDefaults(
   datasource: Datasource,
   signalType: SignalType,
-  fallbackTable = ''
+  fallbackTable = '',
+  tableColumnNames: readonly string[] = []
 ): QueryBuilderOptions {
   return signalType === 'logs'
-    ? buildCompactLogsDefaults(datasource, fallbackTable)
+    ? buildCompactLogsDefaults(datasource, fallbackTable, tableColumnNames)
     : buildCompactTracesDefaults(datasource, fallbackTable);
 }
 
-const buildCompactLogsDefaults = (datasource: Datasource, fallbackTable: string): QueryBuilderOptions => {
+const buildCompactLogsDefaults = (
+  datasource: Datasource,
+  fallbackTable: string,
+  tableColumnNames: readonly string[]
+): QueryBuilderOptions => {
   const defaultDb = datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase();
   const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable() || fallbackTable;
   const otelVersion = datasource.getLogsOtelVersion();
-  const columns = getLogsDefaultColumns(datasource);
+  const columns = getLogsDefaultColumns(datasource, tableColumnNames);
 
   return {
     database: defaultDb,
@@ -102,8 +108,26 @@ const buildCompactTracesDefaults = (datasource: Datasource, fallbackTable: strin
   };
 };
 
-const getLogsDefaultColumns = (datasource: Datasource): SelectedColumn[] => {
-  const nextColumns = getDefaultColumns(datasource.getDefaultLogsColumns());
+// The 'latest' OTel alias resolves the log schema against the actual table
+// rather than a fixed version: pre-v0.151.0 collector tables keep their
+// TimestampTime column, newer ones don't, and both exist in the wild (see
+// #1900). This mirrors useOtelColumns in logsQueryBuilderHooks. Pinned
+// versions are honoured as-is, and without fetched columns the static latest
+// map from the datasource remains the fallback.
+const getLogsDefaultColumnMap = (
+  datasource: Datasource,
+  tableColumnNames: readonly string[]
+): Map<ColumnHint, string> => {
+  const otelConfig = otel.getVersion(datasource.getLogsOtelVersion());
+  if (otelConfig?.version === 'latest' && tableColumnNames.length > 0) {
+    return otel.detectLogsVersion(tableColumnNames).logColumnMap;
+  }
+
+  return datasource.getDefaultLogsColumns();
+};
+
+const getLogsDefaultColumns = (datasource: Datasource, tableColumnNames: readonly string[]): SelectedColumn[] => {
+  const nextColumns = getDefaultColumns(getLogsDefaultColumnMap(datasource, tableColumnNames));
   const includedColumns = new Set(nextColumns.map((c) => c.name));
 
   if (datasource.shouldSelectLogContextColumns()) {

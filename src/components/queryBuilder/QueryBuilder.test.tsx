@@ -376,6 +376,65 @@ describe('QueryBuilder', () => {
     expect(onQueryChange).not.toHaveBeenCalled();
   });
 
+  it('re-resolves compact logs defaults to the pre-v0.151.0 otel schema once table columns load', async () => {
+    const compactDs = {
+      ...mockDs,
+      uid: 'compact-otel-latest',
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'otel_logs'),
+      // The static "latest" schema has no filter_time mapping, so the initial
+      // defaults order and filter on Timestamp only.
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => 'latest'),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      // The table itself is the older schema, identified by TimestampTime.
+      fetchColumns: jest.fn(() =>
+        Promise.resolve([
+          { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+          { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+          { name: 'Body', type: 'String', picklistValues: [] },
+        ])
+      ),
+    } as unknown as Datasource;
+    const onQueryChange = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.Table,
+          mode: BuilderMode.List,
+          database: '',
+          table: '',
+          columns: [],
+          filters: [],
+        }}
+        builderOptionsDispatch={jest.fn()}
+        datasource={compactDs}
+        generatedSql=""
+        onQueryChange={onQueryChange}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onQueryChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: expect.arrayContaining([{ name: 'TimestampTime', hint: ColumnHint.FilterTime }]),
+        })
+      )
+    );
+  });
+
   it('renders traces compact mode without database/table or query type selectors', async () => {
     const compactDs = {
       ...mockDs,
