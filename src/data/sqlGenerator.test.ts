@@ -541,8 +541,8 @@ describe('SQL Generator', () => {
     };
 
     const expectedSqlParts = [
-      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
-      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      `WITH 'abcdefg' as __gf_trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_end`,
       'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
       '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
       'multiply("Duration", 0.000001) as duration,',
@@ -557,7 +557,7 @@ describe('SQL Generator', () => {
       '"InstrumentationLibraryName" as instrumentationLibraryName,',
       '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
       '"TraceState" as traceState',
-      `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+      `FROM "default"."otel_traces" WHERE traceID = __gf_trace_id AND "Timestamp" >= __gf_trace_start AND "Timestamp" <= __gf_trace_end`,
     ];
 
     const sql = generateSql(opts);
@@ -604,8 +604,8 @@ describe('SQL Generator', () => {
     };
 
     const expectedSqlParts = [
-      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
-      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      `WITH 'abcdefg' as __gf_trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_end`,
       'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
       '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
       'multiply("Duration", 0.000001) as duration,',
@@ -620,7 +620,7 @@ describe('SQL Generator', () => {
       '"InstrumentationLibraryName" as instrumentationLibraryName,',
       '"InstrumentationLibraryVersion" as instrumentationLibraryVersion,',
       '"TraceState" as traceState',
-      `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+      `FROM "default"."otel_traces" WHERE traceID = __gf_trace_id AND "Timestamp" >= __gf_trace_start AND "Timestamp" <= __gf_trace_end`,
     ];
 
     const sql = generateSql(opts);
@@ -658,8 +658,8 @@ describe('SQL Generator', () => {
       orderBy: [],
     };
     const expectedSqlParts = [
-      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
-      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      `WITH 'abcdefg' as __gf_trace_id, (SELECT min(Start) FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_end`,
       'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
       '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
       'multiply("Duration", 0.000001) as duration,',
@@ -667,7 +667,7 @@ describe('SQL Generator', () => {
       `mapKeys("SpanAttributes")) as tags,`,
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
-      `FROM "default"."otel_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+      `FROM "default"."otel_traces" WHERE traceID = __gf_trace_id AND "Timestamp" >= __gf_trace_start AND "Timestamp" <= __gf_trace_end`,
     ];
 
     const sql = generateSql(opts);
@@ -777,8 +777,8 @@ describe('SQL Generator', () => {
       orderBy: [],
     };
     const expectedSqlParts = [
-      `WITH 'abcdefg' as trace_id, (SELECT min(Start) FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
-      `(SELECT max(End) + 1 FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+      `WITH 'abcdefg' as __gf_trace_id, (SELECT min(Start) FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_start,`,
+      `(SELECT max(End) + 1 FROM "default"."custom_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_end`,
       'SELECT "TraceId" as traceID, "SpanId" as spanID, "ParentSpanId" as parentSpanID,',
       '"ServiceName" as serviceName, "SpanName" as operationName, multiply(toUnixTimestamp64Nano("Timestamp"), 0.000001) as startTime,',
       'multiply("Duration", 0.000001) as duration,',
@@ -786,7 +786,7 @@ describe('SQL Generator', () => {
       `mapKeys("SpanAttributes")) as tags,`,
       `arrayMap(key -> map('key', key, 'value',"ResourceAttributes"[key]), mapKeys("ResourceAttributes")) as serviceTags,`,
       `if("StatusCode" IN ('Error', 'STATUS_CODE_ERROR'), 2, 0) as statusCode`,
-      `FROM "default"."custom_traces" WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`,
+      `FROM "default"."custom_traces" WHERE traceID = __gf_trace_id AND "Timestamp" >= __gf_trace_start AND "Timestamp" <= __gf_trace_end`,
     ];
 
     const sql = generateSql(opts);
@@ -828,8 +828,47 @@ describe('SQL Generator', () => {
 
     expect(sql).toContain('FROM "default"."custom_traces_ts_index"');
     expect(sql).not.toContain('custom_traces_trace_id_ts');
-    expect(sql).toContain(`WITH 'abcdefg' as trace_id`);
-    expect(sql).toContain('"Timestamp" >= trace_start');
+    expect(sql).toContain(`WITH 'abcdefg' as __gf_trace_id`);
+    expect(sql).toContain('"Timestamp" >= __gf_trace_start');
+  });
+
+  // Regression guard: the WITH aliases must never collide with physical columns
+  // on the main traces table. A bare `trace_id` alias is shadowed by a physical
+  // `trace_id` column, so `WHERE traceID = trace_id` becomes a tautology and
+  // every span in the time window is returned mislabelled with the searched ID.
+  it('does not emit WITH aliases that can be shadowed by main-table columns named trace_id/trace_start/trace_end', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'custom_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'trace_id', type: 'String', hint: ColumnHint.TraceId },
+        { name: 'span_id', type: 'String', hint: ColumnHint.TraceSpanId },
+        { name: 'trace_start', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+      ],
+      filters: [],
+      meta: {
+        minimized: true,
+        otelEnabled: false,
+        otelVersion: undefined,
+        traceDurationUnit: TimeUnit.Nanoseconds,
+        isTraceIdMode: true,
+        traceId: 'abcdefg',
+        hasTraceTimestampTable: true,
+      },
+      limit: 1000,
+      orderBy: [],
+    };
+    const sql = generateSql(opts);
+
+    expect(sql).not.toMatch(/\bas trace_id\b/i);
+    expect(sql).not.toMatch(/\bas trace_start\b/i);
+    expect(sql).not.toMatch(/\bas trace_end\b/i);
+    expect(sql).toContain(`WITH 'abcdefg' as __gf_trace_id`);
+    expect(sql).toContain('WHERE traceID = __gf_trace_id');
+    expect(sql).toContain('"trace_start" >= __gf_trace_start');
+    expect(sql).toContain('"trace_start" <= __gf_trace_end');
   });
 
   it('generates trace search query', () => {
