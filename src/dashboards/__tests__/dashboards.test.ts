@@ -147,4 +147,21 @@ describe('OTel dashboards', () => {
       expect(content).not.toMatch(/= '\$\{?\w+\}?'/);
     });
   });
+
+  describe('database variable', () => {
+    it.each(otelDashboards)('%s exposes a "database" query variable', (filename) => {
+      const dashboard = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as {
+        templating?: { list?: Array<{ name?: string; type?: string }> };
+      };
+      const variable = dashboard.templating?.list?.find((v) => v.name === 'database');
+      expect(variable).toBeDefined();
+      expect(variable?.type).toBe('query');
+    });
+
+    it.each(otelDashboards)('%s qualifies every otel table with ${database}', (filename) => {
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+      // No bare (unqualified) references to the otel tables should remain.
+      expect(content).not.toMatch(/(?:FROM|JOIN)\s+otel_(?:logs|traces)\b/);
+    });
+  });
 });
