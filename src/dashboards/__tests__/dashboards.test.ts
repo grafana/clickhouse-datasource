@@ -107,4 +107,23 @@ describe('OTel dashboards', () => {
       expect(fs.existsSync(filepath)).toBe(true);
     });
   });
+
+  describe('template variable quoting', () => {
+    // Guard every bundled dashboard, so a bare interpolation added to any of them is caught.
+    const allDashboards = (
+      JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')) as { includes: Array<{ type: string; path: string }> }
+    ).includes
+      .filter((i) => i.type === 'dashboard')
+      .map((i) => path.basename(i.path));
+
+    it.each(allDashboards)('%s quotes template variables in SQL', (filename) => {
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+      // Template variables must be interpolated with :singlequote, not bare. The datasource's
+      // default formatter quotes multi-value selections ('a','b') but does not escape a single
+      // quote inside a value, and leaves single-value selections unquoted; :singlequote does
+      // both. ($__... macros are excluded.)
+      expect(content).not.toMatch(/IN \(\$\{?(?!__)\w+\}?\)/);
+      expect(content).not.toMatch(/= '\$\{?\w+\}?'/);
+    });
+  });
 });
