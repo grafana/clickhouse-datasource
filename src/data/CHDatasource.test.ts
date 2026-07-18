@@ -2707,6 +2707,31 @@ describe('ClickHouseDatasource', () => {
       expect(datasource.queryHasFilter(queryWithLevel, { key: 'level', value: 'info' })).toBe(true);
     });
 
+    it('returns true for an editor-created filter that stores the real column type', () => {
+      // The compact FilterPopover and the classic FilterEditor store the real
+      // ClickHouse column type, not the 'string' sentinel the log-view toggles
+      // use, so the same column's filters must still be found.
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'SeverityText', value: 'Error' })).toBe(true);
+    });
+
     it('returns true for OTel map key match', () => {
       const queryWithMap: CHBuilderQuery = {
         ...query,
@@ -3026,6 +3051,66 @@ describe('ClickHouseDatasource', () => {
       expect(result.builderOptions.filters![0]).toMatchObject({
         operator: FilterOperator.NotEquals,
         value: 'error',
+      });
+    });
+
+    it('FILTER_FOR toggles off an editor-created filter that stores the real column type', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+
+    it('FILTER_FOR replaces an editor-created Equals filter with a different value (no AND-ing)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Info' },
+      }) as CHBuilderQuery;
+
+      // Must NOT produce `SeverityText = 'Error' AND SeverityText = 'Info'` (zero rows).
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'SeverityText',
+        operator: FilterOperator.Equals,
+        value: 'Info',
       });
     });
 
