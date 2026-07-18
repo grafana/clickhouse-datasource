@@ -218,12 +218,19 @@ var ClickHouseMacros = macropro.MergeMacros(
 
 // clickHouseComments is the comment/quote style macropro uses when stripping
 // comments before macro expansion. It keeps the standard -- and /* */
-// stripping (which protects against macros hidden inside comments) but adds
-// BackslashEscape so that ClickHouse's default C-style string escapes (e.g.
-// 'O\'Brien') are handled. Without it, macropro mis-reads a \' as the
-// closing quote, treats the trailing text as a comment, and silently drops any
-// macro that follows — corrupting the emitted SQL with no error.
-const clickHouseComments = macropro.LineComment | macropro.BlockComment | macropro.BackslashEscape
+// stripping (which protects against macros hidden inside comments) and adds
+// the quoting rules ClickHouse supports on top of plain single quotes:
+//   - BackslashEscape for ClickHouse's default C-style string escapes (e.g.
+//     'O\'Brien'), so a \' is not mis-read as the closing quote.
+//   - BacktickQuote for backtick-quoted identifiers (e.g. `it's` or `a--b`),
+//     so quote- and comment-like sequences inside them are not mis-lexed.
+//   - DollarQuote for dollar-quoted string literals (e.g. $tag$a--b$tag$),
+//     so a -- inside them is not treated as a line comment.
+//
+// Without these flags macropro mis-terminates the region, treats the trailing
+// text as a string or comment, and silently drops any macro that follows,
+// corrupting the emitted SQL with no error.
+const clickHouseComments = macropro.LineComment | macropro.BlockComment | macropro.BackslashEscape | macropro.BacktickQuote | macropro.DollarQuote
 
 // Interpolate expands all $__ macros in rawSQL using macropro's parsing engine.
 // Unknown macros are left unchanged; a handler error returns the original query and the error.
