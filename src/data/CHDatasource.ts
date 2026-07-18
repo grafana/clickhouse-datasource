@@ -28,7 +28,7 @@ import {
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { trackClickhouseHealthCheckFailed } from 'tracking';
 import LogsContextPanel from 'components/LogsContextPanel';
-import { cloneDeep, isEmpty, isString } from 'lodash';
+import { cloneDeep, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
@@ -1608,16 +1608,38 @@ export class Datasource
   }
 
   /**
+   * Default source for ad-hoc filter key/value discovery, used when the
+   * dashboard does not define `$clickhouse_adhoc_query`. Returns a bare
+   * database name or `db.table`. Single-table mode (#1832) hides the classic
+   * Default database field in the config editor, so when that field is unset
+   * the source is derived from the configured signal's database and table
+   * (mirroring buildCompactQueryDefaults) rather than the literal 'default'
+   * database that getDefaultDatabase coerces to.
+   */
+  private getDefaultAdhocSource(): string | undefined {
+    if (!this.settings.jsonData.defaultDatabase && this.isSingleTableMode()) {
+      const isTraces = this.getSignalType() === 'traces';
+      const signalDb = isTraces ? this.getDefaultTraceDatabase() : this.getDefaultLogsDatabase();
+      const signalTable = isTraces ? this.getDefaultTraceTable() : this.getDefaultLogsTable();
+      const table = signalTable || this.getDefaultTable();
+      if (table) {
+        return `${signalDb || this.getDefaultDatabase()}.${table}`;
+      }
+    }
+    return this.getDefaultDatabase();
+  }
+
+  /**
    * The `$clickhouse_adhoc_query` template variable may resolve to a bare
    * database name or `db.table`. This returns the database component, or
    * undefined when we can't derive one (free-form SELECT variable, etc.).
    */
   private resolveAdhocDatabase(_frame: DataFrame): string | undefined {
     const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
-    const defaultDatabase = this.getDefaultDatabase();
-    const raw = source === '$clickhouse_adhoc_query' ? defaultDatabase : source;
+    const defaultSource = this.getDefaultAdhocSource();
+    const raw = source === '$clickhouse_adhoc_query' ? defaultSource : source;
     if (!raw || raw.toLowerCase().startsWith('select')) {
-      return defaultDatabase;
+      return defaultSource?.split('.')[0];
     }
     return raw.includes('.') ? raw.split('.')[0] : raw;
   }
@@ -1630,7 +1652,7 @@ export class Datasource
    */
   private resolveAdhocSingleTable(): string | undefined {
     const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
-    const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultDatabase() : source;
+    const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultAdhocSource() : source;
     if (!raw || raw.toLowerCase().startsWith('select')) {
       return undefined;
     }
@@ -1802,12 +1824,14 @@ export class Datasource
   private getTagSource() {
     // @todo https://github.com/grafana/grafana/issues/13109
     const ADHOC_VAR = '$clickhouse_adhoc_query';
-    const defaultDatabase = this.getDefaultDatabase();
     let source = getTemplateSrv().replace(ADHOC_VAR);
-    if (source === ADHOC_VAR && isEmpty(defaultDatabase)) {
-      return { type: TagType.schema, source: undefined };
+    if (source === ADHOC_VAR) {
+      const defaultSource = this.getDefaultAdhocSource();
+      if (!defaultSource) {
+        return { type: TagType.schema, source: undefined };
+      }
+      source = defaultSource;
     }
-    source = source === ADHOC_VAR ? defaultDatabase! : source;
     if (source.toLowerCase().startsWith('select')) {
       return { type: TagType.query, source };
     }
