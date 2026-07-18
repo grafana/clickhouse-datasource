@@ -80,6 +80,25 @@ describe('DatabaseCredentialsSection', () => {
       mocks: { onOptionsChange: jest.fn() },
     });
 
+    it('shows username error on blur when empty and no validation API is present', () => {
+      render(<DatabaseCredentialsSection {...emptyProps} />);
+
+      fireEvent.blur(screen.getByLabelText(/username/i));
+
+      expect(screen.getByText('Username is required')).toBeInTheDocument();
+    });
+
+    it('clears username error once the field is filled and no validation API is present', () => {
+      const { rerender } = render(<DatabaseCredentialsSection {...emptyProps} />);
+
+      fireEvent.blur(screen.getByLabelText(/username/i));
+      expect(screen.getByText('Username is required')).toBeInTheDocument();
+
+      rerender(<DatabaseCredentialsSection {...filledProps} />);
+
+      expect(screen.queryByText('Username is required')).not.toBeInTheDocument();
+    });
+
     it('shows inline error for username when validator is called with empty value', async () => {
       const validation = createMockValidation();
       render(<DatabaseCredentialsSection {...emptyProps} validation={validation} />);
