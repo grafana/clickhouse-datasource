@@ -1932,14 +1932,40 @@ export class Datasource
       throw new Error('Unable to match any log context columns');
     }
 
-    const contextColumnFilters: Filter[] = contextColumns.map((c) => ({
-      operator: FilterOperator.Equals,
-      filterType: 'custom',
-      key: c.name,
-      value: c.value,
-      type: 'string',
-      condition: 'AND',
-    }));
+    const contextColumnFilters: Filter[] = contextColumns.map((c) => {
+      // Configured context columns can reference a map key, e.g. LogAttributes['host.name'].
+      // When the underlying attributes column is JSON-typed, the Map subscript syntax is
+      // invalid SQL, so resolve the real column type from the query and let the SQL
+      // generator build the JSON accessor from the map key instead. The value is coerced
+      // to a string because the generator compares JSON paths as Nullable(String), and
+      // JSON attribute values can be numeric or boolean at runtime.
+      const bracketIndex = c.name.indexOf("['");
+      if (bracketIndex !== -1 && c.name.endsWith("']")) {
+        const mapName = c.name.substring(0, bracketIndex);
+        const keyName = c.name.substring(bracketIndex + 2, c.name.length - 2);
+        const mapColumnType = builderOptions.columns?.find((col) => col.name === mapName)?.type;
+        if (mapColumnType?.startsWith('JSON')) {
+          return {
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: mapName,
+            mapKey: keyName,
+            value: String(c.value),
+            type: mapColumnType,
+            condition: 'AND',
+          };
+        }
+      }
+
+      return {
+        operator: FilterOperator.Equals,
+        filterType: 'custom',
+        key: c.name,
+        value: c.value,
+        type: 'string',
+        condition: 'AND',
+      };
+    });
     builderOptions.filters.push(...contextColumnFilters);
 
     contextQuery.rawSql = generateSql(builderOptions);

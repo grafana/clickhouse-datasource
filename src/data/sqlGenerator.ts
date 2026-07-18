@@ -715,7 +715,14 @@ export const escapeIdentifier = (id: string): string => {
  */
 export const JSON_SENTINEL_KEY = '__ch_json__';
 
-const escapeValue = (value: string): string => {
+const escapeValue = (value: string | number | boolean): string => {
+  // Filter values are typed as strings, but JSON-typed attribute columns can
+  // carry numeric/boolean values at runtime. Render those unquoted instead of
+  // throwing on the string methods below.
+  if (typeof value !== 'string') {
+    return String(value);
+  }
+
   if (value.includes('$') || value.includes('(') || value.includes(')') || value.includes("'") || value.includes('"')) {
     return value;
   }
