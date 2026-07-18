@@ -225,8 +225,9 @@ export class Datasource
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
   private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
   // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
-  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes concurrent
-  // callers and lets cache hits resolve in a microtask. Entries expire after
+  // companion, keyed by the qualified companion table name (`${database}.${table}${suffix}`)
+  // so checks against different suffixes never share a result. Caching the Promise dedupes
+  // concurrent callers and lets cache hits resolve in a microtask. Entries expire after
   // TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS so a companion table created after the datasource
   // loaded is detected without a page reload.
   private traceTimestampTableCache = new Map<
@@ -998,16 +999,22 @@ export class Datasource
    * with trace_id/start_time/end_time) would produce an UNKNOWN_IDENTIFIER error,
    * so it is rejected here and the query falls back to the plain filter.
    *
+   * The companion name is resolved from the per-query `suffix` when one is
+   * given (saved queries bake it into `meta.traceTimestampTableSuffix`) so the
+   * probe targets the same table the SQL generator will reference; without it
+   * the datasource config suffix applies.
+   *
    * Caches the Promise so concurrent and repeat callers share a single
    * round-trip; on failure, evicts so the next caller retries and meanwhile
    * returns `false` (the safe, unoptimized path).
    */
-  async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
+  async hasTraceTimestampTable(database: string, table: string, suffix?: string): Promise<boolean> {
     if (!database || !table) {
       return false;
     }
 
-    const key = `${database}.${table}`;
+    const companionTable = table + (suffix || this.getTraceTimestampTableSuffix());
+    const key = `${database}.${companionTable}`;
     const now = Date.now();
 
     let entry = this.traceTimestampTableCache.get(key);
@@ -1015,7 +1022,6 @@ export class Datasource
     if (!entry || entry.expiresAt <= now) {
       const pending = (async () => {
         try {
-          const companionTable = table + this.getTraceTimestampTableSuffix();
           const tables = await this.fetchTables(database);
           if (!tables.includes(companionTable)) {
             return false;
@@ -1049,11 +1055,12 @@ export class Datasource
    * Lets the React hook seed its initial state from a warm cache and skip a
    * false→true render that would briefly clobber a known-good meta value.
    */
-  peekTraceTimestampTable(database: string, table: string): boolean | undefined {
+  peekTraceTimestampTable(database: string, table: string, suffix?: string): boolean | undefined {
     if (!database || !table) {
       return undefined;
     }
-    const entry = this.traceTimestampTableCache.get(`${database}.${table}`);
+    const companionTable = table + (suffix || this.getTraceTimestampTableSuffix());
+    const entry = this.traceTimestampTableCache.get(`${database}.${companionTable}`);
     if (!entry || entry.expiresAt <= Date.now()) {
       return undefined;
     }

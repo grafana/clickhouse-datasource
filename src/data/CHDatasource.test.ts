@@ -2515,6 +2515,30 @@ describe('ClickHouseDatasource', () => {
 
       await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(true);
     });
+
+    it('prefers an explicit suffix argument over the configured one', async () => {
+      // A saved query can bake a meta.traceTimestampTableSuffix that differs
+      // from the current datasource config. The check must probe the companion
+      // the generated SQL will reference (the query's suffix), and the two
+      // suffixes must not share a cache entry.
+      const ds = cloneDeep(mockDatasource);
+      ds.settings = {
+        ...ds.settings,
+        jsonData: {
+          ...ds.settings.jsonData,
+          traces: { ...(ds.settings.jsonData.traces || {}), traceTimestampTableSuffix: '_idx_ts' },
+        },
+      };
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['traces', 'traces_saved_ts']);
+      const columnsSpy = jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
+
+      await expect(ds.hasTraceTimestampTable('default', 'traces', '_saved_ts')).resolves.toBe(true);
+      expect(columnsSpy).toHaveBeenCalledWith('default', 'traces_saved_ts');
+
+      // The config-suffix companion does not exist, and the cached result for
+      // the explicit suffix must not leak into this separate check.
+      await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(false);
+    });
   });
 
   describe('peekTraceTimestampTable', () => {
@@ -2568,6 +2592,17 @@ describe('ClickHouseDatasource', () => {
       expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
 
       nowSpy.mockRestore();
+    });
+
+    it('keys cached results by the resolved suffix', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_saved_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces', '_saved_ts');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces', '_saved_ts')).toBe(true);
+      // The config-suffix check has not run, so it must still read as unknown.
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
     });
   });
 
