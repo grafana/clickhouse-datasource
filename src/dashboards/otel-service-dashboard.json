@@ -1,4 +1,46 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_GRAFANA_CLICKHOUSE_DATASOURCE",
+      "label": "ClickHouse",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "grafana-clickhouse-datasource",
+      "pluginName": "ClickHouse"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.0.1"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-clickhouse-datasource",
+      "name": "ClickHouse",
+      "version": "2.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "logs",
+      "name": "Logs",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "title": "OpenTelemetry Service Dashboard",
   "uid": "otel-service-dashboard",
   "description": "Single-service deep dive: RED metrics and slowest operations broken out by SpanKind (Server, Client, Internal, Async), with errors and recent logs side by side. Click a service in Traces Explorer to land here.",
@@ -71,7 +113,11 @@
   "templating": {
     "list": [
       {
-        "current": {},
+        "current": {
+          "selected": false,
+          "text": "ClickHouse",
+          "value": "${DS_GRAFANA_CLICKHOUSE_DATASOURCE}"
+        },
         "hide": 0,
         "includeAll": false,
         "label": "Data Source",
