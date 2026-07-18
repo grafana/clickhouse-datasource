@@ -1528,7 +1528,10 @@ export class Datasource
 
     // Replace each top-level Map-column entry with one entry per discovered
     // map key. If probing returned nothing (empty set, stripped by the
-    // filter), keep the original entry as a no-op fallback.
+    // filter), keep the original entry as a no-op fallback. Keys are minted
+    // in explicit bracket form (`col['key']`) so that filter application is
+    // stateless: a saved filter must render correct SQL on fresh dashboard
+    // load, before this method has run and populated the Map-column caches.
     const expandedKeyByCol = new Map<string, string[]>();
     for (const p of probed) {
       if (p.keys.length > 0) {
@@ -1550,7 +1553,7 @@ export class Datasource
         return;
       }
       for (const k of mapKeys) {
-        expanded.push({ text: `${baseText}.${k}` });
+        expanded.push({ text: `${baseText}['${escapeCHStringLiteral(k)}']` });
       }
     });
     return expanded;
@@ -1627,7 +1630,9 @@ export class Datasource
     // distinct Map values rather than stringified Map objects (which the
     // Grafana frame layer renders as `[object Object]`). The map key is
     // escaped for CH string-literal embedding so that keys containing `'`
-    // or `\` produce valid SQL.
+    // or `\` produce valid SQL. Keys minted by getTagKeys arrive already in
+    // bracket form (`mapCol['key']`, literal body pre-escaped) and pass
+    // through unchanged as valid bracket access.
     const mapAccess = this.asMapAccess(col, source);
     const selectExpr = mapAccess ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']` : col;
 

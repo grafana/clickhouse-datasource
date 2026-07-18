@@ -111,6 +111,17 @@ function escapeMapKeyForOuterFilter(key: string): string {
   return key.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
 }
 
+// Self-describing Map access minted by getTagKeys: `MapCol['key']` or
+// `table.MapCol['key']`. The bracket content is a ClickHouse string-literal
+// body (quotes and backslashes pre-escaped with `\`).
+const BRACKET_MAP_ACCESS = /^(?:([^.[\]']+)\.)?([^.[\]']+)\['((?:[^'\\]|\\.)*)'\]$/;
+
+// Inverse of the ClickHouse string-literal escaping applied when the key was
+// minted: `\X` → `X`.
+function unescapeCHStringLiteral(s: string): string {
+  return s.replace(/\\(.)/g, '$1');
+}
+
 function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
@@ -120,6 +131,20 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
       const [_, array, key] = match;
       return `${array}[\\'${escapeMapKeyForOuterFilter(key)}\\']`;
     }
+  }
+
+  // Explicit bracket form (`MapCol['key']` or `table.MapCol['key']`) is
+  // handled without consulting mapColumns, so saved filters render
+  // correctly on a fresh dashboard load, before getTagKeys has populated
+  // the Map-column cache.
+  const bracketed = s.match(BRACKET_MAP_ACCESS);
+  if (bracketed) {
+    const [, , mapCol, literalKey] = bracketed;
+    const mapKey = unescapeCHStringLiteral(literalKey);
+    if (isJSON) {
+      return `${mapCol}.${mapKey}`;
+    }
+    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
   }
 
   const parts = s.split('.');

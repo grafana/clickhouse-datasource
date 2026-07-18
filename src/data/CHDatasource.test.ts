@@ -728,11 +728,32 @@ describe('ClickHouseDatasource', () => {
       });
 
       const keys = await ds.getTagKeys();
+      // Bracket form is self-describing: applying the saved filter must not
+      // depend on the Map-column caches populated by this method (#2043).
       expect(keys).toEqual([
         { text: 'events.level' },
-        { text: 'events.labels.http.method' },
-        { text: 'events.labels.http.status' },
+        { text: "events.labels['http.method']" },
+        { text: "events.labels['http.status']" },
       ]);
+    });
+
+    it('mints bracketed keys with the map key escaped as a ClickHouse string literal', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: "weird'key" }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("labels".keys)')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([{ text: "events.labels['weird\\'key']" }]);
     });
 
     it('falls back to a flat Map column entry when no table context is available', async () => {
@@ -769,6 +790,30 @@ describe('ClickHouseDatasource', () => {
 
       await ds.getTagKeys(); // populates the mapColumnsByTable cache
       const values = await ds.getTagValues({ key: 'events.labels.http.method' });
+      expect(values).toEqual([{ text: 'GET' }, { text: 'POST' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: "select distinct labels['http.method'] from db.events limit 1000",
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('fetches values for a bracketed Map key without a prior getTagKeys call', async () => {
+      // Round-trip of a key minted by getTagKeys: the bracketed form must
+      // produce the same values SELECT with no stored state, i.e. on a
+      // fresh dashboard load where the Map-column caches are still empty
+      // (#2043).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const valuesFrame = arrayToDataFrame([{ val: 'GET' }, { val: 'POST' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [valuesFrame] }));
+
+      const values = await ds.getTagValues({ key: "events.labels['http.method']" });
       expect(values).toEqual([{ text: 'GET' }, { text: 'POST' }]);
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({
