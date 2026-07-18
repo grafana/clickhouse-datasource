@@ -495,6 +495,105 @@ describe('ClickHouseDatasource', () => {
       expect(keys).toEqual([{ text: 'table.foo' }]);
     });
 
+    it('coerces an unset default database to the literal default on a classic datasource', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('default')" };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('should Fetch Tags From the single-table logs source when no default database is set', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'otel_logs' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+      ds.settings.jsonData.logs = { defaultDatabase: 'otel', defaultTable: 'otel_logs' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      const expected = {
+        rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('otel') AND table = 'otel_logs'",
+      };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(keys).toEqual([{ text: 'otel_logs.foo' }]);
+    });
+
+    it('should Fetch Tags From the single-table traces source when no default database is set', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'otel_traces' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'traces';
+      ds.settings.jsonData.traces = { defaultDatabase: 'otel', defaultTable: 'otel_traces' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = {
+        rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('otel') AND table = 'otel_traces'",
+      };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('coerces an unset single-table logs database to the literal default', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'otel_logs' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+      ds.settings.jsonData.logs = { defaultTable: 'otel_logs' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = {
+        rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('default') AND table = 'otel_logs'",
+      };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('prefers an explicit default database over the single-table source', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'foo';
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+      ds.settings.jsonData.logs = { defaultDatabase: 'otel', defaultTable: 'otel_logs' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('foo')" };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
     it('should Fetch Tags From Query', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
       const frame = arrayToDataFrame([{ name: 'foo' }]);
