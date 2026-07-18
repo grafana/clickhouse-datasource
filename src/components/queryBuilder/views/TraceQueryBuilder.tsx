@@ -150,6 +150,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   useDefaultTraceColumnsByName(
     allColumns,
     builderOptions.table,
+    isNewQuery,
     {
       traceId: builderState.traceIdColumn,
       spanId: builderState.spanIdColumn,

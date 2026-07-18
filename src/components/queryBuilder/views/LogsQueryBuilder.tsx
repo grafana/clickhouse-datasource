@@ -113,6 +113,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   useDefaultLogColumnsByName(
     allColumns,
     builderOptions.table,
+    isNewQuery,
     builderState.messageColumn,
     builderState.logLevelColumn,
     builderState.otelEnabled,

@@ -233,9 +233,12 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   // LogMessage hint). Reuse the classic builder's conventional-name heuristic
   // to fill the empty Message and Level slots once table columns are fetched.
   // Configured columns already carry the hint, so they are never overridden.
+  // A query whose defaults are still being built is the compact equivalent of
+  // a new query: saved compact queries keep deliberately cleared slots.
   useDefaultLogColumnsByName(
     signalType === 'logs' ? allColumns : [],
     activeOptions.table,
+    needsInitialization,
     getColumnByHint(activeOptions, ColumnHint.LogMessage),
     getColumnByHint(activeOptions, ColumnHint.LogLevel),
     activeOptions.meta?.otelEnabled || false,
