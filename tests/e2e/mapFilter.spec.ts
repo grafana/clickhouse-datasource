@@ -87,7 +87,7 @@ test.describe('Map column adhoc filters', () => {
     // the fixture has the expected distinct keys so that any future change
     // to the discovery query (e.g. sampling via a subquery) keeps surfacing
     // all map keys present in a small table.
-    await enterSql(page, 'SELECT DISTINCT arrayJoin(labels.keys) AS keys FROM e2e_test.map_events ORDER BY keys');
+    await enterSql(page, 'SELECT DISTINCT arrayJoin(mapKeys(labels)) AS keys FROM e2e_test.map_events ORDER BY keys');
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();

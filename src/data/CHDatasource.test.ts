@@ -721,7 +721,7 @@ describe('ClickHouseDatasource', () => {
       const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }, { keys: 'http.status' }]);
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         return of({ data: [columnsFrame] });
@@ -758,7 +758,7 @@ describe('ClickHouseDatasource', () => {
 
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['http.method']")) {
@@ -802,7 +802,7 @@ describe('ClickHouseDatasource', () => {
 
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['region']")) {
@@ -829,7 +829,7 @@ describe('ClickHouseDatasource', () => {
 
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['weird\\'key']")) {
@@ -863,7 +863,7 @@ describe('ClickHouseDatasource', () => {
       const mapKeysFrame = arrayToDataFrame([{ keys: 'a' }]);
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('.keys)')) {
+        if (sql.includes('mapKeys(')) {
           return of({ data: [mapKeysFrame] });
         }
         return of({ data: [columnsFrame] });
@@ -893,8 +893,35 @@ describe('ClickHouseDatasource', () => {
       expect(result).toEqual(['a', 'b']);
       const sql = spy.mock.calls[0][0].targets[0].rawSql!;
       expect(sql).toBe(
-        'SELECT DISTINCT arrayJoin("labels".keys) as keys FROM (SELECT "labels" FROM "db"."events" LIMIT 100000) LIMIT 1000'
+        'SELECT DISTINCT arrayJoin(mapKeys("labels")) as keys FROM (SELECT "labels" FROM "db"."events" LIMIT 100000) LIMIT 1000'
       );
+    });
+
+    it('uses the mapKeys() function rather than the .keys sub-column so the old analyzer can resolve it', async () => {
+      // ClickHouse's old analyzer (the default before 24.3, or with
+      // allow_experimental_analyzer=0) cannot resolve `.keys` sub-columns on
+      // subquery results and fails with UNKNOWN_IDENTIFIER (code 47). Every
+      // call site swallows the error, so Map-key ad-hoc filters silently
+      // vanish on 22.7-24.2 unless the probe uses the mapKeys() function.
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const frame = arrayToDataFrame([{ keys: 'a' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      // Subquery-sampled path (free-form table) and time-bounded path (OTel
+      // logs table) must both avoid the sub-column syntax.
+      await ds.fetchUniqueMapKeys('labels', 'db', 'events');
+      await ds.fetchUniqueMapKeys('LogAttributes', 'otel', 'otel_logs');
+      for (const call of spy.mock.calls) {
+        const sql = call[0].targets[0].rawSql!;
+        expect(sql).not.toContain('.keys');
+        expect(sql).toContain('arrayJoin(mapKeys(');
+      }
     });
 
     it('bounds the probe to the configured logs time column when target matches OTel logs table', async () => {
