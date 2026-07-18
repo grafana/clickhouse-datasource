@@ -15,6 +15,7 @@ const columns: readonly TableColumn[] = [
   { name: 'ServiceName', type: 'String', picklistValues: [] },
   { name: 'Environment', type: 'String', picklistValues: [] },
   { name: 'ResourceAttributes', type: 'Map(String, String)', picklistValues: [] },
+  { name: 'SpanAttributes', type: 'JSON', picklistValues: [] },
   { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
 ];
 
@@ -40,6 +41,7 @@ const buildDatasource = (config: DatasourceConfig = {}): Datasource => {
   ds.fetchTables = jest.fn(() => Promise.resolve(['otel_traces', 'otel_logs']));
   ds.fetchColumns = jest.fn(() => Promise.resolve([...columns]));
   ds.fetchUniqueMapKeys = jest.fn(() => Promise.resolve(['service.version']));
+  ds.fetchUniqueJSONPaths = jest.fn(() => Promise.resolve(['service.version', 'host.name']));
   return ds;
 };
 
@@ -122,6 +124,46 @@ describe('generateChangeDetectionSQL: guards and quoting', () => {
     expect(sql).toContain('lagInFrame(topK(1)("version")[1])');
   });
 
+  it('returns the placeholder for a JSON watch column until a path is chosen', () => {
+    // Without a path the query would compare the whole JSON column to '', which
+    // ClickHouse rejects (cannot convert '' to JSON).
+    const sql = generateChangeDetectionSQL({
+      table: 'otel_traces',
+      column: 'ResourceAttributes',
+      columnType: 'JSON',
+    });
+    expect(sql).toContain('Select a table and column');
+    expect(sql).not.toContain('lagInFrame');
+  });
+
+  it('emits backtick path access cast to Nullable(String) for a JSON watch column', () => {
+    const sql = generateChangeDetectionSQL({
+      database: 'otel',
+      table: 'otel_traces',
+      column: 'ResourceAttributes',
+      columnType: 'JSON',
+      mapKey: 'service.version',
+    });
+    // Same accessor shape the query builder emits for JSON filters, never the
+    // Map subscript, which ClickHouse rejects on a JSON column.
+    expect(sql).toContain('topK(1)("ResourceAttributes".`service`.`version`::Nullable(String))[1]');
+    expect(sql).toContain('lagInFrame(topK(1)("ResourceAttributes".`service`.`version`::Nullable(String))[1])');
+    expect(sql).toContain(`AND "ResourceAttributes".\`service\`.\`version\`::Nullable(String) != ''`);
+    expect(sql).not.toContain(`['service.version']`);
+    expect(sql).toContain('ResourceAttributes.service.version change');
+  });
+
+  it('treats a JSON watch column type with type parameters as JSON', () => {
+    const sql = generateChangeDetectionSQL({
+      table: 'otel_traces',
+      column: 'ResourceAttributes',
+      columnType: 'JSON(max_dynamic_paths=64)',
+      mapKey: 'service.version',
+    });
+    expect(sql).toContain('"ResourceAttributes".`service`.`version`::Nullable(String)');
+    expect(sql).not.toContain(`['service.version']`);
+  });
+
   it('quotes the database and table via the shared identifier helper', () => {
     expect(generateChangeDetectionSQL({ database: 'db', table: 't', column: 'c' })).toContain('FROM "db"."t"');
     // No leading dot when the database is empty (single-table datasources).
@@ -135,9 +177,10 @@ describe('buildGroupByOptions', () => {
     expect(buildGroupByOptions(columns, undefined, undefined).filter((o) => o.value === 'ServiceName')).toHaveLength(1);
   });
 
-  it('excludes Map columns, the timestamp, and the watched column', () => {
+  it('excludes Map and JSON columns, the timestamp, and the watched column', () => {
     const values = buildGroupByOptions(columns, 'Environment', undefined).map((o) => o.value);
     expect(values).not.toContain('ResourceAttributes');
+    expect(values).not.toContain('SpanAttributes');
     expect(values).not.toContain('Timestamp');
     expect(values).not.toContain('Environment');
     expect(values).toContain('ServiceName');
@@ -360,6 +403,18 @@ describe('AnnotationQueryEditor', () => {
       })
     );
     expect(result.getByText('Group By')).toBeInTheDocument();
+  });
+
+  it('shows the JSON path picker for a JSON watch column', async () => {
+    const result = await renderEditor(
+      buildDatasource(),
+      annotationWith({
+        preset: 'change_detection',
+        changeDetection: { database: 'default', table: 'otel_traces', column: 'SpanAttributes' },
+      })
+    );
+    await waitFor(() => expect(result.getByText('JSON Path')).toBeInTheDocument());
+    expect(result.queryByText('Map Key')).not.toBeInTheDocument();
   });
 
   it('emits the edited SQL through onAnnotationChange', async () => {
