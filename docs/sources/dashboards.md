@@ -29,10 +29,10 @@ The three dashboards link to each other via dashboard data links: clicking a ser
 
 The dashboards expect the standard table layout produced by the [ClickHouse exporter for the OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter):
 
-- A logs table named `otel_logs` in the data source's default database.
-- A traces table named `otel_traces` in the data source's default database.
+- A logs table named `otel_logs`.
+- A traces table named `otel_traces`.
 
-Both tables are referenced by their bare names in raw SQL, so the data source's **Default database** setting needs to point at the database that holds them. If you renamed the OTel exporter tables, the dashboards do not pick the new names up automatically; either restore the standard names or duplicate the dashboards and edit the SQL.
+The dashboards expose a **Database** template variable and qualify every table reference as `${database}.otel_logs` / `${database}.otel_traces`, so you select the database that holds the OTel tables from the dashboard itself instead of relying on the data source's **Default database** setting. The variable lists only the databases that actually contain the OTel tables (it queries `system.tables`), so it defaults to a valid database; the data source user therefore needs read access to `system.tables`. If you renamed the OTel exporter tables, the dashboards do not pick the new names up automatically; either restore the standard names or duplicate the dashboards and edit the SQL.
 
 The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`, `SeverityText`, `ServiceName`, `TraceId`, `SpanId`, `ResourceAttributes` for logs; `TraceId`, `ServiceName`, `SpanName`, `Timestamp`, `Duration`, `StatusCode`, `SpanKind`, `ParentSpanId`, `SpanAttributes`, `ResourceAttributes` for traces.
 
@@ -48,7 +48,7 @@ Below the overview, a per-service row repeats once per service in the **Service*
 
 Both per-service panels have an **Open in Explore** link in the panel header that pre-fills a matching query for that row's service in Explore. The Log Volume link drops you into a time-series query; the Log Samples link drops you into the logs visualization with the same column projection as the dashboard panel. Because the per-service row repeats once per selected service, each panel-header link is scoped to its row's `$service` value.
 
-Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
+Filter variables: **Database** (selects the database that holds the OTel tables; needs read access to `system.tables`), **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
 
 Annotations: deployment markers derived from `service.version` changes in `otel_traces` over 30-second buckets.
 
@@ -64,7 +64,7 @@ Below trace search, a per-service row repeats once per service: a 1-in-500 sampl
 
 Each per-service panel has an **Open in Explore** link in its panel header that pre-fills a matching query in Explore.
 
-Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName applied to every trace panel).
+Filter variables: **Database** (selects the database that holds the OTel tables), **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName applied to every trace panel).
 
 ## OpenTelemetry Service Dashboard
 
@@ -80,7 +80,7 @@ Single-service deep dive, broken out by SpanKind. Top to bottom:
 
 Click any operation in any Slowest Operations or Top Errors table to open the matching trace search in OpenTelemetry Traces Explorer.
 
-Filter variables: **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
+Filter variables: **Database** (selects the database that holds the OTel tables), **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
 
 Each non-row panel has an **Open in Explore** link in its header that pre-fills the panel's underlying query in Explore. Useful when you want to refine the SQL, change visualization, or read log details with more horizontal space.
 
