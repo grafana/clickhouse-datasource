@@ -29,6 +29,14 @@ describe('OTel dashboards', () => {
       expect(dashboard.uid).toBeTruthy();
       expect(dashboard.title).toBeTruthy();
     });
+
+    it('does not pass the free-text search variable to hasToken', () => {
+      // hasToken() raises BAD_ARGUMENTS for needles containing whitespace or
+      // ASCII separators (e.g. 'GET /api'), so free-text search clauses must
+      // use substring matching such as positionCaseInsensitive() instead.
+      const content = fs.readFileSync(filepath, 'utf8');
+      expect(content).not.toContain('hasToken(');
+    });
   });
 
   describe('plugin.json registration', () => {
