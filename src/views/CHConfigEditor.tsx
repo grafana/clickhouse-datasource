@@ -96,15 +96,16 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const fieldErrors = validation?.getErrors() ?? {};
 
-  // When the clickHouseConfigValidation feature toggle is off (the default),
-  // `validation` is undefined and `fieldErrors` is always empty — which dropped
-  // the inline required-field indicator that shipped in v4.17.0. Fall back to a
-  // structural empty check so the required host/port fields still surface an
-  // inline error on the default install, before Save & Test round-trips.
-  const hostInvalid = validation ? Boolean(fieldErrors.host) : !jsonData.host;
-  const hostError = validation ? fieldErrors.host : jsonData.host ? undefined : labels.serverAddress.error;
-  const portInvalid = validation ? Boolean(fieldErrors.port) : !jsonData.port;
-  const portError = validation ? fieldErrors.port : jsonData.port ? undefined : labels.serverPort.error;
+  // The structural empty check must run regardless of the validation plumbing:
+  // with the clickHouseConfigValidation toggle off `validation` is undefined,
+  // and with it on the local ValidationAPI only gains errors once Grafana
+  // calls validate() (13.1+). Either way an empty required host/port field
+  // must surface an inline error immediately, as it did in v4.17.0, with any
+  // API-driven error message taking precedence when present.
+  const hostInvalid = Boolean(fieldErrors.host) || !jsonData.host;
+  const hostError = fieldErrors.host || (jsonData.host ? undefined : labels.serverAddress.error);
+  const portInvalid = Boolean(fieldErrors.port) || !jsonData.port;
+  const portError = fieldErrors.port || (jsonData.port ? undefined : labels.serverPort.error);
 
   const onPortChange = (port: string) => {
     onOptionsChange({
