@@ -71,7 +71,8 @@ export const useLogDefaultsOnMount = (
 
 /**
  * Sets OTEL Logs columns automatically when OTEL is enabled.
- * Does not run if OTEL is already enabled, only when it's changed.
+ * Does not run if OTEL is already enabled, only when the toggle or the
+ * selected schema version changes.
  */
 export const useOtelColumns = (
   datasource: Datasource,
@@ -81,8 +82,15 @@ export const useOtelColumns = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
+  const prevOtelVersion = useRef<string>(otelVersion);
   if (!otelEnabled) {
     didSetColumns.current = false;
+    prevOtelVersion.current = otelVersion;
+  } else if (otelVersion !== prevOtelVersion.current) {
+    // Version changed while OTel is on: reset the flag so the Effect re-applies
+    // the new version's column map ('latest' re-runs auto-detection).
+    didSetColumns.current = false;
+    prevOtelVersion.current = otelVersion;
   }
 
   useEffect(() => {

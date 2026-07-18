@@ -280,6 +280,80 @@ describe('useOtelColumns', () => {
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
   });
+
+  it('should re-dispatch columns when otelVersion changes while OTEL is enabled', async () => {
+    // prevOtelVersion detects the version change and resets the flag so the
+    // Effect re-applies the new version's column map.
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+      { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+    ];
+
+    // Mount with OTel already enabled (saved query), no dispatch expected
+    const hook = renderHook(
+      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch),
+      { initialProps: '1.29.0' }
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+
+    // Change version while OTel is on, the new version's column map is applied
+    hook.rerender('1.30.0');
+
+    const columns: SelectedColumn[] = [];
+    otel.getVersion('1.30.0')!.logColumnMap.forEach((v, k) => {
+      columns.push({ name: v, hint: k, type: allColumns.find((c) => c.name === v)?.type });
+    });
+    const expectedOptions = { columns };
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+
+  it('should re-run auto-detection when switching from a pinned version to "latest"', async () => {
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    const builderOptionsDispatch = jest.fn();
+    // Table has TimestampTime, so "latest" detection resolves to 1.29.0.
+    const allColumns: readonly TableColumn[] = [
+      { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+      { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+    ];
+
+    const hook = renderHook(
+      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch),
+      { initialProps: '1.30.0' }
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+
+    hook.rerender('latest');
+
+    const columns: SelectedColumn[] = [];
+    otel.getVersion('1.29.0')!.logColumnMap.forEach((v, k) => {
+      columns.push({ name: v, hint: k, type: allColumns.find((c) => c.name === v)?.type });
+    });
+    const expectedOptions = { columns };
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+
+  it('should not re-dispatch when rerendered with an unchanged version', async () => {
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+    ];
+
+    const hook = renderHook(
+      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch),
+      { initialProps: '1.29.0' }
+    );
+    hook.rerender('1.30.0'); // version change applies the new column map
+    hook.rerender('1.30.0'); // unchanged, must not re-apply
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useDefaultTimeColumn', () => {
