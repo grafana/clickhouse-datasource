@@ -1,6 +1,7 @@
 import { Datasource } from 'data/CHDatasource';
 import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn } from 'types/queryBuilder';
 import { SignalType } from 'types/config';
+import { isBuilderOptionsRunnable } from 'data/utils';
 import {
   getDefaultLogsFilters,
   getDefaultLogsOrderBy,
@@ -12,20 +13,36 @@ export const getCompactQueryType = (signalType: SignalType): QueryType => {
   return signalType === 'logs' ? QueryType.Logs : QueryType.Traces;
 };
 
-export const isDefaultOrMismatchedCompactQuery = (
-  builderOptions: QueryBuilderOptions,
-  signalType: SignalType
-): boolean => {
-  const expectedQueryType = getCompactQueryType(signalType);
-  const isDefaultState =
+export const isDefaultCompactQuery = (builderOptions: QueryBuilderOptions): boolean => {
+  return (
     builderOptions.queryType === QueryType.Table &&
     !builderOptions.database &&
     !builderOptions.table &&
     (!builderOptions.columns || builderOptions.columns.length === 0) &&
     (!builderOptions.filters || builderOptions.filters.length === 0) &&
-    (!builderOptions.aggregates || builderOptions.aggregates.length === 0);
+    (!builderOptions.aggregates || builderOptions.aggregates.length === 0)
+  );
+};
 
-  return isDefaultState || builderOptions.queryType !== expectedQueryType;
+export const isCompactQueryTypeMismatch = (builderOptions: QueryBuilderOptions, signalType: SignalType): boolean => {
+  return builderOptions.queryType !== getCompactQueryType(signalType);
+};
+
+/**
+ * True when the compact editor should replace the saved options with generated defaults.
+ * A mismatched query type alone is not enough: a query with meaningful user content
+ * (columns, filters, aggregates, group by, or order by) must be preserved, never
+ * silently replaced.
+ */
+export const shouldBuildCompactQueryDefaults = (
+  builderOptions: QueryBuilderOptions,
+  signalType: SignalType
+): boolean => {
+  if (isDefaultCompactQuery(builderOptions)) {
+    return true;
+  }
+
+  return isCompactQueryTypeMismatch(builderOptions, signalType) && !isBuilderOptionsRunnable(builderOptions);
 };
 
 export function buildCompactQueryDefaults(
