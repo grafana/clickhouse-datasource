@@ -91,6 +91,32 @@ describe('SQL Generator', () => {
     expect(jsonSql).toContain('LogAttributes.`method`');
   });
 
+  // Log-context filters are declared with sentinel type 'string', but JSON-typed
+  // attribute columns can carry numeric values at runtime. See getLogRowContext.
+  it('renders a numeric value on a string-typed filter without throwing', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_logs',
+      queryType: QueryType.Table,
+      columns: [{ name: 'Body', type: 'String' }],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          key: "LogAttributes['bytes']",
+          type: 'string',
+          condition: 'AND',
+          operator: FilterOperator.Equals,
+          value: 42,
+        },
+      ],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toContain("LogAttributes['bytes'] = 42");
+  });
+
   it('generates aggregate table query', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
@@ -1093,6 +1119,18 @@ describe('escapeValue', () => {
   ];
 
   it.each(cases)('returns escaped value (case %#)', (c) => {
+    expect(_testExports.escapeValue(c.input)).toEqual(c.expected);
+  });
+
+  const nonStringCases: Array<{ input: number | boolean; expected: string }> = [
+    { input: 42, expected: '42' },
+    { input: 4.2, expected: '4.2' },
+    { input: 0, expected: '0' },
+    { input: true, expected: 'true' },
+    { input: false, expected: 'false' },
+  ];
+
+  it.each(nonStringCases)('renders non-string primitive unquoted (case %#)', (c) => {
     expect(_testExports.escapeValue(c.input)).toEqual(c.expected);
   });
 });
