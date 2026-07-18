@@ -88,8 +88,10 @@ describe('generateVariableSql', () => {
       }),
       ''
     );
+    // Map subscript on a missing key yields the value type's default, never
+    // NULL, so the guard must be mapContains rather than IS NOT NULL.
     expect(sql).toBe(
-      `SELECT DISTINCT "ResourceAttributes"['service.version'] AS value FROM "otel"."otel_logs" WHERE "ResourceAttributes"['service.version'] IS NOT NULL ORDER BY value LIMIT 1000`
+      `SELECT DISTINCT "ResourceAttributes"['service.version'] AS value FROM "otel"."otel_logs" WHERE mapContains("ResourceAttributes", 'service.version') ORDER BY value LIMIT 1000`
     );
   });
 
@@ -139,7 +141,7 @@ describe('generateVariableSql', () => {
       ''
     );
     expect(mapSql).toBe(
-      `SELECT DISTINCT "ResourceAttributes"['a\\'b'] AS value FROM "otel"."otel_logs" WHERE "ResourceAttributes"['a\\'b'] IS NOT NULL ORDER BY value LIMIT 1000`
+      `SELECT DISTINCT "ResourceAttributes"['a\\'b'] AS value FROM "otel"."otel_logs" WHERE mapContains("ResourceAttributes", 'a\\'b') ORDER BY value LIMIT 1000`
     );
   });
 
