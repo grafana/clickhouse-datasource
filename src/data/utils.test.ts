@@ -549,8 +549,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       const traceQuery = viewTraceLink?.internal?.query as CHBuilderQuery;
 
       expect(traceQuery.rawSql).toContain('otel_traces_trace_id_ts');
-      expect(traceQuery.rawSql).toContain('trace_start');
-      expect(traceQuery.rawSql).toContain('trace_end');
+      expect(traceQuery.rawSql).toContain('__gf_trace_start');
+      expect(traceQuery.rawSql).toContain('__gf_trace_end');
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(true);
     });
 
@@ -642,8 +642,8 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.builderOptions.meta?.otelEnabled).toBe(true);
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(true);
       expect(traceQuery.rawSql).toContain('otel_traces_trace_id_ts');
-      expect(traceQuery.rawSql).toContain('trace_start');
-      expect(traceQuery.rawSql).toContain('trace_end');
+      expect(traceQuery.rawSql).toContain('__gf_trace_start');
+      expect(traceQuery.rawSql).toContain('__gf_trace_end');
     });
 
     it('sets format on the trace ID link query so Grafana picks the trace panel', async () => {

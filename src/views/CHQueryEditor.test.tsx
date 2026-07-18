@@ -98,11 +98,11 @@ describe('Query Editor', () => {
     jest.spyOn(ds, 'hasTraceTimestampTable').mockResolvedValue(true);
 
     const optimizedSql =
-      `WITH 'abc' as trace_id, ` +
-      `(SELECT min(Start) FROM "otel"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_start, ` +
-      `(SELECT max(End) + 1 FROM "otel"."otel_traces_trace_id_ts" WHERE TraceId = trace_id) as trace_end ` +
+      `WITH 'abc' as __gf_trace_id, ` +
+      `(SELECT min(Start) FROM "otel"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_start, ` +
+      `(SELECT max(End) + 1 FROM "otel"."otel_traces_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_end ` +
       `SELECT "TraceId" as traceID FROM "otel"."otel_traces" ` +
-      `WHERE traceID = trace_id AND "Timestamp" >= trace_start AND "Timestamp" <= trace_end`;
+      `WHERE traceID = __gf_trace_id AND "Timestamp" >= __gf_trace_start AND "Timestamp" <= __gf_trace_end`;
 
     const onChange = jest.fn();
     render(
