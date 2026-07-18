@@ -1000,7 +1000,7 @@ const isNumberType = (type: string): boolean => numberTypes.some((t) => type?.to
 const isDateType = (type: string): boolean =>
   type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
 // const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
-const isStringType = (type: string): boolean => {
+export const isStringType = (type: string): boolean => {
   type = stripTypeModifiers(type.toLowerCase());
   return (
     (type === 'string' || type.startsWith('fixedstring')) &&
