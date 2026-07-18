@@ -19,6 +19,7 @@ const buildDatasource = (overrides: Partial<Datasource> = {}): Datasource => {
   ds.fetchTables = jest.fn(() => Promise.resolve(['events', 'logs']));
   ds.fetchColumns = jest.fn(() => Promise.resolve([...mapColumns]));
   ds.fetchUniqueMapKeys = jest.fn(() => Promise.resolve(['service.name', 'http.status']));
+  ds.fetchUniqueJSONPaths = jest.fn(() => Promise.resolve(['service.version', 'host.name']));
   return Object.assign(ds, overrides);
 };
 
@@ -246,6 +247,79 @@ describe('SchemaPicker', () => {
     });
   });
 
+  describe("level='mapKey' with JSON columns", () => {
+    // Same ordering constraint as mapColumns: the JSON column first.
+    const jsonColumns: readonly TableColumn[] = [
+      { name: 'attrs_json', type: 'JSON', picklistValues: [] },
+      { name: 'service', type: 'String', picklistValues: [] },
+    ];
+    const buildJsonDatasource = (): Datasource =>
+      buildDatasource({ fetchColumns: jest.fn(() => Promise.resolve([...jsonColumns])) });
+    const value: SchemaPickerValue = { database: 'default', table: 'events', column: 'attrs_json' };
+
+    it('hides the key picker for a JSON column when enableJsonPaths is not set', async () => {
+      const datasource = buildJsonDatasource();
+      const result = await waitFor(() =>
+        render(<SchemaPicker datasource={datasource} level="mapKey" value={value} onChange={() => {}} />)
+      );
+      await waitFor(() => expect(datasource.fetchColumns).toHaveBeenCalled());
+      expect(result.queryByText('JSON Path')).not.toBeInTheDocument();
+      expect(result.queryByText('Map Key')).not.toBeInTheDocument();
+      expect(result.getAllByRole('combobox')).toHaveLength(3);
+      expect(datasource.fetchUniqueJSONPaths).not.toHaveBeenCalled();
+    });
+
+    it('shows the JSON Path selector with probed paths when enableJsonPaths is set', async () => {
+      const datasource = buildJsonDatasource();
+      const result = await waitFor(() =>
+        render(
+          <SchemaPicker datasource={datasource} level="mapKey" enableJsonPaths value={value} onChange={() => {}} />
+        )
+      );
+      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(4));
+      expect(result.getByText('JSON Path')).toBeInTheDocument();
+      expect(datasource.fetchUniqueJSONPaths).toHaveBeenCalledWith('attrs_json', 'default', 'events', undefined);
+      expect(datasource.fetchUniqueMapKeys).not.toHaveBeenCalled();
+    });
+
+    it('emits the chosen JSON path alongside the existing selection', async () => {
+      const datasource = buildJsonDatasource();
+      const onChange = jest.fn();
+      const result = await waitFor(() =>
+        render(
+          <SchemaPicker datasource={datasource} level="mapKey" enableJsonPaths value={value} onChange={onChange} />
+        )
+      );
+
+      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(4));
+      const pathCombobox = result.getAllByRole('combobox')[3];
+      fireEvent.keyDown(pathCombobox, { key: 'ArrowDown' });
+      fireEvent.keyDown(pathCombobox, { key: 'Enter' });
+
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(onChange).toHaveBeenCalledWith({
+        database: 'default',
+        table: 'events',
+        column: 'attrs_json',
+        mapKey: 'service.version',
+        isMapColumn: false,
+      });
+    });
+
+    it('still shows the Map Key selector for Map columns when enableJsonPaths is set', async () => {
+      const datasource = buildDatasource();
+      const mapValue: SchemaPickerValue = { database: 'default', table: 'events', column: 'attrs' };
+      const result = await waitFor(() =>
+        render(
+          <SchemaPicker datasource={datasource} level="mapKey" enableJsonPaths value={mapValue} onChange={() => {}} />
+        )
+      );
+      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(4));
+      expect(result.getByText('Map Key')).toBeInTheDocument();
+      expect(datasource.fetchUniqueJSONPaths).not.toHaveBeenCalled();
+    });
+  });
+
   describe('cross-level cascade invalidation', () => {
     it('clears table, column, and mapKey when the database changes at mapKey depth', async () => {
       const datasource = buildDatasource();
@@ -349,7 +423,13 @@ describe('SchemaPicker', () => {
       fireEvent.keyDown(columnCombobox, { key: 'Backspace' });
 
       expect(onChange).toHaveBeenCalledTimes(1);
-      expect(onChange).toHaveBeenCalledWith({ database: 'default', table: 'events', column: '', mapKey: '', isMapColumn: false });
+      expect(onChange).toHaveBeenCalledWith({
+        database: 'default',
+        table: 'events',
+        column: '',
+        mapKey: '',
+        isMapColumn: false,
+      });
     });
   });
 });
