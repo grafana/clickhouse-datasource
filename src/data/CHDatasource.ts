@@ -570,7 +570,9 @@ export class Datasource
       return query;
     }
 
-    const meta = query.builderOptions.meta;
+    // Hand-provisioned models can carry editorType 'builder' without builderOptions,
+    // and the query editor now calls this on every render, so guard the access.
+    const meta = query.builderOptions?.meta;
     if (!meta?.isTraceIdMode) {
       return query;
     }
