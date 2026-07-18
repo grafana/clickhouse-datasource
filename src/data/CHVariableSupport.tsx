@@ -266,9 +266,11 @@ export class CHVariableSupport extends CustomVariableSupport<Datasource, CHVaria
     }
     // Pass rawSql as a string. metricFindQuery accepts (CHQuery | string) and
     // wraps a string into a minimal SQL-mode CHQuery internally; that keeps
-    // pluginVersion / refId concerns where they already live.
+    // pluginVersion / refId concerns where they already live. Forward
+    // scopedVars so scoped variables and __searchFilter resolve inside
+    // variable queries (they reach applyTemplateVariables via runQuery).
     const promise = this.datasource
-      .metricFindQuery(rawSql, { range: request.range })
+      .metricFindQuery(rawSql, { range: request.range, scopedVars: request.scopedVars })
       .then((values: MetricFindValue[]) => ({
         // Emit text and value separately so a `SELECT value, label` query
         // substitutes the value while displaying the label. Fall back to text
