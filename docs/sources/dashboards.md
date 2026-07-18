@@ -21,9 +21,9 @@ review_date: 2026-08-12
 
 # ClickHouse OpenTelemetry dashboards
 
-The plugin ships three pre-built dashboards for OpenTelemetry data stored in ClickHouse. Together they cover top-down log exploration, service topology and trace search, and a single-service deep dive that ties RED metrics, errors, logs, and trace detail into one view.
+The plugin ships four pre-built dashboards for OpenTelemetry data stored in ClickHouse. Three cover top-down log exploration, service topology and trace search, and a single-service deep dive that ties RED metrics, errors, logs, and trace detail into one view; a fourth is a variant of the logs explorer for tables that store OTel attributes as the native JSON type.
 
-The three dashboards link to each other via dashboard data links: clicking a service or operation in one dashboard preserves the time range and datasource and lands you on the matching view in another.
+The core three dashboards link to each other via dashboard data links: clicking a service or operation in one dashboard preserves the time range and datasource and lands you on the matching view in another.
 
 ## Required schema
 
@@ -51,6 +51,10 @@ Both per-service panels have an **Open in Explore** link in the panel header tha
 Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `positionCaseInsensitive(Body, ...)`, a case-insensitive substring match).
 
 Annotations: deployment markers derived from `service.version` changes in `otel_traces` over 30-second buckets.
+
+## OpenTelemetry Logs Explorer (JSON schema)
+
+A variant of the OpenTelemetry Logs Explorer for deployments where the `otel_logs` attribute columns (`ResourceAttributes`, `LogAttributes`, `ScopeAttributes`) use ClickHouse's native `JSON` type instead of `Map(String, String)` — the ClickStack schema. The panels are identical except that the Log Samples panel reads attributes with JSON path access (for example `ResourceAttributes.service.namespace::String`) instead of Map key access. Because the two access styles are not interchangeable within a single query, this ships as a separate dashboard rather than a mode of the Map dashboard. The deployment annotation reads `otel_traces`, which is left as `Map`.
 
 ## OpenTelemetry Traces Explorer
 
