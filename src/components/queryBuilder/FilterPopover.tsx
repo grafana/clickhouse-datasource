@@ -173,7 +173,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
     filterKind === 'number' && !noValueNeeded && (value.trim() === '' || isNaN(numericValue));
 
   const handleAdd = () => {
-    if (!selectedColumn || isNumberValueInvalid || (isJSONColumn && !selectedMapKey)) {
+    if (!selectedColumn || isNumberValueInvalid || (isKeyedColumn && !selectedMapKey)) {
       return;
     }
 
@@ -240,7 +240,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
             }}
             createCustomValue
             width={20}
-            placeholder={isJSONColumn ? 'Select path...' : 'Select key...'}
+            placeholder={isJSONColumn ? 'Type or select path...' : 'Type or select key...'}
           />
         </div>
       )}
@@ -274,7 +274,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
         <Button
           size="sm"
           onClick={handleAdd}
-          disabled={!selectedColumn || isNumberValueInvalid || (isJSONColumn && !selectedMapKey)}
+          disabled={!selectedColumn || isNumberValueInvalid || (isKeyedColumn && !selectedMapKey)}
         >
           Add
         </Button>
