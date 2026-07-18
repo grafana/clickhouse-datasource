@@ -147,4 +147,33 @@ describe('OTel dashboards', () => {
       expect(content).not.toMatch(/= '\$\{?\w+\}?'/);
     });
   });
+
+  describe('interval variable', () => {
+    type Panel = { gridPos?: unknown; interval?: string; targets?: Array<{ rawSql?: string }> };
+    type Dashboard = {
+      templating?: { list?: Array<{ name?: string; type?: string }> };
+      panels?: Array<Panel & { panels?: Panel[] }>;
+    };
+
+    const flatten = (d: Dashboard): Panel[] =>
+      (d.panels ?? []).flatMap((p) => [p, ...(p.panels ?? [])]);
+
+    it.each(otelDashboards)('%s exposes an "interval" interval variable', (filename) => {
+      const d = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as Dashboard;
+      const variable = d.templating?.list?.find((v) => v.name === 'interval');
+      expect(variable).toBeDefined();
+      expect(variable?.type).toBe('interval');
+    });
+
+    it.each(otelDashboards)('%s sets min interval on every $__interval_s panel', (filename) => {
+      const d = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as Dashboard;
+      const bucketed = flatten(d).filter((p) =>
+        (p.targets ?? []).some((t) => (t.rawSql ?? '').includes('$__interval_s'))
+      );
+      expect(bucketed.length).toBeGreaterThan(0);
+      for (const panel of bucketed) {
+        expect(panel.interval).toBe('${interval}');
+      }
+    });
+  });
 });
