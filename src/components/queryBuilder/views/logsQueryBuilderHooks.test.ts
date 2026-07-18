@@ -390,7 +390,7 @@ describe('useDefaultLogColumnsByName', () => {
     ];
 
     renderHook(() =>
-      useDefaultLogColumnsByName(allColumns, 'logs', undefined, undefined, false, builderOptionsDispatch)
+      useDefaultLogColumnsByName(allColumns, 'logs', true, undefined, undefined, false, builderOptionsDispatch)
     );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(2);
@@ -413,7 +413,7 @@ describe('useDefaultLogColumnsByName', () => {
     const userPickedMessage: SelectedColumn = { name: 'custom_msg', type: 'String', hint: ColumnHint.LogMessage };
 
     renderHook(() =>
-      useDefaultLogColumnsByName(allColumns, 'logs', userPickedMessage, undefined, false, builderOptionsDispatch)
+      useDefaultLogColumnsByName(allColumns, 'logs', true, userPickedMessage, undefined, false, builderOptionsDispatch)
     );
 
     // Only Log Level should be filled; Message is preserved.
@@ -431,7 +431,7 @@ describe('useDefaultLogColumnsByName', () => {
     ];
 
     renderHook(() =>
-      useDefaultLogColumnsByName(allColumns, 'otel_logs', undefined, undefined, true, builderOptionsDispatch)
+      useDefaultLogColumnsByName(allColumns, 'otel_logs', true, undefined, undefined, true, builderOptionsDispatch)
     );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
@@ -442,10 +442,43 @@ describe('useDefaultLogColumnsByName', () => {
     const allColumns: readonly TableColumn[] = [{ name: 'unrelated', type: 'String', picklistValues: [] }];
 
     renderHook(() =>
-      useDefaultLogColumnsByName(allColumns, 'logs', undefined, undefined, false, builderOptionsDispatch)
+      useDefaultLogColumnsByName(allColumns, 'logs', true, undefined, undefined, false, builderOptionsDispatch)
     );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('does not fill empty slots on mount for a saved query', async () => {
+    const builderOptionsDispatch = jest.fn();
+    // Conventional names are present, but the saved query has both slots
+    // deliberately cleared. Opening the editor must not re-add them.
+    const allColumns: readonly TableColumn[] = [
+      { name: 'message', type: 'String', picklistValues: [] },
+      { name: 'level', type: 'LowCardinality(String)', picklistValues: [] },
+    ];
+
+    renderHook(() =>
+      useDefaultLogColumnsByName(allColumns, 'logs', false, undefined, undefined, false, builderOptionsDispatch)
+    );
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('fills empty slots when the table changes on a saved query', async () => {
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'message', type: 'String', picklistValues: [] },
+      { name: 'level', type: 'String', picklistValues: [] },
+    ];
+
+    const hook = renderHook(
+      (table) =>
+        useDefaultLogColumnsByName(allColumns, table, false, undefined, undefined, false, builderOptionsDispatch),
+      { initialProps: 'logs' }
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+    hook.rerender('other_logs');
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(2);
   });
 
   it('re-runs on table change and fills empty slots for the new table', async () => {
@@ -456,7 +489,8 @@ describe('useDefaultLogColumnsByName', () => {
     ];
 
     const hook = renderHook(
-      (table) => useDefaultLogColumnsByName(allColumns, table, undefined, undefined, false, builderOptionsDispatch),
+      (table) =>
+        useDefaultLogColumnsByName(allColumns, table, true, undefined, undefined, false, builderOptionsDispatch),
       { initialProps: 'logs' }
     );
     // After the first render both slots are filled (2 dispatches). Changing the

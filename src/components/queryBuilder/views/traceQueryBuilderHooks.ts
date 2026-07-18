@@ -190,6 +190,10 @@ export const useOtelColumns = (
  * OTel toggle is off). Runs once per table change; never overwrites an
  * explicit user pick.
  *
+ * Saved queries never auto-fill on mount: a deliberately cleared slot must
+ * stay cleared, otherwise opening the panel editor would silently mutate the
+ * saved query model.
+ *
  * The trace builder has many slots; we only heuristic-fill the ones with
  * unambiguous conventional names (Trace ID, Span ID, Parent Span ID, Service
  * Name, Operation/Span Name, Start Time, Duration). Other slots (Tags, Kind,
@@ -199,6 +203,7 @@ export const useOtelColumns = (
 export const useDefaultTraceColumnsByName = (
   allColumns: readonly TableColumn[],
   table: string,
+  isNewQuery: boolean,
   currentColumns: {
     traceId?: SelectedColumn;
     spanId?: SelectedColumn;
@@ -212,7 +217,7 @@ export const useDefaultTraceColumnsByName = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const lastTable = useRef<string>(table || '');
-  const didRun = useRef<boolean>(false);
+  const didRun = useRef<boolean>(!isNewQuery);
   if (table !== lastTable.current) {
     didRun.current = false;
   }
