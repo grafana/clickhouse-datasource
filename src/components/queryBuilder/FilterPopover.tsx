@@ -53,6 +53,12 @@ const getMapValueType = (type: string): string => {
 };
 
 export const getFilterValueKind = (type = ''): FilterValueKind => {
+  // JSON path filters are cast to Nullable(String) by the SQL generator, so
+  // string operators always apply regardless of any parameters in the type.
+  if (type.startsWith('JSON')) {
+    return 'string';
+  }
+
   const valueType = getMapValueType(type);
 
   return utils.isNumberType(valueType) ? 'number' : 'string';
@@ -110,20 +116,25 @@ export const FilterPopover = (props: FilterPopoverProps) => {
 
   const selectedColDef = allColumns.find((column) => column.name === selectedColumn);
   const isMapColumn = selectedColDef?.type?.startsWith('Map(') || false;
+  const isJSONColumn = selectedColDef?.type?.startsWith('JSON') || false;
+  const isKeyedColumn = isMapColumn || isJSONColumn;
+  const jsonKeysColumn = isJSONColumn
+    ? allColumns.find((column) => column.name === `${selectedColumn}Keys`)?.name
+    : undefined;
   const filterKind = getFilterValueKind(selectedColDef?.type);
   const currentOperatorOptions = useMemo(() => getOperatorOptions(filterKind), [filterKind]);
 
   useEffect(() => {
-    if (isMapColumn && selectedColumn && database && table) {
-      datasource
-        .fetchUniqueMapKeys(selectedColumn, database, table)
-        .then(setMapKeys)
-        .catch(() => setMapKeys([]));
+    if ((isMapColumn || isJSONColumn) && selectedColumn && database && table) {
+      const fetchKeys = isMapColumn
+        ? datasource.fetchUniqueMapKeys(selectedColumn, database, table)
+        : datasource.fetchUniqueJSONPaths(selectedColumn, database, table, jsonKeysColumn);
+      fetchKeys.then(setMapKeys).catch(() => setMapKeys([]));
     } else {
       setMapKeys([]);
       setSelectedMapKey('');
     }
-  }, [datasource, database, table, selectedColumn, isMapColumn]);
+  }, [datasource, database, table, selectedColumn, isMapColumn, isJSONColumn, jsonKeysColumn]);
 
   const columnOptions: Array<ComboboxOption<string>> = allColumns.map((column) => ({
     label: column.label || column.name,
@@ -140,7 +151,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
         const values =
           isMapColumn && selectedMapKey
             ? await datasource.fetchDistinctMapValues(selectedColumn, selectedMapKey, database, table)
-            : !isMapColumn
+            : !isKeyedColumn
               ? await datasource.fetchDistinctValues(selectedColumn, database, table)
               : [];
 
@@ -153,7 +164,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
         return [];
       }
     },
-    [datasource, database, table, selectedColumn, isMapColumn, selectedMapKey]
+    [datasource, database, table, selectedColumn, isMapColumn, isKeyedColumn, selectedMapKey]
   );
 
   const noValueNeeded = operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
@@ -162,7 +173,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
     filterKind === 'number' && !noValueNeeded && (value.trim() === '' || isNaN(numericValue));
 
   const handleAdd = () => {
-    if (!selectedColumn || isNumberValueInvalid) {
+    if (!selectedColumn || isNumberValueInvalid || (isJSONColumn && !selectedMapKey)) {
       return;
     }
 
@@ -172,7 +183,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       type: selectedColDef?.type || 'string',
       operator: operator as any,
       condition: 'AND',
-      ...(isMapColumn && selectedMapKey ? { mapKey: selectedMapKey } : {}),
+      ...(isKeyedColumn && selectedMapKey ? { mapKey: selectedMapKey } : {}),
     };
 
     const filter: StringFilter | NumberFilter =
@@ -214,9 +225,9 @@ export const FilterPopover = (props: FilterPopoverProps) => {
         />
       </div>
 
-      {isMapColumn && (
+      {isKeyedColumn && (
         <div className={styles.field}>
-          <span className={styles.fieldLabel}>Map key</span>
+          <span className={styles.fieldLabel}>{isJSONColumn ? 'JSON path' : 'Map key'}</span>
           <Combobox
             options={mapKeys.map((key) => ({ label: key, value: key }))}
             value={selectedMapKey || null}
@@ -227,8 +238,9 @@ export const FilterPopover = (props: FilterPopoverProps) => {
               setSelectedMapKey(option.value || '');
               setValue('');
             }}
+            createCustomValue
             width={20}
-            placeholder="Select key..."
+            placeholder={isJSONColumn ? 'Select path...' : 'Select key...'}
           />
         </div>
       )}
@@ -259,7 +271,11 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       )}
 
       <div className={styles.actions}>
-        <Button size="sm" onClick={handleAdd} disabled={!selectedColumn || isNumberValueInvalid}>
+        <Button
+          size="sm"
+          onClick={handleAdd}
+          disabled={!selectedColumn || isNumberValueInvalid || (isJSONColumn && !selectedMapKey)}
+        >
           Add
         </Button>
         <Button size="sm" variant="secondary" onClick={onClose}>
