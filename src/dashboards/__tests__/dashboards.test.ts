@@ -10,6 +10,36 @@ const otelDashboards = [
   'otel-service-dashboard.json',
 ] as const;
 
+const allDashboards = fs.readdirSync(DASHBOARDS_DIR).filter((filename) => filename.endsWith('.json'));
+
+// Built-in Grafana datasources referenced by annotations
+const builtInDatasourceUids = new Set(['grafana', '-- Grafana --']);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+const collectDatasourceUids = (node: unknown): string[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap(collectDatasourceUids);
+  }
+  if (!isRecord(node)) {
+    return [];
+  }
+  const datasource = node.datasource;
+  const uids = isRecord(datasource) && typeof datasource.uid === 'string' ? [datasource.uid] : [];
+  return uids.concat(Object.values(node).flatMap(collectDatasourceUids));
+};
+
+describe('shipped dashboards', () => {
+  it.each(allDashboards)('%s references datasources only via variables or built-ins', (filename) => {
+    const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+    const dashboard: unknown = JSON.parse(content);
+    const hardcodedUids = collectDatasourceUids(dashboard).filter(
+      (uid) => !uid.startsWith('${') && !builtInDatasourceUids.has(uid)
+    );
+    expect(hardcodedUids).toEqual([]);
+  });
+});
+
 describe('OTel dashboards', () => {
   describe.each(otelDashboards)('%s', (filename) => {
     const filepath = path.join(DASHBOARDS_DIR, filename);
