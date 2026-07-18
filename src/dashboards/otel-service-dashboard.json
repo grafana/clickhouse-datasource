@@ -204,7 +204,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -266,7 +266,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -336,7 +336,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -420,7 +420,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
+          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Server' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
           "refId": "A",
           "format": 1
         }
@@ -478,7 +478,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -540,7 +540,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -610,7 +610,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -694,7 +694,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
+          "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Client' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
           "refId": "A",
           "format": 1
         }
@@ -779,7 +779,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \"Last Seen\" FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName, SpanKind, StatusMessage ORDER BY Count DESC LIMIT 20",
+          "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \"Last Seen\" FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName, SpanKind, StatusMessage ORDER BY Count DESC LIMIT 20",
           "refId": "A",
           "format": 1
         }
@@ -821,7 +821,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId FROM otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(hasToken(Body, '$search'), $search) ORDER BY Timestamp DESC LIMIT 200",
+          "rawSql": "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, TraceId, SpanId FROM otel_logs WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search) ORDER BY Timestamp DESC LIMIT 200",
           "refId": "A",
           "format": 2
         }
@@ -878,7 +878,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
               "refId": "A",
               "format": 0
             }
@@ -940,7 +940,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
               "refId": "A",
               "format": 0
             }
@@ -1010,7 +1010,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
               "refId": "A",
               "format": 0
             }
@@ -1094,7 +1094,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
+              "rawSql": "SELECT SpanName AS Operation, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind = 'Internal' AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName ORDER BY P99 DESC LIMIT 20",
               "refId": "A",
               "format": 1
             }
@@ -1153,7 +1153,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() / $__interval_s AS rps FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
               "refId": "A",
               "format": 0
             }
@@ -1215,7 +1215,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS error_rate FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
               "refId": "A",
               "format": 0
             }
@@ -1285,7 +1285,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY time ORDER BY time",
+              "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, quantile(0.5)(Duration) AS p50, quantile(0.9)(Duration) AS p90, quantile(0.99)(Duration) AS p99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
               "refId": "A",
               "format": 0
             }
@@ -1381,7 +1381,7 @@
                 "uid": "${datasource}"
               },
               "editorType": "sql",
-              "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(hasToken(SpanName, '$search'), $search) GROUP BY SpanName, SpanKind ORDER BY P99 DESC LIMIT 20",
+              "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, count() AS Count, quantile(0.5)(Duration) AS P50, quantile(0.99)(Duration) AS P99 FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = '${service}' AND SpanKind IN ('Producer', 'Consumer') AND $__conditionalAll(SpanName IN ($operation), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName, SpanKind ORDER BY P99 DESC LIMIT 20",
               "refId": "A",
               "format": 1
             }
