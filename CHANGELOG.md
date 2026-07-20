@@ -1,15 +1,26 @@
 # Changelog
 
-## Unreleased
+## 4.20.0
 
 ### Features
 
 - Add `1.3.0` OTel schema version to support `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0`+, which removed the `TimestampTime` column from `otel_logs`. The `latest` selector now points to this schema; existing data sources continue to use `1.2.9` until manually updated (#1882)
 - Auto-detect the OTel logs schema version from the table's columns when the version selector is on `auto (latest)`, removing the manual version pick for the common case. Pinned versions are unchanged (#1900)
+- Add optional Row Capacity Hint setting for large query responses (#2014)
 
 ### Fixes
 
 - Fix dashboard query variables that return numeric or numeric-looking string values (for example `toString(toUnixTimestamp(...))`) failing to resolve with "Couldn't find any field of type string in the results" (#2021)
+- Expand macros nested inside another macro's arguments (#2043)
+- Don't break variable loading when `version()` returns no rows (#2023)
+- Correct and align attribute filters added from the log view (#2020)
+- Handle NaN/Inf in Tuple, Map and Nested JSON conversion (#2002)
+- Dependency updates (#2012, #2013)
+
+### Refactors
+
+- Expand macros via the sqlds Interpolator extension point (#2008)
+- Unify the converter type registry behind generic builders (#1990)
 
 ## 4.19.0
 
