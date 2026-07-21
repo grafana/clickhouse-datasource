@@ -189,11 +189,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
       return;
     }
 
-    // When auto-including all columns, wait until the schema has loaded so the first query
-    // already carries them. This keeps it a single query instead of running the base query
-    // and then re-running with the extra columns. Other modes need no schema, so they do
-    // not wait.
-    if (datasource.shouldIncludeAllLogColumns() && allColumns.length === 0) {
+    // For logs with "Include all columns" on, wait until the schema has loaded so the first
+    // query already carries the extra columns. This keeps it a single query instead of running
+    // the base query and then re-running with the extra columns. Only logs auto-include columns,
+    // so traces and table modes never wait.
+    if (signalType === 'logs' && datasource.shouldIncludeAllLogColumns() && allColumns.length === 0) {
       return;
     }
 

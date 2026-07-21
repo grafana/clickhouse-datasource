@@ -39,6 +39,8 @@ describe('QueryBuilder', () => {
   mockDs.getDefaultDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceColumns = jest.fn((_db?: string) => new Map());
   mockDs.shouldSelectLogContextColumns = jest.fn((_db?: string) => false);
+  mockDs.shouldIncludeAllLogColumns = jest.fn(() => false);
+  mockDs.getAdditionalLogColumns = jest.fn(() => []);
   mockDs.getDefaultTable = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceTable = jest.fn((_db?: string) => '');
