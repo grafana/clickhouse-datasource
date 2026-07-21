@@ -1,10 +1,25 @@
 import React, { useState, useEffect } from 'react';
+import { css, cx } from '@emotion/css';
 import { InlineField, InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { TableColumn, SelectedColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
 import { styles } from 'styles';
+
+// Let the selected-column chips wrap onto multiple lines within a bounded width, instead of forming
+// one long row that fills the builder edge to edge (and clips when many columns are selected, for
+// example logs with "Include all columns" on). The dropdown menu still lists every column. The
+// builder's column width is driven by its widest row, so a bounded value list also keeps the whole
+// builder from stretching to fit a long column list.
+const wrappedColumnValues = css`
+  & [class*='grafana-select-value-container'] {
+    max-width: 760px;
+    height: auto;
+    overflow: visible;
+    flex-wrap: wrap;
+  }
+`;
 
 interface ColumnsEditorProps {
   allColumns: readonly TableColumn[];
@@ -89,7 +104,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     >
       <div
         data-testid={selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper}
-        className={styles.Common.selectWrapper}
+        className={cx(styles.Common.selectWrapper, wrappedColumnValues)}
       >
         <MultiSelect<string>
           disabled={disabled}
