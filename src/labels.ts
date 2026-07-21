@@ -335,12 +335,12 @@ export default {
             tooltip: 'Column for log message',
           },
           includeAllColumns: {
-            label: 'Include all columns as fields',
+            label: 'Include all columns',
             tooltip:
-              'Automatically show every column from the table as a log field, so you can find it in the Fields list, filter by its value, and add it as a displayed column without editing the query. Attributes stored in OTel maps (Resource, Scope, and Log attributes) already show up as grouped fields and are left unchanged; internal columns (names starting with two underscores) and the timestamp columns are skipped. Turn this off to show only the columns listed under Additional fields.',
+              'Automatically show every column from the table as a log field, so you can find it in the Fields list, filter by its value, and add it as a displayed column without editing the query. Attributes stored in OTel maps (Resource, Scope, and Log attributes) already show up as grouped fields and are left unchanged; internal columns (names starting with two underscores) and the timestamp columns are skipped. Turn this off to show only the columns listed under Additional columns.',
           },
           additionalColumns: {
-            label: 'Additional fields',
+            label: 'Additional columns',
             tooltip:
               'Column names to show as log fields, in addition to the time, level, and message columns above. Use this to expose a few specific columns (for example ServiceName or status) so they appear in the Fields list and can be filtered, without showing every column. Leave empty to add none.',
             placeholder: 'Column name (enter key to add)',
