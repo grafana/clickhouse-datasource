@@ -24,6 +24,8 @@ interface LogsConfigProps {
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
   onShowLogLinksChange: (v: boolean) => void;
+  onIncludeAllColumnsChange?: (v: boolean) => void;
+  onAdditionalColumnsChange?: (v: string[]) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -39,6 +41,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onSelectContextColumnsChange,
     onContextColumnsChange,
     onShowLogLinksChange,
+    onIncludeAllColumnsChange,
+    onAdditionalColumnsChange,
   } = props;
   let {
     defaultDatabase,
@@ -52,6 +56,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     selectContextColumns,
     contextColumns,
     showLogLinks,
+    includeAllColumns,
+    additionalColumns,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
   const sectionLabels = props.variant === 'single-table' ? labels.variants.singleTable : labels;
@@ -66,6 +72,9 @@ export const LogsConfig = (props: LogsConfigProps) => {
 
   const onContextColumnsChangeTrimmed = (columns: string[]) =>
     onContextColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
+
+  const onAdditionalColumnsChangeTrimmed = (columns: string[]) =>
+    onAdditionalColumnsChange?.(columns.map((c) => c.trim()).filter((c) => c));
 
   return (
     <ConfigSection title={sectionLabels.title} description={sectionLabels.description}>
@@ -132,6 +141,29 @@ export const LogsConfig = (props: LogsConfigProps) => {
           value={messageColumn || ''}
           onChange={onMessageColumnChange}
         />
+        <Switch
+          label={labels.columns.includeAllColumns.label}
+          tooltip={labels.columns.includeAllColumns.tooltip}
+          value={includeAllColumns || false}
+          onChange={(v) => onIncludeAllColumnsChange?.(v)}
+          wide
+        />
+        {!includeAllColumns && (
+          <InlineField
+            label={
+              <InlineFormLabel width={12} className="query-keyword" tooltip={labels.columns.additionalColumns.tooltip}>
+                {labels.columns.additionalColumns.label}
+              </InlineFormLabel>
+            }
+          >
+            <TagsInput
+              placeholder={labels.columns.additionalColumns.placeholder}
+              tags={additionalColumns || []}
+              onChange={onAdditionalColumnsChangeTrimmed}
+              width={60}
+            />
+          </InlineField>
+        )}
       </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>

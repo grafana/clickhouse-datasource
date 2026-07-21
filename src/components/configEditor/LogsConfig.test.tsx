@@ -278,12 +278,37 @@ describe('LogsConfig', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    // showLogLinks is the 1st role="switch" (index 0), before selectContextColumns
-    const switches = await result.findAllByRole('switch');
-    const input = switches[0];
+    const input = await result.findByRole('switch', { name: /view logs/i });
     expect(input).toBeInTheDocument();
     fireEvent.click(input);
     expect(onShowLogLinksChange).toHaveBeenCalledTimes(1);
     expect(onShowLogLinksChange).toHaveBeenCalledWith(false);
+  });
+
+  it('should call onIncludeAllColumnsChange when toggled', async () => {
+    const onIncludeAllColumnsChange = jest.fn();
+    const result = render(
+      <LogsConfig
+        logsConfig={{}}
+        onDefaultDatabaseChange={() => {}}
+        onDefaultTableChange={() => {}}
+        onOtelEnabledChange={() => {}}
+        onOtelVersionChange={() => {}}
+        onFilterTimeColumnChange={() => {}}
+        onTimeColumnChange={() => {}}
+        onLevelColumnChange={() => {}}
+        onMessageColumnChange={() => {}}
+        onSelectContextColumnsChange={() => {}}
+        onContextColumnsChange={() => {}}
+        onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={onIncludeAllColumnsChange}
+      />
+    );
+
+    const input = await result.findByRole('switch', { name: /include all columns/i });
+    expect(input).toBeInTheDocument();
+    fireEvent.click(input);
+    expect(onIncludeAllColumnsChange).toHaveBeenCalledTimes(1);
+    expect(onIncludeAllColumnsChange).toHaveBeenCalledWith(true);
   });
 });

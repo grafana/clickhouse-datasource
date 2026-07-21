@@ -177,8 +177,23 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     onQueryChangeRef.current = onQueryChange;
   }, [onQueryChange]);
 
+  // Resolve database/table first (this does not need the schema), so we can fetch the
+  // column list and then build defaults that may include schema-derived columns.
+  const draftOptions = needsInitialization
+    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table)
+    : builderOptions;
+  const allColumns = useColumns(datasource, draftOptions.database, draftOptions.table);
+
   useEffect(() => {
     if (!needsInitialization) {
+      return;
+    }
+
+    // When auto-including all columns, wait until the schema has loaded so the first query
+    // already carries them. This keeps it a single query instead of running the base query
+    // and then re-running with the extra columns. Other modes need no schema, so they do
+    // not wait.
+    if (datasource.shouldIncludeAllLogColumns() && allColumns.length === 0) {
       return;
     }
 
@@ -188,17 +203,16 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
     lastInitializationKey.current = initializationKey;
 
-    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns);
     if (!isEqual(builderOptions, nextOptions)) {
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
     }
-  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType]);
+  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType, allColumns]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table)
+    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns)
     : builderOptions;
-  const allColumns = useColumns(datasource, activeOptions.database, activeOptions.table);
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 
   const onActiveOptionsChange = (nextOptions: QueryBuilderOptions, shouldRunQuery = false) => {

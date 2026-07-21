@@ -1,4 +1,4 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, FieldType } from '@grafana/data';
 import {
   ColumnHint,
   FilterOperator,
@@ -673,4 +673,121 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   const labelKeys = Object.keys(labels);
 
   return labelKeys.includes(name);
+};
+
+const isMapLikeType = (t?: string): boolean => {
+  const s = (t || '').trim();
+  return (
+    s.startsWith('Map(') ||
+    s.startsWith('Array(') ||
+    s.startsWith('Tuple(') ||
+    s.startsWith('Nested') ||
+    s.startsWith('Object(') ||
+    s === 'JSON'
+  );
+};
+
+/**
+ * Fold the extra top-level scalar columns (the ones the "Default columns" field options add via
+ * `includeAllColumns` or `additionalColumns`) into the `labels` field under their PLAIN names, so
+ * they surface as flat, first-class log fields: in the Fields sidebar, in the log-row details
+ * flyout under a "Fields" group (next to the grouped Resource/Log attributes, each with the
+ * filter-for / filter-out buttons), and in the field filters.
+ *
+ * The OTel attribute maps keep their prefixed, grouped rendering; the backend already flattens them
+ * into `labels` with a `ResourceAttributes.` / `LogAttributes.` prefix, and getLabelDisplayTypeFromFrame
+ * buckets those prefixes into their named sections. Folded columns keep their real column names (no
+ * alias) so a "Filter for value" click resolves against the real column in BOTH the main query and
+ * the separate logs-volume query (an alias would only exist in the main query's projection and break
+ * the volume query). Folded columns are removed as standalone frame fields so they do not also render as raw
+ * table columns. The `labels` field is created when the frame has none (a non-OTel table with no
+ * attribute maps). Frames that share the query's columns but carry none of them (the logs-volume
+ * frame) are skipped, so no empty `labels` field is added to the volume series.
+ */
+export const foldDiscoveredLogFieldsIntoLabels = (
+  datasource: Datasource,
+  req: DataQueryRequest<CHQuery>,
+  res: DataQueryResponse
+): DataQueryResponse => {
+  if (!datasource.shouldIncludeAllLogColumns() && datasource.getAdditionalLogColumns().length === 0) {
+    return res;
+  }
+
+  const targetsByRefId = new Map(req.targets.map((t) => [t.refId, t]));
+
+  for (const frame of (res.data as DataFrame[]) || []) {
+    const target = targetsByRefId.get(frame.refId ?? '');
+    if (!target || target.editorType !== EditorType.Builder) {
+      continue;
+    }
+    const builderOptions = (target as CHBuilderQuery).builderOptions;
+    if (!builderOptions || builderOptions.queryType !== QueryType.Logs) {
+      continue;
+    }
+
+    // The columns the field options selected are the hint-less, non-collection ones. Role columns
+    // (time / body / level / trace id) carry a hint; the attribute maps are collection-typed.
+    const discovered = (builderOptions.columns || [])
+      .filter((c) => c.hint === undefined && !isMapLikeType(c.type))
+      .map((c) => c.alias || c.name);
+    const foldable = discovered.filter((name) =>
+      frame.fields.some((f) => f.name === name && f.name !== labelsFieldName)
+    );
+    if (foldable.length === 0) {
+      continue;
+    }
+
+    const rowLen = frame.length ?? frame.fields[0]?.values.length ?? 0;
+
+    let labelsField = frame.fields.find((f) => f.name === labelsFieldName);
+    if (!labelsField) {
+      labelsField = {
+        name: labelsFieldName,
+        type: FieldType.other,
+        config: {},
+        values: Array.from({ length: rowLen }, () => ({})),
+      } as unknown as DataFrame['fields'][number];
+      frame.fields.push(labelsField);
+    }
+
+    const foldedNames = new Set<string>();
+    for (const name of foldable) {
+      const src = frame.fields.find((f) => f.name === name);
+      if (!src || src === labelsField) {
+        continue;
+      }
+      for (let i = 0; i < rowLen; i++) {
+        const v = src.values[i];
+        if (v === null || v === undefined || v === '') {
+          continue;
+        }
+        // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
+        // or already-parsed objects (a frame we just created). Handle both and write back in kind.
+        const raw = labelsField.values[i];
+        const wasString = typeof raw === 'string';
+        let obj: Record<string, unknown>;
+        if (wasString) {
+          try {
+            obj = JSON.parse(raw as string) as Record<string, unknown>;
+          } catch {
+            obj = {};
+          }
+        } else {
+          obj = (raw as Record<string, unknown>) || {};
+        }
+        if (!obj || typeof obj !== 'object') {
+          obj = {};
+        }
+        obj[name] = typeof v === 'string' ? v : String(v);
+        labelsField.values[i] = wasString ? JSON.stringify(obj) : obj;
+      }
+      foldedNames.add(name);
+    }
+
+    if (foldedNames.size > 0) {
+      frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
+    }
+  }
+
+  return res;
 };

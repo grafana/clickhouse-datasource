@@ -3,6 +3,7 @@ import {
   applyTraceSearchFieldConfig,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
+  foldDiscoveredLogFieldsIntoLabels,
   getBuilderOptions,
   isBuilderOptionsRunnable,
   labelsFieldName,
@@ -1035,5 +1036,134 @@ describe('dataFrameHasLogLabelWithName', () => {
       ],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
+  });
+});
+
+describe('foldDiscoveredLogFieldsIntoLabels', () => {
+  const buildLogsRequestResponse = (
+    columns: Array<{ name: string; hint?: ColumnHint; type?: string }>,
+    frameFields: Field[]
+  ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
+    const inputQuery: CHBuilderQuery = {
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: { database: 'otel', table: 'otel_logs', queryType: QueryType.Logs, columns },
+      pluginVersion: '',
+      rawSql: '',
+    };
+    const request = { targets: [inputQuery] } as any as DataQueryRequest<CHQuery>;
+    const data: DataFrame[] = [{ fields: frameFields, length: frameFields[0]?.values.length ?? 0, refId: 'A' }];
+    return [request, { data }];
+  };
+
+  const withFeature = (includeAll: boolean, additional: string[] = []) => {
+    const ds = newMockDatasource();
+    ds.settings.jsonData.logs = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: 'latest',
+      includeAllColumns: includeAll,
+      additionalColumns: additional,
+    };
+    return ds;
+  };
+
+  const field = (name: string, values: any[], type = FieldType.string): Field => ({ name, type, config: {}, values });
+
+  it('folds hint-less scalar columns into an existing labels field and removes them as columns', () => {
+    const ds = withFeature(true);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Timestamp', hint: ColumnHint.Time },
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'LowCardinality(String)' },
+        { name: 'SpanId', type: 'String' },
+      ],
+      [
+        field('Timestamp', [1]),
+        field('Body', ['hello']),
+        field('ServiceName', ['cart']),
+        field('SpanId', ['abc']),
+        field(labelsFieldName, [{ 'ResourceAttributes.k8s.pod.name': 'pod-1' }], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    const names = frame.fields.map((f) => f.name);
+
+    // scalar columns removed as standalone fields, role columns + labels kept
+    expect(names).toEqual(['Timestamp', 'Body', labelsFieldName]);
+    // scalar values folded into labels under their plain names, next to the attribute keys
+    const labels = frame.fields.find((f) => f.name === labelsFieldName)!.values[0];
+    expect(labels).toEqual({ 'ResourceAttributes.k8s.pod.name': 'pod-1', ServiceName: 'cart', SpanId: 'abc' });
+  });
+
+  it('parses and rewrites a JSON-string labels value (backend-serialized shape)', () => {
+    const ds = withFeature(true);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [
+        field('Body', ['hi']),
+        field('ServiceName', ['cart']),
+        field(labelsFieldName, ['{"LogAttributes.http.method":"GET"}'], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const labels = (res.data[0] as DataFrame).fields.find((f) => f.name === labelsFieldName)!.values[0];
+    // written back as a JSON string, in the same shape it arrived in
+    expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
+  });
+
+  it('creates a labels field when the frame has none (non-OTel table)', () => {
+    const ds = withFeature(false, ['method', 'status']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'event_time', hint: ColumnHint.Time },
+        { name: 'method', type: 'String' },
+        { name: 'status', type: 'UInt16' },
+      ],
+      [field('event_time', [1]), field('method', ['GET']), field('status', ['200'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    expect(frame.fields.map((f) => f.name)).toEqual(['event_time', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({ method: 'GET', status: '200' });
+  });
+
+  it('is a no-op when the feature is off (no includeAllColumns, no additionalColumns)', () => {
+    const ds = withFeature(false);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('ServiceName', ['cart'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // ServiceName stays a standalone column; no labels field synthesized
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'ServiceName']);
+  });
+
+  it('skips frames that share the query columns but carry none of them (logs-volume)', () => {
+    const ds = withFeature(true);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [field('Time', [1], FieldType.time), field('count', [5], FieldType.number)]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // no scalar field present to fold, so no labels field is added to the volume frame
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Time', 'count']);
   });
 });

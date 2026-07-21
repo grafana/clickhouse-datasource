@@ -2226,23 +2226,23 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns null for the Body core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('Body', undefined, null)).toBeNull();
+      it('returns "Fields" for a top-level scalar column folded into labels', () => {
+        // foldDiscoveredLogFieldsIntoLabels merges the extra top-level columns
+        // into `labels` under their plain, unprefixed names. Those group under a
+        // "Fields" section in the log details flyout, next to the attribute groups.
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBe('Fields');
+        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBe('Fields');
       });
 
-      it('returns null for the TraceId core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('TraceId', undefined, null)).toBeNull();
+      it('returns "Fields" for an arbitrary user-defined column', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBe('Fields');
       });
 
-      it('returns null for the bare "ResourceAttributes" without a dot', () => {
-        // The backend's flatten always emits at least one nested key, so the
-        // bare column name never reaches Grafana's label list. Guard against
-        // mis-grouping if a custom schema ever surfaces it.
-        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBeNull();
-      });
-
-      it('returns null for an arbitrary user-defined column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+      it('returns "Fields" for the bare "ResourceAttributes" without a dot', () => {
+        // The backend's flatten always emits at least one nested key, so the bare
+        // column name never reaches Grafana's label list in practice; an unprefixed
+        // key is treated as a plain field.
+        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBe('Fields');
       });
     });
 

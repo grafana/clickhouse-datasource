@@ -61,7 +61,11 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import {
+  foldDiscoveredLogFieldsIntoLabels,
+  labelsFieldName,
+  transformQueryResponseWithTraceAndLogLinks,
+} from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -900,6 +904,17 @@ export class Datasource
     return this.settings.jsonData.logs?.selectContextColumns || false;
   }
 
+  // Whether to auto-include every detected top-level scalar column as a field.
+  shouldIncludeAllLogColumns(): boolean {
+    return this.settings.jsonData.logs?.includeAllColumns || false;
+  }
+
+  // Explicit list of extra columns to surface as fields (used when
+  // shouldIncludeAllLogColumns is false).
+  getAdditionalLogColumns(): string[] {
+    return this.settings.jsonData.logs?.additionalColumns?.length ? this.settings.jsonData.logs.additionalColumns : [];
+  }
+
   getLogContextColumnNames(): string[] {
     return this.settings.jsonData.logs?.contextColumns?.length ? this.settings.jsonData.logs?.contextColumns : [];
   }
@@ -1418,7 +1433,8 @@ export class Datasource
       })
       .pipe(
         concatMap(async (res: DataQueryResponse) => {
-          const transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          let transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          transformed = foldDiscoveredLogFieldsIntoLabels(this, request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
@@ -2011,10 +2027,14 @@ export class Datasource
    * (e.g. "ResourceAttributes.service.name"). This method tells Grafana
    * how to bucket those keys into named, collapsible sections.
    *
-   * Returning null leaves the field under Grafana's default "Fields"
-   * section. Filtering is unaffected: `modifyQuery` already splits the
-   * same prefix back when a user clicks "Filter for value", so the
-   * visual grouping and the filter routing stay aligned.
+   * Unprefixed keys are the top-level scalar columns that
+   * `foldDiscoveredLogFieldsIntoLabels` merged into `labels` (the field
+   * options feature). They are bucketed under a plain "Fields" section so
+   * they sit next to the grouped attributes in the log-row details flyout,
+   * with the same filter-for / filter-out buttons. Filtering is unaffected:
+   * `modifyQuery` resolves a bare key to the real column (and splits the
+   * `<map>.` prefix back for the attribute keys), so grouping and filter
+   * routing stay aligned.
    *
    * Strings are plain English; the plugin codebase does not currently
    * use `@grafana/i18n`, so a future i18n pass would localize these
@@ -2030,7 +2050,7 @@ export class Datasource
     if (labelKey.startsWith('LogAttributes.')) {
       return 'Log attributes';
     }
-    return null;
+    return 'Fields';
   }
 
   async testDatasource(): Promise<{ status: string; message: string }> {

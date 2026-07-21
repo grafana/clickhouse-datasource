@@ -122,6 +122,14 @@ export interface CHLogsConfig {
   selectContextColumns?: boolean;
   contextColumns?: string[];
   showLogLinks?: boolean;
+
+  // Extra top-level columns to select into log queries so they surface as
+  // first-class fields (Fields sidebar, flyout, filters). Independent of the
+  // Show-context feature. `includeAllColumns` auto-includes every detected
+  // scalar column; otherwise `additionalColumns` is an explicit list. Both
+  // default to off/empty, so existing datasources keep their current behavior.
+  includeAllColumns?: boolean;
+  additionalColumns?: string[];
 }
 
 export interface CHTracesConfig {
