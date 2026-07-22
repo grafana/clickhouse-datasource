@@ -312,6 +312,36 @@ export class Datasource
     return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
   }
 
+  /**
+   * Builds a message search filter from meta.logMessageLike so the supplementary logs volume and
+   * sample queries apply the same message search as the main logs query.
+   *
+   * The filter uses an explicit key with the LogMessage column's real name, not a ColumnHint and
+   * not the "body" alias. A hinted filter only resolves when its column is selected (see the
+   * hint-to-key resolution in the callers), and the volume query does not project the LogMessage
+   * column, so an explicit real-name key is what resolves in both supplementary queries.
+   */
+  private getLogMessageSearchFilter(builderOptions: QueryBuilderOptions): StringFilter | undefined {
+    const logMessageLike = builderOptions.meta?.logMessageLike;
+    if (!logMessageLike) {
+      return undefined;
+    }
+
+    const logMessageColumn = getColumnByHint(builderOptions, ColumnHint.LogMessage);
+    if (!logMessageColumn) {
+      return undefined;
+    }
+
+    return {
+      condition: 'AND',
+      key: logMessageColumn.name,
+      type: 'string',
+      filterType: 'custom',
+      operator: FilterOperator.Like,
+      value: logMessageLike,
+    };
+  }
+
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
       query.editorType !== EditorType.Builder ||
@@ -371,6 +401,11 @@ export class Datasource
       return f;
     });
 
+    const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);
+    if (messageFilter) {
+      filters.push(messageFilter);
+    }
+
     const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
       database: query.builderOptions.database,
       table: query.builderOptions.table,
@@ -417,6 +452,11 @@ export class Datasource
       }
       return { ...f };
     });
+
+    const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);
+    if (messageFilter) {
+      filters.push(messageFilter);
+    }
 
     const defaultColumns = Array.from(this.getDefaultLogsColumns(), ([hint, name]) => ({ hint, name }));
 
