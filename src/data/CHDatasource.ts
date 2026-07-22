@@ -2,6 +2,7 @@ import {
   AdHocVariableFilter,
   DataFrame,
   DataFrameView,
+  DataQueryError,
   DataQueryRequest,
   DataQueryResponse,
   DataSourceInstanceSettings,
@@ -13,6 +14,7 @@ import {
   Field,
   getTimeZone,
   getTimeZoneInfo,
+  LoadingState,
   LogRowContextOptions,
   LogRowContextQueryDirection,
   LogRowModel,
@@ -31,7 +33,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { concatMap, firstValueFrom, Observable } from 'rxjs';
+import { catchError, concatMap, firstValueFrom, Observable, of } from 'rxjs';
 import { CHConfig, ConfigMode, SignalType } from 'types/config';
 import {
   AggregateColumn,
@@ -1477,6 +1479,16 @@ export class Datasource
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
           return transformed;
+        }),
+        // Without this, a throw during response transformation escapes the
+        // observable unshaped and the panel spins forever instead of showing
+        // an error (#1931).
+        catchError((err) => {
+          console.error('ClickHouse query failed:', err);
+          const error: DataQueryError = {
+            message: this.extractQueryErrorMessage(err) || 'Query failed. Check the browser console for details.',
+          };
+          return of<DataQueryResponse>({ data: [], state: LoadingState.Error, error, errors: [error] });
         })
       );
   }

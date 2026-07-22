@@ -60,6 +60,27 @@ describe('Query Editor', () => {
     expect(screen.getByText('SELECT * FROM table')).toBeInTheDocument();
   });
 
+  it('renders an error alert instead of crashing when the editor throws (#1931)', () => {
+    // Suppress React's error-boundary console noise for the intentional throw.
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const datasource = newMockDatasource();
+    jest.spyOn(datasource, 'isSingleTableMode').mockImplementation(() => {
+      throw new Error('render crash');
+    });
+
+    render(
+      <CHQueryEditor
+        query={{ pluginVersion: '', rawSql: 'SELECT 1', refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    expect(screen.getByText('ClickHouse query editor failed to load')).toBeInTheDocument();
+    consoleSpy.mockRestore();
+  });
+
   it('Should not sync builder options when editorType remains SQL', () => {
     const builderOptions = {
       database: 'db2',
