@@ -108,13 +108,13 @@ function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
 }
 
-// Two-layer escape for Map keys embedded as `MapCol[\'<key>\']` inside the
-// outer single-quoted string passed to `additional_table_filters`. A raw
-// `'` in the key has to survive (a) the inner bracket-access string literal
-// and (b) the outer filter string — so each `'` produces `\\\'` and each
-// `\` produces `\\\\` at SQL source level.
-function escapeMapKeyForOuterFilter(key: string): string {
-  return key.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
+// Two-layer escape for a string embedded as a nested SQL literal inside the
+// outer single-quoted `additional_table_filters` string — a Map key in
+// `MapCol[\'<key>\']` or a filter value in `= \'<value>\'`. A raw `'` has to
+// survive (a) the inner string literal and (b) the outer filter string — so
+// each `'` produces `\\\'` and each `\` produces `\\\\` at SQL source level.
+function escapeForOuterFilterLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
 }
 
 // Self-describing Map access minted by getTagKeys: `MapCol['key']` or
@@ -143,7 +143,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const match = s.match(/arrayElement\((.*?),\s*['"](.*?)['"]\)/);
     if (match) {
       const [_, array, key] = match;
-      return `${array}[\\'${escapeMapKeyForOuterFilter(key)}\\']`;
+      return `${array}[\\'${escapeForOuterFilterLiteral(key)}\\']`;
     }
   }
 
@@ -158,7 +158,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+    return `${mapCol}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Stateless JSON path form minted by getTagKeys (`col.`seg``): the backtick
@@ -181,7 +181,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+    return `${mapCol}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Non-prefixed Map access: `MapCol.key1.key2` (hideTableName=true or
@@ -193,7 +193,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+    return `${mapCol}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Default: bare column, or `table.col` reference where col isn't a Map.
@@ -209,7 +209,11 @@ function escapeValueBasedOnOperator(s: string, operator: string): string {
     }
     return s.replace(/'/g, "\\'");
   } else {
-    return `\\'${s}\\'`;
+    // The value becomes a SQL string literal nested inside the single-quoted
+    // additional_table_filters string — the same two-layer embedding as a Map
+    // key inside `col['...']` — so reuse that escaping. Without it a value
+    // containing `'` breaks out of the filter (e.g. `x' OR '1'='1`).
+    return `\\'${escapeForOuterFilterLiteral(s)}\\'`;
   }
 }
 

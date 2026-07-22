@@ -300,6 +300,12 @@ describe('AdHocManager', () => {
       expect(result).toEqual(" key NOT REGEXP \\'val\\' ");
     });
 
+    it('escapes single quotes in filter values so they cannot break out of the filter string', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: "x'" }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k = \\'x\\\\\\'\\' ");
+    });
+
     it('builds filter string with IN operator', () => {
       const ahm = new AdHocFilter();
       const result = ahm.buildFilterString([
