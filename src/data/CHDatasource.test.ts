@@ -1143,6 +1143,38 @@ describe('ClickHouseDatasource', () => {
         })
       );
     });
+
+    it('bounds the value SELECT to a time window for the configured logs table', async () => {
+      // The distinct-value scan behind the filter-value dropdown is bounded to a
+      // 6h window when the target is the configured OTel logs/traces table (same
+      // partition-pruning heuristic as the key-discovery probe). Without it,
+      // `select distinct <expr>` scans the whole column — worse for JSON paths.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'otel.otel_logs');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'otel';
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'otel_logs' }]);
+      const valuesFrame = arrayToDataFrame([{ v: 'pod-a' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagValues({ key: 'otel_logs.ResourceAttributes.`k8s`.`pod`' });
+      const valueSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql ?? '')
+        .find((s: string) => s.includes('select distinct'));
+      expect(valueSql).toContain('where "Timestamp" >= now() - INTERVAL 6 HOUR');
+      expect(valueSql).toContain('ResourceAttributes.`k8s`.`pod`::Nullable(String)');
+    });
   });
 
   describe('fetchUniqueMapKeys probe (#1843)', () => {

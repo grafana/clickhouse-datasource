@@ -1785,7 +1785,15 @@ export class Datasource
     // are cast rather than emitted uncast (Dynamic → all-null).
     await this.ensureAttributeColumnCache(source);
     const selectExpr = this.buildAdhocColumnExpr(col, source);
-    const rawSql = `select distinct ${selectExpr} from ${source} limit 1000`;
+    // Bound the DISTINCT scan to a recent time window when the target is the
+    // configured OTel logs/traces table (same partition-pruning heuristic as the
+    // key-discovery probe). Without this, `select distinct <expr>` scans the
+    // whole column — a full-table scan on large tables, worse for JSON paths.
+    const valueTable = source.includes('.') ? source.split('.')[1] : source;
+    const valueDb = source.includes('.') ? source.split('.')[0] : this.getDefaultDatabase();
+    const timeColumn = valueDb ? this.getMapKeyProbeTimeColumn(valueDb, valueTable) : undefined;
+    const whereClause = timeColumn ? ` where ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR` : '';
+    const rawSql = `select distinct ${selectExpr} from ${source}${whereClause} limit 1000`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
@@ -2418,7 +2426,7 @@ function isMapColumnType(type: string | undefined): boolean {
   if (!type) {
     return false;
   }
-  return /^(?:Nullable\(|LowCardinality\()?Map\(/.test(type);
+  return /^(?:Nullable\(|LowCardinality\()?Map\(/i.test(type);
 }
 
 /**
