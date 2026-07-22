@@ -181,9 +181,37 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
       { key: 'key', operator: 'IN', value: '(1, 2, 3)' },
     ] as AdHocVariableFilter[]);
+    // Elements are quoted for safety; ClickHouse coerces quoted numerics.
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (1, 2, 3) '}`
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (\\'1\\', \\'2\\', \\'3\\') '}`
     );
+  });
+
+  it('escapes each IN element so a crafted value cannot break out of the filter', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "1) OR 1=1 OR ServiceName IN (1" },
+    ] as AdHocVariableFilter[]);
+    // The whole payload becomes a single quoted literal element, not injected SQL.
+    expect(result).toContain("k IN (\\'1) OR 1=1 OR ServiceName IN (1\\')");
+    // The unquoted injected form (which the old single-layer escaping produced) is gone.
+    expect(result).not.toContain('IN (1) OR 1=1');
+  });
+
+  it('builds the IN list from the structured values array and escapes each element', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: 'ignored', values: ["a'b", 'c'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\', \\'c\\') ");
+  });
+
+  it('handles NOT IN with per-element escaping', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'NOT IN', value: 'ignored', values: ['x', 'y'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k NOT IN (\\'x\\', \\'y\\') ");
   });
 
   it('does not apply an adhoc filter without "operator"', () => {

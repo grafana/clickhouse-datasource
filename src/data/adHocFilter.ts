@@ -60,7 +60,7 @@ export class AdHocFilter {
     const filters = validFilters
       .map((f, i) => {
         const key = escapeKey(f.key, useJSON, this._mapColumns);
-        const value = escapeValueBasedOnOperator(f.value, f.operator);
+        const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
         const condition = i !== validFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
@@ -201,20 +201,40 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
   return s.includes('.') ? s.split('.').slice(1).join('.') : s;
 }
 
-function escapeValueBasedOnOperator(s: string, operator: string): string {
-  if (operator === 'IN') {
-    // Allow list of values without parentheses
-    if (s.length > 2 && s[0] !== '(' && s[s.length - 1] !== ')') {
-      s = `(${s})`;
+function escapeValueBasedOnOperator(s: string, operator: string, values?: string[]): string {
+  if (operator === 'IN' || operator === 'NOT IN') {
+    // Build the list from the structured `values` array when Grafana provides it
+    // (multi-select), otherwise best-effort split of the legacy joined string.
+    // Every element is escaped and re-quoted, so no element can break out of the
+    // filter clause — ClickHouse coerces quoted numerics, so numeric IN still
+    // works. Empty list → `(NULL)` so `IN`/`NOT IN` stay valid SQL.
+    const items = values && values.length > 0 ? values : parseInListItems(s);
+    if (items.length === 0) {
+      return '(NULL)';
     }
-    return s.replace(/'/g, "\\'");
-  } else {
-    // The value becomes a SQL string literal nested inside the single-quoted
-    // additional_table_filters string — the same two-layer embedding as a Map
-    // key inside `col['...']` — so reuse that escaping. Without it a value
-    // containing `'` breaks out of the filter (e.g. `x' OR '1'='1`).
-    return `\\'${escapeForOuterFilterLiteral(s)}\\'`;
+    return `(${items.map((item) => `\\'${escapeForOuterFilterLiteral(item)}\\'`).join(', ')})`;
   }
+  // The value becomes a SQL string literal nested inside the single-quoted
+  // additional_table_filters string — the same two-layer embedding as a Map
+  // key inside `col['...']` — so reuse that escaping. Without it a value
+  // containing `'` breaks out of the filter (e.g. `x' OR '1'='1`).
+  return `\\'${escapeForOuterFilterLiteral(s)}\\'`;
+}
+
+// Split a legacy comma-separated IN value into individual items when the
+// structured `values` array isn't provided. Strips an optional surrounding pair
+// of parentheses and per-item surrounding single quotes/whitespace. Best-effort
+// (a value containing a comma won't split correctly), but every resulting item
+// is re-escaped and re-quoted by the caller, so it cannot break out of the SQL.
+function parseInListItems(raw: string): string[] {
+  let s = raw.trim();
+  if (s.startsWith('(') && s.endsWith(')')) {
+    s = s.slice(1, -1);
+  }
+  return s
+    .split(',')
+    .map((item) => item.trim().replace(/^'(.*)'$/, '$1'))
+    .filter((item) => item.length > 0);
 }
 
 function convertOperatorToClickHouseOperator(operator: string): string {
