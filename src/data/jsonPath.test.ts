@@ -52,6 +52,14 @@ describe('buildJSONPathAccess', () => {
     // expression — the column becomes a single (quoted) identifier.
     expect(buildJSONPathAccess("a) OR 1=1--", 'x')).toBe('`a) OR 1=1--`.`x`::Nullable(String)');
   });
+
+  it('escapes a backslash inside a path segment', () => {
+    expect(buildJSONPathAccess('attrs', 'a\\b')).toBe('attrs.`a\\\\b`::Nullable(String)');
+  });
+
+  it('handles a single empty path', () => {
+    expect(buildJSONPathAccess('attrs', '')).toBe('attrs.``::Nullable(String)');
+  });
 });
 
 describe('mintJSONAdhocKey / parseJSONAdhocKey round-trip', () => {
