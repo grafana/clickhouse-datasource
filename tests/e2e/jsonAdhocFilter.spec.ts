@@ -66,10 +66,12 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 //
 // The filter-application predicate shape (`col.`path`::Nullable(String) = ...`)
 // is identical between the query-builder and the adhoc path and is already
-// exercised by jsonFilter.spec.ts. The tests below cover the two shapes unique
-// to the adhoc path: JSON-path discovery (fetchUniqueJSONPathsForAdhoc) and the
-// distinct-value listing (fetchTagValuesFromSchema), run against the
-// e2e_test.json_events fixture.
+// exercised by jsonFilter.spec.ts. The tests below run the SQL *shapes* the
+// adhoc path emits — JSON-path discovery (as fetchUniqueJSONPathsForAdhoc emits)
+// and the distinct-value listing (as fetchTagValuesFromSchema emits) — against
+// the e2e_test.json_events fixture to confirm ClickHouse accepts them. They
+// assert CH semantics, not the plugin's SQL generation (the unit tests cover
+// generation), so they hand-type the SQL rather than invoking those methods.
 // ---------------------------------------------------------------------------
 
 test.describe('JSON column adhoc filters', () => {

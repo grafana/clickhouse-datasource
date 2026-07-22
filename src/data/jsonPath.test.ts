@@ -20,7 +20,12 @@ describe('escapeJSONPathSegment', () => {
   });
 
   it('escapes backslash before backtick (no double-escaping)', () => {
+    // `a\`b` -> backslash doubled first, then backtick escaped.
     expect(escapeJSONPathSegment('a\\`b')).toBe('a\\\\\\`b');
+  });
+
+  it('leaves single quotes untouched (not special inside a backtick identifier)', () => {
+    expect(escapeJSONPathSegment("a'b")).toBe("a'b");
   });
 });
 
