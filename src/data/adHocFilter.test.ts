@@ -328,6 +328,22 @@ describe('AdHocManager', () => {
       expect(result).toEqual(" key NOT REGEXP \\'val\\' ");
     });
 
+    it('two-layer escapes a backslash in a regex value so the pattern reaches ClickHouse literally', () => {
+      // `=~` rides the scalar value branch; a `\d+` pattern must survive both the
+      // outer additional_table_filters string and the inner literal so the regex
+      // engine receives `\d+`. Verified live: this form matches the same rows as
+      // an inline `REGEXP '\d+'`.
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=~', value: '\\d+' }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k REGEXP \\'\\\\\\\\d+\\' ");
+    });
+
+    it('escapes backslashes in scalar filter values', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: 'a\\b' }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k = \\'a\\\\\\\\b\\' ");
+    });
+
     it('escapes single quotes in filter values so they cannot break out of the filter string', () => {
       const ahm = new AdHocFilter();
       const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: "x'" }] as AdHocVariableFilter[]);
