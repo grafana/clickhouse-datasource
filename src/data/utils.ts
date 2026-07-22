@@ -10,6 +10,7 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { isCollectionColumnType } from 'components/queryBuilder/views/columnNameHeuristics';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
@@ -675,18 +676,6 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   return labelKeys.includes(name);
 };
 
-const isMapLikeType = (t?: string): boolean => {
-  const s = (t || '').trim();
-  return (
-    s.startsWith('Map(') ||
-    s.startsWith('Array(') ||
-    s.startsWith('Tuple(') ||
-    s.startsWith('Nested') ||
-    s.startsWith('Object(') ||
-    s === 'JSON'
-  );
-};
-
 /**
  * Fold the extra top-level scalar columns (the ones the "Default columns" field options add via
  * `includeAllColumns` or `additionalColumns`) into the `labels` field under their PLAIN names, so
@@ -728,7 +717,7 @@ export const foldDiscoveredLogFieldsIntoLabels = (
     // The columns the field options selected are the hint-less, non-collection ones. Role columns
     // (time / body / level / trace id) carry a hint; the attribute maps are collection-typed.
     const discovered = (builderOptions.columns || [])
-      .filter((c) => c.hint === undefined && !isMapLikeType(c.type))
+      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type))
       .map((c) => c.alias || c.name);
     const foldable = discovered.filter((name) =>
       frame.fields.some((f) => f.name === name && f.name !== labelsFieldName)

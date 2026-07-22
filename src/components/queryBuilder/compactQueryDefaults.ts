@@ -14,19 +14,7 @@ import {
   getDefaultTraceFilters,
   getDefaultTraceOrderBy,
 } from './defaultQueryOptions';
-import { isDateTimeColumn } from './views/columnNameHeuristics';
-
-const isCollectionType = (t?: string): boolean => {
-  const s = (t || '').trim();
-  return (
-    s.startsWith('Map(') ||
-    s.startsWith('Array(') ||
-    s.startsWith('Tuple(') ||
-    s.startsWith('Nested') ||
-    s.startsWith('Object(') ||
-    s === 'JSON'
-  );
-};
+import { isCollectionColumnType, isDateTimeColumn } from './views/columnNameHeuristics';
 
 /**
  * Appends the datasource's configured extra log columns so they surface as first-class
@@ -48,7 +36,7 @@ export const appendAdditionalLogColumns = (
     for (const col of allColumns) {
       if (
         includedColumns.has(col.name) ||
-        isCollectionType(col.type) ||
+        isCollectionColumnType(col.type) ||
         col.name.startsWith('__') ||
         isDateTimeColumn(col)
       ) {
