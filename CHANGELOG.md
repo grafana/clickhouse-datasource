@@ -9,7 +9,7 @@
 
 ### Fixes
 
-- Escape single quotes/backslashes in ad-hoc filter values so a value containing `'` can't break out of the `additional_table_filters` clause (#TBD)
+- Escape ad-hoc filter values (including `IN`/`NOT IN` list elements) so a value containing `'` can't break out of the `additional_table_filters` clause (#TBD)
 - Bound the ad-hoc value-suggestion query to a recent time window on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#TBD)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
