@@ -9,8 +9,8 @@
 
 ### Fixes
 
-- Escape ad-hoc filter values (including `IN`/`NOT IN` list elements) so a value containing `'` can't break out of the `additional_table_filters` clause (#TBD)
-- Bound the ad-hoc value-suggestion query to a recent time window on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#TBD)
+- Escape ad-hoc filter values (including `IN`/`NOT IN` list elements) so a value containing `'` can't break out of the `additional_table_filters` clause (#2095)
+- Bound the ad-hoc value-suggestion query to a recent time window on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
 ## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)
