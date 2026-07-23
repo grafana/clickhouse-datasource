@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
+
 ## 4.20.0
 
 ### Features

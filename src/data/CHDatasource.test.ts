@@ -1418,6 +1418,65 @@ describe('ClickHouseDatasource', () => {
             `ORDER BY time ASC`
         );
       });
+
+      it('should apply the log message search using the real column name', () => {
+        jest
+          .spyOn(logs, 'getTimeFieldRoundingClause')
+          .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
+        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [
+              { name: 'created_at', hint: ColumnHint.Time },
+              { name: 'Body', hint: ColumnHint.LogMessage },
+            ],
+            meta: { logMessageLike: 'found' },
+          },
+        });
+        expect(result?.rawSql).toEqual(
+          'SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", count(*) as logs ' +
+            'FROM "default"."logs" ' +
+            "WHERE ( Body LIKE '%found%' ) " +
+            'GROUP BY time ' +
+            'ORDER BY time ASC'
+        );
+        // real column name, not the "body" alias that the volume query never projects
+        expect(result?.rawSql).not.toContain('body LIKE');
+      });
+
+      it('should not apply a message filter when meta.logMessageLike is unset', () => {
+        jest
+          .spyOn(logs, 'getTimeFieldRoundingClause')
+          .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
+        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [
+              { name: 'created_at', hint: ColumnHint.Time },
+              { name: 'Body', hint: ColumnHint.LogMessage },
+            ],
+          },
+        });
+        expect(result?.rawSql).not.toContain('LIKE');
+      });
+
+      it('should not apply a message filter when there is no log message column', () => {
+        jest
+          .spyOn(logs, 'getTimeFieldRoundingClause')
+          .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
+        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'created_at', hint: ColumnHint.Time }],
+            meta: { logMessageLike: 'found' },
+          },
+        });
+        expect(result).toBeDefined();
+        expect(result?.rawSql).not.toContain('LIKE');
+      });
     });
 
     describe('getSupplementaryLogsSampleQuery', () => {
@@ -1522,6 +1581,62 @@ describe('ClickHouseDatasource', () => {
         const result = datasource.getSupplementaryLogsSampleQuery(timeSeriesQuery);
         expect(result).toBeDefined();
         expect((result as CHBuilderQuery).builderOptions.queryType).toBe(QueryType.Logs);
+      });
+
+      it('should apply the log message search using the real column name', () => {
+        const result = datasource.getSupplementaryLogsSampleQuery({
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [
+              { name: 'created_at', hint: ColumnHint.Time },
+              { name: 'level', hint: ColumnHint.LogLevel },
+              { name: 'Body', hint: ColumnHint.LogMessage },
+            ],
+            meta: { logMessageLike: 'found' },
+          },
+        }) as CHBuilderQuery;
+        expect(result).toBeDefined();
+        expect(result.rawSql).toContain("( Body LIKE '%found%' )");
+        // real column name, not the "body" alias
+        expect(result.rawSql).not.toContain('body LIKE');
+        const appended = result.builderOptions.filters?.find((f) => f.key === 'Body');
+        expect(appended).toMatchObject({
+          key: 'Body',
+          operator: FilterOperator.Like,
+          value: 'found',
+          type: 'string',
+          filterType: 'custom',
+          condition: 'AND',
+        });
+      });
+
+      it('should not apply a message filter when meta.logMessageLike is unset', () => {
+        const result = datasource.getSupplementaryLogsSampleQuery({
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [
+              { name: 'created_at', hint: ColumnHint.Time },
+              { name: 'Body', hint: ColumnHint.LogMessage },
+            ],
+          },
+        }) as CHBuilderQuery;
+        expect(result).toBeDefined();
+        expect(result.rawSql).not.toContain('LIKE');
+      });
+
+      it('should not apply a message filter when there is no log message column', () => {
+        const result = datasource.getSupplementaryLogsSampleQuery({
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'created_at', hint: ColumnHint.Time }],
+            meta: { logMessageLike: 'found' },
+          },
+        }) as CHBuilderQuery;
+        expect(result).toBeDefined();
+        expect(result.rawSql).not.toContain('LIKE');
       });
     });
 
