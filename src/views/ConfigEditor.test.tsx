@@ -15,6 +15,9 @@ jest.mock('./config-v2/CHConfigEditor', () => ({
 }));
 
 const setLegacyToggle = (value: boolean | undefined) => {
+  // The source reads featureToggles with optional chaining, so the helper must
+  // not assume the runtime test environment provides the map either.
+  config.featureToggles = config.featureToggles ?? ({} as typeof config.featureToggles);
   (config.featureToggles as Record<string, boolean | undefined>)['newClickhouseConfigPageDesign'] = value;
 };
 

@@ -235,16 +235,8 @@ describe('ConfigEditor', () => {
     // initially open so the query settings render.
     const overrides: Partial<CHConfig> = { dialTimeout: '10', enableMapKeysDiscovery: false };
 
-    const getMapKeysSwitch = (): HTMLInputElement => {
-      const labelText = screen.getByText(allLabels.components.Config.QuerySettingsConfig.enableMapKeysDiscovery.label);
-      // The switch is inside a grafana-ui Field: the input lives in a sibling
-      // of the label element, under the shared field container.
-      const input = labelText.closest('label')?.parentElement?.parentElement?.querySelector('input[type="checkbox"]');
-      if (!(input instanceof HTMLInputElement)) {
-        throw new Error('map keys discovery switch not found');
-      }
-      return input;
-    };
+    const getMapKeysSwitch = (): HTMLElement =>
+      screen.getByTestId(allLabels.components.Config.QuerySettingsConfig.enableMapKeysDiscovery.testid);
 
     it('reflects a stored enableMapKeysDiscovery=false', () => {
       render(<ConfigEditor {...mockConfigEditorProps(overrides)} />);

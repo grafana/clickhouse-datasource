@@ -176,6 +176,7 @@ export default {
         },
         enableMapKeysDiscovery: {
           label: 'Suggest Map keys in filter editor',
+          testid: 'data-testid enable-map-keys-discovery-switch',
           tooltip:
             'When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. ' +
             'On large tables with high-cardinality maps this probe can scan billions of rows. ' +
