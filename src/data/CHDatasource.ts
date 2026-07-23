@@ -393,12 +393,14 @@ export class Datasource
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
       // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
       // For this histogram query the "level" column isn't selected, so we must find the original column name
-      if (f.hint && !f.key) {
-        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
-        f.key = originalColumn?.alias || originalColumn?.name || '';
+      // Clone so resolving the key does not write it back into the user's query filters.
+      const next = { ...f };
+      if (next.hint && !next.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, next.hint);
+        next.key = originalColumn?.alias || originalColumn?.name || '';
       }
 
-      return f;
+      return next;
     });
 
     const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);

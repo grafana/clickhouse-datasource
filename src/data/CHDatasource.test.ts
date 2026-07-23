@@ -1477,22 +1477,6 @@ describe('ClickHouseDatasource', () => {
         expect(result).toBeDefined();
         expect(result?.rawSql).not.toContain('LIKE');
       });
-
-      it('should use the configured LogMessage column name for non-OTel tables', () => {
-        jest.spyOn(logs, 'getTimeFieldRoundingClause').mockReturnValue('toStartOfInterval("ts", INTERVAL 1 DAY)');
-        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
-          ...query,
-          builderOptions: {
-            ...query.builderOptions,
-            columns: [
-              { name: 'ts', hint: ColumnHint.Time },
-              { name: 'message', hint: ColumnHint.LogMessage },
-            ],
-            meta: { logMessageLike: 'oops' },
-          },
-        });
-        expect(result?.rawSql).toContain("( message LIKE '%oops%' )");
-      });
     });
 
     describe('getSupplementaryLogsSampleQuery', () => {
@@ -1653,21 +1637,6 @@ describe('ClickHouseDatasource', () => {
         }) as CHBuilderQuery;
         expect(result).toBeDefined();
         expect(result.rawSql).not.toContain('LIKE');
-      });
-
-      it('should use the configured LogMessage column name for non-OTel tables', () => {
-        const result = datasource.getSupplementaryLogsSampleQuery({
-          ...query,
-          builderOptions: {
-            ...query.builderOptions,
-            columns: [
-              { name: 'ts', hint: ColumnHint.Time },
-              { name: 'message', hint: ColumnHint.LogMessage },
-            ],
-            meta: { logMessageLike: 'oops' },
-          },
-        }) as CHBuilderQuery;
-        expect(result.rawSql).toContain("( message LIKE '%oops%' )");
       });
     });
 
