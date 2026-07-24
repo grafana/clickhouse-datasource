@@ -535,16 +535,17 @@ export class Datasource
       }
 
       const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
+      const hideTableNameInAdhocFilters = Boolean(this.settings.jsonData.hideTableNameInAdhocFilters);
 
       // Check if query contains $__adHocFilters macro
       const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
 
       // Apply $__adHocFilters macro before automatic filter application
-      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON);
+      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON, hideTableNameInAdhocFilters);
 
       // Only apply automatic filters if the macro was not used
       if (!hasMacro) {
-        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
+        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON, hideTableNameInAdhocFilters);
       }
     }
     this.skipAdHocFilter = false;
@@ -626,7 +627,12 @@ export class Datasource
     return rawQuery;
   }
 
-  applyAdHocFiltersMacro(rawQuery: string, filters: AdHocVariableFilter[], useJSON = false): string {
+  applyAdHocFiltersMacro(
+    rawQuery: string,
+    filters: AdHocVariableFilter[],
+    useJSON = false,
+    hideTableNameInAdhocFilters = false
+  ): string {
     if (!rawQuery) {
       return rawQuery;
     }
@@ -648,7 +654,7 @@ export class Datasource
         return match; // Return original if no valid table names found
       }
 
-      const filterStr = this.adHocFilter.buildFilterString(filters, useJSON);
+      const filterStr = this.adHocFilter.buildFilterString(filters, useJSON, hideTableNameInAdhocFilters);
       if (filterStr === '') {
         return 'additional_table_filters={}';
       }

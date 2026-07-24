@@ -324,6 +324,19 @@ describe('AdHocManager', () => {
     expect(val).toEqual(`SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key.key2 = \\'val\\' '}`);
   });
 
+  it('preserves a dotted non-Map column name when table names are hidden', () => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply(
+      'SELECT stuff FROM foo',
+      [{ key: '__otel_materialized_k8s.cluster.name', operator: '=', value: 'val' }] as AdHocVariableFilter[],
+      false,
+      true
+    );
+    expect(val).toEqual(
+      "SELECT stuff FROM foo settings additional_table_filters={'foo' : ' `__otel_materialized_k8s.cluster.name` = \\'val\\' '}"
+    );
+  });
+
   describe('schema-driven Map column detection (#1434)', () => {
     it('rewrites dotted key access for user-registered Map columns (hideTableName)', () => {
       // Mirrors the hideTableNameInAdhocFilters=true path: UI emits `col.key`

@@ -38,7 +38,7 @@ export class AdHocFilter {
     this._mapColumns = merged;
   }
 
-  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false, hideTableNameInAdhocFilters = false): string {
     if (!adHocFilters || adHocFilters.length === 0) {
       return '';
     }
@@ -53,7 +53,7 @@ export class AdHocFilter {
 
     const filters = validFilters
       .map((f, i) => {
-        const key = escapeKey(f.key, useJSON, this._mapColumns);
+        const key = escapeKey(f.key, useJSON, this._mapColumns, hideTableNameInAdhocFilters);
         const value = escapeValueBasedOnOperator(f.value, f.operator);
         const condition = i !== validFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
@@ -69,7 +69,12 @@ export class AdHocFilter {
     return this._mapColumns;
   }
 
-  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  apply(
+    sql: string,
+    adHocFilters: AdHocVariableFilter[],
+    useJSON = false,
+    hideTableNameInAdhocFilters = false
+  ): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
@@ -87,7 +92,7 @@ export class AdHocFilter {
       return sql;
     }
 
-    const filters = this.buildFilterString(adHocFilters, useJSON);
+    const filters = this.buildFilterString(adHocFilters, useJSON, hideTableNameInAdhocFilters);
 
     if (filters === '') {
       return sql;
@@ -111,7 +116,17 @@ function escapeMapKeyForOuterFilter(key: string): string {
   return key.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
 }
 
-function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
+function escapeIdentifierForOuterFilter(identifier: string): string {
+  const escaped = identifier.replace(/\\/g, '\\\\\\\\').replace(/`/g, '\\\\`');
+  return `\`${escaped}\``;
+}
+
+function escapeKey(
+  s: string,
+  isJSON = false,
+  mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS,
+  hideTableNameInAdhocFilters = false
+): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
   if (s.startsWith('arrayElement(') && s.endsWith(')')) {
@@ -149,9 +164,12 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
   }
 
-  // Default: bare column, or `table.col` reference where col isn't a Map.
-  // Strip the leading table prefix if present.
-  return s.includes('.') ? s.split('.').slice(1).join('.') : s;
+  // With visible table names, strip the leading table prefix. With hidden
+  // table names, dots belong to the column name and must be quoted.
+  if (hideTableNameInAdhocFilters && s.includes('.')) {
+    return escapeIdentifierForOuterFilter(s);
+  }
+  return s.includes('.') ? parts.slice(1).join('.') : s;
 }
 
 function escapeValueBasedOnOperator(s: string, operator: string): string {
