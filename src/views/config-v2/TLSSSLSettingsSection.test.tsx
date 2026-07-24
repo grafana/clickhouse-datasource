@@ -1,7 +1,8 @@
+import { fireEvent, render, screen } from '@testing-library/react';
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
 import { TLSSSLSettingsSection } from './TLSSSLSettingsSection';
 import { createTestProps } from './helpers';
+import allLabels from './labelsV2';
 
 describe('TLSSSLSettingsSection', () => {
   const onOptionsChangeMock = jest.fn();
@@ -140,6 +141,6 @@ describe('TLSSSLSettingsSection', () => {
 
     render(<TLSSSLSettingsSection {...props} />);
 
-    expect(screen.getByLabelText(/ca cert/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(allLabels.components.Config.ConfigEditor.tlsCACert.label)).toBeInTheDocument();
   });
 });

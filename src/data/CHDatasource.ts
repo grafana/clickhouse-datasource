@@ -316,6 +316,36 @@ export class Datasource
     return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
   }
 
+  /**
+   * Builds a message search filter from meta.logMessageLike so the supplementary logs volume and
+   * sample queries apply the same message search as the main logs query.
+   *
+   * The filter uses an explicit key with the LogMessage column's real name, not a ColumnHint and
+   * not the "body" alias. A hinted filter only resolves when its column is selected (see the
+   * hint-to-key resolution in the callers), and the volume query does not project the LogMessage
+   * column, so an explicit real-name key is what resolves in both supplementary queries.
+   */
+  private getLogMessageSearchFilter(builderOptions: QueryBuilderOptions): StringFilter | undefined {
+    const logMessageLike = builderOptions.meta?.logMessageLike;
+    if (!logMessageLike) {
+      return undefined;
+    }
+
+    const logMessageColumn = getColumnByHint(builderOptions, ColumnHint.LogMessage);
+    if (!logMessageColumn) {
+      return undefined;
+    }
+
+    return {
+      condition: 'AND',
+      key: logMessageColumn.name,
+      type: 'string',
+      filterType: 'custom',
+      operator: FilterOperator.Like,
+      value: logMessageLike,
+    };
+  }
+
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
     if (
       query.editorType !== EditorType.Builder ||
@@ -367,13 +397,20 @@ export class Datasource
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
       // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
       // For this histogram query the "level" column isn't selected, so we must find the original column name
-      if (f.hint && !f.key) {
-        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
-        f.key = originalColumn?.alias || originalColumn?.name || '';
+      // Clone so resolving the key does not write it back into the user's query filters.
+      const next = { ...f };
+      if (next.hint && !next.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, next.hint);
+        next.key = originalColumn?.alias || originalColumn?.name || '';
       }
 
-      return f;
+      return next;
     });
+
+    const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);
+    if (messageFilter) {
+      filters.push(messageFilter);
+    }
 
     const logVolumeSqlBuilderOptions: QueryBuilderOptions = {
       database: query.builderOptions.database,
@@ -421,6 +458,11 @@ export class Datasource
       }
       return { ...f };
     });
+
+    const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);
+    if (messageFilter) {
+      filters.push(messageFilter);
+    }
 
     const defaultColumns = Array.from(this.getDefaultLogsColumns(), ([hint, name]) => ({ hint, name }));
 

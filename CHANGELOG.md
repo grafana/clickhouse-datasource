@@ -6,6 +6,10 @@
 
 - Add logs data source options to show table columns as fields: **Include all columns** (a toggle) and **Additional columns** (a list). The selected columns appear in the Fields list, the log row details (under a **Fields** group next to the attribute groups), and the field filters, without editing each query (#2086)
 
+### Fixes
+
+- Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
+
 ## 4.20.0
 
 ### Features

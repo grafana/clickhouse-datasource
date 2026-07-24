@@ -418,3 +418,54 @@ func TestInterpolateBackslashEscapedStringLiterals(t *testing.T) {
 		})
 	}
 }
+
+// TestInterpolateBacktickAndDollarQuotedRegions guards against macropro's
+// comment-stripping pass mis-lexing ClickHouse backtick-quoted identifiers
+// and dollar-quoted string literals. Without BacktickQuote, an apostrophe
+// inside `it's` opens a phantom string region that swallows the rest of the
+// query, and comment-like sequences inside backticks are stripped. Without
+// DollarQuote, a -- inside $tag$…$tag$ is treated as a line comment. Either
+// way the emitted SQL is silently corrupted and trailing macros are dropped.
+func TestInterpolateBacktickAndDollarQuotedRegions(t *testing.T) {
+	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.123Z")
+	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.456Z")
+
+	type test struct {
+		name   string
+		input  string
+		output string
+	}
+
+	tests := []test{
+		{
+			name:   "backtick identifier with apostrophe keeps later literal and macro intact",
+			input:  "SELECT `it's` AS x, msg FROM t WHERE msg = 'a--b' AND $__timeFilter(ts)",
+			output: "SELECT `it's` AS x, msg FROM t WHERE msg = 'a--b' AND ts >= toDateTime(1415792726) AND ts <= toDateTime(1447328726)",
+		},
+		{
+			name:   "backtick identifier containing -- and /* survives verbatim",
+			input:  "SELECT `a--b`, `c/*d` FROM t WHERE $__fromTime",
+			output: "SELECT `a--b`, `c/*d` FROM t WHERE toDateTime(1415792726)",
+		},
+		{
+			name:   "dollar-quoted string containing -- survives with macro expanded",
+			input:  "SELECT $doc$a--b$doc$ AS x FROM t WHERE $__toTime",
+			output: "SELECT $doc$a--b$doc$ AS x FROM t WHERE toDateTime(1447328726)",
+		},
+	}
+
+	for i, tc := range tests {
+		t.Run(fmt.Sprintf("[%d/%d] %s", i+1, len(tests), tc.name), func(t *testing.T) {
+			query := &sqlutil.Query{
+				RawSQL: tc.input,
+				TimeRange: backend.TimeRange{
+					From: from,
+					To:   to,
+				},
+			}
+			interpolatedQuery, err := Interpolate(tc.input, query)
+			require.Nil(t, err)
+			assert.Equal(t, tc.output, interpolatedQuery)
+		})
+	}
+}
