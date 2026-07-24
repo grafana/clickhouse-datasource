@@ -339,7 +339,9 @@ describe('useDefaultTraceColumnsByName', () => {
   it('fills every role slot from conventional column names', () => {
     const builderOptionsDispatch = jest.fn();
 
-    renderHook(() => useDefaultTraceColumnsByName(traceTableColumns, 'traces', {}, false, builderOptionsDispatch));
+    renderHook(() =>
+      useDefaultTraceColumnsByName(traceTableColumns, 'traces', true, {}, false, builderOptionsDispatch)
+    );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(7);
     const expected: Array<[ColumnHint, string, string]> = [
@@ -363,7 +365,14 @@ describe('useDefaultTraceColumnsByName', () => {
     const userTraceId: SelectedColumn = { name: 'myTraceId', type: 'String', hint: ColumnHint.TraceId };
 
     renderHook(() =>
-      useDefaultTraceColumnsByName(traceTableColumns, 'traces', { traceId: userTraceId }, false, builderOptionsDispatch)
+      useDefaultTraceColumnsByName(
+        traceTableColumns,
+        'traces',
+        true,
+        { traceId: userTraceId },
+        false,
+        builderOptionsDispatch
+      )
     );
 
     // 7 slots minus the already-filled TraceId = 6 dispatches.
@@ -376,20 +385,43 @@ describe('useDefaultTraceColumnsByName', () => {
 
   it('does nothing when OTel mode is enabled', () => {
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useDefaultTraceColumnsByName(traceTableColumns, 'traces', {}, true, builderOptionsDispatch));
+    renderHook(() =>
+      useDefaultTraceColumnsByName(traceTableColumns, 'traces', true, {}, true, builderOptionsDispatch)
+    );
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
 
   it('does nothing when allColumns is empty', () => {
     const builderOptionsDispatch = jest.fn();
-    renderHook(() => useDefaultTraceColumnsByName([], 'traces', {}, false, builderOptionsDispatch));
+    renderHook(() => useDefaultTraceColumnsByName([], 'traces', true, {}, false, builderOptionsDispatch));
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('does not fill empty slots on mount for a saved query', () => {
+    const builderOptionsDispatch = jest.fn();
+    // Conventional names are present, but the saved query has its slots
+    // deliberately cleared. Opening the editor must not re-add them.
+    renderHook(() =>
+      useDefaultTraceColumnsByName(traceTableColumns, 'traces', false, {}, false, builderOptionsDispatch)
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('fills empty slots when the table changes on a saved query', () => {
+    const builderOptionsDispatch = jest.fn();
+    const hook = renderHook(
+      (table) => useDefaultTraceColumnsByName(traceTableColumns, table, false, {}, false, builderOptionsDispatch),
+      { initialProps: 'traces' }
+    );
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+    hook.rerender('other_traces');
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(7);
   });
 
   it('re-runs when the table changes', () => {
     const builderOptionsDispatch = jest.fn();
     const hook = renderHook(
-      (table) => useDefaultTraceColumnsByName(traceTableColumns, table, {}, false, builderOptionsDispatch),
+      (table) => useDefaultTraceColumnsByName(traceTableColumns, table, true, {}, false, builderOptionsDispatch),
       { initialProps: 'traces' }
     );
     const first = builderOptionsDispatch.mock.calls.length;
@@ -402,7 +434,7 @@ describe('useDefaultTraceColumnsByName', () => {
     // `duration` here is a String — heuristic must skip it, leaving the slot empty.
     const cols: readonly TableColumn[] = [{ name: 'duration', type: 'String', picklistValues: [] }];
 
-    renderHook(() => useDefaultTraceColumnsByName(cols, 'traces', {}, false, builderOptionsDispatch));
+    renderHook(() => useDefaultTraceColumnsByName(cols, 'traces', true, {}, false, builderOptionsDispatch));
 
     const durationDispatch = builderOptionsDispatch.mock.calls.find(
       ([action]) => action?.payload?.column?.hint === ColumnHint.TraceDurationTime

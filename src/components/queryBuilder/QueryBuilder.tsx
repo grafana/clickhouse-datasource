@@ -30,7 +30,13 @@ import TraceIdInput from './TraceIdInput';
 import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
-import { buildCompactQueryDefaults, isDefaultOrMismatchedCompactQuery } from './compactQueryDefaults';
+import {
+  buildCompactQueryDefaults,
+  isCompactQueryTypeMismatch,
+  shouldBuildCompactQueryDefaults,
+} from './compactQueryDefaults';
+import { useDefaultLogColumnsByName } from './views/logsQueryBuilderHooks';
+import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
@@ -70,18 +76,27 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   }
 
   if (singleTableMode && signalType) {
-    return (
-      <CompactQueryEditor
-        datasource={datasource}
-        builderOptions={builderOptions}
-        builderOptionsDispatch={builderOptionsDispatch}
-        generatedSql={generatedSql}
-        signalType={signalType}
-        onQueryChange={onQueryChange}
-        onEditAsSql={onEditAsSql}
-        onRunQuery={onRunQuery}
-      />
-    );
+    // An authored query whose type does not match the datasource signal falls through to
+    // the classic builder, so switching a datasource to single-table mode never silently
+    // replaces the saved options of pre-existing queries.
+    const preserveAuthoredQuery =
+      isCompactQueryTypeMismatch(builderOptions, signalType) &&
+      !shouldBuildCompactQueryDefaults(builderOptions, signalType);
+
+    if (!preserveAuthoredQuery) {
+      return (
+        <CompactQueryEditor
+          datasource={datasource}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          generatedSql={generatedSql}
+          signalType={signalType}
+          onQueryChange={onQueryChange}
+          onEditAsSql={onEditAsSql}
+          onRunQuery={onRunQuery}
+        />
+      );
+    }
   }
 
   return (
@@ -168,10 +183,22 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     onEditAsSql,
     onRunQuery,
   } = props;
-  const needsInitialization = isDefaultOrMismatchedCompactQuery(builderOptions, signalType);
+  // Defaults are built in two passes: database and table never depend on the
+  // table's columns, so a build without column names locates the table for the
+  // columns fetch, and the fetched column names then feed the OTel logs schema
+  // detection inside buildCompactQueryDefaults. Treating a query that still
+  // equals the base defaults as needing initialization lets that detection
+  // correct the defaults once the columns arrive, without clobbering edits:
+  // authored queries differ from the generated defaults and are never replaced.
+  const baseDefaults = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+  const needsInitialization =
+    shouldBuildCompactQueryDefaults(builderOptions, signalType) || isEqual(builderOptions, baseDefaults);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const lastInitializationKey = useRef<string>();
   const onQueryChangeRef = useRef(onQueryChange);
+  const locationOptions = needsInitialization ? baseDefaults : builderOptions;
+  const allColumns = useColumns(datasource, locationOptions.database, locationOptions.table);
+  const tableColumnNames = useMemo(() => allColumns.map((column) => column.name), [allColumns]);
 
   useEffect(() => {
     onQueryChangeRef.current = onQueryChange;
@@ -182,24 +209,41 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
       return;
     }
 
-    const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}`;
+    const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}:${tableColumnNames.length > 0}`;
     if (lastInitializationKey.current === initializationKey) {
       return;
     }
     lastInitializationKey.current = initializationKey;
 
-    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table, tableColumnNames);
     if (!isEqual(builderOptions, nextOptions)) {
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
     }
-  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType]);
+  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType, tableColumnNames]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table)
+    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, tableColumnNames)
     : builderOptions;
-  const allColumns = useColumns(datasource, activeOptions.database, activeOptions.table);
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
+
+  // Compact defaults take columns from datasource config only, so a non-OTel
+  // table without a configured Message column would leave the search box inert
+  // (generateLogsQuery drops meta.logMessageLike unless a column carries the
+  // LogMessage hint). Reuse the classic builder's conventional-name heuristic
+  // to fill the empty Message and Level slots once table columns are fetched.
+  // Configured columns already carry the hint, so they are never overridden.
+  // A query whose defaults are still being built is the compact equivalent of
+  // a new query: saved compact queries keep deliberately cleared slots.
+  useDefaultLogColumnsByName(
+    signalType === 'logs' ? allColumns : [],
+    activeOptions.table,
+    needsInitialization,
+    getColumnByHint(activeOptions, ColumnHint.LogMessage),
+    getColumnByHint(activeOptions, ColumnHint.LogLevel),
+    activeOptions.meta?.otelEnabled || false,
+    builderOptionsDispatch
+  );
 
   const onActiveOptionsChange = (nextOptions: QueryBuilderOptions, shouldRunQuery = false) => {
     builderOptionsDispatch(setAllOptions(nextOptions));
