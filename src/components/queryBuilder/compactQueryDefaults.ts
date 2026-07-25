@@ -19,14 +19,10 @@ import {
 import { isCollectionColumnType, isDateTimeColumn } from './views/columnNameHeuristics';
 
 /**
- * Appends the datasource's configured extra log columns so they surface as first-class
- * fields. Two modes (both default off, so existing datasources are unaffected):
- *   - includeAllColumns: every detected top-level scalar column (skips the attribute maps,
- *     `__`-prefixed materialized/plumbing columns, DateTime columns, and anything already
- *     selected). Needs the table schema, so `allColumns` must be populated.
- *   - additionalColumns: an explicit list; needs no schema, so it is always a single query.
- * Mutates `columns` / `includedColumns` in place. Reuses the same shape as the
- * Show-context column append, but is independent of that feature.
+ * Appends the datasource's configured extra log columns so they surface as first-class fields
+ * (both modes default off): `includeAllColumns` adds every detected top-level scalar column and
+ * needs the table schema; `additionalColumns` adds an explicit list and needs none. Mutates
+ * `columns` / `includedColumns` in place.
  */
 export const appendAdditionalLogColumns = (
   datasource: Datasource,
@@ -176,7 +172,12 @@ const getLogsDefaultColumnMap = (
 };
 
 const getLogsDefaultColumns = (datasource: Datasource, allColumns: readonly TableColumn[]): SelectedColumn[] => {
-  const nextColumns = getDefaultColumns(getLogsDefaultColumnMap(datasource, allColumns.map((column) => column.name)));
+  const nextColumns = getDefaultColumns(
+    getLogsDefaultColumnMap(
+      datasource,
+      allColumns.map((column) => column.name)
+    )
+  );
   const includedColumns = new Set(nextColumns.map((c) => c.name));
 
   if (datasource.shouldSelectLogContextColumns()) {

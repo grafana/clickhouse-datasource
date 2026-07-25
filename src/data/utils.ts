@@ -677,21 +677,12 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
 };
 
 /**
- * Fold the extra top-level scalar columns (the ones the "Default columns" field options add via
- * `includeAllColumns` or `additionalColumns`) into the `labels` field under their PLAIN names, so
- * they surface as flat, first-class log fields: in the Fields sidebar, in the log-row details
- * flyout under a "Fields" group (next to the grouped Resource/Log attributes, each with the
- * filter-for / filter-out buttons), and in the field filters.
- *
- * The OTel attribute maps keep their prefixed, grouped rendering; the backend already flattens them
- * into `labels` with a `ResourceAttributes.` / `LogAttributes.` prefix, and getLabelDisplayTypeFromFrame
- * buckets those prefixes into their named sections. Folded columns keep their real column names (no
- * alias) so a "Filter for value" click resolves against the real column in BOTH the main query and
- * the separate logs-volume query (an alias would only exist in the main query's projection and break
- * the volume query). Folded columns are removed as standalone frame fields so they do not also render as raw
- * table columns. The `labels` field is created when the frame has none (a non-OTel table with no
- * attribute maps). Frames that share the query's columns but carry none of them (the logs-volume
- * frame) are skipped, so no empty `labels` field is added to the volume series.
+ * Folds the extra top-level scalar columns added by the "Default columns" options
+ * (`includeAllColumns` / `additionalColumns`) into the `labels` field under their plain names, so
+ * they surface as flat, filterable fields alongside the grouped OTel attributes, and removes them
+ * as standalone frame fields. Real column names (not aliases) are used so a filter-for click
+ * resolves in both the main query and the logs-volume query. Creates `labels` when the frame has
+ * none (non-OTel tables), and skips the logs-volume frame so no empty `labels` series is added.
  */
 export const foldDiscoveredLogFieldsIntoLabels = (
   datasource: Datasource,
