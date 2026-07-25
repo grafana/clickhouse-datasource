@@ -194,8 +194,12 @@ export const useDefaultTimeColumn = (
  * Fills the Message and Log Level role slots from common non-OTel column names
  * (message, body, log_message; level, severity, severity_text, ...) when:
  *   - OTel mode is off (OTel has its own detection path),
- *   - the current table has changed since last run, and
+ *   - the query is new, or the current table has changed since last run, and
  *   - the role slot is still empty (never overwrites explicit user picks).
+ *
+ * Saved queries never auto-fill on mount: a deliberately cleared slot must
+ * stay cleared, otherwise opening the panel editor would silently mutate the
+ * saved query model.
  *
  * The Time role is handled separately by `useDefaultTimeColumn` so the two
  * stay independently testable and the Time fallback behavior is preserved.
@@ -203,13 +207,14 @@ export const useDefaultTimeColumn = (
 export const useDefaultLogColumnsByName = (
   allColumns: readonly TableColumn[],
   table: string,
+  isNewQuery: boolean,
   messageColumn: SelectedColumn | undefined,
   logLevelColumn: SelectedColumn | undefined,
   otelEnabled: boolean,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const lastTable = useRef<string>(table || '');
-  const didRun = useRef<boolean>(false);
+  const didRun = useRef<boolean>(!isNewQuery);
   if (table !== lastTable.current) {
     didRun.current = false;
   }

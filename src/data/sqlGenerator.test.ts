@@ -1402,6 +1402,27 @@ describe('getFilters', () => {
     expect(sql).toEqual("( ResourceAttributes.`service`.`name`::Nullable(String) LIKE '%my-service%' )");
   });
 
+  it('routes a compact popover JSON filter through the JSON accessor, not bare LIKE', () => {
+    // The compact filter popover keeps the real column type, which may carry
+    // parameters on newer schemas (e.g. JSON(max_dynamic_paths=100)).
+    const options = {
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'LogAttributes',
+          mapKey: 'service.name',
+          operator: FilterOperator.Like,
+          type: 'JSON(max_dynamic_paths=100)',
+          value: 'grafana',
+        },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getFilters(options);
+    expect(sql).toEqual("( LogAttributes.`service`.`name`::Nullable(String) LIKE '%grafana%' )");
+    expect(sql).not.toContain('LogAttributes LIKE');
+  });
+
   it('generates IS NULL clause for JSON mapKey filter', () => {
     const options = {
       filters: [
