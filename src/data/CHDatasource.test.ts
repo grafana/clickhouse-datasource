@@ -207,6 +207,7 @@ describe('ClickHouseDatasource', () => {
       // Create datasource instance with our mocked ad-hoc filter
       const ds = createInstance({});
       ds.adHocFilter = adHocFilter;
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
 
       // Resolve variables
       const result = ds.applyTemplateVariables(query, {}, adHocFilters);
@@ -216,7 +217,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -268,7 +269,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true, false);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -303,17 +304,19 @@ describe('ClickHouseDatasource', () => {
         editorType: EditorType.SQL,
       } as CHQuery;
 
-      const adHocFilters = [{ key: 'key', operator: '=', value: 'val' }];
+      const adHocFilters = [{ key: '__otel_materialized_k8s.cluster.name', operator: '=', value: 'val' }];
 
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
       const spyOnGetVars = jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
 
-      const result = createInstance({}).applyTemplateVariables(query, {}, adHocFilters);
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const result = ds.applyTemplateVariables(query, {}, adHocFilters);
 
       expect(spyOnReplace).toHaveBeenCalled();
       expect(spyOnGetVars).toHaveBeenCalled();
       expect(result.rawSql).toEqual(
-        "SELECT * FROM complex_table settings additional_table_filters={'my_table': ' key = \\'val\\' '}"
+        "SELECT * FROM complex_table settings additional_table_filters={'my_table': ' `__otel_materialized_k8s.cluster.name` = \\'val\\' '}"
       );
     });
 
