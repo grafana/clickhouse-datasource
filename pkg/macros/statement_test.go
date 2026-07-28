@@ -86,6 +86,21 @@ func TestExpandStatementMacrosColumns(t *testing.T) {
 			input: "$__columns(EventTime, ServiceName, count() AS c) from requests where ServiceName != '' limit 10",
 			want:  "SELECT $__timeInterval(EventTime) AS t, toString(ServiceName) AS metric, count() AS c from requests WHERE $__timeFilter(EventTime) AND (ServiceName != '') GROUP BY t, metric ORDER BY t, metric limit 10",
 		},
+		{
+			name:  "backtick identifier containing a comma is one argument",
+			input: "$__columns(timestamp, `service,name`, count()) FROM events",
+			want:  "SELECT $__timeInterval(timestamp) AS t, toString(`service,name`) AS metric, count() AS value FROM events WHERE $__timeFilter(timestamp) GROUP BY t, metric ORDER BY t, metric",
+		},
+		{
+			name:  "keyword inside a backtick identifier is not a clause boundary",
+			input: "$__columns(ts, svc, count()) FROM `weird where table` WHERE x = 1",
+			want:  "SELECT $__timeInterval(ts) AS t, toString(svc) AS metric, count() AS value FROM `weird where table` WHERE $__timeFilter(ts) AND (x = 1) GROUP BY t, metric ORDER BY t, metric",
+		},
+		{
+			name:  "AS inside a backtick identifier is not an alias",
+			input: "$__columns(ts, `a AS b`, count()) FROM events",
+			want:  "SELECT $__timeInterval(ts) AS t, toString(`a AS b`) AS metric, count() AS value FROM events WHERE $__timeFilter(ts) GROUP BY t, metric ORDER BY t, metric",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -224,11 +239,19 @@ func TestExpandStatementMacrosLTTB(t *testing.T) {
 				"WHERE $__timeFilter(EventTime)) ORDER BY EventTime",
 		},
 		{
-			name:  "aliased expressions keep the alias inside the lttb call",
+			name:  "GROUP BY pre-aggregates in a subquery so lttb never nests aggregates",
+			input: "$__lttb(5, ts, avg(value)) FROM events GROUP BY ts",
+			want: "SELECT point.1 AS ts, point.2 AS y FROM " +
+				"(SELECT arrayJoin(lttb(5)(ts, y)) AS point FROM " +
+				"(SELECT ts, avg(value) AS y FROM events WHERE $__timeFilter(ts) GROUP BY ts ORDER BY ts)) ORDER BY ts",
+		},
+		{
+			name:  "aliases steer the pre-aggregated columns",
 			input: "$__lttb(500, EventTime, avg(Latency) AS l) FROM latencies GROUP BY EventTime",
 			want: "SELECT point.1 AS EventTime, point.2 AS l FROM " +
-				"(SELECT arrayJoin(lttb(500)(EventTime, avg(Latency) AS l)) AS point FROM latencies " +
-				"WHERE $__timeFilter(EventTime) GROUP BY EventTime) ORDER BY EventTime",
+				"(SELECT arrayJoin(lttb(500)(EventTime, l)) AS point FROM " +
+				"(SELECT EventTime, avg(Latency) AS l FROM latencies " +
+				"WHERE $__timeFilter(EventTime) GROUP BY EventTime ORDER BY EventTime)) ORDER BY EventTime",
 		},
 		{
 			name:  "non-identifier expressions fall back to x and y aliases",
@@ -343,6 +366,24 @@ func TestInterpolateStatementMacros(t *testing.T) {
 	want := "SELECT toStartOfInterval(toDateTime(EventTime), INTERVAL 20 second) AS t, " +
 		"toString(ServiceName) AS metric, count() AS c FROM requests " +
 		"WHERE EventTime >= toDateTime(1415792726) AND EventTime <= toDateTime(1447328726) " +
+		"GROUP BY t, metric ORDER BY t, metric"
+	assert.Equal(t, want, got)
+}
+
+// TestInterpolateBacktickIdentifierWithCommentMarker verifies that comment
+// markers inside backtick-quoted identifiers survive the whole pipeline:
+// without BacktickQuote in the comment style, StripComments would blank the
+// identifier from the -- onwards.
+func TestInterpolateBacktickIdentifierWithCommentMarker(t *testing.T) {
+	input := "$__columns(ts, `svc--name`, count()) FROM events"
+	q := stmtQuery(input)
+
+	got, err := Interpolate(input, q)
+	require.NoError(t, err)
+
+	want := "SELECT toStartOfInterval(toDateTime(ts), INTERVAL 20 second) AS t, " +
+		"toString(`svc--name`) AS metric, count() AS value FROM events " +
+		"WHERE ts >= toDateTime(1415792726) AND ts <= toDateTime(1447328726) " +
 		"GROUP BY t, metric ORDER BY t, metric"
 	assert.Equal(t, want, got)
 }

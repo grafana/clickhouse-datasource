@@ -120,7 +120,7 @@ func findStatementMacro(work string) (*stmtMatch, error) {
 	depth := 0
 	for i := 0; i < len(work); {
 		switch c := work[i]; c {
-		case '\'', '"':
+		case '\'', '"', '`':
 			i = scanQuoted(work, i)
 		case '(':
 			depth++
@@ -169,10 +169,12 @@ func findStatementMacro(work string) (*stmtMatch, error) {
 	return found, nil
 }
 
-// scanQuoted advances past the string literal opening at pos and returns the
-// index after the closing quote. Both the doubled-quote escape and ClickHouse
-// backslash escapes are handled, mirroring the BackslashEscape flag set in
-// clickHouseComments. An unterminated literal consumes the rest of the input.
+// scanQuoted advances past the quoted region opening at pos and returns the
+// index after the closing quote. It handles single-quoted string literals,
+// double-quoted identifiers, and backtick-quoted identifiers, which ClickHouse
+// all closes with the same rules: a doubled quote character or a backslash
+// escape continues the region (verified against ClickHouse for all three
+// quote characters). An unterminated region consumes the rest of the input.
 func scanQuoted(s string, pos int) int {
 	quote := s[pos]
 	for i := pos + 1; i < len(s); {
@@ -198,7 +200,7 @@ func matchParen(s string, open int) (int, error) {
 	depth := 0
 	for i := open; i < len(s); {
 		switch s[i] {
-		case '\'', '"':
+		case '\'', '"', '`':
 			i = scanQuoted(s, i)
 			continue
 		case '(':
@@ -225,7 +227,7 @@ func splitStatementArgs(raw string) ([]string, error) {
 	depth, start := 0, 0
 	for i := 0; i < len(raw); {
 		switch raw[i] {
-		case '\'', '"':
+		case '\'', '"', '`':
 			i = scanQuoted(raw, i)
 			continue
 		case '(':
@@ -300,7 +302,7 @@ func parseTailClauses(macro, tail string) (tailClauses, error) {
 	depth := 0
 	for i := 0; i < len(tail); {
 		switch c := tail[i]; c {
-		case '\'', '"':
+		case '\'', '"', '`':
 			i = scanQuoted(tail, i)
 		case '(':
 			depth++
@@ -424,7 +426,7 @@ func splitAlias(arg string) (expr, alias string) {
 	depth := 0
 	for i := 0; i < len(arg); {
 		switch arg[i] {
-		case '\'', '"':
+		case '\'', '"', '`':
 			i = scanQuoted(arg, i)
 		case '(':
 			depth++
@@ -547,28 +549,20 @@ func buildIncreaseColumns(_ *sqlutil.Query, args []string, tail string) (string,
 }
 
 // buildLTTB expands $__lttb(buckets, x, y) using ClickHouse's native lttb
-// aggregate. The x and y arguments are spliced verbatim into the aggregate
-// call so that any user aliases stay valid, and the alias only steers the
-// outer column names.
+// aggregate. Without a GROUP BY the x and y arguments are spliced verbatim
+// into the aggregate call. With a GROUP BY the aggregation runs in a
+// subquery and lttb consumes its aliased output columns, because lttb is
+// itself an aggregate and ClickHouse rejects nested aggregation such as
+// lttb(...)(ts, avg(value)) with ILLEGAL_AGGREGATION.
 func buildLTTB(q *sqlutil.Query, args []string, tail string) (string, error) {
 	buckets, err := lttbBuckets(args[0], q)
 	if err != nil {
 		return "", err
 	}
 	xExpr, xAlias := splitAlias(args[1])
-	if xAlias == "" {
-		xAlias = "x"
-		if bareIdentRe.MatchString(xExpr) {
-			xAlias = xExpr
-		}
-	}
-	_, yAlias := splitAlias(args[2])
-	if yAlias == "" {
-		yAlias = "y"
-		if bareIdentRe.MatchString(args[2]) {
-			yAlias = args[2]
-		}
-	}
+	xAlias = lttbAlias(xExpr, xAlias, "x")
+	yExpr, yAlias := splitAlias(args[2])
+	yAlias = lttbAlias(yExpr, yAlias, "y")
 
 	tc, err := parseTailClauses("$__lttb", tail)
 	if err != nil {
@@ -579,18 +573,65 @@ func buildLTTB(q *sqlutil.Query, args []string, tail string) (string, error) {
 		where += fmt.Sprintf(" AND (%s)", tc.where)
 	}
 
+	lttbX, lttbY := args[1], args[2]
+	from := tc.from
+	if tc.groupBy != "" {
+		// GROUP BY output order is unspecified and lttb buckets by input
+		// order, so the aggregated rows are sorted by x unless the user
+		// ordered them explicitly.
+		orderBy := tc.orderBy
+		if orderBy == "" {
+			orderBy = fmt.Sprintf("ORDER BY %s", xAlias)
+		}
+		aggregated := []string{
+			fmt.Sprintf("SELECT %s, %s", lttbSelectColumn(xExpr, xAlias), lttbSelectColumn(yExpr, yAlias)),
+			tc.from,
+			where,
+			tc.groupBy,
+		}
+		for _, clause := range []string{tc.having, orderBy, tc.limit, tc.settings} {
+			if clause != "" {
+				aggregated = append(aggregated, clause)
+			}
+		}
+		return fmt.Sprintf("SELECT point.1 AS %s, point.2 AS %s FROM (SELECT arrayJoin(lttb(%s)(%s, %s)) AS point FROM (%s)) ORDER BY %s",
+			xAlias, yAlias, buckets, xAlias, yAlias, strings.Join(aggregated, " "), xAlias), nil
+	}
+
 	inner := []string{
-		fmt.Sprintf("SELECT arrayJoin(lttb(%s)(%s, %s)) AS point", buckets, args[1], args[2]),
-		tc.from,
+		fmt.Sprintf("SELECT arrayJoin(lttb(%s)(%s, %s)) AS point", buckets, lttbX, lttbY),
+		from,
 		where,
 	}
-	for _, clause := range []string{tc.groupBy, tc.having, tc.orderBy, tc.limit, tc.settings} {
+	for _, clause := range []string{tc.having, tc.orderBy, tc.limit, tc.settings} {
 		if clause != "" {
 			inner = append(inner, clause)
 		}
 	}
 	return fmt.Sprintf("SELECT point.1 AS %s, point.2 AS %s FROM (%s) ORDER BY %s",
 		xAlias, yAlias, strings.Join(inner, " "), xAlias), nil
+}
+
+// lttbAlias picks the outer column name for an lttb coordinate: the user's
+// alias when given, the column itself when the expression is a bare
+// identifier, and the fallback otherwise.
+func lttbAlias(expr, alias, fallback string) string {
+	if alias != "" {
+		return alias
+	}
+	if bareIdentRe.MatchString(expr) {
+		return expr
+	}
+	return fallback
+}
+
+// lttbSelectColumn renders one coordinate of the pre-aggregation subquery.
+// A bare column whose alias is itself needs no AS clause.
+func lttbSelectColumn(expr, alias string) string {
+	if expr == alias {
+		return expr
+	}
+	return fmt.Sprintf("%s AS %s", expr, alias)
 }
 
 // lttbBuckets validates the buckets argument. The auto keyword derives the

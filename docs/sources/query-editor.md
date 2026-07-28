@@ -321,7 +321,7 @@ $__perSecondColumns(EventTime, ServiceName, RequestsTotal) FROM requests WHERE S
 Usage notes:
 
 - The key column is converted to a string and defaults to the alias `metric`. Provide your own alias with `AS`, for example `ServiceName AS service`. The value column defaults to the alias `value`.
-- A `WHERE` clause in the query is combined with the generated time filter. `HAVING`, `ORDER BY`, `LIMIT`, and `SETTINGS` clauses are kept. The `*Columns` macros generate their own `GROUP BY`, so the query must not contain one. `$__lttb` passes a `GROUP BY` through to the inner query.
+- A `WHERE` clause in the query is combined with the generated time filter. `HAVING`, `ORDER BY`, `LIMIT`, and `SETTINGS` clauses are kept. The `*Columns` macros generate their own `GROUP BY`, so the query must not contain one. `$__lttb` runs a `GROUP BY` in a subquery so the rows are aggregated before they are downsampled, which allows an aggregate `y` expression such as `avg(value)`.
 - The first point of each series, and any point where a counter resets, is returned as `nan`.
 - Only one statement macro can be used per query, and it must be at the top level of the statement rather than inside a subquery. Text before the macro, such as a `WITH` clause, is preserved.
 
