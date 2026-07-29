@@ -87,7 +87,7 @@
       {
         "current": {},
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
-        "definition": "",
+        "definition": "SELECT database FROM system.tables WHERE name IN ('otel_logs', 'otel_traces') GROUP BY database HAVING count(DISTINCT name) = 2 ORDER BY database",
         "hide": 0,
         "includeAll": false,
         "label": "Database",
@@ -412,7 +412,7 @@
                 "value": [
                   {
                     "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
                   }
                 ]
               }
@@ -686,7 +686,7 @@
                 "value": [
                   {
                     "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
                   }
                 ]
               }
@@ -771,7 +771,7 @@
                 "value": [
                   {
                     "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
                   }
                 ]
               }
@@ -1086,7 +1086,7 @@
                     "value": [
                       {
                         "title": "View traces for ${__value.raw}",
-                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
                       }
                     ]
                   }
@@ -1373,7 +1373,7 @@
                     "value": [
                       {
                         "title": "View traces for ${__value.raw}",
-                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}"
+                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
                       }
                     ]
                   }
