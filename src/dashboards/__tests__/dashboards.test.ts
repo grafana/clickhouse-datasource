@@ -162,10 +162,10 @@ describe('OTel dashboards', () => {
       // On UI import Grafana substitutes the input token into current.value, so the datasource
       // the user picks in the import prompt becomes the variable's selection.
       const dashboard = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as {
-        __inputs?: Array<{ name?: string }>;
+        __inputs?: Array<{ name?: string; type?: string }>;
         templating?: { list?: Array<{ type?: string; current?: { value?: string } }> };
       };
-      const inputName = dashboard.__inputs?.[0]?.name;
+      const inputName = dashboard.__inputs?.find((i) => i.type === 'datasource')?.name;
       const dsVar = dashboard.templating?.list?.find((v) => v.type === 'datasource');
       expect(dsVar?.current?.value).toBe(`\${${inputName}}`);
     });
