@@ -80,7 +80,7 @@
       {
         "current": {},
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
-        "definition": "",
+        "definition": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_traces' ORDER BY database",
         "hide": 0,
         "includeAll": false,
         "label": "Database",

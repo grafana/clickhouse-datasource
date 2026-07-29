@@ -122,6 +122,9 @@ describe('OTel dashboards', () => {
       const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
       // No bare (unqualified) references to the otel tables should remain.
       expect(content).not.toMatch(/(?:FROM|JOIN)\s+otel_(?:logs|traces)\b/);
+      // ...and qualification must actually have happened: at least one table
+      // reference is prefixed with the ${database} variable.
+      expect(content).toMatch(/(?:FROM|JOIN)\s+\$\{database\}\.otel_(?:logs|traces)\b/);
     });
   });
 });
