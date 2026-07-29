@@ -144,6 +144,8 @@
         "name": "interval",
         "options": [
           { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": false, "text": "10s", "value": "10s" },
+          { "selected": false, "text": "30s", "value": "30s" },
           { "selected": false, "text": "1m", "value": "1m" },
           { "selected": false, "text": "5m", "value": "5m" },
           { "selected": false, "text": "10m", "value": "10m" },
@@ -153,7 +155,7 @@
           { "selected": false, "text": "12h", "value": "12h" },
           { "selected": false, "text": "1d", "value": "1d" }
         ],
-        "query": "1m,5m,10m,30m,1h,6h,12h,1d",
+        "query": "10s,30s,1m,5m,10m,30m,1h,6h,12h,1d",
         "refresh": 2,
         "type": "interval"
       },
@@ -488,7 +490,7 @@
                 "value": [
                   {
                     "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}&var-interval=${interval}"
                   }
                 ]
               }
@@ -765,7 +767,7 @@
                 "value": [
                   {
                     "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}&var-interval=${interval}"
                   }
                 ]
               }
@@ -850,7 +852,7 @@
                 "value": [
                   {
                     "title": "View traces for ${__value.raw}",
-                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
+                    "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}&var-interval=${interval}"
                   }
                 ]
               }
@@ -1168,7 +1170,7 @@
                     "value": [
                       {
                         "title": "View traces for ${__value.raw}",
-                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
+                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}&var-interval=${interval}"
                       }
                     ]
                   }
@@ -1458,7 +1460,7 @@
                     "value": [
                       {
                         "title": "View traces for ${__value.raw}",
-                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}"
+                        "url": "/d/otel-traces-explorer?var-service=${service}&var-operation=${__value.raw}&${__url_time_range}&var-datasource=${datasource}&var-database=${database}&var-interval=${interval}"
                       }
                     ]
                   }
