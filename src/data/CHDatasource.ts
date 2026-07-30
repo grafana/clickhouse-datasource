@@ -28,7 +28,7 @@ import {
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { trackClickhouseHealthCheckFailed } from 'tracking';
 import LogsContextPanel from 'components/LogsContextPanel';
-import { cloneDeep, isEmpty, isString } from 'lodash';
+import { cloneDeep, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
@@ -1752,12 +1752,6 @@ export class Datasource
     const tagSource = this.getTagSource();
     this.skipAdHocFilter = true;
 
-    if (tagSource.source === undefined) {
-      const rawSql = 'SELECT name, type, table FROM system.columns';
-      const results = await this.runQuery({ rawSql });
-      return { type: TagType.schema, frame: results };
-    }
-
     if (tagSource.type === TagType.query) {
       // Check if the query contains the $__adhoc_column macro
       if (tagSource.source.includes('$__adhoc_column')) {
@@ -1802,12 +1796,10 @@ export class Datasource
   private getTagSource() {
     // @todo https://github.com/grafana/grafana/issues/13109
     const ADHOC_VAR = '$clickhouse_adhoc_query';
-    const defaultDatabase = this.getDefaultDatabase();
     let source = getTemplateSrv().replace(ADHOC_VAR);
-    if (source === ADHOC_VAR && isEmpty(defaultDatabase)) {
-      return { type: TagType.schema, source: undefined };
+    if (source === ADHOC_VAR) {
+      source = this.getDefaultDatabase();
     }
-    source = source === ADHOC_VAR ? defaultDatabase! : source;
     if (source.toLowerCase().startsWith('select')) {
       return { type: TagType.query, source };
     }

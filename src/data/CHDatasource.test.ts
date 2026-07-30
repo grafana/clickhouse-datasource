@@ -460,16 +460,16 @@ describe('ClickHouseDatasource', () => {
   });
 
   describe('Tag Keys', () => {
-    it('should Fetch Default Tags When No Second AdHoc Variable', async () => {
+    it('should Fetch Tags From The Literal Default Database When None Is Configured', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
       const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
       const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
-      jest.spyOn(ds, 'getDefaultDatabase').mockImplementation(() => undefined!); // Disable default DB
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
 
       const keys = await ds.getTagKeys();
       expect(spyOnReplace).toHaveBeenCalled();
-      const expected = { rawSql: 'SELECT name, type, table FROM system.columns' };
+      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('default')" };
 
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
