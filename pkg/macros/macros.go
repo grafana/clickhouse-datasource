@@ -234,8 +234,18 @@ const clickHouseComments = macropro.LineComment | macropro.BlockComment | macrop
 
 // Interpolate expands all $__ macros in rawSQL using macropro's parsing engine.
 // Unknown macros are left unchanged; a handler error returns the original query and the error.
+//
+// Statement macros ($__columns, $__rateColumns, $__perSecondColumns,
+// $__increaseColumns, $__lttb) expand first, because they rewrite the whole
+// statement rather than a single token. Their output contains ordinary
+// $__timeInterval and $__timeFilter calls, which the macropro pass below then
+// expands like any other macro.
 func Interpolate(rawSQL string, q *sqlutil.Query) (string, error) {
-	return macropro.Interpolate(rawSQL, ClickHouseMacros, contextFrom(q), macropro.WithComments(clickHouseComments))
+	sql, err := expandStatementMacros(rawSQL, q)
+	if err != nil {
+		return rawSQL, err
+	}
+	return macropro.Interpolate(sql, ClickHouseMacros, contextFrom(q), macropro.WithComments(clickHouseComments))
 }
 
 // RemoveQuotesInArgs removes all quotes from macro arguments.

@@ -93,6 +93,41 @@ export const pluginMacros: PluginMacro[] = [
     example: 'condition or 1=1',
   },
   {
+    name: '$__columns',
+    isFunction: true,
+    documentation:
+      'Statement macro producing one series per key value. Replaces the query from the macro to the end: buckets the time column with $__timeInterval, applies the panel time filter, and groups by bucket and key. Write it in place of SELECT, followed by the FROM clause',
+    example: "$__columns(EventTime, ServiceName, count() AS c) FROM requests WHERE ServiceName != ''",
+  },
+  {
+    name: '$__rateColumns',
+    isFunction: true,
+    documentation:
+      'Statement macro like $__columns, but divides the aggregated value by the seconds since the previous bucket of the same series, for per-second smoothing of gauges',
+    example: '$__rateColumns(EventTime, ServiceName, sum(Requests)) FROM requests',
+  },
+  {
+    name: '$__perSecondColumns',
+    isFunction: true,
+    documentation:
+      'Statement macro for monotonic counters: per-second rate of max(value) per series, like the Prometheus rate() function. Counter resets and first points are emitted as nan',
+    example: '$__perSecondColumns(EventTime, ServiceName, RequestsTotal) FROM requests',
+  },
+  {
+    name: '$__increaseColumns',
+    isFunction: true,
+    documentation:
+      'Statement macro for monotonic counters: raw delta of max(value) per bucket and series, like the Prometheus increase() function. Counter resets and first points are emitted as nan',
+    example: '$__increaseColumns(EventTime, ServiceName, RequestsTotal) FROM requests',
+  },
+  {
+    name: '$__lttb',
+    isFunction: true,
+    documentation:
+      "Statement macro that downsamples dense series with ClickHouse's lttb() aggregate (Largest-Triangle-Three-Buckets). Takes a bucket count or 'auto' to derive one from the panel time range and interval",
+    example: '$__lttb(auto, EventTime, Latency) FROM requests',
+  },
+  {
     name: '$__adHocFilters',
     isFunction: true,
     documentation:
