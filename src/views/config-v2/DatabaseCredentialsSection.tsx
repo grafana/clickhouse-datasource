@@ -29,16 +29,18 @@ export const DatabaseCredentialsSection = (props: Props) => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (!validation) {
-      return;
-    }
+    // Always clear the error eagerly when the user fills in the field,
+    // regardless of whether the ValidationAPI is available.
     if (jsonData.username) {
       setFieldErrors((prev) => {
         const next = { ...prev };
         delete next.username;
         return next;
       });
-      validation.clearError('username');
+      validation?.clearError('username');
+    }
+    if (!validation) {
+      return;
     }
     return validation.registerValidation(() => {
       const errors: Record<string, string> = {};
