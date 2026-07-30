@@ -413,9 +413,12 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           false) ||
         (!fetchedLiveSchema && !typeKnown && Boolean(originalQuery.builderOptions.meta?.tagsAreJSON));
 
+      // Validate the companion table the generated SQL will reference: the
+      // query's baked suffix wins over the current datasource config suffix.
       const hasTraceTimestampTable = await datasource.hasTraceTimestampTable(
         originalQuery.builderOptions.database || '',
-        originalQuery.builderOptions.table || ''
+        originalQuery.builderOptions.table || '',
+        originalQuery.builderOptions.meta?.traceTimestampTableSuffix
       );
 
       traceIdQuery.builderOptions = {

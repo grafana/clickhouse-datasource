@@ -281,10 +281,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     const traceIdValue = options.meta!.traceId;
     const suffix = options.meta?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
     const timestampTable = getTableIdentifier(database, table + suffix);
+    // The WITH aliases are prefixed so they cannot collide with physical columns
+    // on the main traces table. A bare `trace_id` alias shadows a physical
+    // `trace_id` column, turning `WHERE traceID = trace_id` into a tautology
+    // that returns every span in the time window.
     queryParts.push('WITH');
-    queryParts.push(`'${traceIdValue}' as trace_id,`);
-    queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
-    queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = trace_id) as trace_end`);
+    queryParts.push(`'${traceIdValue}' as __gf_trace_id,`);
+    queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = __gf_trace_id) as __gf_trace_start,`);
+    queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = __gf_trace_id) as __gf_trace_end`);
   }
 
   queryParts.push('SELECT');
@@ -299,11 +303,11 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (applyTraceIdOptimization) {
-    queryParts.push('traceID = trace_id');
+    queryParts.push('traceID = __gf_trace_id');
     queryParts.push('AND');
-    queryParts.push(`${escapeIdentifier(traceStartTime.name)} >= trace_start`);
+    queryParts.push(`${escapeIdentifier(traceStartTime.name)} >= __gf_trace_start`);
     queryParts.push('AND');
-    queryParts.push(`${escapeIdentifier(traceStartTime.name)} <= trace_end`);
+    queryParts.push(`${escapeIdentifier(traceStartTime.name)} <= __gf_trace_end`);
   } else if (hasTraceIdFilter) {
     const traceId = options.meta!.traceId;
     queryParts.push(`traceID = '${traceId}'`);
