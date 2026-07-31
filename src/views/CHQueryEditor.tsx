@@ -3,7 +3,7 @@ import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
-import { Button, ConfirmModal, InlineFieldRow, Stack } from '@grafana/ui';
+import { Button, ConfirmModal, ErrorBoundaryAlert, InlineFieldRow, Stack } from '@grafana/ui';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -38,9 +38,19 @@ const removeSpanLinkQueryField = (query: CHQuery): CHQuery => {
 };
 
 /**
- * Top level query editor component
+ * Top level query editor component.
+ * Wrapped in an error boundary so a crash while rendering the editor surfaces
+ * an alert instead of breaking the panel edit view (#1931).
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
+  return (
+    <ErrorBoundaryAlert title="ClickHouse query editor failed to load" style="alertbox">
+      <CHQueryEditorContent {...props} />
+    </ErrorBoundaryAlert>
+  );
+};
+
+const CHQueryEditorContent = (props: CHQueryEditorProps) => {
   const { datasource, query: savedQuery, onChange, onRunQuery } = props;
   // Fold a span-link injected trace id into the builder options before rendering, so the
   // editor shows the linked trace and the first propagated change keeps targeting it once
