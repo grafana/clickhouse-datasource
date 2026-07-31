@@ -2,6 +2,7 @@ import {
   arrayToDataFrame,
   CoreApp,
   DataQueryRequest,
+  LoadingState,
   SupplementaryQueryType,
   TimeRange,
   toDataFrame,
@@ -11,7 +12,7 @@ import { DataSourceWithBackend } from '@grafana/runtime';
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { of } from 'rxjs';
+import { lastValueFrom, of, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
@@ -1412,6 +1413,51 @@ describe('ClickHouseDatasource', () => {
         ],
         timezone: 'UTC',
       });
+    });
+
+    // Regression guards for #1931: a crash during frontend response
+    // processing must produce a visible error response, not an unshaped
+    // throw that leaves the panel spinning forever.
+    it('emits an error response when response transformation throws', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      // A frame with no `fields` makes the trace/log link transforms throw,
+      // same crash class as the TypeError fixed by #1920.
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [{ refId: '1' }] } as any));
+
+      const response = await lastValueFrom(
+        instance.query({
+          targets: [{ refId: '1' }] as DataQuery[],
+          timezone: 'UTC',
+        } as any)
+      );
+
+      expect(response.state).toBe(LoadingState.Error);
+      expect(response.data).toEqual([]);
+      expect(response.errors?.[0]?.message).toBeTruthy();
+      consoleSpy.mockRestore();
+    });
+
+    it('emits an error response when the backend query observable errors', async () => {
+      const instance = cloneDeep(mockDatasource);
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => throwError(() => ({ data: { message: 'connection refused' } })));
+
+      const response = await lastValueFrom(
+        instance.query({
+          targets: [{ refId: '1' }] as DataQuery[],
+          timezone: 'UTC',
+        } as any)
+      );
+
+      expect(response.state).toBe(LoadingState.Error);
+      expect(response.data).toEqual([]);
+      expect(response.errors?.[0]?.message).toBe('connection refused');
+      consoleSpy.mockRestore();
     });
   });
 
