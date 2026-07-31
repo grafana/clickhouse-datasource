@@ -300,6 +300,31 @@ WHERE $__timeFilter(date_time)
 
 You can also use brace notation `{}` when the macro parameter must contain a query or other expression.
 
+### Statement macros
+
+Statement macros expand to a complete query rather than a single expression. Write the macro in place of the `SELECT` clause, followed by the rest of the query. Everything from the macro to the end of the query is replaced with a generated statement that applies the panel time filter, buckets timestamps with `$__timeInterval()`, and returns one series per key value.
+
+| Macro                                         | Description                                                                                                                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$__columns(timeColumn, key, value)`          | One series per `key` value, with `value` aggregated per time bucket.                                                                                                                          |
+| `$__rateColumns(timeColumn, key, value)`      | Like `$__columns`, but divides the aggregated value by the number of seconds since the previous bucket of the same series. Use it to smooth gauge-style values into per-second rates.         |
+| `$__perSecondColumns(timeColumn, key, value)` | Per-second rate of a monotonic counter per series, like the Prometheus `rate()` function. `value` is aggregated with `max()`.                                                                 |
+| `$__increaseColumns(timeColumn, key, value)`  | Raw increase of a monotonic counter per bucket and series, like the Prometheus `increase()` function. `value` is aggregated with `max()`.                                                     |
+| `$__lttb(buckets, x, y)`                      | Downsamples dense series with ClickHouse's `lttb()` aggregate function (Largest-Triangle-Three-Buckets). Pass a bucket count, or `auto` to derive one from the panel time range and interval. |
+
+For example, the following query charts the per-second request rate of every service:
+
+```sql
+$__perSecondColumns(EventTime, ServiceName, RequestsTotal) FROM requests WHERE ServiceName != ''
+```
+
+Usage notes:
+
+- The key column is converted to a string and defaults to the alias `metric`. Provide your own alias with `AS`, for example `ServiceName AS service`. The value column defaults to the alias `value`.
+- A `WHERE` clause in the query is combined with the generated time filter. `HAVING`, `ORDER BY`, `LIMIT`, and `SETTINGS` clauses are kept. The `*Columns` macros generate their own `GROUP BY`, so the query must not contain one. `$__lttb` runs a `GROUP BY` in a subquery so the rows are aggregated before they are downsampled, which allows an aggregate `y` expression such as `avg(value)`.
+- The first point of each series, and any point where a counter resets, is returned as `nan`.
+- Only one statement macro can be used per query, and it must be at the top level of the statement rather than inside a subquery. Text before the macro, such as a `WITH` clause, is preserved.
+
 ## Next steps
 
 - [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Use variables in dashboards and queries.

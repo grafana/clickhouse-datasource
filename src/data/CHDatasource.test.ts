@@ -495,6 +495,105 @@ describe('ClickHouseDatasource', () => {
       expect(keys).toEqual([{ text: 'table.foo' }]);
     });
 
+    it('coerces an unset default database to the literal default on a classic datasource', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('default')" };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('should Fetch Tags From the single-table logs source when no default database is set', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'otel_logs' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+      ds.settings.jsonData.logs = { defaultDatabase: 'otel', defaultTable: 'otel_logs' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      const keys = await ds.getTagKeys();
+      const expected = {
+        rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('otel') AND table = 'otel_logs'",
+      };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+
+      expect(keys).toEqual([{ text: 'otel_logs.foo' }]);
+    });
+
+    it('should Fetch Tags From the single-table traces source when no default database is set', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'otel_traces' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'traces';
+      ds.settings.jsonData.traces = { defaultDatabase: 'otel', defaultTable: 'otel_traces' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = {
+        rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('otel') AND table = 'otel_traces'",
+      };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('coerces an unset single-table logs database to the literal default', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'otel_logs' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      ds.settings.jsonData.defaultTable = undefined;
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+      ds.settings.jsonData.logs = { defaultTable: 'otel_logs' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = {
+        rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('default') AND table = 'otel_logs'",
+      };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
+    it('prefers an explicit default database over the single-table source', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => '$clickhouse_adhoc_query');
+      const frame = arrayToDataFrame([{ name: 'foo', type: 'string', table: 'table' }]);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'foo';
+      ds.settings.jsonData.configMode = 'single-table';
+      ds.settings.jsonData.signalType = 'logs';
+      ds.settings.jsonData.logs = { defaultDatabase: 'otel', defaultTable: 'otel_logs' };
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+
+      await ds.getTagKeys();
+      const expected = { rawSql: "SELECT name, type, table FROM system.columns WHERE database IN ('foo')" };
+
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+      );
+    });
+
     it('should Fetch Tags From Query', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from foo');
       const frame = arrayToDataFrame([{ name: 'foo' }]);
@@ -721,18 +820,39 @@ describe('ClickHouseDatasource', () => {
       const mapKeysFrame = arrayToDataFrame([{ keys: 'http.method' }, { keys: 'http.status' }]);
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         return of({ data: [columnsFrame] });
       });
 
       const keys = await ds.getTagKeys();
+      // Bracket form is self-describing: applying the saved filter must not
+      // depend on the Map-column caches populated by this method (#2043).
       expect(keys).toEqual([
         { text: 'events.level' },
-        { text: 'events.labels.http.method' },
-        { text: 'events.labels.http.status' },
+        { text: "events.labels['http.method']" },
+        { text: "events.labels['http.status']" },
       ]);
+    });
+
+    it('mints bracketed keys with the map key escaped as a ClickHouse string literal', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([{ name: 'labels', type: 'Map(String, String)', table: 'events' }]);
+      const mapKeysFrame = arrayToDataFrame([{ keys: "weird'key" }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
+          return of({ data: [mapKeysFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toEqual([{ text: "events.labels['weird\\'key']" }]);
     });
 
     it('falls back to a flat Map column entry when no table context is available', async () => {
@@ -758,7 +878,7 @@ describe('ClickHouseDatasource', () => {
 
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['http.method']")) {
@@ -769,6 +889,30 @@ describe('ClickHouseDatasource', () => {
 
       await ds.getTagKeys(); // populates the mapColumnsByTable cache
       const values = await ds.getTagValues({ key: 'events.labels.http.method' });
+      expect(values).toEqual([{ text: 'GET' }, { text: 'POST' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: "select distinct labels['http.method'] from db.events limit 1000",
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('fetches values for a bracketed Map key without a prior getTagKeys call', async () => {
+      // Round-trip of a key minted by getTagKeys: the bracketed form must
+      // produce the same values SELECT with no stored state, i.e. on a
+      // fresh dashboard load where the Map-column caches are still empty
+      // (#2043).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const valuesFrame = arrayToDataFrame([{ val: 'GET' }, { val: 'POST' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [valuesFrame] }));
+
+      const values = await ds.getTagValues({ key: "events.labels['http.method']" });
       expect(values).toEqual([{ text: 'GET' }, { text: 'POST' }]);
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -802,7 +946,7 @@ describe('ClickHouseDatasource', () => {
 
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['region']")) {
@@ -829,7 +973,7 @@ describe('ClickHouseDatasource', () => {
 
       const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('arrayJoin("labels".keys)')) {
+        if (sql.includes('arrayJoin(mapKeys("labels"))')) {
           return of({ data: [mapKeysFrame] });
         }
         if (sql.includes("labels['weird\\'key']")) {
@@ -863,7 +1007,7 @@ describe('ClickHouseDatasource', () => {
       const mapKeysFrame = arrayToDataFrame([{ keys: 'a' }]);
       jest.spyOn(ds, 'query').mockImplementation((request) => {
         const sql = request.targets[0].rawSql ?? '';
-        if (sql.includes('.keys)')) {
+        if (sql.includes('mapKeys(')) {
           return of({ data: [mapKeysFrame] });
         }
         return of({ data: [columnsFrame] });
@@ -893,8 +1037,35 @@ describe('ClickHouseDatasource', () => {
       expect(result).toEqual(['a', 'b']);
       const sql = spy.mock.calls[0][0].targets[0].rawSql!;
       expect(sql).toBe(
-        'SELECT DISTINCT arrayJoin("labels".keys) as keys FROM (SELECT "labels" FROM "db"."events" LIMIT 100000) LIMIT 1000'
+        'SELECT DISTINCT arrayJoin(mapKeys("labels")) as keys FROM (SELECT "labels" FROM "db"."events" LIMIT 100000) LIMIT 1000'
       );
+    });
+
+    it('uses the mapKeys() function rather than the .keys sub-column so the old analyzer can resolve it', async () => {
+      // ClickHouse's old analyzer (the default before 24.3, or with
+      // allow_experimental_analyzer=0) cannot resolve `.keys` sub-columns on
+      // subquery results and fails with UNKNOWN_IDENTIFIER (code 47). Every
+      // call site swallows the error, so Map-key ad-hoc filters silently
+      // vanish on 22.7-24.2 unless the probe uses the mapKeys() function.
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const frame = arrayToDataFrame([{ keys: 'a' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      // Subquery-sampled path (free-form table) and time-bounded path (OTel
+      // logs table) must both avoid the sub-column syntax.
+      await ds.fetchUniqueMapKeys('labels', 'db', 'events');
+      await ds.fetchUniqueMapKeys('LogAttributes', 'otel', 'otel_logs');
+      for (const call of spy.mock.calls) {
+        const sql = call[0].targets[0].rawSql!;
+        expect(sql).not.toContain('.keys');
+        expect(sql).toContain('arrayJoin(mapKeys(');
+      }
     });
 
     it('bounds the probe to the configured logs time column when target matches OTel logs table', async () => {
@@ -2630,6 +2801,30 @@ describe('ClickHouseDatasource', () => {
 
       await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(true);
     });
+
+    it('prefers an explicit suffix argument over the configured one', async () => {
+      // A saved query can bake a meta.traceTimestampTableSuffix that differs
+      // from the current datasource config. The check must probe the companion
+      // the generated SQL will reference (the query's suffix), and the two
+      // suffixes must not share a cache entry.
+      const ds = cloneDeep(mockDatasource);
+      ds.settings = {
+        ...ds.settings,
+        jsonData: {
+          ...ds.settings.jsonData,
+          traces: { ...(ds.settings.jsonData.traces || {}), traceTimestampTableSuffix: '_idx_ts' },
+        },
+      };
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['traces', 'traces_saved_ts']);
+      const columnsSpy = jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
+
+      await expect(ds.hasTraceTimestampTable('default', 'traces', '_saved_ts')).resolves.toBe(true);
+      expect(columnsSpy).toHaveBeenCalledWith('default', 'traces_saved_ts');
+
+      // The config-suffix companion does not exist, and the cached result for
+      // the explicit suffix must not leak into this separate check.
+      await expect(ds.hasTraceTimestampTable('default', 'traces')).resolves.toBe(false);
+    });
   });
 
   describe('peekTraceTimestampTable', () => {
@@ -2683,6 +2878,17 @@ describe('ClickHouseDatasource', () => {
       expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
 
       nowSpy.mockRestore();
+    });
+
+    it('keys cached results by the resolved suffix', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'fetchTables').mockResolvedValue(['otel_traces', 'otel_traces_saved_ts']);
+      jest.spyOn(ds, 'fetchColumns').mockResolvedValue(timestampColumns());
+
+      await ds.hasTraceTimestampTable('otel', 'otel_traces', '_saved_ts');
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces', '_saved_ts')).toBe(true);
+      // The config-suffix check has not run, so it must still read as unknown.
+      expect(ds.peekTraceTimestampTable('otel', 'otel_traces')).toBeUndefined();
     });
   });
 

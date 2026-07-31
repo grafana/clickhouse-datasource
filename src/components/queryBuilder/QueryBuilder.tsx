@@ -226,7 +226,15 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
     }
-  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType, tableColumnNames, allColumns]);
+  }, [
+    builderOptions,
+    builderOptionsDispatch,
+    datasource,
+    needsInitialization,
+    signalType,
+    tableColumnNames,
+    allColumns,
+  ]);
 
   const activeOptions = needsInitialization
     ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns)

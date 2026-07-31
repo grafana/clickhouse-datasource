@@ -400,4 +400,64 @@ describe('AdHocManager', () => {
       expect(val).toContain("labels[\\'a\\\\\\\\b\\']");
     });
   });
+
+  describe('self-describing bracketed Map keys (#2043)', () => {
+    it('renders a bracketed key without any setMapColumns call (table-prefixed)', () => {
+      // Saved filters must apply on a fresh dashboard load, before
+      // getTagKeys has run, because the key itself carries the Map access.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "events.metadata['region']", operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+
+    it('renders a bracketed key without any setMapColumns call (hideTableName)', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "metadata['region']", operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+
+    it('renders a bracketed key whose map key contains dots', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "events.labels['http.method']", operator: '=', value: 'GET' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("labels[\\'http.method\\'] = \\'GET\\'");
+    });
+
+    it('re-escapes quotes from the minted string-literal body for the outer filter string', () => {
+      // getTagKeys mints `labels['weird\'key']` for the raw map key
+      // `weird'key`. The outer additional_table_filters embedding needs the
+      // same two-layer escape as the legacy dotted form.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "events.labels['weird\\'key']", operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("labels[\\'weird\\\\\\'key\\']");
+    });
+
+    it('renders a bracketed key as dot access when useJSON is set', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply(
+        'SELECT * FROM events',
+        [{ key: "events.metadata['region']", operator: '=', value: 'eu' }] as AdHocVariableFilter[],
+        true
+      );
+      expect(val).toContain("metadata.region = \\'eu\\'");
+    });
+
+    it('legacy dotted keys still render via the registered Map-column set', () => {
+      // Already-saved dashboards persist the dotted form; it must keep
+      // working when getTagKeys has populated the column set.
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['metadata']));
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: 'events.metadata.region', operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+  });
 });

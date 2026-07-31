@@ -28,7 +28,7 @@ import {
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { trackClickhouseHealthCheckFailed } from 'tracking';
 import LogsContextPanel from 'components/LogsContextPanel';
-import { cloneDeep, isEmpty, isString } from 'lodash';
+import { cloneDeep, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
 import { concatMap, firstValueFrom, Observable } from 'rxjs';
@@ -229,8 +229,9 @@ export class Datasource
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
   private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
   // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
-  // companion, keyed by `${database}.${table}`. Caching the Promise dedupes concurrent
-  // callers and lets cache hits resolve in a microtask. Entries expire after
+  // companion, keyed by the qualified companion table name (`${database}.${table}${suffix}`)
+  // so checks against different suffixes never share a result. Caching the Promise dedupes
+  // concurrent callers and lets cache hits resolve in a microtask. Entries expire after
   // TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS so a companion table created after the datasource
   // loaded is detected without a page reload.
   private traceTimestampTableCache = new Map<
@@ -573,7 +574,9 @@ export class Datasource
       return query;
     }
 
-    const meta = query.builderOptions.meta;
+    // Hand-provisioned models can carry editorType 'builder' without builderOptions,
+    // and the query editor now calls this on every render, so guard the access.
+    const meta = query.builderOptions?.meta;
     if (!meta?.isTraceIdMode) {
       return query;
     }
@@ -1055,16 +1058,22 @@ export class Datasource
    * with trace_id/start_time/end_time) would produce an UNKNOWN_IDENTIFIER error,
    * so it is rejected here and the query falls back to the plain filter.
    *
+   * The companion name is resolved from the per-query `suffix` when one is
+   * given (saved queries bake it into `meta.traceTimestampTableSuffix`) so the
+   * probe targets the same table the SQL generator will reference; without it
+   * the datasource config suffix applies.
+   *
    * Caches the Promise so concurrent and repeat callers share a single
    * round-trip; on failure, evicts so the next caller retries and meanwhile
    * returns `false` (the safe, unoptimized path).
    */
-  async hasTraceTimestampTable(database: string, table: string): Promise<boolean> {
+  async hasTraceTimestampTable(database: string, table: string, suffix?: string): Promise<boolean> {
     if (!database || !table) {
       return false;
     }
 
-    const key = `${database}.${table}`;
+    const companionTable = table + (suffix || this.getTraceTimestampTableSuffix());
+    const key = `${database}.${companionTable}`;
     const now = Date.now();
 
     let entry = this.traceTimestampTableCache.get(key);
@@ -1072,7 +1081,6 @@ export class Datasource
     if (!entry || entry.expiresAt <= now) {
       const pending = (async () => {
         try {
-          const companionTable = table + this.getTraceTimestampTableSuffix();
           const tables = await this.fetchTables(database);
           if (!tables.includes(companionTable)) {
             return false;
@@ -1106,11 +1114,12 @@ export class Datasource
    * Lets the React hook seed its initial state from a warm cache and skip a
    * false→true render that would briefly clobber a known-good meta value.
    */
-  peekTraceTimestampTable(database: string, table: string): boolean | undefined {
+  peekTraceTimestampTable(database: string, table: string, suffix?: string): boolean | undefined {
     if (!database || !table) {
       return undefined;
     }
-    const entry = this.traceTimestampTableCache.get(`${database}.${table}`);
+    const companionTable = table + (suffix || this.getTraceTimestampTableSuffix());
+    const entry = this.traceTimestampTableCache.get(`${database}.${companionTable}`);
     if (!entry || entry.expiresAt <= Date.now()) {
       return undefined;
     }
@@ -1210,7 +1219,10 @@ export class Datasource
     const source = timeColumn
       ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
       : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
-    const rawSql = `SELECT DISTINCT arrayJoin(${escapedColumn}.keys) as keys FROM ${source} LIMIT 1000`;
+    // mapKeys() rather than the `.keys` sub-column: ClickHouse's old analyzer
+    // (the default before 24.3) cannot resolve sub-columns on subquery results
+    // and fails with UNKNOWN_IDENTIFIER, silently breaking key discovery.
+    const rawSql = `SELECT DISTINCT arrayJoin(mapKeys(${escapedColumn})) as keys FROM ${source} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1586,7 +1598,10 @@ export class Datasource
 
     // Replace each top-level Map-column entry with one entry per discovered
     // map key. If probing returned nothing (empty set, stripped by the
-    // filter), keep the original entry as a no-op fallback.
+    // filter), keep the original entry as a no-op fallback. Keys are minted
+    // in explicit bracket form (`col['key']`) so that filter application is
+    // stateless: a saved filter must render correct SQL on fresh dashboard
+    // load, before this method has run and populated the Map-column caches.
     const expandedKeyByCol = new Map<string, string[]>();
     for (const p of probed) {
       if (p.keys.length > 0) {
@@ -1608,10 +1623,32 @@ export class Datasource
         return;
       }
       for (const k of mapKeys) {
-        expanded.push({ text: `${baseText}.${k}` });
+        expanded.push({ text: `${baseText}['${escapeCHStringLiteral(k)}']` });
       }
     });
     return expanded;
+  }
+
+  /**
+   * Default source for ad-hoc filter key/value discovery, used when the
+   * dashboard does not define `$clickhouse_adhoc_query`. Returns a bare
+   * database name or `db.table`. Single-table mode (#1832) hides the classic
+   * Default database field in the config editor, so when that field is unset
+   * the source is derived from the configured signal's database and table
+   * (mirroring buildCompactQueryDefaults) rather than the literal 'default'
+   * database that getDefaultDatabase coerces to.
+   */
+  private getDefaultAdhocSource(): string | undefined {
+    if (!this.settings.jsonData.defaultDatabase && this.isSingleTableMode()) {
+      const isTraces = this.getSignalType() === 'traces';
+      const signalDb = isTraces ? this.getDefaultTraceDatabase() : this.getDefaultLogsDatabase();
+      const signalTable = isTraces ? this.getDefaultTraceTable() : this.getDefaultLogsTable();
+      const table = signalTable || this.getDefaultTable();
+      if (table) {
+        return `${signalDb || this.getDefaultDatabase()}.${table}`;
+      }
+    }
+    return this.getDefaultDatabase();
   }
 
   /**
@@ -1621,10 +1658,10 @@ export class Datasource
    */
   private resolveAdhocDatabase(_frame: DataFrame): string | undefined {
     const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
-    const defaultDatabase = this.getDefaultDatabase();
-    const raw = source === '$clickhouse_adhoc_query' ? defaultDatabase : source;
+    const defaultSource = this.getDefaultAdhocSource();
+    const raw = source === '$clickhouse_adhoc_query' ? defaultSource : source;
     if (!raw || raw.toLowerCase().startsWith('select')) {
-      return defaultDatabase;
+      return defaultSource?.split('.')[0];
     }
     return raw.includes('.') ? raw.split('.')[0] : raw;
   }
@@ -1637,7 +1674,7 @@ export class Datasource
    */
   private resolveAdhocSingleTable(): string | undefined {
     const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
-    const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultDatabase() : source;
+    const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultAdhocSource() : source;
     if (!raw || raw.toLowerCase().startsWith('select')) {
       return undefined;
     }
@@ -1685,7 +1722,9 @@ export class Datasource
     // distinct Map values rather than stringified Map objects (which the
     // Grafana frame layer renders as `[object Object]`). The map key is
     // escaped for CH string-literal embedding so that keys containing `'`
-    // or `\` produce valid SQL.
+    // or `\` produce valid SQL. Keys minted by getTagKeys arrive already in
+    // bracket form (`mapCol['key']`, literal body pre-escaped) and pass
+    // through unchanged as valid bracket access.
     const mapAccess = this.asMapAccess(col, source);
     const selectExpr = mapAccess ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']` : col;
 
@@ -1809,12 +1848,14 @@ export class Datasource
   private getTagSource() {
     // @todo https://github.com/grafana/grafana/issues/13109
     const ADHOC_VAR = '$clickhouse_adhoc_query';
-    const defaultDatabase = this.getDefaultDatabase();
     let source = getTemplateSrv().replace(ADHOC_VAR);
-    if (source === ADHOC_VAR && isEmpty(defaultDatabase)) {
-      return { type: TagType.schema, source: undefined };
+    if (source === ADHOC_VAR) {
+      const defaultSource = this.getDefaultAdhocSource();
+      if (!defaultSource) {
+        return { type: TagType.schema, source: undefined };
+      }
+      source = defaultSource;
     }
-    source = source === ADHOC_VAR ? defaultDatabase! : source;
     if (source.toLowerCase().startsWith('select')) {
       return { type: TagType.query, source };
     }

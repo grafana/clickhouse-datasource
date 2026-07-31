@@ -131,6 +131,7 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
       <Field label={labels.enableMapKeysDiscovery.label} description={labels.enableMapKeysDiscovery.tooltip}>
         <Switch
           value={enableMapKeysDiscovery ?? true}
+          data-testid={labels.enableMapKeysDiscovery.testid}
           onChange={onEnableMapKeysDiscoveryChange}
           role="checkbox"
         />
