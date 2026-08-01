@@ -328,10 +328,10 @@ func TestMutateQueryData(t *testing.T) {
 	h := &Clickhouse{}
 
 	tests := []struct {
-		name   string
+		name    string
 		headers map[string]string
-		want   grafanaHeaders
-		stored bool
+		want    grafanaHeaders
+		stored  bool
 	}{
 		{
 			name: "all headers",
@@ -587,4 +587,75 @@ func TestMissingTableMacroIsDownstream(t *testing.T) {
 	got := resp.Responses["A"]
 	require.Error(t, got.Error)
 	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
+}
+
+func TestConnectionAddresses(t *testing.T) {
+	tests := []struct {
+		name     string
+		settings Settings
+		expected []string
+	}{
+		{
+			name:     "single host falls back to Host/Port",
+			settings: Settings{Host: "localhost", Port: 9000},
+			expected: []string{"localhost:9000"},
+		},
+		{
+			name: "hosts share the top-level port",
+			settings: Settings{
+				Port:  9000,
+				Hosts: []HostAddress{{Host: "ch1"}, {Host: "ch2"}, {Host: "ch3"}},
+			},
+			expected: []string{"ch1:9000", "ch2:9000", "ch3:9000"},
+		},
+		{
+			name: "per-host port overrides the shared port",
+			settings: Settings{
+				Port:  9000,
+				Hosts: []HostAddress{{Host: "ch1", Port: 9001}, {Host: "ch2"}},
+			},
+			expected: []string{"ch1:9001", "ch2:9000"},
+		},
+		{
+			name: "hosts take precedence over Host/Port",
+			settings: Settings{
+				Host:  "legacy",
+				Port:  9000,
+				Hosts: []HostAddress{{Host: "ch1", Port: 9440}},
+			},
+			expected: []string{"ch1:9440"},
+		},
+		{
+			name: "IPv6 hosts are bracketed by the caller",
+			settings: Settings{
+				Port:  9440,
+				Hosts: []HostAddress{{Host: "[::1]", Port: 9000}, {Host: "ch2"}},
+			},
+			expected: []string{"[::1]:9000", "ch2:9440"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := connectionAddresses(tt.settings)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+// The TLS config is handed to clickhouse-go once and reused for every address
+// it dials, so pinning ServerName would break verification on all but one host.
+// crypto/tls infers the name per connection from the address instead.
+func TestGetTLSConfigLeavesServerNameUnset(t *testing.T) {
+	tlsConfig, err := getTLSConfig(Settings{
+		Host: "ch1",
+		Port: 9000,
+		Hosts: []HostAddress{
+			{Host: "ch1"},
+			{Host: "ch2"},
+		},
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, tlsConfig.ServerName)
 }

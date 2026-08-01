@@ -45,12 +45,37 @@ type Clickhouse struct {
 	SchemaDatasource *schemas.SchemaDatasource
 }
 
+// connectionAddresses returns the "host:port" addresses passed to
+// clickhouse-go, which natively load-balances and fails over across multiple
+// entries (see #279). Settings.Hosts takes precedence when set; otherwise the
+// single Host/Port pair is used. A node without its own port falls back to the
+// shared port.
+func connectionAddresses(settings Settings) []string {
+	if len(settings.Hosts) == 0 {
+		return []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)}
+	}
+
+	addrs := make([]string, 0, len(settings.Hosts))
+	for _, host := range settings.Hosts {
+		port := host.Port
+		if port == 0 {
+			port = settings.Port
+		}
+		addrs = append(addrs, fmt.Sprintf("%s:%d", host.Host, port))
+	}
+	return addrs
+}
+
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
 func getTLSConfig(settings Settings) (*tls.Config, error) {
+	// ServerName is deliberately left unset. clickhouse-go hands this one
+	// tls.Config to every address it dials, so a name pinned here would be sent
+	// for all nodes and fail verification on every host but the one it names.
+	// Left empty, crypto/tls infers the name per connection from the address
+	// being dialled, which is correct for both a single host and a list.
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: settings.InsecureSkipVerify,
-		ServerName:         settings.Host,
 	}
 	if settings.TlsClientAuth || settings.TlsAuthWithCACert {
 		if settings.TlsAuthWithCACert && len(settings.TlsCACert) > 0 {
@@ -217,7 +242,7 @@ func (h *Clickhouse) Connect(
 	}
 
 	opts := &clickhouse.Options{
-		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
+		Addr: connectionAddresses(settings),
 		Auth: clickhouse.Auth{
 			Database: settings.DefaultDatabase,
 			Password: settings.Password,
