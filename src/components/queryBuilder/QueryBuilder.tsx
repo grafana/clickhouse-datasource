@@ -35,7 +35,11 @@ import {
   isCompactQueryTypeMismatch,
   shouldBuildCompactQueryDefaults,
 } from './compactQueryDefaults';
-import { useDefaultLogColumnsByName } from './views/logsQueryBuilderHooks';
+import {
+  useDefaultLogColumnsByName,
+  useDefaultTimeColumn,
+  useIncludeAllLogColumns,
+} from './views/logsQueryBuilderHooks';
 import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
@@ -248,12 +252,35 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   // Configured columns already carry the hint, so they are never overridden.
   // A query whose defaults are still being built is the compact equivalent of
   // a new query: saved compact queries keep deliberately cleared slots.
+  // A non-OTel table has no configured Time column, so the compact defaults leave the Time role
+  // empty and the logs query has no time field to render. Fill it from the schema by convention,
+  // the same hook the classic builder uses. No-op when OTel is on (the OTel map provides Time).
+  useDefaultTimeColumn(
+    datasource,
+    signalType === 'logs' ? allColumns : [],
+    activeOptions.table,
+    getColumnByHint(activeOptions, ColumnHint.Time),
+    activeOptions.meta?.otelEnabled || false,
+    builderOptionsDispatch
+  );
   useDefaultLogColumnsByName(
     signalType === 'logs' ? allColumns : [],
     activeOptions.table,
     needsInitialization,
     getColumnByHint(activeOptions, ColumnHint.LogMessage),
     getColumnByHint(activeOptions, ColumnHint.LogLevel),
+    activeOptions.meta?.otelEnabled || false,
+    builderOptionsDispatch
+  );
+  // "Include all columns" needs the fetched schema. The two-pass initialization above cannot
+  // apply it reliably: needsInitialization can flip false before the schema loads, so the
+  // schema-arrival rebuild never runs. This hook, like useDefaultLogColumnsByName, keys off a
+  // ref seeded on the first render, so it still appends the detected columns once they arrive.
+  useIncludeAllLogColumns(
+    datasource,
+    signalType === 'logs' ? allColumns : [],
+    activeOptions.table,
+    needsInitialization,
     activeOptions.meta?.otelEnabled || false,
     builderOptionsDispatch
   );

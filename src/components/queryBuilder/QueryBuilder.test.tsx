@@ -3,7 +3,15 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryType, TimeUnit } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  OrderByDirection,
+  QueryType,
+  SelectedColumn,
+  TimeUnit,
+} from 'types/queryBuilder';
 import { setColumnByHint } from 'hooks/useBuilderOptionsState';
 import { CoreApp } from '@grafana/data';
 
@@ -327,6 +335,64 @@ describe('QueryBuilder', () => {
         queryType: QueryType.Logs,
       })
     );
+  });
+
+  it('applies include-all columns and a detected time column in non-OTel logs compact mode', async () => {
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'logs'),
+      getDefaultLogsTable: jest.fn(() => 'host_logs'),
+      getDefaultLogsColumns: jest.fn(() => new Map()),
+      getLogsOtelVersion: jest.fn(() => undefined),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      shouldIncludeAllLogColumns: jest.fn(() => true),
+      getAdditionalLogColumns: jest.fn(() => []),
+      fetchColumns: jest.fn(() =>
+        Promise.resolve([
+          { name: 'event_time', type: 'DateTime', picklistValues: [] },
+          { name: 'message', type: 'String', picklistValues: [] },
+          { name: 'level', type: 'String', picklistValues: [] },
+          { name: 'service', type: 'String', picklistValues: [] },
+          { name: 'host', type: 'String', picklistValues: [] },
+        ])
+      ),
+    } as unknown as Datasource;
+    const builderOptionsDispatch = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.Table,
+          mode: BuilderMode.List,
+          database: '',
+          table: '',
+          columns: [],
+          filters: [],
+        }}
+        builderOptionsDispatch={builderOptionsDispatch}
+        datasource={compactDs}
+        generatedSql=""
+        onQueryChange={jest.fn()}
+      />
+    );
+
+    // Include-all appends the detected top-level scalar columns via mergeColumns once the schema loads.
+    await waitFor(() => {
+      const merge = builderOptionsDispatch.mock.calls.find(([a]) => a?.type === 'merge_columns');
+      expect((merge?.[0].payload.columns || []).map((c: SelectedColumn) => c.name)).toEqual(
+        expect.arrayContaining(['service', 'host'])
+      );
+    });
+    // A DateTime column is promoted to the Time role so the non-OTel logs query has a time field.
+    const timeCall = builderOptionsDispatch.mock.calls.find(
+      ([a]) => a?.type === 'set_column_by_hint' && a.payload.column?.hint === ColumnHint.Time
+    );
+    expect(timeCall?.[0].payload.column.name).toEqual('event_time');
   });
 
   it('preserves an authored query when its type does not match the datasource signal', async () => {
