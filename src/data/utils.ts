@@ -710,13 +710,15 @@ export const foldDiscoveredLogFieldsIntoLabels = (
 
     // The columns the field options selected are the hint-less, non-collection ones. Role columns
     // (time / body / level / trace id) carry a hint; the attribute maps are collection-typed.
+    // Aliased columns are skipped: a filter-for click would key on the alias, which the
+    // logs-volume query cannot resolve, so they stay as ordinary frame fields instead.
     const discovered = (builderOptions.columns || [])
-      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type))
-      .map((c) => c.alias || c.name);
-    const foldable = discovered.filter((name) =>
-      frame.fields.some((f) => f.name === name && f.name !== labelsFieldName)
-    );
-    if (foldable.length === 0) {
+      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type) && !c.alias)
+      .map((c) => c.name);
+    const sourceFields = discovered
+      .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
+      .filter((f): f is DataFrame['fields'][number] => f !== undefined);
+    if (sourceFields.length === 0) {
       continue;
     }
 
@@ -733,43 +735,44 @@ export const foldDiscoveredLogFieldsIntoLabels = (
       frame.fields.push(labelsField);
     }
 
-    const foldedNames = new Set<string>();
-    for (const name of foldable) {
-      const src = frame.fields.find((f) => f.name === name);
-      if (!src || src === labelsField) {
-        continue;
+    // Fold every column into `labels` with a single parse/serialize per row, rather than one
+    // round trip per column per row (which is quadratic on a wide table with include-all on).
+    for (let i = 0; i < rowLen; i++) {
+      // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
+      // or already-parsed objects (a frame we just created). Handle both and write back in kind.
+      const raw = labelsField.values[i];
+      const wasString = typeof raw === 'string';
+      let obj: Record<string, unknown>;
+      if (wasString) {
+        try {
+          obj = JSON.parse(raw as string) as Record<string, unknown>;
+        } catch {
+          obj = {};
+        }
+      } else {
+        obj = (raw as Record<string, unknown>) || {};
       }
-      for (let i = 0; i < rowLen; i++) {
+      if (!obj || typeof obj !== 'object') {
+        obj = {};
+      }
+
+      let folded = false;
+      for (const src of sourceFields) {
         const v = src.values[i];
         if (v === null || v === undefined || v === '') {
           continue;
         }
-        // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
-        // or already-parsed objects (a frame we just created). Handle both and write back in kind.
-        const raw = labelsField.values[i];
-        const wasString = typeof raw === 'string';
-        let obj: Record<string, unknown>;
-        if (wasString) {
-          try {
-            obj = JSON.parse(raw as string) as Record<string, unknown>;
-          } catch {
-            obj = {};
-          }
-        } else {
-          obj = (raw as Record<string, unknown>) || {};
-        }
-        if (!obj || typeof obj !== 'object') {
-          obj = {};
-        }
-        obj[name] = typeof v === 'string' ? v : String(v);
+        obj[src.name] = typeof v === 'string' ? v : String(v);
+        folded = true;
+      }
+
+      if (folded) {
         labelsField.values[i] = wasString ? JSON.stringify(obj) : obj;
       }
-      foldedNames.add(name);
     }
 
-    if (foldedNames.size > 0) {
-      frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
-    }
+    const foldedNames = new Set(sourceFields.map((f) => f.name));
+    frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
   }
 
   return res;

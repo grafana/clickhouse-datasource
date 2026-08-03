@@ -24,8 +24,8 @@ interface LogsConfigProps {
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
   onShowLogLinksChange: (v: boolean) => void;
-  onIncludeAllColumnsChange?: (v: boolean) => void;
-  onAdditionalColumnsChange?: (v: string[]) => void;
+  onIncludeAllColumnsChange: (v: boolean) => void;
+  onAdditionalColumnsChange: (v: string[]) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -74,7 +74,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onContextColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
 
   const onAdditionalColumnsChangeTrimmed = (columns: string[]) =>
-    onAdditionalColumnsChange?.(columns.map((c) => c.trim()).filter((c) => c));
+    onAdditionalColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
 
   return (
     <ConfigSection title={sectionLabels.title} description={sectionLabels.description}>
@@ -145,7 +145,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           label={labels.columns.includeAllColumns.label}
           tooltip={labels.columns.includeAllColumns.tooltip}
           value={includeAllColumns || false}
-          onChange={(v) => onIncludeAllColumnsChange?.(v)}
+          onChange={(v) => onIncludeAllColumnsChange(v)}
           wide
         />
         {!includeAllColumns && (

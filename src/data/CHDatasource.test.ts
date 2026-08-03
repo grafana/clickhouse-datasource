@@ -2558,22 +2558,26 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns "Fields" for a top-level scalar column folded into labels', () => {
-        // foldDiscoveredLogFieldsIntoLabels merges the extra top-level columns
-        // into `labels` under their plain, unprefixed names. Those group under a
-        // "Fields" section in the log details flyout, next to the attribute groups.
+      it('returns null for an unprefixed key when the Default columns options are off', () => {
+        // With both options off nothing is folded, so the grouping of any other
+        // unprefixed key is left to Grafana's default handling (the prior behavior).
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBeNull();
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+      });
+
+      it('returns "Fields" for a folded top-level column when include-all is on', () => {
+        // foldDiscoveredLogFieldsIntoLabels merges the extra top-level columns into
+        // `labels` under their plain, unprefixed names. Those group under a "Fields"
+        // section in the log details flyout, next to the attribute groups.
+        jest.spyOn(datasource, 'shouldIncludeAllLogColumns').mockReturnValue(true);
         expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBe('Fields');
         expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBe('Fields');
       });
 
-      it('returns "Fields" for an arbitrary user-defined column', () => {
+      it('returns "Fields" for an unprefixed key when additional columns are configured', () => {
+        jest.spyOn(datasource, 'getAdditionalLogColumns').mockReturnValue(['ServiceName']);
         expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBe('Fields');
-      });
-
-      it('returns "Fields" for the bare "ResourceAttributes" without a dot', () => {
-        // The backend's flatten always emits at least one nested key, so the bare
-        // column name never reaches Grafana's label list in practice; an unprefixed
-        // key is treated as a plain field.
+        // The bare attribute-map name is unprefixed too, so it groups under Fields when the feature is on.
         expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBe('Fields');
       });
     });

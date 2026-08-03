@@ -1088,7 +1088,7 @@ describe('dataFrameHasLogLabelWithName', () => {
 
 describe('foldDiscoveredLogFieldsIntoLabels', () => {
   const buildLogsRequestResponse = (
-    columns: Array<{ name: string; hint?: ColumnHint; type?: string }>,
+    columns: Array<{ name: string; hint?: ColumnHint; type?: string; alias?: string }>,
     frameFields: Field[]
   ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
     const inputQuery: CHBuilderQuery = {
@@ -1212,5 +1212,31 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     foldDiscoveredLogFieldsIntoLabels(ds, req, res);
     // no scalar field present to fold, so no labels field is added to the volume frame
     expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Time', 'count']);
+  });
+
+  it('leaves an aliased column as a standalone field so its filter keys on the real column', () => {
+    const ds = withFeature(true);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String', alias: 'svc' },
+        { name: 'SpanId', type: 'String' },
+      ],
+      [
+        field('Body', ['hi']),
+        field('svc', ['cart']),
+        field('SpanId', ['abc']),
+        field(labelsFieldName, [{ 'LogAttributes.x': 'y' }], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // aliased svc stays a standalone field (not folded); only SpanId, which has no alias, is folded in
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'svc', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({
+      'LogAttributes.x': 'y',
+      SpanId: 'abc',
+    });
   });
 });

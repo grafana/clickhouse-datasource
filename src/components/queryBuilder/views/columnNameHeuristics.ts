@@ -75,6 +75,7 @@ export const isCollectionColumnType = (type?: string): boolean => {
     s.startsWith('Tuple(') ||
     s.startsWith('Nested') ||
     s.startsWith('Object(') ||
-    s === 'JSON'
+    s === 'JSON' ||
+    s.startsWith('JSON(')
   );
 };

@@ -2145,7 +2145,14 @@ export class Datasource
     if (labelKey.startsWith('LogAttributes.')) {
       return 'Log attributes';
     }
-    return 'Fields';
+    // Unprefixed keys are the plain scalar columns folded in by the Default columns
+    // options (`includeAllColumns` / `additionalColumns`); group them under "Fields".
+    // With both options off nothing is folded, so keep the prior null to leave the
+    // grouping of any other unprefixed keys to Grafana's default handling.
+    if (this.shouldIncludeAllLogColumns() || this.getAdditionalLogColumns().length > 0) {
+      return 'Fields';
+    }
+    return null;
   }
 
   async testDatasource(): Promise<{ status: string; message: string }> {

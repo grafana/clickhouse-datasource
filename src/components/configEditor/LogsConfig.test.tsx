@@ -21,6 +21,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -42,6 +44,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -70,6 +74,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -126,6 +132,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -154,6 +162,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -184,6 +194,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -214,6 +226,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -244,6 +258,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -274,6 +290,8 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={onShowLogLinksChange}
+        onIncludeAllColumnsChange={() => {}}
+        onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -302,6 +320,7 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onIncludeAllColumnsChange={onIncludeAllColumnsChange}
+        onAdditionalColumnsChange={() => {}}
       />
     );
 
