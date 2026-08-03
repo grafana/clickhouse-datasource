@@ -11,6 +11,7 @@ enum BuilderOptionsActionType {
   SetOtelEnabled = 'set_otel_enabled',
   SetOtelVersion = 'set_otel_version',
   SetColumnByHint = 'set_column_by_hint',
+  MergeColumns = 'merge_columns',
   SetBuilderMinimized = 'set_builder_minimized',
 }
 
@@ -47,6 +48,8 @@ export const setOtelVersion = (otelVersion: string): BuilderOptionsReducerAction
   createAction(BuilderOptionsActionType.SetOtelVersion, { meta: { otelVersion } });
 export const setColumnByHint = (column: SelectedColumn): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.SetColumnByHint, { column });
+export const mergeColumns = (columns: SelectedColumn[]): GenericReducerAction =>
+  createGenericAction(BuilderOptionsActionType.MergeColumns, { columns });
 export const setBuilderMinimized = (minimized: boolean): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.SetBuilderMinimized, { minimized });
 
@@ -148,6 +151,24 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
 
       return mergeBuilderOptionsState(state, {
         columns: nextColumns,
+      });
+    },
+  ],
+  [
+    BuilderOptionsActionType.MergeColumns,
+    (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
+      // Append columns whose name is not already selected, keeping every existing column
+      // (including role columns set by hint). Merging against live state keeps this safe
+      // regardless of dispatch ordering relative to setColumnByHint.
+      const incoming = (action.payload.columns as SelectedColumn[]) || [];
+      const existingNames = new Set((state.columns || []).map((c) => c.name));
+      const additions = incoming.filter((c) => !existingNames.has(c.name));
+      if (additions.length === 0) {
+        return state;
+      }
+
+      return mergeBuilderOptionsState(state, {
+        columns: [...(state.columns || []), ...additions],
       });
     },
   ],

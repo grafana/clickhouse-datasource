@@ -20,6 +20,7 @@ import {
   useDefaultFilters,
   useDefaultLogColumnsByName,
   useDefaultTimeColumn,
+  useIncludeAllLogColumns,
   useLogDefaultsOnMount,
   useOtelColumns,
 } from './logsQueryBuilderHooks';
@@ -116,6 +117,14 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     isNewQuery,
     builderState.messageColumn,
     builderState.logLevelColumn,
+    builderState.otelEnabled,
+    builderOptionsDispatch
+  );
+  useIncludeAllLogColumns(
+    datasource,
+    allColumns,
+    builderOptions.table,
+    isNewQuery,
     builderState.otelEnabled,
     builderOptionsDispatch
   );

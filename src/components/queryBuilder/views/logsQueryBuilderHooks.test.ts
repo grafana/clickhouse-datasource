@@ -3,12 +3,13 @@ import {
   useDefaultFilters,
   useDefaultLogColumnsByName,
   useDefaultTimeColumn,
+  useIncludeAllLogColumns,
   useLogDefaultsOnMount,
   useOtelColumns,
 } from './logsQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
-import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import { mergeColumns, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import otel from 'otel';
 
 describe('useLogDefaultsOnMount', () => {
@@ -544,5 +545,68 @@ describe('useDefaultFilters', () => {
     };
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+});
+
+describe('useIncludeAllLogColumns', () => {
+  const allColumns: readonly TableColumn[] = [
+    { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+    { name: 'ServiceName', type: 'String', picklistValues: [] },
+    { name: 'SpanId', type: 'String', picklistValues: [] },
+    { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+  ];
+
+  it('should not call builderOptionsDispatch when OTEL is enabled', async () => {
+    jest.spyOn(mockDatasource, 'shouldIncludeAllLogColumns').mockReturnValue(true);
+    const builderOptionsDispatch = jest.fn();
+
+    renderHook(() => useIncludeAllLogColumns(mockDatasource, allColumns, 'logs', true, true, builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('should not call builderOptionsDispatch when the include-all option is off', async () => {
+    jest.spyOn(mockDatasource, 'shouldIncludeAllLogColumns').mockReturnValue(false);
+    const builderOptionsDispatch = jest.fn();
+
+    renderHook(() => useIncludeAllLogColumns(mockDatasource, allColumns, 'logs', true, false, builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('should not call builderOptionsDispatch before the schema has loaded', async () => {
+    jest.spyOn(mockDatasource, 'shouldIncludeAllLogColumns').mockReturnValue(true);
+    const builderOptionsDispatch = jest.fn();
+
+    renderHook(() => useIncludeAllLogColumns(mockDatasource, [], 'logs', true, false, builderOptionsDispatch));
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
+  });
+
+  it('dispatches mergeColumns with the detected scalar columns once the schema loads, skipping collections and date/time', async () => {
+    jest.spyOn(mockDatasource, 'shouldIncludeAllLogColumns').mockReturnValue(true);
+    const builderOptionsDispatch = jest.fn();
+
+    let cols: readonly TableColumn[] = [];
+    const hook = renderHook(
+      (c) => useIncludeAllLogColumns(mockDatasource, c, 'logs', true, false, builderOptionsDispatch),
+      {
+        initialProps: cols,
+      }
+    );
+    cols = allColumns;
+    hook.rerender(cols);
+
+    // Timestamp is DateTime and LogAttributes is a Map, so both are skipped. The reducer's
+    // mergeColumns is what drops any of these that are already selected (covered in its own test).
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    expect(builderOptionsDispatch).toHaveBeenCalledWith(
+      expect.objectContaining(
+        mergeColumns([
+          { name: 'ServiceName', type: 'String' },
+          { name: 'SpanId', type: 'String' },
+        ])
+      )
+    );
   });
 });

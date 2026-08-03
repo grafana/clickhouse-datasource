@@ -1,5 +1,6 @@
 import { ColumnHint, QueryType } from 'types/queryBuilder';
 import {
+  mergeColumns,
   setAllOptions,
   setBuilderMinimized,
   setColumnByHint,
@@ -136,6 +137,22 @@ describe('reducer', () => {
 
     const nextState = reducer(prevState, action);
     expect(nextState.meta?.minimized).toBe(true);
+  });
+  it('applies MergeColumns action, appending only columns whose name is not already selected', async () => {
+    const prevState = buildInitialState({
+      columns: [{ name: 'Timestamp', hint: ColumnHint.Time }, { name: 'ServiceName' }],
+    });
+    const action = mergeColumns([{ name: 'ServiceName' }, { name: 'StatusCode' }, { name: 'SpanId' }]);
+
+    const nextState = reducer(prevState, action);
+    // ServiceName is already present, so it is not duplicated; the new columns append in order
+    expect(nextState.columns!.map((c) => c.name)).toEqual(['Timestamp', 'ServiceName', 'StatusCode', 'SpanId']);
+  });
+  it('returns the same state reference when MergeColumns adds nothing new', async () => {
+    const prevState = buildInitialState({ columns: [{ name: 'ServiceName' }] });
+
+    const nextState = reducer(prevState, mergeColumns([{ name: 'ServiceName' }]));
+    expect(nextState).toBe(prevState);
   });
 });
 

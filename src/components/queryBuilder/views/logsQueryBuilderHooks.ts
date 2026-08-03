@@ -1,5 +1,5 @@
 import { Datasource } from 'data/CHDatasource';
-import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import { BuilderOptionsReducerAction, mergeColumns, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import { useEffect, useMemo, useRef } from 'react';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import otel from 'otel';
@@ -241,6 +241,53 @@ export const useDefaultLogColumnsByName = (
     lastTable.current = table;
     didRun.current = true;
   }, [allColumns, table, messageColumn, logLevelColumn, otelEnabled, builderOptionsDispatch]);
+};
+
+/**
+ * Applies the "Include all columns" logs option in the classic builder when OTel mode is off.
+ *
+ * The explicit `additionalColumns` list needs no schema and is applied at mount by
+ * useLogDefaultsOnMount. "Include all" needs the table schema, which arrives asynchronously:
+ * useOtelColumns already appends it once OTel is on, and this hook is the non-OTel counterpart
+ * (without it the toggle silently does nothing on a non-OTel table in the classic builder).
+ *
+ * It runs once per table after the schema loads and dispatches mergeColumns, which appends only
+ * the columns not already selected. Declaring it after useDefaultTimeColumn /
+ * useDefaultLogColumnsByName means their role columns are already in state, so a column that
+ * doubles as a role is not added a second time (mergeColumns skips it).
+ */
+export const useIncludeAllLogColumns = (
+  datasource: Datasource,
+  allColumns: readonly TableColumn[],
+  table: string,
+  isNewQuery: boolean,
+  otelEnabled: boolean,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
+  const lastTable = useRef<string>(table || '');
+  const didRun = useRef<boolean>(!isNewQuery);
+  if (table !== lastTable.current) {
+    didRun.current = false;
+  }
+
+  useEffect(() => {
+    if (otelEnabled || didRun.current || !table || allColumns.length === 0) {
+      return;
+    }
+
+    lastTable.current = table;
+    didRun.current = true;
+
+    if (!datasource.shouldIncludeAllLogColumns()) {
+      return;
+    }
+
+    const nextColumns: SelectedColumn[] = [];
+    appendAdditionalLogColumns(datasource, allColumns, nextColumns, new Set<string>());
+    if (nextColumns.length > 0) {
+      builderOptionsDispatch(mergeColumns(nextColumns));
+    }
+  }, [datasource, allColumns, table, otelEnabled, builderOptionsDispatch]);
 };
 
 // Apply default filters/orderBy on table change
