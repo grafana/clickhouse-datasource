@@ -199,6 +199,19 @@ describe('buildCompactQueryDefaults', () => {
     expect(options.meta?.otelEnabled).toBe(true);
     expect(options.meta?.otelVersion).toBe('latest');
   });
+
+  it('appends detected scalar columns to the compact logs defaults when include-all is on', () => {
+    const ds = createLogsDatasource('latest');
+    (ds.shouldIncludeAllLogColumns as jest.Mock).mockReturnValue(true);
+    const allColumns = toColumns([...v151ColumnNames, 'ServiceName', 'HostName']);
+
+    const options = buildCompactQueryDefaults(ds, 'logs', '', allColumns);
+    const names = (options.columns || []).map((c) => c.name);
+
+    // the detected top-level scalars are appended, and the OTel role columns are still present
+    expect(names).toEqual(expect.arrayContaining(['ServiceName', 'HostName']));
+    expect(names).toContain('Timestamp');
+  });
 });
 
 describe('appendAdditionalLogColumns', () => {

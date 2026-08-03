@@ -84,6 +84,26 @@ describe('useLogDefaultsOnMount', () => {
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
+
+  it('appends the explicit additionalColumns list on mount', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getLogsOtelVersion').mockReturnValue(undefined);
+    jest
+      .spyOn(mockDatasource, 'getDefaultLogsColumns')
+      .mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));
+    jest.spyOn(mockDatasource, 'shouldIncludeAllLogColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getAdditionalLogColumns').mockReturnValue(['method', 'status']);
+
+    renderHook(() => useLogDefaultsOnMount(mockDatasource, true, {} as QueryBuilderOptions, builderOptionsDispatch));
+
+    // additionalColumns needs no schema, so it is applied here at mount alongside the default columns
+    const dispatched = builderOptionsDispatch.mock.calls[0][0].payload.columns as SelectedColumn[];
+    expect(dispatched.map((c) => c.name)).toEqual(['timestamp', 'method', 'status']);
+
+    // This suite does not auto-restore spies; clean up so getAdditionalLogColumns does not leak.
+    jest.restoreAllMocks();
+  });
 });
 
 describe('useOtelColumns', () => {
@@ -153,6 +173,35 @@ describe('useOtelColumns', () => {
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+  });
+
+  it('appends include-all scalar columns alongside the OTel columns when the option is on', async () => {
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'shouldIncludeAllLogColumns').mockReturnValue(true);
+    const builderOptionsDispatch = jest.fn();
+    const allColumns: readonly TableColumn[] = [
+      { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+      { name: 'ServiceName', type: 'String', picklistValues: [] },
+      { name: 'SpanId', type: 'String', picklistValues: [] },
+    ];
+
+    let otelEnabled = false;
+    const hook = renderHook(
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
+      { initialProps: otelEnabled }
+    );
+    otelEnabled = true;
+    hook.rerender(otelEnabled);
+
+    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+    const dispatched = builderOptionsDispatch.mock.calls[0][0].payload.columns as SelectedColumn[];
+    const names = dispatched.map((c) => c.name);
+    // The OTel role columns are still dispatched; the detected top-level scalars are appended and
+    // the attribute Map is skipped by the collection-type guard.
+    expect(names).toEqual(expect.arrayContaining(['ServiceName', 'SpanId']));
+
+    // This suite does not auto-restore spies; clean up so shouldIncludeAllLogColumns does not leak.
+    jest.restoreAllMocks();
   });
 
   it('should call builderOptionsDispatch with log context columns when auto-select is enabled', async () => {
