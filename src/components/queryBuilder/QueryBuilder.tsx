@@ -209,12 +209,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
       return;
     }
 
-    // With "Include all columns" on, wait for the schema so the first logs query already
-    // carries the extra columns (a single query instead of a base query then a re-run).
-    if (signalType === 'logs' && datasource.shouldIncludeAllLogColumns() && allColumns.length === 0) {
-      return;
-    }
-
+    // The key flips once column names arrive (tableColumnNames.length > 0), so with
+    // "Include all columns" on the editor initializes with base defaults and re-runs
+    // with the full column set when the schema loads. Waiting for the schema here
+    // instead would deadlock when the fetch fails or the table is empty, since
+    // useColumns swallows errors and keeps returning [], and the gate would never lift.
     const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}:${tableColumnNames.length > 0}`;
     if (lastInitializationKey.current === initializationKey) {
       return;
