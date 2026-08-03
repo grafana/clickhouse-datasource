@@ -8,11 +8,12 @@ import {
   ColumnHint,
   FilterOperator,
   OrderByDirection,
+  QueryBuilderOptions,
   QueryType,
-  SelectedColumn,
   TimeUnit,
 } from 'types/queryBuilder';
-import { setColumnByHint } from 'hooks/useBuilderOptionsState';
+import { setColumnByHint, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
 
 jest.mock('./views/TableQueryBuilder', () => ({
@@ -337,7 +338,29 @@ describe('QueryBuilder', () => {
     );
   });
 
-  it('applies include-all columns and a detected time column in non-OTel logs compact mode', async () => {
+  // Drive the REAL reducer (not a jest.fn dispatch) through CompactQueryEditor so the test observes
+  // the composed column set after every hook has run, and can catch a duplicate projection.
+  const renderCompactWithRealReducer = (datasource: Datasource): (() => QueryBuilderOptions) => {
+    let latest: QueryBuilderOptions = defaultCHBuilderQuery.builderOptions;
+    const Harness = () => {
+      const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState(defaultCHBuilderQuery.builderOptions);
+      latest = builderOptions;
+      return (
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+          onQueryChange={jest.fn()}
+        />
+      );
+    };
+    render(<Harness />);
+    return () => latest;
+  };
+
+  it('surfaces include-all columns, a detected time column, and no duplicate projection in non-OTel compact mode', async () => {
     const compactDs = {
       ...mockDs,
       getSignalType: jest.fn(() => 'logs'),
@@ -361,38 +384,74 @@ describe('QueryBuilder', () => {
         ])
       ),
     } as unknown as Datasource;
-    const builderOptionsDispatch = jest.fn();
 
-    render(
-      <QueryBuilder
-        app={CoreApp.PanelEditor}
-        builderOptions={{
-          queryType: QueryType.Table,
-          mode: BuilderMode.List,
-          database: '',
-          table: '',
-          columns: [],
-          filters: [],
-        }}
-        builderOptionsDispatch={builderOptionsDispatch}
-        datasource={compactDs}
-        generatedSql=""
-        onQueryChange={jest.fn()}
-      />
-    );
+    const getOptions = renderCompactWithRealReducer(compactDs);
 
-    // Include-all appends the detected top-level scalar columns via mergeColumns once the schema loads.
     await waitFor(() => {
-      const merge = builderOptionsDispatch.mock.calls.find(([a]) => a?.type === 'merge_columns');
-      expect((merge?.[0].payload.columns || []).map((c: SelectedColumn) => c.name)).toEqual(
-        expect.arrayContaining(['service', 'host'])
-      );
+      const names = (getOptions().columns || []).map((c) => c.name);
+      expect(names).toEqual(expect.arrayContaining(['event_time', 'service', 'host']));
     });
-    // A DateTime column is promoted to the Time role so the non-OTel logs query has a time field.
-    const timeCall = builderOptionsDispatch.mock.calls.find(
-      ([a]) => a?.type === 'set_column_by_hint' && a.payload.column?.hint === ColumnHint.Time
-    );
-    expect(timeCall?.[0].payload.column.name).toEqual('event_time');
+
+    const columns = getOptions().columns || [];
+    const names = columns.map((c) => c.name);
+    // No column is projected twice (the promote-to-role dedup and the include-all merge cooperate).
+    expect(new Set(names).size).toBe(names.length);
+    // event_time / message / level are promoted to their roles; message and level are not also plain.
+    expect(columns.find((c) => c.name === 'event_time')?.hint).toBe(ColumnHint.Time);
+    expect(columns.find((c) => c.name === 'message')?.hint).toBe(ColumnHint.LogMessage);
+    expect(columns.find((c) => c.name === 'level')?.hint).toBe(ColumnHint.LogLevel);
+    // The remaining top-level scalars surface as plain (hint-less) fields.
+    expect(columns.find((c) => c.name === 'service')?.hint).toBeUndefined();
+    expect(columns.find((c) => c.name === 'host')?.hint).toBeUndefined();
+  });
+
+  it('surfaces include-all columns with no duplicate projection in OTel compact mode (the new hooks no-op)', async () => {
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'otel_logs'),
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+            ['log_level', 'SeverityText'],
+            ['log_attributes', 'LogAttributes'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => '1.29.0'),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      shouldIncludeAllLogColumns: jest.fn(() => true),
+      getAdditionalLogColumns: jest.fn(() => []),
+      fetchColumns: jest.fn(() =>
+        Promise.resolve([
+          { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+          { name: 'Body', type: 'String', picklistValues: [] },
+          { name: 'SeverityText', type: 'String', picklistValues: [] },
+          { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
+          { name: 'ServiceName', type: 'String', picklistValues: [] },
+          { name: 'SpanId', type: 'String', picklistValues: [] },
+        ])
+      ),
+    } as unknown as Datasource;
+
+    const getOptions = renderCompactWithRealReducer(compactDs);
+
+    // OTel include-all comes through buildCompactQueryDefaults; the non-OTel hooks stay inert.
+    await waitFor(() => {
+      const names = (getOptions().columns || []).map((c) => c.name);
+      expect(names).toEqual(expect.arrayContaining(['ServiceName', 'SpanId']));
+    });
+
+    const columns = getOptions().columns || [];
+    const names = columns.map((c) => c.name);
+    expect(new Set(names).size).toBe(names.length);
+    // The attribute Map is not folded in as a scalar; it stays a hinted role column.
+    expect(columns.find((c) => c.name === 'LogAttributes')?.hint).toBe(ColumnHint.LogAttributes);
   });
 
   it('preserves an authored query when its type does not match the datasource signal', async () => {

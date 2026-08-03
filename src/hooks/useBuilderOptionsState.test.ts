@@ -145,6 +145,21 @@ describe('reducer', () => {
       { name: 'SeverityText', hint: ColumnHint.LogLevel },
     ]);
   });
+  it('applies SetColumnByHint action, keeping a same-named column that holds a different hint', async () => {
+    // The dedup only drops a hint-less twin; a column that legitimately fills two roles under the
+    // same name (e.g. one column as both FilterTime and Time) must keep both entries.
+    const prevState = buildInitialState({
+      columns: [{ name: 'Timestamp', hint: ColumnHint.FilterTime }, { name: 'a' }],
+    });
+    const action = setColumnByHint({ name: 'Timestamp', hint: ColumnHint.Time });
+
+    const nextState = reducer(prevState, action);
+    expect(nextState.columns).toEqual([
+      { name: 'Timestamp', hint: ColumnHint.FilterTime },
+      { name: 'a' },
+      { name: 'Timestamp', hint: ColumnHint.Time },
+    ]);
+  });
   it('applies SetBuilderMinimized action', async () => {
     const prevState = buildInitialState();
     const action = setBuilderMinimized(true);
