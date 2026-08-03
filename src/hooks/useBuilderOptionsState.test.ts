@@ -131,6 +131,20 @@ describe('reducer', () => {
     // Updated column is filtered and pushed to end of array
     expect(nextState.columns![3].name).toEqual('next_timestamp');
   });
+  it('applies SetColumnByHint action, dropping a same-named hint-less column so it is not projected twice', async () => {
+    // SeverityText was added as a plain column (for example by "Include all columns") and is now
+    // promoted to the Level role; it must end up selected once, not once plain and once hinted.
+    const prevState = buildInitialState({
+      columns: [{ name: 'Timestamp', hint: ColumnHint.Time }, { name: 'SeverityText' }],
+    });
+    const action = setColumnByHint({ name: 'SeverityText', hint: ColumnHint.LogLevel });
+
+    const nextState = reducer(prevState, action);
+    expect(nextState.columns).toEqual([
+      { name: 'Timestamp', hint: ColumnHint.Time },
+      { name: 'SeverityText', hint: ColumnHint.LogLevel },
+    ]);
+  });
   it('applies SetBuilderMinimized action', async () => {
     const prevState = buildInitialState();
     const action = setBuilderMinimized(true);

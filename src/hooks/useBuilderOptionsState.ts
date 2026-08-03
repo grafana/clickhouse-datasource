@@ -146,7 +146,13 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     BuilderOptionsActionType.SetColumnByHint,
     (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
       const col = action.payload.column as SelectedColumn;
-      const nextColumns = (state.columns || []).filter((c) => c.hint !== col.hint);
+      // Drop the column that currently holds this hint, and any hint-less column of the same name.
+      // The latter is a plain column (for example one added by the "Include all columns" option)
+      // being promoted to a role; without this it would stay selected and get projected twice.
+      // Columns that hold a different hint are kept, so a column can still fill more than one role.
+      const nextColumns = (state.columns || []).filter(
+        (c) => c.hint !== col.hint && !(c.hint === undefined && c.name === col.name)
+      );
       nextColumns.push(col);
 
       return mergeBuilderOptionsState(state, {

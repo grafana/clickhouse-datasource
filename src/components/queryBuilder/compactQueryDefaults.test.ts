@@ -16,6 +16,7 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import { SignalType } from 'types/config';
+import { setAllOptions, setColumnByHint, testFuncs } from 'hooks/useBuilderOptionsState';
 import otel from 'otel';
 
 const defaultOptions: QueryBuilderOptions = {
@@ -288,5 +289,38 @@ describe('appendAdditionalLogColumns', () => {
       // method is already present; the map key dedupes against its base ResourceAttributes column
       expect(columns.map((c) => c.name)).toEqual(['method', 'ResourceAttributes']);
     });
+  });
+});
+
+describe('compact logs defaults with role assignment', () => {
+  const { reducer, buildInitialState } = testFuncs;
+
+  it('does not project a role-named scalar column twice when include-all is on (non-OTel)', () => {
+    // Non-OTel table with no configured role columns, plus a column whose name matches the Level
+    // heuristic. Reproduces the compact-editor path: build the defaults (include-all adds the
+    // column hint-less), then fill the empty Level slot from that same column by name.
+    const ds = {} as Datasource;
+    ds.getDefaultLogsDatabase = jest.fn(() => 'logs');
+    ds.getDefaultDatabase = jest.fn(() => '');
+    ds.getDefaultLogsTable = jest.fn(() => 'app_logs');
+    ds.getDefaultTable = jest.fn(() => '');
+    ds.getLogsOtelVersion = jest.fn(() => '');
+    ds.getDefaultLogsColumns = jest.fn(() => new Map<ColumnHint, string>());
+    ds.shouldSelectLogContextColumns = jest.fn(() => false);
+    ds.getLogContextColumnNames = jest.fn(() => []);
+    ds.shouldIncludeAllLogColumns = jest.fn(() => true);
+    ds.getAdditionalLogColumns = jest.fn(() => []);
+    const allColumns: TableColumn[] = [
+      { name: 'event_time', type: 'DateTime', picklistValues: [] },
+      { name: 'SeverityText', type: 'String', picklistValues: [] },
+      { name: 'message', type: 'String', picklistValues: [] },
+    ];
+
+    const defaults = buildCompactQueryDefaults(ds, 'logs', '', allColumns);
+    let state = reducer(buildInitialState(), setAllOptions(defaults));
+    state = reducer(state, setColumnByHint({ name: 'SeverityText', type: 'String', hint: ColumnHint.LogLevel }));
+
+    const severity = (state.columns || []).filter((c) => c.name === 'SeverityText');
+    expect(severity).toEqual([{ name: 'SeverityText', type: 'String', hint: ColumnHint.LogLevel }]);
   });
 });
