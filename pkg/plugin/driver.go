@@ -235,7 +235,7 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	// certificate is not verified exposes the token to interception. This is a
 	// higher bar than a shared service credential, so reject the combination.
 	if settings.OAuthPassThru && settings.InsecureSkipVerify {
-		return nil, backend.DownstreamError(fmt.Errorf("Forward OAuth Identity cannot be used with \"Skip TLS Verify\": forwarding a user token over an unverified TLS connection would expose it to interception"))
+		return nil, backend.DownstreamError(fmt.Errorf("the \"Forward OAuth Identity\" and \"Skip TLS Verify\" options cannot be combined: forwarding a user token over an unverified TLS connection would expose it to interception"))
 	}
 
 	// When Forward OAuth Identity is enabled, a data query (message != nil)
@@ -246,7 +246,7 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	if settings.OAuthPassThru && message != nil && httpHeaders[backend.OAuthIdentityTokenHeaderName] == "" {
 		if !settings.OAuthPassThruAllowFallback {
 			return nil, backend.DownstreamError(fmt.Errorf(
-				"Forward OAuth Identity is enabled but this query carries no user identity; " +
+				"this query carries no user identity but \"Forward OAuth Identity\" is enabled; " +
 					"it is running outside a user session (for example, an alert rule). Enable " +
 					"\"Allow service account fallback\" on the data source to let these queries " +
 					"run with the configured username/password, or ensure the request forwards a user OAuth token"))
