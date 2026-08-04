@@ -175,6 +175,25 @@ export const DatabaseCredentialsSection = (props: Props) => {
             });
           }}
         />
+        {jsonData.oauthPassThru && (
+          <Box marginTop={1}>
+            <Checkbox
+              label={labels.oauthPassThruAllowFallback.label}
+              description={labels.oauthPassThruAllowFallback.tooltip}
+              checked={jsonData.oauthPassThruAllowFallback || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    oauthPassThruAllowFallback: checked,
+                  },
+                });
+              }}
+            />
+          </Box>
+        )}
       </CollapsableSection>
     </Box>
   );

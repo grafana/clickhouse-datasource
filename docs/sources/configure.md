@@ -300,7 +300,12 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
 
 - **A secure (TLS) connection is required.** Enable **Secure connection** and set the **Port** to a TLS-enabled port. The plugin rejects the connection if JWT authentication is enabled without TLS.
 - **Credentials are suppressed on query connections.** When enabled, the configured username and password are not sent on per-query connections; the forwarded token is the sole credential.
-- **Health checks and alerts fall back to username and password.** **Save & test**, other health checks, and alert rule evaluation run outside a user request, where no user token is available, so they use the configured username and password. Keep valid credentials configured so connection tests and alert queries can succeed.
+- **Health checks fall back to username and password.** **Save & test** and other health checks run outside a user request, where no user token is available, so they use the configured username and password. Keep valid credentials configured so connection tests can succeed.
+- **Alerting is blocked by default.** Alert rule evaluation also runs outside a user session, so there is no identity to forward. By default these queries are **rejected** rather than run as a shared account. To keep alerting working, enable **Allow service account fallback** in the **Database credentials** section.
+
+  {{< admonition type="warning" >}}
+  Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries — so an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
+  {{< /admonition >}}
 - **Connections are keyed per user.** Enabling JWT authentication automatically turns on header forwarding, so each Grafana user opens a separate ClickHouse connection. See [Connection pool implications](#connection-pool-implications) for sizing guidance.
 
 ## Provision the data source

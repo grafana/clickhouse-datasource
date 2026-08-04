@@ -139,14 +139,14 @@ describe('DatabaseCredentialsSection', () => {
 
     render(<DatabaseCredentialsSection {...jwtProps} />);
 
-    const toggle = screen.getByRole('checkbox', { name: /forward oauth identity/i });
+    const toggle = screen.getByRole('checkbox', { name: /^forward oauth identity/i });
     expect(toggle).toBeChecked();
   });
 
   it('sets oauthPassThru when toggled on', () => {
     render(<DatabaseCredentialsSection {...defaultProps} />);
 
-    const toggle = screen.getByRole('checkbox', { name: /forward oauth identity/i });
+    const toggle = screen.getByRole('checkbox', { name: /^forward oauth identity/i });
     fireEvent.click(toggle);
 
     expect(onOptionsChangeMock).toHaveBeenCalled();
@@ -171,7 +171,7 @@ describe('DatabaseCredentialsSection', () => {
 
     render(<DatabaseCredentialsSection {...jwtProps} />);
 
-    const toggle = screen.getByRole('checkbox', { name: /forward oauth identity/i });
+    const toggle = screen.getByRole('checkbox', { name: /^forward oauth identity/i });
     fireEvent.click(toggle);
 
     expect(onOptionsChangeMock).toHaveBeenCalled();

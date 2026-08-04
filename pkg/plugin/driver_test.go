@@ -663,10 +663,10 @@ func TestBuildClickHouseOptionsJWTBothProtocols(t *testing.T) {
 	}
 }
 
-func TestBuildClickHouseOptionsJWTFallbackWithoutToken(t *testing.T) {
-	message := json.RawMessage(`{}`)
-
-	settings := Settings{
+// baseJWTSettings returns a valid secure OAuthPassThru configuration with a
+// service-account username/password configured as the fallback credential.
+func baseJWTSettings() Settings {
+	return Settings{
 		Host:          "localhost",
 		Port:          9440,
 		Protocol:      "native",
@@ -677,13 +677,51 @@ func TestBuildClickHouseOptionsJWTFallbackWithoutToken(t *testing.T) {
 		DialTimeout:   "5",
 		QueryTimeout:  "30",
 	}
+}
 
-	opts, err := buildClickHouseOptions(t.Context(), settings, message)
-	assert.NoError(t, err)
+func TestBuildClickHouseOptionsJWTTokenlessDataQuery(t *testing.T) {
+	// A data query (non-nil message) with no forwarded user token is a backend
+	// query with no identity to attribute it to — typically alert evaluation.
+	dataQuery := json.RawMessage(`{}`)
 
-	assert.Nil(t, opts.GetJWT, "GetJWT must be nil when no token is forwarded")
-	assert.Equal(t, "svc", opts.Auth.Username)
-	assert.Equal(t, "fallback", opts.Auth.Password)
+	t.Run("blocked by default", func(t *testing.T) {
+		settings := baseJWTSettings()
+
+		_, err := buildClickHouseOptions(t.Context(), settings, dataQuery)
+		require.Error(t, err, "tokenless data queries must be rejected when fallback is not allowed")
+		assert.Contains(t, err.Error(), "no user identity")
+	})
+
+	t.Run("falls back to service account when fallback is allowed", func(t *testing.T) {
+		settings := baseJWTSettings()
+		settings.OAuthPassThruAllowFallback = true
+
+		opts, err := buildClickHouseOptions(t.Context(), settings, dataQuery)
+		require.NoError(t, err)
+
+		assert.Nil(t, opts.GetJWT, "GetJWT must be nil when no token is forwarded")
+		assert.Equal(t, "svc", opts.Auth.Username)
+		assert.Equal(t, "fallback", opts.Auth.Password)
+	})
+}
+
+func TestBuildClickHouseOptionsJWTHealthCheckAlwaysFallsBack(t *testing.T) {
+	// Health checks and schema introspection pass a nil message; no user token
+	// is ever available for them, so they always fall back regardless of the
+	// OAuthPassThruAllowFallback setting.
+	for _, allowFallback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("allowFallback=%v", allowFallback), func(t *testing.T) {
+			settings := baseJWTSettings()
+			settings.OAuthPassThruAllowFallback = allowFallback
+
+			opts, err := buildClickHouseOptions(t.Context(), settings, nil)
+			require.NoError(t, err, "health checks (nil message) must never be blocked")
+
+			assert.Nil(t, opts.GetJWT)
+			assert.Equal(t, "svc", opts.Auth.Username)
+			assert.Equal(t, "fallback", opts.Auth.Password)
+		})
+	}
 }
 
 func TestInterpolateMacros(t *testing.T) {

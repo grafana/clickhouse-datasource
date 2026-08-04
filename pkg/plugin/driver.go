@@ -226,6 +226,27 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		return nil, backend.DownstreamError(fmt.Errorf("JWT authentication requires a secure (TLS) connection"))
 	}
 
+	// When Forward OAuth Identity is enabled, a data query (message != nil)
+	// that arrives without a forwarded user token is a backend query with no
+	// user to attribute it to — typically alert rule evaluation. Health checks
+	// and schema introspection pass a nil message and always fall back, since
+	// no user token is ever available for them.
+	if settings.OAuthPassThru && message != nil && httpHeaders[backend.OAuthIdentityTokenHeaderName] == "" {
+		if !settings.OAuthPassThruAllowFallback {
+			return nil, backend.DownstreamError(fmt.Errorf(
+				"Forward OAuth Identity is enabled but this query carries no user identity; " +
+					"it is running outside a user session (for example, an alert rule). Enable " +
+					"\"Allow service account fallback\" on the data source to let these queries " +
+					"run with the configured username/password, or ensure the request forwards a user OAuth token"))
+		}
+		// Fallback is opt-in and exercised: warn so the privilege divergence is
+		// not silent. These queries run as the shared service account and are
+		// not subject to the per-user row policies or quotas that OAuth
+		// pass-through enforces for interactive queries.
+		backend.Logger.Warn("Forward OAuth Identity: query has no forwarded user identity; " +
+			"falling back to the configured username/password (service account)")
+	}
+
 	auth, getJWT := resolveJWTAuth(settings, httpHeaders)
 
 	opts := &clickhouse.Options{

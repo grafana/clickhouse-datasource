@@ -523,6 +523,28 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             }}
           />
         </Field>
+        {jsonData.oauthPassThru && (
+          <Field
+            label={labels.oauthPassThruAllowFallback.label}
+            description={labels.oauthPassThruAllowFallback.tooltip}
+          >
+            <Switch
+              id="oauthPassThruAllowFallback"
+              className="gf-form"
+              value={jsonData.oauthPassThruAllowFallback || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    oauthPassThruAllowFallback: checked,
+                  },
+                });
+              }}
+            />
+          </Field>
+        )}
       </ConfigSection>
 
       <Divider />
