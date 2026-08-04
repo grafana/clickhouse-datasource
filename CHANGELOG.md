@@ -4,7 +4,7 @@
 
 ### Features
 
-- Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password
+- Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
 
 ### Fixes
 
