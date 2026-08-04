@@ -724,6 +724,18 @@ func TestBuildClickHouseOptionsJWTHealthCheckAlwaysFallsBack(t *testing.T) {
 	}
 }
 
+func TestBuildClickHouseOptionsJWTRequiresTLS(t *testing.T) {
+	// Forward OAuth Identity must never be used over a plaintext connection.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.Secure = false
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secure (TLS) connection")
+}
+
 func TestBuildClickHouseOptionsJWTRejectsSkipTLSVerify(t *testing.T) {
 	// Forwarding a user token over a connection whose server certificate is
 	// not verified would expose it to interception.
