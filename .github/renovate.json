@@ -7,5 +7,9 @@
       "matchPackageNames": ["*"],
       "semanticCommitType": "chore"
     }
-  ]
+  ],
+  "vulnerabilityAlerts": {
+    "description": "Carve security updates out of the blanket chore(deps) rule: fix(deps) is changelog-visible and bumps the patch version, so CVE fixes produce a release PR",
+    "semanticCommitType": "fix"
+  }
 }
