@@ -1468,7 +1468,15 @@ export class Datasource
   }
 
   filterQuery(query: CHQuery): boolean {
-    return !query.hide;
+    if (query.hide) {
+      return false;
+    }
+
+    // Skip queries with no SQL to run. A logs builder query carries an empty rawSql until its
+    // columns resolve (for example a non-OTel table in the compact editor before the schema fetch
+    // returns); running it would send an empty statement that ClickHouse rejects with a 400. Once
+    // the columns arrive the generated SQL is non-empty and the query runs normally.
+    return Boolean(query.rawSql && query.rawSql.trim().length > 0);
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
