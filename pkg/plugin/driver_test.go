@@ -328,10 +328,10 @@ func TestMutateQueryData(t *testing.T) {
 	h := &Clickhouse{}
 
 	tests := []struct {
-		name   string
+		name    string
 		headers map[string]string
-		want   grafanaHeaders
-		stored bool
+		want    grafanaHeaders
+		stored  bool
 	}{
 		{
 			name: "all headers",
@@ -679,7 +679,7 @@ func baseJWTSettings() Settings {
 	}
 }
 
-func TestBuildClickHouseOptionsJWTTokenlessDataQuery(t *testing.T) {
+func TestBuildClickHouseOptionsJWTDataQueryWithoutToken(t *testing.T) {
 	// A data query (non-nil message) with no forwarded user token is a backend
 	// query with no identity to attribute it to — typically alert evaluation.
 	dataQuery := json.RawMessage(`{}`)
@@ -688,7 +688,7 @@ func TestBuildClickHouseOptionsJWTTokenlessDataQuery(t *testing.T) {
 		settings := baseJWTSettings()
 
 		_, err := buildClickHouseOptions(t.Context(), settings, dataQuery)
-		require.Error(t, err, "tokenless data queries must be rejected when fallback is not allowed")
+		require.Error(t, err, "data queries without a forwarded token must be rejected when fallback is not allowed")
 		assert.Contains(t, err.Error(), "no user identity")
 	})
 
