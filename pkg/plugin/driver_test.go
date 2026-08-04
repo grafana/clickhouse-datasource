@@ -724,6 +724,19 @@ func TestBuildClickHouseOptionsJWTHealthCheckAlwaysFallsBack(t *testing.T) {
 	}
 }
 
+func TestBuildClickHouseOptionsJWTRejectsSkipTLSVerify(t *testing.T) {
+	// Forwarding a user token over a connection whose server certificate is
+	// not verified would expose it to interception.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.InsecureSkipVerify = true
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Skip TLS Verify")
+}
+
 func TestInterpolateMacros(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")

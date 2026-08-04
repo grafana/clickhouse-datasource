@@ -298,7 +298,7 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
 
 ### Requirements and behavior
 
-- **A secure (TLS) connection is required.** Enable **Secure connection** and set the **Port** to a TLS-enabled port. The plugin rejects the connection if JWT authentication is enabled without TLS.
+- **A secure (TLS) connection is required.** Enable **Secure connection** and set the **Port** to a TLS-enabled port. The plugin rejects the connection if JWT authentication is enabled without TLS. It also rejects the connection when **Skip TLS Verify** is enabled, because forwarding a real user's token over an unverified connection exposes it to interception.
 - **Credentials are suppressed on query connections.** When enabled, the configured username and password are not sent on per-query connections; the forwarded token is the sole credential.
 - **Health checks fall back to username and password.** **Save & test** and other health checks run outside a user request, where no user token is available, so they use the configured username and password. Keep valid credentials configured so connection tests can succeed.
 - **Alerting is blocked by default.** Alert rule evaluation also runs outside a user session, so there is no identity to forward. By default these queries are **rejected** rather than run as a shared account. To keep alerting working, enable **Allow service account fallback** in the **Database credentials** section.

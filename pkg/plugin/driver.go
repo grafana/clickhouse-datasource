@@ -226,6 +226,13 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		return nil, backend.DownstreamError(fmt.Errorf("JWT authentication requires a secure (TLS) connection"))
 	}
 
+	// Forwarding a real user's token over a connection whose server
+	// certificate is not verified exposes the token to interception. This is a
+	// higher bar than a shared service credential, so reject the combination.
+	if settings.OAuthPassThru && settings.InsecureSkipVerify {
+		return nil, backend.DownstreamError(fmt.Errorf("Forward OAuth Identity cannot be used with \"Skip TLS Verify\": forwarding a user token over an unverified TLS connection would expose it to interception"))
+	}
+
 	// When Forward OAuth Identity is enabled, a data query (message != nil)
 	// that arrives without a forwarded user token is a backend query with no
 	// user to attribute it to — typically alert rule evaluation. Health checks
