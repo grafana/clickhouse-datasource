@@ -38,6 +38,9 @@ export default {
           placeholder: 'password',
           tooltip: 'ClickHouse password',
         },
+        oauthPassThru: {
+          label: 'Forward OAuth Identity',
+        },
         tlsSkipVerify: {
           label: 'Skip TLS Verify',
           tooltip: 'Skip TLS Verify',

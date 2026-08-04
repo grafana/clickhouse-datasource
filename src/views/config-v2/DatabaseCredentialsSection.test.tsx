@@ -122,6 +122,63 @@ describe('DatabaseCredentialsSection', () => {
     });
   });
 
+  it('reflects oauthPassThru=true from jsonData', () => {
+    const jwtProps = createTestProps({
+      options: {
+        jsonData: {
+          username: 'default',
+          oauthPassThru: true,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<DatabaseCredentialsSection {...jwtProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /forward oauth identity/i });
+    expect(toggle).toBeChecked();
+  });
+
+  it('sets oauthPassThru when toggled on', () => {
+    render(<DatabaseCredentialsSection {...defaultProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /forward oauth identity/i });
+    fireEvent.click(toggle);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(lastArgs.jsonData?.oauthPassThru).toBe(true);
+  });
+
+  it('clears oauthPassThru when toggled off', () => {
+    const jwtProps = createTestProps({
+      options: {
+        jsonData: {
+          username: 'default',
+          oauthPassThru: true,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<DatabaseCredentialsSection {...jwtProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /forward oauth identity/i });
+    fireEvent.click(toggle);
+
+    expect(onOptionsChangeMock).toHaveBeenCalled();
+    const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(lastArgs.jsonData?.oauthPassThru).toBe(false);
+  });
+
   it('resets password when Reset is clicked (isConfigured=true)', () => {
     const configuredProps = createTestProps({
       options: {

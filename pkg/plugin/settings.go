@@ -43,6 +43,7 @@ type Settings struct {
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	OAuthPassThru         bool              `json:"oauthPassThru,omitempty"`
 	CustomSettings        []CustomSetting   `json:"customSettings"`
 	ProxyOptions          *proxy.Options
 
@@ -215,6 +216,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
+		}
+	}
+
+	if jsonData["oauthPassThru"] != nil {
+		if oauthPassThru, ok := jsonData["oauthPassThru"].(string); ok {
+			settings.OAuthPassThru, err = strconv.ParseBool(oauthPassThru)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThru value: %w", err))
+			}
+		} else {
+			settings.OAuthPassThru = jsonData["oauthPassThru"].(bool)
 		}
 	}
 
