@@ -1024,6 +1024,95 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('JSON type ad-hoc filters (#2094)', () => {
+    it('expands JSON-typed columns into self-describing backtick path keys', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'level', type: 'String', table: 'events' },
+        { name: 'ResourceAttributes', type: 'JSON', table: 'events' },
+      ]);
+      // fetchUniqueJSONPathsForAdhoc → distinct JSON paths for ResourceAttributes.
+      const pathsFrame = arrayToDataFrame([{ path: 'k8s.pod' }, { path: 'level' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('JSONAllPaths("ResourceAttributes")')) {
+          return of({ data: [pathsFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      // Each level backtick-quoted: the key is self-describing, so escapeKey
+      // renders cast JSON access with no JSON-column cache.
+      expect(keys).toEqual([
+        { text: 'events.level' },
+        { text: 'events.ResourceAttributes.`k8s`.`pod`' },
+        { text: 'events.ResourceAttributes.`level`' },
+      ]);
+    });
+
+    it('reads a companion <col>Keys array column instead of JSONAllPaths when present', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'ResourceAttributes', type: 'JSON', table: 'events' },
+        { name: 'ResourceAttributesKeys', type: 'Array(String)', table: 'events' },
+      ]);
+      const pathsFrame = arrayToDataFrame([{ path: 'service.name' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("ResourceAttributesKeys")')) {
+          return of({ data: [pathsFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toContainEqual({ text: 'events.ResourceAttributes.`service`.`name`' });
+      // Discovery read the companion array column, not JSONAllPaths.
+      const probedSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql as string)
+        .find((s) => s.includes('arrayJoin('));
+      expect(probedSql).toContain('arrayJoin("ResourceAttributesKeys")');
+      expect(probedSql).not.toContain('JSONAllPaths');
+    });
+
+    it('fetches values for a minted JSON key with the cast, no prior getTagKeys call', async () => {
+      // Stateless round-trip: on a fresh dashboard load (caches empty) the
+      // value SELECT must still cast the JSON sub-path — an uncast Dynamic path
+      // reads back all-null over the native protocol.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'events' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'api' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const values = await ds.getTagValues({ key: 'events.ResourceAttributes.`k8s`.`pod`' });
+      expect(values).toEqual([{ text: 'api' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: 'select distinct ResourceAttributes.`k8s`.`pod`::Nullable(String) from db.events limit 1000',
+            }),
+          ]),
+        })
+      );
+    });
+  });
+
   describe('fetchUniqueMapKeys probe (#1843)', () => {
     it('bounds the probe to a row-sampled subquery for free-form tables (no time column known)', async () => {
       // Without a known time column the probe can't prune by partition, so it

@@ -1,5 +1,6 @@
 import { AdHocVariableFilter } from '@grafana/data';
 import { getTable } from './ast';
+import { buildJSONPathAccess, parseJSONAdhocKey } from './jsonPath';
 
 // OTel-standard Map columns. Retained as a fallback so behavior does not
 // regress when schema info has not been populated (e.g. in tests that
@@ -11,10 +12,15 @@ export class AdHocFilter {
   private _mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS;
 
   setTargetTableFromQuery(query: string) {
-    this._targetTable = getTable(query);
-    if (this._targetTable === '') {
+    // Reset first so that if getTable() throws (its pgsql AST can't parse some
+    // valid ClickHouse SQL, e.g. backtick identifiers) we don't retain a stale
+    // table from a previous query — apply() then re-derives from the panel SQL.
+    this._targetTable = '';
+    const table = getTable(query);
+    if (table === '') {
       throw new Error('Failed to get table from adhoc query.');
     }
+    this._targetTable = table;
   }
 
   /**
@@ -122,6 +128,14 @@ function unescapeCHStringLiteral(s: string): string {
   return s.replace(/\\(.)/g, '$1');
 }
 
+// `buildJSONPathAccess` output embedded inside the single-quoted
+// `additional_table_filters` string needs one further layer of string escaping
+// (`'` → `\'`, `\` → `\\`) over the whole expression.
+function buildJSONAccessForOuterFilter(col: string, path: string): string {
+  const expr = buildJSONPathAccess(col, path);
+  return expr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
@@ -142,9 +156,17 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const [, , mapCol, literalKey] = bracketed;
     const mapKey = unescapeCHStringLiteral(literalKey);
     if (isJSON) {
-      return `${mapCol}.${mapKey}`;
+      return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
     return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+  }
+
+  // Stateless JSON path form minted by getTagKeys (`col.`seg``): the backtick
+  // form is itself the signal, so it renders with no column cache (mirrors the
+  // Map bracket form above).
+  const jsonKey = parseJSONAdhocKey(s);
+  if (jsonKey) {
+    return buildJSONAccessForOuterFilter(jsonKey.column, jsonKey.path);
   }
 
   const parts = s.split('.');
@@ -157,7 +179,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const mapCol = parts[1];
     const mapKey = parts.slice(2).join('.');
     if (isJSON) {
-      return `${mapCol}.${mapKey}`;
+      return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
     return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
   }
@@ -169,7 +191,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const mapCol = parts[0];
     const mapKey = parts.slice(1).join('.');
     if (isJSON) {
-      return s;
+      return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
     return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
   }
