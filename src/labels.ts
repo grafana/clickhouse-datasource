@@ -44,7 +44,7 @@ export default {
         oauthPassThruAllowFallback: {
           label: 'Allow service account fallback',
           tooltip:
-            'When Forward OAuth Identity is enabled, alert rules and other backend queries run without a signed-in user. By default they are blocked. Enable this to let them fall back to the configured username/password. Those queries then run as the shared service account and are NOT subject to the per-user row policies or quotas enforced for interactive queries.',
+            'Run queries with no signed-in user (alert rules and other backend queries) using the configured username and password instead of failing them; per-user row policies and quotas will not apply.',
         },
         tlsSkipVerify: {
           label: 'Skip TLS Verify',
