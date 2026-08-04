@@ -165,6 +165,11 @@ func resolveJWTAuth(settings Settings, httpHeaders map[string]string) (clickhous
 func wrapCategorizedConnectionError(err error) error {
 	category := CategorizeConnectionError(err)
 	backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
+	if category == ConnectionErrorCategoryAuth {
+		if hint := authErrorHint(err); hint != "" {
+			return backend.DownstreamError(fmt.Errorf("[%s] %w (%s)", category, err, hint))
+		}
+	}
 	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
 }
 

@@ -294,3 +294,29 @@ func TestCategorizeConnectionError(t *testing.T) {
 		})
 	}
 }
+
+func TestAuthErrorHint(t *testing.T) {
+	tests := []struct {
+		name        string
+		err         error
+		wantSubstr  string
+		wantNoMatch bool
+	}{
+		{name: "HTTP 401", err: errors.New("clickhouse [HTTP 401]: Unauthorized"), wantSubstr: "sign out and back in"},
+		{name: "HTTP 403", err: errors.New("clickhouse [HTTP 403]: Forbidden"), wantSubstr: "missing a required ClickHouse role"},
+		{name: "native AUTHENTICATION_FAILED", err: &clickhouse.Exception{Code: 516, Message: "Authentication failed"}, wantSubstr: "sign out and back in"},
+		{name: "native NOT_ENOUGH_PRIVILEGES", err: &clickhouse.Exception{Code: 497, Message: "Not enough privileges"}, wantSubstr: "missing a required ClickHouse role"},
+		{name: "non-auth error yields no hint", err: errors.New("dial tcp: connection refused"), wantNoMatch: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := authErrorHint(tt.err)
+			if tt.wantNoMatch {
+				assert.Empty(t, got)
+				return
+			}
+			assert.Contains(t, got, tt.wantSubstr)
+		})
+	}
+}
