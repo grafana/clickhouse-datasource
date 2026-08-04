@@ -3,8 +3,7 @@
   "release-type": "node",
   "include-v-in-tag": true,
   "include-component-in-tag": false,
-  "skip-github-release": true,
-  "bootstrap-sha": "eef5ef85e9aa5027a1612efad89b4cceb5938c9a",
+  "bootstrap-sha": "973c4a508220c378ef8a477f3133bba935ca2345",
   "changelog-sections": [
     { "type": "feat", "section": "🎉 Features" },
     { "type": "fix", "section": "🐛 Bug Fixes" },

@@ -19,6 +19,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       # PRs created with the default GITHUB_TOKEN do not trigger CI runs,
       # so the release PR is created with an app token instead.
@@ -29,9 +32,34 @@ jobs:
           github_app: grafana-oss-big-tent
 
       - name: Run release-please
+        id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ steps.generate-github-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
           target-branch: main
+
+  # When the release PR merges, release-please creates the vX.Y.Z tag and
+  # GitHub release, and this job publishes that tag to the prod catalog
+  # (Grafana Cloud scope). CD tolerates the pre-existing tag and attaches
+  # the plugin zips to the release that release-please created.
+  # On-prem, docs-only, and emergency publishes remain available via the
+  # manual dispatch in publish.yml.
+  publish:
+    name: Publish to prod catalog
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v10.1.0
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pull-requests: read
+    with:
+      branch: ${{ needs.release-please.outputs.tag_name }}
+      environment: prod
+      scopes: grafana_cloud
+      release-reference-regex: 'main|v\d+\.\d+\.\d+'
+      run-playwright: false
+      github-draft-release: false
