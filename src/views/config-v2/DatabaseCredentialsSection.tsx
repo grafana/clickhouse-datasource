@@ -43,7 +43,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
   useEffect(() => {
     // Always clear the error eagerly when the user fills in the field,
     // regardless of whether the ValidationAPI is available.
-    if (jsonData.username || jsonData.oauthPassThru) {
+    if (jsonData.username) {
       setFieldErrors((prev) => {
         const next = { ...prev };
         delete next.username;
@@ -56,14 +56,18 @@ export const DatabaseCredentialsSection = (props: Props) => {
     }
     return validation.registerValidation(() => {
       const errors: Record<string, string> = {};
-      if (!jsonData.username && !jsonData.oauthPassThru) {
+      // Username stays required even under Forward OAuth Identity: health
+      // checks and (when enabled) alert fallback authenticate with these
+      // static credentials, so a blank username would pass validation but
+      // fail Save & test.
+      if (!jsonData.username) {
         errors.username = labels.username.error;
       }
       setFieldErrors(errors);
       Object.entries(errors).forEach(([field, msg]) => validation.setError(field, msg));
       return Object.keys(errors).length === 0;
     });
-  }, [jsonData.username, jsonData.oauthPassThru, validation, labels.username.error]);
+  }, [jsonData.username, validation, labels.username.error]);
 
   const onResetPassword = () => {
     onOptionsChange({
@@ -107,7 +111,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
                 </TextLink>
               </>
             }
-            required={!jsonData.oauthPassThru}
+            required
             invalid={!!fieldErrors.username}
             error={fieldErrors.username}
           >

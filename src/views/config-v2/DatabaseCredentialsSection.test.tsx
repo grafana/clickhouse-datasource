@@ -120,6 +120,28 @@ describe('DatabaseCredentialsSection', () => {
 
       expect(screen.queryByText('Username is required')).not.toBeInTheDocument();
     });
+
+    it('still requires username when Forward OAuth Identity is enabled', async () => {
+      // Username backs health checks and (when enabled) alert fallback, so it
+      // must stay required even with oauthPassThru on — otherwise validation
+      // passes but Save & test fails.
+      const oauthEmptyProps = createTestProps({
+        options: {
+          jsonData: { username: '', oauthPassThru: true },
+          secureJsonData: {},
+          secureJsonFields: {},
+        },
+        mocks: { onOptionsChange: jest.fn() },
+      });
+      const validation = createMockValidation();
+      render(<DatabaseCredentialsSection {...oauthEmptyProps} validation={validation} />);
+
+      await act(async () => {
+        validation.runValidator();
+      });
+
+      expect(screen.getByText('Username is required')).toBeInTheDocument();
+    });
   });
 
   it('reflects oauthPassThru=true from jsonData', () => {
