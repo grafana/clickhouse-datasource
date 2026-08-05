@@ -407,3 +407,65 @@ func TestLoadSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadSettingsOAuthPassThru(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse oauthPassThru as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "oauthPassThru": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.OAuthPassThru)
+	})
+
+	t.Run("should parse oauthPassThru as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "oauthPassThru": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.OAuthPassThru)
+	})
+
+	t.Run("should default oauthPassThru to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.OAuthPassThru)
+	})
+}
+
+func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse oauthPassThruAllowFallback as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "oauthPassThruAllowFallback": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.OAuthPassThruAllowFallback)
+	})
+
+	t.Run("should parse oauthPassThruAllowFallback as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "oauthPassThruAllowFallback": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.OAuthPassThruAllowFallback)
+	})
+
+	t.Run("should default oauthPassThruAllowFallback to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.OAuthPassThruAllowFallback)
+	})
+}

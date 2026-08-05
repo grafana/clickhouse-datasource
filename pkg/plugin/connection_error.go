@@ -61,6 +61,38 @@ func httpStatusCode(errStr string) int {
 	return code
 }
 
+// authErrorHint returns human-readable guidance for an authentication failure,
+// distinguishing "who are you" (expired/invalid credentials — sign out and back
+// in to refresh a forwarded token) from "you may not do that" (missing role or
+// privilege). It returns an empty string when the error is not a recognized
+// auth failure. Both HTTP status codes and native ClickHouse exception codes
+// are handled.
+func authErrorHint(err error) string {
+	const (
+		unauthenticated = "authentication failed — the credentials or forwarded token may be missing or expired; if using Forward OAuth Identity, sign out and back in to refresh the token"
+		unauthorized    = "access denied — the authenticated identity is missing a required ClickHouse role or privilege"
+	)
+
+	switch httpStatusCode(err.Error()) {
+	case 401:
+		return unauthenticated
+	case 403:
+		return unauthorized
+	}
+
+	var exception *clickhouse.Exception
+	if errors.As(err, &exception) {
+		switch exception.Code {
+		case 516: // AUTHENTICATION_FAILED
+			return unauthenticated
+		case 497, 164: // NOT_ENOUGH_PRIVILEGES, READONLY
+			return unauthorized
+		}
+	}
+
+	return ""
+}
+
 // CategorizeConnectionError classifies a connection error into a ConnectionErrorCategory.
 // Typed errors are checked first; string matching is used as a fallback for HTTP
 // transport errors that the clickhouse-go driver surfaces as plain strings.

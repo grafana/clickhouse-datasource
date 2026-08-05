@@ -1,4 +1,16 @@
-import { Box, CollapsableSection, Field, Input, SecretInput, Text, TextLink, useStyles2 } from '@grafana/ui';
+import {
+  Box,
+  Checkbox,
+  CollapsableSection,
+  Field,
+  Icon,
+  Input,
+  SecretInput,
+  Text,
+  TextLink,
+  Tooltip,
+  useStyles2,
+} from '@grafana/ui';
 import React, { useEffect, useState } from 'react';
 import { CONFIG_SECTION_HEADERS, CONTAINER_MIN_WIDTH } from './constants';
 import {
@@ -44,6 +56,10 @@ export const DatabaseCredentialsSection = (props: Props) => {
     }
     return validation.registerValidation(() => {
       const errors: Record<string, string> = {};
+      // Username stays required even under Forward OAuth Identity: health
+      // checks and (when enabled) alert fallback authenticate with these
+      // static credentials, so a blank username would pass validation but
+      // fail Save & test.
       if (!jsonData.username) {
         errors.username = labels.username.error;
       }
@@ -132,6 +148,56 @@ export const DatabaseCredentialsSection = (props: Props) => {
             />
           </Field>
         </div>
+        <Checkbox
+          label={labels.oauthPassThru.label}
+          description={
+            <>
+              {'Authenticate using '}
+              <TextLink
+                variant="bodySmall"
+                href="https://clickhouse.com/docs/en/operations/external-authenticators/jwt"
+                external
+              >
+                JWT
+              </TextLink>
+              {' '}
+              <Tooltip content="ClickHouse Cloud only" placement="top">
+                <Icon name="info-circle" size="sm" />
+              </Tooltip>
+              {'. When enabled, credentials are only used for health checks.'}
+            </>
+          }
+          checked={jsonData.oauthPassThru || false}
+          onChange={(e) => {
+            const checked = e.currentTarget.checked;
+            onOptionsChange({
+              ...options,
+              jsonData: {
+                ...jsonData,
+                oauthPassThru: checked,
+              },
+            });
+          }}
+        />
+        {jsonData.oauthPassThru && (
+          <Box marginTop={1}>
+            <Checkbox
+              label={labels.oauthPassThruAllowFallback.label}
+              description={labels.oauthPassThruAllowFallback.tooltip}
+              checked={jsonData.oauthPassThruAllowFallback || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    oauthPassThruAllowFallback: checked,
+                  },
+                });
+              }}
+            />
+          </Box>
+        )}
       </CollapsableSection>
     </Box>
   );

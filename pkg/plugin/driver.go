@@ -141,30 +141,41 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 	return true, nil
 }
 
+// resolveJWTAuth builds the ClickHouse Auth and GetJWT callback when JWT
+// authentication is enabled. The Bearer token is removed from httpHeaders
+// (mutated in-place) and returned via the GetJWT callback instead.
+func resolveJWTAuth(settings Settings, httpHeaders map[string]string) (clickhouse.Auth, clickhouse.GetJWTFunc) {
+	auth := clickhouse.Auth{
+		Database: settings.DefaultDatabase,
+		Username: settings.Username,
+		Password: settings.Password,
+	}
+
+	authHeader := httpHeaders[backend.OAuthIdentityTokenHeaderName]
+	if !settings.OAuthPassThru || authHeader == "" {
+		return auth, nil
+	}
+
+	delete(httpHeaders, backend.OAuthIdentityTokenHeaderName)
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	return clickhouse.Auth{Database: settings.DefaultDatabase},
+		func(context.Context) (string, error) { return token, nil }
+}
+
 func wrapCategorizedConnectionError(err error) error {
 	category := CategorizeConnectionError(err)
 	backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
+	if category == ConnectionErrorCategoryAuth {
+		if hint := authErrorHint(err); hint != "" {
+			return backend.DownstreamError(fmt.Errorf("[%s] %w (%s)", category, err, hint))
+		}
+	}
 	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
 }
 
-// Connect opens a sql.DB connection using datasource settings
-func (h *Clickhouse) Connect(
-	ctx context.Context,
-	config backend.DataSourceInstanceSettings,
-	message json.RawMessage,
-) (*sql.DB, error) {
-	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse connect", trace.WithAttributes(
-		attribute.String("db.system", "clickhouse"),
-	))
-
-	defer span.End()
-
-	settings, err := LoadSettings(ctx, config)
-	if err != nil {
-		return nil, wrapCategorizedConnectionError(err)
-	}
-
+func buildClickHouseOptions(ctx context.Context, settings Settings, message json.RawMessage) (*clickhouse.Options, error) {
 	var tlsConfig *tls.Config
+	var err error
 	if settings.TlsAuthWithCACert || settings.TlsClientAuth {
 		tlsConfig, err = getTLSConfig(settings)
 		if err != nil {
@@ -216,13 +227,43 @@ func (h *Clickhouse) Connect(
 		httpHeaders[k] = v
 	}
 
+	if settings.OAuthPassThru && tlsConfig == nil {
+		return nil, backend.DownstreamError(fmt.Errorf("JWT authentication requires a secure (TLS) connection"))
+	}
+
+	// Forwarding a real user's token over a connection whose server
+	// certificate is not verified exposes the token to interception. This is a
+	// higher bar than a shared service credential, so reject the combination.
+	if settings.OAuthPassThru && settings.InsecureSkipVerify {
+		return nil, backend.DownstreamError(fmt.Errorf("the \"Forward OAuth Identity\" and \"Skip TLS Verify\" options cannot be combined: forwarding a user token over an unverified TLS connection would expose it to interception"))
+	}
+
+	// When Forward OAuth Identity is enabled, a data query (message != nil)
+	// that arrives without a forwarded user token is a backend query with no
+	// user to attribute it to — typically alert rule evaluation. Health checks
+	// and schema introspection pass a nil message and always fall back, since
+	// no user token is ever available for them.
+	if settings.OAuthPassThru && message != nil && httpHeaders[backend.OAuthIdentityTokenHeaderName] == "" {
+		if !settings.OAuthPassThruAllowFallback {
+			return nil, backend.DownstreamError(fmt.Errorf(
+				"this query carries no user identity but \"Forward OAuth Identity\" is enabled; " +
+					"it is running outside a user session (for example, an alert rule). Enable " +
+					"\"Allow service account fallback\" on the data source to let these queries " +
+					"run with the configured username/password, or ensure the request forwards a user OAuth token"))
+		}
+		// Fallback is opt-in and exercised: warn so the privilege divergence is
+		// not silent. These queries run as the shared service account and are
+		// not subject to the per-user row policies or quotas that OAuth
+		// pass-through enforces for interactive queries.
+		backend.Logger.Warn("Forward OAuth Identity: query has no forwarded user identity; " +
+			"falling back to the configured username/password (service account)")
+	}
+
+	auth, getJWT := resolveJWTAuth(settings, httpHeaders)
+
 	opts := &clickhouse.Options{
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
-		Auth: clickhouse.Auth{
-			Database: settings.DefaultDatabase,
-			Password: settings.Password,
-			Username: settings.Username,
-		},
+		Auth: auth,
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
 		},
@@ -230,6 +271,7 @@ func (h *Clickhouse) Connect(
 			Method: compression,
 		},
 		DialTimeout: time.Duration(t) * time.Second,
+		GetJWT:      getJWT,
 		HttpHeaders: httpHeaders,
 		HttpUrlPath: settings.Path,
 		Protocol:    protocol,
@@ -238,7 +280,7 @@ func (h *Clickhouse) Connect(
 		TLS:         tlsConfig,
 	}
 
-	// dialCtx is used to create a connection to PDC, if it is enabled
+	// dialCtx is used to create a connection to PDC, if it is enabled above
 	dialCtx, err := getPDCDialContext(settings)
 	if err != nil {
 		return nil, err
@@ -247,7 +289,32 @@ func (h *Clickhouse) Connect(
 		opts.DialContext = dialCtx
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(t)*time.Second)
+	return opts, nil
+}
+
+// Connect opens a sql.DB connection using datasource settings
+func (h *Clickhouse) Connect(
+	ctx context.Context,
+	config backend.DataSourceInstanceSettings,
+	message json.RawMessage,
+) (*sql.DB, error) {
+	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse connect", trace.WithAttributes(
+		attribute.String("db.system", "clickhouse"),
+	))
+
+	defer span.End()
+
+	settings, err := LoadSettings(ctx, config)
+	if err != nil {
+		return nil, wrapCategorizedConnectionError(err)
+	}
+
+	opts, err := buildClickHouseOptions(ctx, settings, message)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, opts.DialTimeout)
 	defer cancel()
 
 	db := clickhouse.OpenDB(opts)
@@ -373,7 +440,7 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders:  settings.ForwardGrafanaHeaders,
+		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
 		RowCapacityHint: settings.RowCapacityHint,
 	}
 }

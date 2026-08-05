@@ -328,10 +328,10 @@ func TestMutateQueryData(t *testing.T) {
 	h := &Clickhouse{}
 
 	tests := []struct {
-		name   string
+		name    string
 		headers map[string]string
-		want   grafanaHeaders
-		stored bool
+		want    grafanaHeaders
+		stored  bool
 	}{
 		{
 			name: "all headers",
@@ -503,6 +503,250 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
+}
+
+func TestSettingsForwardHeadersWithJWT(t *testing.T) {
+	h := &Clickhouse{}
+
+	t.Run("ForwardHeaders is true when oauthPassThru is enabled", func(t *testing.T) {
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "oauthPassThru": true, "forwardGrafanaHeaders": false}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.True(t, ds.ForwardHeaders)
+	})
+
+	t.Run("ForwardHeaders is true when forwardGrafanaHeaders is enabled", func(t *testing.T) {
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "oauthPassThru": false, "forwardGrafanaHeaders": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.True(t, ds.ForwardHeaders)
+	})
+
+	t.Run("ForwardHeaders is false when both are disabled", func(t *testing.T) {
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.False(t, ds.ForwardHeaders)
+	})
+}
+
+func TestExtractForwardedHeadersWithAuthorization(t *testing.T) {
+	t.Run("extracts Authorization header from message", func(t *testing.T) {
+		message := json.RawMessage(`{
+			"grafana-http-headers": {
+				"Authorization": ["Bearer test-token-123"],
+				"X-Grafana-User": ["alice"]
+			}
+		}`)
+		headers, err := extractForwardedHeadersFromMessage(message)
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer test-token-123", headers["Authorization"])
+		assert.Equal(t, "alice", headers["X-Grafana-User"])
+	})
+
+	t.Run("returns empty map when message is nil", func(t *testing.T) {
+		headers, err := extractForwardedHeadersFromMessage(nil)
+		assert.NoError(t, err)
+		assert.Empty(t, headers)
+	})
+}
+
+func TestResolveJWTAuth(t *testing.T) {
+	baseSettings := Settings{
+		DefaultDatabase: "default",
+		Username:        "admin",
+		Password:        "secret",
+	}
+
+	t.Run("JWT enabled clears credentials and moves token to GetJWT", func(t *testing.T) {
+		s := baseSettings
+		s.OAuthPassThru = true
+		headers := map[string]string{"Authorization": "Bearer my-jwt-token"}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Empty(t, auth.Username)
+		assert.Empty(t, auth.Password)
+		assert.Equal(t, "default", auth.Database)
+		assert.NotNil(t, getJWT)
+
+		token, err := getJWT(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "my-jwt-token", token)
+
+		_, exists := headers["Authorization"]
+		assert.False(t, exists, "Authorization header should be removed from httpHeaders")
+	})
+
+	t.Run("token is read from the SDK OAuth identity header constant", func(t *testing.T) {
+		s := baseSettings
+		s.OAuthPassThru = true
+		// Key the header with the SDK constant rather than a literal so this
+		// fails if backend.OAuthIdentityTokenHeaderName ever stops being the
+		// header resolveJWTAuth reads.
+		headers := map[string]string{backend.OAuthIdentityTokenHeaderName: "Bearer my-jwt-token"}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Empty(t, auth.Username)
+		assert.Empty(t, auth.Password)
+		assert.NotNil(t, getJWT)
+
+		token, err := getJWT(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, "my-jwt-token", token)
+
+		_, exists := headers[backend.OAuthIdentityTokenHeaderName]
+		assert.False(t, exists, "OAuth identity header should be removed from httpHeaders")
+	})
+
+	t.Run("JWT enabled but no token falls back to credentials", func(t *testing.T) {
+		s := baseSettings
+		s.OAuthPassThru = true
+		headers := map[string]string{}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Equal(t, "admin", auth.Username)
+		assert.Equal(t, "secret", auth.Password)
+		assert.Nil(t, getJWT)
+	})
+
+	t.Run("JWT disabled uses credentials regardless of token", func(t *testing.T) {
+		s := baseSettings
+		s.OAuthPassThru = false
+		headers := map[string]string{"Authorization": "Bearer some-token"}
+
+		auth, getJWT := resolveJWTAuth(s, headers)
+
+		assert.Equal(t, "admin", auth.Username)
+		assert.Equal(t, "secret", auth.Password)
+		assert.Nil(t, getJWT)
+		assert.Equal(t, "Bearer some-token", headers["Authorization"])
+	})
+}
+
+func TestBuildClickHouseOptionsJWTBothProtocols(t *testing.T) {
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	for _, protocol := range []string{"native", "http"} {
+		t.Run(protocol, func(t *testing.T) {
+			settings := Settings{
+				Host:          "localhost",
+				Port:          9440,
+				Protocol:      protocol,
+				Secure:        true,
+				OAuthPassThru: true,
+				Username:      "svc",
+				Password:      "fallback",
+				DialTimeout:   "5",
+				QueryTimeout:  "30",
+			}
+
+			opts, err := buildClickHouseOptions(t.Context(), settings, message)
+			assert.NoError(t, err)
+
+			assert.NotNil(t, opts.GetJWT, "GetJWT must be set for %s protocol", protocol)
+			token, err := opts.GetJWT(context.Background())
+			assert.NoError(t, err)
+			assert.Equal(t, "my-jwt-token", token)
+
+			assert.Empty(t, opts.Auth.Username, "username must be cleared when JWT is active")
+			assert.Empty(t, opts.Auth.Password, "password must be cleared when JWT is active")
+		})
+	}
+}
+
+// baseJWTSettings returns a valid secure OAuthPassThru configuration with a
+// service-account username/password configured as the fallback credential.
+func baseJWTSettings() Settings {
+	return Settings{
+		Host:          "localhost",
+		Port:          9440,
+		Protocol:      "native",
+		Secure:        true,
+		OAuthPassThru: true,
+		Username:      "svc",
+		Password:      "fallback",
+		DialTimeout:   "5",
+		QueryTimeout:  "30",
+	}
+}
+
+func TestBuildClickHouseOptionsJWTDataQueryWithoutToken(t *testing.T) {
+	// A data query (non-nil message) with no forwarded user token is a backend
+	// query with no identity to attribute it to — typically alert evaluation.
+	dataQuery := json.RawMessage(`{}`)
+
+	t.Run("blocked by default", func(t *testing.T) {
+		settings := baseJWTSettings()
+
+		_, err := buildClickHouseOptions(t.Context(), settings, dataQuery)
+		require.Error(t, err, "data queries without a forwarded token must be rejected when fallback is not allowed")
+		assert.Contains(t, err.Error(), "no user identity")
+	})
+
+	t.Run("falls back to service account when fallback is allowed", func(t *testing.T) {
+		settings := baseJWTSettings()
+		settings.OAuthPassThruAllowFallback = true
+
+		opts, err := buildClickHouseOptions(t.Context(), settings, dataQuery)
+		require.NoError(t, err)
+
+		assert.Nil(t, opts.GetJWT, "GetJWT must be nil when no token is forwarded")
+		assert.Equal(t, "svc", opts.Auth.Username)
+		assert.Equal(t, "fallback", opts.Auth.Password)
+	})
+}
+
+func TestBuildClickHouseOptionsJWTHealthCheckAlwaysFallsBack(t *testing.T) {
+	// Health checks and schema introspection pass a nil message; no user token
+	// is ever available for them, so they always fall back regardless of the
+	// OAuthPassThruAllowFallback setting.
+	for _, allowFallback := range []bool{false, true} {
+		t.Run(fmt.Sprintf("allowFallback=%v", allowFallback), func(t *testing.T) {
+			settings := baseJWTSettings()
+			settings.OAuthPassThruAllowFallback = allowFallback
+
+			opts, err := buildClickHouseOptions(t.Context(), settings, nil)
+			require.NoError(t, err, "health checks (nil message) must never be blocked")
+
+			assert.Nil(t, opts.GetJWT)
+			assert.Equal(t, "svc", opts.Auth.Username)
+			assert.Equal(t, "fallback", opts.Auth.Password)
+		})
+	}
+}
+
+func TestBuildClickHouseOptionsJWTRequiresTLS(t *testing.T) {
+	// Forward OAuth Identity must never be used over a plaintext connection.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.Secure = false
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "secure (TLS) connection")
+}
+
+func TestBuildClickHouseOptionsJWTRejectsSkipTLSVerify(t *testing.T) {
+	// Forwarding a user token over a connection whose server certificate is
+	// not verified would expose it to interception.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.InsecureSkipVerify = true
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Skip TLS Verify")
 }
 
 func TestInterpolateMacros(t *testing.T) {

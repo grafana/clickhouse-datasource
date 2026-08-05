@@ -134,6 +134,13 @@ describe('ConfigEditor', () => {
     expect(screen.getByTestId(labels.enableRowLimit.testid)).toBeChecked();
   });
 
+  it('reflects oauthPassThru=true from jsonData', () => {
+    render(<ConfigEditor {...mockConfigEditorProps({ oauthPassThru: true })} />);
+    const toggle = document.getElementById('oauthPassThru') as HTMLInputElement;
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.checked).toBe(true);
+  });
+
   it('shows the required-field error on an empty host when config validation is not enabled', () => {
     // On a default install the clickHouseConfigValidation feature toggle is off,
     // so `validation` is undefined. The required host field must still show an

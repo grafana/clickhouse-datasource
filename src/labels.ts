@@ -38,6 +38,14 @@ export default {
           placeholder: 'password',
           tooltip: 'ClickHouse password',
         },
+        oauthPassThru: {
+          label: 'Forward OAuth Identity',
+        },
+        oauthPassThruAllowFallback: {
+          label: 'Allow service account fallback',
+          tooltip:
+            'Run queries with no signed-in user (alert rules and other backend queries) using the configured username and password instead of failing them; per-user row policies and quotas will not apply.',
+        },
         tlsSkipVerify: {
           label: 'Skip TLS Verify',
           tooltip: 'Skip TLS Verify',

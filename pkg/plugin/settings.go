@@ -43,6 +43,15 @@ type Settings struct {
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	OAuthPassThru         bool              `json:"oauthPassThru,omitempty"`
+	// OAuthPassThruAllowFallback controls what happens when Forward OAuth
+	// Identity is enabled but a data query arrives without a forwarded user
+	// token (for example, alert rule evaluation, which runs outside a user
+	// session). When false (the default) such queries are rejected; when true
+	// they fall back to the configured username/password (service account).
+	// Health checks and schema introspection always fall back regardless of
+	// this setting, since no user token is ever available for them.
+	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
 	CustomSettings        []CustomSetting   `json:"customSettings"`
 	ProxyOptions          *proxy.Options
 
@@ -215,6 +224,28 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
+		}
+	}
+
+	if jsonData["oauthPassThru"] != nil {
+		if oauthPassThru, ok := jsonData["oauthPassThru"].(string); ok {
+			settings.OAuthPassThru, err = strconv.ParseBool(oauthPassThru)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThru value: %w", err))
+			}
+		} else {
+			settings.OAuthPassThru = jsonData["oauthPassThru"].(bool)
+		}
+	}
+
+	if jsonData["oauthPassThruAllowFallback"] != nil {
+		if allowFallback, ok := jsonData["oauthPassThruAllowFallback"].(string); ok {
+			settings.OAuthPassThruAllowFallback, err = strconv.ParseBool(allowFallback)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThruAllowFallback value: %w", err))
+			}
+		} else {
+			settings.OAuthPassThruAllowFallback = jsonData["oauthPassThruAllowFallback"].(bool)
 		}
 	}
 
