@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
+import { generateSql } from 'data/sqlGenerator';
 import {
   BuilderMode,
   ColumnHint,
@@ -403,6 +404,40 @@ describe('QueryBuilder', () => {
     // The remaining top-level scalars surface as plain (hint-less) fields.
     expect(columns.find((c) => c.name === 'service')?.hint).toBeUndefined();
     expect(columns.find((c) => c.name === 'host')?.hint).toBeUndefined();
+  });
+
+  it('emits no runnable query for a non-OTel compact logs table before its schema loads', async () => {
+    // Cold-load transient: fetchColumns has not returned, so no time/message/scalar column can be
+    // resolved. The logs query must be empty rather than an invalid `SELECT  FROM host_logs`, which
+    // ClickHouse rejects with a 400. generateSql returns '' for a columns-less logs query, and
+    // filterQuery (tested in CHDatasource) skips an empty query so Grafana never sends it.
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'logs'),
+      getDefaultLogsTable: jest.fn(() => 'host_logs'),
+      getDefaultLogsColumns: jest.fn(() => new Map()),
+      getLogsOtelVersion: jest.fn(() => undefined),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      shouldIncludeAllLogColumns: jest.fn(() => true),
+      getAdditionalLogColumns: jest.fn(() => []),
+      fetchColumns: jest.fn(() => Promise.resolve([])),
+    } as unknown as Datasource;
+
+    const getOptions = renderCompactWithRealReducer(compactDs);
+
+    await waitFor(() => {
+      expect(getOptions().queryType).toBe(QueryType.Logs);
+    });
+
+    const options = getOptions();
+    // No column could be resolved from an empty schema, so nothing is projected...
+    expect(options.columns || []).toHaveLength(0);
+    // ...and the generated logs query is empty rather than `SELECT  FROM "logs"."host_logs"`.
+    expect(generateSql(options)).toBe('');
   });
 
   it('surfaces include-all columns with no duplicate projection in OTel compact mode (the new hooks no-op)', async () => {
