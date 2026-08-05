@@ -130,7 +130,7 @@ After adding the data source, configure the following settings.
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
 | **Username**          | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions).                                                                         |
 | **Password**          | ClickHouse user password.                                                                                                                               |
-| **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings). See [JWT authentication](#jwt-authentication). |
+| **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings). See [Forward OAuth Identity](#forward-oauth-identity). |
 | **Default database**  | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`.                                      |
 | **Default table**     | The default table used by the query builder.                                                                                                            |
 
@@ -284,7 +284,7 @@ With header forwarding enabled, connections are keyed by the forwarded header se
 
 To forward headers other than the Grafana-set ones — for example, bearer tokens or tenant identifiers — add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
 
-## JWT authentication
+## Forward OAuth Identity
 
 {{< admonition type="note" >}}
 JWT authentication requires server-side support for JSON Web Tokens, which is currently [ClickHouse Cloud only](https://clickhouse.com/docs/en/operations/external-authenticators/jwt). It is not available on self-hosted or open source ClickHouse.
