@@ -1383,16 +1383,24 @@ describe('ClickHouseDatasource', () => {
   });
 
   describe('filterQuery', () => {
-    it('returns true when hide is not set', () => {
-      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
+    it('returns true for a non-hidden query with SQL', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: 'SELECT 1' } as CHQuery)).toBe(true);
     });
 
-    it('returns true when hide is false', () => {
-      expect(mockDatasource.filterQuery({ refId: '1', hide: false } as CHQuery)).toBe(true);
+    it('returns true when hide is false and SQL is present', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', hide: false, rawSql: 'SELECT 1' } as CHQuery)).toBe(true);
     });
 
     it('returns false when hide is true', () => {
-      expect(mockDatasource.filterQuery({ refId: '1', hide: true } as CHQuery)).toBe(false);
+      expect(mockDatasource.filterQuery({ refId: '1', hide: true, rawSql: 'SELECT 1' } as CHQuery)).toBe(false);
+    });
+
+    it('returns false when rawSql is empty, so an incomplete builder query is not run', () => {
+      // A logs builder query has an empty rawSql until its columns resolve (e.g. a non-OTel table
+      // in the compact editor before the schema fetch returns). Running it would 400 at the backend.
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '' } as CHQuery)).toBe(false);
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '   ' } as CHQuery)).toBe(false);
+      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(false);
     });
   });
 
@@ -2559,23 +2567,13 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns null for the Body core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('Body', undefined, null)).toBeNull();
-      });
-
-      it('returns null for the TraceId core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('TraceId', undefined, null)).toBeNull();
-      });
-
-      it('returns null for the bare "ResourceAttributes" without a dot', () => {
-        // The backend's flatten always emits at least one nested key, so the
-        // bare column name never reaches Grafana's label list. Guard against
-        // mis-grouping if a custom schema ever surfaces it.
-        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBeNull();
-      });
-
-      it('returns null for an arbitrary user-defined column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+      it('returns "Fields" for an unprefixed key (a folded top-level column)', () => {
+        // foldDiscoveredLogFieldsIntoLabels merges selected top-level columns into `labels` under
+        // their plain, unprefixed names. The backend only emits prefixed attribute keys, so an
+        // unprefixed key is always a folded column and groups under a "Fields" section.
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBe('Fields');
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBe('Fields');
+        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBe('Fields');
       });
     });
 

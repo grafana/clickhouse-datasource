@@ -19,7 +19,10 @@ import { ColumnHint, TableColumn } from 'types/queryBuilder';
 export const columnNameHeuristics: Partial<Record<ColumnHint, RegExp>> = {
   // Logs
   [ColumnHint.Time]: /^(timestamp|@timestamp|time|event_?time|log_?time|created_?at)$/i,
-  [ColumnHint.LogMessage]: /^(body|message|msg|log_?message)$/i,
+  // `query` covers ClickHouse / DB query logs (system.query_log) and `request` covers HTTP
+  // access logs (nginx and similar), so those non-OTel sources get a message role without
+  // manual configuration. Both are unambiguous message columns in a logs context.
+  [ColumnHint.LogMessage]: /^(body|message|msg|log_?message|query|request)$/i,
   [ColumnHint.LogLevel]: /^(level|severity|severity_?text|log_?level)$/i,
   // Traces — mirrors the OTel map in src/otel.ts
   [ColumnHint.TraceId]: /^(trace_?id)$/i,
@@ -64,4 +67,18 @@ export const isStringLikeColumn = (column: TableColumn): boolean => {
 export const isNumericColumn = (column: TableColumn): boolean => {
   const type = (column.type || '').toLowerCase();
   return type.includes('uint') || type.includes('int') || type.includes('float') || type.includes('decimal');
+};
+
+/** Type predicate: ClickHouse collection / compound column types (Map, Array, Tuple, Nested, Object, JSON). */
+export const isCollectionColumnType = (type?: string): boolean => {
+  const s = (type || '').trim();
+  return (
+    s.startsWith('Map(') ||
+    s.startsWith('Array(') ||
+    s.startsWith('Tuple(') ||
+    s.startsWith('Nested') ||
+    s.startsWith('Object(') ||
+    s === 'JSON' ||
+    s.startsWith('JSON(')
+  );
 };

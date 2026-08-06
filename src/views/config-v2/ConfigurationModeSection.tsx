@@ -125,6 +125,7 @@ export const ConfigurationModeSection = (props: Props) => {
             <Divider />
             <LogsConfig
               variant="single-table"
+              uid={options.uid}
               logsConfig={jsonData.logs}
               onDefaultDatabaseChange={(db) => onUpdateLogsConfig('defaultDatabase', db)}
               onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
@@ -137,6 +138,7 @@ export const ConfigurationModeSection = (props: Props) => {
               onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
               onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
               onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
+              onAdditionalColumnsChange={(c) => onUpdateLogsConfig('additionalColumns', c)}
             />
           </>
         )}
