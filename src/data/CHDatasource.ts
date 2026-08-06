@@ -2140,10 +2140,8 @@ export class Datasource
       const hint = getConnectionErrorHint(category, detail);
       const label = category === 'tls' ? 'TLS' : category.charAt(0).toUpperCase() + category.slice(1);
       const message = hint ? `${label} error [${detail}]: ${hint}` : result.message;
-      // Rejecting on failure is load-bearing: Grafana core sets the success
-      // flag on its test_datasource_clicked event from whether this promise
-      // rejects, matching the base DataSourceWithBackend behavior. Returning
-      // an error-status object here records failed tests as successes.
+      // This must reject on failure. If we return the error instead,
+      // Grafana treats the test as successful in its analytics.
       return Promise.reject({
         status: 'error',
         message,
