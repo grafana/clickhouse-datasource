@@ -25,6 +25,11 @@ jobs:
       contents: read
       id-token: write
     with:
+      # This is the nightly Cloud E2E run, so label it with the DER run_stage vocabulary.
+      run-stage: nightly
+      # datasource-version is omitted here: the nightly tests whatever version is deployed
+      # on the shared instance, so it defaults to the commit SHA. The in-Argo promotion
+      # gate (generateBenchSuites) passes the real released version.
       pdc-network-name: datasources-pdc-network-aws-datasourcese2e
       repo-secrets: |
         DS_INSTANCE_HOST=ds-instance:host
