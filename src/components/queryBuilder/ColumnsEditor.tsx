@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { css, cx } from '@emotion/css';
 import { InlineField, InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { TableColumn, SelectedColumn } from 'types/queryBuilder';
 import labels from 'labels';
 import { selectors } from 'selectors';
 import { styles } from 'styles';
+import { isCollectionColumnType, isDateTimeColumn } from './views/columnNameHeuristics';
+
+// Let the selected-column chips wrap onto multiple lines within a bounded width, instead of forming
+// one long row that fills the builder edge to edge (and clips when many columns are selected, for
+// example logs with "Include all columns" on). The dropdown menu still lists every column. The
+// builder's column width is driven by its widest row, so a bounded value list also keeps the whole
+// builder from stretching to fit a long column list.
+const wrappedColumnValues = css`
+  & [class*='grafana-select-value-container'] {
+    max-width: 760px;
+    height: auto;
+    overflow: visible;
+    flex-wrap: wrap;
+  }
+`;
 
 interface ColumnsEditorProps {
   allColumns: readonly TableColumn[];
@@ -12,6 +28,13 @@ interface ColumnsEditorProps {
   onSelectedColumnsChange: (selectedColumns: SelectedColumn[]) => void;
   disabled?: boolean;
   showAllOption?: boolean;
+  // Logs-only: show a subtle "Add all columns" entry at the top of the dropdown that materializes
+  // every scalar column as an explicit selected column (still removable individually). Off elsewhere.
+  showAddAllOption?: boolean;
+  // Handles the "Add all columns" action with the curated columns to add. The parent merges them
+  // against live reducer state (deduping by name) so a column already selected as a role is not
+  // projected twice. Falls back to onSelectedColumnsChange when not provided.
+  onAddAllColumns?: (columnsToAdd: SelectedColumn[]) => void;
 }
 
 function getCustomColumns(columnNames: string[], allColumns: readonly TableColumn[]): Array<SelectableValue<string>> {
@@ -20,9 +43,20 @@ function getCustomColumns(columnNames: string[], allColumns: readonly TableColum
 }
 
 const allColumnName = '*';
+// Sentinel value for the in-dropdown "Add all columns" action. Selecting it triggers the materialize
+// action instead of adding a literal column, so it never becomes a chip or a projected column.
+const addAllColumnsValue = '__add_all_columns__';
 
 export const ColumnsEditor = (props: ColumnsEditorProps) => {
-  const { allColumns, selectedColumns, onSelectedColumnsChange, disabled, showAllOption } = props;
+  const {
+    allColumns,
+    selectedColumns,
+    onSelectedColumnsChange,
+    disabled,
+    showAllOption,
+    showAddAllOption,
+    onAddAllColumns,
+  } = props;
   const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const allColumnNames = allColumns.map((c) => ({ label: c.label || c.name, value: c.name }));
@@ -32,7 +66,13 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
   const selectedColumnNames = (selectedColumns || []).map((c) => ({ label: c.alias || c.name, value: c.name }));
   const { label, tooltip } = labels.components.ColumnsEditor;
 
-  const options = [...allColumnNames, ...customColumns];
+  const options = [
+    // Subtle first entry, only for logs and once the schema has loaded. Selecting it materializes
+    // every scalar column (handled in onChange); it is never added as a column itself.
+    ...(showAddAllOption && allColumns.length > 0 ? [{ label: 'Add all columns', value: addAllColumnsValue }] : []),
+    ...allColumnNames,
+    ...customColumns,
+  ];
 
   useEffect(() => {
     if (allColumns.length === 0) {
@@ -46,6 +86,11 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
 
   const onChange = (selected: Array<SelectableValue<string>>): void => {
     setIsOpen(false);
+    // The "Add all columns" entry is an action, not a column: materialize all scalars and stop.
+    if (selected.some((s) => s.value === addAllColumnsValue)) {
+      onAddAll();
+      return;
+    }
     const selectedColumnNames = new Set<string>(selected.map((s) => s.value!));
     const customColumnNames = new Set<string>(customColumns.map((c) => c.value!));
     const columnMap = new Map<string, TableColumn>();
@@ -78,6 +123,29 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     onSelectedColumnsChange(nextSelectedColumns);
   };
 
+  // Materialize every non-collection scalar column (skipping time-typed, __-internal, and
+  // already-selected ones) as explicit selected columns. Each folds into the log details as a
+  // browsable, filterable field and can still be removed individually.
+  const onAddAll = (): void => {
+    const selected = new Set(selectedColumns.map((c) => c.name));
+    const toAdd: SelectedColumn[] = allColumns
+      .filter(
+        (c) =>
+          !selected.has(c.name) && !isCollectionColumnType(c.type) && !c.name.startsWith('__') && !isDateTimeColumn(c)
+      )
+      .map((c) => ({ name: c.name, type: c.type }));
+    if (toAdd.length === 0) {
+      return;
+    }
+    // Prefer the parent's merge (dedupes against live reducer state, incl. role columns of the same
+    // name) so nothing is projected twice; fall back to a plain replace when no handler is given.
+    if (onAddAllColumns) {
+      onAddAllColumns(toAdd);
+    } else {
+      onSelectedColumnsChange([...selectedColumns, ...toAdd]);
+    }
+  };
+
   return (
     <InlineField
       label={
@@ -89,7 +157,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     >
       <div
         data-testid={selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper}
-        className={styles.Common.selectWrapper}
+        className={cx(styles.Common.selectWrapper, wrappedColumnValues)}
       >
         <MultiSelect<string>
           disabled={disabled}

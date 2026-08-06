@@ -402,6 +402,16 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
 
   const selectPartsSql = selectParts.join(', ');
 
+  // A logs query with no selected columns would generate `SELECT  FROM table`, which
+  // ClickHouse rejects with a syntax error. This happens transiently in the compact
+  // editor on a cold load: a non-OTel table has no columns until the schema fetch
+  // resolves and the default-column hooks populate the roles / include-all set. Emit
+  // no query in that window so Grafana skips it rather than issuing an invalid one; a
+  // valid query is generated on the next render once the columns arrive.
+  if (selectParts.length === 0) {
+    return '';
+  }
+
   queryParts.push('SELECT');
   queryParts.push(selectPartsSql);
   queryParts.push('FROM');
