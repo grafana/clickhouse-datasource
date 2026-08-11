@@ -348,6 +348,8 @@ export default {
             tooltip:
               'Columns to show as log fields, in addition to the time, level, and message columns above. Each one appears in the Fields list, can be filtered, and can be added as a displayed column. Use "Add all columns" in the dropdown to add every column at once. Leave empty to add none.',
             placeholder: 'Column name (enter key to add)',
+            description:
+              'These columns are projected in addition to the time, level, and message columns above. When Use OTel is on, they are added on top of the OTel default columns.',
           },
         },
         traceIdCorrelation: {
@@ -413,6 +415,7 @@ export default {
     ColumnsEditor: {
       label: 'Columns',
       tooltip: 'A list of columns to include in the query',
+      addAllColumns: 'Add all columns',
     },
     OtelVersionSelect: {
       label: 'Use OTel',
