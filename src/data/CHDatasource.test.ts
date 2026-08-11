@@ -8,7 +8,7 @@ import {
   toDataFrame,
   TypedVariableModel,
 } from '@grafana/data';
-import { DataSourceWithBackend } from '@grafana/runtime';
+import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/runtime';
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
@@ -45,6 +45,7 @@ const templateSrvMock = { replace: jest.fn(), getVariables: jest.fn(), getAdhocF
 jest.mock('@grafana/runtime', () => ({
   ...(jest.requireActual('@grafana/runtime') as unknown as object),
   getTemplateSrv: () => templateSrvMock,
+  reportInteraction: jest.fn(),
 }));
 
 const createInstance = ({ queryResponse }: Partial<InstanceConfig> = {}) => {
@@ -3468,6 +3469,33 @@ describe('ClickHouseDatasource', () => {
       }) as CHBuilderQuery;
 
       expect(result.builderOptions.filters).toHaveLength(0);
+    });
+  });
+
+  describe('testDatasource', () => {
+    it('resolves with success when the health check passes', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({ status: HealthStatus.OK, message: 'ok', details: {} });
+
+      await expect(ds.testDatasource()).resolves.toEqual({ status: 'success', message: 'ok' });
+    });
+
+    // Grafana core records the test_datasource_clicked success flag from
+    // whether testDatasource rejects. A returned error-status object counts
+    // as success, so a failed health check MUST reject (see PR #1776 fallout).
+    it('rejects when the health check fails so core records success=false', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({
+        status: HealthStatus.Error,
+        message: '[auth] code: 516, authentication failed',
+        details: {},
+      });
+
+      await expect(ds.testDatasource()).rejects.toMatchObject({
+        status: 'error',
+        message: expect.stringContaining('Auth error'),
+        error: expect.any(HealthCheckError),
+      });
     });
   });
 });
