@@ -1227,6 +1227,36 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Time', 'count']);
   });
 
+  it('folds a column aliased to its own name but not one aliased to a different name', () => {
+    // alias === name is how the query builder tags a plain column pick, so it folds like an unaliased
+    // column. A column aliased to a *different* name is skipped: a filter-for click keys on the alias,
+    // which the logs-volume query cannot resolve, so it stays a standalone field.
+    const ds = withFeature();
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String', alias: 'ServiceName' },
+        { name: 'Namespace', type: 'String', alias: 'svc' },
+      ],
+      [
+        field('Body', ['hi']),
+        field('ServiceName', ['cart']),
+        field('svc', ['ns-1']),
+        field(labelsFieldName, [{ 'LogAttributes.x': 'y' }], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // ServiceName (alias === name) is folded and removed; the alias-mismatched column (field 'svc')
+    // stays standalone. Body (a role) and labels are kept.
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'svc', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({
+      'LogAttributes.x': 'y',
+      ServiceName: 'cart',
+    });
+  });
+
   it('leaves an aliased column as a standalone field so its filter keys on the real column', () => {
     const ds = withFeature();
     const [req, res] = buildLogsRequestResponse(
