@@ -4,14 +4,15 @@ import '@testing-library/jest-dom';
 import { ConfigurationModeSection } from './ConfigurationModeSection';
 import { createTestProps } from './helpers';
 
-// The single-table logs config resolves the datasource by uid to fetch the table's columns for the
-// Columns field. Stub the runtime singleton so that effect resolves to an empty schema in tests.
+// The single-table logs config resolves the datasource by uid and reads the table's columns from the
+// datasource cache (getColumnsCached) for the Columns field. Stub the runtime singleton so that
+// effect resolves to an empty schema in tests.
 jest.mock('@grafana/runtime', () => {
   const original = jest.requireActual('@grafana/runtime');
   return {
     ...original,
     getDataSourceSrv: () => ({
-      get: async () => ({ fetchColumns: async () => [] }),
+      get: async () => ({ getColumnsCached: async () => [] }),
     }),
   };
 });
