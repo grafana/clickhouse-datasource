@@ -103,11 +103,11 @@ export const LogsConfig = (props: LogsConfigProps) => {
         .get(props.uid)
         .then((ds) => {
           // getDataSourceSrv returns a generic DataSourceApi; this plugin's instance exposes the cache.
-          const chds = ds as Datasource; // [as-cast: allow]
-          if (typeof chds?.getColumnsCached !== 'function') {
+          const datasourceInstance = ds as Datasource; // [as-cast: allow]
+          if (typeof datasourceInstance?.getColumnsCached !== 'function') {
             return undefined;
           }
-          return chds.getColumnsCached(defaultDatabase || undefined, defaultTable);
+          return datasourceInstance.getColumnsCached(defaultDatabase || undefined, defaultTable);
         })
         .then((cols) => {
           if (!ignore && cols) {
