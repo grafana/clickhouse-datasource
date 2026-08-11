@@ -64,12 +64,12 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     allColumnNames.push({ label: allColumnName, value: allColumnName });
   }
   const selectedColumnNames = (selectedColumns || []).map((c) => ({ label: c.alias || c.name, value: c.name }));
-  const { label, tooltip } = labels.components.ColumnsEditor;
+  const { label, tooltip, addAllColumns } = labels.components.ColumnsEditor;
 
   const options = [
     // Subtle first entry, only for logs and once the schema has loaded. Selecting it materializes
     // every scalar column (handled in onChange); it is never added as a column itself.
-    ...(showAddAllOption && allColumns.length > 0 ? [{ label: 'Add all columns', value: addAllColumnsValue }] : []),
+    ...(showAddAllOption && allColumns.length > 0 ? [{ label: addAllColumns, value: addAllColumnsValue }] : []),
     ...allColumnNames,
     ...customColumns,
   ];

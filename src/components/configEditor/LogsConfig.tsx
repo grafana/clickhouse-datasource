@@ -92,33 +92,38 @@ export const LogsConfig = (props: LogsConfigProps) => {
       setFetchedColumns([]);
       return;
     }
-    // getDataSourceSrv() is the supported way to resolve a saved datasource instance so we can read
-    // its column schema for the picker. The runtime marks the singleton (and .get) deprecated in
-    // favor of an unstable API; keep the stable singleton until a stable replacement ships.
-    /* eslint-disable @typescript-eslint/no-deprecated */
-    getDataSourceSrv()
-      .get(props.uid)
-      .then((ds) => {
-        // getDataSourceSrv returns a generic DataSourceApi; this plugin's instance exposes fetchColumns.
-        const chds = ds as Datasource; // [as-cast: allow]
-        if (typeof chds?.fetchColumns !== 'function') {
-          return undefined;
-        }
-        return chds.fetchColumns(defaultDatabase || undefined, defaultTable);
-      })
-      .then((cols) => {
-        if (!ignore && cols) {
-          setFetchedColumns(cols);
-        }
-      })
-      .catch(() => {
-        if (!ignore) {
-          setFetchedColumns([]);
-        }
-      });
-    /* eslint-enable @typescript-eslint/no-deprecated */
+    // Debounce so typing the database/table name does not fire a schema read per keystroke, and read
+    // through the datasource's column cache so repeated edits of the same table reuse a prior fetch.
+    // getDataSourceSrv() is the supported way to resolve a saved datasource instance; the runtime
+    // marks the singleton (and .get) deprecated in favor of an unstable API, so keep the stable
+    // singleton until a stable replacement ships.
+    const handle = setTimeout(() => {
+      /* eslint-disable @typescript-eslint/no-deprecated */
+      getDataSourceSrv()
+        .get(props.uid)
+        .then((ds) => {
+          // getDataSourceSrv returns a generic DataSourceApi; this plugin's instance exposes the cache.
+          const chds = ds as Datasource; // [as-cast: allow]
+          if (typeof chds?.getColumnsCached !== 'function') {
+            return undefined;
+          }
+          return chds.getColumnsCached(defaultDatabase || undefined, defaultTable);
+        })
+        .then((cols) => {
+          if (!ignore && cols) {
+            setFetchedColumns(cols);
+          }
+        })
+        .catch(() => {
+          if (!ignore) {
+            setFetchedColumns([]);
+          }
+        });
+      /* eslint-enable @typescript-eslint/no-deprecated */
+    }, 400);
     return () => {
       ignore = true;
+      clearTimeout(handle);
     };
   }, [isSingleTable, props.uid, defaultDatabase, defaultTable]);
 
@@ -258,8 +263,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
           </InlineField>
         )}
         <Text variant="bodySmall" color="secondary">
-          These columns are projected in addition to the time, level, and message columns above. When Use OTel is on,
-          they are added on top of the OTel default columns.
+          {labels.columns.additionalColumns.description}
         </Text>
       </ConfigSubSection>
       <br />

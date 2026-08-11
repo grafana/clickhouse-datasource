@@ -750,10 +750,12 @@ export const foldDiscoveredLogFieldsIntoLabels = (
 
     // The columns the field options selected are the hint-less, non-collection ones. Role columns
     // (time / body / level / trace id) carry a hint; the attribute maps are collection-typed.
-    // Aliased columns are skipped: a filter-for click would key on the alias, which the
-    // logs-volume query cannot resolve, so they stay as ordinary frame fields instead.
+    // A column aliased to a different name is skipped: a filter-for click would key on the alias,
+    // which the logs-volume query cannot resolve. A column whose alias equals its name (how the
+    // query builder tags a plain column pick) folds like an unaliased one, so columns chosen in the
+    // builder become browsable fields the same way columns configured on the datasource do.
     const discovered = (builderOptions.columns || [])
-      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type) && !c.alias)
+      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type) && (!c.alias || c.alias === c.name))
       .map((c) => c.name);
     const sourceFields = discovered
       .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
