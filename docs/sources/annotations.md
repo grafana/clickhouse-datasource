@@ -61,7 +61,7 @@ Detect when a column value changes over time, such as a deployment (`service.ver
 - **Map Key**: shown when the watch column is a `Map`. Pick the key to track, such as `service.version`.
 - **Group By**: track each value of this column independently. Defaults to `ServiceName`.
 
-The generated query buckets rows into 30-second intervals, takes the dominant value in each bucket, and uses `lagInFrame()` to compare each bucket with the previous one per group. Taking the dominant value keeps a service that runs two versions at once, during a rolling deploy or canary, from flapping between them. It emits one annotation per transition, so a rollback (`v1.0` to `v1.1` back to `v1.0`) produces three annotations rather than two:
+The generated query buckets rows into 30-second intervals, takes the dominant value in each bucket, and uses `lagInFrame()` to compare each bucket with the previous one per group. Taking the dominant value keeps a service that runs two versions at once, during a rolling deploy or canary, from flapping between them. It emits one annotation per transition, so a rollback (`v1.0` to `v1.1` and back to `v1.0`) produces a separate annotation for the return to `v1.0`, which a simple `DISTINCT` on version would hide:
 
 ```sql
 SELECT
@@ -126,7 +126,21 @@ The Change Detection preset keeps its generated SQL editable, so you can build t
 
 The following examples show common patterns. Replace the table and column names with your own.
 
-**Application events (e.g. deployments or status changes):**
+**OpenTelemetry log errors (mark error and fatal log lines from the standard OTel schema):**
+
+```sql
+SELECT
+  Timestamp AS time,
+  concat(SeverityText, ': ', Body) AS text,
+  ServiceName AS tags
+FROM otel_logs
+WHERE $__timeFilter(Timestamp)
+  AND SeverityText IN ('ERROR', 'FATAL')
+ORDER BY Timestamp DESC
+LIMIT 100
+```
+
+**Application events (for example, deployments or status changes):**
 
 ```sql
 SELECT
@@ -140,7 +154,7 @@ ORDER BY event_time DESC
 LIMIT 100
 ```
 
-**Query log events (e.g. long-running or failed queries from ClickHouse system tables):**
+**Query log events (for example, long-running or failed queries from ClickHouse system tables):**
 
 ```sql
 SELECT
