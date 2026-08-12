@@ -16,7 +16,7 @@ menuTitle: OpenTelemetry dashboards
 title: ClickHouse OpenTelemetry dashboards
 weight: 60
 version: 0.1
-last_reviewed: 2026-05-07
+review_date: 2026-08-12
 ---
 
 # ClickHouse OpenTelemetry dashboards

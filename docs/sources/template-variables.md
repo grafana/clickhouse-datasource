@@ -12,7 +12,7 @@ menuTitle: Template variables
 title: ClickHouse template variables
 weight: 40
 version: 0.1
-last_reviewed: 2026-04-24
+review_date: 2026-08-12
 ---
 
 # ClickHouse template variables

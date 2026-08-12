@@ -11,7 +11,7 @@ menuTitle: Configure
 title: Configure the ClickHouse data source
 weight: 20
 version: 0.1
-last_reviewed: 2026-04-24
+review_date: 2026-08-12
 ---
 
 # Configure the ClickHouse data source
@@ -185,6 +185,7 @@ Use **Single source** when the data source is dedicated to one logs or traces ta
 | **Query Timeout**    | Timeout in seconds for read queries. Default: `60`.                   |
 | **Validate SQL**     | When enabled, validates SQL syntax in the query editor.               |
 | **Enable row limit** | When enabled, applies the Grafana row limit setting to query results. |
+| **Row Capacity Hint** | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. |
 
 ### Custom ClickHouse settings
 
@@ -344,6 +345,7 @@ datasources:
       # queryTimeout: <seconds>
       # validateSql: <bool>
       # enableRowLimit: <bool>
+      # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled)
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
       # path: <string>  # HTTP URL path (HTTP protocol only)

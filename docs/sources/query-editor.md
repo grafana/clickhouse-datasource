@@ -11,7 +11,7 @@ menuTitle: Query editor
 title: ClickHouse query editor
 weight: 30
 version: 0.1
-last_reviewed: 2026-04-24
+review_date: 2026-08-12
 ---
 
 # ClickHouse query editor

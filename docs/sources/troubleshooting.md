@@ -12,16 +12,37 @@ menuTitle: Troubleshooting
 title: Troubleshoot ClickHouse data source issues
 weight: 70
 version: 0.1
-last_reviewed: 2026-04-27
+review_date: 2026-08-12
 ---
 
-## Troubleshoot ClickHouse data source issues
+# Troubleshoot ClickHouse data source issues
 
 This guide provides solutions for common errors you may encounter when configuring or using the ClickHouse data source for Grafana.
 
-### Connection Errors
+## Understand error categories
 
-Invalid Server Host
+The plugin classifies connection and configuration errors into categories and prefixes the error message with the category in square brackets. This prefix helps you quickly identify the class of problem:
+
+| Category    | Meaning                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `[auth]`    | Authentication or authorization failure (invalid credentials, missing privileges, HTTP 401/403). |
+| `[network]` | The Grafana server cannot reach ClickHouse (DNS failure, connection refused, HTTP 502/503).   |
+| `[tls]`     | TLS/SSL handshake or certificate verification failure.                                       |
+| `[timeout]` | The connection or query exceeded the configured timeout.                                     |
+| `[config]`  | A data source setting is missing or invalid (empty host, bad port, invalid JSON).            |
+| `[server]`  | ClickHouse returned a server-side error (`DB::Exception`, HTTP 5xx).                         |
+| `[unknown]` | The error does not match a known pattern.                                                    |
+
+For authentication errors, the plugin appends an additional hint after the error message:
+
+- **`authentication failed`** hint: the credentials or forwarded token may be missing or expired. If using Forward OAuth Identity, sign out and back in to refresh the token.
+- **`access denied`** hint: the authenticated identity is missing a required ClickHouse role or privilege.
+
+Use the category prefix to jump to the matching section in this guide.
+
+## Connection errors
+
+#### Invalid server host
 
 **Error message:** "invalid server host. Either empty or not set"
 
@@ -35,7 +56,7 @@ Invalid Server Host
 
 ---
 
-Invalid Port
+#### Invalid port
 
 **Error message:** "invalid port"
 
@@ -50,7 +71,7 @@ Invalid Port
 
 ---
 
-Failed to Create ClickHouse Client
+#### Failed to create ClickHouse client
 
 **Error message:** "failed to create ClickHouse client" or "failed to create data source"
 
@@ -72,7 +93,7 @@ Work through the following checks in order. Most cases are resolved by one of th
 
 ---
 
-Connection Timeout
+#### Connection timeout
 
 **Error message:** "connection timeout" or "the operation was cancelled before starting: context deadline exceeded"
 
@@ -87,7 +108,7 @@ Connection Timeout
 
 ---
 
-Operation Cancelled During Execution
+#### Operation cancelled during execution
 
 **Error message:** "the operation was cancelled during execution: context deadline exceeded"
 
@@ -102,7 +123,7 @@ Operation Cancelled During Execution
 
 ---
 
-Plugin Not Found After Installation (Grafana Cloud)
+#### Plugin not found after installation (Grafana Cloud)
 
 **Error message:** 404 error when adding the ClickHouse data source, or the plugin does not appear in the data source list after installation.
 
@@ -116,9 +137,9 @@ Plugin Not Found After Installation (Grafana Cloud)
 
 ---
 
-### Authentication Errors
+## Authentication errors
 
-Invalid Username
+#### Invalid username
 
 **Error message:** "username is either empty or not set"
 
@@ -132,7 +153,7 @@ Invalid Username
 
 ---
 
-Invalid Password
+#### Invalid password
 
 **Error message:** "password is either empty or not set"
 
@@ -146,9 +167,56 @@ Invalid Password
 
 ---
 
-### TLS/SSL Certificate Errors
+#### JWT authentication requires a secure (TLS) connection
 
-Invalid CA Certificate
+**Error message:** "JWT authentication requires a secure (TLS) connection"
+
+**Cause:** **Forward OAuth Identity** is enabled but the data source does not have a secure (TLS) connection configured. Forwarding a user's OAuth token over an unencrypted connection would expose it to interception.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. Enable **Secure connection**.
+1. Set the **Port** to a TLS-enabled port (8443 for HTTP, 9440 for Native).
+1. Configure a valid CA certificate if the ClickHouse server uses a self-signed certificate.
+
+---
+
+#### Forward OAuth Identity and Skip TLS Verify cannot be combined
+
+**Error message:** "the \"Forward OAuth Identity\" and \"Skip TLS Verify\" options cannot be combined: forwarding a user token over an unverified TLS connection would expose it to interception"
+
+**Cause:** Both **Forward OAuth Identity** and **Skip TLS Verify** are enabled. The plugin blocks this combination because an unverified TLS connection is vulnerable to man-in-the-middle attacks, and forwarding a real user's token over such a connection would expose it.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. Disable **Skip TLS Verify**.
+1. If the ClickHouse server uses a self-signed certificate, provide the CA certificate in the TLS settings instead of skipping verification.
+
+---
+
+#### No user identity for backend query (Forward OAuth Identity)
+
+**Error message:** "this query carries no user identity but \"Forward OAuth Identity\" is enabled; it is running outside a user session (for example, an alert rule). Enable \"Allow service account fallback\" in the data source configuration to fall back to the configured username/password for backend queries."
+
+**Cause:** An alert rule, recording rule, or other backend operation attempted to query ClickHouse, but **Forward OAuth Identity** is enabled and the query has no user session to forward. By default the plugin rejects these queries rather than silently falling back to the shared service account.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. In the **Database credentials** section, enable **Allow service account fallback**.
+1. Ensure the configured username and password have the permissions needed by your alert queries.
+
+{{< admonition type="note" >}}
+Queries that fall back to the service account are not subject to per-user row policies, quotas, or query-log attribution. Scope the service account to the least privilege your alert queries require.
+{{< /admonition >}}
+
+---
+
+## TLS/SSL certificate errors
+
+#### Invalid CA certificate
 
 **Error message:** "failed to parse TLS CA PEM certificate"
 
@@ -163,7 +231,7 @@ Invalid CA Certificate
 
 ---
 
-Invalid Client Certificate
+#### Invalid client certificate
 
 **Error message:** "tls: failed to find any PEM data in certificate input"
 
@@ -179,9 +247,9 @@ Invalid Client Certificate
 
 ---
 
-### Protocol Errors
+## Protocol errors
 
-Invalid Protocol
+#### Invalid protocol
 
 **Error message:** "protocol is invalid, use native or http"
 
@@ -195,9 +263,9 @@ Invalid Protocol
 
 ---
 
-### Configuration Parsing Errors
+## Configuration parsing errors
 
-Invalid JSON Configuration
+#### Invalid JSON configuration
 
 **Error message:** "could not parse json"
 
@@ -212,7 +280,7 @@ Invalid JSON Configuration
 
 ---
 
-## Could Not Parse Configuration Values
+#### Could not parse configuration values
 
 **Error messages:**
 
@@ -233,7 +301,7 @@ Invalid JSON Configuration
 
 ---
 
-Invalid Timeout Values
+#### Invalid timeout values
 
 **Error messages:**
 
@@ -250,9 +318,9 @@ Invalid Timeout Values
 
 ---
 
-### Permission and Settings Errors
+## Permission and settings errors
 
-Setting Is Locked (readonly)
+#### Setting is locked (readonly)
 
 **Error message:** "DB::Exception: Cannot modify 'max_execution_time': Setting is locked (in readonly mode)"
 
@@ -273,13 +341,13 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 
 ---
 
-### Query Builder Issues
+## Query builder issues
 
-Empty Database, Table, or Column Dropdowns
+#### Empty database, table, or column drop-downs
 
-**Symptoms:** The database, table, or column dropdowns in the query builder show no options, or they briefly attempt to load and then appear empty.
+**Symptoms:** The database, table, or column drop-downs in the query builder show no options, or they briefly attempt to load and then appear empty.
 
-**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these dropdowns. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the dropdowns will be empty without a visible error message in the panel — the error is logged only to the browser console.
+**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these drop-downs. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the drop-downs will be empty without a visible error message in the panel — the error is logged only to the browser console.
 
 **Solution:**
 
@@ -290,7 +358,7 @@ Empty Database, Table, or Column Dropdowns
 
 ---
 
-Column Value Suggestions Time Out on Large Tables
+#### Column value suggestions time out on large tables
 
 **Symptoms:** Autocomplete suggestions for column values in the query builder are slow or return no results.
 
@@ -304,9 +372,9 @@ Column Value Suggestions Time Out on Large Tables
 
 ---
 
-### Query Errors
+## Query errors
 
-ClickHouse Database Exception
+#### ClickHouse database exception
 
 **Error message:** "DB::Exception: [error details]"
 
@@ -322,7 +390,7 @@ ClickHouse Database Exception
 
 ---
 
-Macro Argument Count Error
+#### Macro argument count error
 
 **Error messages:**
 
@@ -348,7 +416,7 @@ Macro Argument Count Error
 
 ---
 
-SQL Parse Error
+#### SQL parse error
 
 **Error message:** Parse error with line and column information
 
@@ -363,9 +431,9 @@ SQL Parse Error
 
 ---
 
-### Ad Hoc Filter Errors
+## Ad hoc filter errors
 
-Unable to Apply Ad Hoc Filters
+#### Unable to apply ad hoc filters
 
 **Error message:** "Unable to apply ad hoc filters. Upgrade ClickHouse to >=22.7 or remove ad hoc filters for the dashboard."
 
@@ -379,7 +447,7 @@ Unable to Apply Ad Hoc Filters
 
 ---
 
-Failed to Get Table from Ad Hoc Query
+#### Failed to get table from ad hoc query
 
 **Error message:** "Failed to get table from adhoc query."
 
@@ -393,7 +461,7 @@ Failed to Get Table from Ad Hoc Query
 
 ---
 
-Ad Hoc Filters Produce Incorrect or Missing Results
+#### Ad hoc filters produce incorrect or missing results
 
 **Symptoms:**
 
@@ -410,7 +478,7 @@ Ad Hoc Filters Produce Incorrect or Missing Results
 
 ---
 
-Invalid Ad Hoc Filter
+#### Invalid ad hoc filter
 
 **Error message:** "Invalid adhoc filter will be ignored: [filter details]"
 
@@ -424,9 +492,9 @@ Invalid Ad Hoc Filter
 
 ---
 
-### Log Context Errors
+## Log context errors
 
-Missing Query for Log Context
+#### Missing query for log context
 
 **Error message:** "Missing query for log context"
 
@@ -439,7 +507,7 @@ Missing Query for Log Context
 
 ---
 
-Missing Log Context Options
+#### Missing log context options
 
 **Error message:** "Missing log context options for query"
 
@@ -452,7 +520,7 @@ Missing Log Context Options
 
 ---
 
-Log Context Only Works for Builder Queries
+#### Log context only works for builder queries
 
 **Error message:** "Log context feature only works for builder queries"
 
@@ -465,7 +533,7 @@ Log Context Only Works for Builder Queries
 
 ---
 
-Missing Time Column for Log Context
+#### Missing time column for log context
 
 **Error message:** "Missing time column for log context"
 
@@ -478,7 +546,7 @@ Missing Time Column for Log Context
 
 ---
 
-Unable to Match Log Context Columns
+#### Unable to match log context columns
 
 **Error message:** "Unable to match any log context columns"
 
@@ -492,9 +560,9 @@ Unable to Match Log Context Columns
 
 ---
 
-### Proxy and Private Data Connect (PDC) Errors
+## Proxy and Private Data Connect (PDC) errors
 
-Unable to Cast SOCKS Proxy Dialer
+#### Unable to cast SOCKS proxy dialer
 
 **Error message:** "unable to cast SOCKS proxy dialer to context proxy dialer"
 
@@ -509,7 +577,7 @@ Unable to Cast SOCKS Proxy Dialer
 
 ---
 
-PDC Connection Fails with No Agent Logs
+#### PDC connection fails with no agent logs
 
 **Error message:** "check PDC agent logs" (but no relevant logs appear in the PDC agent pod)
 
@@ -528,7 +596,7 @@ PDC Connection Fails with No Agent Logs
 
 ---
 
-Alerting Times Out via PDC While Dashboards Work
+#### Alerting times out via PDC while dashboards work
 
 **Error message:** "i/o timeout", "datasourceError", or alert rule evaluations fail while dashboard queries using the same data source succeed.
 
@@ -538,12 +606,12 @@ Alerting Times Out via PDC While Dashboards Work
 
 1. Ensure you are using the **Grafana ClickHouse plugin** (`grafana-clickhouse-datasource`), not a community or third-party ClickHouse plugin. The Grafana plugin has better PDC compatibility for backend operations like alerting.
 2. Upgrade to the latest plugin version. PDC-related alerting fixes have been included in recent releases.
-3. Verify the PDC agent is healthy and not silently disconnected (see [PDC Connection Fails with No Agent Logs](#pdc-connection-fails-with-no-agent-logs) above).
+3. Verify the PDC agent is healthy and not silently disconnected (refer to [PDC connection fails with no agent logs](#pdc-connection-fails-with-no-agent-logs) above).
 4. Check the Grafana alerting logs for detailed timeout or connection errors by filtering for the data source name or UID.
 
 ---
 
-Stale PDC Token — Metrics Suddenly Lost
+#### Stale PDC token — metrics suddenly lost
 
 **Symptoms:** ClickHouse dashboards that were previously working stop loading data. The PDC agent pod appears to be running, but all queries return errors or empty results. No obvious error is shown in Grafana.
 
@@ -561,9 +629,9 @@ Stale PDC Token — Metrics Suddenly Lost
 
 ---
 
-### Header Parsing Errors
+## Header parsing errors
 
-Couldn't Parse Message as Args
+#### Couldn't parse message as args
 
 **Error message:** "Couldn't parse message as args"
 
@@ -577,7 +645,7 @@ Couldn't Parse Message as Args
 
 ---
 
-Couldn't Parse Grafana HTTP Headers
+#### Couldn't parse Grafana HTTP headers
 
 **Error message:** "Couldn't parse grafana HTTP headers"
 
@@ -591,9 +659,9 @@ Couldn't Parse Grafana HTTP Headers
 
 ---
 
-### Data Display Issues
+## Data display issues
 
-Timestamp Millisecond Precision Lost
+#### Timestamp millisecond precision lost
 
 **Symptoms:** ClickHouse `DateTime64` timestamps with millisecond (or higher) precision display in Grafana with only second-level granularity. Milliseconds are truncated or shown as `.000` in both Explore and dashboard panels.
 
@@ -622,9 +690,9 @@ This is a Grafana platform limitation, not specific to the ClickHouse plugin. A 
 
 ---
 
-### Upgrade and Compatibility Issues
+## Upgrade and compatibility issues
 
-v3 to v4 Migration Problems
+#### v3 to v4 migration problems
 
 **Symptoms:** After upgrading from plugin v3 to v4, data source settings appear to be missing (blank host, no timeout), or saved dashboard queries no longer load in the query editor.
 
@@ -641,7 +709,7 @@ v3 to v4 Migration Problems
 
 ---
 
-Log Volume Not Showing in SQL Editor
+#### Log volume not showing in SQL editor
 
 **Symptoms:** The log volume histogram does not appear above log results when using the SQL editor in Explore. It works in the query builder.
 
@@ -654,7 +722,7 @@ Log Volume Not Showing in SQL Editor
 
 ---
 
-Connection Pool Saturation (Sudden Slowness)
+#### Connection pool saturation (sudden slowness)
 
 **Symptoms:** Queries become progressively slower or time out under concurrent load, even though individual queries run quickly when tested in isolation. The ClickHouse server itself is not overloaded.
 
@@ -675,7 +743,7 @@ Connection Pool Saturation (Sudden Slowness)
 
 ---
 
-### Getting More Help
+## Get additional help
 
 If you continue to experience issues after trying the solutions in this guide:
 

@@ -11,7 +11,7 @@ menuTitle: ClickHouse data source
 title: ClickHouse data source
 weight: 10
 version: 0.1
-last_reviewed: 2026-04-27
+review_date: 2026-08-12
 ---
 
 # ClickHouse data source
@@ -73,7 +73,7 @@ The plugin includes the following pre-built dashboards:
 - **OpenTelemetry Logs Explorer**: stacked log volume, services, and per-service samples for OpenTelemetry data exported to `otel_logs`. See the [OpenTelemetry dashboards guide](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/dashboards/).
 - **OpenTelemetry Traces Explorer**: service map, trace search, and per-service performance for OpenTelemetry data exported to `otel_traces`.
 - **OpenTelemetry Service Dashboard**: single-service deep dive with RED metrics, top errors, slowest operations, related logs, and trace detail.
-- **Advanced ClickHouse Monitoring Dashboard** — System metrics (CPU, queries/sec, IO, memory) similar to ClickHouse built-in monitoring.
+- **ClickHouse System Dashboards** — System metrics (CPU, queries/sec, IO, memory) similar to ClickHouse built-in monitoring.
 
 To import a pre-built dashboard:
 

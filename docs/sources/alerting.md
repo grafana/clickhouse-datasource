@@ -12,7 +12,7 @@ menuTitle: Alerting
 title: ClickHouse alerting
 weight: 60
 version: 0.1
-last_reviewed: 2026-04-27
+review_date: 2026-08-12
 ---
 
 # ClickHouse alerting
@@ -113,6 +113,14 @@ To apply equivalent filtering in an alert rule, add the filter conditions direct
 ### Row limit
 
 If **Enable row limit** is turned on in the data source [configuration](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/), ClickHouse applies a `limit` setting to every query, including alert queries. This can silently truncate results, causing alerts to evaluate against incomplete data. Disable the row limit or ensure it is set high enough to capture the full result set for your alert queries.
+
+### Forward OAuth Identity
+
+When [Forward OAuth Identity](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#forward-oauth-identity) is enabled, alert rule evaluations are **blocked by default** because they run outside a user session and have no OAuth token to forward. If you need alerting with this authentication mode, enable **Allow service account fallback** in the data source configuration so that alert queries fall back to the configured username and password.
+
+{{< admonition type="note" >}}
+Queries that fall back to the service account are not subject to per-user row policies, quotas, or query-log attribution. Scope the service account to the least privilege your alert queries require.
+{{< /admonition >}}
 
 ## Best practices
 
