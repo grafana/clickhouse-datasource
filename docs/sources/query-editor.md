@@ -75,6 +75,32 @@ When using the query builder, the available options depend on the selected **que
 | **Logs**        | **Simple** or **Aggregate**      | Simple returns log rows. Aggregate supports grouping for log volume histograms.                                                                                         |
 | **Traces**      | **Trace ID** or **Trace search** | Trace ID fetches a single trace by ID. Trace search finds traces matching filters (service name, duration, time range).                                                 |
 
+### Aggregate mode
+
+Selecting **Aggregate** as the builder mode (available for the **Table** and **Logs** query types) computes aggregate functions with a `GROUP BY`. The builder exposes these fields:
+
+| Field           | Description                                                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Columns**     | Plain columns to return alongside the aggregates.                                                                                               |
+| **Aggregates**  | One or more aggregate functions to compute, such as `count()`, `avg(Duration)`, or `sum(Bytes)`. Click **Aggregate** to add each one, and optionally alias it. |
+| **Group By**    | Columns to group the aggregates by. The drop-down lists every column in the selected table, so it can be long on wide tables.                   |
+| **Order By**    | Columns or aggregates to sort by, each ascending or descending.                                                                                |
+| **Limit**       | Maximum number of rows to return. Set to `0` to omit the `LIMIT` clause.                                                                        |
+| **Filters**     | `WHERE` conditions, combined with `AND` or `OR`.                                                                                                |
+
+The builder assembles these into a single query, selecting the grouped columns before the aggregate expressions. For example, grouping by `Datacenter` with a row count and average duration produces:
+
+```sql
+SELECT
+  Datacenter,
+  count() AS count,
+  avg(Duration) AS avg_duration
+FROM grafanadb.GENERATED_LOGS
+GROUP BY Datacenter
+ORDER BY count DESC
+LIMIT 1000
+```
+
 ### Logs query builder
 
 The logs query builder provides structured fields for common log exploration patterns. When **Use OTel** is enabled, the builder pre-fills column mappings for [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter) tables.
