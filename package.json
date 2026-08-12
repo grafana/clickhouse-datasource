@@ -30,7 +30,7 @@
     "@axe-core/playwright": "4.12.1",
     "@babel/core": "8.0.1",
     "@grafana/eslint-config": "8.2.0",
-    "@grafana/plugin-e2e": "3.10.0",
+    "@grafana/plugin-e2e": "3.11.0",
     "@grafana/sign-plugin": "3.3.3",
     "@grafana/tsconfig": "2.2.0",
     "@playwright/test": "1.61.1",
