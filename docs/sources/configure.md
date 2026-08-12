@@ -124,7 +124,7 @@ After adding the data source, configure the following settings.
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Name**              | The name used to refer to the data source in panels and queries.                                                                                        |
 | **Default**           | Toggle to make this the default data source for new panels.                                                                                             |
-| **Server**            | The ClickHouse server host (for example, `localhost`).                                                                                                  |
+| **Server address**    | The ClickHouse server host (for example, `localhost`).                                                                                                  |
 | **Protocol**          | **Native** or **HTTP**.                                                                                                                                 |
 | **Port**              | Port number; depends on protocol and whether TLS is enabled (see default ports above).                                                                  |
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
@@ -181,11 +181,15 @@ Use **Single source** when the data source is dedicated to one logs or traces ta
 
 | Setting              | Description                                                           |
 | -------------------- | --------------------------------------------------------------------- |
-| **Dial Timeout**     | Timeout in seconds for establishing a connection. Default: `10`.      |
-| **Query Timeout**    | Timeout in seconds for read queries. Default: `60`.                   |
-| **Validate SQL**     | When enabled, validates SQL syntax in the query editor.               |
-| **Enable row limit** | When enabled, applies the Grafana row limit setting to query results. |
-| **Row Capacity Hint** | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. |
+| **Dial Timeout**             | Timeout in seconds for establishing a connection. Default: `10`.                                                                                                                                                                                                                                                                                       |
+| **Query Timeout**            | Timeout in seconds for read queries. Default: `60`.                                                                                                                                                                                                                                                                                                    |
+| **Connection Max Lifetime**  | Maximum lifetime of a pooled connection, in minutes. Default: `5`.                                                                                                                                                                                                                                                                                     |
+| **Max Idle Connections**     | Maximum number of idle connections kept in the pool. Default: `25`.                                                                                                                                                                                                                                                                                    |
+| **Max Open Connections**     | Maximum number of open connections in the pool. Default: `50`.                                                                                                                                                                                                                                                                                         |
+| **Validate SQL**             | When enabled, validates SQL syntax in the query editor.                                                                                                                                                                                                                                                                                                |
+| **Enable row limit**         | When enabled, applies the Grafana row limit setting to query results.                                                                                                                                                                                                                                                                                  |
+| **Row Capacity Hint**        | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. |
+| **Suggest Map keys in filter editor** | When enabled, the filter editor probes `Map(...)` columns for distinct keys to populate key suggestions. On large tables with high-cardinality maps this probe can scan a very large number of rows, so disable it to suppress the probe (you can still type Map keys manually). Default: enabled.                                              |
 
 ### Custom ClickHouse settings
 
@@ -343,11 +347,16 @@ datasources:
       # tlsAuthWithCACert: <bool>
       # dialTimeout: <seconds>
       # queryTimeout: <seconds>
+      # connMaxLifetime: <minutes>   # max lifetime of a pooled connection (default 5)
+      # maxIdleConns: <int>          # max idle connections in the pool (default 25)
+      # maxOpenConns: <int>          # max open connections in the pool (default 50)
       # validateSql: <bool>
       # enableRowLimit: <bool>
       # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled)
+      # enableMapKeysDiscovery: <bool>  # probe Map columns for filter-editor key suggestions (default true)
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
+      # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
       # path: <string>  # HTTP URL path (HTTP protocol only)
       # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
