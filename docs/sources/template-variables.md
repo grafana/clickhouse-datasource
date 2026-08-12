@@ -214,9 +214,11 @@ Ad hoc filters support the following operators:
 | `=`      | `=`                   | Equals                                               |
 | `!=`     | `!=`                  | Not equals                                           |
 | `<`      | `<`                   | Less than                                            |
+| `<=`     | `<=`                  | Less than or equal to                                |
 | `>`      | `>`                   | Greater than                                         |
-| `=~`     | `ILIKE`               | Case-insensitive pattern match (use `%` as wildcard) |
-| `!~`     | `NOT ILIKE`           | Negated case-insensitive pattern match               |
+| `>=`     | `>=`                  | Greater than or equal to                             |
+| `=~`     | `REGEXP`              | Regular expression match (RE2 syntax)                |
+| `!~`     | `NOT REGEXP`          | Negated regular expression match                     |
 | `IN`     | `IN (...)`            | Matches any value in a list                          |
 
 ## Hide table name in ad hoc filter keys
