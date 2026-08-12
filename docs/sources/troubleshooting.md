@@ -42,6 +42,8 @@ Use the category prefix to jump to the matching section in this guide.
 
 ## Connection errors
 
+These errors occur when the plugin cannot establish or maintain a connection to the ClickHouse server, or when connection settings are missing or invalid.
+
 #### Invalid server host
 
 **Error message:** "invalid server host. Either empty or not set"
@@ -137,7 +139,76 @@ Work through the following checks in order. Most cases are resolved by one of th
 
 ---
 
+#### Invalid protocol
+
+**Error message:** "protocol is invalid, use native or http"
+
+**Cause:** An unsupported protocol was specified in the data source configuration.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. Set the **Protocol** to either `native` or `http`.
+1. Use `native` (port 9000) for better performance or `http` (port 8123) for HTTP-based connectivity.
+
+---
+
+#### Invalid JSON configuration
+
+**Error message:** "could not parse json"
+
+**Cause:** The data source configuration contains invalid JSON syntax.
+
+**Solution:**
+
+1. If you are provisioning the data source via YAML/JSON files, validate the JSON syntax.
+1. Use a JSON validator to check for syntax errors.
+1. Ensure all string values are properly quoted and special characters are escaped.
+1. Re-save the data source configuration through the Grafana UI.
+
+---
+
+#### Could not parse configuration values
+
+**Error messages:**
+
+- "could not parse port value"
+- "could not parse secure value"
+- "could not parse tlsSkipVerify value"
+- "could not parse tlsAuth value"
+- "could not parse tlsAuthWithCACert value"
+- "could not parse forwardGrafanaHeaders value"
+
+**Cause:** A configuration value could not be converted to the expected type (boolean or number).
+
+**Solution:**
+
+1. Verify that boolean values are set to `true` or `false` (without quotes in JSON, or as strings `"true"`/`"false"`).
+1. Verify that numeric values like port are valid integers.
+1. Re-configure the data source through the Grafana UI to ensure proper value types.
+
+---
+
+#### Invalid timeout values
+
+**Error messages:**
+
+- "invalid timeout: [value]"
+- "invalid query timeout: [value]"
+
+**Cause:** The dial timeout or query timeout value is not a valid integer.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. Ensure the **Dial Timeout** and **Query Timeout** fields contain valid integer values (in seconds).
+1. Remove any non-numeric characters from the timeout fields.
+
+---
+
 ## Authentication errors
+
+These errors indicate that the plugin reached the ClickHouse server but the provided credentials were rejected or missing.
 
 #### Invalid username
 
@@ -216,6 +287,8 @@ Queries that fall back to the service account are not subject to per-user row po
 
 ## TLS/SSL certificate errors
 
+These errors occur during the TLS handshake when certificates are malformed, expired, or not trusted.
+
 #### Invalid CA certificate
 
 **Error message:** "failed to parse TLS CA PEM certificate"
@@ -247,78 +320,9 @@ Queries that fall back to the service account are not subject to per-user row po
 
 ---
 
-## Protocol errors
-
-#### Invalid protocol
-
-**Error message:** "protocol is invalid, use native or http"
-
-**Cause:** An unsupported protocol was specified in the data source configuration.
-
-**Solution:**
-
-1. Open the data source configuration in Grafana.
-2. Set the **Protocol** to either `native` or `http`.
-3. Use `native` (port 9000) for better performance or `http` (port 8123) for HTTP-based connectivity.
-
----
-
-## Configuration parsing errors
-
-#### Invalid JSON configuration
-
-**Error message:** "could not parse json"
-
-**Cause:** The data source configuration contains invalid JSON syntax.
-
-**Solution:**
-
-1. If you are provisioning the data source via YAML/JSON files, validate the JSON syntax.
-2. Use a JSON validator to check for syntax errors.
-3. Ensure all string values are properly quoted and special characters are escaped.
-4. Re-save the data source configuration through the Grafana UI.
-
----
-
-#### Could not parse configuration values
-
-**Error messages:**
-
-- "could not parse port value"
-- "could not parse secure value"
-- "could not parse tlsSkipVerify value"
-- "could not parse tlsAuth value"
-- "could not parse tlsAuthWithCACert value"
-- "could not parse forwardGrafanaHeaders value"
-
-**Cause:** A configuration value could not be converted to the expected type (boolean or number).
-
-**Solution:**
-
-1. Verify that boolean values are set to `true` or `false` (without quotes in JSON, or as strings `"true"`/`"false"`).
-2. Verify that numeric values like port are valid integers.
-3. Re-configure the data source through the Grafana UI to ensure proper value types.
-
----
-
-#### Invalid timeout values
-
-**Error messages:**
-
-- "invalid timeout: [value]"
-- "invalid query timeout: [value]"
-
-**Cause:** The dial timeout or query timeout value is not a valid integer.
-
-**Solution:**
-
-1. Open the data source configuration in Grafana.
-2. Ensure the **Dial Timeout** and **Query Timeout** fields contain valid integer values (in seconds).
-3. Remove any non-numeric characters from the timeout fields.
-
----
-
 ## Permission and settings errors
+
+These errors occur when the connection succeeds but the ClickHouse user lacks permission to modify settings that the plugin requires at query time.
 
 #### Setting is locked (readonly)
 
@@ -342,6 +346,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 ---
 
 ## Query builder issues
+
+These issues affect the visual query builder's schema drop-downs and autocomplete rather than query execution itself.
 
 #### Empty database, table, or column drop-downs
 
@@ -373,6 +379,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 ---
 
 ## Query errors
+
+These errors occur when a query is sent to ClickHouse but fails during parsing or execution.
 
 #### ClickHouse database exception
 
@@ -432,6 +440,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 ---
 
 ## Ad hoc filter errors
+
+These errors relate to the ad hoc filter variable type, which injects filters into queries at runtime using ClickHouse's `additional_table_filters` setting.
 
 #### Unable to apply ad hoc filters
 
@@ -493,6 +503,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 ---
 
 ## Log context errors
+
+These errors appear when using the log context panel, which fetches surrounding log lines for a selected row.
 
 #### Missing query for log context
 
@@ -561,6 +573,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 ---
 
 ## Proxy and Private Data Connect (PDC) errors
+
+These errors relate to Private Data Connect, which tunnels connections from Grafana Cloud to ClickHouse servers behind a firewall.
 
 #### Unable to cast SOCKS proxy dialer
 
@@ -631,6 +645,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 
 ## Header parsing errors
 
+These errors occur when the plugin cannot parse forwarded HTTP headers from Grafana. They typically affect configurations that use **Forward Grafana HTTP headers**.
+
 #### Couldn't parse message as args
 
 **Error message:** "Couldn't parse message as args"
@@ -660,6 +676,8 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 ---
 
 ## Data display issues
+
+These issues affect how query results are rendered in Grafana panels rather than query execution itself.
 
 #### Timestamp millisecond precision lost
 
@@ -691,6 +709,8 @@ This is a Grafana platform limitation, not specific to the ClickHouse plugin. A 
 ---
 
 ## Upgrade and compatibility issues
+
+These issues can occur after upgrading the plugin version or the Grafana version.
 
 #### v3 to v4 migration problems
 
