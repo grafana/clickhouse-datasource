@@ -48,12 +48,12 @@ The ClickHouse data source plugin allows you to query and visualize ClickHouse d
 
 Start by configuring a connection to your ClickHouse server, then use the query editor to build queries for dashboards and alerts.
 
-1. [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/) — Set up the connection, authentication, TLS, and optional features like logs and traces.
-2. [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Write SQL queries or use the visual query builder. Includes macros, query types, and examples.
-3. [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Create dynamic dashboards with variables and ad hoc filters.
-4. [ClickHouse annotations](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/annotations/) — Overlay event markers on dashboard panels from ClickHouse data.
-5. [ClickHouse alerting](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/alerting/) — Create alert rules and recording rules from ClickHouse queries.
-6. [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) — Solutions for common connection, query, and configuration errors.
+1. [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/): Set up the connection, authentication, TLS, and optional features like logs and traces.
+2. [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/): Write SQL queries or use the visual query builder. Includes macros, query types, and examples.
+3. [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/): Create dynamic dashboards with variables and ad hoc filters.
+4. [ClickHouse annotations](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/annotations/): Overlay event markers on dashboard panels from ClickHouse data.
+5. [ClickHouse alerting](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/alerting/): Create alert rules and recording rules from ClickHouse queries.
+6. [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/): Solutions for common connection, query, and configuration errors.
 
 ## Additional features
 
@@ -67,13 +67,13 @@ After configuring the data source, you can:
 
 The plugin includes the following pre-built dashboards:
 
-- **ClickHouse - Query Analysis** — Query performance, time distribution, top users, and memory usage.
-- **ClickHouse - Data Analysis** — Disk usage, table and database summary, parts over time, and dictionaries.
-- **ClickHouse - Cluster Analysis** — Cluster overview, merges, mutations, and replicated table delay.
+- **ClickHouse - Query Analysis**: Query performance, time distribution, top users, and memory usage.
+- **ClickHouse - Data Analysis**: Disk usage, table and database summary, parts over time, and dictionaries.
+- **ClickHouse - Cluster Analysis**: Cluster overview, merges, mutations, and replicated table delay.
 - **OpenTelemetry Logs Explorer**: stacked log volume, services, and per-service samples for OpenTelemetry data exported to `otel_logs`. See the [OpenTelemetry dashboards guide](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/dashboards/).
 - **OpenTelemetry Traces Explorer**: service map, trace search, and per-service performance for OpenTelemetry data exported to `otel_traces`.
 - **OpenTelemetry Service Dashboard**: single-service deep dive with RED metrics, top errors, slowest operations, related logs, and trace detail.
-- **ClickHouse System Dashboards** — System metrics (CPU, queries/sec, IO, memory) similar to ClickHouse built-in monitoring.
+- **ClickHouse System Dashboards**: System metrics (CPU, queries/sec, IO, memory) similar to ClickHouse built-in monitoring.
 
 To import a pre-built dashboard:
 
@@ -93,5 +93,5 @@ Plugins are automatically updated in Grafana Cloud.
 ## Related resources
 
 - [ClickHouse documentation](https://clickhouse.com/docs)
-- [grafana-clickhouse-datasource on GitHub](https://github.com/grafana/clickhouse-datasource) — Source code, issues, and changelog.
+- [grafana-clickhouse-datasource on GitHub](https://github.com/grafana/clickhouse-datasource): Source code, issues, and changelog.
 - [Grafana community forum](https://community.grafana.com/)

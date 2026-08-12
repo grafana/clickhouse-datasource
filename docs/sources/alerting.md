@@ -140,11 +140,11 @@ Queries that fall back to the service account are not subject to per-user row po
 
 ## Best practices
 
-1. **Use an appropriate evaluation interval** — Set the alert evaluation interval to match how often your data is written. Avoid intervals shorter than your data resolution to prevent flapping or missed data.
-2. **Reduce multiple series** — If your query returns multiple time series (for example, one per host), use **Reduce** to aggregate: **Last**, **Max**, **Mean**, or **Sum** so Grafana can evaluate a single value.
-3. **Restrict the time range** — Use **$\_\_timeFilter(column)** in your WHERE clause so the query only reads data in the evaluation window. Avoid full table scans.
-4. **Handle no data** — In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (for example, a heartbeat query).
-5. **Test the query first** — Run the query in **Explore** with the ClickHouse data source and confirm it returns the expected numeric data before saving the alert rule.
+1. **Use an appropriate evaluation interval**: Set the alert evaluation interval to match how often your data is written. Avoid intervals shorter than your data resolution to prevent flapping or missed data.
+2. **Reduce multiple series**: If your query returns multiple time series (for example, one per host), use **Reduce** to aggregate: **Last**, **Max**, **Mean**, or **Sum** so Grafana can evaluate a single value.
+3. **Restrict the time range**: Use **$\_\_timeFilter(column)** in your WHERE clause so the query only reads data in the evaluation window. Avoid full table scans.
+4. **Handle no data**: In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (for example, a heartbeat query).
+5. **Test the query first**: Run the query in **Explore** with the ClickHouse data source and confirm it returns the expected numeric data before saving the alert rule.
 
 ## Recording rules
 
@@ -166,8 +166,8 @@ If a recording rule or alert rule returns missing data points or incomplete resu
 
 When an alert rule evaluates, the ClickHouse plugin injects metadata into the ClickHouse [`ClientInfo` comment](https://clickhouse.com/docs/en/operations/system-tables/query_log), including:
 
-- `grafana_rule:<rule-UID>` — the Grafana alert rule UID
-- `grafana_user:<login>` — the Grafana user (when available)
+- `grafana_rule:<rule-UID>` is the Grafana alert rule UID
+- `grafana_user:<login>` is the Grafana user (when available)
 
 This metadata appears in the ClickHouse `system.query_log` table and helps database administrators identify which alert rules are generating specific queries. Use it to debug slow or resource-heavy alert evaluations on the ClickHouse side.
 
@@ -175,16 +175,16 @@ This metadata appears in the ClickHouse `system.query_log` table and helps datab
 
 If alerts or recording rules do not fire or evaluate as expected:
 
-- **Query returns no numeric data** — Confirm the query returns a time column and a numeric column (or a single numeric value). Test in **Explore** and check the result format.
-- **Missing data points** — Check for data ingestion latency. Refer to [Account for data ingestion latency](#account-for-data-ingestion-latency) above.
-- **Evaluation interval** — Ensure the evaluation interval is long enough for data to be available. Avoid intervals shorter than your data resolution.
-- **No data handling** — In **Configure no data and error handling**, choose whether no data should fire the alert, resolve it, or keep the current state.
-- **Alerting times out via PDC** — If dashboards work but alert rules time out when using Private Data Connect, refer to [Alerting times out via PDC while dashboards work](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/#alerting-times-out-via-pdc-while-dashboards-work) in the troubleshooting guide.
+- **Query returns no numeric data**: Confirm the query returns a time column and a numeric column (or a single numeric value). Test in **Explore** and check the result format.
+- **Missing data points**: Check for data ingestion latency. Refer to [Account for data ingestion latency](#account-for-data-ingestion-latency) above.
+- **Evaluation interval**: Ensure the evaluation interval is long enough for data to be available. Avoid intervals shorter than your data resolution.
+- **No data handling**: In **Configure no data and error handling**, choose whether no data should fire the alert, resolve it, or keep the current state.
+- **Alerting times out via PDC**: If dashboards work but alert rules time out when using Private Data Connect, refer to [Alerting times out via PDC while dashboards work](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/#alerting-times-out-via-pdc-while-dashboards-work) in the troubleshooting guide.
 
 For connection errors, timeouts, or other data source issues, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/).
 
 ## Next steps
 
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Macros such as `$__timeFilter` and `$__timeInterval`.
-- [Grafana Alerting](https://grafana.com/docs/grafana/latest/alerting/) — Alert rules, contact points, and notification policies.
-- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) — Common errors and solutions.
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/): Macros such as `$__timeFilter` and `$__timeInterval`.
+- [Grafana Alerting](https://grafana.com/docs/grafana/latest/alerting/): Alert rules, contact points, and notification policies.
+- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/): Common errors and solutions.

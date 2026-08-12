@@ -208,14 +208,14 @@ If this is not the desired behavior and you want the annotation to always show a
 
 ## Best practices
 
-1. **Use a time filter** — Include `$__timeFilter(your_time_column)` in the WHERE clause so the query only returns data in the dashboard time range.
-2. **Limit results** — Use `LIMIT` (for example, 100) so the query stays fast and the dashboard does not show too many markers.
-3. **Meaningful text** — Use `concat()` or similar so the text column is clear (e.g. event type plus a short description).
-4. **Use tags** — Return one or more tag columns (e.g. environment, service, user) so users can filter annotations in the dashboard.
-5. **Descriptive names** — Give the annotation a clear name (e.g. "Production deployments", "Query errors") so dashboard users know what it represents.
+1. **Use a time filter**: Include `$__timeFilter(your_time_column)` in the WHERE clause so the query only returns data in the dashboard time range.
+2. **Limit results**: Use `LIMIT` (for example, 100) so the query stays fast and the dashboard does not show too many markers.
+3. **Meaningful text**: Use `concat()` or similar so the text column is clear (for example, event type plus a short description).
+4. **Use tags**: Return one or more tag columns (for example, environment, service, or user) so users can filter annotations in the dashboard.
+5. **Descriptive names**: Give the annotation a clear name (for example, "Production deployments" or "Query errors") so dashboard users know what it represents.
 
 ## Next steps
 
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Macros such as `$__timeFilter` and building queries.
-- [Annotate visualizations](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/annotate-visualizations/) — Grafana annotation options (colors, which panels show annotations, filters).
-- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) — Common errors and solutions.
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/): Macros such as `$__timeFilter` and building queries.
+- [Annotate visualizations](https://grafana.com/docs/grafana/latest/dashboards/build-dashboards/annotate-visualizations/): Grafana annotation options (colors, which panels show annotations, filters).
+- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/): Common errors and solutions.

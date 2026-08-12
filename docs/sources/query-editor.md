@@ -35,16 +35,16 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 
 **In SQL mode:**
 
-- **SQL editor** — A code editor where you write ClickHouse SQL. It provides schema suggestions (databases, tables, columns) as you type. If SQL validation is enabled in the data source settings, the editor marks invalid syntax.
-- **Format code** — Use the editor toolbar to format your SQL.
-- **Query type** — Select **Table**, **Logs**, **Time series**, or **Traces** so the panel uses the correct visualization.
+- **SQL editor**: A code editor where you write ClickHouse SQL. It provides schema suggestions (databases, tables, columns) as you type. If SQL validation is enabled in the data source settings, the editor marks invalid syntax.
+- **Format code**: Use the editor toolbar to format your SQL.
+- **Query type**: Select **Table**, **Logs**, **Time series**, or **Traces** so the panel uses the correct visualization.
 
 **In Query builder mode:**
 
-- **Database** and **Table** — Select the database and table to query from the drop-downs.
-- **Query type** — Select **Table**, **Logs**, **Time series**, or **Traces**. The builder shows options that match the type (for example, time column and value columns for time series; columns, filters, group by, and order by for tables).
-- **Type-specific options** — Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
-- **SQL preview** — At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
+- **Database** and **Table**: Select the database and table to query from the drop-downs.
+- **Query type**: Select **Table**, **Logs**, **Time series**, or **Traces**. The builder shows options that match the type (for example, time column and value columns for time series; columns, filters, group by, and order by for tables).
+- **Type-specific options**: Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
+- **SQL preview**: At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
 
 If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
 
@@ -92,8 +92,8 @@ You can also filter by log message text using the search field, and add column f
 
 The traces query builder supports two modes:
 
-- **Trace ID mode** — Enter a trace ID (or use a template variable like `$traceId`) to fetch all spans for that trace.
-- **Trace search mode** — Filter traces by service name, span name, duration range, and time range.
+- **Trace ID mode**: Enter a trace ID (or use a template variable like `$traceId`) to fetch all spans for that trace.
+- **Trace search mode**: Filter traces by service name, span name, duration range, and time range.
 
 When **Use OTel** is enabled, column mappings are pre-filled for the OpenTelemetry schema. You can also configure:
 
@@ -106,7 +106,7 @@ When **Use OTel** is enabled, column mappings are pre-filled for the OpenTelemet
 
 ### JSON-type OTel attribute columns
 
-The [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/README.md#experimental-json-support) supports an experimental mode (enabled by setting `enable_json_type: true` in the collector config) that stores attribute maps — `SpanAttributes`, `ResourceAttributes`, `LogAttributes`, `ScopeAttributes`, and event/link attribute columns — as ClickHouse's native `JSON` type instead of `Map(String, String)`.
+The [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/README.md#experimental-json-support) supports an experimental mode (enabled by setting `enable_json_type: true` in the collector config) that stores attribute maps (`SpanAttributes`, `ResourceAttributes`, `LogAttributes`, `ScopeAttributes`, and event/link attribute columns) as ClickHouse's native `JSON` type instead of `Map(String, String)`.
 
 The plugin auto-detects JSON-typed attribute columns at query time. No manual configuration is required.
 
@@ -200,7 +200,7 @@ WHERE TraceId = '61d489320c01243966700e172ab37081'
 ORDER BY startTime ASC
 ```
 
-For tables with **`JSON`-type attribute columns** (ClickHouse 26+ with `enable_json_type: true`), select the attribute columns directly — `mapKeys()` does not work on the `JSON` type:
+For tables with **`JSON`-type attribute columns** (ClickHouse 26+ with `enable_json_type: true`), select the attribute columns directly, because `mapKeys()` does not work on the `JSON` type:
 
 ```sql
 SELECT
@@ -327,5 +327,5 @@ Usage notes:
 
 ## Next steps
 
-- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Use variables in dashboards and queries.
-- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/) — Connection and authentication options.
+- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/): Use variables in dashboards and queries.
+- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/): Connection and authentication options.

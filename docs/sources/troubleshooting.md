@@ -77,13 +77,13 @@ These errors occur when the plugin cannot establish or maintain a connection to 
 
 **Error message:** "failed to create ClickHouse client" or "failed to create data source"
 
-**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This is the most commonly reported ClickHouse error. The error message is intentionally generic — the actual root cause can be any of the issues listed below.
+**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This is the most commonly reported ClickHouse error. The error message is intentionally generic. The actual root cause can be any of the issues listed below.
 
 **Solution:**
 
 Work through the following checks in order. Most cases are resolved by one of the first four items.
 
-1. **Clear the Default database field.** This is one of the most common fixes. If you are connecting to **ClickHouse Cloud**, leave it blank — setting an explicit database name that does not match the service's configured database causes this error. For details, see [Default database guidance](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#default-database-guidance).
+1. **Clear the Default database field.** This is one of the most common fixes. If you are connecting to **ClickHouse Cloud**, leave it blank. Setting an explicit database name that does not match the service's configured database causes this error. For details, refer to [Default database guidance](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#default-database-guidance).
 2. **Verify credentials.** Confirm that the username and password are correct for the ClickHouse server. A typo or stale password is a frequent cause.
 3. **Check ClickHouse user permissions.** The connection test may pass, but queries can still fail if the user lacks permission to modify settings such as `max_execution_time`. See [Required SETTINGS permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#required-settings-permissions).
 4. **Confirm network connectivity.** Verify that the ClickHouse server is running and reachable from the Grafana server on the configured port. Ensure no firewall rules or security groups are blocking the connection.
@@ -353,7 +353,7 @@ These issues affect the visual query builder's schema drop-downs and autocomplet
 
 **Symptoms:** The database, table, or column drop-downs in the query builder show no options, or they briefly attempt to load and then appear empty.
 
-**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these drop-downs. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the drop-downs will be empty without a visible error message in the panel — the error is logged only to the browser console.
+**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these drop-downs. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the drop-downs are empty without a visible error message in the panel. The error is logged only to the browser console.
 
 **Solution:**
 
@@ -625,7 +625,7 @@ These errors relate to Private Data Connect, which tunnels connections from Graf
 
 ---
 
-#### Stale PDC token — metrics suddenly lost
+#### Stale PDC token: metrics suddenly lost
 
 **Symptoms:** ClickHouse dashboards that were previously working stop loading data. The PDC agent pod appears to be running, but all queries return errors or empty results. No obvious error is shown in Grafana.
 
@@ -639,7 +639,7 @@ These errors relate to Private Data Connect, which tunnels connections from Graf
    ```
 2. If restarting doesn't resolve it, regenerate the PDC agent token in the Grafana Cloud portal and redeploy the agent with the new token.
 3. After the agent is back, click **Save & test** on the data source to confirm connectivity.
-4. To prevent recurrence, set up monitoring on the PDC agent pod — for example, a liveness probe or periodic health check that verifies the agent can relay a test query.
+4. To prevent recurrence, set up monitoring on the PDC agent pod, for example, a liveness probe or periodic health check that verifies the agent can relay a test query.
 
 ---
 
@@ -683,7 +683,7 @@ These issues affect how query results are rendered in Grafana panels rather than
 
 **Symptoms:** ClickHouse `DateTime64` timestamps with millisecond (or higher) precision display in Grafana with only second-level granularity. Milliseconds are truncated or shown as `.000` in both Explore and dashboard panels.
 
-**Cause:** This is a known Grafana platform limitation — Grafana's default time formatter displays timestamps at second precision regardless of the underlying data. The ClickHouse plugin returns the full-precision value, but Grafana's display layer truncates it.
+**Cause:** This is a known Grafana platform limitation. Grafana's default time formatter displays timestamps at second precision regardless of the underlying data. The ClickHouse plugin returns the full-precision value, but Grafana's display layer truncates it.
 
 **Workaround for dashboards:**
 
@@ -716,7 +716,7 @@ These issues can occur after upgrading the plugin version or the Grafana version
 
 **Symptoms:** After upgrading from plugin v3 to v4, data source settings appear to be missing (blank host, no timeout), or saved dashboard queries no longer load in the query editor.
 
-**Cause:** Plugin v4 renamed several configuration fields (`server` to `host`, `timeout` to `dialTimeout`) and restructured the query model (the `queryType` field changed from `sql`/`builder` to the new `editorType` format). The plugin includes automatic migration logic, but in some cases — especially with provisioned data sources — the migration may not run until the configuration page is opened.
+**Cause:** Plugin v4 renamed several configuration fields (`server` to `host`, `timeout` to `dialTimeout`) and restructured the query model (the `queryType` field changed from `sql`/`builder` to the new `editorType` format). The plugin includes automatic migration logic, but in some cases, especially with provisioned data sources, the migration may not run until the configuration page is opened.
 
 **Solution:**
 

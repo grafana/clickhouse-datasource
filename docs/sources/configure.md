@@ -230,9 +230,9 @@ When **Configuration mode** is set to **Single source** and **Signal type** is s
 
 The plugin ships built-in column maps for the OpenTelemetry ClickHouse exporter's default schemas. Pick the version that matches the exporter that wrote your data:
 
-- **`auto (latest)`** — detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
-- **`1.3.0`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
-- **`1.2.9`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
+- **`auto (latest)`**: detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
+- **`1.3.0`**: `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
+- **`1.2.9`**: `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
 
 The trace tables (`otel_traces`, `otel_traces_trace_id_ts`) and metric tables are unchanged across these versions; only the `otel_logs` schema changed. Detection therefore only applies to logs, and traces always use the selected version's map.
 
@@ -274,8 +274,8 @@ When the toggle is on, the following headers are forwarded on each ClickHouse co
 
 ### Use cases
 
-- **Query-log attribution** — ClickHouse records the forwarded headers in `system.query_log.http_user_agent` and related fields, so operators can correlate queries back to the Grafana user and dashboard that triggered them.
-- **Row policies and quotas** — ClickHouse [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies) and [quotas](https://clickhouse.com/docs/en/operations/quotas) can key on the `X-Grafana-User` header, so a single shared ClickHouse account can still enforce per-viewer access rules.
+- **Query-log attribution**: ClickHouse records the forwarded headers in `system.query_log.http_user_agent` and related fields, so operators can correlate queries back to the Grafana user and dashboard that triggered them.
+- **Row policies and quotas**: ClickHouse [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies) and [quotas](https://clickhouse.com/docs/en/operations/quotas) can key on the `X-Grafana-User` header, so a single shared ClickHouse account can still enforce per-viewer access rules.
 
 ### Connection pool implications
 
@@ -283,7 +283,7 @@ With header forwarding enabled, connections are keyed by the forwarded header se
 
 ### Custom headers
 
-To forward headers other than the Grafana-set ones — for example, bearer tokens or tenant identifiers — add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
+To forward headers other than the Grafana-set ones (for example, bearer tokens or tenant identifiers), add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
 
 ## Forward OAuth Identity
 
@@ -305,7 +305,7 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
 - **Alerting is blocked by default.** Alert rule evaluation also runs outside a user session, so there is no identity to forward. By default these queries are **rejected** rather than run as a shared account. To keep alerting working, enable **Allow service account fallback** in the **Database credentials** section.
 
   {{< admonition type="warning" >}}
-  Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries — so an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
+  Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries. As a result, an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
   {{< /admonition >}}
 - **Connections are keyed per user.** Enabling JWT authentication automatically turns on header forwarding, so each Grafana user opens a separate ClickHouse connection. See [Connection pool implications](#connection-pool-implications) for sizing guidance.
 
@@ -405,6 +405,6 @@ For more options and authentication methods, refer to the [Grafana Terraform pro
 
 After configuring the data source:
 
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Build queries with the SQL editor or query builder.
-- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Use variables in dashboards and queries.
-- [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/) — Overview, supported features, and pre-built dashboards.
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/): Build queries with the SQL editor or query builder.
+- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/): Use variables in dashboards and queries.
+- [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/): Overview, supported features, and pre-built dashboards.
