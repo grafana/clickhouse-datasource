@@ -252,12 +252,6 @@ Private data source connect (PDC) allows you to establish a private, secured con
 
 Click **Manage private data source connect** to go to your PDC connection page, where you can find your PDC configuration details.
 
-## Verify the connection
-
-Once you have configured your ClickHouse connection settings, click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
-
-If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
-
 ## Forward Grafana HTTP headers
 
 When you use the **HTTP** protocol, you can propagate Grafana's per-request HTTP headers end-to-end to ClickHouse. This attaches context about the originating Grafana user, dashboard, and panel to every query so you can drive query-log attribution, quotas, and row policies from ClickHouse.
@@ -312,6 +306,12 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
   Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries. As a result, an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
   {{< /admonition >}}
 - **Connections are keyed per user.** Enabling JWT authentication automatically turns on header forwarding, so each Grafana user opens a separate ClickHouse connection. See [Connection pool implications](#connection-pool-implications) for sizing guidance.
+
+## Verify the connection
+
+Once you have configured your ClickHouse connection settings, click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
+
+If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
 ## Provision the data source
 
