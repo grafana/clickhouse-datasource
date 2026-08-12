@@ -70,9 +70,9 @@ When using the query builder, the available options depend on the selected **que
 
 | Query type      | Builder modes                    | Description                                                                                                                                                             |
 | --------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Table**       | **List** or **Aggregate**        | List returns raw rows. Aggregate lets you add functions like `count()`, `avg()`, and `GROUP BY`.                                                                        |
+| **Table**       | **Simple** or **Aggregate**      | Simple returns raw rows. Aggregate lets you add functions like `count()`, `avg()`, and `GROUP BY`.                                                                      |
 | **Time series** | **Trend**                        | Automatically groups by time using `$__timeInterval()` and applies aggregate functions. Select a time column, one or more value columns, and optional grouping columns. |
-| **Logs**        | **List** or **Aggregate**        | List returns log rows. Aggregate supports grouping for log volume histograms.                                                                                           |
+| **Logs**        | **Simple** or **Aggregate**      | Simple returns log rows. Aggregate supports grouping for log volume histograms.                                                                                         |
 | **Traces**      | **Trace ID** or **Trace search** | Trace ID fetches a single trace by ID. Trace search finds traces matching filters (service name, duration, time range).                                                 |
 
 ### Logs query builder
