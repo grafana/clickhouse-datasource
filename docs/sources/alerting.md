@@ -10,7 +10,7 @@ keywords:
   - alerting
 menuTitle: Alerting
 title: ClickHouse alerting
-weight: 60
+weight: 55
 version: 0.1
 review_date: 2026-08-12
 ---

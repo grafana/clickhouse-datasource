@@ -67,9 +67,9 @@ After configuring the data source, you can:
 
 The plugin includes the following pre-built dashboards:
 
-- **ClickHouse - Query Analysis**: Query performance, time distribution, top users, and memory usage.
-- **ClickHouse - Data Analysis**: Disk usage, table and database summary, parts over time, and dictionaries.
-- **ClickHouse - Cluster Analysis**: Cluster overview, merges, mutations, and replicated table delay.
+- **Query Analysis**: Query performance, time distribution, top users, and memory usage.
+- **Data Analysis**: Disk usage, table and database summary, parts over time, and dictionaries.
+- **Cluster Analysis**: Cluster overview, merges, mutations, and replicated table delay.
 - **OpenTelemetry Logs Explorer**: stacked log volume, services, and per-service samples for OpenTelemetry data exported to `otel_logs`. See the [OpenTelemetry dashboards guide](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/dashboards/).
 - **OpenTelemetry Traces Explorer**: service map, trace search, and per-service performance for OpenTelemetry data exported to `otel_traces`.
 - **OpenTelemetry Service Dashboard**: single-service deep dive with RED metrics, top errors, slowest operations, related logs, and trace detail.
