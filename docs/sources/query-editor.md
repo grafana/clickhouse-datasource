@@ -139,6 +139,16 @@ Log volume and logs sample are only available when all queries in the panel use 
 
 For time series visualizations, your query must include a `datetime` column. Use an alias of `time` for the timestamp column. Grafana treats timestamp rows without an explicit time zone as UTC. Any column other than `time` is treated as a value column.
 
+Example of a single series bucketed to the panel interval (replace `mgbench.logs1` with your database and table):
+
+```sql
+SELECT $__timeInterval(log_time) AS time, avg(disk_free) AS avg_disk_free
+FROM mgbench.logs1
+WHERE $__timeFilter(log_time)
+GROUP BY time
+ORDER BY time
+```
+
 ## Multi-line time series
 
 To create multi-line time series, the query must return at least 3 columns in this order:
@@ -162,22 +172,25 @@ Table visualizations are available for any valid ClickHouse query. Select **Tabl
 
 ## Visualize logs with the Logs panel
 
-To use the Logs panel, your query must return a timestamp and string values. To default to the logs visualization in Explore, set the timestamp column alias to `log_time`.
+To use the Logs panel, your query must return a time column and one or more string columns. Set the **Query type** to **Logs** so Grafana renders the results in the logs visualization. In the query builder, select the **Logs** query type; in the SQL editor, set the **Query type** (Format) to **Logs**. Aliasing the message column to `body`, the time column to `timestamp`, and the level column to `level` matches what the Logs panel and the query builder expect.
 
-Example (replace `logs1` with your database and table, for example `mydb.logs`):
+Example (replace `mydb.logs` with your database and table):
 
 ```sql
-SELECT log_time AS log_time, machine_group, toString(avg(disk_free)) AS avg_disk_free
-FROM logs1
-GROUP BY machine_group, log_time
-ORDER BY log_time
+SELECT
+  Timestamp AS timestamp,
+  Body AS body,
+  SeverityText AS level,
+  ServiceName
+FROM mydb.logs
+WHERE $__timeFilter(Timestamp)
+ORDER BY Timestamp DESC
+LIMIT 1000
 ```
-
-When you don't have a `log_time` column, set **Format** to **Logs** to force logs rendering (available from plugin version 2.2.0).
 
 ## Visualize traces with the Traces panel
 
-To use the Traces panel, your data must meet the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). Set **Format** to **Trace** when building the query (available from plugin version 2.2.0).
+To use the Traces panel, your data must meet the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). Set the **Query type** to **Traces** when building the query.
 
 If you use the [OpenTelemetry Collector and ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter), the following query returns the required column names (case sensitive). Replace the trace ID in the WHERE clause with your trace ID or a template variable (for example `$traceId`).
 
@@ -287,8 +300,11 @@ WHERE $__timeFilter(date_time)
 | `$__dateFilter(columnName)`                  | Filters by the panel date range using the given column.                                          | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')`                                                                       |
 | `$__timeFilter(columnName)`                  | Filters by the panel time range (seconds).                                                       | `time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)`                                                                   |
 | `$__timeFilter_ms(columnName)`               | Filters by the panel time range (milliseconds).                                                  | `time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)`                                 |
-| `$__dateTimeFilter(dateColumn, timeColumn)`  | Combines date and time filters for separate Date and DateTime columns.                           | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23') AND time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)` |
+| `$__dateTimeFilter(dateColumn, timeColumn)`  | Combines date and time filters for separate Date and DateTime columns.                           | `(date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')) AND (time >= toDateTime(1415792726) AND time <= toDateTime(1447328726))` |
 | `$__dt(dateColumn, timeColumn)`              | Shorthand alias for `$__dateTimeFilter`.                                                         | Same as `$__dateTimeFilter`.                                                                                                          |
+| `$__timeFrom(columnName)`                    | Filters rows at or after the panel time range start.                                             | `time >= toDateTime(1415792726)`                                                                                                    |
+| `$__timeTo(columnName)`                      | Filters rows at or before the panel time range end.                                              | `time <= toDateTime(1447328726)`                                                                                                    |
+| `$__timeGroup(columnName, period)`           | Buckets the time column into fixed intervals for grouping. Accepts a duration such as `5m`.      | `toStartOfInterval(toDateTime(column), INTERVAL 300 second)`                                                                        |
 | `$__fromTime`                                | Start of the panel time range as `DateTime`.                                                     | `toDateTime(1415792726)`                                                                                                              |
 | `$__toTime`                                  | End of the panel time range as `DateTime`.                                                       | `toDateTime(1447328726)`                                                                                                              |
 | `$__fromTime_ms`                             | Start of the panel time range as `DateTime64(3)`.                                                | `fromUnixTimestamp64Milli(1415792726123)`                                                                                             |
@@ -312,7 +328,13 @@ Statement macros expand to a complete query rather than a single expression. Wri
 | `$__increaseColumns(timeColumn, key, value)`  | Raw increase of a monotonic counter per bucket and series, like the Prometheus `increase()` function. `value` is aggregated with `max()`.                                                     |
 | `$__lttb(buckets, x, y)`                      | Downsamples dense series with ClickHouse's `lttb()` aggregate function (Largest-Triangle-Three-Buckets). Pass a bucket count, or `auto` to derive one from the panel time range and interval. |
 
-For example, the following query charts the per-second request rate of every service:
+For example, the following query returns one series per service, with the request count aggregated into each time bucket:
+
+```sql
+$__columns(EventTime, ServiceName, count() AS c) FROM requests WHERE ServiceName != ''
+```
+
+For a monotonic counter, the following query charts the per-second request rate of every service:
 
 ```sql
 $__perSecondColumns(EventTime, ServiceName, RequestsTotal) FROM requests WHERE ServiceName != ''
