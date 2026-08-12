@@ -21,7 +21,7 @@ The ClickHouse data source supports [Grafana Alerting](https://grafana.com/docs/
 
 Alert rules run as background processes. Grafana executes your ClickHouse query on a schedule, then evaluates the result using expressions such as **Reduce** and **Threshold**. Your query must return numeric data that Grafana can evaluate.
 
-For an overview of alerting in Grafana, see [Alert rules](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/) and [Create a Grafana-managed alert rule](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/create-grafana-managed-rule/).
+For an overview of alerting in Grafana, refer to [Alert rules](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/) and [Create a Grafana-managed alert rule](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/create-grafana-managed-rule/).
 
 ## Before you begin
 
@@ -35,12 +35,12 @@ Alert rules need numeric values to evaluate. Your ClickHouse query should return
 
 | Query result                                   | Use case                                                                                                                                                 |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Time series** (time column + numeric column) | Threshold alerts on a metric (e.g. average CPU, error count per interval). Use **Reduce** (Last, Max, Mean, etc.) to get a single value from the series. |
-| **Single row, numeric value**                  | Threshold alerts on an aggregate (e.g. `SELECT count() FROM errors WHERE ...`). Use **Reduce** > **Last** to use the value.                              |
+| **Time series** (time column + numeric column) | Threshold alerts on a metric (for example, average CPU or error count per interval). Use **Reduce** (Last, Max, Mean, and so on) to get a single value from the series. |
+| **Single row, numeric value**                  | Threshold alerts on an aggregate (for example, `SELECT count() FROM errors WHERE ...`). Use **Reduce** > **Last** to use the value.                              |
 
 Queries that return only text or non-numeric data cannot be used directly for threshold evaluation. Use `count()`, `avg()`, `sum()`, or similar in your SQL so the result is numeric.
 
-Use the **$\_\_timeFilter(column)** macro in your WHERE clause so the query respects the alert rule’s evaluation interval and time range. See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section.
+Use the **$\_\_timeFilter(column)** macro in your WHERE clause so the query respects the alert rule’s evaluation interval and time range. Refer to the Macros section of the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/).
 
 ## Create an alert rule
 
@@ -54,15 +54,15 @@ To create an alert rule using ClickHouse data:
 4. In **Define query and alert condition**:
    - Select your **ClickHouse** data source.
    - Write a query that returns a time column and a numeric column (or a single numeric value). Use **Format** > **Time series** if your query returns time + value; use **Table** if it returns a single row.
-   - Add a **Reduce** expression to aggregate the query result (e.g. **Last** to use the latest value, **Max** for the highest, **Mean** for the average).
-   - Add a **Threshold** expression to define when the alert fires (e.g. **Is above** 80, **Is below** 3).
+   - Add a **Reduce** expression to aggregate the query result (for example, **Last** to use the latest value, **Max** for the highest, or **Mean** for the average).
+   - Add a **Threshold** expression to define when the alert fires (for example, **Is above** 80 or **Is below** 3).
 5. Configure **Set evaluation behavior**: choose a folder and evaluation group, set the evaluation interval, and set the pending period.
 6. Add **Labels** and **Annotations** for notifications.
 7. Click **Save rule**.
 
 If your alert rule contains multiple queries (multiple refIds), you can hide a query by clicking the eye icon next to it. Hidden queries are excluded from evaluation.
 
-For detailed steps, see [Create a Grafana-managed alert rule](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/create-grafana-managed-rule/).
+For detailed steps, refer to [Create a Grafana-managed alert rule](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/create-grafana-managed-rule/).
 
 ## Example: Metric threshold alert
 
@@ -100,13 +100,29 @@ In the alert rule, set the query **Format** to **Table**, add **Reduce** > **Las
 
 ## Example: No data alert
 
-You can alert when a query returns no rows (for example, a health check that should always return at least one row). Write a query that returns a row when things are healthy, then in the alert rule configure **Configure no data and error handling** to **Alerting** when there is no data.
+You can alert when a query returns no rows, such as a heartbeat check on an ingestion pipeline that should always produce events. Write a query that returns rows only while data is flowing, then set **Configure no data and error handling** to **Alerting** so the rule fires when the result is empty.
+
+**Query (Time series format):**
+
+```sql
+SELECT
+  $__timeInterval(timestamp) AS time,
+  count() AS value
+FROM my_app.events
+WHERE $__timeFilter(timestamp)
+GROUP BY time
+ORDER BY time
+```
+
+When events stop arriving, the query returns no rows and the rule enters the **No Data** state. In the alert rule, set **Configure no data and error handling** > **Alerting** so this state fires the alert.
 
 ## Limitations
 
+The following limitations apply to alert and recording rule queries.
+
 ### Ad hoc filters
 
-[Ad hoc filters](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#ad-hoc-filters) are a dashboard-scoped feature. When Grafana evaluates an alert rule, queries run through the backend and ad hoc filters are **not** applied. If you reuse a dashboard query that relies on ad hoc filters, the alert query will run without those filters and may return unexpected results.
+[Ad hoc filters](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#ad-hoc-filters) are a dashboard-scoped feature. When Grafana evaluates an alert rule, queries run through the backend and ad hoc filters are **not** applied. If you reuse a dashboard query that relies on ad hoc filters, the alert query runs without those filters and may return unexpected results.
 
 To apply equivalent filtering in an alert rule, add the filter conditions directly in your SQL `WHERE` clause.
 
@@ -125,16 +141,16 @@ Queries that fall back to the service account are not subject to per-user row po
 ## Best practices
 
 1. **Use an appropriate evaluation interval** — Set the alert evaluation interval to match how often your data is written. Avoid intervals shorter than your data resolution to prevent flapping or missed data.
-2. **Reduce multiple series** — If your query returns multiple time series (e.g. one per host), use **Reduce** to aggregate: **Last**, **Max**, **Mean**, or **Sum** so Grafana can evaluate a single value.
+2. **Reduce multiple series** — If your query returns multiple time series (for example, one per host), use **Reduce** to aggregate: **Last**, **Max**, **Mean**, or **Sum** so Grafana can evaluate a single value.
 3. **Restrict the time range** — Use **$\_\_timeFilter(column)** in your WHERE clause so the query only reads data in the evaluation window. Avoid full table scans.
-4. **Handle no data** — In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (e.g. a heartbeat query).
+4. **Handle no data** — In **Configure no data and error handling**, choose whether no data should keep the alert as-is, fire the alert, or resolve it. Use **Alerting** when no data indicates a problem (for example, a heartbeat query).
 5. **Test the query first** — Run the query in **Explore** with the ClickHouse data source and confirm it returns the expected numeric data before saving the alert rule.
 
 ## Recording rules
 
 The ClickHouse data source supports [Grafana-managed recording rules](https://grafana.com/docs/grafana/latest/alerting/configure-alert-rules/create-recording-rules/), which evaluate a ClickHouse query on a schedule and write the result as a Prometheus metric. This is useful for pre-aggregating expensive queries so dashboards load faster.
 
-The same query requirements and best practices that apply to alert rules also apply to recording rules. Pay particular attention to **data ingestion latency** — see the section below.
+The same query requirements and best practices that apply to alert rules also apply to recording rules. Pay particular attention to **data ingestion latency**, described in the following section.
 
 ### Account for data ingestion latency
 
@@ -143,7 +159,7 @@ ClickHouse data may not be available at the exact moment a rule evaluates. This 
 If a recording rule or alert rule returns missing data points or incomplete results:
 
 1. **Widen the relative time range.** Instead of querying only the last evaluation interval (for example, the last 1 minute), shift the query window back to account for ingestion lag. For example, query the last 5 minutes even if the rule evaluates every 1 minute.
-2. **Avoid filtering on `now()` tightly.** A `WHERE timestamp > now() - INTERVAL 1 MINUTE` filter will miss data that hasn't been flushed to ClickHouse yet. Use a wider window like `now() - INTERVAL 5 MINUTE` and rely on **Reduce** > **Last** to pick up the most recent value.
+2. **Avoid filtering on `now()` tightly.** A `WHERE timestamp > now() - INTERVAL 1 MINUTE` filter misses data that hasn't been flushed to ClickHouse yet. Use a wider window like `now() - INTERVAL 5 MINUTE` and rely on **Reduce** > **Last** to pick up the most recent value.
 3. **Test the query lag in Explore.** Run the query manually with different time offsets to determine how much delay your pipeline typically introduces, then build that buffer into the rule's time range.
 
 ## Query metadata in ClickHouse
@@ -160,12 +176,12 @@ This metadata appears in the ClickHouse `system.query_log` table and helps datab
 If alerts or recording rules do not fire or evaluate as expected:
 
 - **Query returns no numeric data** — Confirm the query returns a time column and a numeric column (or a single numeric value). Test in **Explore** and check the result format.
-- **Missing data points** — Check for data ingestion latency. See [Account for data ingestion latency](#account-for-data-ingestion-latency) above.
+- **Missing data points** — Check for data ingestion latency. Refer to [Account for data ingestion latency](#account-for-data-ingestion-latency) above.
 - **Evaluation interval** — Ensure the evaluation interval is long enough for data to be available. Avoid intervals shorter than your data resolution.
 - **No data handling** — In **Configure no data and error handling**, choose whether no data should fire the alert, resolve it, or keep the current state.
-- **Alerting times out via PDC** — If dashboards work but alert rules time out when using Private Data Connect, see [Alerting Times Out via PDC While Dashboards Work](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/#alerting-times-out-via-pdc-while-dashboards-work) in the troubleshooting guide.
+- **Alerting times out via PDC** — If dashboards work but alert rules time out when using Private Data Connect, refer to [Alerting times out via PDC while dashboards work](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/#alerting-times-out-via-pdc-while-dashboards-work) in the troubleshooting guide.
 
-For connection errors, timeouts, or other data source issues, see [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/).
+For connection errors, timeouts, or other data source issues, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/).
 
 ## Next steps
 
