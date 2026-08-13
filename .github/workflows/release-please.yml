@@ -23,8 +23,9 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      # PRs created with the default GITHUB_TOKEN do not trigger CI runs,
-      # so the release PR is created with an app token instead.
+      # PRs created with the default GITHUB_TOKEN get their CI runs held in
+      # an approval-required state instead of running automatically, so the
+      # release PR is created with an app token.
       - name: Generate GitHub token
         id: generate-github-token
         uses: grafana/shared-workflows/actions/create-github-app-token@46f48da11e78ebdba7a8747ae456b11062fac83e # create-github-app-token/v0.3.1
