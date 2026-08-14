@@ -46,12 +46,17 @@ test.describe('Column auto-detection (Layer 2)', () => {
       await pickBuilderSelect(page, 'Log Level', 'service');
       await expect(levelRow).toContainText('service');
 
-      // Toggling back to a different table should re-run auto-fill for *empty*
-      // slots but must not clobber the explicit `service` pick if the user
-      // returns to the original table. Simulate by flipping database and back.
-      // (The seed provides only one database, so instead we verify the pick
-      // survives a page re-render without the heuristic firing again.)
+      // Changing the pick re-fires the heuristic effect (the selected columns
+      // are in its dependency list), which must skip non-empty slots. A table
+      // or database flip cannot exercise this: SetTable/SetDatabase rebuild
+      // the whole builder state by design (useBuilderOptionsState.ts), wiping
+      // every pick. The reset and re-arm paths are unit-tested in
+      // logsQueryBuilderHooks.test.ts; here we give the re-fired effect time
+      // to mis-fire before asserting the explicit pick was not clobbered
+      // back to `level`.
+      await page.waitForTimeout(500);
       await expect(levelRow).toContainText('service');
+      await expect(levelRow).not.toContainText('level');
     });
   });
 });

@@ -73,15 +73,24 @@ async function openClickHouseVariableEditor(variableEditPage: VariableEditPage, 
 
 /**
  * Pick a value in one of the plugin editor's selects, located by its
- * aria-label: open the combobox, type the value to filter the option list,
- * commit with Enter and close any lingering menu with Escape (the same
- * pattern as pickBuilderSelect in helpers/builder.ts).
+ * aria-label. The schema pickers load their options from /api/ds/query, so a
+ * blind Enter could commit before the matching option exists: wait for the
+ * real option and click it instead (the same hardening as pickBuilderSelect
+ * in helpers/builder.ts).
  */
 async function pickEditorSelect(page: Page, label: string, value: string): Promise<void> {
   const combobox = pluginEditorSelect(page, label);
   await combobox.click();
   await page.keyboard.type(value);
-  await page.keyboard.press('Enter');
+  // Match on a value-anchored prefix rather than exact name: the query-type
+  // options carry a description in their accessible name (e.g. 'List
+  // databases All databases on the server'), while schema-picker options are
+  // bare values, and this handles both.
+  const escaped = value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  await page
+    .getByRole('option', { name: new RegExp(`^${escaped}\\b`) })
+    .first()
+    .click();
   await page.keyboard.press('Escape');
 }
 

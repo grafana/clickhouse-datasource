@@ -47,12 +47,15 @@ function sqlPreview(page: Page): Locator {
 /**
  * Pick a value in a classic Grafana Select given its combobox locator
  * directly, for Selects that are not label-anchored (the aggregate column
- * and the order-by direction): open, type to filter, commit with Enter.
+ * and the order-by direction). The option list can populate asynchronously
+ * from a schema fetch, so a blind Enter could commit before the matching
+ * option exists: wait for the real option and click it instead (the same
+ * hardening as pickBuilderSelect in helpers/builder.ts).
  */
 async function pickSelectValue(page: Page, combobox: Locator, value: string) {
   await combobox.click();
   await page.keyboard.type(value);
-  await page.keyboard.press('Enter');
+  await page.getByRole('option', { name: value, exact: true }).first().click();
   // Close any lingering option list before the next interaction.
   await page.keyboard.press('Escape');
 }
@@ -167,9 +170,11 @@ test.describe('Query builder to executed SQL wiring', () => {
       // seed.sql inserts 10 rows, so all of them arrive under the default limit.
       expect(rowCount(body)).toBe(10);
       // The latest seeded row is 2024-03-15 10:09:00 UTC. Time fields are
-      // encoded as epoch millisecond numbers in the data frame JSON.
+      // encoded as epoch millisecond numbers in the data frame JSON. Parse an
+      // ISO string rather than using Date.UTC, whose zero-indexed month reads
+      // like an off-by-one.
       const firstTimestamp = frameValues(body)[0][0];
-      expect(Number(firstTimestamp)).toBe(Date.UTC(2024, 2, 15, 10, 9, 0));
+      expect(Number(firstTimestamp)).toBe(Date.parse('2024-03-15T10:09:00.000Z'));
     });
 
     test('LIMIT 3 caps the result at exactly three rows', async ({ page, explorePage }) => {

@@ -14,7 +14,10 @@
 
 CREATE DATABASE IF NOT EXISTS e2e_test;
 
-CREATE TABLE IF NOT EXISTS e2e_test.trace_ts_spans
+DROP TABLE IF EXISTS e2e_test.trace_ts_spans;
+-- Dropped and recreated on every load so re-running the e2e-data-loader
+-- (e.g. docker compose up against an existing stack) cannot duplicate rows.
+CREATE TABLE e2e_test.trace_ts_spans
 (
     Timestamp    DateTime64(9),
     TraceId      String,
@@ -27,7 +30,10 @@ CREATE TABLE IF NOT EXISTS e2e_test.trace_ts_spans
 ENGINE = MergeTree
 ORDER BY (TraceId, Timestamp);
 
-CREATE TABLE IF NOT EXISTS e2e_test.trace_ts_spans_trace_id_ts
+DROP TABLE IF EXISTS e2e_test.trace_ts_spans_trace_id_ts;
+-- Dropped and recreated on every load so re-running the e2e-data-loader
+-- (e.g. docker compose up against an existing stack) cannot duplicate rows.
+CREATE TABLE e2e_test.trace_ts_spans_trace_id_ts
 (
     TraceId String,
     Start   DateTime64(9),
