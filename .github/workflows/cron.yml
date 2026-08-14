@@ -48,11 +48,10 @@ jobs:
     steps:
       # Intentionally pinned to @main, same as the playwright-cloud call above.
       - name: Notify Slack on failure
-        uses: grafana/data-sources-ci-workflows/.github/actions/notify-slack-failure@main
+        uses: grafana/data-sources-ci-workflows/.github/actions/notify-cloud-e2e-failure@main
         with:
-          title: Cloud E2E tests failed
           repo: ${{ github.repository }}
-          stage: nightly
+          run-stage: nightly
           ref-name: ${{ github.ref_name }}
           actor: ${{ github.actor }}
           sha: ${{ github.sha }}
