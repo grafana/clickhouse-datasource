@@ -28,8 +28,6 @@ jobs:
       id-token: write
       attestations: write
       pull-requests: read
-    with:
-      plugin-id: grafana-clickhouse-datasource
     secrets: inherit
 
   publish-dev:
