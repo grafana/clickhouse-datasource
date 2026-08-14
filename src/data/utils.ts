@@ -29,6 +29,18 @@ export const getBuilderOptions = (query?: CHQuery): QueryBuilderOptions | undefi
 };
 
 /**
+ * Drops `builderOptions` from a query, for callers switching to an editor type that
+ * doesn't carry it at the top level.
+ */
+export const stripBuilderOptions = <T extends CHQuery>(
+  query: T & { builderOptions?: QueryBuilderOptions }
+): Omit<T, 'builderOptions'> => {
+  const { builderOptions: discardedBuilderOptions, ...rest } = query;
+  void discardedBuilderOptions;
+  return rest;
+};
+
+/**
  * Returns true if the builder options contain enough information to start showing a query
  */
 export const isBuilderOptionsRunnable = (builderOptions: QueryBuilderOptions): boolean => {

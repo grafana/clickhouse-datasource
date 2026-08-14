@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { InlineField, InlineFormLabel, MultiSelect } from '@grafana/ui';
 import { SelectableValue } from '@grafana/data';
 import { TableColumn, SelectedColumn } from 'types/queryBuilder';
+import { ALL_COLUMNS } from 'data/sqlGenerator';
 import labels from 'labels';
 import { selectors } from 'selectors';
 import { styles } from 'styles';
@@ -19,15 +20,13 @@ function getCustomColumns(columnNames: string[], allColumns: readonly TableColum
   return allColumns.filter((c) => columnNamesSet.has(c.name)).map((c) => ({ label: c.label || c.name, value: c.name }));
 }
 
-const allColumnName = '*';
-
 export const ColumnsEditor = (props: ColumnsEditorProps) => {
   const { allColumns, selectedColumns, onSelectedColumnsChange, disabled, showAllOption } = props;
   const [customColumns, setCustomColumns] = useState<Array<SelectableValue<string>>>([]);
   const [isOpen, setIsOpen] = useState(false);
   const allColumnNames = allColumns.map((c) => ({ label: c.label || c.name, value: c.name }));
   if (showAllOption) {
-    allColumnNames.push({ label: allColumnName, value: allColumnName });
+    allColumnNames.push({ label: ALL_COLUMNS, value: ALL_COLUMNS });
   }
   const selectedColumnNames = (selectedColumns || []).map((c) => ({ label: c.alias || c.name, value: c.name }));
   const { label, tooltip } = labels.components.ColumnsEditor;
@@ -56,7 +55,7 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     const excludeAllColumn = selectedColumnNames.size > 1;
     const nextSelectedColumns: SelectedColumn[] = [];
     for (let columnName of selectedColumnNames) {
-      if (excludeAllColumn && columnName === allColumnName) {
+      if (excludeAllColumn && columnName === ALL_COLUMNS) {
         continue;
       }
 

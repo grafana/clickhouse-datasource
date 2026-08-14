@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import { InlineField, InlineFormLabel, Select, Button, Input, Stack } from '@grafana/ui';
 import { AggregateColumn, AggregateType, TableColumn } from 'types/queryBuilder';
+import { ALL_COLUMNS } from 'data/sqlGenerator';
 import labels from 'labels';
 import { selectors } from 'selectors';
 import { styles } from 'styles';
@@ -94,8 +95,6 @@ interface AggregateEditorProps {
   onAggregatesChange: (aggregates: AggregateColumn[]) => void;
 }
 
-const allColumnName = '*';
-
 export const AggregateEditor = (props: AggregateEditorProps) => {
   const { allColumns, aggregates, onAggregatesChange } = props;
   const { label, tooltip, addLabel } = labels.components.AggregatesEditor;
@@ -103,7 +102,7 @@ export const AggregateEditor = (props: AggregateEditorProps) => {
     label: c.label || c.name,
     value: c.name,
   }));
-  columnOptions.push({ label: allColumnName, value: allColumnName });
+  columnOptions.push({ label: ALL_COLUMNS, value: ALL_COLUMNS });
 
   const addAggregate = () => {
     const nextAggregates: AggregateColumn[] = aggregates.slice();
