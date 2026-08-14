@@ -61,6 +61,13 @@ jobs:
       branch: ${{ needs.release-please.outputs.tag_name }}
       environment: prod
       scopes: grafana_cloud
-      release-reference-regex: 'main|v\d+\.\d+\.\d+'
+      # Auto-publish is plugin-only. Docs publish separately via publish.yml on
+      # the release event, keyed to the grafana-plugins-platform-bot website-docs
+      # grant on publish.yml (that app is not wired to this workflow).
+      disable-docs-publishing: true
+      # release-please already created the tag and GitHub release with its own
+      # generated notes; don't let cd.yml recreate or overwrite them.
+      disable-github-release: true
+      release-reference-regex: '^(main|v\d+\.\d+\.\d+)$'
       run-playwright: false
       github-draft-release: false

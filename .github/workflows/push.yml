@@ -43,8 +43,14 @@ jobs:
   publish-and-deploy:
     name: Publish to Dev Catalog and Deploy
 
-    # Main-only: publish the latest build and trigger Argo deployment
-    if: github.ref == 'refs/heads/main'
+    # Main-only: publish the latest build and trigger Argo deployment.
+    # Skip the Release Please release commit: release-please.yml publishes that
+    # version to dev+ops+prod itself, so this dev-only publish would double up on
+    # the dev catalog. The repo squash-merges, so the release PR lands as its
+    # title, `chore(main): release X.Y.Z`.
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      !startsWith(github.event.head_commit.message, 'chore(main): release')
 
     # Intentionally pinned to @main: data-sources-ci-workflows does not
     # publish versioned tags for cd-dev.yml yet. Allowed by the zizmor
