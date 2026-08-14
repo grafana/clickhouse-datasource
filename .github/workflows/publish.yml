@@ -1,7 +1,14 @@
-name: Plugins - CD
-run-name: Deploy ${{ inputs.branch }} to ${{ inputs.environment }} by @${{ github.actor }}
+# Description:
+# Thin caller for the shared datasource publish workflow. On a published release
+# it publishes docs for the released tag; on manual dispatch it publishes the
+# plugin. All logic lives in grafana/data-sources-ci-workflows.
+
+name: Plugins - Publish plugin
+run-name: Publish ${{ inputs.branch }} to ${{ inputs.environment }} by @${{ github.actor }}
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       branch:
@@ -19,34 +26,29 @@ on:
         description: Only publish docs, do not publish the plugin
         default: false
         type: boolean
-  # Auto-publish docs when release-please cuts a release. release-please creates
-  # the release with the grafana-oss-big-tent token, so this event fires; the run
-  # below is docs-only and mints the platform bot via the website-docs-release
-  # grant keyed to this workflow (release-please.yml is never wired to that app).
-  release:
-    types: [published]
 
 permissions: {}
 
 jobs:
-  cd:
-    name: CD
-    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v10.1.0
+  publish:
+    name: Publish
+    # Intentionally pinned to @main: data-sources-ci-workflows does not publish
+    # versioned tags for datasource-publish.yml yet. Allowed by the zizmor policy
+    # (`grafana/*: any`); review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-publish.yml@main # zizmor: ignore[unpinned-uses]
     permissions:
       contents: write
       id-token: write
       attestations: write
       pull-requests: read
     with:
-      # On a release event there are no dispatch inputs: publish the release tag,
-      # docs-only. Otherwise use the workflow_dispatch inputs as before.
-      branch: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.branch }}
-      environment: "prod"
-      docs-only: ${{ github.event_name == 'release' || github.event.inputs.docs-only == 'true' }}
-      scopes: ${{ github.event_name == 'release' && 'grafana_cloud' || (github.event.inputs.environment == 'cloud (recommended)' && 'grafana_cloud' || github.event.inputs.environment == 'on-prem (for emergencies fix to On Prem customers)' && 'universal') }}
-      # Required so the release tag (vX.Y.Z) is accepted as a release reference for
-      # prod docs publishing; main still matches for the manual dispatch path.
-      # Anchored so a ref merely containing a match is not treated as a release.
-      release-reference-regex: '^(main|v\d+\.\d+\.\d+)$'
-      run-playwright: false
-      github-draft-release: false
+      plugin-id: grafana-clickhouse-datasource
+      # On a release event these dispatch inputs are empty and the shared
+      # workflow's docs job reads github.event.release instead. On dispatch, the
+      # environment choice maps to publishing scopes (Cloud vs On Prem/universal),
+      # while the catalog environment is always prod.
+      branch: ${{ github.event.inputs.branch }}
+      environment: prod
+      scopes: ${{ github.event.inputs.environment == 'cloud (recommended)' && 'grafana_cloud' || 'universal' }}
+      docs-only: ${{ github.event.inputs.docs-only == 'true' }}
+    secrets: inherit
