@@ -111,18 +111,20 @@ export const FilterPopover = (props: FilterPopoverProps) => {
   const styles = useStyles2(getStyles);
 
   const hintedColumn = filter?.hint ? selectedColumns?.find((column) => column.hint === filter.hint)?.name : undefined;
+  const filterValue = filter && 'value' in filter ? filter.value : undefined;
   const [selectedColumn, setSelectedColumn] = useState(filter?.key || hintedColumn || '');
-  const [selectedMapKey, setSelectedMapKey] = useState(filter && 'mapKey' in filter ? filter.mapKey || '' : '');
+  const filterMapKey = filter && 'mapKey' in filter ? filter.mapKey : undefined;
+  const [selectedMapKey, setSelectedMapKey] = useState(filterMapKey || '');
   const [operator, setOperator] = useState<FilterOperator>(filter?.operator || FilterOperator.Equals);
-  const [value, setValue] = useState(filter && 'value' in filter ? String(filter.value) : '');
+  const [value, setValue] = useState(filterValue !== undefined ? String(filterValue) : '');
   const [mapKeys, setMapKeys] = useState<string[]>([]);
 
   useEffect(() => {
     setSelectedColumn(filter?.key || hintedColumn || '');
-    setSelectedMapKey(filter && 'mapKey' in filter ? filter.mapKey || '' : '');
+    setSelectedMapKey(filterMapKey || '');
     setOperator(filter?.operator || FilterOperator.Equals);
-    setValue(filter && 'value' in filter ? String(filter.value) : '');
-  }, [filter, filter?.key, filter?.operator, filter && 'value' in filter ? filter.value : undefined, hintedColumn]);
+    setValue(filterValue !== undefined ? String(filterValue) : '');
+  }, [filter, filter?.key, filter?.operator, filterMapKey, filterValue, hintedColumn]);
 
   const selectedColDef = allColumns.find((column) => column.name === selectedColumn);
   const isMapColumn = selectedColDef?.type?.startsWith('Map(') || false;
