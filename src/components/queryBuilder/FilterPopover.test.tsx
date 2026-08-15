@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Datasource } from 'data/CHDatasource';
-import { FilterOperator, TableColumn } from 'types/queryBuilder';
+import { Filter, FilterOperator, TableColumn } from 'types/queryBuilder';
 import { FilterPopover, getFilterValueKind, getOperatorOptions, toFilterValueOption } from './FilterPopover';
 import { newMockDatasource } from '__mocks__/datasource';
 
@@ -21,7 +21,12 @@ const allColumns: TableColumn[] = [
   { name: 'ResourceAttributes', type: 'Map(String, String)', picklistValues: [] },
 ];
 
-const renderPopover = (overrides?: { onAddFilter?: jest.Mock; onClose?: jest.Mock; columns?: TableColumn[] }) => {
+const renderPopover = (overrides?: {
+  onAddFilter?: jest.Mock;
+  onClose?: jest.Mock;
+  columns?: TableColumn[];
+  filter?: Filter;
+}) => {
   const datasource = createMockDatasource();
   render(
     <FilterPopover
@@ -30,6 +35,7 @@ const renderPopover = (overrides?: { onAddFilter?: jest.Mock; onClose?: jest.Moc
       table="otel_logs"
       allColumns={overrides?.columns || allColumns}
       onAddFilter={overrides?.onAddFilter || jest.fn()}
+      filter={overrides?.filter}
       onClose={overrides?.onClose || jest.fn()}
     />
   );
@@ -91,6 +97,36 @@ describe('FilterPopover', () => {
       { label: 'error', value: 'error' },
       { label: 'true', value: 'true' },
     ]);
+  });
+
+  it('prefills an existing filter and updates it', async () => {
+    const onAddFilter = jest.fn();
+    const onClose = jest.fn();
+    renderPopover({
+      onAddFilter,
+      onClose,
+      filter: {
+        filterType: 'custom',
+        key: 'Body',
+        type: 'String',
+        operator: FilterOperator.Like,
+        condition: 'AND',
+        value: 'worker',
+      },
+    });
+
+    expect(screen.getByRole('button', { name: 'Update' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    expect(onAddFilter).toHaveBeenCalledWith({
+      filterType: 'custom',
+      key: 'Body',
+      type: 'String',
+      operator: FilterOperator.Like,
+      condition: 'AND',
+      value: 'worker',
+    });
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('shows a path input and probes JSON paths when a JSON column is selected', async () => {
