@@ -2131,49 +2131,25 @@ export class Datasource
   async testDatasource(): Promise<{ status: string; message: string }> {
     const result = await this.callHealthCheck();
     if (result.status !== 'OK') {
-      const category = parseConnectionErrorCategory(result.message);
+      const details = (result.details ?? {}) as { error_category?: string; protocol?: string };
+      // TODO: we are keeping this here because at the moment there is no event enrichment in
+      // the plugin UI testDatasource function, ideally, we should enrich the event tracked there
+      // so that it can be used by all datasources, and once available, remove the override for
+      // testDatasource from here.
       trackClickhouseHealthCheckFailed({
-        error_category: category,
-        protocol: this.settings.jsonData.protocol ?? 'native',
+        error_category: details.error_category ?? 'unknown',
+        protocol: details.protocol ?? 'native',
       });
-      const detail = result.message.replace(/^\[\w+\]\s*/, '');
-      const hint = getConnectionErrorHint(category, detail);
-      const label = category === 'tls' ? 'TLS' : category.charAt(0).toUpperCase() + category.slice(1);
-      const message = hint ? `${label} error [${detail}]: ${hint}` : result.message;
       // This must reject on failure. If we return the error instead,
       // Grafana treats the test as successful in its analytics.
       return Promise.reject({
         status: 'error',
-        message,
-        error: new HealthCheckError(message, result.details),
+        message: result.message,
+        error: new HealthCheckError(result.message, result.details),
       });
     }
     return { status: 'success', message: result.message };
   }
-}
-
-// parseConnectionErrorCategory extracts the error category embedded by the backend in
-// health check failure messages of the form "[category] original error message".
-function parseConnectionErrorCategory(message: string): string {
-  const match = message?.match(/^\[(\w+)\]/);
-  return match ? match[1] : 'unknown';
-}
-
-const CONNECTION_ERROR_HINTS: Record<string, string> = {
-  auth: 'Verify your credentials and that the user has the required permissions in ClickHouse.',
-  network:
-    'Check that the host and port are correct and that the ClickHouse server is reachable from the machine running Grafana.',
-  tls: 'Verify your TLS certificate configuration. If using a self-signed certificate, ensure the CA certificate is configured.',
-  timeout:
-    'Check that the ClickHouse server is reachable and consider increasing the dial timeout in the connection settings.',
-  config: 'Check that all required fields are correctly filled in.',
-};
-
-function getConnectionErrorHint(category: string, detail: string): string | undefined {
-  if (category === 'tls' && detail.includes('first record does not look like a TLS handshake')) {
-    return 'The server does not appear to be using TLS. Try disabling the secure connection toggle.';
-  }
-  return CONNECTION_ERROR_HINTS[category];
 }
 
 enum TagType {

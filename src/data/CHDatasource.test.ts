@@ -8,7 +8,7 @@ import {
   toDataFrame,
   TypedVariableModel,
 } from '@grafana/data';
-import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/runtime';
+import { DataSourceWithBackend, HealthCheckError, HealthStatus, reportInteraction } from '@grafana/runtime';
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
@@ -3487,14 +3487,62 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({
         status: HealthStatus.Error,
-        message: '[auth] code: 516, authentication failed',
-        details: {},
+        message: 'Auth error [code: 516, authentication failed]: sign out and back in to refresh the token',
+        details: { error_category: 'auth', protocol: 'native' },
       });
 
       await expect(ds.testDatasource()).rejects.toMatchObject({
         status: 'error',
         message: expect.stringContaining('Auth error'),
         error: expect.any(HealthCheckError),
+      });
+    });
+
+    it('passes the backend-provided message and details through unchanged', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const details = { error_category: 'network', protocol: 'http' };
+      jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({
+        status: HealthStatus.Error,
+        message: 'Network error [connection refused]: check the host and port',
+        details,
+      });
+
+      await expect(ds.testDatasource()).rejects.toMatchObject({
+        status: 'error',
+        message: 'Network error [connection refused]: check the host and port',
+        error: expect.objectContaining({ details }),
+      });
+    });
+
+    it('tracks the health check failure using the category and protocol from backend details', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({
+        status: HealthStatus.Error,
+        message: 'TLS error [bad certificate]: verify your TLS configuration',
+        details: { error_category: 'tls', protocol: 'http' },
+      });
+
+      await expect(ds.testDatasource()).rejects.toBeDefined();
+
+      expect(reportInteraction).toHaveBeenCalledWith('grafana_ds_clickhouse_healthcheck_failed', {
+        error_category: 'tls',
+        protocol: 'http',
+      });
+    });
+
+    it('falls back to unknown/native when the backend does not provide details', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'callHealthCheck').mockResolvedValue({
+        status: HealthStatus.Error,
+        message: 'something went wrong',
+        details: {},
+      });
+
+      await expect(ds.testDatasource()).rejects.toBeDefined();
+
+      expect(reportInteraction).toHaveBeenCalledWith('grafana_ds_clickhouse_healthcheck_failed', {
+        error_category: 'unknown',
+        protocol: 'native',
       });
     });
   });
