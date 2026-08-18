@@ -191,3 +191,38 @@ func CategorizeConnectionError(err error) ConnectionErrorCategory {
 
 	return ConnectionErrorCategoryUnknown
 }
+
+// connectionErrorHints maps a category to general remediation guidance shown
+// in a health check failure message. Auth is handled separately by
+// authErrorHint, which distinguishes unauthenticated from unauthorized.
+var connectionErrorHints = map[ConnectionErrorCategory]string{
+	ConnectionErrorCategoryNetwork: "Check that the host and port are correct and that the ClickHouse server is reachable from the machine running Grafana.",
+	ConnectionErrorCategoryTLS:     "Verify your TLS certificate configuration. If using a self-signed certificate, ensure the CA certificate is configured.",
+	ConnectionErrorCategoryTimeout: "Check that the ClickHouse server is reachable and consider increasing the dial timeout in the connection settings.",
+	ConnectionErrorCategoryConfig:  "Check that all required fields are correctly filled in.",
+}
+
+// connectionErrorHint returns human-readable remediation guidance for a
+// categorized connection error, or "" if no guidance applies.
+func connectionErrorHint(category ConnectionErrorCategory, err error) string {
+	if category == ConnectionErrorCategoryAuth {
+		return authErrorHint(err)
+	}
+	if category == ConnectionErrorCategoryTLS && strings.Contains(err.Error(), "first record does not look like a TLS handshake") {
+		return "The server does not appear to be using TLS. Try disabling the secure connection toggle."
+	}
+	return connectionErrorHints[category]
+}
+
+// connectionErrorCategoryLabel returns the display label for a category, e.g. "TLS" or "Auth".
+func connectionErrorCategoryLabel(category ConnectionErrorCategory) string {
+	if category == ConnectionErrorCategoryTLS {
+		return "TLS"
+	}
+	s := string(category)
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
+}
+

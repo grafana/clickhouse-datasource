@@ -320,3 +320,56 @@ func TestAuthErrorHint(t *testing.T) {
 		})
 	}
 }
+
+func TestWrapCategorizedConnectionErrorMessage(t *testing.T) {
+	tests := []struct {
+		name             string
+		err              error
+		wantMessage      string
+		wantMessageParts []string
+	}{
+		{
+			name: "auth error gets a specific unauthenticated hint",
+			err:  &clickhouse.Exception{Code: 516, Message: "Authentication failed"},
+			wantMessageParts: []string{
+				"Auth error [",
+				"code: 516",
+				"sign out and back in",
+			},
+		},
+		{
+			name: "network error gets the generic network hint",
+			err:  errors.New("dial tcp: connect: connection refused"),
+			wantMessageParts: []string{
+				"Network error [",
+				"connection refused",
+				"Check that the host and port are correct",
+			},
+		},
+		{
+			name: "TLS handshake mismatch gets the disable-secure-toggle hint",
+			err:  errors.New("tls: first record does not look like a TLS handshake"),
+			wantMessageParts: []string{
+				"TLS error [",
+				"Try disabling the secure connection toggle",
+			},
+		},
+		{
+			name:        "server error has no hint and falls back to the plain category tag",
+			err:         &clickhouse.Exception{Code: 60, Message: "Table does not exist"},
+			wantMessage: "[server] code: 60, message: Table does not exist",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			message := wrapCategorizedConnectionError(tt.err).Error()
+			if tt.wantMessage != "" {
+				assert.Equal(t, tt.wantMessage, message)
+			}
+			for _, part := range tt.wantMessageParts {
+				assert.Contains(t, message, part)
+			}
+		})
+	}
+}
