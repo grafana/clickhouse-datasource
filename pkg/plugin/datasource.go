@@ -53,6 +53,8 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	// Replace sqlds's default sqlutil.Interpolate pipeline with the
 	// macropro-backed interpolator; see interpolateMacros in driver.go.
 	ds.Interpolator = interpolateMacros
+	// See checkHealth in driver.go for why this hook is needed at all.
+	ds.PreCheckHealth = clickhousePlugin.checkHealth
 	pluginSettings := clickhousePlugin.Settings(ctx, settings)
 	if pluginSettings.ForwardHeaders {
 		ds.EnableMultipleConnections = true

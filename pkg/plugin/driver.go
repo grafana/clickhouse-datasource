@@ -162,15 +162,18 @@ func resolveJWTAuth(settings Settings, httpHeaders map[string]string) (clickhous
 		func(context.Context) (string, error) { return token, nil }
 }
 
+// When a remediation hint applies for the
+// category, the message is "<Label> error [<detail>]: <hint>"; otherwise it
+// falls back to a plain "[category] <detail>" tag so the category is still
+// visible without a hint claiming to help.
 func wrapCategorizedConnectionError(err error) error {
 	category := CategorizeConnectionError(err)
 	backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
-	if category == ConnectionErrorCategoryAuth {
-		if hint := authErrorHint(err); hint != "" {
-			return backend.DownstreamError(fmt.Errorf("[%s] %w (%s)", category, err, hint))
-		}
+	hint := connectionErrorHint(category, err)
+	if hint == "" {
+		return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
 	}
-	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
+	return backend.DownstreamError(fmt.Errorf("%s error [%w]: %s", connectionErrorCategoryLabel(category), err, hint))
 }
 
 func buildClickHouseOptions(ctx context.Context, settings Settings, message json.RawMessage) (*clickhouse.Options, error) {
@@ -355,6 +358,53 @@ func (h *Clickhouse) Connect(
 		return nil, err
 	}
 	return db, nil
+}
+
+// healthCheckDetails is the JSON payload attached to a failed health check's
+// CheckHealthResult.JSONDetails, so the frontend gets structured data instead
+// of parsing it out of the message.
+type healthCheckDetails struct {
+	ErrorCategory string `json:"error_category"`
+	Protocol      string `json:"protocol"`
+}
+
+// checkHealth is installed as sqlds's PreCheckHealth hook (see NewDatasource).
+// It is the only way to get a categorized connect error and JSONDetails onto
+// a health check result: sqlds's own check (github.com/grafana/sqlds/v5
+// HealthChecker.Check) pings whatever connection is already cached for the
+// datasource instance and, on failure, returns only a bare err.Error()
+// string with no JSONDetails at all — there's no hook that runs after a
+// failed connect other than this one. Returning nil here defers to that
+// default check, which still runs (and still records its usual metrics).
+func (h *Clickhouse) checkHealth(ctx context.Context, req *backend.CheckHealthRequest) *backend.CheckHealthResult {
+	var instanceSettings backend.DataSourceInstanceSettings
+	if req.PluginContext.DataSourceInstanceSettings != nil {
+		instanceSettings = *req.PluginContext.DataSourceInstanceSettings
+	}
+
+	db, err := h.Connect(ctx, instanceSettings, nil)
+	if err != nil {
+		details, marshalErr := json.Marshal(healthCheckDetails{
+			ErrorCategory: string(CategorizeConnectionError(err)),
+			Protocol:      healthCheckProtocol(ctx, instanceSettings),
+		})
+		if marshalErr != nil {
+			backend.Logger.Error("failed to marshal health check details", "error", marshalErr)
+		}
+		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: err.Error(), JSONDetails: details}
+	}
+	_ = db.Close()
+	return nil
+}
+
+// healthCheckProtocol mirrors buildClickHouseOptions' default: anything other
+// than "http" is native.
+func healthCheckProtocol(ctx context.Context, config backend.DataSourceInstanceSettings) string {
+	settings, err := LoadSettings(ctx, config)
+	if err != nil || settings.Protocol == "" {
+		return "native"
+	}
+	return settings.Protocol
 }
 
 // Converters defines list of data type converters

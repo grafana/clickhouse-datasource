@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"reflect"
 	"testing"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	schemas "github.com/grafana/schemads"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSchemaResourceOptions(t *testing.T) {
@@ -126,4 +129,41 @@ func TestSchemaResourceOptionsControlResponseCache(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHealthCheckProtocol(t *testing.T) {
+	t.Run("defaults to native when unset", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: json.RawMessage(`{"host":"localhost","port":9000}`)}
+		assert.Equal(t, "native", healthCheckProtocol(t.Context(), settings))
+	})
+
+	t.Run("returns the configured protocol", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: json.RawMessage(`{"host":"localhost","port":8123,"protocol":"http"}`)}
+		assert.Equal(t, "http", healthCheckProtocol(t.Context(), settings))
+	})
+
+	t.Run("defaults to native when settings can't be parsed", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: json.RawMessage(`not json`)}
+		assert.Equal(t, "native", healthCheckProtocol(t.Context(), settings))
+	})
+}
+
+func TestClickhouseCheckHealth(t *testing.T) {
+	t.Run("a settings error fails fast with category and protocol in JSONDetails", func(t *testing.T) {
+		h := &Clickhouse{}
+		settings := backend.DataSourceInstanceSettings{JSONData: json.RawMessage(`not json`)}
+		req := &backend.CheckHealthRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+		}
+
+		result := h.checkHealth(t.Context(), req)
+		require.NotNil(t, result)
+		assert.Equal(t, backend.HealthStatusError, result.Status)
+		assert.Contains(t, result.Message, "Config error [")
+
+		var details healthCheckDetails
+		require.NoError(t, json.Unmarshal(result.JSONDetails, &details))
+		assert.Equal(t, "config", details.ErrorCategory)
+		assert.Equal(t, "native", details.Protocol)
+	})
 }
