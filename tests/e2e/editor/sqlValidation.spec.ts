@@ -1,56 +1,14 @@
+// E2E coverage for SQL editor validation markers. Unit tests cover the
+// validator's verdict on individual statements, but only E2E confirms the
+// full wiring: user keystrokes reach the onKeyUp handler, validate() runs,
+// setModelMarkers() is called, and Monaco renders (or does not render) the
+// red squiggles the user actually sees.
+
 import { expect, test } from '@grafana/plugin-e2e';
-import { Page } from '@playwright/test';
-
-const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
-
-// GRAFANA_URL is set only by the Cloud cron workflow (see .github/workflows/cron.yml).
-const isCloudRun = !!process.env.GRAFANA_URL;
-
-// CLOUD_DEFAULT_UID points at `[managed_data_source] - ClickHouse Native (PDC)` on the
-// shared Cloud dev instance. The infra team uses a stable `clickhouse-{protocol}-ds-m`
-// naming convention, but if the datasource is ever re-provisioned and Cloud E2E starts
-// failing with datasource-not-found errors, log into the instance, copy the current uid
-// from the /connections/datasources/edit/<uid> URL, and update this constant (or set
-// DS_E2E_UID in the workflow as a quick override).
-const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
-const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
-const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
-
-/**
- * Build an Explore URL with an empty SQL query so the editor opens in
- * SQL Editor mode with no pre-existing content.
- */
-function exploreUrl(): string {
-  const query: Record<string, unknown> = {
-    refId: 'A',
-    datasource: { type: PLUGIN_TYPE, uid: DATASOURCE_UID },
-    editorType: 'sql',
-    pluginVersion: '',
-    rawSql: '',
-  };
-
-  const panes = JSON.stringify({
-    explore: {
-      datasource: DATASOURCE_UID,
-      queries: [query],
-      range: { from: 'now-1h', to: 'now' },
-    },
-  });
-
-  return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
-}
-
-/**
- * Type SQL into the Monaco editor. Clicks to focus, selects all existing
- * content, then types the replacement query. Each keystroke triggers the
- * editor's onKeyUp handler, which runs validate() and writes Monaco markers.
- */
-async function enterSql(page: Page, sql: string) {
-  const editor = page.getByRole('code');
-  await editor.click();
-  await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type(sql);
-}
+import type { Page } from '@playwright/test';
+import { isCloudRun } from '../helpers/env';
+import { exploreUrl } from '../helpers/explore';
+import { enterSql } from '../helpers/sqlEditor';
 
 /**
  * Monaco renders validation errors by adding the `squiggly-error` CSS class
