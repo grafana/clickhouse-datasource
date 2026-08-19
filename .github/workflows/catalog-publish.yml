@@ -1,0 +1,25 @@
+name: Catalog publish (coupled)
+run-name: Publish ${{ github.event.client_payload.plugin_version }} to ${{ github.event.client_payload.environment }}
+
+on:
+  repository_dispatch:
+    types: [publish-catalog]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    uses: grafana/plugin-ci-workflows/.github/workflows/cd.yml@ci-cd-workflows/v11.1.0
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pull-requests: read
+    with:
+      branch: ${{ github.event.client_payload.ref }}
+      environment: ${{ github.event.client_payload.environment }}
+      scopes: ${{ github.event.client_payload.environment == 'prod' && 'grafana_cloud' || 'universal' }}
+      run-playwright: false
+      github-draft-release: false
+      trigger-argo: false
