@@ -1,0 +1,71 @@
+{
+  "uid": "e2e-adhoc-dash",
+  "title": "E2E ad hoc filter dashboard",
+  "tags": ["e2e"],
+  "timezone": "utc",
+  "editable": true,
+  "schemaVersion": 39,
+  "version": 0,
+  "refresh": "",
+  "time": {
+    "from": "2024-03-15T09:45:00.000Z",
+    "to": "2024-03-15T10:15:00.000Z"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "clickhouse_adhoc_query",
+        "type": "constant",
+        "label": "Ad hoc query scope",
+        "hide": 2,
+        "query": "e2e_test.events",
+        "current": {
+          "selected": false,
+          "text": "e2e_test.events",
+          "value": "e2e_test.events"
+        },
+        "options": [],
+        "skipUrlSync": true
+      },
+      {
+        "name": "adhoc_filters",
+        "label": "Filters",
+        "type": "adhoc",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "clickhouse-e2e"
+        },
+        "filters": [],
+        "baseFilters": []
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Events",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "clickhouse-e2e"
+      },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "clickhouse-e2e"
+          },
+          "editorType": "sql",
+          "pluginVersion": "",
+          "rawSql": "SELECT * FROM e2e_test.events",
+          "queryType": "table",
+          "format": 1
+        }
+      ]
+    }
+  ]
+}
