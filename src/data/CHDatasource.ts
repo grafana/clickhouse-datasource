@@ -95,6 +95,9 @@ const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
 // Row cap for the Map-key discovery probe on free-form tables (no known time
 // column to prune by). Bounds the scan to a sample instead of the whole column.
 const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
+// Recent-data window used to bound attribute-discovery/value probes on a table
+// with a known time column, so they prune instead of scanning the full column.
+const ADHOC_PROBE_TIME_WINDOW = 'INTERVAL 6 HOUR';
 
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
@@ -1212,7 +1215,7 @@ export class Datasource
     const tableIdentifier = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
     const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
     const source = timeColumn
-      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`
       : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
     // mapKeys() rather than the `.keys` sub-column: ClickHouse's old analyzer
     // (the default before 24.3) cannot resolve sub-columns on subquery results
@@ -1250,7 +1253,7 @@ export class Datasource
       : `arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)}))`;
     const projected = keysColumn ? escapeIdentifier(keysColumn) : escapeIdentifier(jsonColumn);
     const source = timeColumn
-      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`
       : `(SELECT ${projected} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
     const rawSql = `SELECT DISTINCT ${pathExpr} as path FROM ${source} LIMIT 1000`;
     return this.fetchData(rawSql);
@@ -1771,7 +1774,9 @@ export class Datasource
     } else {
       // When hideTableNameInAdhocFilters is false, key is 'table.column' format (e.g., 'foo.bar')
       const [table, ...colParts] = key.split('.');
-      col = colParts.join('.');
+      // A single-segment key (no `table.` prefix) leaves colParts empty; fall
+      // back to the whole key so we never emit `select distinct  from …`.
+      col = colParts.length ? colParts.join('.') : key;
       source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     }
 
@@ -1801,8 +1806,11 @@ export class Datasource
     if (set) {
       return set;
     }
-    const tableKnown = this.mapColumnsByTable.has(tableKey) || this.jsonColumnsByTable.has(tableKey);
-    if (tableKnown) {
+    // "Known" means the table's schema was fetched — NOT that it has attribute
+    // columns. A fetched table with no Map/JSON column is absent from both
+    // caches, but must still return an empty set (not the cross-table union),
+    // otherwise a same-named column from another table would misclassify it.
+    if (this.attributeSchemaFetched.has(tableKey)) {
       return EMPTY_COLUMN_SET;
     }
     return cache === this.mapColumnsByTable ? this.getFlatMapColumnSet() : this.getFlatJSONColumnSet();
@@ -1968,7 +1976,10 @@ export class Datasource
         const parts = key.split('.');
         // Strip a leading `<table>.` prefix (present unless hideTableName) before
         // resolving the column against the per-table attribute caches.
-        const col = parts[0] === bareTable ? parts.slice(1).join('.') : key;
+        // Only strip a leading `<table>.` prefix; a single-segment key that
+        // equals the table name must stay as the column (else the substitution
+        // becomes empty and yields `SELECT  FROM <table>`).
+        const col = parts.length > 1 && parts[0] === bareTable ? parts.slice(1).join('.') : key;
         columnExpr = this.buildAdhocColumnExpr(col, from);
       }
       // Use a function replacer so `$`-sequences in columnExpr (e.g. a Map key

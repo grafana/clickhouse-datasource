@@ -484,5 +484,19 @@ describe('AdHocManager', () => {
       ] as AdHocVariableFilter[]);
       expect(val).toContain("ResourceAttributes.`level`::Nullable(String) = \\'error\\'");
     });
+
+    it('escapes a quote in a JSON path segment for the outer filter string', () => {
+      // The rendered access is embedded inside the single-quoted
+      // additional_table_filters string, so a `'` in a path segment must be
+      // escaped over the whole expression — otherwise it breaks the string.
+      // Pins the outer-escape layer (buildJSONAccessForOuterFilter); an empty
+      // implementation would emit the un-escaped `` `a'b` `` form and fail here.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: "otel_logs.ResourceAttributes.`a'b`", operator: '=', value: 'v' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`a\\'b`::Nullable(String)");
+      expect(val).not.toContain("`a'b`");
+    });
   });
 });

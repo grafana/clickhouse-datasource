@@ -1111,6 +1111,38 @@ describe('ClickHouseDatasource', () => {
         })
       );
     });
+
+    it('casts a LEGACY dotted JSON key on a cold cache (pins ensureAttributeColumnCache)', async () => {
+      // A minted backtick key self-describes and casts with no cache, so it
+      // can't catch a broken warm-up. A legacy dotted key (`col.path`, from an
+      // already-saved dashboard) resolves JSON-ness only via the column cache,
+      // which getTagKeys hasn't populated on a fresh load — ensureAttributeColumnCache
+      // must warm it, else the sub-path is emitted uncast (Dynamic → all-null).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'events' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'api' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const values = await ds.getTagValues({ key: 'events.ResourceAttributes.k8s.pod' });
+      expect(values).toEqual([{ text: 'api' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: 'select distinct ResourceAttributes.`k8s`.`pod`::Nullable(String) from db.events limit 1000',
+            }),
+          ]),
+        })
+      );
+    });
   });
 
   describe('fetchUniqueMapKeys probe (#1843)', () => {
