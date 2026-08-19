@@ -95,7 +95,7 @@ SELECT
   Datacenter,
   count() AS count,
   avg(Duration) AS avg_duration
-FROM grafanadb.GENERATED_LOGS
+FROM mydb.GENERATED_LOGS
 GROUP BY Datacenter
 ORDER BY count DESC
 LIMIT 1000
