@@ -30,6 +30,7 @@
     "commitish",
     "concats",
     "createddate",
+    "Datacenter",
     "dataframe",
     "dataproxy",
     "DataSource",
