@@ -16,8 +16,9 @@ export function escapeJSONPathSegment(segment: string): string {
  * The `Nullable(String)` cast is required: JSON sub-paths are `Dynamic`, which
  * `IN` / `NOT IN` reject with ILLEGAL_TYPE_OF_ARGUMENT, and an uncast sub-path
  * also reads all-null over Grafana's native protocol. The cast still preserves
- * the `IS NULL` signal for missing paths. `column` is emitted verbatim (a
- * trusted `system.columns` name); only the path segments are escaped.
+ * the `IS NULL` signal for missing paths. Only the path segments are escaped;
+ * `column` is emitted as-is, so the caller is responsible for passing a valid
+ * column identifier.
  */
 export function buildJSONPathAccess(column: string, path: string): string {
   const segments = path
