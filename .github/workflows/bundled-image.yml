@@ -1,0 +1,36 @@
+name: Bundled image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "pkg/**"
+      - "package.json"
+  workflow_dispatch:
+    inputs:
+      debug:
+        type: boolean
+        default: false
+      trigger_argo:
+        type: boolean
+        default: true
+  repository_dispatch:
+    types: [rebase-plugin-image]
+
+permissions:
+  contents: read
+
+jobs:
+  bundled:
+    # TODO(kuba): pin to the data-sources-ci-workflows release tag once that PR is merged and tagged
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-bundled.yml@SET-TO-DS-CI-WORKFLOWS-RELEASE-TAG
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      plugin-id: grafana-clickhouse-datasource
+      plugin-directory: src
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
+      trigger-argo: ${{ github.event_name == 'workflow_dispatch' && inputs.trigger_argo || github.event_name == 'push' }}
+      argo-workflow-template: grafana-clickhouse-datasource
