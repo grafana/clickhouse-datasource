@@ -23,6 +23,11 @@ jobs:
     # versioned tags for datasource-cicd.yml yet. Allowed by the zizmor policy
     # (`grafana/*: any`); review periodically.
     uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-cicd.yml@main # zizmor: ignore[unpinned-uses]
+    # These are a ceiling for the called workflow, not a grant to each of its jobs.
+    # Every job there is guarded, and each declares its own permissions, which cannot
+    # exceed this block. A pull_request run reaches only the `ci` job, which declares
+    # contents: read, so no job on the PR path gets a write-capable token. The write
+    # entries exist for the release path on main.
     permissions:
       contents: write
       id-token: write
