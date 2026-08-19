@@ -1,5 +1,10 @@
 name: Bundled image
 
+# Builds the bundled Grafana + clickhouse-datasource backend image via the reusable
+# cd-bundled.yml pipeline in data-sources-ci-workflows, then (on push / when asked) triggers
+# the Argo rollout. The reusable workflow derives the plugin id and version from ci.yml's
+# output, so this caller only supplies the target GAR and the trigger flags.
+
 on:
   push:
     branches: [main]
@@ -10,11 +15,19 @@ on:
   workflow_dispatch:
     inputs:
       debug:
+        description: Build a debug (Delve) image. Kept out of the rollout.
         type: boolean
         default: false
       trigger_argo:
+        description: Trigger the Argo rollout after a successful push.
         type: boolean
         default: true
+      grafana_image:
+        description: >-
+          Override the Grafana base image. Use for the first run, before the deployment_tools-read
+          grant for grafana-oss-big-tent is applied on this repo. Leave empty once the grant lands.
+        type: string
+        default: ""
   repository_dispatch:
     types: [rebase-plugin-image]
 
@@ -23,14 +36,14 @@ permissions:
 
 jobs:
   bundled:
-    # TODO(kuba): pin to the data-sources-ci-workflows release tag once that PR is merged and tagged
+    # TODO(kuba): pin to the data-sources-ci-workflows release tag cut from
+    # https://github.com/grafana/data-sources-ci-workflows/pull/18 once merged.
     uses: grafana/data-sources-ci-workflows/.github/workflows/cd-bundled.yml@SET-TO-DS-CI-WORKFLOWS-RELEASE-TAG
     permissions:
       contents: read
       id-token: write
     with:
-      plugin-id: grafana-clickhouse-datasource
-      plugin-directory: src
+      gar-repository: docker-clickhouse-datasource-prod
+      grafana-image: ${{ github.event_name == 'workflow_dispatch' && inputs.grafana_image || '' }}
       debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug || false }}
       trigger-argo: ${{ github.event_name == 'workflow_dispatch' && inputs.trigger_argo || github.event_name == 'push' }}
-      argo-workflow-template: grafana-clickhouse-datasource
