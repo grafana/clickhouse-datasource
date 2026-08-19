@@ -56,11 +56,12 @@ export default defineConfig<PluginOptions>({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     /*
-     * Recording video for every test makes fully-parallel local runs CPU-bound
-     * enough to cause spurious 30s timeouts. Keep full recording on CI (single
-     * worker) and record only failures locally.
+     * Recording video makes fully-parallel local runs CPU-bound enough to cause spurious
+     * timeouts, and no workflow keeps the output, so nothing reads it. `retain-on-failure`
+     * would not help: it records for every test and only deletes the passing ones, so it
+     * costs the same to run. Pass `--video=retain-on-failure` when a failure needs one.
      */
-    video: process.env.CI ? 'on' : 'retain-on-failure',
+    video: 'off',
   },
 
   /* Configure projects for major browsers */
