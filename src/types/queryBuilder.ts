@@ -322,6 +322,13 @@ export interface NumberFilter extends CommonFilterProps {
     | FilterOperator.GreaterThan
     | FilterOperator.GreaterThanOrEqual;
   value: number;
+  /**
+   * Original textual input, preserved for UI round-trip when the filter is
+   * rendered with a human-friendly duration editor (see DurationFilterInput).
+   * SQL generation ignores this field and uses `value` (already in the
+   * column's stored unit).
+   */
+  rawInput?: string;
 }
 
 export interface DateFilterWithValue extends CommonFilterProps {

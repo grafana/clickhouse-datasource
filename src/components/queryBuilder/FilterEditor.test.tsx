@@ -463,5 +463,85 @@ describe('FilterEditor', () => {
       expect(result.container.firstChild).not.toBeNull();
       expect(result.getByTestId('query-builder-filters-multi-string-value-container')).toBeInTheDocument();
     });
+
+    it('renders the duration editor when the filter matches the duration column key', async () => {
+      const filter: NumberFilter = {
+        filterType: 'custom',
+        key: 'Duration',
+        operator: FilterOperator.GreaterThan,
+        type: 'UInt64',
+        condition: 'AND',
+        value: 0,
+      };
+      const onFilterChange = jest.fn();
+      const result = render(
+        <FilterValueEditor
+          allColumns={[]}
+          filter={filter}
+          onFilterChange={onFilterChange}
+          durationFilterContext={{ columnKey: 'Duration', unit: 'nanoseconds' as any }}
+        />
+      );
+      expect(result.getByTestId('query-builder-filters-duration-value-container')).toBeInTheDocument();
+      expect(result.queryByTestId('query-builder-filters-number-value-container')).toBeNull();
+
+      const input = result.getByTestId('query-builder-filters-duration-value-input') as HTMLInputElement;
+      await userEvent.clear(input);
+      await userEvent.type(input, '1.2s');
+      fireEvent.blur(input);
+      expect(onFilterChange).toHaveBeenCalledTimes(1);
+      const emitted = onFilterChange.mock.calls[0][0] as NumberFilter;
+      expect(emitted.value).toBe(1_200_000_000);
+      expect(emitted.rawInput).toBe('1.2s');
+    });
+
+    it('falls back to the number editor when the filter is not on the duration column', () => {
+      const filter: NumberFilter = {
+        filterType: 'custom',
+        key: 'SomeOtherNumber',
+        operator: FilterOperator.GreaterThan,
+        type: 'UInt64',
+        condition: 'AND',
+        value: 0,
+      };
+      const result = render(
+        <FilterValueEditor
+          allColumns={[]}
+          filter={filter}
+          onFilterChange={jest.fn()}
+          durationFilterContext={{ columnKey: 'Duration', unit: 'nanoseconds' as any }}
+        />
+      );
+      expect(result.getByTestId('query-builder-filters-number-value-container')).toBeInTheDocument();
+      expect(result.queryByTestId('query-builder-filters-duration-value-container')).toBeNull();
+    });
+
+    it('converts bare-nanosecond input to the configured stored unit (milliseconds)', async () => {
+      const filter: NumberFilter = {
+        filterType: 'custom',
+        key: 'Duration',
+        operator: FilterOperator.GreaterThan,
+        type: 'UInt64',
+        condition: 'AND',
+        value: 0,
+      };
+      const onFilterChange = jest.fn();
+      const result = render(
+        <FilterValueEditor
+          allColumns={[]}
+          filter={filter}
+          onFilterChange={onFilterChange}
+          durationFilterContext={{ columnKey: 'Duration', unit: 'milliseconds' as any }}
+        />
+      );
+      const input = result.getByTestId('query-builder-filters-duration-value-input');
+      await userEvent.clear(input);
+      await userEvent.type(input, '1000000');
+      fireEvent.blur(input);
+      const emitted = onFilterChange.mock.calls[0][0] as NumberFilter;
+      // 1_000_000 ns == 1 ms
+      expect(emitted.value).toBe(1);
+      expect(emitted.rawInput).toBe('1000000');
+    });
   });
 });
