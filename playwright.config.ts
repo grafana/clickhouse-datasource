@@ -11,12 +11,30 @@ import type { PluginOptions } from '@grafana/plugin-e2e';
 // dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 /**
+ * GRAFANA_URL is set only by the Cloud cron workflow (.github/workflows/cron.yml),
+ * which runs the suite against a shared Grafana Cloud dev instance.
+ */
+const isCloudRun = !!process.env.GRAFANA_URL;
+
+/**
  * See https://playwright.dev/docs/test-configuration.
  */
 export default defineConfig<PluginOptions>({
   testDir: './tests/e2e',
   /* Run tests in files in parallel */
   fullyParallel: true,
+  /*
+   * Timeout ceilings are raised for Cloud runs. Each test gets a fresh browser
+   * context, so on the shared Cloud instance every test re-downloads the plugin
+   * bundle and Monaco assets. When the instance is busy that first paint can
+   * exceed Playwright's 5s expect default, which made the query editor rendering
+   * tests flake on the nightly cron. These are polling ceilings, not sleeps, so
+   * fast runs are unaffected.
+   */
+  timeout: isCloudRun ? 90_000 : 30_000,
+  expect: {
+    timeout: isCloudRun ? 30_000 : 5_000,
+  },
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
@@ -37,7 +55,12 @@ export default defineConfig<PluginOptions>({
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'on',
+    /*
+     * Recording video for every test makes fully-parallel local runs CPU-bound
+     * enough to cause spurious 30s timeouts. Keep full recording on CI (single
+     * worker) and record only failures locally.
+     */
+    video: process.env.CI ? 'on' : 'retain-on-failure',
   },
 
   /* Configure projects for major browsers */
