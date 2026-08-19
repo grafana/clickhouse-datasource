@@ -1,11 +1,17 @@
 # Description:
-# Thin caller for the shared datasource CI/CD pipeline. Most logic (CI on PRs,
-# release-please + prod publish on release) lives in grafana/data-sources-ci-workflows.
-# The dev-catalog publish stays a direct cd-dev.yml call here rather than being
-# routed through the shared workflow, so the reusable-workflow chain stays within
-# GitHub's 4-level nesting cap. It is gated on the shared workflow's release_created
-# output so a Release Please merge (which cicd publishes to prod) does not also
-# double-publish to the dev catalog.
+# Thin caller for the shared datasource CI/CD pipeline in
+# grafana/data-sources-ci-workflows, which owns release-please and the prod publish.
+#
+# CI is called directly rather than through the shared workflow. A called workflow
+# prefixes its checks with the calling job's name, so routing CI through
+# datasource-cicd.yml reports every check as "CI/CD / CI / <job>" instead of
+# "CI / <job>". The branch rulesets require the two-segment names, so the deeper
+# names leave the required checks permanently unreported and block every PR.
+#
+# The dev-catalog publish is also a direct cd-dev.yml call, so the
+# reusable-workflow chain stays within GitHub's 4-level nesting cap. It is gated on
+# the shared workflow's release_created output so a Release Please merge (which
+# cicd publishes to prod) does not also double-publish to the dev catalog.
 
 name: Plugins - CI/CD
 
@@ -16,18 +22,34 @@ on:
 
 permissions: {}
 
+concurrency:
+  group: plugins-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
+  ci:
+    name: CI
+    if: github.event_name == 'pull_request'
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v10.1.0
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      # Ensure PR builds produce unique plugin versions.
+      plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
+
   cicd:
     name: CI/CD
+    # Release path only. On pull requests every job in the shared workflow is
+    # skipped, so it is not called at all and CI above is the only PR path.
+    if: github.ref == 'refs/heads/main'
     # Intentionally pinned to @main: data-sources-ci-workflows does not publish
     # versioned tags for datasource-cicd.yml yet. Allowed by the zizmor policy
     # (`grafana/*: any`); review periodically.
     uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-cicd.yml@main # zizmor: ignore[unpinned-uses]
     # These are a ceiling for the called workflow, not a grant to each of its jobs.
-    # Every job there is guarded, and each declares its own permissions, which cannot
-    # exceed this block. A pull_request run reaches only the `ci` job, which declares
-    # contents: read, so no job on the PR path gets a write-capable token. The write
-    # entries exist for the release path on main.
+    # Every job there is guarded, and each declares its own permissions, which
+    # cannot exceed this block.
     permissions:
       contents: write
       id-token: write
@@ -52,5 +74,5 @@ jobs:
       id-token: write
       pull-requests: read
     with:
-      go-version: "1.26.5"
-      golangci-lint-version: "2.10.1"
+      go-version: '1.26.5'
+      golangci-lint-version: '2.10.1'
