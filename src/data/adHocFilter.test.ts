@@ -214,6 +214,27 @@ describe('AdHocManager', () => {
     expect(result).toBe(" k NOT IN (\\'x\\', \\'y\\') ");
   });
 
+  it('splits an IN value string on commas outside quotes (comma inside a value stays intact)', () => {
+    // grafana/scenes leaves `values` undefined for IN, so real IN filters take
+    // the string-parsing path; a value containing a comma must not be torn apart.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "'gzip, deflate','identity'" },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'gzip, deflate\\', \\'identity\\') ");
+  });
+
+  it('escapes quotes in IN elements taken from the value string (no values array)', () => {
+    // Pins the escaping on the parseInListItems path — a mutant that escapes
+    // only the `values` array elements would leave this quote un-escaped.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "a'b" },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\') ");
+    expect(result).not.toContain("a'b");
+  });
+
   it('does not apply an adhoc filter without "operator"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');

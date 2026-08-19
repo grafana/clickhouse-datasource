@@ -9,8 +9,8 @@
 
 ### Fixes
 
-- Escape ad-hoc filter values (including `IN`/`NOT IN` list elements) so a value containing `'` can't break out of the `additional_table_filters` clause (#2095)
-- Bound the ad-hoc value-suggestion query to a recent time window on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
+- Escape ad-hoc filter values, including `IN`/`NOT IN` list elements, so a crafted value can't break out of the `additional_table_filters` clause. Previously a value with unbalanced parentheses bypassed the filter (no quote required), `NOT IN` was a silent no-op that returned every row, and values containing a backslash matched the wrong rows (#2095)
+- Bound the ad-hoc value-suggestion query to the dashboard time range (falling back to a recent window) on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
 ## 4.20.0
