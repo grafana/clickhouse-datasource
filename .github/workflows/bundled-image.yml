@@ -1,0 +1,58 @@
+# Description:
+# Thin caller for the shared bundled-image pipeline in grafana/data-sources-ci-workflows, which
+# builds the plugin, bakes it onto the Grafana base image the dev0 wave runs, boot-smokes the
+# result, and pushes it to this repo's own prod GAR.
+#
+# Manual dispatch only, deliberately. Bundled delivery is being rolled out to the pilot data
+# sources one step at a time, and a push trigger would start building an image for every commit
+# to main before the rollout is proven. Add the push trigger once the first dispatched runs are
+# consistently green.
+#
+# Note on the app grant:
+# The shared workflow reads the Grafana base image from one line of a private infrastructure repo.
+# The token for that read is granted against THIS file's path, because the broker keys on the
+# top-level caller rather than on the shared workflow it calls. Until that grant applies, pass
+# grafana-image explicitly and the lookup is skipped.
+
+name: Plugins - Bundled image
+
+on:
+  workflow_dispatch:
+    inputs:
+      grafana-image:
+        description: >-
+          Grafana base image to bundle onto. Leave empty to read the dev0 wave's current image.
+        type: string
+        required: false
+        default: ""
+      push-image:
+        description: Push the image to the GAR once the smoke test passes.
+        type: boolean
+        required: false
+        default: false
+      trigger-argo:
+        description: Submit the Argo rollout after a successful push.
+        type: boolean
+        required: false
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: bundled-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundled-image:
+    name: Build and push
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-bundled.yml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      # Created by adding this repo to the bundled-image source repos in the infrastructure
+      # terraform. The name is derived from the repo name, so it changes only if the repo is renamed.
+      gar-repository: docker-clickhouse-datasource-prod
+      grafana-image: ${{ inputs.grafana-image }}
+      push-image: ${{ inputs.push-image }}
+      trigger-argo: ${{ inputs.trigger-argo }}
