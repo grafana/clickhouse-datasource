@@ -231,9 +231,26 @@ function parseInListItems(raw: string): string[] {
   if (s.startsWith('(') && s.endsWith(')')) {
     s = s.slice(1, -1);
   }
-  return s
-    .split(',')
-    .map((item) => item.trim().replace(/^'(.*)'$/, '$1'))
+  // Split on commas that are NOT inside a single-quoted element, so a value
+  // containing a comma (e.g. `'gzip, deflate'`) stays a single item instead of
+  // being torn in half. Best-effort: the joined form isn't a strict grammar.
+  const items: string[] = [];
+  let cur = '';
+  let inQuote = false;
+  for (const ch of s) {
+    if (ch === "'") {
+      inQuote = !inQuote;
+      cur += ch;
+    } else if (ch === ',' && !inQuote) {
+      items.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  items.push(cur);
+  return items
+    .map((item) => item.trim().replace(/^'([\s\S]*)'$/, '$1').replace(/''/g, "'"))
     .filter((item) => item.length > 0);
 }
 

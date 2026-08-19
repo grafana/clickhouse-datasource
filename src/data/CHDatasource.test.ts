@@ -1172,8 +1172,41 @@ describe('ClickHouseDatasource', () => {
       const valueSql = spyOnQuery.mock.calls
         .map((c) => (c[0] as any).targets[0].rawSql ?? '')
         .find((s: string) => s.includes('select distinct'));
-      expect(valueSql).toContain('where "Timestamp" >= now() - INTERVAL 6 HOUR');
+      // Pin clause ordering: the WHERE must sit before LIMIT (a WHERE placed
+      // after LIMIT is a live syntax error but would still satisfy `toContain`).
+      expect(valueSql).toContain('where "Timestamp" >= now() - INTERVAL 6 HOUR limit 1000');
       expect(valueSql).toContain('ResourceAttributes.`k8s`.`pod`::Nullable(String)');
+    });
+
+    it('bounds the value SELECT to the dashboard time range when supplied', async () => {
+      // The dropdown should reflect values within the dashboard's own range, not
+      // a fixed recent window. When a timeRange is passed it wins over the 6h fallback.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'otel.otel_logs');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'otel';
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'otel_logs' }]);
+      const valuesFrame = arrayToDataFrame([{ v: 'pod-a' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const timeRange = { from: { valueOf: () => 1_600_000_000_000 }, to: { valueOf: () => 1_600_086_400_000 } };
+      await ds.getTagValues({ key: 'otel_logs.ResourceAttributes.`k8s`.`pod`', timeRange } as any);
+      const valueSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql ?? '')
+        .find((s: string) => s.includes('select distinct'));
+      expect(valueSql).toContain('where "Timestamp" >= fromUnixTimestamp(1600000000) and "Timestamp" <= fromUnixTimestamp(1600086400) limit 1000');
+      expect(valueSql).not.toContain('INTERVAL 6 HOUR');
     });
   });
 
