@@ -6,6 +6,7 @@ const PLUGIN_JSON = path.join(__dirname, '..', '..', 'plugin.json');
 
 const otelDashboards = [
   'otel-logs-explorer.json',
+  'otel-logs-explorer-json.json',
   'otel-traces-explorer.json',
   'otel-service-dashboard.json',
 ] as const;

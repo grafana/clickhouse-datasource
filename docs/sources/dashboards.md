@@ -29,10 +29,14 @@ The core three dashboards link to each other via dashboard data links: clicking 
 
 The dashboards expect the standard table layout produced by the [ClickHouse exporter for the OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter):
 
-- A logs table named `otel_logs` in the data source's default database.
-- A traces table named `otel_traces` in the data source's default database.
+- A logs table named `otel_logs`.
+- A traces table named `otel_traces`.
 
-Both tables are referenced by their bare names in raw SQL, so the data source's **Default database** setting needs to point at the database that holds them. If you renamed the OTel exporter tables, the dashboards do not pick the new names up automatically; either restore the standard names or duplicate the dashboards and edit the SQL.
+The three Map-schema dashboards (Logs Explorer, Traces Explorer, and the single-service deep dive) reference both tables by their bare names in raw SQL, so the data source's **Default database** setting needs to point at the database that holds them.
+
+The JSON-schema Logs Explorer instead exposes a **Database** selector variable and qualifies its queries as `${database}.otel_logs`, so it can run against any database without changing the data source default. Its panels only need `otel_logs`; the `otel_traces` table is required solely by the optional deployment annotation, which is **disabled by default**, so a logs-only database works out of the box.
+
+If you renamed the OTel exporter tables, the dashboards do not pick the new names up automatically; either restore the standard names or duplicate the dashboards and edit the SQL.
 
 The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`, `SeverityText`, `ServiceName`, `TraceId`, `SpanId`, `ResourceAttributes` for logs; `TraceId`, `ServiceName`, `SpanName`, `Timestamp`, `Duration`, `StatusCode`, `SpanKind`, `ParentSpanId`, `SpanAttributes`, `ResourceAttributes` for traces.
 
