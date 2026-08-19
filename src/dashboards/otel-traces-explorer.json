@@ -42,7 +42,7 @@
         "type": "dashboard"
       },
       {
-        "customSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
+        "customSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
         "datasource": {
           "type": "grafana-clickhouse-datasource",
           "uid": "${datasource}"
@@ -52,11 +52,11 @@
         "iconColor": "#73BF69",
         "name": "Deployments (service.version)",
         "preset": "custom",
-        "rawQuery": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
+        "rawQuery": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
         "target": {
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time"
+          "rawSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time"
         }
       }
     ]
@@ -79,11 +79,30 @@
       },
       {
         "current": {},
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+        "definition": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_traces' ORDER BY database",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Database",
+        "multi": false,
+        "name": "database",
+        "options": [],
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_traces' ORDER BY database"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
         "datasource": {
           "type": "grafana-clickhouse-datasource",
           "uid": "${datasource}"
         },
-        "definition": "SELECT ServiceName FROM otel_traces WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10",
+        "definition": "SELECT ServiceName FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10",
         "hide": 0,
         "includeAll": true,
         "allValue": null,
@@ -93,7 +112,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT ServiceName FROM otel_traces WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10"
+          "rawSql": "SELECT ServiceName FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10"
         },
         "refresh": 2,
         "sort": 0,
@@ -105,7 +124,7 @@
           "type": "grafana-clickhouse-datasource",
           "uid": "${datasource}"
         },
-        "definition": "SELECT DISTINCT SpanName FROM otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ServiceName IN ($service), $service) ORDER BY SpanName LIMIT 200",
+        "definition": "SELECT DISTINCT SpanName FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ServiceName IN ($service), $service) ORDER BY SpanName LIMIT 200",
         "hide": 0,
         "includeAll": true,
         "allValue": null,
@@ -115,7 +134,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT DISTINCT SpanName FROM otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ServiceName IN ($service), $service) ORDER BY SpanName LIMIT 200"
+          "rawSql": "SELECT DISTINCT SpanName FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND $__conditionalAll(ServiceName IN ($service), $service) ORDER BY SpanName LIMIT 200"
         },
         "refresh": 2,
         "sort": 0,
@@ -136,7 +155,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT DISTINCT StatusCode FROM otel_traces WHERE $__timeFilter(Timestamp) ORDER BY StatusCode"
+          "rawSql": "SELECT DISTINCT StatusCode FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) ORDER BY StatusCode"
         },
         "refresh": 2,
         "sort": 0,
@@ -221,7 +240,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  ServiceName AS id,\n  ServiceName AS title,\n  concat(toString(count()), ' spans') AS mainstat,\n  concat(toString(round(avg(Duration) / 1000000, 1)), ' ms avg') AS secondarystat,\n  (count() - countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR'))) / count() AS arc__success,\n  countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS arc__errors\nFROM otel_traces\nWHERE $__timeFilter(Timestamp)\nGROUP BY ServiceName\nORDER BY count() DESC\nLIMIT 30",
+          "rawSql": "SELECT\n  ServiceName AS id,\n  ServiceName AS title,\n  concat(toString(count()), ' spans') AS mainstat,\n  concat(toString(round(avg(Duration) / 1000000, 1)), ' ms avg') AS secondarystat,\n  (count() - countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR'))) / count() AS arc__success,\n  countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() AS arc__errors\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\nGROUP BY ServiceName\nORDER BY count() DESC\nLIMIT 30",
           "refId": "nodes"
         },
         {
@@ -231,7 +250,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  concat(parent.ServiceName, '-', child.ServiceName) AS id,\n  parent.ServiceName AS source,\n  child.ServiceName AS target,\n  concat(toString(count()), ' calls') AS mainstat\nFROM otel_traces AS child\nINNER JOIN otel_traces AS parent\n  ON child.ParentSpanId = parent.SpanId\n  AND child.TraceId = parent.TraceId\nWHERE $__timeFilter(child.Timestamp)\n  AND $__timeFilter(parent.Timestamp)\n  AND parent.ServiceName != child.ServiceName\nGROUP BY source, target\nORDER BY count() DESC\nLIMIT 50",
+          "rawSql": "SELECT\n  concat(parent.ServiceName, '-', child.ServiceName) AS id,\n  parent.ServiceName AS source,\n  child.ServiceName AS target,\n  concat(toString(count()), ' calls') AS mainstat\nFROM ${database}.otel_traces AS child\nINNER JOIN ${database}.otel_traces AS parent\n  ON child.ParentSpanId = parent.SpanId\n  AND child.TraceId = parent.TraceId\nWHERE $__timeFilter(child.Timestamp)\n  AND $__timeFilter(parent.Timestamp)\n  AND parent.ServiceName != child.ServiceName\nGROUP BY source, target\nORDER BY count() DESC\nLIMIT 50",
           "refId": "edges"
         }
       ]
@@ -334,7 +353,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  TraceId,\n  any(ServiceName) AS Service,\n  any(SpanName) AS RootOperation,\n  min(Timestamp) AS Time,\n  max(Duration) AS Duration,\n  count() AS Spans,\n  anyIf(StatusCode, StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Status\nFROM otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SpanName IN ($operation), $operation)\n  AND $__conditionalAll(StatusCode IN ($status), $status)\n  AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY TraceId\nHAVING $__conditionalAll(max(Duration) >= toUInt64($min_duration) * 1000000, $min_duration)\nORDER BY Time DESC\nLIMIT 200",
+          "rawSql": "SELECT\n  TraceId,\n  any(ServiceName) AS Service,\n  any(SpanName) AS RootOperation,\n  min(Timestamp) AS Time,\n  max(Duration) AS Duration,\n  count() AS Spans,\n  anyIf(StatusCode, StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Status\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SpanName IN ($operation), $operation)\n  AND $__conditionalAll(StatusCode IN ($status), $status)\n  AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY TraceId\nHAVING $__conditionalAll(max(Duration) >= toUInt64($min_duration) * 1000000, $min_duration)\nORDER BY Time DESC\nLIMIT 200",
           "refId": "A"
         }
       ]
@@ -405,7 +424,7 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  Duration / 1000000 AS duration_ms\nFROM otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\n  AND cityHash64(SpanId) % 500 = 0\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  Duration / 1000000 AS duration_ms\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\n  AND cityHash64(SpanId) % 500 = 0\nORDER BY time",
           "refId": "A"
         }
       ]
@@ -431,7 +450,7 @@
       "targets": [{
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "editorType": "sql",
-        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() AS Spans FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
+        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() AS Spans FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
         "refId": "A",
         "format": 1
       }]
@@ -457,7 +476,7 @@
       "targets": [{
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "editorType": "sql",
-        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
+        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
         "refId": "A",
         "format": 1
       }]
@@ -488,7 +507,7 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  quantile(0.99)(Duration) / 1000000 AS p99_ms\nFROM otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY time\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  quantile(0.99)(Duration) / 1000000 AS p99_ms\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY time\nORDER BY time",
           "refId": "A"
         }
       ]
@@ -514,7 +533,7 @@
       "targets": [{
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "editorType": "sql",
-        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, avg(Duration) / 1000000 AS \"Avg Duration\" FROM otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
+        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, avg(Duration) / 1000000 AS \"Avg Duration\" FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
         "refId": "A",
         "format": 1
       }]
@@ -642,7 +661,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  SpanName AS Operation,\n  count() AS Count,\n  countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors,\n  round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \"Error %\",\n  quantile(0.5)(Duration) AS P50,\n  quantile(0.99)(Duration) AS P99,\n  anyIf(if(StatusMessage != '', StatusMessage, SpanAttributes['http.status_code']), StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS \"Top Error\"\nFROM otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY Operation\nORDER BY Count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  SpanName AS Operation,\n  count() AS Count,\n  countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors,\n  round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \"Error %\",\n  quantile(0.5)(Duration) AS P50,\n  quantile(0.99)(Duration) AS P99,\n  anyIf(if(StatusMessage != '', StatusMessage, SpanAttributes['http.status_code']), StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS \"Top Error\"\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY Operation\nORDER BY Count DESC\nLIMIT 15",
           "refId": "A"
         }
       ]

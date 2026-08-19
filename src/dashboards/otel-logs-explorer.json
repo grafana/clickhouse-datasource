@@ -54,7 +54,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY time, metric\nORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -86,7 +86,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
           "refId": "A",
           "format": 0
         }
@@ -122,7 +122,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level\nORDER BY Count DESC",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level\nORDER BY Count DESC",
           "refId": "A",
           "format": 0
         }
@@ -159,7 +159,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN ($service), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
           "refId": "A",
           "format": 0
         }
@@ -208,7 +208,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY time, metric\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY time, metric\nORDER BY time",
           "refId": "A",
           "format": 0
         }
@@ -238,7 +238,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes['service.namespace'] AS namespace,\n  ResourceAttributes['k8s.pod.name'] AS k8s_pod\nFROM otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nORDER BY Timestamp DESC\nLIMIT 200",
+          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes['service.namespace'] AS namespace,\n  ResourceAttributes['k8s.pod.name'] AS k8s_pod\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = '${service}'\n  AND $__conditionalAll(SeverityText IN ($level_filter), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nORDER BY Timestamp DESC\nLIMIT 200",
           "refId": "A",
           "format": 2
         }
@@ -258,7 +258,7 @@
         "type": "dashboard"
       },
       {
-        "customSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
+        "customSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "enable": false,
         "hide": false,
@@ -267,7 +267,7 @@
         "preset": "custom",
         "target": {
           "editorType": "sql",
-          "rawSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
+          "rawSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN ($service), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
           "refId": "anno",
           "format": 1
         }
@@ -293,6 +293,25 @@
         "type": "datasource"
       },
       {
+        "current": {},
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+        "definition": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_logs' ORDER BY database",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Database",
+        "multi": false,
+        "name": "database",
+        "options": [],
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_logs' ORDER BY database"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
         "allValue": null,
         "current": {},
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
@@ -305,7 +324,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT ServiceName FROM otel_logs WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10"
+          "rawSql": "SELECT ServiceName FROM ${database}.otel_logs WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10"
         },
         "refresh": 2,
         "regex": "",
@@ -325,7 +344,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT DISTINCT SeverityText FROM otel_logs WHERE $__timeFilter(Timestamp) ORDER BY SeverityText"
+          "rawSql": "SELECT DISTINCT SeverityText FROM ${database}.otel_logs WHERE $__timeFilter(Timestamp) ORDER BY SeverityText"
         },
         "refresh": 2,
         "regex": "",
