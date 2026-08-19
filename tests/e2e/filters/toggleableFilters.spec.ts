@@ -1,20 +1,20 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Locator, Page, Request } from '@playwright/test';
-import { QueryType } from '../../src/types/queryBuilder';
-
-const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
-
-const isCloudRun = !!process.env.GRAFANA_URL;
-
-const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
-const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
-const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
-
-// Time range that fully covers the seed fixture data in tests/e2e/fixtures/seed.sql
-const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
-const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
+import type { Locator, Page } from '@playwright/test';
+import { QueryType } from '../../../src/types/queryBuilder';
+import { FIXTURE_FROM_ISO, FIXTURE_TO_ISO, skipFixtureTestsOnCloud } from '../helpers/env';
+import { exploreUrl } from '../helpers/explore';
+import { pickBuilderSelect, switchToBuilderMode } from '../helpers/builder';
+import { waitForQueryDataResponseWithBody } from '../helpers/queryResponse';
+import { runQuery, runSqlAndGetBody } from '../helpers/sqlEditor';
 
 // ---------------------------------------------------------------------------
+// Toggleable log filters in Explore
+//
+// Unit tests in src/data/CHDatasource.test.ts cover toggleQueryFilter and
+// queryHasFilter exhaustively at the JS level. Only E2E can confirm the
+// integration boundary: clicking the +/- "Filter for/out value" buttons in
+// Grafana's Logs panel reaches the plugin, and the mutated query (with
+// regenerated rawSql) reaches the next /api/ds/query request.
 //
 // Two structurally different DOMs:
 //   * Legacy panel (Grafana ≤12.2 with newLogsPanel off): each row is a <tr>
@@ -43,139 +43,20 @@ const LOGS_PANEL_LOCATORS = {
   filterForLabel: /Filter for value/i,
 };
 
-interface ExploreUrlOpts {
-  queryType?: QueryType;
-  from?: string;
-  to?: string;
-}
-
-function exploreUrl(opts: ExploreUrlOpts = {}): string {
-  const { queryType = QueryType.Logs, from = FIXTURE_FROM_ISO, to = FIXTURE_TO_ISO } = opts;
-
-  const query: Record<string, unknown> = {
-    refId: 'A',
-    datasource: { type: PLUGIN_TYPE, uid: DATASOURCE_UID },
-    editorType: 'sql',
-    pluginVersion: '',
-    rawSql: '',
-    queryType,
-  };
-
-  const panes = JSON.stringify({
-    explore: {
-      datasource: DATASOURCE_UID,
-      queries: [query],
-      range: { from, to },
-    },
-  });
-
-  return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
-}
-
-async function switchToBuilderMode(page: Page, queryType?: QueryType) {
-  await page.getByRole('radio', { name: 'Query Builder' }).click();
-  const continueButton = page.getByRole('button', { name: 'Continue' });
-  if (await continueButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await continueButton.click();
-  }
-  await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
-
-  if (queryType && queryType !== QueryType.Table) {
-    const label = queryTypeRadioLabel(queryType);
-    await page.getByRole('radio', { name: label, exact: true }).click();
-    await expect(page.getByRole('radio', { name: label, exact: true })).toBeChecked();
-  }
-}
-
-function queryTypeRadioLabel(queryType: QueryType): string {
-  switch (queryType) {
-    case QueryType.Logs:
-      return 'Logs';
-    case QueryType.TimeSeries:
-      return 'Time Series';
-    case QueryType.Traces:
-      return 'Traces';
-    default:
-      return 'Table';
-  }
-}
-
-async function enterSql(page: Page, sql: string) {
-  const editor = page.getByRole('code');
-  await editor.click();
-  await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.type(sql);
-  await page.keyboard.press('Escape');
-}
-
-async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
-  let body: Record<string, unknown> | null = null;
-  const responsePromise = explorePage.waitForQueryDataResponse(async (r) => {
-    if (!r.ok()) {
-      return false;
-    }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const b: any = await r.json().catch(() => null);
-    if (!Array.isArray(b?.results?.A?.frames)) {
-      return false;
-    }
-    body = b as Record<string, unknown>;
-    return true;
-  });
-  return { responsePromise, getBody: () => body };
-}
-
 /**
  * After switchToBuilderMode(page, QueryType.Logs), drive the database/table
  * and column-role Selects so the Logs builder points at e2e_test.events
  * with timestamp/message/level mapped to Time/Message/Log Level.
  *
  * The provisioned local datasource has no logs defaults — the builder
- * starts in the "unconfigured" state (a help note + empty Selects). All
- * Selects rendered by the plugin sit inside a `<label class="query-keyword">`
- * with the role label as text; the Select itself is the immediately
- * following sibling.
+ * starts in the "unconfigured" state (a help note + empty Selects).
  */
 async function configureBuilderLogsAgainstFixture(page: Page) {
-  await pickComboboxByLabel(page, 'Database', 'e2e_test');
-  await pickComboboxByLabel(page, 'Table', 'events');
-  await pickComboboxByLabel(page, 'Time', 'timestamp');
-  await pickComboboxByLabel(page, 'Message', 'message');
-  await pickComboboxByLabel(page, 'Log Level', 'level');
-}
-
-/**
- * Locate the Select container immediately after a `<label class="query-keyword">`
- * whose text matches `labelText` exactly.
- *
- * Several labels share the prefix "Time" (e.g. "Filter Time", "Order By"
- * subsections), so we anchor with a regex to avoid `.first()` selecting an
- * unrelated label.
- */
-function roleContainer(page: Page, labelText: string): Locator {
-  return page
-    .locator('label.query-keyword', { hasText: new RegExp(`^${labelText}$`) })
-    .first()
-    .locator('xpath=following-sibling::*[1]');
-}
-
-/**
- * Open the Select rendered immediately after a `<label class="query-keyword">`
- * whose text matches `labelText` exactly, type the value to filter the
- * option list, and commit the selection with Enter.
- *
- * The Database/Table pair lives inside a single parent row, so we cannot rely
- * on `xpath=..` + `.first()` (it would always hit the Database combobox).
- * Targeting the label's immediate following sibling is robust for both the
- * single-column rows (Time, Message, Log Level) and the shared-row pairs.
- */
-async function pickComboboxByLabel(page: Page, labelText: string, value: string) {
-  const combobox = roleContainer(page, labelText).getByRole('combobox').first();
-  await combobox.click();
-  await page.keyboard.type(value);
-  await page.keyboard.press('Enter');
-  // Close any lingering option list before the next interaction.
-  await page.keyboard.press('Escape');
+  await pickBuilderSelect(page, 'Database', 'e2e_test');
+  await pickBuilderSelect(page, 'Table', 'events');
+  await pickBuilderSelect(page, 'Time', 'timestamp');
+  await pickBuilderSelect(page, 'Message', 'message');
+  await pickBuilderSelect(page, 'Log Level', 'level');
 }
 
 /**
@@ -184,7 +65,7 @@ async function pickComboboxByLabel(page: Page, labelText: string, value: string)
  */
 async function runQueryAndExpandFirstLogRow(page: Page, explorePage: ExplorePage) {
   const { responsePromise } = await waitForQueryDataResponseWithBody(explorePage);
-  await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+  await runQuery(page);
   await responsePromise;
   await expandFirstLogRow(page);
 }
@@ -239,6 +120,22 @@ function filterForButton(page: Page): Locator {
   return page.getByRole('button', { name: LOGS_PANEL_LOCATORS.filterForLabel }).first();
 }
 
+// Minimal typed view of the /api/ds/query request body the tests drill into.
+// Filters are kept as loose records because the plugin emits several filter
+// shapes (key/operator/value plus optional hint) and the tests probe them
+// field by field.
+interface QueryRequestQuery {
+  editorType?: string;
+  rawSql?: string;
+  builderOptions?: {
+    filters?: Array<Record<string, unknown>>;
+  };
+}
+
+interface QueryRequestBody {
+  queries?: QueryRequestQuery[];
+}
+
 /**
  * Wait for the next /api/ds/query POST request AND its response, returning
  * the parsed request body.
@@ -248,16 +145,16 @@ function filterForButton(page: Page): Locator {
  * ensures the panel has had a chance to start re-rendering before subsequent
  * interactions try to read the new state.
  */
-async function waitForNextQueryRequestBody(page: Page): Promise<any> {
+async function waitForNextQueryRequestBody(page: Page): Promise<QueryRequestBody> {
   const requestPromise = page.waitForRequest((r) => r.url().includes('/api/ds/query') && r.method() === 'POST');
   const responsePromise = page.waitForResponse(
     (r) => r.url().includes('/api/ds/query') && r.request().method() === 'POST' && r.ok()
   );
   const [req] = await Promise.all([requestPromise, responsePromise]);
-  return JSON.parse(req.postData() || '{}');
+  return JSON.parse(req.postData() || '{}') as QueryRequestBody;
 }
 
-function firstQueryFromBody(body: any): any {
+function firstQueryFromBody(body: QueryRequestBody): QueryRequestQuery | undefined {
   const queries = body?.queries;
   return Array.isArray(queries) ? queries[0] : undefined;
 }
@@ -266,19 +163,16 @@ function firstQueryFromBody(body: any): any {
 // Tests
 // ---------------------------------------------------------------------------
 
-test.describe('DataSourceWithToggleableQueryFiltersSupport (HDX-3540)', () => {
+test.describe('Toggleable log filters in Explore', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(() => {
-    test.skip(
-      isCloudRun,
-      'Fixture-data tests depend on e2e_test.events seeded by tests/e2e/fixtures/seed.sql via the local e2e-data-loader Docker service, which is not available on Cloud.'
-    );
+    skipFixtureTestsOnCloud('seed.sql');
   });
 
   test.describe('Builder mode (Logs)', () => {
     test.beforeEach(async ({ page, explorePage }) => {
-      await page.goto(exploreUrl({ queryType: QueryType.Logs }));
+      await page.goto(exploreUrl({ queryType: QueryType.Logs, from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO }));
       await switchToBuilderMode(page, QueryType.Logs);
       await configureBuilderLogsAgainstFixture(page);
       await runQueryAndExpandFirstLogRow(page, explorePage);
@@ -306,7 +200,7 @@ test.describe('DataSourceWithToggleableQueryFiltersSupport (HDX-3540)', () => {
       const q = firstQueryFromBody(body);
       expect(q?.editorType).toBe('builder');
 
-      const filters: any[] = q?.builderOptions?.filters ?? [];
+      const filters = q?.builderOptions?.filters ?? [];
       const levelFilter = filters.find(
         (f) => (f.key === 'level' || f.hint === 'log_level') && f.operator === '=' && String(f.value) === 'error'
       );
@@ -321,12 +215,13 @@ test.describe('DataSourceWithToggleableQueryFiltersSupport (HDX-3540)', () => {
       // to "Table" — explicitly select "Logs" so Grafana renders the result
       // as a Logs panel (with the +/- detail buttons we want to verify the
       // early-return for).
-      await page.goto(exploreUrl({ queryType: QueryType.Logs }));
+      await page.goto(exploreUrl({ queryType: QueryType.Logs, from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO }));
       await page.getByRole('radio', { name: 'Logs', exact: true }).click();
-      await enterSql(page, 'SELECT timestamp, level, message FROM e2e_test.events ORDER BY timestamp');
-      const { responsePromise } = await waitForQueryDataResponseWithBody(explorePage);
-      await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
-      await responsePromise;
+      await runSqlAndGetBody(
+        page,
+        explorePage,
+        'SELECT timestamp, level, message FROM e2e_test.events ORDER BY timestamp'
+      );
 
       await openFirstLogRowDetails(page);
 
