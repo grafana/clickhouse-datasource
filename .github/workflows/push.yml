@@ -1,21 +1,27 @@
-name: Plugins - CI
+# Description:
+# Thin caller for the shared datasource CI/CD pipeline in
+# grafana/data-sources-ci-workflows, which owns release-please and the prod publish.
+#
+# CI is called directly rather than through the shared workflow. A called workflow
+# prefixes its checks with the calling job's name, so routing CI through
+# datasource-cicd.yml reports every check as "CI/CD / CI / <job>" instead of
+# "CI / <job>". The branch rulesets require the two-segment names, so the deeper
+# names leave the required checks permanently unreported and block every PR.
+#
+# The dev-catalog publish is also a direct cd-dev.yml call, so the
+# reusable-workflow chain stays within GitHub's 4-level nesting cap. It is gated on
+# the shared workflow's release_created output so a Release Please merge (which
+# cicd publishes to prod) does not also double-publish to the dev catalog.
+
+name: Plugins - CI/CD
 
 on:
-  # Run CI on all PRs
   pull_request:
-
-  # Also run on pushes to main (used for publish + downstream automation)
   push:
     branches: [main]
 
-  # Allow manual re-runs from the Actions UI (useful for debugging failures)
-  workflow_dispatch:
+permissions: {}
 
-# Minimal top-level permissions; jobs can extend as needed
-
-# Prevent duplicate runs on the same ref.
-# For PRs: cancel older in-progress runs when new commits are pushed.
-# For main: do NOT cancel (publishing should complete once started).
 concurrency:
   group: plugins-ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -23,40 +29,50 @@ concurrency:
 jobs:
   ci:
     name: CI
-
+    if: github.event_name == 'pull_request'
     uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v10.1.0
-
-    # Only run CI job for PRs / non-main refs.
-    # Main publishing is handled by the CD workflow below.
-    if: github.ref != 'refs/heads/main'
-
-    # Required for checkout + OIDC in shared workflows
     permissions:
       contents: read
       id-token: write
-
     with:
       # Ensure PR builds produce unique plugin versions.
-      # For PR events, suffix with the head SHA; otherwise leave empty.
-      plugin-version-suffix: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
+      plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
 
-  publish-and-deploy:
-    name: Publish to Dev Catalog and Deploy
-
-    # Main-only: publish the latest build and trigger Argo deployment
+  cicd:
+    name: CI/CD
+    # Release path only. On pull requests every job in the shared workflow is
+    # skipped, so it is not called at all and CI above is the only PR path.
     if: github.ref == 'refs/heads/main'
+    # Intentionally pinned to @main: data-sources-ci-workflows does not publish
+    # versioned tags for datasource-cicd.yml yet. Allowed by the zizmor policy
+    # (`grafana/*: any`); review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/datasource-cicd.yml@main # zizmor: ignore[unpinned-uses]
+    # These are a ceiling for the called workflow, not a grant to each of its jobs.
+    # Every job there is guarded, and each declares its own permissions, which
+    # cannot exceed this block.
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      pull-requests: read
+    secrets: inherit
 
-    # Intentionally pinned to @main: data-sources-ci-workflows does not
-    # publish versioned tags for cd-dev.yml yet. Allowed by the zizmor
-    # policy (`grafana/*: any`); review periodically.
-    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main
-
+  publish-dev:
+    name: Publish to Dev Catalog and Deploy
+    needs: cicd
+    # Normal pushes to main (no release cut) publish the latest build to the dev
+    # catalog. Skipped when release-please cut a release, since cicd already
+    # publishes that version to prod (dev+ops+prod).
+    if: github.ref == 'refs/heads/main' && needs.cicd.outputs.release_created != 'true'
+    # Intentionally pinned to @main: data-sources-ci-workflows does not publish
+    # versioned tags for cd-dev.yml yet. Allowed by the zizmor policy
+    # (`grafana/*: any`); review periodically.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-dev.yml@main # zizmor: ignore[unpinned-uses]
     permissions:
       attestations: write
       contents: write
       id-token: write
       pull-requests: read
-
     with:
-      go-version: "1.26.5"
-      golangci-lint-version: "2.10.1"
+      go-version: '1.26.5'
+      golangci-lint-version: '2.10.1'
