@@ -30,7 +30,7 @@ jobs:
   ci:
     name: CI
     if: github.event_name == 'pull_request'
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v10.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v11.1.0
     permissions:
       contents: read
       id-token: write
