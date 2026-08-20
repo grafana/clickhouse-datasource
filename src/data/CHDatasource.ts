@@ -500,7 +500,12 @@ export class Datasource
     }
     const chQuery = isString(query) ? { rawSql: query, editorType: EditorType.SQL } : query;
 
-    if (!(chQuery.editorType === EditorType.SQL || chQuery.editorType === EditorType.Builder || !chQuery.editorType)) {
+    if (!(
+      chQuery.editorType === EditorType.SQL ||
+      chQuery.editorType === EditorType.Builder ||
+      chQuery.editorType === EditorType.Schema ||
+      !chQuery.editorType
+    )) {
       return [];
     }
 
@@ -1144,6 +1149,30 @@ export class Datasource
   }
 
   /**
+   * Table name to engine, for the given database. Resolves to an empty map when
+   * system.tables is not readable, so callers treat engines as decoration.
+   */
+  async fetchTableEngines(database: string): Promise<Record<string, string>> {
+    const rawSql = `SELECT name, engine FROM system.tables WHERE database = '${escapeCHStringLiteral(database)}'`;
+
+    try {
+      const frame = await this.runQuery({ rawSql });
+      if (frame.fields?.length === 0) {
+        return {};
+      }
+
+      const engines: Record<string, string> = {};
+      new DataFrameView(frame).forEach((row) => {
+        engines[String(row[0])] = String(row[1]);
+      });
+      return engines;
+    } catch (ex) {
+      console.error('Failed to fetch table engines for database:', database, ex);
+      return {};
+    }
+  }
+
+  /**
    * Whether the Map-key discovery probe is enabled. Defaults to true.
    * When false, `fetchUniqueMapKeys` resolves to an empty list and adhoc
    * tag-key expansion skips the fan-out.
@@ -1153,12 +1182,11 @@ export class Datasource
   }
 
   /**
-   * When the (db, table) matches the configured OTel logs or traces table,
-   * returns a time-column name suitable for bounding the Map-key probe.
-   * Returns undefined for free-form tables where the plugin can't know which
-   * column is the time column — those continue to use the bare LIMIT probe.
+   * When the (db, table) matches the configured logs or traces table, returns the
+   * configured time-column name. Returns undefined for free-form tables where the
+   * plugin can't know which column is the time column.
    */
-  private getMapKeyProbeTimeColumn(db: string, table: string): string | undefined {
+  getConfiguredTimeColumn(db: string, table: string): string | undefined {
     const logsDb = this.getDefaultLogsDatabase();
     const logsTable = this.getDefaultLogsTable();
     if (logsDb === db && logsTable === table) {
@@ -1202,7 +1230,7 @@ export class Datasource
     }
     const escapedColumn = escapeIdentifier(mapColumn);
     const tableIdentifier = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
-    const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
+    const timeColumn = this.getConfiguredTimeColumn(db, table);
     const source = timeColumn
       ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
       : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
@@ -1969,7 +1997,7 @@ export class Datasource
       throw new Error('Missing query for log context');
     } else if (!options || !options.direction || options.limit === undefined) {
       throw new Error('Missing log context options for query');
-    } else if (query.editorType === EditorType.SQL || !query.builderOptions) {
+    } else if (query.editorType !== EditorType.Builder || !query.builderOptions) {
       throw new Error('Log context feature only works for builder queries');
     }
 
