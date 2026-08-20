@@ -9,6 +9,18 @@ export function escapeJSONPathSegment(segment: string): string {
   return segment.replace(/\\/g, '\\\\').replace(/`/g, '\\`');
 }
 
+// Emit a column identifier as-is when it's a plain (optionally dotted)
+// identifier; otherwise backtick-quote it (escaping backticks/backslashes). Most
+// callers pass a schema column name and see no change, but an ad-hoc filter key
+// can be typed/unusual — quoting keeps the generated SQL well-formed instead of
+// splicing arbitrary text into the expression.
+function quoteColumnIfUnsafe(column: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(column)) {
+    return column;
+  }
+  return '`' + column.replace(/\\/g, '\\\\').replace(/`/g, '\\`') + '`';
+}
+
 /**
  * Build a JSON sub-path access expression, e.g.
  * `buildJSONPathAccess('attrs', 'a.b')` → ``attrs.`a`.`b`::Nullable(String)``.
@@ -16,16 +28,16 @@ export function escapeJSONPathSegment(segment: string): string {
  * The `Nullable(String)` cast is required: JSON sub-paths are `Dynamic`, which
  * `IN` / `NOT IN` reject with ILLEGAL_TYPE_OF_ARGUMENT, and an uncast sub-path
  * also reads all-null over Grafana's native protocol. The cast still preserves
- * the `IS NULL` signal for missing paths. Only the path segments are escaped;
- * `column` is emitted as-is, so the caller is responsible for passing a valid
- * column identifier.
+ * the `IS NULL` signal for missing paths. Path segments are backtick-escaped and
+ * the column is quoted unless it's a plain (optionally dotted) identifier, so an
+ * unusual/typed key still yields valid SQL.
  */
 export function buildJSONPathAccess(column: string, path: string): string {
   const segments = path
     .split('.')
     .map((segment) => '`' + escapeJSONPathSegment(segment) + '`')
     .join('.');
-  return `${column}.${segments}::Nullable(String)`;
+  return `${quoteColumnIfUnsafe(column)}.${segments}::Nullable(String)`;
 }
 
 // Inverse of escapeJSONPathSegment: `\X` → `X`.

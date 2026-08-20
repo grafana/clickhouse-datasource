@@ -36,6 +36,17 @@ describe('buildJSONPathAccess', () => {
   it('escapes backticks in a segment to prevent identifier break-out', () => {
     expect(buildJSONPathAccess('attrs', 'a`b')).toBe('attrs.`a\\`b`::Nullable(String)');
   });
+
+  it('leaves a plain (optionally dotted) column identifier unquoted', () => {
+    expect(buildJSONPathAccess('ResourceAttributes', 'x')).toBe('ResourceAttributes.`x`::Nullable(String)');
+    expect(buildJSONPathAccess('a.b', 'x')).toBe('a.b.`x`::Nullable(String)');
+  });
+
+  it('backtick-quotes a column that is not a plain identifier', () => {
+    // A typed/unusual ad-hoc key must not splice arbitrary text into the
+    // expression — the column becomes a single (quoted) identifier.
+    expect(buildJSONPathAccess("a) OR 1=1--", 'x')).toBe('`a) OR 1=1--`.`x`::Nullable(String)');
+  });
 });
 
 describe('mintJSONAdhocKey / parseJSONAdhocKey round-trip', () => {
