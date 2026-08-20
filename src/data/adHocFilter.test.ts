@@ -258,10 +258,12 @@ describe('AdHocManager', () => {
     const ahm = new AdHocFilter();
     const result = ahm.apply(
       'SELECT * FROM foo',
-      [{ key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      [{ key: 'ResourceAttributes.cloud.region', operator: '=', value: 'test' }] as AdHocVariableFilter[],
       true
     );
-    expect(result).toContain('ResourceAttributes.cloud.region');
+    // useJSON forces JSON dot-access on the default OTel column, cast to
+    // Nullable(String) — an uncast Dynamic sub-path reads back all-null.
+    expect(result).toContain('ResourceAttributes.`cloud`.`region`::Nullable(String)');
   });
 
   describe('buildFilterString', () => {
@@ -446,7 +448,7 @@ describe('AdHocManager', () => {
         [{ key: "events.metadata['region']", operator: '=', value: 'eu' }] as AdHocVariableFilter[],
         true
       );
-      expect(val).toContain("metadata.region = \\'eu\\'");
+      expect(val).toContain("metadata.`region`::Nullable(String) = \\'eu\\'");
     });
 
     it('legacy dotted keys still render via the registered Map-column set', () => {
@@ -458,6 +460,43 @@ describe('AdHocManager', () => {
         { key: 'events.metadata.region', operator: '=', value: 'eu' },
       ] as AdHocVariableFilter[]);
       expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+  });
+
+  describe('self-describing JSON keys (#2094)', () => {
+    // getTagKeys mints JSON sub-paths in a backtick form (`col.`seg`.`seg``).
+    // escapeKey renders them cast to Nullable(String) with NO column cache, so
+    // a saved JSON filter applies correctly on a fresh dashboard load.
+    it('renders a minted JSON key statelessly (no setMapColumns/setJSONColumns)', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: 'otel_logs.ResourceAttributes.`k8s`.`pod`.`name`', operator: '=', value: 'api' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain(
+        "ResourceAttributes.`k8s`.`pod`.`name`::Nullable(String) = \\'api\\'"
+      );
+    });
+
+    it('renders a single-segment minted JSON key with hideTableName-style key', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: 'ResourceAttributes.`level`', operator: '=', value: 'error' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`level`::Nullable(String) = \\'error\\'");
+    });
+
+    it('escapes a quote in a JSON path segment for the outer filter string', () => {
+      // The rendered access is embedded inside the single-quoted
+      // additional_table_filters string, so a `'` in a path segment must be
+      // escaped over the whole expression — otherwise it breaks the string.
+      // Pins the outer-escape layer (buildJSONAccessForOuterFilter); an empty
+      // implementation would emit the un-escaped `` `a'b` `` form and fail here.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: "otel_logs.ResourceAttributes.`a'b`", operator: '=', value: 'v' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`a\\'b`::Nullable(String)");
+      expect(val).not.toContain("`a'b`");
     });
   });
 });

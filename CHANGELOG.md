@@ -5,6 +5,7 @@
 ### Features
 
 - Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
+- Support JSON-typed columns (e.g. the OTel JSON schema's `LogAttributes`/`ResourceAttributes`) in ad-hoc filters: JSON sub-paths are discovered for the key dropdown and rendered as backtick-quoted dot-access cast to `Nullable(String)`, so every filter operator works and values read back over the native protocol. Keys are minted in a stateless self-describing form (building on #2079), so a saved JSON filter applies correctly on a fresh dashboard load (#2094)
 
 ### Fixes
 
