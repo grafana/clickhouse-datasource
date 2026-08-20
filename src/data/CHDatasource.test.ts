@@ -1024,6 +1024,192 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('JSON type ad-hoc filters (#2094)', () => {
+    it('expands JSON-typed columns into self-describing backtick path keys', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'level', type: 'String', table: 'events' },
+        { name: 'ResourceAttributes', type: 'JSON', table: 'events' },
+      ]);
+      // fetchUniqueJSONPathsForAdhoc → distinct JSON paths for ResourceAttributes.
+      const pathsFrame = arrayToDataFrame([{ path: 'k8s.pod' }, { path: 'level' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('JSONAllPaths("ResourceAttributes")')) {
+          return of({ data: [pathsFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      // Each level backtick-quoted: the key is self-describing, so escapeKey
+      // renders cast JSON access with no JSON-column cache.
+      expect(keys).toEqual([
+        { text: 'events.level' },
+        { text: 'events.ResourceAttributes.`k8s`.`pod`' },
+        { text: 'events.ResourceAttributes.`level`' },
+      ]);
+    });
+
+    it('reads a companion <col>Keys array column instead of JSONAllPaths when present', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'ResourceAttributes', type: 'JSON', table: 'events' },
+        { name: 'ResourceAttributesKeys', type: 'Array(String)', table: 'events' },
+      ]);
+      const pathsFrame = arrayToDataFrame([{ path: 'service.name' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("ResourceAttributesKeys")')) {
+          return of({ data: [pathsFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toContainEqual({ text: 'events.ResourceAttributes.`service`.`name`' });
+      // Discovery read the companion array column, not JSONAllPaths.
+      const probedSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql as string)
+        .find((s) => s.includes('arrayJoin('));
+      expect(probedSql).toContain('arrayJoin("ResourceAttributesKeys")');
+      expect(probedSql).not.toContain('JSONAllPaths');
+    });
+
+    it('fetches values for a minted JSON key with the cast, no prior getTagKeys call', async () => {
+      // Stateless round-trip: on a fresh dashboard load (caches empty) the
+      // value SELECT must still cast the JSON sub-path — an uncast Dynamic path
+      // reads back all-null over the native protocol.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'events' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'api' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const values = await ds.getTagValues({ key: 'events.ResourceAttributes.`k8s`.`pod`' });
+      expect(values).toEqual([{ text: 'api' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: 'select distinct ResourceAttributes.`k8s`.`pod`::Nullable(String) from db.events limit 1000',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('casts a LEGACY dotted JSON key on a cold cache (pins ensureAttributeColumnCache)', async () => {
+      // A minted backtick key self-describes and casts with no cache, so it
+      // can't catch a broken warm-up. A legacy dotted key (`col.path`, from an
+      // already-saved dashboard) resolves JSON-ness only via the column cache,
+      // which getTagKeys hasn't populated on a fresh load — ensureAttributeColumnCache
+      // must warm it, else the sub-path is emitted uncast (Dynamic → all-null).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'events' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'api' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const values = await ds.getTagValues({ key: 'events.ResourceAttributes.k8s.pod' });
+      expect(values).toEqual([{ text: 'api' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: 'select distinct ResourceAttributes.`k8s`.`pod`::Nullable(String) from db.events limit 1000',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('bounds the value SELECT to a time window for the configured logs table', async () => {
+      // The distinct-value scan behind the filter-value dropdown is bounded to a
+      // 6h window when the target is the configured OTel logs/traces table (same
+      // partition-pruning heuristic as the key-discovery probe). Without it,
+      // `select distinct <expr>` scans the whole column — worse for JSON paths.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'otel.otel_logs');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'otel';
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'otel_logs' }]);
+      const valuesFrame = arrayToDataFrame([{ v: 'pod-a' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagValues({ key: 'otel_logs.ResourceAttributes.`k8s`.`pod`' });
+      const valueSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql ?? '')
+        .find((s: string) => s.includes('select distinct'));
+      // Pin clause ordering: the WHERE must sit before LIMIT (a WHERE placed
+      // after LIMIT is a live syntax error but would still satisfy `toContain`).
+      expect(valueSql).toContain('where "Timestamp" >= now() - INTERVAL 6 HOUR limit 1000');
+      expect(valueSql).toContain('ResourceAttributes.`k8s`.`pod`::Nullable(String)');
+    });
+
+    it('bounds the value SELECT to the dashboard time range when supplied', async () => {
+      // The dropdown should reflect values within the dashboard's own range, not
+      // a fixed recent window. When a timeRange is passed it wins over the 6h fallback.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'otel.otel_logs');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'otel';
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'otel_logs' }]);
+      const valuesFrame = arrayToDataFrame([{ v: 'pod-a' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const timeRange = { from: { valueOf: () => 1_600_000_000_000 }, to: { valueOf: () => 1_600_086_400_000 } };
+      await ds.getTagValues({ key: 'otel_logs.ResourceAttributes.`k8s`.`pod`', timeRange } as any);
+      const valueSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql ?? '')
+        .find((s: string) => s.includes('select distinct'));
+      expect(valueSql).toContain('where "Timestamp" >= fromUnixTimestamp(1600000000) and "Timestamp" <= fromUnixTimestamp(1600086400) limit 1000');
+      expect(valueSql).not.toContain('INTERVAL 6 HOUR');
+    });
+  });
+
   describe('fetchUniqueMapKeys probe (#1843)', () => {
     it('bounds the probe to a row-sampled subquery for free-form tables (no time column known)', async () => {
       // Without a known time column the probe can't prune by partition, so it
