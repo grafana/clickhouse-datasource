@@ -138,7 +138,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT count() as \"Total queries\" FROM system.query_log WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) AND $__timeFilter(event_time) ",
+          "rawSql": "SELECT count() as \"Total queries\" FROM system.query_log WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) AND $__timeFilter(event_time) ",
           "refId": "A"
         }
       ],
@@ -220,7 +220,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT avg(memory_usage) as \"Avg query memory\", $__timeInterval(query_start_time) as time FROM system.query_log WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) AND $__timeFilter(event_time) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT avg(memory_usage) as \"Avg query memory\", $__timeInterval(query_start_time) as time FROM system.query_log WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) AND $__timeFilter(event_time) GROUP BY time ORDER BY time",
           "refId": "A"
         }
       ],
@@ -308,7 +308,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT query_duration_ms as \"Query time\" FROM system.query_log WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) AND $__timeFilter(event_time) LIMIT 1000;",
+          "rawSql": "SELECT query_duration_ms as \"Query time\" FROM system.query_log WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) AND $__timeFilter(event_time) LIMIT 1000;",
           "refId": "A"
         }
       ],
@@ -380,7 +380,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT initial_user, count() as c FROM system.query_log WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) GROUP BY initial_user LIMIT 100;\n",
+          "rawSql": "SELECT initial_user, count() as c FROM system.query_log WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) GROUP BY initial_user LIMIT 100;\n",
           "refId": "A"
         }
       ],
@@ -463,7 +463,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT avg(query_duration_ms) as \"Avg query time\", $__timeInterval(query_start_time) as time FROM system.query_log WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) AND $__timeFilter(event_time) GROUP BY time ORDER BY time",
+          "rawSql": "SELECT avg(query_duration_ms) as \"Avg query time\", $__timeInterval(query_start_time) as time FROM system.query_log WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) AND $__timeFilter(event_time) GROUP BY time ORDER BY time",
           "refId": "A"
         }
       ],
@@ -562,7 +562,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT $__timeInterval(query_start_time) as time,\n       any(normalizeQuery(query)) AS normalized_query,\n       count() as c\nFROM system.query_log\nWHERE type != 'QueryStart'\n  AND $__timeFilter(event_time)\n  AND initial_user IN ($user)\n   AND query_kind IN ($query_kind)\n  AND normalized_query_hash IN (SELECT normalized_query_hash\n                                FROM system.query_log\n                                WHERE type in ($type) AND $__timeFilter(event_time) AND query_kind IN ($query_kind)\n                                GROUP BY normalized_query_hash\n                                ORDER BY count() DESC\n                                LIMIT 5)\nGROUP BY normalized_query_hash, time\nORDER BY time",
+          "rawSql": "SELECT $__timeInterval(query_start_time) as time,\n       any(normalizeQuery(query)) AS normalized_query,\n       count() as c\nFROM system.query_log\nWHERE type != 'QueryStart'\n  AND $__timeFilter(event_time)\n  AND initial_user IN (${user:singlequote})\n   AND query_kind IN (${query_kind:singlequote})\n  AND normalized_query_hash IN (SELECT normalized_query_hash\n                                FROM system.query_log\n                                WHERE type in (${type:singlequote}) AND $__timeFilter(event_time) AND query_kind IN (${query_kind:singlequote})\n                                GROUP BY normalized_query_hash\n                                ORDER BY count() DESC\n                                LIMIT 5)\nGROUP BY normalized_query_hash, time\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -670,7 +670,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT $__timeInterval(query_start_time) as time,\n       any(normalizeQuery(query)) AS normalized_query,\n       avg(query_duration_ms) as avg_query_duration\nFROM system.query_log\nWHERE type != 'QueryStart'\n  AND $__timeFilter(event_time)\n  AND type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind)\n  AND normalized_query_hash IN (SELECT normalized_query_hash\n                                FROM system.query_log\n                                WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) AND $__timeFilter(event_time)\n                                GROUP BY normalized_query_hash\n                                ORDER BY avg(query_duration_ms) DESC\n                                LIMIT 10)\nGROUP BY normalized_query_hash, time\nORDER BY time",
+          "rawSql": "SELECT $__timeInterval(query_start_time) as time,\n       any(normalizeQuery(query)) AS normalized_query,\n       avg(query_duration_ms) as avg_query_duration\nFROM system.query_log\nWHERE type != 'QueryStart'\n  AND $__timeFilter(event_time)\n  AND type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote})\n  AND normalized_query_hash IN (SELECT normalized_query_hash\n                                FROM system.query_log\n                                WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) AND $__timeFilter(event_time)\n                                GROUP BY normalized_query_hash\n                                ORDER BY avg(query_duration_ms) DESC\n                                LIMIT 10)\nGROUP BY normalized_query_hash, time\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -774,7 +774,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT $__timeInterval(query_start_time) as time, initial_user as user, count() as \"number of queries by\"\nFROM system.query_log\nWHERE query_kind IN ($query_kind) AND type IN ($type) AND $__timeFilter(event_time) AND initial_user IN (\n  SELECT initial_user\nFROM system.query_log\nWHERE query_kind IN ($query_kind) AND type IN ($type) AND $__timeFilter(event_time)\nGROUP BY initial_user\nORDER BY count() as c DESC\nLIMIT 10\n)\nGROUP BY initial_user, time\nORDER BY time;",
+          "rawSql": "SELECT $__timeInterval(query_start_time) as time, initial_user as user, count() as \"number of queries by\"\nFROM system.query_log\nWHERE query_kind IN (${query_kind:singlequote}) AND type IN (${type:singlequote}) AND $__timeFilter(event_time) AND initial_user IN (\n  SELECT initial_user\nFROM system.query_log\nWHERE query_kind IN (${query_kind:singlequote}) AND type IN (${type:singlequote}) AND $__timeFilter(event_time)\nGROUP BY initial_user\nORDER BY count() as c DESC\nLIMIT 10\n)\nGROUP BY initial_user, time\nORDER BY time;",
           "refId": "A"
         }
       ],
@@ -1382,7 +1382,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT query_start_time, type, query_duration_ms, initial_user, substring(query_id,1, 8) as query_id, query_kind, normalizeQuery(query) AS normalized_query, concat( toString(read_rows), ' rows / ', formatReadableSize(read_bytes) ) AS read, concat( toString(written_rows), ' rows / ', formatReadableSize(written_bytes) ) AS written, concat( toString(result_rows), ' rows / ', formatReadableSize(result_bytes) ) AS result, memory_usage FROM system.query_log WHERE type in ($type) AND initial_user IN ($user) AND query_kind IN ($query_kind) AND $__timeFilter(event_time) ORDER BY query_duration_ms DESC LIMIT  1000",
+          "rawSql": "SELECT query_start_time, type, query_duration_ms, initial_user, substring(query_id,1, 8) as query_id, query_kind, normalizeQuery(query) AS normalized_query, concat( toString(read_rows), ' rows / ', formatReadableSize(read_bytes) ) AS read, concat( toString(written_rows), ' rows / ', formatReadableSize(written_bytes) ) AS written, concat( toString(result_rows), ' rows / ', formatReadableSize(result_bytes) ) AS result, memory_usage FROM system.query_log WHERE type in (${type:singlequote}) AND initial_user IN (${user:singlequote}) AND query_kind IN (${query_kind:singlequote}) AND $__timeFilter(event_time) ORDER BY query_duration_ms DESC LIMIT  1000",
           "refId": "A"
         }
       ],
