@@ -36,9 +36,10 @@ permissions:
 
 jobs:
   bundled:
-    # TODO(kuba): pin to the data-sources-ci-workflows release tag cut from
-    # https://github.com/grafana/data-sources-ci-workflows/pull/18 once merged.
-    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-bundled.yml@SET-TO-DS-CI-WORKFLOWS-RELEASE-TAG
+    # Rolling-main by design: cd-bundled.yml's nested actions float on main, so callers track main
+    # too (pinning a tag would give false reproducibility). Resolves once
+    # https://github.com/grafana/data-sources-ci-workflows/pull/18 merges.
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-bundled.yml@main
     permissions:
       contents: read
       id-token: write
