@@ -10,6 +10,50 @@
 
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.21.0](https://github.com/grafana/clickhouse-datasource/compare/v4.20.0...v4.21.0) (2026-08-20)
+
+
+### 🎉 Features
+
+* add time series statement macros ($__columns, $__rateColumns, $__perSecondColumns, $__increaseColumns, $__lttb) ([#2019](https://github.com/grafana/clickhouse-datasource/issues/2019)) ([d90dbb1](https://github.com/grafana/clickhouse-datasource/commit/d90dbb172b72cd352d911092639345bdd89b9d31))
+* **auth:** add Forward OAuth Identity authentication ([#1987](https://github.com/grafana/clickhouse-datasource/issues/1987)) ([769e1bd](https://github.com/grafana/clickhouse-datasource/commit/769e1bd47d97d78595d8d8b1b71dabc6c7023e59))
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** single-table sources, stateless Map keys, and pre-24.3 discovery ([#2079](https://github.com/grafana/clickhouse-datasource/issues/2079)) ([b915269](https://github.com/grafana/clickhouse-datasource/commit/b91526902a20870e91db45f07f38863cb73b70b2))
+* **config:** v1/v2 editor validation, Map keys switch, and feature toggle fixes ([#2076](https://github.com/grafana/clickhouse-datasource/issues/2076)) ([9b087dd](https://github.com/grafana/clickhouse-datasource/commit/9b087dd66da42a13401148c18a28ee0527ac9076))
+* **dashboards:** annotation presets, free-text search, and datasource ref fixes ([#2077](https://github.com/grafana/clickhouse-datasource/issues/2077)) ([8225d94](https://github.com/grafana/clickhouse-datasource/commit/8225d9463c162b1fa678ca08a34a6a4aeaaae70d))
+* **deps:** update backend dependencies ([#2089](https://github.com/grafana/clickhouse-datasource/issues/2089)) ([afa6962](https://github.com/grafana/clickhouse-datasource/commit/afa6962e69f580234abbcba197651b64dda16d30))
+* **logs:** apply log message search to logs volume and sample queries ([#2092](https://github.com/grafana/clickhouse-datasource/issues/2092)) ([d95e79b](https://github.com/grafana/clickhouse-datasource/commit/d95e79bf576d82a0002495dff11bbafe4f5f46d1))
+* **macros:** preserve backtick identifiers and dollar-quoted literals ([#2045](https://github.com/grafana/clickhouse-datasource/issues/2045)) ([6a565ed](https://github.com/grafana/clickhouse-datasource/commit/6a565edbfadb5010b644965a57bca6cfd49b09ec))
+* **queryBuilder:** compact editor, filter popover, and column auto-detection fixes ([#2073](https://github.com/grafana/clickhouse-datasource/issues/2073)) ([431359a](https://github.com/grafana/clickhouse-datasource/commit/431359a6fea1b89364d0eef198d2b10624c95014))
+* **query:** surface frontend query processing errors instead of hanging panels ([#2090](https://github.com/grafana/clickhouse-datasource/issues/2090)) ([c003a5d](https://github.com/grafana/clickhouse-datasource/commit/c003a5dc1066bc9ad8814d90d821ed96d7aa3cc8))
+* **schema:** honour the plugin cache settings in schema resource responses ([#2063](https://github.com/grafana/clickhouse-datasource/issues/2063)) ([13e8b3b](https://github.com/grafana/clickhouse-datasource/commit/13e8b3b7da77e1b76b539f84b75f69d59854097d))
+* **traces:** trace-ID lookup, companion-table validation, and span-link fixes ([#2075](https://github.com/grafana/clickhouse-datasource/issues/2075)) ([83f8d10](https://github.com/grafana/clickhouse-datasource/commit/83f8d108aa96a67609a82e1d599ee36905af1cab))
+* **variables:** forward scoped variables and filter missing Map keys ([#2074](https://github.com/grafana/clickhouse-datasource/issues/2074)) ([8370829](https://github.com/grafana/clickhouse-datasource/commit/837082975a1b944e3b8b500fc52aa7c266fb0d56))
+
+
+### 📝 Documentation
+
+* ClickHouse quarterly update (FY27 Y3) ([#2114](https://github.com/grafana/clickhouse-datasource/issues/2114)) ([f26229a](https://github.com/grafana/clickhouse-datasource/commit/f26229a22f984f14c470a215c9ce8e083c4f7718))
+
+
+### ✅ Tests
+
+* **e2e:** default Playwright video off ([#2129](https://github.com/grafana/clickhouse-datasource/issues/2129)) ([923183e](https://github.com/grafana/clickhouse-datasource/commit/923183eca44a829ccce546da4adf8d8e50710d9d))
+* **e2e:** raise cloud-run timeouts to fix nightly cron flakiness ([#2121](https://github.com/grafana/clickhouse-datasource/issues/2121)) ([1327901](https://github.com/grafana/clickhouse-datasource/commit/1327901fd32fe03a9779f09fdbedf5e2b4e30738))
+
+
+### 🤖 Continuous Integration
+
+* add a dispatch-only caller for the bundled image pipeline ([#2134](https://github.com/grafana/clickhouse-datasource/issues/2134)) ([1d04063](https://github.com/grafana/clickhouse-datasource/commit/1d04063a31fb30f9582cd0b3aeaacb7d350b0dcf))
+* **cron:** notify Slack on Cloud E2E failure ([#2117](https://github.com/grafana/clickhouse-datasource/issues/2117)) ([0ec6744](https://github.com/grafana/clickhouse-datasource/commit/0ec674428ed1b4b290e4455c0750a56d743f1aa3))
+* **cron:** pass run-stage to the Cloud E2E workflow for DER labelling ([#2107](https://github.com/grafana/clickhouse-datasource/issues/2107)) ([03f906f](https://github.com/grafana/clickhouse-datasource/commit/03f906f386aa0bfbd6bf83b52e110bd0385c5d59))
+* enforce conventional commit pr titles and adopt release-please ([#2015](https://github.com/grafana/clickhouse-datasource/issues/2015)) ([df673cc](https://github.com/grafana/clickhouse-datasource/commit/df673cc1d9322899d193047e8f8dbc9178bfd592))
+* use shared reusable add-to-project workflow ([#2088](https://github.com/grafana/clickhouse-datasource/issues/2088)) ([2be5f6a](https://github.com/grafana/clickhouse-datasource/commit/2be5f6aec88290ea0c7f732558a7a70b6e0259b3))
+* use shared reusable stale workflow ([#2087](https://github.com/grafana/clickhouse-datasource/issues/2087)) ([bfbea5e](https://github.com/grafana/clickhouse-datasource/commit/bfbea5e3ab488c0907c1b8107c858bbe95a44019))
+
 ## 4.20.0
 
 ### Features
