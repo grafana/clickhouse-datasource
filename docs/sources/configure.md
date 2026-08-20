@@ -11,7 +11,7 @@ menuTitle: Configure
 title: Configure the ClickHouse data source
 weight: 20
 version: 0.1
-last_reviewed: 2026-04-24
+review_date: 2026-08-12
 ---
 
 # Configure the ClickHouse data source
@@ -124,7 +124,7 @@ After adding the data source, configure the following settings.
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Name**              | The name used to refer to the data source in panels and queries.                                                                                        |
 | **Default**           | Toggle to make this the default data source for new panels.                                                                                             |
-| **Server**            | The ClickHouse server host (for example, `localhost`).                                                                                                  |
+| **Server address**    | The ClickHouse server host (for example, `localhost`).                                                                                                  |
 | **Protocol**          | **Native** or **HTTP**.                                                                                                                                 |
 | **Port**              | Port number; depends on protocol and whether TLS is enabled (see default ports above).                                                                  |
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
@@ -181,10 +181,15 @@ Use **Single source** when the data source is dedicated to one logs or traces ta
 
 | Setting              | Description                                                           |
 | -------------------- | --------------------------------------------------------------------- |
-| **Dial Timeout**     | Timeout in seconds for establishing a connection. Default: `10`.      |
-| **Query Timeout**    | Timeout in seconds for read queries. Default: `60`.                   |
-| **Validate SQL**     | When enabled, validates SQL syntax in the query editor.               |
-| **Enable row limit** | When enabled, applies the Grafana row limit setting to query results. |
+| **Dial Timeout**             | Timeout in seconds for establishing a connection. Default: `10`.                                                                                                                                                                                                                                                                                       |
+| **Query Timeout**            | Timeout in seconds for read queries. Default: `60`.                                                                                                                                                                                                                                                                                                    |
+| **Connection Max Lifetime**  | Maximum lifetime of a pooled connection, in minutes. Default: `5`.                                                                                                                                                                                                                                                                                     |
+| **Max Idle Connections**     | Maximum number of idle connections kept in the pool. Default: `25`.                                                                                                                                                                                                                                                                                    |
+| **Max Open Connections**     | Maximum number of open connections in the pool. Default: `50`.                                                                                                                                                                                                                                                                                         |
+| **Validate SQL**             | When enabled, validates SQL syntax in the query editor.                                                                                                                                                                                                                                                                                                |
+| **Enable row limit**         | When enabled, applies the Grafana row limit setting to query results.                                                                                                                                                                                                                                                                                  |
+| **Row Capacity Hint**        | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. |
+| **Suggest Map keys in filter editor** | When enabled, the filter editor probes `Map(...)` columns for distinct keys to populate key suggestions. On large tables with high-cardinality maps this probe can scan a very large number of rows, so disable it to suppress the probe (you can still type Map keys manually). Default: enabled.                                              |
 
 ### Custom ClickHouse settings
 
@@ -229,9 +234,9 @@ When **Configuration mode** is set to **Single source** and **Signal type** is s
 
 The plugin ships built-in column maps for the OpenTelemetry ClickHouse exporter's default schemas. Pick the version that matches the exporter that wrote your data:
 
-- **`auto (latest)`** — detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
-- **`1.3.0`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
-- **`1.2.9`** — `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
+- **`auto (latest)`**: detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
+- **`1.3.0`**: `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
+- **`1.2.9`**: `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
 
 The trace tables (`otel_traces`, `otel_traces_trace_id_ts`) and metric tables are unchanged across these versions; only the `otel_logs` schema changed. Detection therefore only applies to logs, and traces always use the selected version's map.
 
@@ -246,12 +251,6 @@ Only available for Grafana Cloud users.
 Private data source connect (PDC) allows you to establish a private, secured connection between a Grafana Cloud instance (or stack) and data sources secured within a private network. Select the drop-down to locate the URL for PDC. For more information, refer to [Private data source connect](https://grafana.com/docs/grafana-cloud/connect-externally-hosted/private-data-source-connect/).
 
 Click **Manage private data source connect** to go to your PDC connection page, where you can find your PDC configuration details.
-
-## Verify the connection
-
-Once you have configured your ClickHouse connection settings, click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
-
-If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
 ## Forward Grafana HTTP headers
 
@@ -273,8 +272,8 @@ When the toggle is on, the following headers are forwarded on each ClickHouse co
 
 ### Use cases
 
-- **Query-log attribution** — ClickHouse records the forwarded headers in `system.query_log.http_user_agent` and related fields, so operators can correlate queries back to the Grafana user and dashboard that triggered them.
-- **Row policies and quotas** — ClickHouse [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies) and [quotas](https://clickhouse.com/docs/en/operations/quotas) can key on the `X-Grafana-User` header, so a single shared ClickHouse account can still enforce per-viewer access rules.
+- **Query-log attribution**: ClickHouse records the forwarded headers in `system.query_log.http_user_agent` and related fields, so operators can correlate queries back to the Grafana user and dashboard that triggered them.
+- **Row policies and quotas**: ClickHouse [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies) and [quotas](https://clickhouse.com/docs/en/operations/quotas) can key on the `X-Grafana-User` header, so a single shared ClickHouse account can still enforce per-viewer access rules.
 
 ### Connection pool implications
 
@@ -282,7 +281,7 @@ With header forwarding enabled, connections are keyed by the forwarded header se
 
 ### Custom headers
 
-To forward headers other than the Grafana-set ones — for example, bearer tokens or tenant identifiers — add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
+To forward headers other than the Grafana-set ones (for example, bearer tokens or tenant identifiers), add them as **Custom HTTP headers** in the same **Optional HTTP settings** panel. Custom headers are sent on every query regardless of the **Forward Grafana HTTP headers** toggle.
 
 ## Forward OAuth Identity
 
@@ -304,9 +303,15 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
 - **Alerting is blocked by default.** Alert rule evaluation also runs outside a user session, so there is no identity to forward. By default these queries are **rejected** rather than run as a shared account. To keep alerting working, enable **Allow service account fallback** in the **Database credentials** section.
 
   {{< admonition type="warning" >}}
-  Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries — so an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
+  Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries. As a result, an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
   {{< /admonition >}}
 - **Connections are keyed per user.** Enabling JWT authentication automatically turns on header forwarding, so each Grafana user opens a separate ClickHouse connection. See [Connection pool implications](#connection-pool-implications) for sizing guidance.
+
+## Verify the connection
+
+Once you have configured your ClickHouse connection settings, click **Save & test** to verify the connection. When the connection test succeeds, you see **Data source is working**. A successful test confirms that Grafana can reach ClickHouse and that the credentials are valid.
+
+If the test fails, refer to [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) for common configuration errors and solutions.
 
 ## Provision the data source
 
@@ -342,10 +347,16 @@ datasources:
       # tlsAuthWithCACert: <bool>
       # dialTimeout: <seconds>
       # queryTimeout: <seconds>
+      # connMaxLifetime: <minutes>   # max lifetime of a pooled connection (default 5)
+      # maxIdleConns: <int>          # max idle connections in the pool (default 25)
+      # maxOpenConns: <int>          # max open connections in the pool (default 50)
       # validateSql: <bool>
       # enableRowLimit: <bool>
+      # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled)
+      # enableMapKeysDiscovery: <bool>  # probe Map columns for filter-editor key suggestions (default true)
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
+      # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
       # path: <string>  # HTTP URL path (HTTP protocol only)
       # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
@@ -403,6 +414,6 @@ For more options and authentication methods, refer to the [Grafana Terraform pro
 
 After configuring the data source:
 
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Build queries with the SQL editor or query builder.
-- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Use variables in dashboards and queries.
-- [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/) — Overview, supported features, and pre-built dashboards.
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/): Build queries with the SQL editor or query builder.
+- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/): Use variables in dashboards and queries.
+- [ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/): Overview, supported features, and pre-built dashboards.

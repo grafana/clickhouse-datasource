@@ -16,7 +16,7 @@ menuTitle: OpenTelemetry dashboards
 title: ClickHouse OpenTelemetry dashboards
 weight: 60
 version: 0.1
-last_reviewed: 2026-05-07
+review_date: 2026-08-12
 ---
 
 # ClickHouse OpenTelemetry dashboards
@@ -36,7 +36,7 @@ Both tables are referenced by their bare names in raw SQL, so the data source's 
 
 The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`, `SeverityText`, `ServiceName`, `TraceId`, `SpanId`, `ResourceAttributes` for logs; `TraceId`, `ServiceName`, `SpanName`, `Timestamp`, `Duration`, `StatusCode`, `SpanKind`, `ParentSpanId`, `SpanAttributes`, `ResourceAttributes` for traces.
 
-`StatusCode` is matched against the OTel spec value `'Error'`, which is what the current ClickHouse exporter writes.
+`StatusCode` is matched against both `'Error'` and `'STATUS_CODE_ERROR'`, the error values the current ClickHouse exporter writes.
 
 ## OpenTelemetry Logs Explorer
 
@@ -48,7 +48,7 @@ Below the overview, a per-service row repeats once per service in the **Service*
 
 Both per-service panels have an **Open in Explore** link in the panel header that pre-fills a matching query for that row's service in Explore. The Log Volume link drops you into a time-series query; the Log Samples link drops you into the logs visualization with the same column projection as the dashboard panel. Because the per-service row repeats once per selected service, each panel-header link is scoped to its row's `$service` value.
 
-Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
+Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `positionCaseInsensitive(Body, ...)`, a case-insensitive substring match).
 
 Annotations: deployment markers derived from `service.version` changes in `otel_traces` over 30-second buckets.
 
