@@ -138,6 +138,10 @@
     "vectorator",
     "WorkDir",
     "varname",
-    "zizmor"
+    "zizmor",
+    "browsable",
+    "projectable",
+    "unaliased",
+    "ungated"
   ]
 }

@@ -80,6 +80,7 @@ export const trackClickhouseConfigV2LogsConfig = (props: {
   messageColumn?: string;
   selectContextColumns?: boolean;
   contextColumns?: string[];
+  additionalColumns?: string[];
 }) => {
   reportInteraction('clickhouse_config_v2_logs_config', props);
 };

@@ -5,6 +5,7 @@ import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'ty
 import otel from 'otel';
 import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
 import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOptions';
+import { appendAdditionalLogColumns } from '../compactQueryDefaults';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -46,6 +47,11 @@ export const useLogDefaultsOnMount = (
         includedColumns.add(columnName);
       }
     }
+
+    // Extra fields configured in Default columns. No schema here (new-query defaults),
+    // so only the explicit list applies; the "all" mode is handled by useOtelColumns
+    // and the compact editor, which have the column list.
+    appendAdditionalLogColumns(datasource, [], nextColumns, includedColumns);
 
     builderOptionsDispatch(
       setOptions({
@@ -124,6 +130,9 @@ export const useOtelColumns = (
         includedColumns.add(columnName);
       }
     }
+
+    // Extra fields configured in Default columns (all detected scalars, or an explicit list).
+    appendAdditionalLogColumns(datasource, allColumns, columns, includedColumns);
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;

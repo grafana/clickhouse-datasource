@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { getDataSourceSrv } from '@grafana/runtime';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
-import { Input, Field, InlineField, InlineFormLabel, TagsInput } from '@grafana/ui';
+import { Input, Field, InlineField, InlineFormLabel, TagsInput, Text } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
-import { ColumnHint } from 'types/queryBuilder';
+import { ColumnsEditor } from 'components/queryBuilder/ColumnsEditor';
+import { ColumnSelect } from 'components/queryBuilder/ColumnSelect';
+import { ColumnHint, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { columnFilterDateTime, columnFilterString } from 'data/columnFilters';
 import otel from 'otel';
 import { LabeledInput } from './LabeledInput';
 import { CHLogsConfig, ConfigMode, defaultCHAdditionalSettingsConfig } from 'types/config';
+import { Datasource } from 'data/CHDatasource';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
@@ -13,6 +18,9 @@ import { Switch } from 'components/queryBuilder/Switch';
 interface LogsConfigProps {
   logsConfig?: CHLogsConfig;
   variant?: ConfigMode;
+  // Datasource uid, used to fetch the configured table's real columns so the Columns field can be a
+  // schema-backed multiselect. Absent (or unsaved) datasources fall back to a free-text column list.
+  uid?: string;
   onDefaultDatabaseChange: (v: string) => void;
   onDefaultTableChange: (v: string) => void;
   onOtelEnabledChange: (v: boolean) => void;
@@ -24,6 +32,7 @@ interface LogsConfigProps {
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
   onShowLogLinksChange: (v: boolean) => void;
+  onAdditionalColumnsChange: (v: string[]) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -39,6 +48,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onSelectContextColumnsChange,
     onContextColumnsChange,
     onShowLogLinksChange,
+    onAdditionalColumnsChange,
   } = props;
   let {
     defaultDatabase,
@@ -52,6 +62,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     selectContextColumns,
     contextColumns,
     showLogLinks,
+    additionalColumns,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
   const sectionLabels = props.variant === 'single-table' ? labels.variants.singleTable : labels;
@@ -66,6 +77,111 @@ export const LogsConfig = (props: LogsConfigProps) => {
 
   const onContextColumnsChangeTrimmed = (columns: string[]) =>
     onContextColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
+
+  const onAdditionalColumnsChangeTrimmed = (columns: string[]) =>
+    onAdditionalColumnsChange(columns.map((c) => c.trim()).filter((c) => c));
+
+  // Fetch the configured table's real columns so the Columns field can be a schema-backed
+  // multiselect (single-table mode only). Resolving the datasource by uid works once it is saved;
+  // before that, or when no table is set, the field falls back to a free-text list below.
+  const isSingleTable = props.variant === 'single-table';
+  const [fetchedColumns, setFetchedColumns] = useState<readonly TableColumn[]>([]);
+  useEffect(() => {
+    let ignore = false;
+    if (!isSingleTable || !props.uid || !defaultTable) {
+      setFetchedColumns([]);
+      return;
+    }
+    // Debounce so typing the database/table name does not fire a schema read per keystroke, and read
+    // through the datasource's column cache so repeated edits of the same table reuse a prior fetch.
+    // getDataSourceSrv() is the supported way to resolve a saved datasource instance; the runtime
+    // marks the singleton (and .get) deprecated in favor of an unstable API, so keep the stable
+    // singleton until a stable replacement ships.
+    const handle = setTimeout(() => {
+      /* eslint-disable @typescript-eslint/no-deprecated */
+      getDataSourceSrv()
+        .get(props.uid)
+        .then((ds) => {
+          // getDataSourceSrv returns a generic DataSourceApi; this plugin's instance exposes the cache.
+          const datasourceInstance = ds as Datasource; // [as-cast: allow]
+          if (typeof datasourceInstance?.getColumnsCached !== 'function') {
+            return undefined;
+          }
+          return datasourceInstance.getColumnsCached(defaultDatabase || undefined, defaultTable);
+        })
+        .then((cols) => {
+          if (!ignore && cols) {
+            setFetchedColumns(cols);
+          }
+        })
+        .catch(() => {
+          if (!ignore) {
+            setFetchedColumns([]);
+          }
+        });
+      /* eslint-enable @typescript-eslint/no-deprecated */
+    }, 400);
+    return () => {
+      ignore = true;
+      clearTimeout(handle);
+    };
+  }, [isSingleTable, props.uid, defaultDatabase, defaultTable]);
+
+  // The Columns field manages the extra projected columns (additionalColumns). Role columns
+  // (time/level/message) are configured separately and projected via their roles, so Add all skips
+  // them to avoid double projection.
+  const roleColumnNames = new Set(
+    [filterTimeColumn, timeColumn, levelColumn, messageColumn].filter((c): c is string => Boolean(c))
+  );
+  const selectedColumns: SelectedColumn[] = (additionalColumns || []).map((name) => ({
+    name,
+    type: fetchedColumns.find((c) => c.name === name)?.type,
+  }));
+  const onSelectedColumnsChange = (cols: SelectedColumn[]) => onAdditionalColumnsChange(cols.map((c) => c.name));
+  const onAddAllColumns = (toAdd: SelectedColumn[]) => {
+    const existing = new Set(additionalColumns || []);
+    const names = toAdd.map((c) => c.name).filter((n) => !roleColumnNames.has(n) && !existing.has(n));
+    onAdditionalColumnsChange([...(additionalColumns || []), ...names]);
+  };
+
+  // Role column fields: a schema-backed single-select (like the query builder) once the table's
+  // columns are known, falling back to a typed input before the datasource is saved. The select
+  // still allows a typed value, so expression-based roles keep working.
+  const renderRoleColumn = (
+    hint: ColumnHint,
+    value: string | undefined,
+    onChange: (v: string) => void,
+    columnFilterFn: (c: TableColumn) => boolean,
+    fieldLabels: { label: string; tooltip: string }
+  ) => {
+    if (fetchedColumns.length > 0) {
+      return (
+        <ColumnSelect
+          disabled={otelEnabled}
+          allColumns={fetchedColumns}
+          selectedColumn={
+            value ? { name: value, type: fetchedColumns.find((c) => c.name === value)?.type, hint } : undefined
+          }
+          onColumnChange={(c) => onChange(c?.name || '')}
+          columnFilterFn={columnFilterFn}
+          columnHint={hint}
+          label={fieldLabels.label}
+          tooltip={fieldLabels.tooltip}
+          wide
+        />
+      );
+    }
+    return (
+      <LabeledInput
+        disabled={otelEnabled}
+        label={fieldLabels.label}
+        placeholder={columnLabelToPlaceholder(fieldLabels.label)}
+        tooltip={fieldLabels.tooltip}
+        value={value || ''}
+        onChange={onChange}
+      />
+    );
+  };
 
   return (
     <ConfigSection title={sectionLabels.title} description={sectionLabels.description}>
@@ -100,38 +216,55 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onVersionChange={onOtelVersionChange}
           wide
         />
-        <LabeledInput
-          disabled={otelEnabled}
-          label={labels.columns.filterTime.label}
-          placeholder={columnLabelToPlaceholder(labels.columns.filterTime.label)}
-          tooltip={labels.columns.filterTime.tooltip}
-          value={filterTimeColumn || ''}
-          onChange={onFilterTimeColumnChange}
-        />
-        <LabeledInput
-          disabled={otelEnabled}
-          label={labels.columns.time.label}
-          placeholder={columnLabelToPlaceholder(labels.columns.time.label)}
-          tooltip={labels.columns.time.tooltip}
-          value={timeColumn || ''}
-          onChange={onTimeColumnChange}
-        />
-        <LabeledInput
-          disabled={otelEnabled}
-          label={labels.columns.level.label}
-          placeholder={columnLabelToPlaceholder(labels.columns.level.label)}
-          tooltip={labels.columns.level.tooltip}
-          value={levelColumn || ''}
-          onChange={onLevelColumnChange}
-        />
-        <LabeledInput
-          disabled={otelEnabled}
-          label={labels.columns.message.label}
-          placeholder={columnLabelToPlaceholder(labels.columns.message.label)}
-          tooltip={labels.columns.message.tooltip}
-          value={messageColumn || ''}
-          onChange={onMessageColumnChange}
-        />
+        {renderRoleColumn(
+          ColumnHint.FilterTime,
+          filterTimeColumn,
+          onFilterTimeColumnChange,
+          columnFilterDateTime,
+          labels.columns.filterTime
+        )}
+        {renderRoleColumn(ColumnHint.Time, timeColumn, onTimeColumnChange, columnFilterDateTime, labels.columns.time)}
+        {renderRoleColumn(
+          ColumnHint.LogLevel,
+          levelColumn,
+          onLevelColumnChange,
+          columnFilterString,
+          labels.columns.level
+        )}
+        {renderRoleColumn(
+          ColumnHint.LogMessage,
+          messageColumn,
+          onMessageColumnChange,
+          columnFilterString,
+          labels.columns.message
+        )}
+        {fetchedColumns.length > 0 ? (
+          <ColumnsEditor
+            allColumns={fetchedColumns}
+            selectedColumns={selectedColumns}
+            onSelectedColumnsChange={onSelectedColumnsChange}
+            showAddAllOption
+            onAddAllColumns={onAddAllColumns}
+          />
+        ) : (
+          <InlineField
+            label={
+              <InlineFormLabel width={12} className="query-keyword" tooltip={labels.columns.additionalColumns.tooltip}>
+                {labels.columns.additionalColumns.label}
+              </InlineFormLabel>
+            }
+          >
+            <TagsInput
+              placeholder={labels.columns.additionalColumns.placeholder}
+              tags={additionalColumns || []}
+              onChange={onAdditionalColumnsChangeTrimmed}
+              width={60}
+            />
+          </InlineField>
+        )}
+        <Text variant="bodySmall" color="secondary">
+          {labels.columns.additionalColumns.description}
+        </Text>
       </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>

@@ -1,4 +1,4 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, FieldType } from '@grafana/data';
 import {
   ColumnHint,
   FilterOperator,
@@ -10,6 +10,7 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { isCollectionColumnType } from 'components/queryBuilder/views/columnNameHeuristics';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
@@ -676,4 +677,103 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   const labelKeys = Object.keys(labels);
 
   return labelKeys.includes(name);
+};
+
+/**
+ * Folds the top-level scalar columns selected in a logs query into the `labels` field under their
+ * plain names, so they surface as flat, filterable fields alongside the grouped OTel attributes, and
+ * removes them as standalone frame fields. The folded columns are the hint-less, non-collection,
+ * non-aliased ones in builderOptions.columns (roles carry a hint; attribute maps are collection-
+ * typed; an aliased column would break filter-for in the logs-volume query). Real column names are
+ * used so a filter-for click resolves in both the main and logs-volume queries. Creates `labels`
+ * when the frame has none (non-OTel tables), and skips the logs-volume frame. A default query (roles
+ * plus attribute maps only) selects no such columns, so it is a no-op.
+ */
+export const foldDiscoveredLogFieldsIntoLabels = (
+  datasource: Datasource,
+  req: DataQueryRequest<CHQuery>,
+  res: DataQueryResponse
+): DataQueryResponse => {
+  const targetsByRefId = new Map(req.targets.map((t) => [t.refId, t]));
+
+  for (const frame of (res.data as DataFrame[]) || []) {
+    const target = targetsByRefId.get(frame.refId ?? '');
+    if (!target || target.editorType !== EditorType.Builder) {
+      continue;
+    }
+    const builderOptions = (target as CHBuilderQuery).builderOptions;
+    if (!builderOptions || builderOptions.queryType !== QueryType.Logs) {
+      continue;
+    }
+
+    // The columns the field options selected are the hint-less, non-collection ones. Role columns
+    // (time / body / level / trace id) carry a hint; the attribute maps are collection-typed.
+    // A column aliased to a different name is skipped: a filter-for click would key on the alias,
+    // which the logs-volume query cannot resolve. A column whose alias equals its name (how the
+    // query builder tags a plain column pick) folds like an unaliased one, so columns chosen in the
+    // builder become browsable fields the same way columns configured on the datasource do.
+    const discovered = (builderOptions.columns || [])
+      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type) && (!c.alias || c.alias === c.name))
+      .map((c) => c.name);
+    const sourceFields = discovered
+      .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
+      .filter((f): f is DataFrame['fields'][number] => f !== undefined);
+    if (sourceFields.length === 0) {
+      continue;
+    }
+
+    const rowLen = frame.length ?? frame.fields[0]?.values.length ?? 0;
+
+    let labelsField = frame.fields.find((f) => f.name === labelsFieldName);
+    if (!labelsField) {
+      labelsField = {
+        name: labelsFieldName,
+        type: FieldType.other,
+        config: {},
+        values: Array.from({ length: rowLen }, () => ({})),
+      } as unknown as DataFrame['fields'][number];
+      frame.fields.push(labelsField);
+    }
+
+    // Fold every column into `labels` with a single parse/serialize per row, rather than one
+    // round trip per column per row (which is quadratic on a wide table with include-all on).
+    for (let i = 0; i < rowLen; i++) {
+      // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
+      // or already-parsed objects (a frame we just created). Handle both and write back in kind.
+      const raw = labelsField.values[i];
+      const wasString = typeof raw === 'string';
+      let obj: Record<string, unknown>;
+      if (wasString) {
+        try {
+          obj = JSON.parse(raw as string) as Record<string, unknown>;
+        } catch {
+          obj = {};
+        }
+      } else {
+        obj = (raw as Record<string, unknown>) || {};
+      }
+      if (!obj || typeof obj !== 'object') {
+        obj = {};
+      }
+
+      let folded = false;
+      for (const src of sourceFields) {
+        const v = src.values[i];
+        if (v === null || v === undefined || v === '') {
+          continue;
+        }
+        obj[src.name] = typeof v === 'string' ? v : String(v);
+        folded = true;
+      }
+
+      if (folded) {
+        labelsField.values[i] = wasString ? JSON.stringify(obj) : obj;
+      }
+    }
+
+    const foldedNames = new Set(sourceFields.map((f) => f.name));
+    frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
+  }
+
+  return res;
 };
