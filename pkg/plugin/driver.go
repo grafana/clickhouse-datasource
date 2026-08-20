@@ -23,7 +23,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	schemas "github.com/grafana/schemads"
 	"github.com/grafana/sqlds/v5"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -41,9 +40,7 @@ type grafanaHeaders struct {
 }
 
 // Clickhouse defines how to connect to a Clickhouse datasource
-type Clickhouse struct {
-	SchemaDatasource *schemas.SchemaDatasource
-}
+type Clickhouse struct{}
 
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
@@ -463,7 +460,6 @@ func (h *Clickhouse) MutateQueryData(
 
 	injectGrafanaUserHeader(ctx, req)
 
-	req = preprocessGrafanaSQL(req)
 	return ctx, req
 }
 
@@ -512,55 +508,6 @@ func interpolateMacros(_ context.Context, query *sqlutil.Query, _ json.RawMessag
 		return "", backend.DownstreamError(err)
 	}
 	return sql, nil
-}
-
-func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
-	if req == nil || len(req.Queries) == 0 {
-		return req
-	}
-
-	queries := make([]backend.DataQuery, 0, len(req.Queries))
-	for _, q := range req.Queries {
-		var sq schemas.Query
-
-		if err := json.Unmarshal(q.JSON, &sq); err != nil {
-			// Cannot unmarshal query JSON, ignoring
-			queries = append(queries, q)
-			continue
-		}
-
-		if !sq.GrafanaSql {
-			// Not a Grafana SQL query, ignoring
-			queries = append(queries, q)
-			continue
-		}
-
-		sqlQuery, err := sq.ToSQL(schemas.DialectClickHouse)
-		if err != nil {
-			backend.Logger.Error("Failed to build SQL query", "error", err.Error())
-			continue
-		}
-
-		// Build JSON with `sqlutil.Query` shape that will be used to execute the query by sqlds
-		queryJSON, err := json.Marshal(sqlutil.Query{
-			RawSQL:         sqlQuery,
-			Format:         sqlutil.FormatOptionTable, // TODO: Is this correct?
-			ConnectionArgs: json.RawMessage("{}"),
-		})
-		if err != nil {
-			backend.Logger.Error("Failed to marshal SQL query", "error", err.Error())
-			continue
-		}
-
-		q.JSON = queryJSON
-		queries = append(queries, q)
-	}
-
-	return &backend.QueryDataRequest{
-		PluginContext: req.PluginContext,
-		Headers:       req.Headers,
-		Queries:       queries,
-	}
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
