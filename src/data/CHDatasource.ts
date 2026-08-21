@@ -62,7 +62,7 @@ import {
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
-import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { escapeIdentifier, generateSql, getColumnByHint, isStringType, logAliasToColumnHints } from './sqlGenerator';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
@@ -199,7 +199,10 @@ function filterMatchesColumn(f: Filter, resolved: ResolvedColumn): boolean {
   if (resolved.hasMapKey) {
     return (f.type.startsWith('Map') || f.type.startsWith('JSON')) && f.mapKey === resolved.mapKey && sameColumn;
   }
-  return f.type === 'string' && sameColumn;
+  // Log-view toggles store the 'string' sentinel type, but the filter editors store the
+  // real column type ('String', 'LowCardinality(String)', ...). Accept any string-like
+  // type so editor-created filters toggle off instead of gaining a contradictory duplicate.
+  return isStringType(f.type) && sameColumn;
 }
 
 export class Datasource
@@ -2027,14 +2030,40 @@ export class Datasource
       throw new Error('Unable to match any log context columns');
     }
 
-    const contextColumnFilters: Filter[] = contextColumns.map((c) => ({
-      operator: FilterOperator.Equals,
-      filterType: 'custom',
-      key: c.name,
-      value: c.value,
-      type: 'string',
-      condition: 'AND',
-    }));
+    const contextColumnFilters: Filter[] = contextColumns.map((c) => {
+      // Configured context columns can reference a map key, e.g. LogAttributes['host.name'].
+      // When the underlying attributes column is JSON-typed, the Map subscript syntax is
+      // invalid SQL, so resolve the real column type from the query and let the SQL
+      // generator build the JSON accessor from the map key instead. The value is coerced
+      // to a string because the generator compares JSON paths as Nullable(String), and
+      // JSON attribute values can be numeric or boolean at runtime.
+      const bracketIndex = c.name.indexOf("['");
+      if (bracketIndex !== -1 && c.name.endsWith("']")) {
+        const mapName = c.name.substring(0, bracketIndex);
+        const keyName = c.name.substring(bracketIndex + 2, c.name.length - 2);
+        const mapColumnType = builderOptions.columns?.find((col) => col.name === mapName)?.type;
+        if (mapColumnType?.startsWith('JSON')) {
+          return {
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: mapName,
+            mapKey: keyName,
+            value: String(c.value),
+            type: mapColumnType,
+            condition: 'AND',
+          };
+        }
+      }
+
+      return {
+        operator: FilterOperator.Equals,
+        filterType: 'custom',
+        key: c.name,
+        value: c.value,
+        type: 'string',
+        condition: 'AND',
+      };
+    });
     builderOptions.filters.push(...contextColumnFilters);
 
     contextQuery.rawSql = generateSql(builderOptions);
