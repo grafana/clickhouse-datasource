@@ -1,13 +1,14 @@
 import { expect, test } from '@grafana/plugin-e2e';
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { skipFixtureTestsOnCloud } from '../helpers/env';
 
 // The annotation editor is reached through Grafana's annotation edit page and
 // works with any ClickHouse datasource. These tests drive the locally
-// provisioned datasource (provisioning/datasources/clickhouse.yml). The Cloud
-// cron uses a different managed datasource, so the suite is local-only; the
-// editor's SQL generation is also covered by the unit tests in
-// src/data/CHAnnotationSupport.test.tsx.
-const isCloudRun = !!process.env.GRAFANA_URL;
+// provisioned datasource (provisioning/datasources/clickhouse.yml) against the
+// locally seeded fixture database, so the suite is local-only; the editor's SQL
+// generation is also covered by the unit tests in
+// src/data/CHAnnotationSupport.test.tsx. Only E2E can confirm the editor's
+// generated query actually executes against a real ClickHouse instance.
 
 // The SQL textarea is identified by its placeholder so it is not confused with
 // the annotation Name input (both are role=textbox).
@@ -19,6 +20,10 @@ const sqlBox = (page: Page) => page.getByPlaceholder(/SELECT Timestamp AS time/)
 // InlineFormLabel inside a grafana-ui InlineField with no accessible name on
 // the control — the InlineField container is the label's direct parent, so
 // anchor on the label. Match either shape so one helper covers both.
+//
+// Kept local rather than using helpers/builder.ts pickBuilderSelect: that
+// helper anchors on `label.query-keyword`, which the annotation editor's
+// fields do not render.
 const comboFor = (page: Page, label: string) =>
   page
     .getByRole('combobox', { name: label })
@@ -32,8 +37,12 @@ async function selectFromCombo(page: Page, label: string, optionText: string) {
   await page.keyboard.press('Enter');
 }
 
-test.describe('annotation editor', () => {
-  test.skip(isCloudRun, 'uses the locally provisioned datasource');
+test.describe('Annotation editor', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeEach(() => {
+    skipFixtureTestsOnCloud('seed.sql');
+  });
 
   test('change detection preset reveals the schema builder', async ({
     annotationEditPage,
