@@ -15,6 +15,7 @@ import {
   getColumnByHint,
   getColumnIndexByHint,
   getColumnsByHints,
+  getJsonPathAccessor,
   isAggregateQuery,
   JSON_SENTINEL_KEY,
 } from './sqlGenerator';
@@ -1070,6 +1071,25 @@ describe('escapeIdentifier', () => {
 
   it.each(cases)('returns escaped identifier (case %#)', (c) => {
     expect(_testExports.escapeIdentifier(c.input)).toEqual(c.expected);
+  });
+});
+
+describe('getJsonPathAccessor', () => {
+  const cases: Array<{ columnExpr: string; path: string; expected: string }> = [
+    { columnExpr: 'LogAttributes', path: 'request_id', expected: 'LogAttributes.`request_id`' },
+    { columnExpr: 'SpanAttributes', path: 'http.status_code', expected: 'SpanAttributes.`http`.`status_code`' },
+    {
+      columnExpr: '"ResourceAttributes"',
+      path: 'service.version',
+      expected: '"ResourceAttributes".`service`.`version`',
+    },
+    // Backticks and backslashes cannot break out of the quoted segment.
+    { columnExpr: 'attrs', path: 'a`b', expected: 'attrs.`a\\`b`' },
+    { columnExpr: 'attrs', path: 'a\\b', expected: 'attrs.`a\\\\b`' },
+  ];
+
+  it.each(cases)('builds backtick-quoted path access (case %#)', (c) => {
+    expect(getJsonPathAccessor(c.columnExpr, c.path)).toEqual(c.expected);
   });
 });
 
