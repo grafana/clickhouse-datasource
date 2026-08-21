@@ -1039,6 +1039,12 @@ describe('getColumnIdentifier', () => {
     { input: { name: 'my:name' }, expected: `"my:name"` },
     { input: { name: 'namespace:field:value' }, expected: `"namespace:field:value"` },
     { input: { name: 'verification:id', alias: 'vid' }, expected: `"verification:id" as "vid"` },
+    // The ` as ` alias sentinel is case-insensitive so users can hand-write map/array
+    // extractions with either lowercase or uppercase AS (e.g. Attributes['http.route'] AS http_route)
+    // in the Columns selector. See https://github.com/grafana/clickhouse-datasource/issues/2126.
+    { input: { name: `Attributes['http.route'] AS http_route` }, expected: `Attributes['http.route'] AS http_route` },
+    { input: { name: `Attributes['http.route'] as http_route` }, expected: `Attributes['http.route'] as http_route` },
+    { input: { name: `Attributes['http.route']\tAS\thttp_route` }, expected: `Attributes['http.route']\tAS\thttp_route` },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {
