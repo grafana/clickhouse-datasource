@@ -355,7 +355,7 @@
       {
         "current": {},
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
-        "definition": "",
+        "definition": "SELECT DISTINCT database FROM system.columns WHERE table = 'otel_logs' AND name = 'ResourceAttributes' AND startsWith(type, 'JSON') ORDER BY database",
         "hide": 0,
         "includeAll": false,
         "label": "Database",
@@ -364,7 +364,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_logs' ORDER BY database"
+          "rawSql": "SELECT DISTINCT database FROM system.columns WHERE table = 'otel_logs' AND name = 'ResourceAttributes' AND startsWith(type, 'JSON') ORDER BY database"
         },
         "refresh": 1,
         "regex": "",
