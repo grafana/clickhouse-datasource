@@ -659,12 +659,24 @@ These issues can occur after upgrading the plugin version or the Grafana version
 
 **Symptoms:** The log volume histogram does not appear above log results when using the SQL editor in Explore. It works in the query builder.
 
-**Cause:** Log volume support for SQL editor queries requires **Grafana 12.4.0 or later**. On older Grafana versions, log volume is only available for queries built with the query builder.
+**Cause:** Either the Grafana version predates the required support, or the plugin declined to aggregate the query because it could not guarantee a correct count.
+
+Aggregated log volume for SQL editor queries requires **Grafana 12.4.0 or later**. On earlier versions, log volume is only available for queries built with the query builder.
+
+On supported versions, the plugin falls back to Grafana's row-based histogram, which counts only the rows your query returned, when any of the following apply:
+
+- No default log columns are configured for the data source, so there is no timestamp column to bucket on.
+- The query does not select the configured timestamp column as its first column, or selects it as an expression rather than a plain column reference.
+- The query uses a construct that changes which rows exist and so cannot be aggregated safely: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `WITH ROLLUP`, `WITH CUBE`, `UNION`, `INTO OUTFILE`, an interval macro such as `$__timeInterval`, or more than one statement.
+
+Because Grafana renders a single histogram for the whole panel, one query that cannot be aggregated causes every query in that panel to use the row-based histogram.
 
 **Solution:**
 
 1. Upgrade Grafana to version 12.4.0 or later.
-2. Alternatively, switch the query to the **Builder** editor mode, which supports log volume on older Grafana versions.
+2. Configure the default log table and columns under **Logs** in the data source settings.
+3. Select the configured timestamp column first in your query, for example `SELECT Timestamp, Body, SeverityText FROM otel_logs WHERE ...`.
+4. Alternatively, switch the query to the **Builder** editor mode.
 
 #### Connection pool saturation (sudden slowness)
 

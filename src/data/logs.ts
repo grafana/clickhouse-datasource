@@ -83,6 +83,55 @@ export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
   }, {} as LogLevelToInClause);
 })();
 
+/**
+ * The six named levels above are mutually exclusive and exact, so
+ * `unknown` can be defined as their complement: any severity value that matches none of
+ * them (an empty string, `NOTICE`, a bare severity number, a vendor-specific label) lands
+ * here. That makes the seven aggregates a true partition of the row set, which is what lets
+ * the stacked histogram total agree with `count()`.
+ *
+ * Matching is exact (`IN`) rather than substring: a value like `debug-trace` contains two
+ * level names and would otherwise be counted in two series at once.
+ */
+const KNOWN_LOG_LEVEL_IN_CLAUSE: string = [
+  LOG_LEVEL_TO_IN_CLAUSE.critical,
+  LOG_LEVEL_TO_IN_CLAUSE.error,
+  LOG_LEVEL_TO_IN_CLAUSE.warn,
+  LOG_LEVEL_TO_IN_CLAUSE.info,
+  LOG_LEVEL_TO_IN_CLAUSE.debug,
+  LOG_LEVEL_TO_IN_CLAUSE.trace,
+].join(',');
+
+/**
+ * Builds the log level histogram aggregates for a logs volume query.
+ *
+ * `levelExpression` is the SQL expression yielding the level value, already quoted and cast
+ * by the caller (for example `toString("SeverityText")`).
+ *
+ * Returns one entry per canonical level, each a boolean expression suitable for `sum(...)`.
+ * The aggregates partition the row set exactly: every row is counted in exactly one series,
+ * so summing the series reproduces `count()`.
+ */
+export function buildLogLevelAggregateExpressions(
+  levelExpression: string
+): Array<{ alias: keyof LogLevelToInClause; expression: string }> {
+  const aggregates: Array<{ alias: keyof LogLevelToInClause; expression: string }> = [];
+
+  let level: keyof LogLevelToInClause;
+  for (level in LOG_LEVEL_TO_IN_CLAUSE) {
+    aggregates.push({
+      alias: level,
+      expression:
+        level === 'unknown'
+          ? // Complement of the six named levels, so nothing goes uncounted.
+            `${levelExpression} NOT IN (${KNOWN_LOG_LEVEL_IN_CLAUSE})`
+          : `${levelExpression} IN (${LOG_LEVEL_TO_IN_CLAUSE[level]})`,
+    });
+  }
+
+  return aggregates;
+}
+
 export function splitLogsVolumeFrames(data: DataFrame[], logVolumePrefix: string): DataFrame[] {
   const result: DataFrame[] = [];
 

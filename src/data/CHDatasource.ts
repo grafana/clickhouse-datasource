@@ -55,15 +55,16 @@ import { CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
+  buildLogLevelAggregateExpressions,
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
   getTimeFieldRoundingClause,
-  LOG_LEVEL_TO_IN_CLAUSE,
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { planSqlLogsVolume } from './logsVolumeSql';
+import { labelsFieldName, mapGrafanaFormatToQueryType, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -308,11 +309,65 @@ export class Datasource
     return undefined;
   }
 
-  getSupportedSupplementaryQueryTypes(dsRequest: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
-    if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
-      return [];
+  /**
+   * Reports which supplementary queries can be produced for a request.
+   *
+   * Grafana evaluates this once per datasource per run, over every target at once, and only
+   * consults its own row based fallback histogram when a type is absent from this list. A
+   * decline made later, from getSupplementaryRequest, therefore renders an empty panel rather
+   * than the fallback. That is why feasibility is decided here, and why it is decided for the
+   * whole request: emitting volume for a subset of targets would render a silent under-count.
+   *
+   * Called with no request by the logs sample panel, which only needs to know whether the type
+   * is supported at all.
+   */
+  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+    if (!dsRequest) {
+      return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
     }
-    return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
+
+    const types: SupplementaryQueryType[] = [];
+    // Hidden targets are not rendered, so they must not influence the decision or be counted.
+    const visibleTargets = dsRequest.targets.filter((t) => !t.hide);
+    const logsTargets = visibleTargets.filter((t) => this.isLogsQuery(t));
+
+    // Requiring at least one recognized logs target matters: with none, `every` would be
+    // vacuously true, we would advertise the type, then emit no targets — which renders
+    // Grafana's "no volume available" empty state instead of its row based histogram.
+    const volumeSupported =
+      logsTargets.length > 0 &&
+      // Probe with the real builder so this decision cannot drift from what actually gets built.
+      logsTargets.every((target) => {
+        try {
+          return this.getSupplementaryLogsVolumeQuery(dsRequest, target) !== undefined;
+        } catch (error) {
+          console.warn('[clickhouse] logs volume feasibility check failed, falling back', error);
+          return false;
+        }
+      });
+    if (volumeSupported) {
+      types.push(SupplementaryQueryType.LogsVolume);
+    }
+
+    // Kept as a pure predicate: getSupplementaryLogsSampleQuery is only defined for builder
+    // queries anyway, so there is nothing for a probe to learn here.
+    if (visibleTargets.every((t) => t.editorType === EditorType.Builder)) {
+      types.push(SupplementaryQueryType.LogsSample);
+    }
+
+    return types;
+  }
+
+  /**
+   * Whether a target is a logs query. Builder queries carry the query type directly; SQL
+   * queries may carry it, or only the Grafana format that the editor set when it was written.
+   */
+  private isLogsQuery(query: CHQuery): boolean {
+    if (query.editorType === EditorType.Builder) {
+      return query.builderOptions?.queryType === QueryType.Logs;
+    }
+
+    return (query.queryType ?? mapGrafanaFormatToQueryType(query.format)) === QueryType.Logs;
   }
 
   /**
@@ -346,12 +401,22 @@ export class Datasource
   }
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
+    // Hidden targets are not rendered in the log list, so counting them would inflate the
+    // histogram. The supplementary targets built below carry no hide flag, and the logs volume
+    // request bypasses the query runner that would otherwise drop hidden responses.
+    if (query.hide) {
+      return undefined;
+    }
+
+    if (query.editorType === EditorType.SQL) {
+      return this.getSqlSupplementaryLogsVolumeQuery(logsVolumeRequest, query);
+    }
+
     if (
-      query.editorType !== EditorType.Builder ||
-      query.builderOptions.queryType !== QueryType.Logs ||
-      query.builderOptions.mode !== BuilderMode.List ||
-      query.builderOptions.database === '' ||
-      query.builderOptions.table === ''
+      query.builderOptions?.queryType !== QueryType.Logs ||
+      query.builderOptions?.mode !== BuilderMode.List ||
+      !query.builderOptions?.database ||
+      !query.builderOptions?.table
     ) {
       return undefined;
     }
@@ -376,12 +441,11 @@ export class Datasource
       // Generates aggregates like
       // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
       const llf = `toString("${logLevelColumn.name}")`;
-      let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
-      for (level in LOG_LEVEL_TO_IN_CLAUSE) {
+      for (const { alias, expression } of buildLogLevelAggregateExpressions(llf)) {
         aggregates.push({
           aggregateType: AggregateType.Sum,
-          column: `multiSearchAny(${llf}, [${LOG_LEVEL_TO_IN_CLAUSE[level]}])`,
-          alias: level,
+          column: expression,
+          alias,
         });
       }
     } else {
@@ -431,11 +495,54 @@ export class Datasource
     };
   }
 
+  /**
+   * Builds an aggregated logs volume query for a query written in the SQL editor.
+   *
+   * The user's SQL becomes a derived table, so their filters, joins, CTEs and macros are
+   * preserved exactly and the count reflects their query rather than an approximation of it.
+   * Only the trailing row limit and ordering are removed, which is the whole point: those are
+   * what cap Grafana's own row based histogram to the visible page of logs.
+   *
+   * Returns undefined for anything not positively recognized, which makes
+   * getSupportedSupplementaryQueryTypes decline and leaves the previous behavior in place.
+   */
+  private getSqlSupplementaryLogsVolumeQuery(
+    logsVolumeRequest: DataQueryRequest<CHQuery>,
+    query: CHQuery
+  ): CHQuery | undefined {
+    if (!this.isLogsQuery(query)) {
+      return undefined;
+    }
+
+    // Deliberately quiet: this runs for every query render, and declining is a normal
+    // outcome rather than a fault. plan.reason names the specific construct that could not be
+    // aggregated, and the decline conditions are documented in docs/sources/troubleshooting.md.
+    const plan = planSqlLogsVolume(query.rawSql, logsVolumeRequest.scopedVars, this.getDefaultLogsColumns());
+    if (!plan.ok) {
+      return undefined;
+    }
+
+    return {
+      pluginVersion,
+      editorType: EditorType.SQL,
+      // Time series, so the backend shapes the buckets the same way it does for the builder
+      // logs volume query.
+      queryType: QueryType.TimeSeries,
+      format: 0,
+      rawSql: plan.sql,
+      refId: '',
+    };
+  }
+
   getSupplementaryLogsSampleQuery(query: CHQuery): CHQuery | undefined {
+    if (query.hide) {
+      return undefined;
+    }
+
     if (
       query.editorType !== EditorType.Builder ||
-      !query.builderOptions.database ||
-      query.builderOptions.table !== this.getDefaultLogsTable()
+      !query.builderOptions?.database ||
+      query.builderOptions?.table !== this.getDefaultLogsTable()
     ) {
       return undefined;
     }
@@ -451,11 +558,13 @@ export class Datasource
     const timeHint = timeColumn.hint ?? ColumnHint.Time;
 
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
-      if (f.hint && !f.key) {
-        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
-        f.key = originalColumn?.alias || originalColumn?.name || '';
+      // Clone before resolving the key so this does not write back into the user's query.
+      const next = { ...f };
+      if (next.hint && !next.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, next.hint);
+        next.key = originalColumn?.alias || originalColumn?.name || '';
       }
-      return { ...f };
+      return next;
     });
 
     const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);

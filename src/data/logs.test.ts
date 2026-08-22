@@ -1,5 +1,11 @@
 import { FieldType } from '@grafana/data';
-import { getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE, splitLogsVolumeFrames } from './logs';
+import {
+  buildLogLevelAggregateExpressions,
+  getIntervalInfo,
+  getTimeFieldRoundingClause,
+  LOG_LEVEL_TO_IN_CLAUSE,
+  splitLogsVolumeFrames,
+} from './logs';
 
 describe('logs', () => {
   describe('getIntervalInfo', () => {
@@ -203,5 +209,45 @@ describe('logs', () => {
         warn: "'warn','warning','WARN','WARNING','Warn','Warning'",
       });
     });
+  });
+});
+
+describe('buildLogLevelAggregateExpressions', () => {
+  const expressions = buildLogLevelAggregateExpressions('toString("level")');
+
+  it('should return one expression per canonical level', () => {
+    expect(expressions.map((e) => e.alias)).toEqual(['critical', 'error', 'warn', 'info', 'debug', 'trace', 'unknown']);
+  });
+
+  it('should match levels exactly so a value cannot be counted twice', () => {
+    // Substring matching would count a value like 'debug-trace' in both the debug and the
+    // trace series, making the stacked total exceed count().
+    const debug = expressions.find((e) => e.alias === 'debug')!;
+    expect(debug.expression).toBe(`toString("level") IN (${LOG_LEVEL_TO_IN_CLAUSE.debug})`);
+    expect(debug.expression).not.toContain('multiSearchAny');
+  });
+
+  it('should define unknown as the complement of the named levels so nothing goes uncounted', () => {
+    // An empty severity, a NOTICE, or a bare severity number matches none of the named levels
+    // and must still appear somewhere, or the total falls short of count().
+    const unknown = expressions.find((e) => e.alias === 'unknown')!;
+    expect(unknown.expression).toBe(
+      `toString("level") NOT IN (` +
+        [
+          LOG_LEVEL_TO_IN_CLAUSE.critical,
+          LOG_LEVEL_TO_IN_CLAUSE.error,
+          LOG_LEVEL_TO_IN_CLAUSE.warn,
+          LOG_LEVEL_TO_IN_CLAUSE.info,
+          LOG_LEVEL_TO_IN_CLAUSE.debug,
+          LOG_LEVEL_TO_IN_CLAUSE.trace,
+        ].join(',') +
+        `)`
+    );
+  });
+
+  it('should use the caller-provided level expression verbatim', () => {
+    expect(buildLogLevelAggregateExpressions('toString("SeverityText")')[0].expression).toContain(
+      'toString("SeverityText")'
+    );
   });
 });

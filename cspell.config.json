@@ -20,6 +20,8 @@
     "amannn",
     "ASOF",
     "apikey",
+    "backquoted",
+    "backticked",
     "buildinfo",
     "chcol",
     "CHSQL",
@@ -106,6 +108,8 @@
     "slvrtrn",
     "sparkline",
     "sqlds",
+    "sqlstring",
+    "sqltable",
     "sqlutil",
     "stagename",
     "stretchr",
@@ -133,12 +137,15 @@
     "traceid",
     "typecheck",
     "Ulimits",
+    "unaliased",
     "unconfigured",
+    "unparseable",
     "uuidv",
     "uvcf",
     "vectorator",
     "WorkDir",
     "varname",
+    "wrappable",
     "zizmor"
   ]
 }
