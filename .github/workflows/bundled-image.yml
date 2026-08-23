@@ -1,0 +1,69 @@
+# Description:
+# Thin caller for the shared bundled-image pipeline in grafana/data-sources-ci-workflows, which
+# builds the plugin, bakes it onto the Grafana base image the first rollout wave runs, boot-smokes
+# the result, and pushes it to this repository's own registry.
+#
+# This file carries no value specific to this repository. The shared workflow derives the plugin id
+# and version from the build, and the registry from the repository name, so the same file works
+# unchanged in every plugin repo that adopts bundled images. Keep it that way: anything that has to
+# differ per repo belongs in the shared workflow's defaults, not copied into three callers.
+#
+# Manual dispatch only, deliberately. Bundled delivery is being rolled out to the pilot data
+# sources one step at a time, and a push trigger would build an image for every commit to main
+# before the rollout is proven. When the push trigger is added it wants a paths filter, so a
+# docs-only or test-only commit does not rebuild the image.
+#
+# Note on the app grant:
+# The shared workflow reads the Grafana base image from one line of a private infrastructure repo.
+# The token for that read is granted against THIS file's path, because the broker keys on the
+# top-level caller rather than on the shared workflow it calls. Until that grant applies, pass
+# grafana-image explicitly and the lookup is skipped.
+
+name: Plugins - Bundled image
+
+on:
+  workflow_dispatch:
+    inputs:
+      grafana-image:
+        description: >-
+          Grafana base image to bundle onto. Leave empty to read the first wave's current image.
+        type: string
+        required: false
+        default: ""
+      push-image:
+        description: Push the image to the registry once the smoke test passes.
+        type: boolean
+        required: false
+        default: false
+      trigger-argo:
+        description: Submit the Argo rollout after a successful push.
+        type: boolean
+        required: false
+        default: false
+      debug:
+        description: >-
+          Build a debug image. It is tagged with a -debug suffix and pushed under a separate
+          debug/ path, which keeps it out of the rollout.
+        type: boolean
+        required: false
+        default: false
+
+permissions: {}
+
+concurrency:
+  # Never cancel a run in flight. A cancelled run can leave a half-pushed image behind.
+  group: bundled-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  bundled-image:
+    name: Build and push
+    uses: grafana/data-sources-ci-workflows/.github/workflows/cd-bundled.yml@main
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      grafana-image: ${{ inputs.grafana-image }}
+      push-image: ${{ inputs.push-image }}
+      trigger-argo: ${{ inputs.trigger-argo }}
+      debug: ${{ inputs.debug }}

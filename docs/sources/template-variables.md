@@ -12,7 +12,7 @@ menuTitle: Template variables
 title: ClickHouse template variables
 weight: 40
 version: 0.1
-last_reviewed: 2026-04-24
+review_date: 2026-08-12
 ---
 
 # ClickHouse template variables
@@ -49,7 +49,7 @@ The plugin uses the query result to build the variable’s drop-down options:
 - **Single column:** Each row becomes one option. Both the displayed label and the value used in queries are that column’s value.
 - **Two columns:** The first column is used as the **value** (for example, an id or key). The second column is used as the **text** (the label shown in the drop-down).
 
-**Example — single column (database names as label and value):**
+**Example: single column (database names as label and value):**
 
 ```sql
 SELECT name FROM system.databases WHERE name NOT IN ('INFORMATION_SCHEMA', 'information_schema')
@@ -57,7 +57,7 @@ SELECT name FROM system.databases WHERE name NOT IN ('INFORMATION_SCHEMA', 'info
 
 You can omit the `WHERE` clause if your ClickHouse instance does not have those databases (for example, a standalone ClickHouse server typically only has `default` and `system`).
 
-**Example — two columns (id as value, name as label):**
+**Example: two columns (id as value, name as label):**
 
 ```sql
 SELECT id, name FROM my_app.environments
@@ -75,15 +75,15 @@ For full syntax and options, see [Variable syntax](https://grafana.com/docs/graf
 
 To avoid SQL syntax or injection issues, use a **format** when the variable is used inside a string or list:
 
-- **singlequote** — Wraps each value in single quotes and escapes single quotes inside the value. Use this for string literals and `IN` lists in ClickHouse.
+- **singlequote**: Wraps each value in single quotes and escapes single quotes inside the value. Use this for string literals and `IN` lists in ClickHouse.
 
-**Example — filter by one database:**
+**Example: filter by one database:**
 
 ```sql
 SELECT * FROM system.tables WHERE database = ${database:singlequote}
 ```
 
-**Example — filter by multiple databases (multi-value variable):**
+**Example: filter by multiple databases (multi-value variable):**
 
 ```sql
 SELECT * FROM system.tables WHERE database IN (${database:singlequote})
@@ -130,7 +130,7 @@ WHERE $__conditionalAll(database IN (${database:singlequote}), $database)
 When the user selects one or more databases, the condition filters by those databases. When the user selects **All**, the condition becomes `1=1` and all databases are included for optimization.
 
 {{< admonition type="note" >}}
-The second argument to `$__conditionalAll` must be a plain variable reference (`$database` or `${database}`). Do not use format specifiers like `${database:singlequote}` in the second argument — the macro will not detect the "All" selection correctly. Format specifiers should only be used in the **first** argument (the condition).
+The second argument to `$__conditionalAll` must be a plain variable reference (`$database` or `${database}`). Do not use format specifiers like `${database:singlequote}` in the second argument, because the macro does not detect the "All" selection correctly. Format specifiers should only be used in the **first** argument (the condition).
 {{< /admonition >}}
 
 See the [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) Macros section for the full list of macros.
@@ -173,9 +173,9 @@ Ad hoc filters let you add key/value filters that are applied to queries that us
 
 By default, the ad hoc filter drop-down lists all tables and columns from the data source. If you set a default database in the data source settings, only tables from that database are used. To limit which tables or columns appear (for example, to avoid slow loads), add a dashboard variable of type **Constant** named `clickhouse_adhoc_query`. Set its value to one of:
 
-- A single database name (for example, `my_database`) — shows tables and columns from that database only.
-- `database.table` (for example, `my_database.my_table`) — shows only columns for that specific table.
-- A `SELECT` query — uses the query results to populate filter keys. See [Use a query to populate ad hoc filters](#use-a-query-to-populate-ad-hoc-filters).
+- A single database name (for example, `my_database`) shows tables and columns from that database only.
+- `database.table` (for example, `my_database.my_table`) shows only columns for that specific table.
+- A `SELECT` query uses the query results to populate filter keys. Refer to [Use a query to populate ad hoc filters](#use-a-query-to-populate-ad-hoc-filters).
 
 You can hide this variable from the dashboard; it is only used to scope the ad hoc filter options.
 
@@ -214,9 +214,11 @@ Ad hoc filters support the following operators:
 | `=`      | `=`                   | Equals                                               |
 | `!=`     | `!=`                  | Not equals                                           |
 | `<`      | `<`                   | Less than                                            |
+| `<=`     | `<=`                  | Less than or equal to                                |
 | `>`      | `>`                   | Greater than                                         |
-| `=~`     | `ILIKE`               | Case-insensitive pattern match (use `%` as wildcard) |
-| `!~`     | `NOT ILIKE`           | Negated case-insensitive pattern match               |
+| `>=`     | `>=`                  | Greater than or equal to                             |
+| `=~`     | `REGEXP`              | Regular expression match (RE2 syntax)                |
+| `!~`     | `NOT REGEXP`          | Negated regular expression match                     |
 | `IN`     | `IN (...)`            | Matches any value in a list                          |
 
 ## Hide table name in ad hoc filter keys
@@ -256,6 +258,6 @@ SETTINGS additional_table_filters={'my_complex_table': 'status = \'active\' AND 
 
 ## Next steps
 
-- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/) — Macros (including `$__timeFilter`, `$__conditionalAll`) and building queries.
-- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/) — Connection and authentication options.
-- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/) — Common errors and solutions.
+- [ClickHouse query editor](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/): Macros (including `$__timeFilter`, `$__conditionalAll`) and building queries.
+- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/): Connection and authentication options.
+- [Troubleshoot ClickHouse data source issues](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/troubleshooting/): Common errors and solutions.

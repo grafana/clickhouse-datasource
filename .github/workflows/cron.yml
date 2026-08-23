@@ -36,3 +36,23 @@ jobs:
         DS_INSTANCE_PASSWORD=ds-instance:password
         DS_INSTANCE_PORT=ds-instance:port
         DS_INSTANCE_USERNAME=ds-instance:username
+
+  notify-slack:
+    name: Notify Slack on failure
+    needs: playwright-cloud
+    if: failure()
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # Intentionally pinned to @main, same as the playwright-cloud call above.
+      - name: Notify Slack on failure
+        uses: grafana/data-sources-ci-workflows/.github/actions/notify-cloud-e2e-failure@main
+        with:
+          repo: ${{ github.repository }}
+          run-stage: nightly
+          ref-name: ${{ github.ref_name }}
+          actor: ${{ github.actor }}
+          sha: ${{ github.sha }}
+          run-url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
