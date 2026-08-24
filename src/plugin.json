@@ -33,6 +33,11 @@
     },
     {
       "type": "dashboard",
+      "name": "OpenTelemetry Logs Explorer (JSON schema)",
+      "path": "dashboards/otel-logs-explorer-json.json"
+    },
+    {
+      "type": "dashboard",
       "name": "OpenTelemetry Traces Explorer",
       "path": "dashboards/otel-traces-explorer.json"
     },
