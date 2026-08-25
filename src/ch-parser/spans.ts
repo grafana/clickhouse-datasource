@@ -1,74 +1,45 @@
 import { Lexer } from './lexer';
 import { Token, TokenType } from './types';
 
-/**
- * Reasons a statement cannot be treated as a single, wrappable top-level SELECT.
- *
- * These are not errors. Every one of them means "do not rewrite this query", and callers are
- * expected to fall back to whatever they did before rather than surface anything to the user.
- */
+/** Why a statement cannot be treated as a single top-level SELECT. Not errors: callers fall back. */
 export enum SelectShapeProblem {
-  /** The lexer produced an error token (unterminated string, quote, or comment). */
   LexError = 'LexError',
-  /** Brackets do not balance, so token offsets cannot be trusted. */
   Unbalanced = 'Unbalanced',
-  /** Not a single top-level SELECT: a non-SELECT statement, a parenthesized SELECT, or several. */
   NotSingleSelect = 'NotSingleSelect',
-  /** More than one statement separated by `;`. */
   MultiStatement = 'MultiStatement',
-  /** No top-level FROM, so there is no row source to aggregate. */
   NoFrom = 'NoFrom',
-  /** Top-level UNION / EXCEPT / INTERSECT. */
   SetOperation = 'SetOperation',
-  /** Top-level INTO (`INTO OUTFILE`). */
   IntoOutfile = 'IntoOutfile',
-  /** `LIMIT n BY expr` — a per-key row filter, not a trailing row cap. */
+  /** A per-key row filter, not a trailing row cap, so it cannot be dropped. */
   LimitBy = 'LimitBy',
-  /** `ORDER BY ... WITH FILL` — manufactures rows that do not exist in the table. */
+  /** Manufactures rows that do not exist in the table. */
   WithFill = 'WithFill',
-  /** `WITH TOTALS` / `WITH ROLLUP` / `WITH CUBE` — adds subtotal rows. */
+  /** Adds subtotal rows. */
   WithTotalsRollupCube = 'WithTotalsRollupCube',
-  /**
-   * A top-level SETTINGS clause. Some settings (notably `additional_result_filter`) only apply
-   * to the outermost result, so they silently stop filtering once the statement becomes a
-   * subquery — the row count would differ from what the user's own query returns.
-   */
+  /** `additional_result_filter` and friends only apply to the outermost result, so they stop
+   * filtering once the statement becomes a subquery. */
   Settings = 'Settings',
 }
 
-/** A single item in the top-level SELECT list. */
 export interface SelectItem {
-  /** The item's output column name, when it can be determined. */
   outputName?: string;
-  /**
-   * The identifier the item selects, when the item is a lone identifier (optionally aliased).
-   * Absent for expressions, qualified names, and anything else we decline to interpret.
-   */
+  /** Set only for a lone identifier, optionally aliased. Absent for expressions and qualified names. */
   sourceIdentifier?: string;
-  /** True when the item is a bare `*`. */
   wildcard?: boolean;
 }
 
 export interface TopLevelSelect {
-  /**
-   * The statement with its trailing top-level ORDER BY / LIMIT / OFFSET / FORMAT and any
-   * terminating `;` removed, so it can be used as a derived table. Always ends with a newline
-   * so that a trailing line comment cannot swallow a following `)`.
-   */
+  /** The statement with its trailing ORDER BY / LIMIT / OFFSET / FORMAT / `;` removed. */
   head: string;
-  /** Top-level SELECT list items, in source order. */
   items: SelectItem[];
 }
 
 export type ScanResult = { ok: true; select: TopLevelSelect } | { ok: false; problem: SelectShapeProblem };
 
-/** Keywords that, appearing at bracket depth 0, begin the trailing clauses we drop. */
+/** Keywords that begin the trailing clauses we drop. */
 const TAIL_KEYWORDS = new Set(['LIMIT', 'OFFSET', 'FORMAT']);
 
-/**
- * Strips surrounding quotes from an identifier and unescapes any doubled quote characters.
- * `"a""b"` -> `a"b`, `` `x` `` -> `x`.
- */
+/** `"a""b"` -> `a"b`, `` `x` `` -> `x`. */
 export function unquoteIdentifier(text: string): string {
   if (text.length < 2) {
     return text;
@@ -95,12 +66,7 @@ interface DepthToken {
   depth: number;
 }
 
-/**
- * Splits the SELECT list into items on depth-relative commas, then classifies each item.
- *
- * `tokens` are the significant tokens between SELECT and FROM, with `baseDepth` the bracket
- * depth of the SELECT itself, so commas inside function calls or tuples do not split items.
- */
+/** Splits the SELECT list on depth-`baseDepth` commas so commas inside calls do not split items. */
 function parseSelectItems(tokens: DepthToken[], baseDepth: number): SelectItem[] {
   const groups: DepthToken[][] = [];
   let current: DepthToken[] = [];
@@ -115,7 +81,7 @@ function parseSelectItems(tokens: DepthToken[], baseDepth: number): SelectItem[]
   groups.push(current);
 
   return groups.map((group) => {
-    // A leading DISTINCT belongs to the SELECT, not to the first item.
+    // DISTINCT belongs to the SELECT, not to the first item.
     while (group.length && group[0].token.matchKeyword('DISTINCT')) {
       group = group.slice(1);
     }
@@ -128,14 +94,12 @@ function parseSelectItems(tokens: DepthToken[], baseDepth: number): SelectItem[]
     if (asIndex !== -1) {
       const left = group.slice(0, asIndex);
       const right = group.slice(asIndex + 1);
-      // The alias must be a single identifier for the output name to be unambiguous.
       if (right.length !== 1 || !isIdentifier(right[0].token)) {
         return {};
       }
       const outputName = unquoteIdentifier(right[0].token.text);
-      // Only a lone identifier on the left is a plain column reference. An expression
-      // (`Timestamp - INTERVAL 5 HOUR AS t`) is deliberately not reported as one, because
-      // callers use sourceIdentifier to decide the value is the column they think it is.
+      // Callers use sourceIdentifier to trust the value is that column, so an expression
+      // like `Timestamp - INTERVAL 5 HOUR AS t` must not report one.
       if (left.length === 1 && isIdentifier(left[0].token)) {
         return { outputName, sourceIdentifier: unquoteIdentifier(left[0].token.text) };
       }
@@ -152,12 +116,9 @@ function parseSelectItems(tokens: DepthToken[], baseDepth: number): SelectItem[]
 }
 
 /**
- * Scans a statement for the structure needed to safely wrap it as a derived table.
- *
- * This deliberately answers only what a caller can act on without understanding the query:
- * where the droppable tail starts, and what the top-level SELECT list projects. It never
- * interprets the FROM clause, so table functions, CTE references, template variables and
- * JOINs need no special handling — they are carried along verbatim.
+ * Finds where the droppable tail starts and what the SELECT list projects, so a caller can wrap
+ * the statement as a derived table. Never interprets the FROM, so table functions, CTE
+ * references and template variables need no handling.
  */
 export function scanTopLevelSelect(sql: string): ScanResult {
   const lexer = new Lexer(sql);
@@ -204,10 +165,9 @@ export function scanTopLevelSelect(sql: string): ScanResult {
 
   const topLevel = significant.filter((e) => e.depth === 0);
 
-  // Locate the SELECT and its FROM first. Every remaining check needs to know whether a token
-  // sits in the select list or after the FROM, because the same word means different things in
-  // each position: `format` and `settings` are ordinary function and column names in a select
-  // list, and `EXCEPT` is a column modifier there but a set operator after the FROM.
+  // Locate SELECT and FROM first: the same word means different things either side of the FROM.
+  // `format` and `settings` are ordinary names in a select list, and `EXCEPT` is a column
+  // modifier there but a set operator after it.
   let selectCount = 0;
   let selectIndex = -1;
   let fromIndex = -1;
@@ -226,16 +186,13 @@ export function scanTopLevelSelect(sql: string): ScanResult {
     } else if (token.matchKeyword('UNION') || token.matchKeyword('INTERSECT')) {
       hasSetOperation = true;
     } else if (token.matchKeyword('EXCEPT') && fromIndex !== -1) {
-      // Only a set operator once the FROM has been seen. Before it, `* EXCEPT (col)` is the
-      // column exclusion modifier, which is harmless to carry along verbatim.
+      // Before the FROM it is `* EXCEPT (col)`, the column exclusion modifier.
       hasSetOperation = true;
     } else if (token.type === TokenType.Semicolon && i !== topLevel.length - 1) {
       hasExtraStatement = true;
     }
   }
 
-  // Reported in the same precedence as the offending construct's severity, so the caller's
-  // decline reason names the most specific thing that is wrong.
   if (hasExtraStatement) {
     return { ok: false, problem: SelectShapeProblem.MultiStatement };
   }
@@ -249,7 +206,6 @@ export function scanTopLevelSelect(sql: string): ScanResult {
     return { ok: false, problem: SelectShapeProblem.NoFrom };
   }
   if (fromIndex < selectIndex) {
-    // A FROM ahead of the SELECT is not a shape we understand.
     return { ok: false, problem: SelectShapeProblem.NotSingleSelect };
   }
 
@@ -260,9 +216,8 @@ export function scanTopLevelSelect(sql: string): ScanResult {
     const next = i + 1 < topLevel.length ? topLevel[i + 1].token : undefined;
     const previous = topLevel[i - 1].token;
 
-    // Matched on token text rather than the keyword set: FILL, TOTALS, ROLLUP, CUBE and
-    // OUTFILE are not in ch-parser's keyword list, but matchKeyword does not require them
-    // to be. Missing any of these would mean silently miscounting rather than declining.
+    // FILL, TOTALS, ROLLUP, CUBE and OUTFILE are absent from ch-parser's keyword set, but
+    // matchKeyword does not require membership.
     if (token.matchKeyword('INTO')) {
       return { ok: false, problem: SelectShapeProblem.IntoOutfile };
     }
@@ -277,8 +232,7 @@ export function scanTopLevelSelect(sql: string): ScanResult {
     }
 
     if (token.type === TokenType.Semicolon) {
-      // Already known to be the final significant token, so it is just the statement
-      // terminator and belongs to the droppable tail.
+      // Already known to be the last significant token, so it is just the terminator.
       if (tailIndex === -1) {
         tailIndex = i;
       }
@@ -292,7 +246,6 @@ export function scanTopLevelSelect(sql: string): ScanResult {
         if (candidate.matchKeyword('BY')) {
           return { ok: false, problem: SelectShapeProblem.LimitBy };
         }
-        // Only `n`, `n, m` and `n OFFSET m` may sit between LIMIT and a BY.
         if (
           candidate.type !== TokenType.Number &&
           candidate.type !== TokenType.Comma &&
@@ -307,9 +260,8 @@ export function scanTopLevelSelect(sql: string): ScanResult {
       continue;
     }
 
-    // A tail keyword only starts the tail in clause position. Requiring the argument that the
-    // clause grammar expects keeps ordinary uses of these words as identifiers from truncating
-    // the statement: `WHERE format = 1`, `WHERE limit = 1`, `... AS format`.
+    // Only in clause position: requiring the expected argument stops `WHERE format = 1`,
+    // `WHERE limit = 1` and `... AS format` from truncating the statement.
     if (token.type === TokenType.BareWord && TAIL_KEYWORDS.has(token.text.toUpperCase()) && next) {
       const expectsNumber = !token.matchKeyword('FORMAT');
       const argumentFits = expectsNumber ? next.type === TokenType.Number : next.type === TokenType.BareWord;
@@ -326,8 +278,7 @@ export function scanTopLevelSelect(sql: string): ScanResult {
   }
 
   const headEnd = tailIndex === -1 ? sql.length : topLevel[tailIndex].token.begin;
-  // The newline guarantees a trailing `--` comment in the head cannot comment out whatever
-  // the caller appends next.
+  // Trailing newline so a `--` comment in the head cannot swallow what the caller appends.
   const head = sql.slice(0, headEnd).replace(/\s+$/, '') + '\n';
 
   const listTokens = significant.slice(

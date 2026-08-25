@@ -83,16 +83,7 @@ export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
   }, {} as LogLevelToInClause);
 })();
 
-/**
- * The six named levels above are mutually exclusive and exact, so
- * `unknown` can be defined as their complement: any severity value that matches none of
- * them (an empty string, `NOTICE`, a bare severity number, a vendor-specific label) lands
- * here. That makes the seven aggregates a true partition of the row set, which is what lets
- * the stacked histogram total agree with `count()`.
- *
- * Matching is exact (`IN`) rather than substring: a value like `debug-trace` contains two
- * level names and would otherwise be counted in two series at once.
- */
+/** The six named levels, so `unknown` can be defined as their complement. */
 const KNOWN_LOG_LEVEL_IN_CLAUSE: string = [
   LOG_LEVEL_TO_IN_CLAUSE.critical,
   LOG_LEVEL_TO_IN_CLAUSE.error,
@@ -103,14 +94,12 @@ const KNOWN_LOG_LEVEL_IN_CLAUSE: string = [
 ].join(',');
 
 /**
- * Builds the log level histogram aggregates for a logs volume query.
+ * One boolean expression per canonical level, for `sum(...)`, given a level expression the
+ * caller has already quoted and cast (`toString("SeverityText")`).
  *
- * `levelExpression` is the SQL expression yielding the level value, already quoted and cast
- * by the caller (for example `toString("SeverityText")`).
- *
- * Returns one entry per canonical level, each a boolean expression suitable for `sum(...)`.
- * The aggregates partition the row set exactly: every row is counted in exactly one series,
- * so summing the series reproduces `count()`.
+ * The levels partition the rows exactly, so summing the series reproduces `count()`. Matching
+ * is exact rather than substring: a value like `debug-trace` contains two level names and
+ * would otherwise land in two series at once.
  */
 export function buildLogLevelAggregateExpressions(
   levelExpression: string
@@ -123,8 +112,7 @@ export function buildLogLevelAggregateExpressions(
       alias: level,
       expression:
         level === 'unknown'
-          ? // Complement of the six named levels, so nothing goes uncounted.
-            `${levelExpression} NOT IN (${KNOWN_LOG_LEVEL_IN_CLAUSE})`
+          ? `${levelExpression} NOT IN (${KNOWN_LOG_LEVEL_IN_CLAUSE})`
           : `${levelExpression} IN (${LOG_LEVEL_TO_IN_CLAUSE[level]})`,
     });
   }

@@ -108,7 +108,6 @@
     "slvrtrn",
     "sparkline",
     "sqlds",
-    "sqlstring",
     "sqltable",
     "sqlutil",
     "stagename",
@@ -145,7 +144,6 @@
     "vectorator",
     "WorkDir",
     "varname",
-    "wrappable",
     "zizmor"
   ]
 }

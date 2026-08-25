@@ -310,16 +310,11 @@ export class Datasource
   }
 
   /**
-   * Reports which supplementary queries can be produced for a request.
+   * Grafana only consults its row-based fallback histogram when a type is absent from this
+   * list, so declining later (from getSupplementaryRequest) renders an empty panel instead.
+   * Feasibility therefore has to be decided here, for the whole request at once.
    *
-   * Grafana evaluates this once per datasource per run, over every target at once, and only
-   * consults its own row based fallback histogram when a type is absent from this list. A
-   * decline made later, from getSupplementaryRequest, therefore renders an empty panel rather
-   * than the fallback. That is why feasibility is decided here, and why it is decided for the
-   * whole request: emitting volume for a subset of targets would render a silent under-count.
-   *
-   * Called with no request by the logs sample panel, which only needs to know whether the type
-   * is supported at all.
+   * Called with no request by the logs sample panel.
    */
   getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
     if (!dsRequest) {
@@ -331,12 +326,11 @@ export class Datasource
     const visibleTargets = dsRequest.targets.filter((t) => !t.hide);
     const logsTargets = visibleTargets.filter((t) => this.isLogsQuery(t));
 
-    // Requiring at least one recognized logs target matters: with none, `every` would be
-    // vacuously true, we would advertise the type, then emit no targets — which renders
-    // Grafana's "no volume available" empty state instead of its row based histogram.
+    // With no logs target `every` is vacuously true, so we would advertise the type, emit
+    // nothing, and get the empty state instead of the row histogram. Probing with the real
+    // builder keeps this decision from drifting from what actually gets built.
     const volumeSupported =
       logsTargets.length > 0 &&
-      // Probe with the real builder so this decision cannot drift from what actually gets built.
       logsTargets.every((target) => {
         try {
           return this.getSupplementaryLogsVolumeQuery(dsRequest, target) !== undefined;
@@ -349,8 +343,7 @@ export class Datasource
       types.push(SupplementaryQueryType.LogsVolume);
     }
 
-    // Kept as a pure predicate: getSupplementaryLogsSampleQuery is only defined for builder
-    // queries anyway, so there is nothing for a probe to learn here.
+    // No probe needed: the sample query is builder-only anyway.
     if (visibleTargets.every((t) => t.editorType === EditorType.Builder)) {
       types.push(SupplementaryQueryType.LogsSample);
     }
@@ -358,10 +351,7 @@ export class Datasource
     return types;
   }
 
-  /**
-   * Whether a target is a logs query. Builder queries carry the query type directly; SQL
-   * queries may carry it, or only the Grafana format that the editor set when it was written.
-   */
+  /** SQL queries may carry the query type, or only the Grafana format the editor set. */
   private isLogsQuery(query: CHQuery): boolean {
     if (query.editorType === EditorType.Builder) {
       return query.builderOptions?.queryType === QueryType.Logs;
@@ -401,9 +391,8 @@ export class Datasource
   }
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
-    // Hidden targets are not rendered in the log list, so counting them would inflate the
-    // histogram. The supplementary targets built below carry no hide flag, and the logs volume
-    // request bypasses the query runner that would otherwise drop hidden responses.
+    // The volume request bypasses the query runner that drops hidden responses, and the
+    // targets built below carry no hide flag, so counting a hidden target would inflate.
     if (query.hide) {
       return undefined;
     }
@@ -496,15 +485,9 @@ export class Datasource
   }
 
   /**
-   * Builds an aggregated logs volume query for a query written in the SQL editor.
-   *
-   * The user's SQL becomes a derived table, so their filters, joins, CTEs and macros are
-   * preserved exactly and the count reflects their query rather than an approximation of it.
-   * Only the trailing row limit and ordering are removed, which is the whole point: those are
-   * what cap Grafana's own row based histogram to the visible page of logs.
-   *
-   * Returns undefined for anything not positively recognized, which makes
-   * getSupportedSupplementaryQueryTypes decline and leaves the previous behavior in place.
+   * The user's SQL becomes a derived table, and only its trailing row limit and ordering are
+   * removed — those are what cap Grafana's own histogram to the visible page of logs.
+   * Undefined for anything not positively recognized, which makes the gate decline.
    */
   private getSqlSupplementaryLogsVolumeQuery(
     logsVolumeRequest: DataQueryRequest<CHQuery>,
@@ -514,9 +497,8 @@ export class Datasource
       return undefined;
     }
 
-    // Deliberately quiet: this runs for every query render, and declining is a normal
-    // outcome rather than a fault. plan.reason names the specific construct that could not be
-    // aggregated, and the decline conditions are documented in docs/sources/troubleshooting.md.
+    // Not logged: this runs on every render and declining is normal. plan.reason names the
+    // construct; the conditions are listed in docs/sources/troubleshooting.md.
     const plan = planSqlLogsVolume(query.rawSql, logsVolumeRequest.scopedVars, this.getDefaultLogsColumns());
     if (!plan.ok) {
       return undefined;
@@ -525,8 +507,7 @@ export class Datasource
     return {
       pluginVersion,
       editorType: EditorType.SQL,
-      // Time series, so the backend shapes the buckets the same way it does for the builder
-      // logs volume query.
+      // Time series, so the backend shapes buckets as it does for the builder volume query.
       queryType: QueryType.TimeSeries,
       format: 0,
       rawSql: plan.sql,
@@ -558,7 +539,7 @@ export class Datasource
     const timeHint = timeColumn.hint ?? ColumnHint.Time;
 
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
-      // Clone before resolving the key so this does not write back into the user's query.
+      // Clone so resolving the key does not write back into the user's query.
       const next = { ...f };
       if (next.hint && !next.key) {
         const originalColumn = getColumnByHint(query.builderOptions, next.hint);
