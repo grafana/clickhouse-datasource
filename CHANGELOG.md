@@ -4,11 +4,14 @@
 
 ### Features
 
+- Show the full time range in the log volume histogram for Logs queries written in the SQL editor, instead of a histogram capped by the query's `LIMIT`. Requires the default log table and columns to be configured under **Logs** in the data source settings; queries the plugin cannot aggregate safely keep the previous behavior (#XXXX)
 - Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
 
 ### Fixes
 
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
+- Count every log line in the log volume histogram: severity values that matched none of the known levels (an empty string, `NOTICE`, a bare severity number, `NULL`) were previously counted in no series, and a value such as `debug-trace` was counted in two, so the stacked total disagreed with the number of log lines (#XXXX)
+- Exclude hidden queries from the log volume histogram, and stop a disabled query from suppressing the histogram for the other queries in the panel (#XXXX)
 
 ## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)
 

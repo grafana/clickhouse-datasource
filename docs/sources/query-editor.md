@@ -159,12 +159,14 @@ In Explore with the **Logs** query type, Grafana automatically shows a **log vol
 
 Log volume works for queries written in either the **query builder** or the **SQL editor**. For a SQL editor query, the plugin aggregates over your query as a subquery, so your filters, joins, CTEs, macros, and template variables are preserved, and it removes your `ORDER BY` and `LIMIT` so the histogram covers the whole selected time range instead of just the rows your query returns. Log level series require a log level column configured under **Logs** in the data source settings and projected by your query.
 
-The plugin falls back to Grafana's row-based histogram, which only counts the rows your query returned, when it cannot guarantee a correct count. This happens when no default log columns are configured, when your query does not select the configured timestamp column first, or when the query uses a construct that changes which rows exist, such as `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `UNION`, or multiple statements.
+When the plugin cannot guarantee a correct count it declines, and Grafana draws its row-based histogram instead. This happens when no default log columns are configured, when your query does not select the configured timestamp column first or selects it as an expression, when a `SELECT *` query reads a table other than the configured logs table, or when the query uses a construct that changes which rows exist, such as `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `UNION`, an interval macro, or multiple statements.
+
+Grafana renders one histogram per panel, so a single query that cannot be aggregated makes every query in that panel fall back, including query builder queries.
 
 {{< admonition type="note" >}}
 Logs sample is only available when all queries in the panel use the **query builder**.
 
-Log volume for SQL editor queries requires Grafana 12.4.0 or later. On earlier versions, log volume is only available for query builder queries.
+Falling back to the row-based histogram requires Grafana 12.4.0 or later. On earlier versions the aggregated histogram still works, but a query the plugin declines shows no volume chart at all.
 {{< /admonition >}}
 
 ## Time series

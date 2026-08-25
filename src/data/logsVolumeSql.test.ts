@@ -30,28 +30,34 @@ const DEBUG = "'debug','dbug','DEBUG','DBUG','Debug','Dbug'";
 const TRACE = "'trace','TRACE','Trace'";
 
 /** The seven per-level series the outer SELECT projects for the given level column name. */
-const levelSeries = (level: string): string =>
-  [
-    `sum(toString("${level}") IN (${CRITICAL})) AS "critical"`,
-    `sum(toString("${level}") IN (${ERROR})) AS "error"`,
-    `sum(toString("${level}") IN (${WARN})) AS "warn"`,
-    `sum(toString("${level}") IN (${INFO})) AS "info"`,
-    `sum(toString("${level}") IN (${DEBUG})) AS "debug"`,
-    `sum(toString("${level}") IN (${TRACE})) AS "trace"`,
-    `sum(toString("${level}") NOT IN (${CRITICAL},${ERROR},${WARN},${INFO},${DEBUG},${TRACE})) AS "unknown"`,
+const levelSeries = (level: string): string => {
+  // ifNull so a Nullable level column does not drop its NULL rows out of every series.
+  const lvl = `ifNull(toString(src."${level}"), '')`;
+  return [
+    `sum(${lvl} IN (${CRITICAL})) AS "critical"`,
+    `sum(${lvl} IN (${ERROR})) AS "error"`,
+    `sum(${lvl} IN (${WARN})) AS "warn"`,
+    `sum(${lvl} IN (${INFO})) AS "info"`,
+    `sum(${lvl} IN (${DEBUG})) AS "debug"`,
+    `sum(${lvl} IN (${TRACE})) AS "trace"`,
+    `sum(${lvl} NOT IN (${CRITICAL},${ERROR},${WARN},${INFO},${DEBUG},${TRACE})) AS "unknown"`,
   ].join(', ');
+};
 
 /** Assembles the expected volume query, line by line, exactly as it is emitted. */
 const expectedSql = (options: { bucket: string; series: string; head: string; timeName: string }): string =>
   [
-    `SELECT toStartOfInterval("${options.timeName}", INTERVAL 1 ${options.bucket}) AS "time", ${options.series}`,
+    `SELECT toStartOfInterval(src."${options.timeName}", INTERVAL 1 ${options.bucket}) AS "time", ${options.series}`,
     'FROM (',
     options.head,
-    ')',
-    `WHERE "${options.timeName}" >= $__fromTime AND "${options.timeName}" <= $__toTime`,
+    ') AS src',
+    `WHERE src."${options.timeName}" >= $__fromTime AND src."${options.timeName}" <= $__toTime`,
     'GROUP BY "time"',
     'ORDER BY "time" ASC',
   ].join('\n');
+
+/** The configured logs table, needed for a wildcard projection to be trusted. */
+const OTEL_LOGS = { table: 'otel_logs' };
 
 const expectPlan = (plan: LogsVolumeSqlPlan) => {
   if (!plan.ok) {
@@ -91,20 +97,20 @@ describe('planSqlLogsVolume', () => {
     it('buckets on the projected alias, not the physical column', () => {
       const { sql, timeName } = expectPlan(plan());
       expect(timeName).toBe('timestamp');
-      expect(sql).toContain('toStartOfInterval("timestamp", INTERVAL 1 HOUR) AS "time"');
+      expect(sql).toContain('toStartOfInterval(src."timestamp", INTERVAL 1 HOUR) AS "time"');
       expect(sql).not.toContain('"Timestamp"');
     });
 
     it('wraps the user statement as a derived table without its ORDER BY and LIMIT', () => {
       const { sql } = expectPlan(plan());
-      expect(sql).toContain(`FROM (\n${head}\n)\n`);
+      expect(sql).toContain(`FROM (\n${head}\n) AS src\n`);
       expect(sql).not.toContain('ORDER BY timestamp DESC');
       expect(sql).not.toContain('LIMIT');
     });
 
     it('bounds, groups and orders the outer query itself', () => {
       const { sql } = expectPlan(plan());
-      expect(sql).toContain('WHERE "timestamp" >= $__fromTime AND "timestamp" <= $__toTime');
+      expect(sql).toContain('WHERE src."timestamp" >= $__fromTime AND src."timestamp" <= $__toTime');
       expect(sql).toContain('GROUP BY "time"');
       expect(sql.endsWith('ORDER BY "time" ASC')).toBe(true);
     });
@@ -172,7 +178,7 @@ describe('planSqlLogsVolume', () => {
   describe('SELECT *', () => {
     it('buckets on the physical column names, since * projects every column under its own name', () => {
       const head = 'SELECT * FROM otel_logs WHERE x=1';
-      const plan = planSqlLogsVolume(head, HOURLY, timeAndLevelColumns());
+      const plan = planSqlLogsVolume(head, HOURLY, timeAndLevelColumns(), OTEL_LOGS);
       expect(plan).toEqual({
         ok: true,
         sql: expectedSql({
@@ -200,7 +206,9 @@ describe('planSqlLogsVolume', () => {
 
     it('buckets a wildcard query on the filter timestamp when that is the only one configured', () => {
       const head = 'SELECT * FROM t';
-      const plan = planSqlLogsVolume(head, HOURLY, new Map([[ColumnHint.FilterTime, 'EventDate']]));
+      const plan = planSqlLogsVolume(head, HOURLY, new Map([[ColumnHint.FilterTime, 'EventDate']]), {
+        table: 't',
+      });
       expect(expectPlan(plan).timeName).toBe('EventDate');
       expect(expectPlan(plan).sql).toBe(
         expectedSql({ bucket: 'HOUR', series: 'count(*) AS "logs"', head, timeName: 'EventDate' })
@@ -213,7 +221,7 @@ describe('planSqlLogsVolume', () => {
         [ColumnHint.FilterTime, 'EventDate'],
       ]);
       const head = 'SELECT * FROM t';
-      const plan = planSqlLogsVolume(head, HOURLY, both);
+      const plan = planSqlLogsVolume(head, HOURLY, both, { table: 't' });
       expect(expectPlan(plan).timeName).toBe('Timestamp');
       expect(expectPlan(plan).sql).toBe(
         expectedSql({ bucket: 'HOUR', series: 'count(*) AS "logs"', head, timeName: 'Timestamp' })
@@ -269,7 +277,7 @@ describe('planSqlLogsVolume', () => {
       expect(sql).toContain('-- only the last hour, roughly\n)');
       const lines = sql.split('\n');
       expect(lines[1]).toBe('FROM (');
-      expect(lines[3]).toBe(')');
+      expect(lines[3]).toBe(') AS src');
     });
 
     it('carries the WHERE clause, macros and template variables through byte for byte', () => {
@@ -358,8 +366,8 @@ describe('identifier escaping', () => {
     const plan = expectPlan(planSqlLogsVolume('SELECT Timestamp AS "we""ird" FROM t', HOURLY, timeColumns()));
 
     expect(plan.timeName).toBe('we"ird');
-    expect(plan.sql).toContain('toStartOfInterval("we""ird", INTERVAL 1 HOUR)');
-    expect(plan.sql).toContain('WHERE "we""ird" >= $__fromTime AND "we""ird" <= $__toTime');
+    expect(plan.sql).toContain('toStartOfInterval(src."we""ird", INTERVAL 1 HOUR)');
+    expect(plan.sql).toContain('WHERE src."we""ird" >= $__fromTime AND src."we""ird" <= $__toTime');
   });
 
   it('re-escapes a quote in the projected level name', () => {
@@ -368,6 +376,76 @@ describe('identifier escaping', () => {
     );
 
     expect(plan.levelName).toBe('lv"l');
-    expect(plan.sql).toContain('toString("lv""l")');
+    expect(plan.sql).toContain('toString(src."lv""l")');
   });
+});
+
+describe('planSqlLogsVolume wildcard trust', () => {
+  const columns = () =>
+    new Map<ColumnHint, string>([
+      [ColumnHint.Time, 'Timestamp'],
+      [ColumnHint.LogLevel, 'SeverityText'],
+    ]);
+
+  it('declines a wildcard when no logs table is configured', () => {
+    // A wildcard is the only shape that references configured column names rather than names the
+    // projection provides, so without a table to check them against they might not exist.
+    expectDeclined(planSqlLogsVolume('SELECT * FROM otel_logs', HOURLY, columns()), 'WildcardOverUnknownTable');
+  });
+
+  it('declines a wildcard over a different table', () => {
+    expectDeclined(
+      planSqlLogsVolume('SELECT * FROM app_logs', HOURLY, columns(), { table: 'otel_logs' }),
+      'WildcardOverUnknownTable'
+    );
+  });
+
+  it('declines a wildcard over a table in a different database', () => {
+    expectDeclined(
+      planSqlLogsVolume('SELECT * FROM other.otel_logs', HOURLY, columns(), {
+        database: 'otel',
+        table: 'otel_logs',
+      }),
+      'WildcardOverUnknownTable'
+    );
+  });
+
+  it('accepts a wildcard over the configured table, qualified or not', () => {
+    for (const sql of ['SELECT * FROM otel_logs', 'SELECT * FROM otel.otel_logs', 'SELECT * FROM otel_logs FINAL']) {
+      expect(planSqlLogsVolume(sql, HOURLY, columns(), { database: 'otel', table: 'otel_logs' }).ok).toBe(true);
+    }
+  });
+
+  it.each([
+    // Anything the scanner cannot reduce to a plain table reference must not be matched.
+    "SELECT * FROM merge(currentDatabase(), '^otel_logs')",
+    'SELECT * FROM cluster(c, otel, otel_logs)',
+    'SELECT * FROM (SELECT * FROM otel_logs)',
+    'SELECT * FROM otel_logs AS a JOIN other AS b ON a.id = b.id',
+    'SELECT * FROM otel_logs, other',
+    'SELECT * FROM otel_logs ARRAY JOIN arr',
+    'SELECT * FROM otel_logs SAMPLE 0.1',
+    'SELECT * FROM $table',
+    'SELECT * FROM ${table:sqltable}',
+  ])('declines a wildcard over a FROM it cannot resolve (%s)', (sql) => {
+    expectDeclined(planSqlLogsVolume(sql, HOURLY, columns(), { table: 'otel_logs' }), 'WildcardOverUnknownTable');
+  });
+
+  it('is unaffected for an explicit projection over an unknown table', () => {
+    // No wildcard, so only names the projection provides are referenced and the table is
+    // irrelevant.
+    expect(planSqlLogsVolume('SELECT Timestamp, SeverityText FROM anything', HOURLY, columns()).ok).toBe(true);
+  });
+});
+
+describe('planSqlLogsVolume statement macros', () => {
+  it.each(['$__columns(Timestamp)', '$__rateColumns(a, b)', '$__perSecondColumns(a, b)', '$__lttb(a, b)'])(
+    'declines %s, which the backend expands into a whole SELECT list',
+    (macro) => {
+      expectDeclined(
+        planSqlLogsVolume(`SELECT Timestamp, ${macro} FROM t`, HOURLY, new Map([[ColumnHint.Time, 'Timestamp']])),
+        'StatementMacro'
+      );
+    }
+  );
 });

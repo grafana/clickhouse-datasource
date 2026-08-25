@@ -659,23 +659,22 @@ These issues can occur after upgrading the plugin version or the Grafana version
 
 **Symptoms:** The log volume histogram does not appear above log results when using the SQL editor in Explore. It works in the query builder.
 
-**Cause:** Either the Grafana version predates the required support, or the plugin declined to aggregate the query because it could not guarantee a correct count.
-
-Aggregated log volume for SQL editor queries requires **Grafana 12.4.0 or later**. On earlier versions, log volume is only available for queries built with the query builder.
-
-On supported versions, the plugin falls back to Grafana's row-based histogram, which counts only the rows your query returned, when any of the following apply:
+**Cause:** The plugin declined to aggregate the query because it could not guarantee a correct count. It declines when any of the following apply:
 
 - No default log columns are configured for the data source, so there is no timestamp column to bucket on.
-- The query does not select the configured timestamp column as its first column, or selects it as an expression rather than a plain column reference.
-- The query uses a construct that changes which rows exist and so cannot be aggregated safely: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `WITH ROLLUP`, `WITH CUBE`, `UNION`, `INTO OUTFILE`, an interval macro such as `$__timeInterval`, or more than one statement.
+- The query does not select the configured timestamp column as its first column, selects it as an expression rather than a plain column reference, or qualifies it (`l.Timestamp`).
+- The query is `SELECT *` over anything other than the configured logs table, including a table function, a subquery, a join or a table variable. The plugin cannot know which columns such a query returns.
+- The query uses a construct that changes which rows exist and so cannot be aggregated safely: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `WITH ROLLUP`, `WITH CUBE`, `UNION`, `INTO OUTFILE`, an interval macro such as `$__timeInterval`, a statement macro such as `$__columns`, or more than one statement.
 
-Because Grafana renders a single histogram for the whole panel, one query that cannot be aggregated causes every query in that panel to use the row-based histogram.
+Because Grafana renders a single histogram for the whole panel, one query that cannot be aggregated causes every query in that panel to fall back, including query builder queries.
+
+On **Grafana 12.4.0 or later** a declined query falls back to Grafana's row-based histogram, which counts only the rows your query returned. On earlier versions the aggregated histogram still works when the query is accepted, but a declined query shows no volume chart at all.
 
 **Solution:**
 
-1. Upgrade Grafana to version 12.4.0 or later.
-2. Configure the default log table and columns under **Logs** in the data source settings.
-3. Select the configured timestamp column first in your query, for example `SELECT Timestamp, Body, SeverityText FROM otel_logs WHERE ...`.
+1. Configure the default log table and columns under **Logs** in the data source settings.
+2. Select the configured timestamp column first in your query, for example `SELECT Timestamp, Body, SeverityText FROM otel_logs WHERE ...`, rather than `SELECT *`.
+3. Upgrade to Grafana 12.4.0 or later so declined queries fall back instead of showing nothing.
 4. Alternatively, switch the query to the **Builder** editor mode.
 
 #### Connection pool saturation (sudden slowness)

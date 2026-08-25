@@ -31,24 +31,28 @@ export function getIntervalInfo(scopedVars: ScopedVars): { interval: string; int
   }
 }
 
-export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timeField: string): string {
+/** The INTERVAL unit to bucket by, for callers that build their own rounding clause. */
+export function getTimeFieldRoundingInterval(scopedVars: ScopedVars): string {
   // NB: slight discrepancy with getIntervalInfo here
   // it returns { interval: '$__interval' } when the interval from the ScopedVars is undefined,
   // but we fall back to DAY here
-  let interval = 'DAY';
-  if (scopedVars.__interval_ms) {
-    let intervalMs: number = scopedVars.__interval_ms.value;
-    if (intervalMs > HOUR) {
-      interval = 'DAY';
-    } else if (intervalMs > MINUTE) {
-      interval = 'HOUR';
-    } else if (intervalMs > SECOND) {
-      interval = 'MINUTE';
-    } else {
-      interval = 'SECOND';
-    }
+  if (!scopedVars.__interval_ms) {
+    return 'DAY';
   }
-  return `toStartOfInterval("${timeField}", INTERVAL 1 ${interval})`;
+
+  const intervalMs: number = scopedVars.__interval_ms.value;
+  if (intervalMs > HOUR) {
+    return 'DAY';
+  } else if (intervalMs > MINUTE) {
+    return 'HOUR';
+  } else if (intervalMs > SECOND) {
+    return 'MINUTE';
+  }
+  return 'SECOND';
+}
+
+export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timeField: string): string {
+  return `toStartOfInterval("${timeField}", INTERVAL 1 ${getTimeFieldRoundingInterval(scopedVars)})`;
 }
 
 export const TIME_FIELD_ALIAS = 'time';
@@ -94,17 +98,19 @@ const KNOWN_LOG_LEVEL_IN_CLAUSE: string = [
 ].join(',');
 
 /**
- * One boolean expression per canonical level, for `sum(...)`, given a level expression the
- * caller has already quoted and cast (`toString("SeverityText")`).
+ * One boolean expression per canonical level, for `sum(...)`, given the already-quoted level
+ * column (`"SeverityText"`, or `src."level"`).
  *
- * The levels partition the rows exactly, so summing the series reproduces `count()`. Matching
- * is exact rather than substring: a value like `debug-trace` contains two level names and
- * would otherwise land in two series at once.
+ * The levels partition the rows exactly, so summing the series reproduces `count()`. Matching is
+ * exact rather than substring: a value like `debug-trace` contains two level names and would
+ * otherwise land in two series at once. ifNull keeps a Nullable column from dropping its NULL
+ * rows out of every series, which would make the total fall short of count().
  */
 export function buildLogLevelAggregateExpressions(
-  levelExpression: string
+  quotedLevelColumn: string
 ): Array<{ alias: keyof LogLevelToInClause; expression: string }> {
   const aggregates: Array<{ alias: keyof LogLevelToInClause; expression: string }> = [];
+  const levelExpression = `ifNull(toString(${quotedLevelColumn}), '')`;
 
   let level: keyof LogLevelToInClause;
   for (level in LOG_LEVEL_TO_IN_CLAUSE) {

@@ -213,7 +213,8 @@ describe('logs', () => {
 });
 
 describe('buildLogLevelAggregateExpressions', () => {
-  const expressions = buildLogLevelAggregateExpressions('toString("level")');
+  const expressions = buildLogLevelAggregateExpressions('"level"');
+  const level = `ifNull(toString("level"), '')`;
 
   it('should return one expression per canonical level', () => {
     expect(expressions.map((e) => e.alias)).toEqual(['critical', 'error', 'warn', 'info', 'debug', 'trace', 'unknown']);
@@ -223,7 +224,7 @@ describe('buildLogLevelAggregateExpressions', () => {
     // Substring matching would count a value like 'debug-trace' in both the debug and the
     // trace series, making the stacked total exceed count().
     const debug = expressions.find((e) => e.alias === 'debug')!;
-    expect(debug.expression).toBe(`toString("level") IN (${LOG_LEVEL_TO_IN_CLAUSE.debug})`);
+    expect(debug.expression).toBe(`${level} IN (${LOG_LEVEL_TO_IN_CLAUSE.debug})`);
     expect(debug.expression).not.toContain('multiSearchAny');
   });
 
@@ -232,7 +233,7 @@ describe('buildLogLevelAggregateExpressions', () => {
     // and must still appear somewhere, or the total falls short of count().
     const unknown = expressions.find((e) => e.alias === 'unknown')!;
     expect(unknown.expression).toBe(
-      `toString("level") NOT IN (` +
+      `${level} NOT IN (` +
         [
           LOG_LEVEL_TO_IN_CLAUSE.critical,
           LOG_LEVEL_TO_IN_CLAUSE.error,
@@ -245,9 +246,15 @@ describe('buildLogLevelAggregateExpressions', () => {
     );
   });
 
-  it('should use the caller-provided level expression verbatim', () => {
-    expect(buildLogLevelAggregateExpressions('toString("SeverityText")')[0].expression).toContain(
-      'toString("SeverityText")'
+  it('should use the caller-provided column verbatim', () => {
+    expect(buildLogLevelAggregateExpressions('src."SeverityText"')[0].expression).toContain(
+      `ifNull(toString(src."SeverityText"), '')`
     );
+  });
+
+  it('should guard against a Nullable level column dropping rows from every series', () => {
+    // Without ifNull a NULL severity matches neither the named levels nor the complement, so
+    // the series would sum to less than count().
+    expressions.forEach((e) => expect(e.expression).toContain('ifNull('));
   });
 });

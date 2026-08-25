@@ -343,8 +343,7 @@ export class Datasource
       types.push(SupplementaryQueryType.LogsVolume);
     }
 
-    // No probe needed: the sample query is builder-only anyway.
-    if (visibleTargets.every((t) => t.editorType === EditorType.Builder)) {
+    if (logsTargets.length > 0 && visibleTargets.every((t) => t.editorType === EditorType.Builder)) {
       types.push(SupplementaryQueryType.LogsSample);
     }
 
@@ -428,9 +427,8 @@ export class Datasource
     const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
     if (logLevelColumn) {
       // Generates aggregates like
-      // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
-      const llf = `toString("${logLevelColumn.name}")`;
-      for (const { alias, expression } of buildLogLevelAggregateExpressions(llf)) {
+      // sum(ifNull(toString("log_level"), '') IN ('dbug','debug','DBUG','DEBUG','Dbug','Debug')) AS debug
+      for (const { alias, expression } of buildLogLevelAggregateExpressions(escapeIdentifier(logLevelColumn.name))) {
         aggregates.push({
           aggregateType: AggregateType.Sum,
           column: expression,
@@ -499,7 +497,10 @@ export class Datasource
 
     // Not logged: this runs on every render and declining is normal. plan.reason names the
     // construct; the conditions are listed in docs/sources/troubleshooting.md.
-    const plan = planSqlLogsVolume(query.rawSql, logsVolumeRequest.scopedVars, this.getDefaultLogsColumns());
+    const plan = planSqlLogsVolume(query.rawSql, logsVolumeRequest.scopedVars, this.getDefaultLogsColumns(), {
+      database: this.getDefaultLogsDatabase(),
+      table: this.getDefaultLogsTable(),
+    });
     if (!plan.ok) {
       return undefined;
     }

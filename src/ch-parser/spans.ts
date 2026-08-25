@@ -28,10 +28,22 @@ export interface SelectItem {
   wildcard?: boolean;
 }
 
+/** A plain `[database.]table` FROM target. Absent for anything else, deliberately. */
+export interface FromTarget {
+  database?: string;
+  table: string;
+}
+
 export interface TopLevelSelect {
   /** The statement with its trailing ORDER BY / LIMIT / OFFSET / FORMAT / `;` removed. */
   head: string;
   items: SelectItem[];
+  /**
+   * Set only when the FROM is a single plain table reference. A table function, subquery,
+   * template variable, JOIN or anything else leaves it undefined rather than guessing, so a
+   * caller can never match the wrong table.
+   */
+  from?: FromTarget;
 }
 
 export type ScanResult = { ok: true; select: TopLevelSelect } | { ok: false; problem: SelectShapeProblem };
@@ -55,6 +67,62 @@ export function unquoteIdentifier(text: string): string {
   }
 
   return text;
+}
+
+/**
+ * Reads a `[database.]table` immediately after the FROM, and only that. Requires the reference to
+ * end the clause (or be followed by FINAL, or an alias) so a JOIN, a comma join, a table function
+ * or a subquery yields undefined instead of a partial match.
+ */
+function parseFromTarget(topLevel: DepthToken[], fromIndex: number): FromTarget | undefined {
+  const parts: string[] = [];
+  let i = fromIndex + 1;
+
+  while (i < topLevel.length && parts.length < 2) {
+    const { token } = topLevel[i];
+    if (!isIdentifier(token)) {
+      return undefined;
+    }
+    parts.push(unquoteIdentifier(token.text));
+    i++;
+
+    if (i < topLevel.length && topLevel[i].token.type === TokenType.Dot) {
+      i++;
+      continue;
+    }
+    break;
+  }
+
+  if (!parts.length) {
+    return undefined;
+  }
+
+  // Only a bare reference, optionally with FINAL or an alias, counts. Anything else — a JOIN, a
+  // comma join, ARRAY JOIN, SAMPLE — means the row set is not simply that table's.
+  for (let j = i; j < topLevel.length; j++) {
+    const { token } = topLevel[j];
+    if (token.matchKeyword('FINAL')) {
+      continue;
+    }
+    if (token.matchKeyword('AS') || isIdentifier(token)) {
+      // An alias is fine, but a second identifier after it is not.
+      continue;
+    }
+    if (
+      token.matchKeyword('WHERE') ||
+      token.matchKeyword('PREWHERE') ||
+      token.matchKeyword('GROUP') ||
+      token.matchKeyword('HAVING') ||
+      token.matchKeyword('ORDER') ||
+      token.matchKeyword('LIMIT') ||
+      token.type === TokenType.Semicolon
+    ) {
+      break;
+    }
+    return undefined;
+  }
+
+  return parts.length === 2 ? { database: parts[0], table: parts[1] } : { table: parts[0] };
 }
 
 function isIdentifier(token: Token): boolean {
@@ -279,12 +347,15 @@ export function scanTopLevelSelect(sql: string): ScanResult {
 
   const headEnd = tailIndex === -1 ? sql.length : topLevel[tailIndex].token.begin;
   // Trailing newline so a `--` comment in the head cannot swallow what the caller appends.
-  const head = sql.slice(0, headEnd).replace(/\s+$/, '') + '\n';
+  const head = sql.slice(0, headEnd).trimEnd() + '\n';
 
   const listTokens = significant.slice(
     significant.indexOf(topLevel[selectIndex]) + 1,
     significant.indexOf(topLevel[fromIndex])
   );
 
-  return { ok: true, select: { head, items: parseSelectItems(listTokens, 0) } };
+  return {
+    ok: true,
+    select: { head, items: parseSelectItems(listTokens, 0), from: parseFromTarget(topLevel, fromIndex) },
+  };
 }

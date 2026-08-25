@@ -32,6 +32,7 @@ jest.mock('./logs', () => ({
   // returning undefined would make every volume query throw rather than build.
   getTimeFieldRoundingClause: jest.fn(() => 'toStartOfInterval("created_at", INTERVAL 1 DAY)'),
   getIntervalInfo: jest.fn(),
+  getTimeFieldRoundingInterval: jest.requireActual('./logs').getTimeFieldRoundingInterval,
   queryLogsVolume: jest.fn(),
   TIME_FIELD_ALIAS: jest.requireActual('./logs').TIME_FIELD_ALIAS,
   DEFAULT_LOGS_ALIAS: jest.requireActual('./logs').DEFAULT_LOGS_ALIAS,
@@ -1523,12 +1524,12 @@ describe('ClickHouseDatasource', () => {
       );
 
     describe('getSupportedSupplementaryQueryTypes', () => {
-      it('should not offer LogsVolume when no target is a logs query', async () => {
-        // There is no logs volume to draw for a non-logs pane, and advertising the type
-        // without emitting a target would replace Grafana's fallback with an empty state.
+      it('should offer nothing when no target is a logs query', async () => {
+        // There is nothing to draw for a non-logs pane, and advertising a type without emitting
+        // a target would replace Grafana's fallback with an empty state.
         const dsRequest = { targets: [{ editorType: EditorType.Builder }] } as DataQueryRequest<CHQuery>;
         const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
-        expect(result).toEqual([SupplementaryQueryType.LogsSample]);
+        expect(result).toEqual([]);
       });
 
       it('should return LogsVolume and LogsSample when all targets use Builder editor', async () => {
@@ -1699,17 +1700,17 @@ describe('ClickHouseDatasource', () => {
           .spyOn(logs, 'getTimeFieldRoundingClause')
           .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
         const result = datasource.getSupplementaryLogsVolumeQuery(request, query);
-        // Levels match exactly and `unknown` is their complement, so every row is counted in
-        // exactly one series and the stacked total equals count().
+        // Levels match exactly, `unknown` is their complement, and ifNull keeps a Nullable
+        // column in the partition, so the stacked total equals count().
         expect(result?.rawSql).toEqual(
           `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", ` +
-            `sum(toString("level") IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) as critical, ` +
-            `sum(toString("level") IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
-            `sum(toString("level") IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
-            `sum(toString("level") IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')) as info, ` +
-            `sum(toString("level") IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
-            `sum(toString("level") IN ('trace','TRACE','Trace')) as trace, ` +
-            `sum(toString("level") NOT IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg','error','err','eror','ERROR','ERR','EROR','Error','Err','Eror','warn','warning','WARN','WARNING','Warn','Warning','info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational','debug','dbug','DEBUG','DBUG','Debug','Dbug','trace','TRACE','Trace')) as unknown ` +
+            `sum(ifNull(toString("level"), '') IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) as critical, ` +
+            `sum(ifNull(toString("level"), '') IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
+            `sum(ifNull(toString("level"), '') IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
+            `sum(ifNull(toString("level"), '') IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')) as info, ` +
+            `sum(ifNull(toString("level"), '') IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
+            `sum(ifNull(toString("level"), '') IN ('trace','TRACE','Trace')) as trace, ` +
+            `sum(ifNull(toString("level"), '') NOT IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg','error','err','eror','ERROR','ERR','EROR','Error','Err','Eror','warn','warning','WARN','WARNING','Warn','Warning','info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational','debug','dbug','DEBUG','DBUG','Debug','Dbug','trace','TRACE','Trace')) as unknown ` +
             `FROM "default"."logs" ` +
             `GROUP BY time ` +
             `ORDER BY time ASC`
@@ -1804,8 +1805,8 @@ describe('ClickHouseDatasource', () => {
           sqlLogsTarget('SELECT created_at AS ts, level AS lvl FROM logs LIMIT 10')
         );
 
-        expect(result?.rawSql).toContain('WHERE "ts" >= $__fromTime AND "ts" <= $__toTime');
-        expect(result?.rawSql).toContain('toString("lvl")');
+        expect(result?.rawSql).toContain('WHERE src."ts" >= $__fromTime AND src."ts" <= $__toTime');
+        expect(result?.rawSql).toContain('toString(src."lvl")');
       });
 
       it('should fall back to a single count series when the level column is not projected', () => {
@@ -2038,7 +2039,7 @@ describe('ClickHouseDatasource', () => {
         const supplementaryQuery = { rawSql: 'SELECT * FROM logs', refId: '', format: 2 } as CHSqlQuery;
         jest.spyOn(Datasource.prototype, 'getSupplementaryLogsSampleQuery').mockReturnValue(supplementaryQuery);
         const result = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, {
-          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          targets: [{ refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } }],
         } as any);
         expect(result).toMatchObject({
           hideFromInspector: true,
@@ -2071,9 +2072,7 @@ describe('ClickHouseDatasource', () => {
           scopedVars: {
             __interval: {},
           },
-          targets: [
-            { refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } },
-          ],
+          targets: [{ refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } }],
           range,
         } as any);
         expect(result).toMatchObject({
