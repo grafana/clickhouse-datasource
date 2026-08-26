@@ -52,8 +52,16 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	// SkipConnectionPings disables the bootstrap/health-check ping that
+	// Connect otherwise performs with no per-user forwarded headers. Use this
+	// when a proxy in front of the data source requires forwarded headers
+	// (for example Cookie via Grafana's keepCookies) on every request and
+	// fails closed on requests that lack them: the bootstrap ping carries no
+	// forwarded headers, so such a proxy would reject it even though real,
+	// per-user queries would be permitted.
+	SkipConnectionPings bool            `json:"skipConnectionPings,omitempty"`
+	CustomSettings      []CustomSetting `json:"customSettings"`
+	ProxyOptions        *proxy.Options
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -246,6 +254,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.OAuthPassThruAllowFallback = jsonData["oauthPassThruAllowFallback"].(bool)
+		}
+	}
+
+	if jsonData["skipConnectionPings"] != nil {
+		if val, ok := jsonData["skipConnectionPings"].(string); ok {
+			settings.SkipConnectionPings, err = strconv.ParseBool(val)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse skipConnectionPings value: %w", err))
+			}
+		} else {
+			settings.SkipConnectionPings = jsonData["skipConnectionPings"].(bool)
 		}
 	}
 
