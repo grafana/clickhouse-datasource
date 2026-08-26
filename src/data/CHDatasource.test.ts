@@ -1608,6 +1608,42 @@ describe('ClickHouseDatasource', () => {
         expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsVolume);
       });
 
+      it('should offer LogsVolume for a hand-typed SQL query that declares no query type', async () => {
+        // Regression guard: the SQL editor defaults queryType to Table, so requiring a declared
+        // logs type made the feature silently do nothing for queries typed by hand.
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              pluginVersion: '',
+              refId: 'A',
+              editorType: EditorType.SQL,
+              format: 1,
+              rawSql: 'SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 10',
+            } as CHQuery,
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should offer nothing for a SQL query that neither declares logs nor aggregates', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              pluginVersion: '',
+              refId: 'A',
+              editorType: EditorType.SQL,
+              format: 1,
+              rawSql: 'SELECT count() FROM logs',
+            } as CHQuery,
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
       it('should return both types when called without a request', async () => {
         expect(datasource.getSupportedSupplementaryQueryTypes()).toEqual([
           SupplementaryQueryType.LogsVolume,
@@ -1828,13 +1864,15 @@ describe('ClickHouseDatasource', () => {
         ).toBeUndefined();
       });
 
-      it('should return undefined for a SQL target that is not a logs query', () => {
+      it('should build a volume query whatever query type the target declares', () => {
+        // The SQL editor defaults queryType to Table, so a hand-written logs query usually does
+        // not declare itself as logs. Whether to offer a histogram is the gate's decision.
         expect(
           datasource.getSupplementaryLogsVolumeQuery(request, {
-            ...sqlLogsTarget('SELECT created_at FROM logs'),
+            ...sqlLogsTarget('SELECT created_at, level FROM logs'),
             queryType: QueryType.Table,
           })
-        ).toBeUndefined();
+        ).toBeDefined();
       });
 
       it('should return undefined when the SQL cannot be safely aggregated', () => {

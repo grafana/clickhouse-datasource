@@ -246,6 +246,8 @@ export class Datasource
     this.annotations = createAnnotationSupport(this);
   }
 
+  private lastDeclinedLogsVolumeSql?: string;
+
   static logVolumePrefix = 'log-volume-';
   static logsSamplePrefix = 'logs-sample-';
 
@@ -324,34 +326,39 @@ export class Datasource
     const types: SupplementaryQueryType[] = [];
     // Hidden targets are not rendered, so they must not influence the decision or be counted.
     const visibleTargets = dsRequest.targets.filter((t) => !t.hide);
-    const logsTargets = visibleTargets.filter((t) => this.isLogsQuery(t));
 
-    // With no logs target `every` is vacuously true, so we would advertise the type, emit
-    // nothing, and get the empty state instead of the row histogram. Probing with the real
-    // builder keeps this decision from drifting from what actually gets built.
-    const volumeSupported =
-      logsTargets.length > 0 &&
-      logsTargets.every((target) => {
-        try {
-          return this.getSupplementaryLogsVolumeQuery(dsRequest, target) !== undefined;
-        } catch (error) {
-          console.warn('[clickhouse] logs volume feasibility check failed, falling back', error);
-          return false;
-        }
-      });
-    if (volumeSupported) {
+    const probed = visibleTargets.map((target) => {
+      try {
+        return { target, built: this.getSupplementaryLogsVolumeQuery(dsRequest, target) };
+      } catch (error) {
+        console.warn('[clickhouse] logs volume feasibility check failed, falling back', error);
+        return { target, built: undefined };
+      }
+    });
+
+    // A target wants a histogram if it declares itself as logs, or if it is SQL that aggregates
+    // cleanly — the SQL editor defaults queryType to Table, so a hand-written logs query often
+    // does not declare itself. Anything that declares logs but cannot be built vetoes the whole
+    // request, since Grafana merges every volume frame into one chart.
+    const wantsVolume = probed.filter(
+      ({ target, built }) =>
+        this.isDeclaredLogsQuery(target) || (target.editorType === EditorType.SQL && built !== undefined)
+    );
+    if (wantsVolume.length > 0 && wantsVolume.every(({ built }) => built !== undefined)) {
       types.push(SupplementaryQueryType.LogsVolume);
     }
 
-    if (logsTargets.length > 0 && visibleTargets.every((t) => t.editorType === EditorType.Builder)) {
+    if (
+      visibleTargets.some((t) => this.isDeclaredLogsQuery(t)) &&
+      visibleTargets.every((t) => t.editorType === EditorType.Builder)
+    ) {
       types.push(SupplementaryQueryType.LogsSample);
     }
 
     return types;
   }
 
-  /** SQL queries may carry the query type, or only the Grafana format the editor set. */
-  private isLogsQuery(query: CHQuery): boolean {
+  private isDeclaredLogsQuery(query: CHQuery): boolean {
     if (query.editorType === EditorType.Builder) {
       return query.builderOptions?.queryType === QueryType.Logs;
     }
@@ -491,17 +498,16 @@ export class Datasource
     logsVolumeRequest: DataQueryRequest<CHQuery>,
     query: CHQuery
   ): CHQuery | undefined {
-    if (!this.isLogsQuery(query)) {
-      return undefined;
-    }
-
-    // Not logged: this runs on every render and declining is normal. plan.reason names the
-    // construct; the conditions are listed in docs/sources/troubleshooting.md.
     const plan = planSqlLogsVolume(query.rawSql, logsVolumeRequest.scopedVars, this.getDefaultLogsColumns(), {
       database: this.getDefaultLogsDatabase(),
       table: this.getDefaultLogsTable(),
     });
     if (!plan.ok) {
+      // Once per query text rather than per render, so it cannot spam.
+      if (this.lastDeclinedLogsVolumeSql !== query.rawSql) {
+        this.lastDeclinedLogsVolumeSql = query.rawSql;
+        console.warn('Aggregated logs volume will be skipped for this query:', plan.reason);
+      }
       return undefined;
     }
 
