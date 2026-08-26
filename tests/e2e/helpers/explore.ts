@@ -25,6 +25,11 @@ export interface ExploreUrlOptions {
  * SQL mode). Tests that need the Query Builder UI without pre-built
  * builderOptions should call switchToBuilderMode after
  * page.goto(exploreUrl(...)).
+ *
+ * TODO: the pane-state/panes-URL shape here is Grafana-generic, not
+ * ClickHouse-specific (the query record is the only plugin-specific part).
+ * Worth proposing as a shared builder in @grafana/plugin-e2e if other
+ * datasource plugins hit the same need.
  */
 export function exploreUrl(opts: ExploreUrlOptions = {}): string {
   const { datasourceUid = DATASOURCE_UID, queryType, from = 'now-1h', to = 'now', rawSql = '', builderOptions } = opts;

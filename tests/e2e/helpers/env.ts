@@ -1,20 +1,17 @@
 import { test } from '@grafana/plugin-e2e';
+import pluginJson from '../../../src/plugin.json';
 
 // Shared environment constants for the E2E suite: plugin identifiers,
 // datasource uid values for the local and Cloud runs, and the fixture time window.
 
-export const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
+export const PLUGIN_TYPE = pluginJson.id;
 
 // GRAFANA_URL is set only by the Cloud cron workflow (see .github/workflows/cron.yml).
 // Its presence indicates the local provisioning file and seed fixtures do not apply.
 export const isCloudRun = !!process.env.GRAFANA_URL;
 
-// CLOUD_DEFAULT_UID points at `[managed_data_source] - ClickHouse Native (PDC)` on the
-// shared Cloud dev instance. The infra team uses a stable `clickhouse-{protocol}-ds-m`
-// naming convention, but if the datasource is ever re-provisioned and Cloud E2E starts
-// failing with datasource-not-found errors, log into the instance, copy the current uid
-// from the /connections/datasources/edit/<uid> URL, and update this constant (or set
-// DS_E2E_UID in the workflow as a quick override).
+// The Cloud dev instance's ClickHouse datasource uid. If it's ever re-provisioned,
+// update this constant or set DS_E2E_UID in the workflow as an override.
 const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
 const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
 export const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
