@@ -10,6 +10,13 @@
 
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.21.1](https://github.com/grafana/clickhouse-datasource/compare/v4.21.0...v4.21.1) (2026-08-27)
+
+
+### 🐛 Bug Fixes
+
+* **pdc:** apply TLS to native protocol connections made through PDC ([#2146](https://github.com/grafana/clickhouse-datasource/issues/2146)) ([8ee9a17](https://github.com/grafana/clickhouse-datasource/commit/8ee9a1732e00db79bee9d1e808899a0fd5e6324a))
+
 ## [4.21.0](https://github.com/grafana/clickhouse-datasource/compare/v4.20.0...v4.21.0) (2026-08-27)
 
 
