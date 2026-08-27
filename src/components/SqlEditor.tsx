@@ -14,6 +14,7 @@ import { QueryTypeSwitcher } from 'components/queryBuilder/QueryTypeSwitcher';
 import { pluginVersion } from 'utils/version';
 import { useSchemaSuggestionsProvider } from 'hooks/useSchemaSuggestionsProvider';
 import { QueryToolbox } from './QueryToolbox';
+import { MinIntervalEditor } from './MinIntervalEditor';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -33,7 +34,7 @@ function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
 }
 
 export const SqlEditor = (props: SqlEditorProps) => {
-  const { query, onChange, datasource } = props;
+  const { query, onChange, onRunQuery, datasource } = props;
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
   const disposeRegistrationRef = useRef<(() => void) | null>(null);
   const sqlQuery = query as CHSqlQuery;
@@ -116,6 +117,18 @@ export const SqlEditor = (props: SqlEditorProps) => {
     <>
       <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={queryType} onChange={(queryType) => saveChanges({ queryType })} sqlEditor />
+      </InlineFieldRow>
+      <InlineFieldRow className={styles.QueryEditor.queryType}>
+        <MinIntervalEditor
+          minInterval={sqlQuery.timeInterval}
+          onMinIntervalChange={(timeInterval) => {
+            // Deliberately not saveChanges: that recomputes `format` from
+            // queryType, which flips a hand-authored model carrying only
+            // { editorType, format } to the Table format.
+            onChange({ ...sqlQuery, timeInterval: timeInterval || undefined });
+            onRunQuery();
+          }}
+        />
       </InlineFieldRow>
       <div className={styles.Common.wrapper}>
         <CodeEditor
