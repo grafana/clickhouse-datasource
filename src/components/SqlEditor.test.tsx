@@ -1,10 +1,11 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { SqlEditor } from './SqlEditor';
 import * as ui from '@grafana/ui';
 import { mockDatasource } from '__mocks__/datasource';
 import { EditorType } from 'types/sql';
+import { selectors } from 'selectors';
 
 const mockCompletionDispose = jest.fn();
 const mockFormattingDispose = jest.fn();
@@ -98,6 +99,32 @@ describe('SQL Editor', () => {
       />
     );
     expect(screen.queryByText(rawSql)).toBeInTheDocument();
+  });
+
+  it('commits a min interval without rewriting format, then re-runs the query', () => {
+    const rawSql = 'select 1';
+    const onChange = jest.fn();
+    const onRunQuery = jest.fn();
+
+    render(
+      <SqlEditor
+        // No queryType, and a non-default format: the shape a provisioned or
+        // hand-authored SQL model has. saveChanges would reset format to Table.
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL, format: 2 }}
+        onChange={onChange}
+        onRunQuery={onRunQuery}
+        datasource={mockDatasource}
+      />
+    );
+
+    const input = screen.getByTestId(selectors.components.QueryEditor.MinIntervalEditor.input);
+    fireEvent.change(input, { target: { value: '5m' } });
+    fireEvent.blur(input);
+
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({ timeInterval: '5m', format: 2, editorType: EditorType.SQL })
+    );
+    expect(onRunQuery).toHaveBeenCalledTimes(1);
   });
 
   // This unit test checks that the shortcut was set and is associated with 'run-query'
