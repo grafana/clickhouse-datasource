@@ -34,6 +34,14 @@ on:
       - tests/**
   workflow_dispatch:
     inputs:
+      ref:
+        description: >-
+          Tag or commit SHA to build. Leave empty to build the commit the run starts from. Set it
+          to the release tag when a release build is re-run, so the image matches the published
+          version and not the current main HEAD.
+        type: string
+        required: false
+        default: ""
       grafana-image:
         description: >-
           Grafana base image to bundle onto. Leave empty to read the first wave's current image.
@@ -73,6 +81,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      ref: ${{ inputs.ref }}
       grafana-image: ${{ inputs.grafana-image }}
       push-image: ${{ inputs.push-image }}
       trigger-argo: ${{ inputs.trigger-argo }}
