@@ -70,6 +70,8 @@ jobs:
       id-token: write
     with:
       grafana-image: ${{ inputs.grafana-image }}
-      push-image: ${{ inputs.push-image }}
-      trigger-argo: ${{ inputs.trigger-argo }}
-      debug: ${{ inputs.debug }}
+      # On push events the inputs context is empty, and an empty string fails the called
+      # workflow's boolean type validation at startup. `== true` coerces empty to false.
+      push-image: ${{ inputs.push-image == true }}
+      trigger-argo: ${{ inputs.trigger-argo == true }}
+      debug: ${{ inputs.debug == true }}
