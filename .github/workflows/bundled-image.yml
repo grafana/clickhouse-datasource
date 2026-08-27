@@ -10,8 +10,10 @@
 #
 # Push events ship every merge to main to the dev0 wave through the shared pipeline: the
 # build is pushed and the `<plugin-id>-dev` rollout is triggered, gated and benched. The
-# paths filter keeps docs- and test-only commits from rebuilding the image. Manual dispatch
-# keeps the explicit inputs and targets the full rollout.
+# paths filter keeps docs- and test-only commits from rebuilding the image. A published
+# release builds from the tag and triggers the full rollout, so merging a release PR
+# delivers it to Cloud. Manual dispatch keeps the explicit inputs, targets the full
+# rollout, and stays as the fallback.
 #
 # Note on the app grant:
 # The shared workflow reads the Grafana base image from one line of a private infrastructure repo.
@@ -22,6 +24,8 @@
 name: Plugins - Bundled image
 
 on:
+  release:
+    types: [published]
   push:
     branches: [main]
     paths-ignore:
