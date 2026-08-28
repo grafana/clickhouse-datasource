@@ -21,6 +21,7 @@ import (
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
+	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v5"
@@ -467,12 +468,27 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 			timeout = t
 		}
 	}
+
+	// Resolve the row limit from the Grafana SQL config here rather than
+	// leaving it to sqlds, whose fallback chain consults the raw
+	// GF_DATAPROXY_ROW_LIMIT environment variable first. The env var is
+	// inherited unclamped from the Grafana process (0 there would mean
+	// zero-row responses) and can disagree with the value the server-side
+	// limit uses. Sourcing both from sqlCfg.RowLimit keeps them identical.
+	// When the config is absent (Grafana < 11.6), rowLimit stays 0 and sqlds
+	// falls back to its own resolution.
+	var rowLimit int64
+	if sqlCfg, cfgErr := sdkconfig.GrafanaConfigFromContext(ctx).SQL(); cfgErr == nil {
+		rowLimit = sqlCfg.RowLimit
+	}
+
 	return sqlds.DriverSettings{
 		Timeout: time.Second * time.Duration(timeout),
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
 		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
+		RowLimit:        rowLimit,
 		RowCapacityHint: settings.RowCapacityHint,
 	}
 }

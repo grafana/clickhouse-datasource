@@ -1517,3 +1517,61 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		assert.Equal(t, backend.ErrorSourceDownstream, resp.Responses["A"].ErrorSource)
 	})
 }
+
+// TestQueryDataRowLimit exercises the full NewDatasource -> QueryData path and
+// asserts that Grafana's dataproxy.row_limit bounds the rows buffered into the
+// response frame. Regression test for unbounded result sets: before the cap,
+// one oversized query could hold the whole result in plugin memory.
+func TestQueryDataRowLimit(t *testing.T) {
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	port := getEnv("CLICKHOUSE_PORT", "9000")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+
+	ctx := backend.WithGrafanaConfig(context.Background(), backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "100",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+
+	settings := backend.DataSourceInstanceSettings{
+		JSONData:                []byte(fmt.Sprintf(`{"server": "%s", "port": %s, "username": "%s"}`, host, port, username)),
+		DecryptedSecureJSONData: map[string]string{"password": password},
+	}
+
+	dsInstance, err := NewDatasource(ctx, settings)
+	require.NoError(t, err)
+	ds, ok := dsInstance.(backend.QueryDataHandler)
+	require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+	req := &backend.QueryDataRequest{
+		PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+		Queries: []backend.DataQuery{
+			{
+				RefID: "A",
+				JSON:  []byte(`{"rawSql": "SELECT number FROM system.numbers LIMIT 1000", "format": 1}`),
+			},
+		},
+	}
+
+	resp, err := ds.QueryData(ctx, req)
+	require.NoError(t, err)
+	require.Contains(t, resp.Responses, "A")
+	res := resp.Responses["A"]
+	require.NoError(t, res.Error)
+	require.Len(t, res.Frames, 1)
+
+	rows, err := res.Frames[0].RowLen()
+	require.NoError(t, err)
+	assert.Equal(t, 100, rows)
+
+	truncated := false
+	for _, notice := range res.Frames[0].Meta.Notices {
+		if strings.Contains(notice.Text, "limited") {
+			truncated = true
+		}
+	}
+	assert.True(t, truncated, "the response must carry a truncation notice")
+}
+

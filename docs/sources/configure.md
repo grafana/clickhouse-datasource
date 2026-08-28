@@ -187,8 +187,8 @@ Use **Single source** when the data source is dedicated to one logs or traces ta
 | **Max Idle Connections**     | Maximum number of idle connections kept in the pool. Default: `25`.                                                                                                                                                                                                                                                                                    |
 | **Max Open Connections**     | Maximum number of open connections in the pool. Default: `50`.                                                                                                                                                                                                                                                                                         |
 | **Validate SQL**             | When enabled, validates SQL syntax in the query editor.                                                                                                                                                                                                                                                                                                |
-| **Enable row limit**         | When enabled, applies the Grafana row limit setting to query results.                                                                                                                                                                                                                                                                                  |
-| **Row Capacity Hint**        | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. |
+| **Enable row limit**         | The plugin always limits query results to the Grafana row limit setting (default `1000000` rows). When enabled, the plugin also applies the limit on the ClickHouse server, so excess rows are not sent over the network.                                                                                                                               |
+| **Row Capacity Hint**        | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. Values above `1000000` are clamped. |
 | **Suggest Map keys in filter editor** | When enabled, the filter editor probes `Map(...)` columns for distinct keys to populate key suggestions. On large tables with high-cardinality maps this probe can scan a very large number of rows, so disable it to suppress the probe (you can still type Map keys manually). Default: enabled.                                              |
 
 ### Custom ClickHouse settings
@@ -352,7 +352,7 @@ datasources:
       # maxOpenConns: <int>          # max open connections in the pool (default 50)
       # validateSql: <bool>
       # enableRowLimit: <bool>
-      # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled)
+      # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled, max 1000000)
       # enableMapKeysDiscovery: <bool>  # probe Map columns for filter-editor key suggestions (default true)
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
