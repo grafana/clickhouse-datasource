@@ -64,7 +64,7 @@ type Settings struct {
 	// results. It is applied to every query, so leave it at 0 (the default,
 	// disabled) unless queries from this datasource reliably return a similar,
 	// large number of rows. A value larger than the typical result wastes
-	// memory.
+	// memory. Values above maxRowCapacityHint are clamped.
 	RowCapacityHint int64 `json:"rowCapacityHint,omitempty"`
 
 	// EnableSchemaCache gates the in-process cache that memoizes
@@ -83,6 +83,13 @@ type CustomSetting struct {
 }
 
 const secureHeaderKeyPrefix = "secureHttpHeaders."
+
+// maxRowCapacityHint bounds the rowCapacityHint datasource option. The hint
+// sets the capacity of every column's backing slice before any row is
+// scanned, so an arbitrarily large value would allocate that much memory per
+// column up front. 1,000,000 matches Grafana's default dataproxy.row_limit,
+// past which results are truncated anyway.
+const maxRowCapacityHint = 1_000_000
 
 func (settings *Settings) isValid() (err error) {
 	if settings.Host == "" {
@@ -306,6 +313,9 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	// A negative hint is meaningless; treat it as disabled.
 	if settings.RowCapacityHint < 0 {
 		settings.RowCapacityHint = 0
+	}
+	if settings.RowCapacityHint > maxRowCapacityHint {
+		settings.RowCapacityHint = maxRowCapacityHint
 	}
 
 	// Set default values
