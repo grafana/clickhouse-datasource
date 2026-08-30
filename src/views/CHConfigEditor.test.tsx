@@ -141,6 +141,16 @@ describe('ConfigEditor', () => {
     expect(toggle.checked).toBe(true);
   });
 
+  it('shows the cleartext JWT forwarding toggle only when oauthPassThru is on', () => {
+    const { rerender } = render(<ConfigEditor {...mockConfigEditorProps({})} />);
+    expect(document.getElementById('allowCleartextJWTForwarding')).not.toBeInTheDocument();
+
+    rerender(<ConfigEditor {...mockConfigEditorProps({ oauthPassThru: true, allowCleartextJWTForwarding: true })} />);
+    const toggle = document.getElementById('allowCleartextJWTForwarding') as HTMLInputElement;
+    expect(toggle).toBeInTheDocument();
+    expect(toggle.checked).toBe(true);
+  });
+
   it('shows the required-field error on an empty host when config validation is not enabled', () => {
     // On a default install the clickHouseConfigValidation feature toggle is off,
     // so `validation` is undefined. The required host field must still show an
