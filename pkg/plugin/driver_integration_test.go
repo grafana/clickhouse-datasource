@@ -1416,9 +1416,8 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 	}
 	dsInstance, err := NewDatasource(ctx, settings)
 	require.NoError(t, err)
-	// NewDatasource returns a *clickhouseInstance that embeds *sqlds.SQLDatasource
-	// (promoting QueryData), or the bare *sqlds.SQLDatasource on the defensive
-	// fallback path. Assert on the QueryDataHandler interface so either works.
+	// NewDatasource returns a *sqlds.SQLDatasource (promoting QueryData).
+	// Assert on the QueryDataHandler interface.
 	ds, ok := dsInstance.(backend.QueryDataHandler)
 	require.True(t, ok)
 

@@ -12,16 +12,39 @@ menuTitle: Troubleshooting
 title: Troubleshoot ClickHouse data source issues
 weight: 70
 version: 0.1
-last_reviewed: 2026-04-27
+review_date: 2026-08-12
 ---
 
-## Troubleshoot ClickHouse data source issues
+# Troubleshoot ClickHouse data source issues
 
 This guide provides solutions for common errors you may encounter when configuring or using the ClickHouse data source for Grafana.
 
-### Connection Errors
+## Understand error categories
 
-Invalid Server Host
+The plugin classifies connection and configuration errors into categories and prefixes the error message with the category in square brackets. This prefix helps you quickly identify the class of problem:
+
+| Category    | Meaning                                                                                      |
+| ----------- | -------------------------------------------------------------------------------------------- |
+| `[auth]`    | Authentication or authorization failure (invalid credentials, missing privileges, HTTP 401/403). |
+| `[network]` | The Grafana server cannot reach ClickHouse (DNS failure, connection refused, HTTP 502/503).   |
+| `[tls]`     | TLS/SSL handshake or certificate verification failure.                                       |
+| `[timeout]` | The connection or query exceeded the configured timeout.                                     |
+| `[config]`  | A data source setting is missing or invalid (empty host, bad port, invalid JSON).            |
+| `[server]`  | ClickHouse returned a server-side error (`DB::Exception`, HTTP 5xx).                         |
+| `[unknown]` | The error does not match a known pattern.                                                    |
+
+For authentication errors, the plugin appends an additional hint after the error message:
+
+- **`authentication failed`** hint: the credentials or forwarded token may be missing or expired. If using Forward OAuth Identity, sign out and back in to refresh the token.
+- **`access denied`** hint: the authenticated identity is missing a required ClickHouse role or privilege.
+
+Use the category prefix to jump to the matching section in this guide.
+
+## Connection errors
+
+These errors occur when the plugin cannot establish or maintain a connection to the ClickHouse server, or when connection settings are missing or invalid.
+
+#### Invalid server host
 
 **Error message:** "invalid server host. Either empty or not set"
 
@@ -30,12 +53,10 @@ Invalid Server Host
 **Solution:**
 
 1. Open the data source configuration in Grafana.
-2. Verify that the **Server** field contains a valid hostname or IP address.
+2. Verify that the **Server address** field contains a valid hostname or IP address.
 3. Ensure there are no leading or trailing spaces in the host value.
 
----
-
-Invalid Port
+#### Invalid port
 
 **Error message:** "invalid port"
 
@@ -48,21 +69,19 @@ Invalid Port
 3. Use the default port `9000` for native protocol or `8123` for HTTP protocol.
 4. Ensure the port value is a number without any special characters.
 
----
-
-Failed to Create ClickHouse Client
+#### Failed to create ClickHouse client
 
 **Error message:** "failed to create ClickHouse client" or "failed to create data source"
 
-**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This is the most commonly reported ClickHouse error. The error message is intentionally generic — the actual root cause can be any of the issues listed below.
+**Cause:** The plugin was unable to establish a connection to the ClickHouse server. This is the most commonly reported ClickHouse error. The error message is intentionally generic. The actual root cause can be any of the issues listed below.
 
 **Solution:**
 
 Work through the following checks in order. Most cases are resolved by one of the first four items.
 
-1. **Clear the Default database field.** This is one of the most common fixes. If you are connecting to **ClickHouse Cloud**, leave it blank — setting an explicit database name that does not match the service's configured database causes this error. For details, see [Default database guidance](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#default-database-guidance).
+1. **Clear the Default database field.** This is one of the most common fixes. If you are connecting to **ClickHouse Cloud**, leave it blank. Setting an explicit database name that does not match the service's configured database causes this error. For details, refer to [Default database guidance](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#default-database-guidance).
 2. **Verify credentials.** Confirm that the username and password are correct for the ClickHouse server. A typo or stale password is a frequent cause.
-3. **Check ClickHouse user permissions.** The connection test may pass, but queries can still fail if the user lacks permission to modify settings such as `max_execution_time`. See [Required SETTINGS permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#required-settings-permissions).
+3. **Check ClickHouse user permissions.** The connection test may pass, but queries can still fail if the user lacks permission to modify settings such as `max_execution_time`. Refer to [Required SETTINGS permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#required-settings-permissions).
 4. **Confirm network connectivity.** Verify that the ClickHouse server is running and reachable from the Grafana server on the configured port. Ensure no firewall rules or security groups are blocking the connection.
 5. **Review the hostname and port.** Check for leading/trailing spaces and confirm the port matches the protocol (Native: 9000/9440, HTTP: 8123/8443).
 6. **Verify TLS configuration.** If using TLS/SSL, confirm that certificates are correctly configured and the port supports TLS.
@@ -70,9 +89,7 @@ Work through the following checks in order. Most cases are resolved by one of th
 8. **Test from the command line.** Run `clickhouse-client` from the Grafana server to isolate whether the problem is network/ClickHouse-side or Grafana-side.
 9. **Check Grafana server logs.** The server logs often contain a more detailed error message that narrows down the root cause.
 
----
-
-Connection Timeout
+#### Connection timeout
 
 **Error message:** "connection timeout" or "the operation was cancelled before starting: context deadline exceeded"
 
@@ -85,9 +102,7 @@ Connection Timeout
 3. Check for network latency or connectivity issues between Grafana and ClickHouse.
 4. Ensure no firewall or security group is blocking the connection.
 
----
-
-Operation Cancelled During Execution
+#### Operation cancelled during execution
 
 **Error message:** "the operation was cancelled during execution: context deadline exceeded"
 
@@ -100,9 +115,7 @@ Operation Cancelled During Execution
 3. Check if the ClickHouse server is under heavy load.
 4. Consider adding appropriate indexes to your ClickHouse tables.
 
----
-
-Plugin Not Found After Installation (Grafana Cloud)
+#### Plugin not found after installation (Grafana Cloud)
 
 **Error message:** 404 error when adding the ClickHouse data source, or the plugin does not appear in the data source list after installation.
 
@@ -114,74 +127,7 @@ Plugin Not Found After Installation (Grafana Cloud)
 2. After the channel change takes effect, reinstall or re-add the ClickHouse data source.
 3. Once the plugin is working, you can discuss with support whether switching back to the Fast channel is safe for your use case.
 
----
-
-### Authentication Errors
-
-Invalid Username
-
-**Error message:** "username is either empty or not set"
-
-**Cause:** The username field is empty or was not configured in the data source settings.
-
-**Solution:**
-
-1. Open the data source configuration in Grafana.
-2. Enter a valid ClickHouse username in the **Username** field.
-3. Verify that the user exists in ClickHouse and has appropriate permissions.
-
----
-
-Invalid Password
-
-**Error message:** "password is either empty or not set"
-
-**Cause:** The password field is empty or was not configured when authentication requires a password.
-
-**Solution:**
-
-1. Open the data source configuration in Grafana.
-2. Enter the correct password in the **Password** field.
-3. Verify that the password matches the one configured in ClickHouse for the specified user.
-
----
-
-### TLS/SSL Certificate Errors
-
-Invalid CA Certificate
-
-**Error message:** "failed to parse TLS CA PEM certificate"
-
-**Cause:** The CA certificate provided is not in valid PEM format or is corrupted.
-
-**Solution:**
-
-1. Verify that the CA certificate is in PEM format (begins with `-----BEGIN CERTIFICATE-----`).
-2. Ensure the entire certificate content is copied, including the BEGIN and END markers.
-3. Check that there are no extra spaces or line breaks in the certificate.
-4. Regenerate the CA certificate if it may be corrupted.
-
----
-
-Invalid Client Certificate
-
-**Error message:** "tls: failed to find any PEM data in certificate input"
-
-**Cause:** The client certificate or key provided is not in valid PEM format or is empty.
-
-**Solution:**
-
-1. Verify that both the client certificate and client key are in PEM format.
-2. Ensure the client certificate begins with `-----BEGIN CERTIFICATE-----`.
-3. Ensure the client key begins with `-----BEGIN PRIVATE KEY-----` or `-----BEGIN RSA PRIVATE KEY-----`.
-4. Check that the certificate and key match (were generated together).
-5. Verify that the entire content is copied without truncation.
-
----
-
-### Protocol Errors
-
-Invalid Protocol
+#### Invalid protocol
 
 **Error message:** "protocol is invalid, use native or http"
 
@@ -190,14 +136,10 @@ Invalid Protocol
 **Solution:**
 
 1. Open the data source configuration in Grafana.
-2. Set the **Protocol** to either `native` or `http`.
-3. Use `native` (port 9000) for better performance or `http` (port 8123) for HTTP-based connectivity.
+1. Set the **Protocol** to either `native` or `http`.
+1. Use `native` (port 9000) for better performance or `http` (port 8123) for HTTP-based connectivity.
 
----
-
-### Configuration Parsing Errors
-
-Invalid JSON Configuration
+#### Invalid JSON configuration
 
 **Error message:** "could not parse json"
 
@@ -206,13 +148,11 @@ Invalid JSON Configuration
 **Solution:**
 
 1. If you are provisioning the data source via YAML/JSON files, validate the JSON syntax.
-2. Use a JSON validator to check for syntax errors.
-3. Ensure all string values are properly quoted and special characters are escaped.
-4. Re-save the data source configuration through the Grafana UI.
+1. Use a JSON validator to check for syntax errors.
+1. Ensure all string values are properly quoted and special characters are escaped.
+1. Re-save the data source configuration through the Grafana UI.
 
----
-
-## Could Not Parse Configuration Values
+#### Could not parse configuration values
 
 **Error messages:**
 
@@ -228,12 +168,10 @@ Invalid JSON Configuration
 **Solution:**
 
 1. Verify that boolean values are set to `true` or `false` (without quotes in JSON, or as strings `"true"`/`"false"`).
-2. Verify that numeric values like port are valid integers.
-3. Re-configure the data source through the Grafana UI to ensure proper value types.
+1. Verify that numeric values like port are valid integers.
+1. Re-configure the data source through the Grafana UI to ensure proper value types.
 
----
-
-Invalid Timeout Values
+#### Invalid timeout values
 
 **Error messages:**
 
@@ -245,14 +183,114 @@ Invalid Timeout Values
 **Solution:**
 
 1. Open the data source configuration in Grafana.
-2. Ensure the **Dial Timeout** and **Query Timeout** fields contain valid integer values (in seconds).
-3. Remove any non-numeric characters from the timeout fields.
+1. Ensure the **Dial Timeout** and **Query Timeout** fields contain valid integer values (in seconds).
+1. Remove any non-numeric characters from the timeout fields.
 
----
+## Authentication errors
 
-### Permission and Settings Errors
+These errors indicate that the plugin reached the ClickHouse server but the provided credentials were rejected or missing.
 
-Setting Is Locked (readonly)
+#### Invalid username
+
+**Error message:** "username is either empty or not set"
+
+**Cause:** The username field is empty or was not configured in the data source settings.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+2. Enter a valid ClickHouse username in the **Username** field.
+3. Verify that the user exists in ClickHouse and has appropriate permissions.
+
+#### Invalid password
+
+**Error message:** "password is either empty or not set"
+
+**Cause:** The password field is empty or was not configured when authentication requires a password.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+2. Enter the correct password in the **Password** field.
+3. Verify that the password matches the one configured in ClickHouse for the specified user.
+
+#### JWT authentication requires a secure (TLS) connection
+
+**Error message:** "JWT authentication requires a secure (TLS) connection"
+
+**Cause:** **Forward OAuth Identity** is enabled but the data source does not have a secure (TLS) connection configured. Forwarding a user's OAuth token over an unencrypted connection would expose it to interception.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. Enable **Secure connection**.
+1. Set the **Port** to a TLS-enabled port (8443 for HTTP, 9440 for Native).
+1. Configure a valid CA certificate if the ClickHouse server uses a self-signed certificate.
+
+#### Forward OAuth Identity and Skip TLS Verify cannot be combined
+
+**Error message:** "the \"Forward OAuth Identity\" and \"Skip TLS Verify\" options cannot be combined: forwarding a user token over an unverified TLS connection would expose it to interception"
+
+**Cause:** Both **Forward OAuth Identity** and **Skip TLS Verify** are enabled. The plugin blocks this combination because an unverified TLS connection is vulnerable to man-in-the-middle attacks, and forwarding a real user's token over such a connection would expose it.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. Disable **Skip TLS Verify**.
+1. If the ClickHouse server uses a self-signed certificate, provide the CA certificate in the TLS settings instead of skipping verification.
+
+#### No user identity for backend query (Forward OAuth Identity)
+
+**Error message:** "this query carries no user identity but \"Forward OAuth Identity\" is enabled; it is running outside a user session (for example, an alert rule). Enable \"Allow service account fallback\" on the data source to let these queries run with the configured username/password, or ensure the request forwards a user OAuth token"
+
+**Cause:** An alert rule, recording rule, or other backend operation attempted to query ClickHouse, but **Forward OAuth Identity** is enabled and the query has no user session to forward. By default the plugin rejects these queries rather than silently falling back to the shared service account.
+
+**Solution:**
+
+1. Open the data source configuration in Grafana.
+1. In the **Database credentials** section, enable **Allow service account fallback**.
+1. Ensure the configured username and password have the permissions needed by your alert queries.
+
+{{< admonition type="note" >}}
+Queries that fall back to the service account are not subject to per-user row policies, quotas, or query-log attribution. Scope the service account to the least privilege your alert queries require.
+{{< /admonition >}}
+
+## TLS/SSL certificate errors
+
+These errors occur during the TLS handshake when certificates are malformed, expired, or not trusted.
+
+#### Invalid CA certificate
+
+**Error message:** "failed to parse TLS CA PEM certificate"
+
+**Cause:** The CA certificate provided is not in valid PEM format or is corrupted.
+
+**Solution:**
+
+1. Verify that the CA certificate is in PEM format (begins with `-----BEGIN CERTIFICATE-----`).
+2. Ensure the entire certificate content is copied, including the BEGIN and END markers.
+3. Check that there are no extra spaces or line breaks in the certificate.
+4. Regenerate the CA certificate if it may be corrupted.
+
+#### Invalid client certificate
+
+**Error message:** "tls: failed to find any PEM data in certificate input"
+
+**Cause:** The client certificate or key provided is not in valid PEM format or is empty.
+
+**Solution:**
+
+1. Verify that both the client certificate and client key are in PEM format.
+2. Ensure the client certificate begins with `-----BEGIN CERTIFICATE-----`.
+3. Ensure the client key begins with `-----BEGIN PRIVATE KEY-----` or `-----BEGIN RSA PRIVATE KEY-----`.
+4. Check that the certificate and key match (were generated together).
+5. Verify that the entire content is copied without truncation.
+
+## Permission and settings errors
+
+These errors occur when the connection succeeds but the ClickHouse user lacks permission to modify settings that the plugin requires at query time.
+
+#### Setting is locked (readonly)
 
 **Error message:** "DB::Exception: Cannot modify 'max_execution_time': Setting is locked (in readonly mode)"
 
@@ -271,15 +309,15 @@ Setting Is Locked (readonly)
 
 For more details on configuring permissions, refer to [ClickHouse user and permissions](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#clickhouse-user-and-permissions).
 
----
+## Query builder issues
 
-### Query Builder Issues
+These issues affect the visual query builder's schema drop-downs and autocomplete rather than query execution itself.
 
-Empty Database, Table, or Column Dropdowns
+#### Empty database, table, or column drop-downs
 
-**Symptoms:** The database, table, or column dropdowns in the query builder show no options, or they briefly attempt to load and then appear empty.
+**Symptoms:** The database, table, or column drop-downs in the query builder show no options, or they briefly attempt to load and then appear empty.
 
-**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these dropdowns. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the dropdowns will be empty without a visible error message in the panel — the error is logged only to the browser console.
+**Cause:** The plugin queries ClickHouse system tables (`system.databases`, `system.columns`) to populate these drop-downs. If the ClickHouse user lacks permission to read those system tables, or if a network or timeout issue prevents the query from completing, the drop-downs are empty without a visible error message in the panel. The error is logged only to the browser console.
 
 **Solution:**
 
@@ -288,9 +326,7 @@ Empty Database, Table, or Column Dropdowns
 3. If the ClickHouse server is slow or under heavy load, the schema query may time out. Wait and try again, or optimize the server's load.
 4. Test the data source connection with **Save & test** to confirm basic connectivity.
 
----
-
-Column Value Suggestions Time Out on Large Tables
+#### Column value suggestions time out on large tables
 
 **Symptoms:** Autocomplete suggestions for column values in the query builder are slow or return no results.
 
@@ -302,11 +338,11 @@ Column Value Suggestions Time Out on Large Tables
 2. Create a materialized view or dictionary with pre-aggregated distinct values for frequently filtered columns.
 3. Add a `clickhouse_adhoc_query` variable with a targeted `SELECT` query instead of relying on schema-driven suggestions.
 
----
+## Query errors
 
-### Query Errors
+These errors occur when a query is sent to ClickHouse but fails during parsing or execution.
 
-ClickHouse Database Exception
+#### ClickHouse database exception
 
 **Error message:** "DB::Exception: [error details]"
 
@@ -320,18 +356,19 @@ ClickHouse Database Exception
 4. Ensure the configured user has permission to access the requested data.
 5. Test the query directly in `clickhouse-client` to isolate the issue.
 
----
-
-Macro Argument Count Error
+#### Macro argument count error
 
 **Error messages:**
 
-- "$\_\_timeFilter: expected 1 argument, received [n]"
-- "$\_\_timeFilter_ms: expected 1 argument, received [n]"
-- "$\_\_dateFilter: expected 1 argument, received [n]"
-- "$\_\_dateTimeFilter: expected 2 arguments, received [n]"
-- "$\_\_timeInterval: expected 1 argument, received [n]"
-- "$\_\_timeInterval_ms: expected 1 argument, received [n]"
+- "$\_\_timeFilter expected 1 argument(s), received [n]"
+- "$\_\_timeFilter_ms expected 1 argument(s), received [n]"
+- "$\_\_dateFilter expected 1 argument(s), received [n]"
+- "$\_\_dateTimeFilter expected 2 argument(s), received [n]"
+- "$\_\_timeInterval expected 1 argument(s), received [n]"
+- "$\_\_timeInterval_ms expected 1 argument(s), received [n]"
+- "$\_\_timeFrom expected 1 argument(s), received [n]"
+- "$\_\_timeTo expected 1 argument(s), received [n]"
+- "$\_\_timeGroup expected 2 argument(s), received [n]"
 
 **Cause:** A Grafana macro was used with the wrong number of arguments.
 
@@ -344,11 +381,12 @@ Macro Argument Count Error
    - `$__dateTimeFilter(dateColumn, timeColumn)` - requires 2 arguments
    - `$__timeInterval(column)` - requires 1 argument (the time column)
    - `$__timeInterval_ms(column)` - requires 1 argument (the time column)
+   - `$__timeFrom(column)` - requires 1 argument (the time column)
+   - `$__timeTo(column)` - requires 1 argument (the time column)
+   - `$__timeGroup(column, interval)` - requires 2 arguments (the time column and an interval such as `5m`)
 2. Ensure arguments are separated by commas if multiple are required.
 
----
-
-SQL Parse Error
+#### SQL parse error
 
 **Error message:** Parse error with line and column information
 
@@ -361,11 +399,11 @@ SQL Parse Error
 3. Verify that ClickHouse-specific syntax is being used correctly.
 4. Use the Query Builder mode to construct queries if you're unfamiliar with ClickHouse SQL.
 
----
+## Ad hoc filter errors
 
-### Ad Hoc Filter Errors
+These errors relate to the ad hoc filter variable type, which injects filters into queries at runtime using ClickHouse's `additional_table_filters` setting.
 
-Unable to Apply Ad Hoc Filters
+#### Unable to apply ad hoc filters
 
 **Error message:** "Unable to apply ad hoc filters. Upgrade ClickHouse to >=22.7 or remove ad hoc filters for the dashboard."
 
@@ -377,9 +415,7 @@ Unable to Apply Ad Hoc Filters
 2. Alternatively, remove the ad hoc filter variable from your dashboard.
 3. Use regular template variables as a workaround if upgrading is not possible.
 
----
-
-Failed to Get Table from Ad Hoc Query
+#### Failed to get table from ad hoc query
 
 **Error message:** "Failed to get table from adhoc query."
 
@@ -391,9 +427,7 @@ Failed to Get Table from Ad Hoc Query
 2. If using a complex query with subqueries or CTEs, consider using a simpler query structure.
 3. Explicitly specify the table in the ad hoc filter configuration variable.
 
----
-
-Ad Hoc Filters Produce Incorrect or Missing Results
+#### Ad hoc filters produce incorrect or missing results
 
 **Symptoms:**
 
@@ -405,12 +439,10 @@ Ad Hoc Filters Produce Incorrect or Missing Results
 1. **Upgrade to plugin v4.12.0 or later.** Both issues were fixed in v4.12.0:
    - Column names with dots are now handled correctly ([#1481](https://github.com/grafana/clickhouse-datasource/pull/1481)).
    - You can now manually control where ad hoc filters are placed in a query, which prevents silent injection failures in complex `WHERE` clauses ([#1488](https://github.com/grafana/clickhouse-datasource/pull/1488)).
-2. **Manual filter placement (v4.12.0+):** If you have a complex query where automatic filter injection fails, use the `$__adHocFilters('table_name')` macro to explicitly specify where filters are applied. Place it in the `SETTINGS` clause. For details and examples, see [Apply ad hoc filters manually](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#apply-ad-hoc-filters-manually-with-__adHocFilters).
+2. **Manual filter placement (v4.12.0+):** If you have a complex query where automatic filter injection fails, use the `$__adHocFilters('table_name')` macro to explicitly specify where filters are applied. Place it in the `SETTINGS` clause. For details and examples, refer to [Apply ad hoc filters manually](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#apply-ad-hoc-filters-manually-with-__adhocfilters).
 3. **Older plugin versions:** If you cannot upgrade, avoid column names with dots in ad hoc filters (use a ClickHouse [alias](https://clickhouse.com/docs/en/sql-reference/statements/create/table#alias) to flatten nested paths), and simplify complex `WHERE` clauses or move them into a subquery.
 
----
-
-Invalid Ad Hoc Filter
+#### Invalid ad hoc filter
 
 **Error message:** "Invalid adhoc filter will be ignored: [filter details]"
 
@@ -422,11 +454,11 @@ Invalid Ad Hoc Filter
 2. Check the filter configuration in your dashboard variables.
 3. Remove any incomplete filter definitions.
 
----
+## Log context errors
 
-### Log Context Errors
+These errors appear when using the log context panel, which fetches surrounding log lines for a selected row.
 
-Missing Query for Log Context
+#### Missing query for log context
 
 **Error message:** "Missing query for log context"
 
@@ -437,9 +469,7 @@ Missing Query for Log Context
 1. Ensure you're using the log context feature with a valid logs query.
 2. Verify that the query is using the Builder editor mode.
 
----
-
-Missing Log Context Options
+#### Missing log context options
 
 **Error message:** "Missing log context options for query"
 
@@ -450,9 +480,7 @@ Missing Log Context Options
 1. This is typically an internal error. Try refreshing the page.
 2. If the issue persists, report it as a bug.
 
----
-
-Log Context Only Works for Builder Queries
+#### Log context only works for builder queries
 
 **Error message:** "Log context feature only works for builder queries"
 
@@ -463,9 +491,7 @@ Log Context Only Works for Builder Queries
 1. Switch your query from **SQL Editor** mode to **Builder** mode.
 2. Configure your logs query using the Builder interface.
 
----
-
-Missing Time Column for Log Context
+#### Missing time column for log context
 
 **Error message:** "Missing time column for log context"
 
@@ -476,9 +502,7 @@ Missing Time Column for Log Context
 1. In the Query Builder, ensure you've selected a column with the **Time** hint.
 2. Verify that your logs table has a timestamp column and it's properly configured.
 
----
-
-Unable to Match Log Context Columns
+#### Unable to match log context columns
 
 **Error message:** "Unable to match any log context columns"
 
@@ -490,11 +514,11 @@ Unable to Match Log Context Columns
 2. Ensure the configured context column names match the actual column names in your query results.
 3. Check that the context columns are included in your SELECT statement.
 
----
+## Proxy and Private Data Connect (PDC) errors
 
-### Proxy and Private Data Connect (PDC) Errors
+These errors relate to Private Data Connect, which tunnels connections from Grafana Cloud to ClickHouse servers behind a firewall.
 
-Unable to Cast SOCKS Proxy Dialer
+#### Unable to cast SOCKS proxy dialer
 
 **Error message:** "unable to cast SOCKS proxy dialer to context proxy dialer"
 
@@ -507,9 +531,7 @@ Unable to Cast SOCKS Proxy Dialer
 3. Review Grafana server logs for more detailed error information.
 4. Ensure your Grafana version supports the PDC feature.
 
----
-
-PDC Connection Fails with No Agent Logs
+#### PDC connection fails with no agent logs
 
 **Error message:** "check PDC agent logs" (but no relevant logs appear in the PDC agent pod)
 
@@ -526,9 +548,7 @@ PDC Connection Fails with No Agent Logs
 4. After restarting, verify the agent logs show a successful registration message before retrying the data source connection.
 5. Confirm that the PDC agent can reach the ClickHouse server on the required port from within its network.
 
----
-
-Alerting Times Out via PDC While Dashboards Work
+#### Alerting times out via PDC while dashboards work
 
 **Error message:** "i/o timeout", "datasourceError", or alert rule evaluations fail while dashboard queries using the same data source succeed.
 
@@ -538,12 +558,10 @@ Alerting Times Out via PDC While Dashboards Work
 
 1. Ensure you are using the **Grafana ClickHouse plugin** (`grafana-clickhouse-datasource`), not a community or third-party ClickHouse plugin. The Grafana plugin has better PDC compatibility for backend operations like alerting.
 2. Upgrade to the latest plugin version. PDC-related alerting fixes have been included in recent releases.
-3. Verify the PDC agent is healthy and not silently disconnected (see [PDC Connection Fails with No Agent Logs](#pdc-connection-fails-with-no-agent-logs) above).
+3. Verify the PDC agent is healthy and not silently disconnected (refer to [PDC connection fails with no agent logs](#pdc-connection-fails-with-no-agent-logs) above).
 4. Check the Grafana alerting logs for detailed timeout or connection errors by filtering for the data source name or UID.
 
----
-
-Stale PDC Token — Metrics Suddenly Lost
+#### Stale PDC token: metrics suddenly lost
 
 **Symptoms:** ClickHouse dashboards that were previously working stop loading data. The PDC agent pod appears to be running, but all queries return errors or empty results. No obvious error is shown in Grafana.
 
@@ -557,13 +575,13 @@ Stale PDC Token — Metrics Suddenly Lost
    ```
 2. If restarting doesn't resolve it, regenerate the PDC agent token in the Grafana Cloud portal and redeploy the agent with the new token.
 3. After the agent is back, click **Save & test** on the data source to confirm connectivity.
-4. To prevent recurrence, set up monitoring on the PDC agent pod — for example, a liveness probe or periodic health check that verifies the agent can relay a test query.
+4. To prevent recurrence, set up monitoring on the PDC agent pod, for example, a liveness probe or periodic health check that verifies the agent can relay a test query.
 
----
+## Header parsing errors
 
-### Header Parsing Errors
+These errors occur when the plugin cannot parse forwarded HTTP headers from Grafana. They typically affect configurations that use **Forward Grafana HTTP headers**.
 
-Couldn't Parse Message as Args
+#### Couldn't parse message as args
 
 **Error message:** "Couldn't parse message as args"
 
@@ -575,9 +593,7 @@ Couldn't Parse Message as Args
 2. Check if **Forward Grafana Headers** is enabled and configured correctly.
 3. Review Grafana server logs for more details.
 
----
-
-Couldn't Parse Grafana HTTP Headers
+#### Couldn't parse Grafana HTTP headers
 
 **Error message:** "Couldn't parse grafana HTTP headers"
 
@@ -589,15 +605,15 @@ Couldn't Parse Grafana HTTP Headers
 2. Check that custom HTTP headers are properly formatted.
 3. Review the data source configuration for any malformed header entries.
 
----
+## Data display issues
 
-### Data Display Issues
+These issues affect how query results are rendered in Grafana panels rather than query execution itself.
 
-Timestamp Millisecond Precision Lost
+#### Timestamp millisecond precision lost
 
 **Symptoms:** ClickHouse `DateTime64` timestamps with millisecond (or higher) precision display in Grafana with only second-level granularity. Milliseconds are truncated or shown as `.000` in both Explore and dashboard panels.
 
-**Cause:** This is a known Grafana platform limitation — Grafana's default time formatter displays timestamps at second precision regardless of the underlying data. The ClickHouse plugin returns the full-precision value, but Grafana's display layer truncates it.
+**Cause:** This is a known Grafana platform limitation. Grafana's default time formatter displays timestamps at second precision regardless of the underlying data. The ClickHouse plugin returns the full-precision value, but Grafana's display layer truncates it.
 
 **Workaround for dashboards:**
 
@@ -620,15 +636,15 @@ WHERE $__timeFilter(timestamp)
 This is a Grafana platform limitation, not specific to the ClickHouse plugin. A feature request for native sub-second display has been filed with the Grafana team.
 {{< /admonition >}}
 
----
+## Upgrade and compatibility issues
 
-### Upgrade and Compatibility Issues
+These issues can occur after upgrading the plugin version or the Grafana version.
 
-v3 to v4 Migration Problems
+#### v3 to v4 migration problems
 
 **Symptoms:** After upgrading from plugin v3 to v4, data source settings appear to be missing (blank host, no timeout), or saved dashboard queries no longer load in the query editor.
 
-**Cause:** Plugin v4 renamed several configuration fields (`server` to `host`, `timeout` to `dialTimeout`) and restructured the query model (the `queryType` field changed from `sql`/`builder` to the new `editorType` format). The plugin includes automatic migration logic, but in some cases — especially with provisioned data sources — the migration may not run until the configuration page is opened.
+**Cause:** Plugin v4 renamed several configuration fields (`server` to `host`, `timeout` to `dialTimeout`) and restructured the query model (the `queryType` field changed from `sql`/`builder` to the new `editorType` format). The plugin includes automatic migration logic, but in some cases, especially with provisioned data sources, the migration may not run until the configuration page is opened.
 
 **Solution:**
 
@@ -639,9 +655,7 @@ v3 to v4 Migration Problems
 3. For dashboard queries that fail to load, open the dashboard and re-save it. The plugin automatically migrates v3 query formats to v4 when the query editor loads.
 4. If individual panels still show errors, switch to the **SQL Editor** tab, verify the query, and re-save the panel.
 
----
-
-Log Volume Not Showing in SQL Editor
+#### Log volume not showing in SQL editor
 
 **Symptoms:** The log volume histogram does not appear above log results when using the SQL editor in Explore. It works in the query builder.
 
@@ -652,9 +666,7 @@ Log Volume Not Showing in SQL Editor
 1. Upgrade Grafana to version 12.4.0 or later.
 2. Alternatively, switch the query to the **Builder** editor mode, which supports log volume on older Grafana versions.
 
----
-
-Connection Pool Saturation (Sudden Slowness)
+#### Connection pool saturation (sudden slowness)
 
 **Symptoms:** Queries become progressively slower or time out under concurrent load, even though individual queries run quickly when tested in isolation. The ClickHouse server itself is not overloaded.
 
@@ -673,9 +685,7 @@ Connection Pool Saturation (Sudden Slowness)
 3. Monitor the ClickHouse server's `system.metrics` table (`CurrentMetric_TCPConnection`) to see whether the connection count from Grafana is approaching the server-side limit.
 4. If using HTTP protocol, check whether a reverse proxy between Grafana and ClickHouse has its own connection limits.
 
----
-
-### Getting More Help
+## Get additional help
 
 If you continue to experience issues after trying the solutions in this guide:
 

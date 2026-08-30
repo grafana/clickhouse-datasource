@@ -1,0 +1,457 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_GRAFANA_CLICKHOUSE_DATASOURCE",
+      "label": "ClickHouse",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "grafana-clickhouse-datasource",
+      "pluginName": "ClickHouse"
+    }
+  ],
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.0.1"
+    },
+    {
+      "type": "datasource",
+      "id": "grafana-clickhouse-datasource",
+      "name": "ClickHouse",
+      "version": "2.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "bargauge",
+      "name": "Bar gauge",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "logs",
+      "name": "Logs",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "piechart",
+      "name": "Pie chart",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "table",
+      "name": "Table",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
+  "description": "Explore OpenTelemetry logs in ClickHouse where attribute columns use the native JSON type (ClickStack schema) instead of Map. Top services with per-service log volume and samples.",
+  "editable": true,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["clickhouse", "otel"],
+      "title": "OpenTelemetry Dashboards",
+      "type": "dashboards"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": { "mode": "normal" },
+            "lineWidth": 0,
+            "pointSize": 5,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "/fatal|FATAL/i" }, "properties": [{ "id": "displayName", "value": "fatal" }, { "id": "color", "value": { "fixedColor": "#C4162A", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/error|Error/i" }, "properties": [{ "id": "displayName", "value": "error" }, { "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/warn|Warning/i" }, "properties": [{ "id": "displayName", "value": "warning" }, { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/info|Information/i" }, "properties": [{ "id": "displayName", "value": "info" }, { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/debug|Debug/i" }, "properties": [{ "id": "displayName", "value": "debug" }, { "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/(?:^count )?TRACE$|(?:^count )?Trace$/i" }, "properties": [{ "id": "displayName", "value": "trace" }, { "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 1 },
+      "id": 1,
+      "interval": "${interval}",
+      "description": "Stacked log volume by SeverityText across the services and levels selected above.",
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
+      "title": "Log Volume by Level",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(SeverityText IN (${level_filter:singlequote}), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A",
+          "format": 0
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "thresholds": { "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 1000 }, { "color": "red", "value": 10000 }] }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 7, "x": 0, "y": 6 },
+      "id": 2,
+      "description": "Log volume per service in the current time range, honoring the Service, Level, and Search filters. Highest-volume first, up to 15.",
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["sum"], "fields": "/Count/", "values": true },
+        "showUnfilled": true,
+        "minVizHeight": 16,
+        "minVizWidth": 80
+      },
+      "title": "Services",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT\n  ServiceName AS Service,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(SeverityText IN (${level_filter:singlequote}), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Service\nORDER BY Count DESC\nLIMIT 15",
+          "refId": "A",
+          "format": 0
+        }
+      ],
+      "type": "bargauge"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "/fatal|FATAL/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#C4162A", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/error|Error/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/warn|Warning/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/info|Information/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/debug|Debug/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/TRACE|Trace/" }, "properties": [{ "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 5, "w": 5, "x": 7, "y": 6 },
+      "id": 4,
+      "description": "Share of log lines by SeverityText. Useful for spotting unusual error spikes at a glance.",
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "values": ["value"] },
+        "pieType": "donut",
+        "reduceOptions": { "calcs": ["sum"], "fields": "/Count/", "values": true },
+        "tooltip": { "mode": "single" }
+      },
+      "title": "Level Distribution",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level\nORDER BY Count DESC",
+          "refId": "A",
+          "format": 0
+        }
+      ],
+      "type": "piechart"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "align": "auto",
+            "filterable": false,
+            "inspect": true
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Count" }, "properties": [{ "id": "custom.width", "value": 70 }] },
+          { "matcher": { "id": "byName", "options": "Level" }, "properties": [{ "id": "custom.width", "value": 60 }] },
+          { "matcher": { "id": "byName", "options": "Service" }, "properties": [{ "id": "custom.width", "value": 100 }] }
+        ]
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 6 },
+      "id": 3,
+      "description": "Most frequent ERROR / WARN / FATAL bodies across the selected services. Common id-style tokens (userId, traceId, etc.) are stripped before grouping so similar messages cluster.",
+      "options": {
+        "showHeader": true,
+        "sortBy": [{ "displayName": "Count", "desc": true }],
+        "footer": { "show": false }
+      },
+      "title": "Top Error Messages",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
+          "refId": "A",
+          "format": 0
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 11 },
+      "id": 200,
+      "repeat": "service",
+      "repeatDirection": "v",
+      "title": "$service",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "stacking": { "mode": "normal" },
+            "lineWidth": 0,
+            "showPoints": "never"
+          }
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "/fatal|FATAL/i" }, "properties": [{ "id": "displayName", "value": "fatal" }, { "id": "color", "value": { "fixedColor": "#C4162A", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/error|Error/i" }, "properties": [{ "id": "displayName", "value": "error" }, { "id": "color", "value": { "fixedColor": "#F2495C", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/warn|Warning/i" }, "properties": [{ "id": "displayName", "value": "warning" }, { "id": "color", "value": { "fixedColor": "#FF9830", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/info|Information/i" }, "properties": [{ "id": "displayName", "value": "info" }, { "id": "color", "value": { "fixedColor": "#73BF69", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/debug|Debug/i" }, "properties": [{ "id": "displayName", "value": "debug" }, { "id": "color", "value": { "fixedColor": "#5794F2", "mode": "fixed" } }] },
+          { "matcher": { "id": "byRegexp", "options": "/(?:^count )?TRACE$|(?:^count )?Trace$/i" }, "properties": [{ "id": "displayName", "value": "trace" }, { "id": "color", "value": { "fixedColor": "#B877D9", "mode": "fixed" } }] }
+        ]
+      },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 12 },
+      "id": 201,
+      "interval": "${interval}",
+      "description": "Log volume by SeverityText for $service.",
+      "options": { "legend": { "displayMode": "list", "placement": "bottom", "calcs": ["sum"] }, "tooltip": { "mode": "multi" } },
+      "links": [
+      ],
+      "title": "Log Volume: $service",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  SeverityText AS metric,\n  count() AS count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = ${service:singlequote}\n  AND $__conditionalAll(SeverityText IN (${level_filter:singlequote}), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY time, metric\nORDER BY time",
+          "refId": "A",
+          "format": 0
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 17 },
+      "id": 202,
+      "description": "Recent log lines for $service. Click a row to expand attributes. JSON-shaped bodies are pretty-printed.",
+      "options": {
+        "showTime": true,
+        "showLabels": true,
+        "showCommonLabels": false,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "enableLogDetails": true,
+        "dedupStrategy": "none",
+        "sortOrder": "Descending"
+      },
+      "links": [
+      ],
+      "title": "Log Samples: $service",
+      "targets": [
+        {
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+          "editorType": "sql",
+          "rawSql": "SELECT\n  Timestamp AS timestamp,\n  Body AS body,\n  SeverityText AS level,\n  ServiceName,\n  TraceId,\n  SpanId,\n  ResourceAttributes.service.namespace::String AS namespace,\n  ResourceAttributes.k8s.pod.name::String AS k8s_pod\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName = ${service:singlequote}\n  AND $__conditionalAll(SeverityText IN (${level_filter:singlequote}), $level_filter)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nORDER BY Timestamp DESC\nLIMIT 200",
+          "refId": "A",
+          "format": 2
+        }
+      ],
+      "type": "logs"
+    }
+  ],
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "customSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+        "enable": false,
+        "hide": false,
+        "iconColor": "#73BF69",
+        "name": "Deployments (service.version, requires traces)",
+        "preset": "custom",
+        "target": {
+          "editorType": "sql",
+          "rawSql": "SELECT\n  time,\n  ServiceName AS tags,\n  concat(ServiceName, ' deployed ', version, if(prev_version != '', concat(' (was ', prev_version, ')'), '')) AS text,\n  'Deployment' AS title\nFROM (\n  SELECT\n    toStartOfInterval(Timestamp, INTERVAL 30 second) AS time,\n    ServiceName,\n    topK(1)(ResourceAttributes['service.version'])[1] AS version,\n    lagInFrame(topK(1)(ResourceAttributes['service.version'])[1])\n      OVER (PARTITION BY ServiceName ORDER BY time) AS prev_version\n  FROM ${database}.otel_traces\n  WHERE $__timeFilter(Timestamp)\n    AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n    AND ResourceAttributes['service.version'] != ''\n  GROUP BY ServiceName, time\n  ORDER BY ServiceName, time\n)\nWHERE prev_version != '' AND prev_version != version\nORDER BY time",
+          "refId": "anno",
+          "format": 1
+        }
+      }
+    ]
+  },
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["clickhouse", "otel", "logs"],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "ClickHouse",
+          "value": "${DS_GRAFANA_CLICKHOUSE_DATASOURCE}"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "grafana-clickhouse-datasource",
+        "refresh": 1,
+        "regex": "",
+        "type": "datasource"
+      },
+      {
+        "current": {},
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+        "definition": "SELECT DISTINCT database FROM system.columns WHERE table = 'otel_logs' AND name = 'ResourceAttributes' AND startsWith(type, 'JSON') ORDER BY database",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Database",
+        "multi": false,
+        "name": "database",
+        "options": [],
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT database FROM system.columns WHERE table = 'otel_logs' AND name = 'ResourceAttributes' AND startsWith(type, 'JSON') ORDER BY database"
+        },
+        "refresh": 1,
+        "regex": "",
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "auto": true,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "current": {
+          "selected": false,
+          "text": "auto",
+          "value": "$__auto_interval_interval"
+        },
+        "hide": 0,
+        "label": "Min interval",
+        "name": "interval",
+        "options": [
+          { "selected": true, "text": "auto", "value": "$__auto_interval_interval" },
+          { "selected": false, "text": "1m", "value": "1m" },
+          { "selected": false, "text": "5m", "value": "5m" },
+          { "selected": false, "text": "10m", "value": "10m" },
+          { "selected": false, "text": "30m", "value": "30m" },
+          { "selected": false, "text": "1h", "value": "1h" },
+          { "selected": false, "text": "6h", "value": "6h" },
+          { "selected": false, "text": "12h", "value": "12h" },
+          { "selected": false, "text": "1d", "value": "1d" }
+        ],
+        "query": "1m,5m,10m,30m,1h,6h,12h,1d",
+        "refresh": 2,
+        "type": "interval"
+      },
+      {
+        "allValue": null,
+        "current": {},
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Service",
+        "multi": true,
+        "name": "service",
+        "options": [],
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT ServiceName FROM ${database}.otel_logs WHERE $__timeFilter(Timestamp) GROUP BY ServiceName ORDER BY count() DESC LIMIT 10"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allValue": null,
+        "current": {},
+        "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
+        "definition": "",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Level",
+        "multi": true,
+        "name": "level_filter",
+        "options": [],
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT SeverityText FROM ${database}.otel_logs WHERE $__timeFilter(Timestamp) ORDER BY SeverityText"
+        },
+        "refresh": 2,
+        "regex": "",
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": { "selected": false, "text": "", "value": "" },
+        "hide": 0,
+        "label": "Search",
+        "name": "search",
+        "options": [{ "selected": true, "text": "", "value": "" }],
+        "query": "",
+        "type": "textbox"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "",
+  "title": "OpenTelemetry Logs Explorer (JSON schema)",
+  "uid": "otel-logs-explorer-json"
+}
