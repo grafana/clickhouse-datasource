@@ -198,6 +198,25 @@ export const DatabaseCredentialsSection = (props: Props) => {
             />
           </Box>
         )}
+        {jsonData.oauthPassThru && (
+          <Box marginTop={1}>
+            <Checkbox
+              label={labels.allowClearTextJWTForwarding.label}
+              description={labels.allowClearTextJWTForwarding.tooltip}
+              checked={jsonData.allowClearTextJWTForwarding || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    allowClearTextJWTForwarding: checked,
+                  },
+                });
+              }}
+            />
+          </Box>
+        )}
       </CollapsableSection>
     </Box>
   );
