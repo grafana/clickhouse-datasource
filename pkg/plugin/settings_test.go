@@ -416,6 +416,37 @@ func TestLoadSettingsOAuthPassThru(t *testing.T) {
 	})
 }
 
+func TestLoadSettingsAllowClearTextJWTForwarding(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse allowClearTextJWTForwarding as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowClearTextJWTForwarding": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.AllowClearTextJWTForwarding)
+	})
+
+	t.Run("should parse allowClearTextJWTForwarding as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowClearTextJWTForwarding": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.AllowClearTextJWTForwarding)
+	})
+
+	t.Run("should default allowClearTextJWTForwarding to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.AllowClearTextJWTForwarding)
+	})
+}
+
 func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 	ctx := context.Background()
 

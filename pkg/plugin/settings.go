@@ -53,8 +53,19 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	// AllowClearTextJWTForwarding lifts the requirement that Forward OAuth
+	// Identity runs over a TLS connection established by the plugin itself.
+	// It exists for deployments where TLS termination and origination are
+	// delegated to a proxy alongside Grafana (an Istio/Envoy sidecar, for
+	// example): the plugin dials the sidecar in plaintext over loopback and
+	// the sidecar re-originates TLS to ClickHouse, so the plugin cannot see
+	// that the hop it forwards the token over is in fact encrypted. Enabling
+	// it without such a proxy sends user tokens in the clear. It does not
+	// affect the separate rejection of Forward OAuth Identity combined with
+	// Skip TLS Verify, which is about unverified TLS rather than no TLS.
+	AllowClearTextJWTForwarding bool            `json:"allowClearTextJWTForwarding,omitempty"`
+	CustomSettings              []CustomSetting `json:"customSettings"`
+	ProxyOptions                *proxy.Options
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -239,6 +250,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.OAuthPassThruAllowFallback = jsonData["oauthPassThruAllowFallback"].(bool)
+		}
+	}
+
+	if jsonData["allowClearTextJWTForwarding"] != nil {
+		if allowClearText, ok := jsonData["allowClearTextJWTForwarding"].(string); ok {
+			settings.AllowClearTextJWTForwarding, err = strconv.ParseBool(allowClearText)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse allowClearTextJWTForwarding value: %w", err))
+			}
+		} else {
+			settings.AllowClearTextJWTForwarding = jsonData["allowClearTextJWTForwarding"].(bool)
 		}
 	}
 
