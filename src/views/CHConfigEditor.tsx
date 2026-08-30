@@ -545,6 +545,28 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             />
           </Field>
         )}
+        {jsonData.oauthPassThru && (
+          <Field
+            label={labels.allowCleartextJWTForwarding.label}
+            description={labels.allowCleartextJWTForwarding.tooltip}
+          >
+            <Switch
+              id="allowCleartextJWTForwarding"
+              className="gf-form"
+              value={jsonData.allowCleartextJWTForwarding || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    allowCleartextJWTForwarding: checked,
+                  },
+                });
+              }}
+            />
+          </Field>
+        )}
       </ConfigSection>
 
       <Divider />
