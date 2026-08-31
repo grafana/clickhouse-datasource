@@ -6,6 +6,7 @@ const PLUGIN_JSON = path.join(__dirname, '..', '..', 'plugin.json');
 
 const otelDashboards = [
   'otel-logs-explorer.json',
+  'otel-logs-explorer-json.json',
   'otel-traces-explorer.json',
   'otel-service-dashboard.json',
 ] as const;
@@ -105,6 +106,45 @@ describe('OTel dashboards', () => {
     it.each(otelDashboards)('%s file exists at the registered path', (filename) => {
       const filepath = path.join(DASHBOARDS_DIR, filename);
       expect(fs.existsSync(filepath)).toBe(true);
+    });
+  });
+
+  describe('JSON-schema logs dashboard', () => {
+    const JSON_DASHBOARD = 'otel-logs-explorer-json.json';
+    const filepath = path.join(DASHBOARDS_DIR, JSON_DASHBOARD);
+
+    it('is registered in plugin.json with a distinct uid/title', () => {
+      const pluginJson = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')) as {
+        includes: Array<{ type: string; path: string }>;
+      };
+      expect(
+        pluginJson.includes.find((i) => i.type === 'dashboard' && i.path === `dashboards/${JSON_DASHBOARD}`)
+      ).toBeDefined();
+
+      const dashboard = JSON.parse(fs.readFileSync(filepath, 'utf8')) as { uid?: string; title?: string };
+      expect(dashboard.uid).toBe('otel-logs-explorer-json');
+      expect(dashboard.title).toContain('JSON');
+    });
+
+    it('reads otel_logs attributes with JSON (dot) access, not Map (bracket)', () => {
+      const content = fs.readFileSync(filepath, 'utf8');
+      expect(content).toContain('ResourceAttributes.service.namespace::String');
+      expect(content).toContain('ResourceAttributes.k8s.pod.name::String');
+      expect(content).not.toContain("ResourceAttributes['service.namespace']");
+      expect(content).not.toContain("ResourceAttributes['k8s.pod.name']");
+    });
+
+    it('keeps Map (bracket) access for otel_traces in the deployment annotation', () => {
+      // otel_traces is still Map(String,String); only otel_logs uses the JSON schema.
+      const content = fs.readFileSync(filepath, 'utf8');
+      expect(content).toContain("ResourceAttributes['service.version']");
+    });
+
+    it('quotes template variables in SQL', () => {
+      // Same guard as the other bundled dashboards ($__... macros excluded).
+      const content = fs.readFileSync(filepath, 'utf8');
+      expect(content).not.toMatch(/IN \(\$\{?(?!__)\w+\}?\)/);
+      expect(content).not.toMatch(/= '\$\{?\w+\}?'/);
     });
   });
 });

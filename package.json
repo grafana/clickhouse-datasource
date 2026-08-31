@@ -1,10 +1,10 @@
 {
   "name": "clickhouse-datasource",
-  "version": "4.20.0",
+  "version": "4.21.1",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=24",
-    "npm": ">=11.6.2"
+    "npm": ">=11.16.0"
   },
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
@@ -30,7 +30,7 @@
     "@axe-core/playwright": "4.12.1",
     "@babel/core": "8.0.1",
     "@grafana/eslint-config": "8.2.0",
-    "@grafana/plugin-e2e": "3.10.0",
+    "@grafana/plugin-e2e": "3.11.0",
     "@grafana/sign-plugin": "3.3.3",
     "@grafana/tsconfig": "2.2.0",
     "@playwright/test": "1.61.1",

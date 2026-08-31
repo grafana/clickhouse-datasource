@@ -23,7 +23,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
-	schemas "github.com/grafana/schemads"
 	"github.com/grafana/sqlds/v5"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -41,9 +40,7 @@ type grafanaHeaders struct {
 }
 
 // Clickhouse defines how to connect to a Clickhouse datasource
-type Clickhouse struct {
-	SchemaDatasource *schemas.SchemaDatasource
-}
+type Clickhouse struct{}
 
 // getTLSConfig returns tlsConfig from settings
 // logic reused from https://github.com/grafana/grafana/blob/615c153b3a2e4d80cff263e67424af6edb992211/pkg/models/datasource_cache.go#L211
@@ -72,7 +69,13 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 }
 
 // getPDCDialContext returns a dialer function for creating a connection to PDC if a secure SOCKS proxy is enabled.
-func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Conn, error), error) {
+//
+// clickhouse-go applies Options.TLS only on its own dial path, and skips that
+// path once Options.DialContext is set. The native protocol therefore needs
+// this dialer to complete the TLS handshake itself. HTTP does not: net/http
+// applies Transport.TLSClientConfig over the dialed connection, and a second
+// handshake breaks it.
+func getPDCDialContext(settings Settings, tlsConfig *tls.Config, protocol clickhouse.Protocol) (func(context.Context, string) (net.Conn, error), error) {
 	p := sdkproxy.New(settings.ProxyOptions)
 
 	if !p.SecureSocksProxyEnabled() {
@@ -89,9 +92,38 @@ func getPDCDialContext(settings Settings) (func(context.Context, string) (net.Co
 		return nil, errors.New("unable to cast SOCKS proxy dialer to context proxy dialer")
 	}
 
+	return proxyDialContext(contextDialer, tlsConfig, protocol), nil
+}
+
+// proxyDialContext routes connections through base, adding TLS for the native protocol.
+func proxyDialContext(base proxy.ContextDialer, tlsConfig *tls.Config, protocol clickhouse.Protocol) func(context.Context, string) (net.Conn, error) {
+	wrapTLS := tlsConfig != nil && protocol == clickhouse.Native
+
 	return func(ctx context.Context, addr string) (net.Conn, error) {
-		return contextDialer.DialContext(ctx, "tcp", addr)
-	}, nil
+		conn, err := base.DialContext(ctx, "tcp", addr)
+		if err != nil || !wrapTLS {
+			return conn, err
+		}
+
+		// tls.Client does not derive the SNI name from the address, unlike
+		// tls.Dial, so an empty ServerName fails verification. The config is
+		// cloned because clickhouse.Options.TLS shares the same value.
+		cfg := tlsConfig.Clone()
+		if cfg.ServerName == "" {
+			host, _, splitErr := net.SplitHostPort(addr)
+			if splitErr != nil {
+				host = addr
+			}
+			cfg.ServerName = host
+		}
+
+		tlsConn := tls.Client(conn, cfg)
+		if err := tlsConn.HandshakeContext(ctx); err != nil {
+			_ = conn.Close()
+			return nil, fmt.Errorf("TLS handshake through the secure SOCKS proxy failed: %w", err)
+		}
+		return tlsConn, nil
+	}
 }
 
 func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
@@ -281,7 +313,7 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	}
 
 	// dialCtx is used to create a connection to PDC, if it is enabled above
-	dialCtx, err := getPDCDialContext(settings)
+	dialCtx, err := getPDCDialContext(settings, tlsConfig, protocol)
 	if err != nil {
 		return nil, err
 	}
@@ -463,7 +495,6 @@ func (h *Clickhouse) MutateQueryData(
 
 	injectGrafanaUserHeader(ctx, req)
 
-	req = preprocessGrafanaSQL(req)
 	return ctx, req
 }
 
@@ -512,55 +543,6 @@ func interpolateMacros(_ context.Context, query *sqlutil.Query, _ json.RawMessag
 		return "", backend.DownstreamError(err)
 	}
 	return sql, nil
-}
-
-func preprocessGrafanaSQL(req *backend.QueryDataRequest) *backend.QueryDataRequest {
-	if req == nil || len(req.Queries) == 0 {
-		return req
-	}
-
-	queries := make([]backend.DataQuery, 0, len(req.Queries))
-	for _, q := range req.Queries {
-		var sq schemas.Query
-
-		if err := json.Unmarshal(q.JSON, &sq); err != nil {
-			// Cannot unmarshal query JSON, ignoring
-			queries = append(queries, q)
-			continue
-		}
-
-		if !sq.GrafanaSql {
-			// Not a Grafana SQL query, ignoring
-			queries = append(queries, q)
-			continue
-		}
-
-		sqlQuery, err := sq.ToSQL(schemas.DialectClickHouse)
-		if err != nil {
-			backend.Logger.Error("Failed to build SQL query", "error", err.Error())
-			continue
-		}
-
-		// Build JSON with `sqlutil.Query` shape that will be used to execute the query by sqlds
-		queryJSON, err := json.Marshal(sqlutil.Query{
-			RawSQL:         sqlQuery,
-			Format:         sqlutil.FormatOptionTable, // TODO: Is this correct?
-			ConnectionArgs: json.RawMessage("{}"),
-		})
-		if err != nil {
-			backend.Logger.Error("Failed to marshal SQL query", "error", err.Error())
-			continue
-		}
-
-		q.JSON = queryJSON
-		queries = append(queries, q)
-	}
-
-	return &backend.QueryDataRequest{
-		PluginContext: req.PluginContext,
-		Headers:       req.Headers,
-		Queries:       queries,
-	}
 }
 
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
