@@ -220,14 +220,19 @@ async function getSuggestionsFromCursorData(
       const variables = await getVariableSuggestions(range);
       results.push(...variables);
 
-      results.push({
-        label: 'NULL',
-        insertText: 'NULL',
-        sortText: '!!!NULL',
-        kind: monaco.languages.CompletionItemKind.Keyword,
-        documentation: '',
-        range,
-      });
+      // After a bare `$` Monaco has an empty word to match on, because `$` is a word
+      // separator, so it filters nothing and the order is pure sortText. NULL sorts above
+      // every macro there, so it has to exclude itself by prefix the way columns already do.
+      if (!data.prefix || 'null'.startsWith(data.prefix.toLowerCase())) {
+        results.push({
+          label: 'NULL',
+          insertText: 'NULL',
+          sortText: '!!!NULL',
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          documentation: '',
+          range,
+        });
+      }
 
       const sqlFunctions = await fetchFunctionSuggestions(schema, range);
       results.push(...sqlFunctions);
