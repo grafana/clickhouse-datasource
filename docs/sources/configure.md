@@ -210,9 +210,12 @@ The data source includes a dedicated configuration section for log queries. Thes
 | **Filter Time column**   | A lower-precision time column for fast partition-based filtering. Used with the `1.2.9` schema only.                                                                                                                                                        |
 | **Log Level column**     | The column containing the log severity level.                                                                                                                                                                                                               |
 | **Log Message column**   | The column containing the log message body.                                                                                                                                                                                                                 |
+| **Columns**              | Extra columns projected into every logs query; each appears in the Fields list, the expanded log row, and the field filters, and can be shown as a displayed field.                                                                                         |
 | **Context columns**      | Comma-separated list of columns included alongside log messages for additional context.                                                                                                                                                                     |
 
 When **Configuration mode** is set to **Single source** and **Signal type** is set to **Logs**, these settings define the focused logs source.
+
+In **Single source** mode, the **Columns** field is a picker of the selected table's columns with an **Add all columns** shortcut; other configuration modes accept a typed list. The columns work with both OTel and non-OTel log tables; when **Use OTel** is enabled, they are added on top of the OTel default columns.
 
 ### Traces configuration
 
