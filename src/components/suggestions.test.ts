@@ -63,8 +63,8 @@ describe('Suggestions', () => {
         { label: 'EventDate', name: 'EventDate', type: 'DateTime' } as TableColumn,
       ],
       functions: async (): Promise<SqlFunction[]> => [
-        { name: 'toDateTime' } as SqlFunction,
-        { name: 'toDateTime' } as SqlFunction,
+        { name: 'toDateTime', origin: 'System' } as SqlFunction,
+        { name: 'toDateTime', origin: 'System' } as SqlFunction,
       ],
       defaultDatabase: 'system',
     };
@@ -102,7 +102,7 @@ describe('Suggestions', () => {
         { label: 'EventDate', type: 'DateTime' } as TableColumn,
       ],
       functions: async (): Promise<SqlFunction[]> => [
-        { name: 'toDateTime' } as SqlFunction,
+        { name: 'toDateTime', origin: 'System' } as SqlFunction,
         { name: '__actionName', origin: 'System' } as SqlFunction,
         { name: '__my_helper', origin: 'SQLUserDefined' } as SqlFunction,
       ],
@@ -147,7 +147,8 @@ describe('Suggestions', () => {
     const columnEventDate = suggestionsByLabel.get('EventDate');
     expect(columnEventDate).not.toBeUndefined();
 
-    // Should show functions
+    // Should show functions. Every built-in reports `origin: 'System'`, including ordinary
+    // ones, so this guards against the internal-function filter keying on origin alone.
     const functionToDateTime = suggestionsByLabel.get('toDateTime');
     expect(functionToDateTime).not.toBeUndefined();
 
