@@ -315,7 +315,11 @@ async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, t
 }
 
 async function fetchFunctionSuggestions(schema: Schema, range: Range) {
-  const sqlFunctions = await schema.functions();
+  // ClickHouse's `__`-prefixed built-ins are query planner helpers, not user-facing SQL.
+  // `origin` keeps a user-defined function of the same shape, which reports SQLUserDefined.
+  // Matching on the name rather than `categories === 'Internal'` because that category only
+  // exists from 26.6, and older servers report it empty for the same functions.
+  const sqlFunctions = (await schema.functions()).filter((c) => !(c.name.startsWith('__') && c.origin === 'System'));
   return sqlFunctions.map((c) => ({
     label: c.name,
     kind: monaco.languages.CompletionItemKind.Function,
@@ -369,6 +373,10 @@ export function getMacroSuggestions(range: Range, prefix?: string) {
       kind: macro.isFunction
         ? monaco.languages.CompletionItemKind.Function
         : monaco.languages.CompletionItemKind.Variable,
+      // Monaco scores candidates against the word under the cursor, and `$` is a word
+      // separator, so typing `$__` is scored as `__`. Without this the label only matches
+      // at offset 1 and ClickHouse's own `__*` internal functions outrank every macro.
+      filterText: nameNoPrefix,
       sortText: `!!${macro.name.substring(3)}`,
       documentation: macro.documentation + (macro.example ? '\nExample output: ' + macro.example : ''),
       insertText: macro.isFunction
