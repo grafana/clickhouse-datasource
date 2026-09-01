@@ -117,6 +117,7 @@ describe('Suggestions', () => {
           Variable: 4,
           Class: 5,
           Module: 8,
+          Keyword: 13,
         },
         CompletionItemInsertTextRule: {
           InsertAsSnippet: 4,
@@ -154,5 +155,40 @@ describe('Suggestions', () => {
     // Should hide ClickHouse internal functions, but keep a user-defined one named like them
     expect(suggestionsByLabel.get('__actionName')).toBeUndefined();
     expect(suggestionsByLabel.get('__my_helper')).not.toBeUndefined();
+
+    // Should show NULL where nothing has been typed to exclude it
+    expect(suggestionsByLabel.get('NULL')).not.toBeUndefined();
+  });
+
+  it('omits NULL when the typed prefix cannot match it', async () => {
+    const sql = 'SELECT * FROM system.query_log WHERE $';
+    const cursorPosition = sql.length;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['system'],
+      tables: async (): Promise<string[]> => ['query_log'],
+      columns: async (): Promise<TableColumn[]> => [],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'system',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const suggestions = await getSuggestions(sql, schema, range, cursorPosition);
+    const labels = suggestions.map((s) => s.label);
+
+    expect(labels).not.toContain('NULL');
+    expect(labels).toContain('$__dateFilter');
   });
 });
