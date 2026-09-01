@@ -15,7 +15,6 @@
 
 ### 🐛 Bug Fixes
 
-* **autocomplete:** rank query macros above ClickHouse internal functions ([4b1f085](https://github.com/grafana/clickhouse-datasource/commit/4b1f085bc3c340663c0bd63d48fbd83301b9bb7e))
 * **autocomplete:** show query macros instead of ClickHouse internal functions ([#2153](https://github.com/grafana/clickhouse-datasource/issues/2153)) ([4b1f085](https://github.com/grafana/clickhouse-datasource/commit/4b1f085bc3c340663c0bd63d48fbd83301b9bb7e))
 
 ## [4.21.1](https://github.com/grafana/clickhouse-datasource/compare/v4.21.0...v4.21.1) (2026-08-27)
