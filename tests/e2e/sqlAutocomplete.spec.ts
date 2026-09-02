@@ -54,6 +54,33 @@ function findDuplicates(labels: string[]): string[] {
   return [...dupes];
 }
 
+/**
+ * Remount SqlEditor inside the same document by toggling the editor type.
+ * registerSQL registers the completion provider against the global 'sql' language, so only
+ * an in-document remount can leave a stale provider answering alongside the new one. A full
+ * page navigation tears Monaco down with the rest of the document and always re-registers
+ * cleanly, which is why it cannot catch a missing dispose.
+ */
+async function remountSqlEditor(page: Page) {
+  // Close the open suggest widget so the next capture cannot read the previous one.
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('radio', { name: 'Query Builder' }).click();
+  // Grafana asks for confirmation when the SQL does not convert to builder options.
+  const continueButton = page.getByRole('button', { name: 'Continue' });
+  const needsConfirm = await continueButton
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (needsConfirm) {
+    await continueButton.click();
+  }
+  await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
+
+  await page.getByRole('radio', { name: 'SQL Editor' }).click();
+  await expect(page.getByRole('radio', { name: 'SQL Editor' })).toBeChecked();
+}
+
 test.describe('SQL editor autocomplete', () => {
   test('does not duplicate suggestions after editor remount', async ({ page }) => {
     await page.goto(exploreUrl());
@@ -64,9 +91,7 @@ test.describe('SQL editor autocomplete', () => {
     expect(firstMountLabels.length, 'first mount surfaces plugin macros').toBeGreaterThan(0);
     expect(findDuplicates(firstMountLabels), 'first mount has no duplicate macros').toEqual([]);
 
-    // Navigate away and back to force SqlEditor to unmount and remount.
-    await page.goto('/');
-    await page.goto(exploreUrl());
+    await remountSqlEditor(page);
     await focusEditorAndType(page, 'SELECT * FROM t WHERE $__');
 
     const secondMountLabels = await captureMacroLabels(page);
