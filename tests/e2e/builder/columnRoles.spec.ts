@@ -1,93 +1,20 @@
+// E2E coverage for the column-roles guidance in the query builder: the help
+// note with its docs link on the Logs / Traces / Time Series builders, and
+// the tooltips explaining the SQL alias each column role maps to. Unit tests
+// cover the label and tooltip constants; only E2E confirms Grafana renders
+// the notes, links and tooltips inside the real builder UI for each query
+// type, and that none of it leaks into the Table builder.
+
 import { expect, test } from '@grafana/plugin-e2e';
-import { Locator, Page } from '@playwright/test';
-import { QueryType } from '../../src/types/queryBuilder';
-import { Components as Selectors } from '../../src/selectors';
-
-const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
-
-const isCloudRun = !!process.env.GRAFANA_URL;
-
-const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
-const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
-const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
+import type { Locator, Page } from '@playwright/test';
+import { QueryType } from '../../../src/types/queryBuilder';
+import { Components as Selectors } from '../../../src/selectors';
+import { switchToBuilderMode } from '../helpers/builder';
+import { exploreUrl } from '../helpers/explore';
 
 // Doc anchor the help link points to; kept in sync with labels.ts.
 const COLUMN_ROLES_DOCS_PATH =
   'https://grafana.com/docs/plugins/grafana-clickhouse-datasource/latest/query-editor/#column-roles';
-
-interface ExploreUrlOpts {
-  queryType?: QueryType;
-}
-
-/**
- * Build an Explore URL that preselects a query type. The editor still opens
- * in SQL Editor mode on load (Grafana does not restore editorType from the
- * URL pane state for this plugin); tests that need the Query Builder must
- * call switchToBuilderMode after navigation.
- */
-function exploreUrl(opts: ExploreUrlOpts = {}): string {
-  const { queryType = QueryType.Table } = opts;
-
-  const query: Record<string, unknown> = {
-    refId: 'A',
-    datasource: { type: PLUGIN_TYPE, uid: DATASOURCE_UID },
-    editorType: 'sql',
-    pluginVersion: '',
-    rawSql: '',
-    queryType,
-  };
-
-  const panes = JSON.stringify({
-    explore: {
-      datasource: DATASOURCE_UID,
-      queries: [query],
-      range: { from: 'now-1h', to: 'now' },
-    },
-  });
-
-  return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
-}
-
-/**
- * Switch from the default SQL Editor mode into Query Builder. Dismisses the
- * "Cannot convert" confirmation that appears when the SQL body is empty or
- * not a plain SELECT. Grafana does not restore `queryType` from Explore's pane
- * state, and switching editor types resets the query type to "Table"; callers
- * that need Logs / Traces / Time Series must pass `queryType` so we re-select
- * it after the mode switch.
- */
-async function switchToBuilderMode(page: Page, queryType?: QueryType) {
-  await page.getByRole('radio', { name: 'Query Builder' }).click();
-  const continueButton = page.getByRole('button', { name: 'Continue' });
-  if (await continueButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-    await continueButton.click();
-  }
-  await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
-
-  if (queryType && queryType !== QueryType.Table) {
-    const label = queryTypeRadioLabel(queryType);
-    await page.getByRole('radio', { name: label, exact: true }).click();
-    await expect(page.getByRole('radio', { name: label, exact: true })).toBeChecked();
-  }
-}
-
-/**
- * Map a QueryType to the human-readable label used by the Query Type radio
- * group. Kept near switchToBuilderMode so both the selection and assertion use
- * the same string.
- */
-function queryTypeRadioLabel(queryType: QueryType): string {
-  switch (queryType) {
-    case QueryType.Logs:
-      return 'Logs';
-    case QueryType.TimeSeries:
-      return 'Time Series';
-    case QueryType.Traces:
-      return 'Traces';
-    default:
-      return 'Table';
-  }
-}
 
 /**
  * Returns the InlineFormLabel element that renders a given column selector
