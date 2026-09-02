@@ -2,6 +2,7 @@ import {
   arrayToDataFrame,
   CoreApp,
   DataQueryRequest,
+  FieldType,
   LoadingState,
   SupplementaryQueryType,
   TimeRange,
@@ -2731,6 +2732,82 @@ describe('ClickHouseDatasource', () => {
         /Syntax error/
       );
     });
+
+    describe('context columns on attribute map columns', () => {
+      // Row whose LogAttributes field carries object values, as returned for
+      // both Map- and JSON-typed attribute columns.
+      const makeAttributesRow = (attributes: Record<string, unknown>) => {
+        const frame = toDataFrame({
+          fields: [
+            { name: 'timestamp', values: [1700000000000] },
+            { name: 'LogAttributes', type: FieldType.other, values: [attributes] },
+          ],
+        });
+        return { ...makeRow(), dataFrame: frame };
+      };
+
+      const setup = (contextColumn: string, attributesColumnType: string | undefined) => {
+        const ds = cloneDeep(mockDatasource);
+        ds.settings.jsonData.logs = { contextColumns: [contextColumn] };
+        const querySpy = jest.spyOn(ds, 'query').mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+
+        const query = cloneDeep(baseQuery);
+        query.builderOptions.columns = [
+          ...(query.builderOptions.columns ?? []),
+          { name: 'LogAttributes', type: attributesColumnType },
+        ];
+
+        return { ds, querySpy, query };
+      };
+
+      const sentQuery = (querySpy: jest.SpyInstance): CHBuilderQuery => {
+        const request = querySpy.mock.calls[0][0] as DataQueryRequest<CHQuery>;
+        return request.targets[0] as CHBuilderQuery;
+      };
+
+      it('builds a JSON accessor filter when the attributes column is JSON-typed', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['host.name']", 'JSON');
+
+        await ds.getLogRowContext(makeAttributesRow({ 'host.name': 'web-01' }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.builderOptions.filters).toContainEqual(
+          expect.objectContaining({ key: 'LogAttributes', mapKey: 'host.name', type: 'JSON', value: 'web-01' })
+        );
+        expect(sent.rawSql).toContain("LogAttributes.`host`.`name`::Nullable(String) = 'web-01'");
+        expect(sent.rawSql).not.toContain("LogAttributes['host.name']");
+      });
+
+      it('does not throw when a JSON-typed attribute value is numeric', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['bytes']", 'JSON');
+
+        await ds.getLogRowContext(makeAttributesRow({ bytes: 42 }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.rawSql).toContain("LogAttributes.`bytes`::Nullable(String) = '42'");
+      });
+
+      it('keeps the raw subscript filter for Map-typed attribute columns', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['host']", 'Map(String, String)');
+
+        await ds.getLogRowContext(makeAttributesRow({ host: 'web' }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.builderOptions.filters).toContainEqual(
+          expect.objectContaining({ key: "LogAttributes['host']", value: 'web', type: 'string' })
+        );
+        expect(sent.rawSql).toContain("LogAttributes['host'] = 'web'");
+      });
+
+      it('does not throw on a numeric value when the attributes column type is unknown', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['bytes']", undefined);
+
+        await ds.getLogRowContext(makeAttributesRow({ bytes: 42 }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.rawSql).toContain("LogAttributes['bytes'] = 42");
+      });
+    });
   });
 
   // Companion `<table>_trace_id_ts` columns the trace-ID optimization requires.
@@ -3075,6 +3152,31 @@ describe('ClickHouseDatasource', () => {
       expect(datasource.queryHasFilter(queryWithLevel, { key: 'level', value: 'info' })).toBe(true);
     });
 
+    it('returns true for an editor-created filter that stores the real column type', () => {
+      // The compact FilterPopover and the classic FilterEditor store the real
+      // ClickHouse column type, not the 'string' sentinel the log-view toggles
+      // use, so the same column's filters must still be found.
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'SeverityText', value: 'Error' })).toBe(true);
+    });
+
     it('returns true for OTel map key match', () => {
       const queryWithMap: CHBuilderQuery = {
         ...query,
@@ -3394,6 +3496,66 @@ describe('ClickHouseDatasource', () => {
       expect(result.builderOptions.filters![0]).toMatchObject({
         operator: FilterOperator.NotEquals,
         value: 'error',
+      });
+    });
+
+    it('FILTER_FOR toggles off an editor-created filter that stores the real column type', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+
+    it('FILTER_FOR replaces an editor-created Equals filter with a different value (no AND-ing)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Info' },
+      }) as CHBuilderQuery;
+
+      // Must NOT produce `SeverityText = 'Error' AND SeverityText = 'Info'` (zero rows).
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'SeverityText',
+        operator: FilterOperator.Equals,
+        value: 'Info',
       });
     });
 
