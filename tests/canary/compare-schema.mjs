@@ -72,12 +72,21 @@ function diffTable(table, expected, actual) {
 }
 
 const live = {};
-for (const table of TABLES) {
-  live[table] = await fetchColumns(table);
-  if (live[table].length === 0) {
-    console.error(`Table ${database}.${table} has no columns — did the collector create the schema?`);
-    process.exit(2);
+try {
+  for (const table of TABLES) {
+    live[table] = await fetchColumns(table);
+    if (live[table].length === 0) {
+      console.error(`Table ${database}.${table} has no columns — did the collector create the schema?`);
+      process.exit(2);
+    }
   }
+} catch (err) {
+  // Exit 2, not 1. A connection failure, a non-2xx response, or a malformed
+  // body is an infrastructure problem, and the workflow reads exit 1 as genuine
+  // drift and files a tracking issue. `cause` carries the socket-level detail
+  // that fetch hides behind its bare "fetch failed" message.
+  console.error(`Could not read the live schema from ${baseUrl}: ${err.cause?.message || err.message}`);
+  process.exit(2);
 }
 
 if (process.argv.includes('--update')) {
