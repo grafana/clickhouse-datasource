@@ -74,8 +74,14 @@ export class AdHocFilter {
       return sql;
     }
 
-    // sql can contain a query with double quotes around the database and table name, e.g. "default"."table", so we remove those
-    if (this._targetTable !== '' && !sql.replace(/"/g, '').match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+    // sql can contain a query that quotes the database and table name, e.g.
+    // "default"."table" or `default`.`table`, so we remove the quoting before
+    // matching. The table name is regex-escaped so a name containing regex
+    // metacharacters (e.g. a backtick-quoted `a[b`) neither throws nor mismatches.
+    if (
+      this._targetTable !== '' &&
+      !sql.replace(/["`]/g, '').match(new RegExp(`.*\\b${escapeRegExp(this._targetTable)}\\b.*`, 'gi'))
+    ) {
       return sql;
     }
 
@@ -100,6 +106,12 @@ export class AdHocFilter {
 
 function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
+}
+
+// Escape regex metacharacters so a table name can be interpolated into a
+// RegExp safely (a `.` in db.table stays literal, `[` etc. do not throw).
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Two-layer escape for Map keys embedded as `MapCol[\'<key>\']` inside the

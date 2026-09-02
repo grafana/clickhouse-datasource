@@ -155,4 +155,39 @@ describe('Suggestions', () => {
     expect(suggestionsByLabel.get('__actionName')).toBeUndefined();
     expect(suggestionsByLabel.get('__my_helper')).not.toBeUndefined();
   });
+
+  it('resolves columns for a keyword-named table (e.g. FROM sample)', async () => {
+    // `sample` is a ClickHouse keyword; the parser must still treat it as the
+    // FROM table so column suggestions resolve to it.
+    const sql = 'SELECT * FROM sample WHERE ';
+    const cursorPosition = 27; // end of string, in the WHERE clause
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['default'],
+      tables: async (): Promise<string[]> => ['sample'],
+      columns: async (_db: string, table: string): Promise<TableColumn[]> =>
+        table === 'sample'
+          ? [{ label: 'ServiceName', name: 'ServiceName', type: 'String' } as TableColumn]
+          : [{ label: 'WRONG_TABLE', name: 'WRONG_TABLE', type: 'String' } as TableColumn],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'default',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const labels = (await getSuggestions(sql, schema, range, cursorPosition)).map((s) => s.label);
+    expect(labels).toContain('ServiceName');
+    expect(labels).not.toContain('WRONG_TABLE');
+  });
 });
