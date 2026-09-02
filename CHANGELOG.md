@@ -10,6 +10,13 @@
 
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.21.3](https://github.com/grafana/clickhouse-datasource/compare/v4.21.2...v4.21.3) (2026-09-02)
+
+
+### 🐛 Bug Fixes
+
+* trace logs linking with timeframe ([#2111](https://github.com/grafana/clickhouse-datasource/issues/2111)) ([801725f](https://github.com/grafana/clickhouse-datasource/commit/801725f674249600a3204b65eee8bbc3037c1457))
+
 ## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)
 
 
