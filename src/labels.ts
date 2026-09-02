@@ -439,6 +439,10 @@ export default {
       addLabel: 'Filter',
       mapKeyPlaceholder: 'map key',
       jsonPathPlaceholder: 'json path',
+      durationFilter: {
+        tooltip:
+          'Accepts a unit suffix: ns, us (or µs), ms, s (integer or decimal, e.g. "1.2s"). A bare number is treated as nanoseconds. Values are converted to the column\u2019s configured Duration Unit before being compared.',
+      },
     },
     GroupByEditor: {
       label: 'Group By',
