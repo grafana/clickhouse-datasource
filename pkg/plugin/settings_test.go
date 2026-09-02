@@ -394,6 +394,8 @@ func TestLoadSettings(t *testing.T) {
 			{description: "string value", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": "50000"}`, want: 50000},
 			{description: "negative clamps to 0", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": -1}`, want: 0},
 			{description: "invalid string defaults to 0", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": "abc"}`, want: 0},
+			{description: "at the maximum passes through", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": 1000000}`, want: 1000000},
+			{description: "above the maximum clamps to the maximum", jsonData: `{"host": "foo", "port": 443, "rowCapacityHint": 9000000000}`, want: 1000000},
 		}
 		for _, tc := range tests {
 			t.Run(tc.description, func(t *testing.T) {

@@ -832,3 +832,34 @@ func TestMissingTableMacroIsDownstream(t *testing.T) {
 	require.Error(t, got.Error)
 	assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource)
 }
+
+func TestBuildClickHouseOptionsRowLimitPushDown(t *testing.T) {
+	message := json.RawMessage(`{}`)
+	base := Settings{
+		Host:         "localhost",
+		Port:         9000,
+		Protocol:     "native",
+		DialTimeout:  "5",
+		QueryTimeout: "30",
+	}
+
+	t.Run("sets the limit setting when enabled", func(t *testing.T) {
+		settings := base
+		settings.EnableRowLimit = true
+		settings.RowLimit = 100
+
+		opts, err := buildClickHouseOptions(t.Context(), settings, message)
+		require.NoError(t, err)
+		assert.Equal(t, int64(100), opts.Settings["limit"])
+	})
+
+	t.Run("does not set the limit setting when disabled", func(t *testing.T) {
+		settings := base
+		settings.RowLimit = 100
+
+		opts, err := buildClickHouseOptions(t.Context(), settings, message)
+		require.NoError(t, err)
+		_, ok := opts.Settings["limit"]
+		assert.False(t, ok, "the limit setting must not be pushed to the server when enableRowLimit is off")
+	})
+}
