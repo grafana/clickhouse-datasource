@@ -710,6 +710,20 @@ export const escapeIdentifier = (id: string): string => {
 };
 
 /**
+ * Builds the accessor for a dotted key path on a JSON-typed column,
+ * e.g. LogAttributes + 'http.status_code' -> LogAttributes.`http`.`status_code`.
+ * Each path segment is backtick-quoted; backslashes and backticks inside a
+ * segment are escaped so a key cannot break out of the quoting.
+ */
+export const getJsonPathAccessor = (columnExpr: string, path: string): string => {
+  const escapedPath = path
+    .split('.')
+    .map((p) => `\`${p.replace(/\\/g, '\\\\').replace(/`/g, '\\`')}\``)
+    .join('.');
+  return `${columnExpr}.${escapedPath}`;
+};
+
+/**
  * Sentinel Map key used to carry a raw JSON blob through the typed
  * Array(Map(String,String)) tuple cast in events/links SQL. Chosen to be
  * distinct from any valid OTel attribute key (OTel keys follow the pattern
@@ -884,15 +898,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
       const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
       type = valueType;
     } else if (filter.mapKey && type.startsWith('JSON')) {
-      const escapedJSONPaths = filter.mapKey
-        .split('.')
-        .map((p) => `\`${p}\``)
-        .join('.');
       // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
       // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
       // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
       // that signal), and `=` / `!=` / `LIKE` are unaffected.
-      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      column = `${getJsonPathAccessor(column, filter.mapKey)}::Nullable(String)`;
       // Update type so filter value generation routes through the string-aware branches.
       type = 'String';
     }
