@@ -1,7 +1,6 @@
 import { getTemplateSrv } from '@grafana/runtime';
 import { Monaco, monacoTypes } from '@grafana/ui';
 import { Range } from './sqlProvider';
-import { Lexer } from 'ch-parser/lexer';
 import { keywords, TokenType } from 'ch-parser/types';
 import { SqlFunction, TableColumn } from 'types/queryBuilder';
 import { pluginMacros } from 'ch-parser/pluginMacros';
@@ -9,8 +8,7 @@ import {
   ClauseType,
   FromQueryNode,
   IdentifierQueryNode,
-  parseSelectQueryNode,
-  QueryNodeParser,
+  parseSelect,
   QueryNodeType,
   SelectQueryNode,
 } from 'ch-parser/parser';
@@ -115,23 +113,7 @@ export async function getSuggestions(
   range: Range,
   cursorPosition: number
 ): Promise<monacoTypes.languages.CompletionItem[]> {
-  const lexer = new Lexer(text);
-  const tokens = [];
-  while (true) {
-    const token = lexer.nextToken();
-    if (token.isEnd()) {
-      break;
-    }
-
-    if (!token.isSignificant()) {
-      continue;
-    }
-
-    tokens.push(token);
-  }
-
-  const parser = new QueryNodeParser(tokens);
-  const selectNode = parseSelectQueryNode(parser);
+  const selectNode = parseSelect(text);
 
   if (!selectNode) {
     return [];

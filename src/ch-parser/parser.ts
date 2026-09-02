@@ -1,3 +1,4 @@
+import { Lexer } from './lexer';
 import { Token, TokenType } from './types';
 
 export class QueryNodeParser {
@@ -76,6 +77,13 @@ export interface FromQueryNode extends QueryNode {
   database?: string;
   table?: string;
   prefix?: string;
+  // True when the FROM target is a table function (e.g. `merge(...)`), which is
+  // not a physical table.
+  isTableFunction?: boolean;
+  // The subquery this FROM reads from, e.g. `FROM (SELECT ...)`. Set only for
+  // the subquery that directly follows this FROM, so table resolution can
+  // descend into it and nothing else.
+  subquery?: SelectQueryNode;
 }
 
 export interface IdentifierQueryNode extends QueryNode {
@@ -84,6 +92,75 @@ export interface IdentifierQueryNode extends QueryNode {
 
 export interface SelectQueryNode extends QueryNode {
   from?: FromQueryNode;
+}
+
+// Clause-starting keywords are never a table name in the FROM position.
+// Without this guard `SELECT * FROM  WHERE ...` would take `WHERE` as the table
+// while the user is mid-edit, and no clause node would be created.
+const RESERVED_FROM_KEYWORDS = new Set([
+  'WHERE',
+  'GROUP',
+  'ORDER',
+  'HAVING',
+  'LIMIT',
+  'SETTINGS',
+  'PREWHERE',
+  'JOIN',
+  'FORMAT',
+  'UNION',
+]);
+
+// A table/database name in a FROM clause. Keywords are accepted here because
+// ClickHouse allows keyword-named tables (e.g. `default.values`, `sample`),
+// except the clause-starting keywords above.
+function isTableNameToken(token: Token): boolean {
+  if (token.type === TokenType.QuotedIdentifier) {
+    return true;
+  }
+  return token.type === TokenType.BareWord && !RESERVED_FROM_KEYWORDS.has(token.text.toUpperCase());
+}
+
+// A Grafana variable used as (part of) a FROM target, e.g. `${table}`. The
+// braced form is reconstructed from its tokens; the loop is bounded so an
+// unterminated `${` (the state on every keystroke while typing) does not
+// swallow the rest of the query.
+function readVariableSegment(parser: QueryNodeParser): string {
+  let text = parser.next().text; // '$'
+  if (parser.hasNext() && parser.peek().type === TokenType.OpeningCurlyBrace) {
+    text += parser.next().text; // '{'
+    while (parser.hasNext()) {
+      const t = parser.peek();
+      if (
+        t.type === TokenType.Semicolon ||
+        t.type === TokenType.OpeningRoundBracket ||
+        t.type === TokenType.ClosingRoundBracket ||
+        (t.type === TokenType.BareWord && RESERVED_FROM_KEYWORDS.has(t.text.toUpperCase()))
+      ) {
+        break; // unterminated variable; stop without consuming the boundary token
+      }
+      parser.next();
+      text += t.text;
+      if (t.type === TokenType.ClosingCurlyBrace) {
+        break;
+      }
+    }
+  }
+  return text;
+}
+
+// One dot-separated segment of a FROM target: a Grafana variable or an
+// identifier. Returns undefined when the next token cannot start a name.
+function readNameSegment(parser: QueryNodeParser): string | undefined {
+  if (!parser.hasNext()) {
+    return undefined;
+  }
+  if (parser.peek().type === TokenType.DollarSign) {
+    return readVariableSegment(parser);
+  }
+  if (isTableNameToken(parser.peek())) {
+    return parser.next().text;
+  }
+  return undefined;
 }
 
 export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode | null {
@@ -109,16 +186,24 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
   parser.advance();
 
   let parenDepth = 0;
+  let fromAwaitingSubquery: FromQueryNode | undefined;
   let endOfNode = false;
   while (!endOfNode && parser.hasNext()) {
     const token = parser.next();
 
-    if (token.matchKeyword('SELECT')) {
+    if (token.type === TokenType.Semicolon) {
+      // Statement boundary: a query string may contain more than one statement,
+      // but each SELECT node covers a single statement.
+      endOfNode = true;
+    } else if (token.matchKeyword('SELECT')) {
       node.token = token;
     } else if (token.matchKeyword('FROM') || token.matchKeyword('JOIN')) {
       const fromNode: FromQueryNode = { type: QueryNodeType.From, token, clause: ClauseType.From };
       node.children!.push(fromNode);
-      if (!node.from) {
+      // Only the outer-level FROM sets node.from. A FROM nested inside a
+      // function call (e.g. `EXTRACT(part FROM col)`, `trim(BOTH ' ' FROM col)`)
+      // is at parenDepth > 0 and must not shadow the real table.
+      if (!node.from && parenDepth === 0) {
         node.from = fromNode;
       }
 
@@ -126,37 +211,47 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
         fromNode.prefix = parser.peek().text;
       }
 
-      if (
-        parser.hasNext() &&
-        ((parser.peek().type === TokenType.BareWord && !parser.peek().isKeyword()) ||
-          parser.peek().type === TokenType.QuotedIdentifier)
-      ) {
-        const databaseOrTable = parser.next().text;
+      const firstSegment = readNameSegment(parser);
+      if (firstSegment !== undefined) {
         if (parser.hasNext() && parser.peek().type === TokenType.Dot) {
           parser.next();
-          fromNode.database = databaseOrTable;
+          fromNode.database = firstSegment;
 
           if (parser.hasNext() && parser.peek().isError()) {
             fromNode.prefix = parser.peek().text;
           }
 
-          if (
-            parser.hasNext() &&
-            ((parser.peek().type === TokenType.BareWord && !parser.peek().isKeyword()) ||
-              parser.peek().type === TokenType.QuotedIdentifier)
-          ) {
-            fromNode.table = parser.next().text;
+          const secondSegment = readNameSegment(parser);
+          if (secondSegment !== undefined) {
+            fromNode.table = secondSegment;
           }
         } else {
-          fromNode.table = databaseOrTable;
+          fromNode.table = firstSegment;
         }
+
+        // A table identifier immediately followed by `(` is a table function
+        // (e.g. `merge(...)`), not a physical table that
+        // `additional_table_filters` can key on.
+        if (fromNode.table && parser.hasNext() && parser.peek().type === TokenType.OpeningRoundBracket) {
+          fromNode.isTableFunction = true;
+        }
+      } else if (parser.hasNext() && parser.peek().type === TokenType.OpeningRoundBracket) {
+        // Subquery FROM, e.g. `FROM (SELECT ...)`. Link the subquery that the
+        // next OpeningRoundBracket parses to this FROM node, so resolution can
+        // descend into it and nothing else.
+        fromAwaitingSubquery = fromNode;
       }
     } else if (token.type === TokenType.OpeningRoundBracket) {
       const nestedNode = parseSelectQueryNode(parser);
       if (nestedNode === null) {
         parenDepth++;
+        fromAwaitingSubquery = undefined;
       } else {
         node.children!.push(nestedNode);
+        if (fromAwaitingSubquery) {
+          fromAwaitingSubquery.subquery = nestedNode;
+          fromAwaitingSubquery = undefined;
+        }
       }
     } else if (token.type === TokenType.ClosingRoundBracket) {
       if (parenDepth === 0) {
@@ -205,4 +300,21 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
   }
 
   return node;
+}
+
+/**
+ * Tokenizes `sql` with the ClickHouse lexer and parses it into a shallow
+ * select-query node tree. Returns null when the input is not a SELECT (or
+ * WITH ... SELECT) statement. Shared by SQL autocomplete and ad-hoc table
+ * detection so the two paths cannot diverge.
+ */
+export function parseSelect(sql: string): SelectQueryNode | null {
+  const lexer = new Lexer(sql);
+  const tokens: Token[] = [];
+  for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
+    if (token.isSignificant()) {
+      tokens.push(token);
+    }
+  }
+  return parseSelectQueryNode(new QueryNodeParser(tokens));
 }
