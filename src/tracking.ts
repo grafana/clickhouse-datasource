@@ -33,6 +33,8 @@ export type ClickhouseCounters = {
   builder_query_type_traces_id: number;
   builder_minimized_queries: number;
   builder_otel_queries: number;
+
+  schema_queries: number;
 };
 
 export interface ClickhouseDashboardLoadedProps extends ClickhouseCounters {
@@ -64,6 +66,8 @@ export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
     builder_query_type_traces_id: 0,
     builder_minimized_queries: 0,
     builder_otel_queries: 0,
+
+    schema_queries: 0,
   };
 
   queries.forEach((q) => {
@@ -121,6 +125,8 @@ export const analyzeQueries = (queries: CHQuery[]): ClickhouseCounters => {
       if (q.builderOptions.meta?.otelEnabled) {
         c.builder_otel_queries++;
       }
+    } else if (q.editorType === EditorType.Schema) {
+      c.schema_queries++;
     }
   });
 

@@ -4,10 +4,12 @@
 
 ### Features
 
+- Add a Schema Explorer view to the query editor for browsing databases, tables, and columns and sending a selection to the Query Builder or SQL Editor
 - Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
 
 ### Fixes
 
+- Stamp `pluginVersion` on every query the editor type switcher emits, so the selected editor type doesn't revert to the SQL editor on the next load
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
 ## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)

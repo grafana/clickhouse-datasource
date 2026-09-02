@@ -10,8 +10,14 @@ import { Datasource } from 'data/CHDatasource';
 // stale schema.
 const inFlightColumns = new Map<string, Promise<readonly TableColumn[]>>();
 
-export default (datasource: Datasource, database: string, table: string): readonly TableColumn[] => {
-  const [columns, setColumns] = useState<readonly TableColumn[]>([]);
+export interface ColumnsState {
+  columns: readonly TableColumn[];
+  loading: boolean;
+}
+
+/** Reports whether a fetch is in flight, so callers can tell "not fetched yet" apart from "this table has no columns". */
+export const useColumnsState = (datasource: Datasource, database: string, table: string): ColumnsState => {
+  const [state, setState] = useState<ColumnsState>({ columns: [], loading: false });
 
   useEffect(() => {
     if (!datasource || !database || !table) {
@@ -30,15 +36,18 @@ export default (datasource: Datasource, database: string, table: string): readon
         }
       });
     }
+
     request
-      .then((cols) => {
-        if (ignore) {
-          return;
+      .then((columns) => {
+        if (!ignore) {
+          setState({ columns, loading: false });
         }
-        setColumns(cols);
       })
       .catch((ex: any) => {
         console.error(ex);
+        if (!ignore) {
+          setState({ columns: [], loading: false });
+        }
       });
 
     return () => {
@@ -48,12 +57,16 @@ export default (datasource: Datasource, database: string, table: string): readon
 
   // Immediately return empty array on change so columns aren't stale
   const lastDbTable = useRef<string>('');
-  const dbTable = database + table;
+  const dbTable = `${database}\0${table}`;
   if (dbTable !== lastDbTable.current) {
     lastDbTable.current = dbTable;
-    setColumns([]);
-    return [];
+    const loading = Boolean(datasource && database && table);
+    setState({ columns: [], loading });
+    return { columns: [], loading };
   }
 
-  return columns;
+  return state;
 };
+
+export default (datasource: Datasource, database: string, table: string): readonly TableColumn[] =>
+  useColumnsState(datasource, database, table).columns;

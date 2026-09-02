@@ -29,7 +29,7 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 
 | Element         | Description                                                                                                                                                                                |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Editor type** | Switch between **SQL** (write raw SQL) and **Query builder** (build queries with drop-downs and filters).                                                                                  |
+| **Editor type** | Switch between **SQL** (write raw SQL), **Query builder** (build queries with drop-downs and filters), and **Schema explorer** (browse databases, tables, and columns).                    |
 | **Run Query**   | Runs the current query and refreshes the panel. In the SQL editor you can also use **Ctrl+Enter** (Windows/Linux) or **Cmd+Enter** (macOS).                                                |
 | **Query type**  | Choose the result format: **Table**, **Logs**, **Time series**, or **Traces**. This sets how Grafana interprets and visualizes the results. Available in both SQL and Query builder modes. |
 
@@ -47,6 +47,15 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 - **SQL preview**: At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
 
 If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
+
+**In Schema explorer mode:**
+
+- **Databases**, **Tables**, and **Columns** — Three lists. Select a database to load its tables, then select a table to load its columns with their ClickHouse types. Each list has a search box.
+- **Time filter column** — The column used for the generated `$__timeFilter()` clause. It defaults to the time column configured for the data source's logs or traces source when the selected table matches one, and otherwise to a `DateTime` or `Date` column detected from the table. Select **No time filter** to omit the clause.
+- **Send to Query builder** — Opens the query builder with the selected database, table, and columns applied, and runs the query.
+- **Send to SQL editor** — Opens the SQL editor with a generated `SELECT` for the selected columns, bounded by the time filter column and limited to 1000 rows, and runs the query.
+
+Selecting no columns generates `SELECT *`.
 
 ### Compact query mode
 
