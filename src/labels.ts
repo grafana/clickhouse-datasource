@@ -413,6 +413,15 @@ export default {
       tooltip:
         'Enables Open Telemetry schema versioning. The auto option matches the logs schema version to the table columns. Pick a specific version to override.',
     },
+    MinIntervalEditor: {
+      label: 'Min interval',
+      placeholder: 'e.g. 1m',
+      tooltip:
+        "Lower bound for this query's interval. Raises the interval Grafana derives from the time range, so " +
+        '$__timeInterval, $__interval and friends bucket no finer than this. One number plus one unit — ms, s, m, ' +
+        'h, d or w (e.g. 10s, 5m, 1d). Leave empty to use the interval Grafana picks.',
+      error: 'Invalid duration. Use one number plus a unit of ms, s, m, h, d or w — for example 10s, 5m or 1d.',
+    },
     LimitEditor: {
       label: 'Limit',
       tooltip: 'Limits the number of rows returned by the query',

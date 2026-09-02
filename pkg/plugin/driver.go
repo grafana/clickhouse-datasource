@@ -545,6 +545,49 @@ func interpolateMacros(_ context.Context, query *sqlutil.Query, _ json.RawMessag
 	return sql, nil
 }
 
+// minIntervalPattern is the grammar for a per-query min interval: one integer
+// plus one unit, anchored. It matches parseMinIntervalMs in
+// src/data/queryInterval.ts exactly — gtime.ParseDuration is deliberately not
+// used, because it accepts forms the frontend reads differently (compound
+// "1h30m", fractional "1.5m") and defines M/y with a different length, which
+// would let $__timeInterval and $__interval bucket one query two ways.
+var minIntervalPattern = regexp.MustCompile(`^(\d+)(ms|s|m|h|d|w)$`)
+
+// maxMinInterval bounds the floor. Larger values emit nonsense SQL and can
+// overflow time.Duration, which would silently drop the clamp here while the
+// frontend still applied it to $__interval.
+const maxMinInterval = 365 * 24 * time.Hour
+
+var minIntervalUnits = map[string]time.Duration{
+	"ms": time.Millisecond,
+	"s":  time.Second,
+	"m":  time.Minute,
+	"h":  time.Hour,
+	"d":  24 * time.Hour,
+	"w":  7 * 24 * time.Hour,
+}
+
+// parseMinInterval returns the per-query interval floor, or 0 when the value is
+// absent or outside the shared grammar (in which case no floor is applied).
+func parseMinInterval(value string) time.Duration {
+	matches := minIntervalPattern.FindStringSubmatch(strings.TrimSpace(value))
+	if matches == nil {
+		return 0
+	}
+
+	count, err := strconv.ParseInt(matches[1], 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	unit := minIntervalUnits[matches[2]]
+	if count <= 0 || count > int64(maxMinInterval/unit) {
+		return 0
+	}
+
+	return time.Duration(count) * unit
+}
+
 func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (context.Context, backend.DataQuery) {
 	ctx, span := tracing.DefaultTracer().Start(ctx, "clickhouse mutate_query", trace.WithAttributes(
 		attribute.String("db.system", "clickhouse"),
@@ -582,10 +625,20 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 			TimeZone string `json:"timezone"`
 		} `json:"meta"`
 		Format int `json:"format"`
+		// Per-query minimum interval. Raises the interval Grafana derived from
+		// the time range and panel width, so $__timeInterval and friends bucket
+		// no finer than this. Explore has no built-in equivalent.
+		TimeInterval string `json:"timeInterval"`
 	}
 
 	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
 		return ctx, req
+	}
+
+	// Clamped here rather than in the interpolator because sqlutil.Query drops
+	// unknown query fields, and MutateQuery runs before it is built.
+	if minInterval := parseMinInterval(dataQuery.TimeInterval); minInterval > req.Interval {
+		req.Interval = minInterval
 	}
 
 	if dataQuery.Meta.TimeZone == "" {

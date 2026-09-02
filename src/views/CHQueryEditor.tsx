@@ -207,6 +207,14 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     [onChange, query]
   );
 
+  const onMinIntervalChange = useCallback(
+    (timeInterval: string) => {
+      onChange({ ...query, timeInterval: timeInterval || undefined });
+      onRunQuery();
+    },
+    [onChange, onRunQuery, query]
+  );
+
   const onEditAsSql = useCallback(
     (newOptions: QueryBuilderOptions) => {
       const {
@@ -248,8 +256,10 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptionsDispatch={builderOptionsDispatch}
       generatedSql={query.rawSql}
       app={app}
+      minInterval={query.timeInterval}
       onQueryChange={onQueryChange}
       onEditAsSql={onEditAsSql}
+      onMinIntervalChange={onMinIntervalChange}
       onRunQuery={onRunQuery}
     />
   );

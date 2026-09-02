@@ -15,6 +15,12 @@ export interface CHQueryBase extends DataQuery {
   rawSql: string;
 
   /**
+   * Per-query lower bound for the interval ("10s", "1m"). Overrides nothing when
+   * unset — the interval Grafana derives from the time range is used as-is.
+   */
+  timeInterval?: string;
+
+  /**
    * REQUIRED by backend for auto selecting preferredVisualizationType.
    * Only used in explore view.
    * src: https://github.com/grafana/sqlds/blob/dda2dc0a54b128961fc9f7885baabf555f3ddfdc/query.go#L36

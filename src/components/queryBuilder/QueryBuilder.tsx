@@ -43,6 +43,7 @@ import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
 import { isEqual } from 'lodash';
+import { MinIntervalEditor } from 'components/MinIntervalEditor';
 
 interface QueryBuilderProps {
   app: CoreApp | undefined;
@@ -50,14 +51,25 @@ interface QueryBuilderProps {
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
   datasource: Datasource;
   generatedSql: string;
+  minInterval?: string;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+  onMinIntervalChange?: (minInterval: string) => void;
   onRunQuery?: () => void;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
-  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, onQueryChange, onEditAsSql, onRunQuery } =
-    props;
+  const {
+    datasource,
+    builderOptions,
+    builderOptionsDispatch,
+    generatedSql,
+    minInterval,
+    onQueryChange,
+    onEditAsSql,
+    onMinIntervalChange,
+    onRunQuery,
+  } = props;
   const signalType = datasource.getSignalType();
   const singleTableMode = datasource.isSingleTableMode();
 
@@ -91,8 +103,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           builderOptionsDispatch={builderOptionsDispatch}
           generatedSql={generatedSql}
           signalType={signalType}
+          minInterval={minInterval}
           onQueryChange={onQueryChange}
           onEditAsSql={onEditAsSql}
+          onMinIntervalChange={onMinIntervalChange}
           onRunQuery={onRunQuery}
         />
       );
@@ -113,6 +127,11 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </InlineFieldRow>
+      {onMinIntervalChange && (
+        <InlineFieldRow className={styles.QueryEditor.queryType}>
+          <MinIntervalEditor minInterval={minInterval} onMinIntervalChange={onMinIntervalChange} />
+        </InlineFieldRow>
+      )}
 
       {builderOptions.queryType === QueryType.Table && (
         <TableQueryBuilder
@@ -167,8 +186,10 @@ interface CompactQueryEditorProps {
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
   generatedSql: string;
   signalType: SignalType;
+  minInterval?: string;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+  onMinIntervalChange?: (minInterval: string) => void;
   onRunQuery?: () => void;
 }
 
@@ -179,8 +200,10 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     builderOptionsDispatch,
     generatedSql,
     signalType,
+    minInterval,
     onQueryChange,
     onEditAsSql,
+    onMinIntervalChange,
     onRunQuery,
   } = props;
   // Defaults are built in two passes: database and table never depend on the
@@ -289,8 +312,10 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         <CompactAdvanced
           builderOptions={activeOptions}
           allColumns={allColumns}
+          minInterval={minInterval}
           onOrderByChange={(orderBy: OrderBy[]) => mergeActiveOptions({ orderBy }, true)}
           onLimitChange={(limit: number) => mergeActiveOptions({ limit }, true)}
+          onMinIntervalChange={onMinIntervalChange}
         />
       )}
 

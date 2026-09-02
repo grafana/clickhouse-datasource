@@ -430,6 +430,45 @@ func TestMutateQuery_GrafanaMetadata(t *testing.T) {
 	})
 }
 
+func TestMutateQuery_MinInterval(t *testing.T) {
+	h := &Clickhouse{}
+
+	cases := []struct {
+		name         string
+		json         string
+		interval     time.Duration
+		wantInterval time.Duration
+	}{
+		{"raises the interval", `{"timeInterval":"5m"}`, 30 * time.Second, 5 * time.Minute},
+		{"never lowers the interval", `{"timeInterval":"1s"}`, 30 * time.Second, 30 * time.Second},
+		{"supports day units", `{"timeInterval":"1d"}`, time.Hour, 24 * time.Hour},
+		{"supports week units", `{"timeInterval":"1w"}`, time.Hour, 7 * 24 * time.Hour},
+		{"trims surrounding space", `{"timeInterval":" 5m "}`, 30 * time.Second, 5 * time.Minute},
+		{"ignores an empty value", `{}`, 30 * time.Second, 30 * time.Second},
+		{"ignores an unparseable value", `{"timeInterval":"soon"}`, 30 * time.Second, 30 * time.Second},
+		// The frontend refuses these too (src/data/queryInterval.ts); both sides
+		// share one grammar so $__interval and $__timeInterval cannot disagree.
+		{"ignores a unit-less value", `{"timeInterval":"60"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores trailing garbage", `{"timeInterval":"5minutes"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a fractional value", `{"timeInterval":"1.5m"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a compound duration", `{"timeInterval":"1h30m"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores month and year units", `{"timeInterval":"1M"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value past the upper bound", `{"timeInterval":"366d"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value that would overflow", `{"timeInterval":"9999999999d"}`, 30 * time.Second, 30 * time.Second},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, req := h.MutateQuery(t.Context(), backend.DataQuery{
+				JSON:     []byte(tc.json),
+				Interval: tc.interval,
+			})
+
+			assert.Equal(t, tc.wantInterval, req.Interval)
+		})
+	}
+}
+
 func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	h := &Clickhouse{}
 

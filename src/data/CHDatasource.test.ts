@@ -153,6 +153,37 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, editorType: EditorType.SQL });
     });
+    it('raises $__interval to the per-query min interval', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $__interval', editorType: EditorType.SQL, timeInterval: '5m' } as CHQuery;
+      const scoped = {
+        __interval: { text: '30s', value: '30s' },
+        __interval_ms: { text: '30000', value: 30000 },
+      };
+
+      createInstance({}).applyTemplateVariables(query, scoped);
+
+      expect(spyOnReplace).toHaveBeenCalledWith(
+        'select $__interval',
+        {
+          __interval: { text: '5m', value: '5m' },
+          __interval_ms: { text: '300000', value: 300000 },
+        },
+        expect.any(Function)
+      );
+    });
+    it('leaves $__interval alone without a per-query min interval', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $__interval', editorType: EditorType.SQL } as CHQuery;
+      const scoped = {
+        __interval: { text: '30s', value: '30s' },
+        __interval_ms: { text: '30000', value: 30000 },
+      };
+
+      createInstance({}).applyTemplateVariables(query, scoped);
+
+      expect(spyOnReplace).toHaveBeenCalledWith('select $__interval', scoped, expect.any(Function));
+    });
     it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];

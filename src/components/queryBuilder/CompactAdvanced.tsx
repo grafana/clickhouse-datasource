@@ -3,12 +3,17 @@ import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Combobox, ComboboxOption, Input, useStyles2 } from '@grafana/ui';
 import { OrderBy, OrderByDirection, QueryBuilderOptions, TableColumn } from 'types/queryBuilder';
+import labels from 'labels';
+import { selectors } from 'selectors';
+import { useMinIntervalDraft } from 'components/MinIntervalEditor';
 
 interface CompactAdvancedProps {
   builderOptions: QueryBuilderOptions;
   allColumns: readonly TableColumn[];
+  minInterval?: string;
   onOrderByChange: (orderBy: OrderBy[]) => void;
   onLimitChange: (limit: number) => void;
+  onMinIntervalChange?: (minInterval: string) => void;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -33,7 +38,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
 });
 
 export const CompactAdvanced = (props: CompactAdvancedProps) => {
-  const { builderOptions, allColumns, onOrderByChange, onLimitChange } = props;
+  const { builderOptions, allColumns, minInterval, onOrderByChange, onLimitChange, onMinIntervalChange } = props;
   const styles = useStyles2(getStyles);
   const orderBy = builderOptions.orderBy || [];
   const limit = builderOptions.limit || 1000;
@@ -92,6 +97,38 @@ export const CompactAdvanced = (props: CompactAdvancedProps) => {
           }}
         />
       </div>
+
+      {onMinIntervalChange && (
+        <div className={styles.item}>
+          <span className={styles.label}>{labels.components.MinIntervalEditor.label}</span>
+          <CompactMinInterval minInterval={minInterval} onMinIntervalChange={onMinIntervalChange} />
+        </div>
+      )}
     </div>
+  );
+};
+
+const CompactMinInterval = (props: { minInterval?: string; onMinIntervalChange: (minInterval: string) => void }) => {
+  const { draft, setDraft, invalid, commit } = useMinIntervalDraft(props.minInterval, props.onMinIntervalChange);
+  const { placeholder, error } = labels.components.MinIntervalEditor;
+
+  return (
+    <Input
+      data-testid={selectors.components.QueryEditor.MinIntervalEditor.input}
+      value={draft}
+      width={10}
+      invalid={invalid}
+      // The compact strip has no room for error text below the field, so the
+      // shared message rides along as a native tooltip instead.
+      title={invalid ? error : undefined}
+      placeholder={placeholder}
+      onChange={(event) => setDraft(event.currentTarget.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') {
+          commit();
+        }
+      }}
+    />
   );
 };
