@@ -51,7 +51,7 @@ import {
   TableColumn,
   TimeUnit,
 } from 'types/queryBuilder';
-import { CHQuery, EditorType } from 'types/sql';
+import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
@@ -1466,11 +1466,19 @@ export class Datasource
       return false;
     }
 
-    // Skip queries with no SQL to run. A logs builder query carries an empty rawSql until its
-    // columns resolve (for example a non-OTel table in the compact editor before the schema fetch
-    // returns); running it would send an empty statement that ClickHouse rejects with a 400. Once
-    // the columns arrive the generated SQL is non-empty and the query runs normally.
-    return Boolean(query.rawSql && query.rawSql.trim().length > 0);
+    // A logs builder query carries an empty rawSql until its columns resolve (for example a
+    // non-OTel table in the compact editor before the schema fetch returns); running it would send
+    // an empty statement that ClickHouse rejects with a 400. Skip only that transient case. Every
+    // other query type runs as before, so an empty or invalid SQL-editor query still surfaces its
+    // error to the user instead of being dropped silently.
+    const isBuilderLogsQuery =
+      query.editorType === EditorType.Builder &&
+      (query as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs;
+    if (isBuilderLogsQuery && !(query.rawSql && query.rawSql.trim().length > 0)) {
+      return false;
+    }
+
+    return true;
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {

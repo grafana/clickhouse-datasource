@@ -1399,12 +1399,30 @@ describe('ClickHouseDatasource', () => {
       expect(mockDatasource.filterQuery({ refId: '1', hide: true, rawSql: 'SELECT 1' } as CHQuery)).toBe(false);
     });
 
-    it('returns false when rawSql is empty, so an incomplete builder query is not run', () => {
+    it('skips only an empty-rawSql logs builder query (its transient pre-schema state)', () => {
       // A logs builder query has an empty rawSql until its columns resolve (e.g. a non-OTel table
       // in the compact editor before the schema fetch returns). Running it would 400 at the backend.
-      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '' } as CHQuery)).toBe(false);
-      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '   ' } as CHQuery)).toBe(false);
-      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(false);
+      const emptyLogsBuilder = {
+        refId: '1',
+        rawSql: '',
+        editorType: EditorType.Builder,
+        builderOptions: { queryType: QueryType.Logs },
+      } as CHQuery;
+      const blankLogsBuilder = {
+        refId: '1',
+        rawSql: '   ',
+        editorType: EditorType.Builder,
+        builderOptions: { queryType: QueryType.Logs },
+      } as CHQuery;
+      expect(mockDatasource.filterQuery(emptyLogsBuilder)).toBe(false);
+      expect(mockDatasource.filterQuery(blankLogsBuilder)).toBe(false);
+    });
+
+    it('runs an empty-rawSql query that is not a logs builder query, so its error still surfaces', () => {
+      // The guard is narrowed to the transient logs-builder case only. An empty SQL-editor query (or
+      // any other type) runs as before, so a broken query errors visibly instead of failing silently.
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '', editorType: EditorType.SQL } as CHQuery)).toBe(true);
+      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
     });
   });
 
@@ -1474,11 +1492,14 @@ describe('ClickHouseDatasource', () => {
     });
 
     // End-to-end guard for the discovered-fields fold: query() runs foldDiscoveredLogFieldsIntoLabels
-    // on the backend response, so a logs Builder query that selects a hint-less scalar column must
-    // come back with that column folded into `labels` and dropped as a standalone frame field. This
-    // mirrors the pure-fold assertion in utils.test.ts, but through the real query() pipeline.
-    it('folds a hint-less scalar column into labels through the query() pipeline', async () => {
+    // on the backend response, so a logs Builder query whose datasource configures a column via the
+    // Columns setting must come back with that column folded into `labels` and dropped as a standalone
+    // frame field. This mirrors the pure-fold assertion in utils.test.ts, but through the real query()
+    // pipeline.
+    it('folds a configured column into labels through the query() pipeline', async () => {
       const instance = cloneDeep(mockDatasource);
+      // The fold is gated on the datasource's configured Columns setting (additionalColumns).
+      instance.settings.jsonData.logs = { ...instance.settings.jsonData.logs, additionalColumns: ['ServiceName'] };
 
       const logsQuery: CHBuilderQuery = {
         refId: 'A',
@@ -1492,7 +1513,7 @@ describe('ClickHouseDatasource', () => {
           columns: [
             { name: 'Timestamp', hint: ColumnHint.Time },
             { name: 'Body', hint: ColumnHint.LogMessage },
-            { name: 'ServiceName', type: 'String' }, // hint-less scalar -> folds into labels
+            { name: 'ServiceName', type: 'String' }, // configured via the Columns setting -> folds into labels
           ],
         },
       };

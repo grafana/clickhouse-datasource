@@ -12,7 +12,7 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
-import { isCollectionColumnType } from 'components/queryBuilder/views/columnNameHeuristics';
+import { isCollectionColumnType, isDateTimeColumnType } from 'components/queryBuilder/views/columnNameHeuristics';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
@@ -722,20 +722,66 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
 };
 
 /**
- * Folds the top-level scalar columns selected in a logs query into the `labels` field under their
- * plain names, so they surface as flat, filterable fields alongside the grouped OTel attributes, and
- * removes them as standalone frame fields. The folded columns are the hint-less, non-collection,
- * non-aliased ones in builderOptions.columns (roles carry a hint; attribute maps are collection-
- * typed; an aliased column would break filter-for in the logs-volume query). Real column names are
- * used so a filter-for click resolves in both the main and logs-volume queries. Creates `labels`
- * when the frame has none (non-OTel tables), and skips the logs-volume frame. A default query (roles
- * plus attribute maps only) selects no such columns, so it is a no-op.
+ * Heuristic: does a `labels` frame field hold the backend's serialized attribute
+ * map (an object, or a JSON-object string) rather than a real table column that
+ * happens to be named `labels`? Samples the first non-empty value. Used so the
+ * fold never overwrites a user's own `labels` column.
+ */
+const isBackendLabelsField = (field: DataFrame['fields'][number]): boolean => {
+  const values = field.values as unknown as unknown[];
+  const len = values?.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const v = values[i];
+    if (v === null || v === undefined || v === '') {
+      continue;
+    }
+    if (typeof v === 'object') {
+      return true; // already-parsed attribute map
+    }
+    if (typeof v === 'string') {
+      try {
+        const parsed = JSON.parse(v);
+        return parsed !== null && typeof parsed === 'object';
+      } catch {
+        return false; // a real string column named `labels`
+      }
+    }
+    return false; // a numeric / boolean column named `labels`
+  }
+  return true; // empty labels field: safe to treat as the (empty) attribute map
+};
+
+/**
+ * Folds the datasource's configured extra log columns (the "Columns" setting,
+ * jsonData.logs.additionalColumns) into the frame's `labels` field under their
+ * plain names, so they surface as flat, filterable fields alongside the grouped
+ * OTel attributes, and removes them as standalone frame fields. Real column names
+ * are used so a filter-for click resolves in both the main and logs-volume queries.
+ *
+ * Scope is limited to the configured columns on purpose:
+ *   - Columns picked by hand in the query builder stay as standalone frame fields,
+ *     so a Table panel on a logs builder query keeps its columns.
+ *   - Context columns (Show-context) are never folded away, so
+ *     getLogContextColumnsFromLogRow can still match them by name.
+ *   - Collection columns (Map/Array/...) and date/time columns are skipped: the
+ *     former have no scalar label value, the latter would serialize to a raw
+ *     epoch. Grafana renders those from the frame field itself.
+ *
+ * Creates `labels` when the frame has none (non-OTel tables). Leaves the frame
+ * untouched when an existing `labels` field is a real table column rather than the
+ * backend-serialized attribute map, so the user's data is not clobbered. When no
+ * columns are configured this is a no-op.
  */
 export const foldDiscoveredLogFieldsIntoLabels = (
   datasource: Datasource,
   req: DataQueryRequest<CHQuery>,
   res: DataQueryResponse
 ): DataQueryResponse => {
+  const configured = new Set(datasource.getAdditionalLogColumns().map((c) => c.split('[')[0]));
+  if (configured.size === 0) {
+    return res;
+  }
+  const contextColumns = new Set(datasource.getLogContextColumnNames().map((c) => c.split('[')[0]));
   const targetsByRefId = new Map(req.targets.map((t) => [t.refId, t]));
 
   for (const frame of (res.data as DataFrame[]) || []) {
@@ -748,14 +794,22 @@ export const foldDiscoveredLogFieldsIntoLabels = (
       continue;
     }
 
-    // The columns the field options selected are the hint-less, non-collection ones. Role columns
-    // (time / body / level / trace id) carry a hint; the attribute maps are collection-typed.
-    // A column aliased to a different name is skipped: a filter-for click would key on the alias,
-    // which the logs-volume query cannot resolve. A column whose alias equals its name (how the
-    // query builder tags a plain column pick) folds like an unaliased one, so columns chosen in the
-    // builder become browsable fields the same way columns configured on the datasource do.
+    // Only the configured extra columns fold. Role columns (time / body / level /
+    // trace id) carry a hint; attribute maps are collection-typed; date/time
+    // columns serialize to a raw epoch; context columns are needed by
+    // Show-context; a column aliased to a different name would break filter-for in
+    // the logs-volume query. A column whose alias equals its name (how the builder
+    // tags a plain pick) folds like an unaliased one.
     const discovered = (builderOptions.columns || [])
-      .filter((c) => c.hint === undefined && !isCollectionColumnType(c.type) && (!c.alias || c.alias === c.name))
+      .filter(
+        (c) =>
+          c.hint === undefined &&
+          !isCollectionColumnType(c.type) &&
+          !isDateTimeColumnType(c.type) &&
+          (!c.alias || c.alias === c.name) &&
+          configured.has(c.name) &&
+          !contextColumns.has(c.name)
+      )
       .map((c) => c.name);
     const sourceFields = discovered
       .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
@@ -764,9 +818,15 @@ export const foldDiscoveredLogFieldsIntoLabels = (
       continue;
     }
 
+    // Do not overwrite a real table column that happens to be named `labels`.
+    const existingLabels = frame.fields.find((f) => f.name === labelsFieldName);
+    if (existingLabels && !isBackendLabelsField(existingLabels)) {
+      continue;
+    }
+
     const rowLen = frame.length ?? frame.fields[0]?.values.length ?? 0;
 
-    let labelsField = frame.fields.find((f) => f.name === labelsFieldName);
+    let labelsField = existingLabels;
     if (!labelsField) {
       labelsField = {
         name: labelsFieldName,
@@ -778,7 +838,7 @@ export const foldDiscoveredLogFieldsIntoLabels = (
     }
 
     // Fold every column into `labels` with a single parse/serialize per row, rather than one
-    // round trip per column per row (which is quadratic on a wide table with include-all on).
+    // round trip per column per row (which is quadratic on a wide table).
     for (let i = 0; i < rowLen; i++) {
       // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
       // or already-parsed objects (a frame we just created). Handle both and write back in kind.

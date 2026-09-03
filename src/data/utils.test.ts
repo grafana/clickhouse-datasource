@@ -1282,9 +1282,10 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     return [request, { data }];
   };
 
-  // Folding is driven by which scalar columns the query selects, not by any config flag, so the
-  // datasource only needs the (optional) explicit additionalColumns list here.
-  const withFeature = (additional: string[] = []) => {
+  // Folding is driven by the datasource's configured Columns setting
+  // (additionalColumns): only those columns fold. Context columns and columns
+  // picked by hand in the query builder are intentionally left standalone.
+  const withFeature = (additional: string[] = [], contextColumns: string[] = []) => {
     const ds = newMockDatasource();
     ds.settings.jsonData.logs = {
       defaultDatabase: 'otel',
@@ -1292,14 +1293,15 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
       otelEnabled: true,
       otelVersion: 'latest',
       additionalColumns: additional,
+      contextColumns,
     };
     return ds;
   };
 
   const field = (name: string, values: any[], type = FieldType.string): Field => ({ name, type, config: {}, values });
 
-  it('folds hint-less scalar columns into an existing labels field and removes them as columns', () => {
-    const ds = withFeature();
+  it('folds configured scalar columns into an existing labels field and removes them as columns', () => {
+    const ds = withFeature(['ServiceName', 'SpanId']);
     const [req, res] = buildLogsRequestResponse(
       [
         { name: 'Timestamp', hint: ColumnHint.Time },
@@ -1320,15 +1322,15 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     const frame = res.data[0] as DataFrame;
     const names = frame.fields.map((f) => f.name);
 
-    // scalar columns removed as standalone fields, role columns + labels kept
+    // configured columns removed as standalone fields, role columns + labels kept
     expect(names).toEqual(['Timestamp', 'Body', labelsFieldName]);
-    // scalar values folded into labels under their plain names, next to the attribute keys
+    // configured values folded into labels under their plain names, next to the attribute keys
     const labels = frame.fields.find((f) => f.name === labelsFieldName)!.values[0];
     expect(labels).toEqual({ 'ResourceAttributes.k8s.pod.name': 'pod-1', ServiceName: 'cart', SpanId: 'abc' });
   });
 
   it('parses and rewrites a JSON-string labels value (backend-serialized shape)', () => {
-    const ds = withFeature();
+    const ds = withFeature(['ServiceName']);
     const [req, res] = buildLogsRequestResponse(
       [
         { name: 'Body', hint: ColumnHint.LogMessage },
@@ -1347,7 +1349,7 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
   });
 
-  it('creates a labels field when the frame has none (non-OTel table)', () => {
+  it('creates a labels field when the frame has none (non-OTel table) and stringifies non-string values', () => {
     const ds = withFeature(['method', 'status']);
     const [req, res] = buildLogsRequestResponse(
       [
@@ -1355,7 +1357,8 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
         { name: 'method', type: 'String' },
         { name: 'status', type: 'UInt16' },
       ],
-      [field('event_time', [1]), field('method', ['GET']), field('status', ['200'])]
+      // status arrives as a real number, so this exercises the String(v) coercion path.
+      [field('event_time', [1]), field('method', ['GET']), field('status', [200], FieldType.number)]
     );
 
     foldDiscoveredLogFieldsIntoLabels(ds, req, res);
@@ -1364,8 +1367,10 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({ method: 'GET', status: '200' });
   });
 
-  it('folds a selected scalar column regardless of the include-all flag (driven by columns, not config)', () => {
-    const ds = withFeature();
+  it('does not fold a hint-less column that is not in the Columns setting', () => {
+    // ServiceName is selected in the builder but not configured, so it stays a standalone field
+    // (a Table panel on a logs builder query keeps its columns).
+    const ds = withFeature([]);
     const [req, res] = buildLogsRequestResponse(
       [
         { name: 'Body', hint: ColumnHint.LogMessage },
@@ -1375,24 +1380,71 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     );
 
     foldDiscoveredLogFieldsIntoLabels(ds, req, res);
-    // ServiceName is a selected hint-less scalar, so it folds into labels and leaves the field list.
-    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'labels']);
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'ServiceName']);
   });
 
-  it('is a no-op for a query that selects no hint-less scalar columns (roles only)', () => {
-    const ds = withFeature();
+  it('is a no-op when no columns are configured (roles only)', () => {
+    const ds = withFeature([]);
     const [req, res] = buildLogsRequestResponse(
       [{ name: 'Body', hint: ColumnHint.LogMessage }],
       [field('Body', ['hi'])]
     );
 
     foldDiscoveredLogFieldsIntoLabels(ds, req, res);
-    // No scalar column to fold, so no labels field is synthesized.
     expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body']);
   });
 
+  it('does not fold a configured column that is also a context column (Show-context needs it)', () => {
+    // service is configured AND a context column: it must stay a standalone field so
+    // getLogContextColumnsFromLogRow can still match it by name.
+    const ds = withFeature(['service'], ['service']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'service', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('service', ['cart'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'service']);
+  });
+
+  it('skips a configured date/time column (would serialize to a raw epoch)', () => {
+    const ds = withFeature(['created']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'created', type: 'DateTime64(3)' },
+      ],
+      [field('Body', ['hi']), field('created', [1710495000000], FieldType.time)]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // created stays a standalone field; Grafana renders it with its own time processor.
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'created']);
+  });
+
+  it('does not clobber a real table column named labels', () => {
+    // A non-attribute-map `labels` column (plain string values) must be left intact.
+    const ds = withFeature(['ServiceName']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('ServiceName', ['cart']), field(labelsFieldName, ['prod'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // fold skipped: ServiceName stays standalone and the real labels value is preserved.
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'ServiceName', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toBe('prod');
+  });
+
   it('skips frames that share the query columns but carry none of them (logs-volume)', () => {
-    const ds = withFeature();
+    const ds = withFeature(['ServiceName']);
     const [req, res] = buildLogsRequestResponse(
       [
         { name: 'Body', hint: ColumnHint.LogMessage },
@@ -1402,7 +1454,7 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     );
 
     foldDiscoveredLogFieldsIntoLabels(ds, req, res);
-    // no scalar field present to fold, so no labels field is added to the volume frame
+    // no configured field present to fold, so no labels field is added to the volume frame
     expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Time', 'count']);
   });
 
@@ -1410,7 +1462,7 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     // alias === name is how the query builder tags a plain column pick, so it folds like an unaliased
     // column. A column aliased to a *different* name is skipped: a filter-for click keys on the alias,
     // which the logs-volume query cannot resolve, so it stays a standalone field.
-    const ds = withFeature();
+    const ds = withFeature(['ServiceName', 'Namespace']);
     const [req, res] = buildLogsRequestResponse(
       [
         { name: 'Body', hint: ColumnHint.LogMessage },
@@ -1437,7 +1489,7 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
   });
 
   it('leaves an aliased column as a standalone field so its filter keys on the real column', () => {
-    const ds = withFeature();
+    const ds = withFeature(['ServiceName', 'SpanId']);
     const [req, res] = buildLogsRequestResponse(
       [
         { name: 'Body', hint: ColumnHint.LogMessage },

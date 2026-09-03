@@ -69,6 +69,9 @@ export const isNumericColumn = (column: TableColumn): boolean => {
   return type.includes('uint') || type.includes('int') || type.includes('float') || type.includes('decimal');
 };
 
+/** Type predicate (by type string): ClickHouse Date / DateTime / DateTime64 columns. */
+export const isDateTimeColumnType = (type?: string): boolean => (type || '').toLowerCase().includes('date');
+
 /** Type predicate: ClickHouse collection / compound column types (Map, Array, Tuple, Nested, Object, JSON). */
 export const isCollectionColumnType = (type?: string): boolean => {
   const s = (type || '').trim();

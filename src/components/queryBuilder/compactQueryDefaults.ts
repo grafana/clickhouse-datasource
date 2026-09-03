@@ -28,10 +28,16 @@ export const appendAdditionalLogColumns = (
   includedColumns: Set<string>
 ): void => {
   for (const columnName of datasource.getAdditionalLogColumns()) {
-    if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
+    const baseName = columnName.split('[')[0];
+    if (includedColumns.has(columnName) || includedColumns.has(baseName)) {
       continue;
     }
-    columns.push({ name: columnName });
+    // Carry the schema type so downstream consumers (e.g. the labels fold's
+    // collection/date checks) can reason about the column. `allColumns` is the
+    // fetched table schema; it is empty on a cold load before the schema
+    // resolves, in which case the type stays undefined (best effort).
+    const type = allColumns.find((c) => c.name === columnName || c.name === baseName)?.type;
+    columns.push(type ? { name: columnName, type } : { name: columnName });
     includedColumns.add(columnName);
   }
 };
