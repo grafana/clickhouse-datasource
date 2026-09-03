@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { act, render, fireEvent, waitFor, within } from '@testing-library/react';
 import { getDataSourceSrv } from '@grafana/runtime';
 import { LogsConfig } from './LogsConfig';
 import allLabels from 'labels';
@@ -357,7 +357,7 @@ describe('LogsConfig', () => {
     // the ColumnsEditor multiselect. That count is the robust signal for the Columns control type.
     const tagsPlaceholder = allLabels.components.Config.LogsConfig.columns.additionalColumns.placeholder;
 
-    it('renders role fields and Columns as comboboxes after the schema fetch resolves', async () => {
+    it('renders role fields as comboboxes immediately and Columns as a combobox once the schema resolves', async () => {
       const result = render(
         <LogsConfig
           {...noopHandlers}
@@ -367,26 +367,27 @@ describe('LogsConfig', () => {
         />
       );
 
-      // The fetch resolves in a debounced (400ms) useEffect, so wait for the role text inputs to be
-      // replaced. Their disappearance means renderRoleColumn switched from LabeledInput (textbox) to
-      // ColumnSelect. Timeout must exceed the debounce, so allow 2000ms.
-      await waitFor(
-        () => {
-          expect(result.queryByPlaceholderText(rolePlaceholders[0])).not.toBeInTheDocument();
-        },
-        { timeout: 2000 }
-      );
+      // A schema fetch will run (single-table + saved + a table), so the role fields are ColumnSelect
+      // dropdowns from the first render, not text inputs, and stay that way regardless of the fetch.
+      // That is the mid-edit-swap fix: the control shape never changes under the cursor.
       for (const placeholder of rolePlaceholders) {
         expect(result.queryByPlaceholderText(placeholder)).not.toBeInTheDocument();
       }
+      // 4 role ColumnSelects, present before the debounced fetch resolves (OtelVersionSelect's Select
+      // is disabled when otelEnabled is false, so it exposes no combobox role). The Columns field is
+      // still the tags input at this point.
+      expect(result.getAllByRole('combobox')).toHaveLength(4);
 
-      // The Columns field is now the ColumnsEditor multiselect, so only the Context Columns tags input
-      // remains (both share the placeholder above); it drops from 2 tags inputs to 1.
+      // Once the debounced (400ms) schema read returns, the Columns field swaps from the tags input to
+      // the ColumnsEditor multiselect: a 5th combobox appears and only the Context Columns tags input
+      // remains (both tags inputs share the placeholder, so it drops from 2 to 1).
+      await result.findByTestId(
+        selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper,
+        {},
+        { timeout: 2000 }
+      );
+      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(5), { timeout: 2000 });
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(1);
-
-      // The 4 role ColumnSelects + the ColumnsEditor multiselect = 5 comboboxes. (OtelVersionSelect's
-      // Select is disabled when otelEnabled is false and so exposes no combobox role.)
-      expect(result.getAllByRole('combobox')).toHaveLength(5);
     });
 
     it('falls back to text inputs and the tags input when uid is absent (not single-table backed)', async () => {
@@ -483,8 +484,9 @@ describe('LogsConfig', () => {
     });
 
     // T2a: the resolved datasource has no getColumnsCached (older instance / wrong type). The guard
-    // returns undefined, so the schema never loads and the component stays on the fallback layout.
-    it('stays on the fallback when the resolved datasource lacks getColumnsCached', async () => {
+    // returns undefined, so the schema never loads and the Columns field stays the tags input.
+    it('keeps the Columns field on the tags-input fallback when the resolved datasource lacks getColumnsCached', async () => {
+      jest.useFakeTimers();
       mockGetDataSourceSrv.mockReturnValue({ get: async () => ({}) });
 
       const result = render(
@@ -496,25 +498,28 @@ describe('LogsConfig', () => {
         />
       );
 
-      // Let the 400ms debounce elapse and the guarded promise settle, then assert the fallback held:
-      // role fields are still text inputs, the Columns tags input is still present (2 tags inputs),
-      // and no schema-backed combobox rendered.
-      await waitFor(
-        () => {
-          expect(result.getByPlaceholderText(rolePlaceholders[1])).toBeInTheDocument();
-        },
-        { timeout: 2000 }
-      );
-      for (const placeholder of rolePlaceholders) {
-        expect(result.getByPlaceholderText(placeholder)).toBeInTheDocument();
-      }
+      // Fire the 400ms debounce and let the guarded (undefined) promise settle. Advancing past the
+      // debounce is what makes this exercise the fetch path rather than the identical first render.
+      await act(async () => {
+        jest.advanceTimersByTime(500);
+      });
+
+      // The fetch produced no columns, so the Columns field stayed the tags input: no ColumnsEditor
+      // multiselect, and both it and Context Columns share the placeholder (2 tags inputs). If the
+      // fetch had returned columns the multiselect would be present, so this distinguishes the paths.
+      // (Role fields are ColumnSelect regardless, per the mid-edit-swap fix, so combobox count is not
+      // the fallback signal.)
+      expect(
+        result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+      ).not.toBeInTheDocument();
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(2);
-      expect(result.queryAllByRole('combobox')).toHaveLength(0);
+      jest.useRealTimers();
     });
 
-    // T2b: getDataSourceSrv().get() rejects. The .catch path clears the schema, so the component must
-    // stay on the fallback layout without throwing or leaving an unhandled rejection.
-    it('stays on the fallback when the datasource resolve rejects', async () => {
+    // T2b: getDataSourceSrv().get() rejects. The .catch path clears the schema, so the Columns field
+    // must stay the tags input without throwing or leaving an unhandled rejection.
+    it('keeps the Columns field on the tags-input fallback when the datasource resolve rejects', async () => {
+      jest.useFakeTimers();
       mockGetDataSourceSrv.mockReturnValue({ get: async () => Promise.reject(new Error('boom')) });
 
       const result = render(
@@ -526,17 +531,15 @@ describe('LogsConfig', () => {
         />
       );
 
-      await waitFor(
-        () => {
-          expect(result.getByPlaceholderText(rolePlaceholders[1])).toBeInTheDocument();
-        },
-        { timeout: 2000 }
-      );
-      for (const placeholder of rolePlaceholders) {
-        expect(result.getByPlaceholderText(placeholder)).toBeInTheDocument();
-      }
+      await act(async () => {
+        jest.advanceTimersByTime(500);
+      });
+
+      expect(
+        result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+      ).not.toBeInTheDocument();
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(2);
-      expect(result.queryAllByRole('combobox')).toHaveLength(0);
+      jest.useRealTimers();
     });
   });
 });

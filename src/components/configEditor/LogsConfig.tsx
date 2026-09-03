@@ -137,16 +137,29 @@ export const LogsConfig = (props: LogsConfigProps) => {
     name,
     type: fetchedColumns.find((c) => c.name === name)?.type,
   }));
-  const onSelectedColumnsChange = (cols: SelectedColumn[]) => onAdditionalColumnsChange(cols.map((c) => c.name));
+  // Trim on both paths: ColumnsEditor's select allows custom values, so a pasted `ServiceName ` would
+  // otherwise be stored untrimmed here while the TagsInput fallback trims via onAdditionalColumnsChangeTrimmed.
+  const onSelectedColumnsChange = (cols: SelectedColumn[]) => onAdditionalColumnsChangeTrimmed(cols.map((c) => c.name));
   const onAddAllColumns = (toAdd: SelectedColumn[]) => {
     const existing = new Set(additionalColumns || []);
     const names = toAdd.map((c) => c.name).filter((n) => !roleColumnNames.has(n) && !existing.has(n));
     onAdditionalColumnsChange([...(additionalColumns || []), ...names]);
   };
 
-  // Role column fields: a schema-backed single-select (like the query builder) once the table's
-  // columns are known, falling back to a typed input before the datasource is saved. The select
-  // still allows a typed value, so expression-based roles keep working.
+  // A configured column that does not exist on the table breaks every logs query with "Unknown
+  // expression identifier". Once the schema is known, flag any configured columns that are missing
+  // from it (comparing the base name so map sub-column access like `col['key']` still resolves).
+  const unknownColumns =
+    fetchedColumns.length > 0
+      ? (additionalColumns || []).filter((name) => !fetchedColumns.some((c) => c.name === name.split('[')[0]))
+      : [];
+
+  // Role column fields: a schema-backed single-select (like the query builder) whenever a schema fetch
+  // will happen (single-table + saved + a table set), falling back to a typed input otherwise. The
+  // control type is chosen from whether a fetch WILL run, not from whether it has resolved, so the
+  // field never swaps shape mid-edit when the debounced fetch returns. ColumnSelect shows the current
+  // value and allows a typed value, so it works with empty options and with expression-based roles.
+  const willFetchSchema = isSingleTable && Boolean(props.uid) && Boolean(defaultTable);
   const renderRoleColumn = (
     hint: ColumnHint,
     value: string | undefined,
@@ -154,7 +167,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     columnFilterFn: (c: TableColumn) => boolean,
     fieldLabels: { label: string; tooltip: string }
   ) => {
-    if (fetchedColumns.length > 0) {
+    if (willFetchSchema) {
       return (
         <ColumnSelect
           disabled={otelEnabled}
@@ -265,6 +278,11 @@ export const LogsConfig = (props: LogsConfigProps) => {
         <Text variant="bodySmall" color="secondary">
           {labels.columns.additionalColumns.description}
         </Text>
+        {unknownColumns.length > 0 && (
+          <Text variant="bodySmall" color="error">
+            {`Not found in ${defaultTable}: ${unknownColumns.join(', ')}. These will fail log queries until corrected.`}
+          </Text>
+        )}
       </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>
