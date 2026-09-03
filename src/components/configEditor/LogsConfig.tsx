@@ -258,6 +258,9 @@ export const LogsConfig = (props: LogsConfigProps) => {
             onSelectedColumnsChange={onSelectedColumnsChange}
             showAddAllOption
             onAddAllColumns={onAddAllColumns}
+            label={labels.columns.additionalColumns.label}
+            tooltip={labels.columns.additionalColumns.tooltip}
+            width={12}
           />
         ) : (
           <InlineField

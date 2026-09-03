@@ -35,6 +35,11 @@ interface ColumnsEditorProps {
   // against live reducer state (deduping by name) so a column already selected as a role is not
   // projected twice. Falls back to onSelectedColumnsChange when not provided.
   onAddAllColumns?: (columnsToAdd: SelectedColumn[]) => void;
+  // Optional field-label overrides so the config editor's Columns row lines up with the width-12
+  // rows above it and keeps its own tooltip. Builders omit these and get the defaults below.
+  label?: string;
+  tooltip?: string;
+  width?: number;
 }
 
 function getCustomColumns(columnNames: string[], allColumns: readonly TableColumn[]): Array<SelectableValue<string>> {
@@ -64,7 +69,10 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
     allColumnNames.push({ label: allColumnName, value: allColumnName });
   }
   const selectedColumnNames = (selectedColumns || []).map((c) => ({ label: c.alias || c.name, value: c.name }));
-  const { label, tooltip, addAllColumns } = labels.components.ColumnsEditor;
+  const { label: defaultLabel, tooltip: defaultTooltip, addAllColumns } = labels.components.ColumnsEditor;
+  const fieldLabel = props.label ?? defaultLabel;
+  const fieldTooltip = props.tooltip ?? defaultTooltip;
+  const fieldWidth = props.width ?? 8;
 
   const options = [
     // Subtle first entry, only for logs and once the schema has loaded. Selecting it materializes
@@ -149,8 +157,8 @@ export const ColumnsEditor = (props: ColumnsEditorProps) => {
   return (
     <InlineField
       label={
-        <InlineFormLabel width={8} className="query-keyword" tooltip={tooltip}>
-          {label}
+        <InlineFormLabel width={fieldWidth} className="query-keyword" tooltip={fieldTooltip}>
+          {fieldLabel}
         </InlineFormLabel>
       }
       grow
