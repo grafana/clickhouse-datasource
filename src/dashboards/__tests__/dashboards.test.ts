@@ -149,6 +149,46 @@ describe('OTel dashboards', () => {
   });
 
   describe('database variable', () => {
+    // The three Map-schema dashboards link to each other with includeVars, so a database
+    // selected on one is forwarded to the others. Their selectors must therefore offer the
+    // same set of databases: one that holds both otel_logs and otel_traces. If a dashboard
+    // listed databases holding only its own signal, forwarding that choice would land the
+    // next dashboard on a database where none of its tables resolve.
+    const linkedOtelDashboards = [
+      'otel-logs-explorer.json',
+      'otel-traces-explorer.json',
+      'otel-service-dashboard.json',
+    ] as const;
+
+    const databaseVariableSql = (filename: string): string | undefined => {
+      const dashboard = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as {
+        templating?: { list?: Array<{ name?: string; query?: { rawSql?: string } }> };
+      };
+      return dashboard.templating?.list?.find((v) => v.name === 'database')?.query?.rawSql;
+    };
+
+    it('linked dashboards agree on which databases the selector offers', () => {
+      const queries = linkedOtelDashboards.map(databaseVariableSql);
+      expect(queries.every((q) => typeof q === 'string' && q.length > 0)).toBe(true);
+      expect(new Set(queries).size).toBe(1);
+    });
+
+    it.each(linkedOtelDashboards)('%s only offers databases holding both otel tables', (filename) => {
+      const sql = databaseVariableSql(filename) ?? '';
+      expect(sql).toContain("name IN ('otel_logs', 'otel_traces')");
+      expect(sql).toContain('count(DISTINCT name) = 2');
+    });
+
+    it.each(linkedOtelDashboards)('%s carries the database through drill-through links', (filename) => {
+      // Nothing else covers link forwarding, so a dropped parameter would leave CI green while
+      // silently sending the target dashboard to whichever database it defaults to.
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+      const crossLinks = content.match(/\/d\/otel-[a-z-]+\?[^"]*/g) ?? [];
+      for (const url of crossLinks) {
+        expect(url).toContain('var-database=${database}');
+      }
+    });
+
     it.each(otelDashboards)('%s exposes a "database" query variable', (filename) => {
       const dashboard = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as {
         templating?: { list?: Array<{ name?: string; type?: string }> };

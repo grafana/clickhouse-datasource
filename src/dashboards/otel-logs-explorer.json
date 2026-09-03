@@ -295,7 +295,7 @@
       {
         "current": {},
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
-        "definition": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_logs' ORDER BY database",
+        "definition": "SELECT database FROM system.tables WHERE name IN ('otel_logs', 'otel_traces') GROUP BY database HAVING count(DISTINCT name) = 2 ORDER BY database",
         "hide": 0,
         "includeAll": false,
         "label": "Database",
@@ -304,7 +304,7 @@
         "options": [],
         "query": {
           "editorType": "sql",
-          "rawSql": "SELECT DISTINCT database FROM system.tables WHERE name = 'otel_logs' ORDER BY database"
+          "rawSql": "SELECT database FROM system.tables WHERE name IN ('otel_logs', 'otel_traces') GROUP BY database HAVING count(DISTINCT name) = 2 ORDER BY database"
         },
         "refresh": 1,
         "regex": "",
