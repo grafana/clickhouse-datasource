@@ -175,5 +175,17 @@ describe('OTel dashboards', () => {
         expect(panel.interval).toBe('${interval}');
       }
     });
+
+    it.each(otelDashboards)('%s forwards the interval selection, not the resolved bucket', (filename) => {
+      // A data link interpolates ${interval} through to the concrete bucket size, so drilling
+      // through while "auto" is selected would pin that bucket on the target dashboard. The
+      // :text formatter forwards the selection as displayed ("auto", "30s"), which the target
+      // matches back to the same option — auto stays auto, an explicit choice stays explicit.
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+      const forwarding = content.match(/var-interval=\$\{interval[^}]*\}/g) ?? [];
+      for (const param of forwarding) {
+        expect(param).toBe('var-interval=${interval:text}');
+      }
+    });
   });
 });
