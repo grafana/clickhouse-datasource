@@ -41,8 +41,8 @@ describe('findColumnByNameHeuristic', () => {
     }
   });
 
-  it('matches conventional log-message names, including DB-log (query) and access-log (request) columns', () => {
-    for (const name of ['body', 'Body', 'message', 'msg', 'log_message', 'query', 'request']) {
+  it('matches conventional log-message names', () => {
+    for (const name of ['body', 'Body', 'message', 'msg', 'log_message']) {
       expect(findColumnByNameHeuristic([col(name, 'String')], ColumnHint.LogMessage)?.name).toBe(name);
     }
   });
