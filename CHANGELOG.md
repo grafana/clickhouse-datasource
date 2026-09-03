@@ -5,7 +5,6 @@
 ### Features
 
 - Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
-- Add a **Columns** setting to the logs data source config for browsing and filtering by any table column. The chosen columns appear in the Fields list, the log row details (under a **Fields** group next to the attribute groups), and the field filters, without editing each query. In single source mode the Columns field and the time, level, and message roles are pickers of the table's real columns, with a one-click **Add all columns**; other modes accept a typed list. Works for OTel and non-OTel log tables (#2108)
 
 ### Fixes
 

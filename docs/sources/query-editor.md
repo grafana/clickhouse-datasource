@@ -114,7 +114,7 @@ The logs query builder provides structured fields for common log exploration pat
 
 You can also filter by log message text using the search field, and add column filters for resource, scope, or log attributes.
 
-Columns configured through the data source **Columns** setting are projected into every logs query automatically, so they appear here as browsable, filterable fields without editing the query. See [Logs configuration](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#logs-configuration).
+Columns configured through the data source **Columns** setting are projected into new logs queries automatically, so they appear here as browsable, filterable fields without editing the query. See [Logs configuration](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#logs-configuration).
 
 ### Traces query builder
 
