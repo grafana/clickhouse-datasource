@@ -663,8 +663,12 @@ These issues can occur after upgrading the plugin version or the Grafana version
 
 - No default log columns are configured for the data source, so there is no timestamp column to bucket on.
 - The query does not select the configured timestamp column as its first column, selects it as an expression rather than a plain column reference, or qualifies it (`l.Timestamp`).
-- The query is `SELECT *` over anything other than the configured logs table, including a table function, a subquery, a join or a table variable. The plugin cannot know which columns such a query returns.
+- The query is `SELECT *` over anything other than the configured logs table, including a table function, a subquery, a join, a table variable, or a CTE that shadows the table name. The plugin cannot know which columns such a query returns.
 - The query uses a construct that changes which rows exist and so cannot be aggregated safely: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `WITH ROLLUP`, `WITH CUBE`, `UNION`, `INTO OUTFILE`, an interval macro such as `$__timeInterval`, a statement macro such as `$__columns`, or more than one statement.
+- The query ends in a trailing `LIMIT`, `OFFSET` or `FORMAT` whose argument the plugin cannot parse, such as `LIMIT (500)` or `LIMIT ${maxRows}`. Leaving a row cap inside the aggregate would leave every bucket short.
+- A `WITH` clause defines a CTE whose name shadows the configured logs table, so a `SELECT *` over it does not read that table's columns.
+- A projected column is aliased using a backslash escape, such as `AS "a\"b"`, which the plugin cannot reproduce exactly.
+- Only a lower-precision _filter_ timestamp column is configured. Its values are typically day-aligned, so no cast can bucket them below a day.
 
 Because Grafana renders a single histogram for the whole panel, one query that cannot be aggregated causes every query in that panel to fall back, including query builder queries.
 

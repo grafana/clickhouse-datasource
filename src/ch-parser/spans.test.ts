@@ -260,13 +260,8 @@ describe('scanTopLevelSelect', () => {
     });
 
     it('does not report `* EXCEPT (...)` as a plain wildcard', () => {
-      // NOTE: the scanner currently declines this statement outright (EXCEPT is matched by text
-      // at depth 0, so it is reported as a set operation) rather than returning an item with no
-      // names. Either way the caller must not believe it selected every column, which is the
-      // property asserted here.
-      const result = scanTopLevelSelect('SELECT * EXCEPT (Body) FROM t');
-      const items = result.ok ? result.select.items : [];
-      expect(items.some((item) => item.wildcard === true)).toBe(false);
+      const select = scanOk('SELECT * EXCEPT (Body) FROM t');
+      expect(select.items.some((item) => item.wildcard === true)).toBe(false);
     });
   });
 
@@ -283,7 +278,7 @@ describe('scanTopLevelSelect', () => {
       ]);
     });
 
-    it('unquotes a backticked identifier and its alias', () => {
+    it('unquotes a backtick identifier and its alias', () => {
       expect(scanOk('SELECT `Timestamp` AS `ts` FROM t').items).toEqual([
         { outputName: 'ts', sourceIdentifier: 'Timestamp' },
       ]);
@@ -295,7 +290,7 @@ describe('scanTopLevelSelect', () => {
       ]);
     });
 
-    it('reports no names for an unaliased qualified name', () => {
+    it('reports no names for a bare qualified name', () => {
       expect(scanOk('SELECT l.Timestamp FROM otel.otel_logs AS l').items).toEqual([{}]);
     });
 
@@ -315,7 +310,7 @@ describe('scanTopLevelSelect', () => {
       ]);
     });
 
-    it('reports no names for an unaliased expression', () => {
+    it('reports no names for a bare expression', () => {
       expect(scanOk('SELECT count() FROM t').items).toEqual([{}]);
     });
 
@@ -372,7 +367,7 @@ describe('scanTopLevelSelect', () => {
       it.each([
         ['an unterminated string literal', "SELECT Body FROM t WHERE Body = 'oops"],
         ['an unterminated double-quoted identifier', 'SELECT "Timestamp FROM t'],
-        ['an unterminated backquoted identifier', 'SELECT `Timestamp FROM t'],
+        ['an unterminated backtick identifier', 'SELECT `Timestamp FROM t'],
         ['an unterminated block comment', 'SELECT Timestamp FROM t /* oops'],
       ])('reports %s', (_name, sql) => {
         expect(scanProblem(sql)).toBe(SelectShapeProblem.LexError);
@@ -689,5 +684,116 @@ describe('EXCEPT disambiguation', () => {
 
   it('treats EXCEPT after the FROM as a set operation', () => {
     expect(scanProblem('SELECT a FROM t EXCEPT SELECT a FROM u')).toBe(SelectShapeProblem.SetOperation);
+  });
+});
+
+describe('bracket kinds', () => {
+  it('does not split an array literal in the select list into phantom items', () => {
+    const select = scanOk('SELECT Timestamp, Body, [ServiceName, SeverityText, ScopeName] AS labels FROM t');
+    expect(select.items).toEqual([
+      { outputName: 'Timestamp', sourceIdentifier: 'Timestamp' },
+      { outputName: 'Body', sourceIdentifier: 'Body' },
+      { outputName: 'labels' },
+    ]);
+  });
+
+  it.each([
+    'SELECT Timestamp, [[1, 2], [3, 4]] AS nested FROM t',
+    "SELECT Timestamp, map('a', 1, 'b', 2) AS m FROM t",
+    "SELECT Timestamp, LogAttributes['a,b'] AS v FROM t",
+  ])('keeps one item per top-level comma in %s', (sql) => {
+    expect(scanOk(sql).items.length).toBe(2);
+  });
+
+  it.each(['SELECT a] FROM t', 'SELECT [1, 2 FROM t', 'SELECT a} FROM t'])('rejects unbalanced %s', (sql) => {
+    expect(scanProblem(sql)).toBe(SelectShapeProblem.Unbalanced);
+  });
+});
+
+describe('trailing clauses that cannot be parsed', () => {
+  it.each([
+    // A row cap left inside the derived table caps the aggregate, with no error to reveal it.
+    'SELECT Timestamp FROM t WHERE a = 1 LIMIT (500)',
+    'SELECT Timestamp FROM t LIMIT ${maxRows}',
+    'SELECT Timestamp FROM t LIMIT ALL',
+    'SELECT Timestamp FROM t LIMIT (SELECT 5)',
+    'SELECT Timestamp FROM t OFFSET (5)',
+  ])('declines %s', (sql) => {
+    expect(scanProblem(sql)).toBe(SelectShapeProblem.UnrecognizedTail);
+  });
+
+  it.each([
+    ['SELECT Timestamp FROM t LIMIT 100', 'SELECT Timestamp FROM t\n'],
+    ['SELECT Timestamp FROM t LIMIT 10, 20', 'SELECT Timestamp FROM t\n'],
+    ['SELECT Timestamp FROM t ORDER BY Timestamp LIMIT 10 WITH TIES', 'SELECT Timestamp FROM t\n'],
+    ['SELECT Timestamp FROM t OFFSET 5 ROWS', 'SELECT Timestamp FROM t\n'],
+    ['SELECT Timestamp FROM t LIMIT 2, 3 FORMAT JSON', 'SELECT Timestamp FROM t\n'],
+  ])('still strips the recognizable tail of %s', (sql, head) => {
+    expect(scanOk(sql).head).toBe(head);
+  });
+
+  it.each([
+    "SELECT Timestamp FROM t WHERE format LIKE 'json%'",
+    "SELECT Timestamp FROM t WHERE t.format LIKE 'json%'",
+    'SELECT Timestamp FROM t WHERE format IS NOT NULL',
+    "SELECT Timestamp FROM t WHERE format IN ('a', 'b')",
+    'SELECT Timestamp FROM t GROUP BY format HAVING count() > 1',
+  ])('keeps a column named like a tail keyword in the head (%s)', (sql) => {
+    expect(scanOk(sql).head).toBe(`${sql}\n`);
+  });
+});
+
+describe('FROM target grammar', () => {
+  it.each(['SELECT * FROM t x y', 'SELECT * FROM t AS x y', 'SELECT * FROM t AS', 'SELECT * FROM t FINAL AS x y'])(
+    'reports no target for %s',
+    (sql) => {
+      expect(scanOk(sql).from).toBeUndefined();
+    }
+  );
+
+  it.each([
+    'SELECT * FROM t OFFSET 5',
+    'SELECT * FROM t FORMAT JSON',
+    'SELECT * FROM t AS x',
+    'SELECT * FROM t x',
+    'SELECT * FROM t FINAL',
+  ])('still reports the target for %s', (sql) => {
+    expect(scanOk(sql).from).toEqual({ table: 't' });
+  });
+
+  it('does not report a CTE that shadows a table name as that table', () => {
+    expect(scanOk('WITH otel_logs AS (SELECT 1 AS x) SELECT * FROM otel_logs').from).toBeUndefined();
+  });
+
+  it.each([
+    'WITH 5 AS otel_logs SELECT * FROM otel_logs',
+    'WITH a AS (SELECT 1), otel_logs AS (SELECT 2) SELECT * FROM otel_logs',
+  ])('also covers the scalar and multi-CTE forms (%s)', (sql) => {
+    expect(scanOk(sql).from).toBeUndefined();
+  });
+
+  it('still reports the real table when an unrelated CTE is present', () => {
+    expect(scanOk('WITH x AS (SELECT 1) SELECT * FROM otel_logs').from).toEqual({ table: 'otel_logs' });
+  });
+
+  it('is never shadowed for a qualified reference', () => {
+    expect(scanOk('WITH otel_logs AS (SELECT 1) SELECT * FROM demo.otel_logs').from).toEqual({
+      database: 'demo',
+      table: 'otel_logs',
+    });
+  });
+});
+
+describe('identifiers we cannot reproduce', () => {
+  it.each(['"a\\"b"', '`a\\`b`', '"a\\\\b"'])('declines to decode %s', (text) => {
+    expect(unquoteIdentifier(text)).toBeUndefined();
+  });
+
+  it('decodes curly quotes verbatim', () => {
+    expect(unquoteIdentifier('\u201Ct\u201D')).toBe('t');
+  });
+
+  it('reports no names for an alias it cannot reproduce', () => {
+    expect(scanOk('SELECT Timestamp AS "a\\"b" FROM t').items).toEqual([{}]);
   });
 });

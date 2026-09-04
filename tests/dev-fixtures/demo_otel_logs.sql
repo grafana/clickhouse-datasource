@@ -1,5 +1,10 @@
--- Demo data for manual testing of the logs experience, in its own `demo` database so it never
--- collides with the e2e fixtures that tests assert against.
+-- Demo data for manual testing of the logs experience, in its own `demo` database.
+--
+-- Deliberately NOT under tests/e2e/fixtures/: the compose loader globs that directory, so this
+-- would insert a quarter of a million rows on every e2e run with no spec referencing it. Load it
+-- by hand when you want a dense histogram to look at:
+--
+--   docker exec -i clickhouse-server clickhouse-client --multiquery < tests/dev-fixtures/demo_otel_logs.sql
 --
 -- The schema matches the opentelemetry-collector-contrib clickhouseexporter v0.151.0 layout,
 -- which is what the plugin's `latest` OTel version expects (src/otel.ts). Turning on the OTel
@@ -8,7 +13,7 @@
 -- Rows are generated relative to load time, so the data always covers the last 24 hours, at
 -- roughly 170 lines per minute — dense enough that minute-wide histogram buckets read as real
 -- traffic rather than ones and twos. A burst of errors around four hours ago gives the
--- histogram a recognisable shape.
+-- histogram a recognizable shape.
 
 CREATE DATABASE IF NOT EXISTS demo;
 
@@ -39,7 +44,7 @@ ORDER BY (ServiceName, Timestamp);
 
 -- Baseline traffic: 240k lines scattered over the last 24 hours.
 --
--- `NOTICE` is deliberate. It matches none of the plugin's known levels, so it lands in the
+-- `VERBOSE` is deliberate. It matches none of the plugin's known levels, so it lands in the
 -- `unknown` band — which is what keeps the stacked total equal to the number of log lines.
 INSERT INTO demo.otel_logs
 SELECT
@@ -47,7 +52,7 @@ SELECT
     lower(hex(MD5(toString(intDiv(number, 4)))))                             AS TraceId,
     lower(hex(substring(MD5(toString(number)), 1, 8)))                       AS SpanId,
     1                                                                        AS TraceFlags,
-    multiIf(sev < 60, 'INFO', sev < 75, 'DEBUG', sev < 87, 'WARN', sev < 95, 'ERROR', sev < 98, 'TRACE', 'NOTICE') AS SeverityText,
+    multiIf(sev < 60, 'INFO', sev < 75, 'DEBUG', sev < 87, 'WARN', sev < 95, 'ERROR', sev < 98, 'TRACE', 'VERBOSE') AS SeverityText,
     multiIf(sev < 60, 9, sev < 75, 5, sev < 87, 13, sev < 95, 17, sev < 98, 1, 10)                                 AS SeverityNumber,
     ['checkout', 'payments', 'inventory'][(number % 3) + 1]                   AS ServiceName,
     concat(

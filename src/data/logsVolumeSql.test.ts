@@ -21,11 +21,11 @@ const timeAndLevelColumns = (): Map<ColumnHint, string> =>
  * change to the emitted SQL has to be made deliberately in both places.
  */
 const CRITICAL =
-  "'critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg'";
+  "'critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency'";
 const ERROR = "'error','err','eror','ERROR','ERR','EROR','Error','Err','Eror'";
 const WARN = "'warn','warning','WARN','WARNING','Warn','Warning'";
 const INFO =
-  "'info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational'";
+  "'info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice'";
 const DEBUG = "'debug','dbug','DEBUG','DBUG','Debug','Dbug'";
 const TRACE = "'trace','TRACE','Trace'";
 
@@ -47,11 +47,11 @@ const levelSeries = (level: string): string => {
 /** Assembles the expected volume query, line by line, exactly as it is emitted. */
 const expectedSql = (options: { bucket: string; series: string; head: string; timeName: string }): string =>
   [
-    `SELECT toStartOfInterval(src."${options.timeName}", INTERVAL 1 ${options.bucket}) AS "time", ${options.series}`,
+    `SELECT toStartOfInterval(toDateTime(src."${options.timeName}"), INTERVAL 1 ${options.bucket}) AS "time", ${options.series}`,
     'FROM (',
     options.head,
     ') AS src',
-    `WHERE src."${options.timeName}" >= $__fromTime AND src."${options.timeName}" <= $__toTime`,
+    `WHERE toDateTime(src."${options.timeName}") >= $__fromTime AND toDateTime(src."${options.timeName}") <= $__toTime`,
     'GROUP BY "time"',
     'ORDER BY "time" ASC',
   ].join('\n');
@@ -97,7 +97,7 @@ describe('planSqlLogsVolume', () => {
     it('buckets on the projected alias, not the physical column', () => {
       const { sql, timeName } = expectPlan(plan());
       expect(timeName).toBe('timestamp');
-      expect(sql).toContain('toStartOfInterval(src."timestamp", INTERVAL 1 HOUR) AS "time"');
+      expect(sql).toContain('toStartOfInterval(toDateTime(src."timestamp"), INTERVAL 1 HOUR) AS "time"');
       expect(sql).not.toContain('"Timestamp"');
     });
 
@@ -110,7 +110,9 @@ describe('planSqlLogsVolume', () => {
 
     it('bounds, groups and orders the outer query itself', () => {
       const { sql } = expectPlan(plan());
-      expect(sql).toContain('WHERE src."timestamp" >= $__fromTime AND src."timestamp" <= $__toTime');
+      expect(sql).toContain(
+        'WHERE toDateTime(src."timestamp") >= $__fromTime AND toDateTime(src."timestamp") <= $__toTime'
+      );
       expect(sql).toContain('GROUP BY "time"');
       expect(sql.endsWith('ORDER BY "time" ASC')).toBe(true);
     });
@@ -194,24 +196,21 @@ describe('planSqlLogsVolume', () => {
   });
 
   describe('choosing the time column', () => {
-    it('uses the filter timestamp when that is the only one configured', () => {
-      const head = 'SELECT EventDate AS timestamp, Body FROM t';
-      const plan = planSqlLogsVolume(head, HOURLY, new Map([[ColumnHint.FilterTime, 'EventDate']]));
-      expect(plan).toEqual({
-        ok: true,
-        sql: expectedSql({ bucket: 'HOUR', series: 'count(*) AS "logs"', head, timeName: 'timestamp' }),
-        timeName: 'timestamp',
-      });
+    it('declines when only the filter timestamp is configured', () => {
+      expectDeclined(
+        planSqlLogsVolume(
+          'SELECT EventDate AS timestamp, Body FROM t',
+          HOURLY,
+          new Map([[ColumnHint.FilterTime, 'EventDate']])
+        ),
+        'NoTimeColumnConfigured'
+      );
     });
 
-    it('buckets a wildcard query on the filter timestamp when that is the only one configured', () => {
-      const head = 'SELECT * FROM t';
-      const plan = planSqlLogsVolume(head, HOURLY, new Map([[ColumnHint.FilterTime, 'EventDate']]), {
-        table: 't',
-      });
-      expect(expectPlan(plan).timeName).toBe('EventDate');
-      expect(expectPlan(plan).sql).toBe(
-        expectedSql({ bucket: 'HOUR', series: 'count(*) AS "logs"', head, timeName: 'EventDate' })
+    it('declines a wildcard query when only the filter timestamp is configured', () => {
+      expectDeclined(
+        planSqlLogsVolume('SELECT * FROM t', HOURLY, new Map([[ColumnHint.FilterTime, 'EventDate']]), { table: 't' }),
+        'NoTimeColumnConfigured'
       );
     });
 
@@ -228,18 +227,15 @@ describe('planSqlLogsVolume', () => {
       );
     });
 
-    it('accepts either configured timestamp in the first projected position', () => {
+    it('declines when the first projected column is the filter timestamp, not the row timestamp', () => {
       const both = new Map([
         [ColumnHint.Time, 'Timestamp'],
         [ColumnHint.FilterTime, 'EventDate'],
       ]);
-      const head = 'SELECT EventDate AS timestamp, Body FROM t';
-      const plan = planSqlLogsVolume(head, HOURLY, both);
-      expect(plan).toEqual({
-        ok: true,
-        sql: expectedSql({ bucket: 'HOUR', series: 'count(*) AS "logs"', head, timeName: 'timestamp' }),
-        timeName: 'timestamp',
-      });
+      expectDeclined(
+        planSqlLogsVolume('SELECT EventDate AS timestamp, Body FROM t', HOURLY, both),
+        'TimeColumnNotProjected'
+      );
     });
   });
 
@@ -249,7 +245,10 @@ describe('planSqlLogsVolume', () => {
     it.each([
       { bucket: 'SECOND', intervalMs: SECOND },
       { bucket: 'MINUTE', intervalMs: SECOND + 1 },
+      // The branches compare with `>`, so a boundary value lands in the finer band.
+      { bucket: 'MINUTE', intervalMs: MINUTE },
       { bucket: 'HOUR', intervalMs: MINUTE + 1 },
+      { bucket: 'HOUR', intervalMs: HOUR },
       { bucket: 'DAY', intervalMs: HOUR + 1 },
     ])('buckets by $bucket for an interval of $intervalMs ms', ({ bucket, intervalMs }) => {
       const plan = planSqlLogsVolume(head, { __interval_ms: { text: '', value: intervalMs } }, timeColumns());
@@ -305,12 +304,20 @@ describe('planSqlLogsVolume', () => {
 
     // The volume request snaps the interval to a coarser bucket, so an interval macro would
     // expand to a different value here than in the query the user sees.
+    it.each(['$__interval', '$__interval_ms', '$__interval_s', '$__timeInterval', '$__timeGroup'])(
+      'declines %s in the head',
+      (macro) => {
+        expectDeclined(
+          planSqlLogsVolume(`SELECT Timestamp AS timestamp FROM t WHERE d > ${macro}`, HOURLY, timeColumns()),
+          'IntervalMacro'
+        );
+      }
+    );
+
     it.each([
-      'SELECT Timestamp AS timestamp FROM t WHERE Duration > $__interval',
-      'SELECT Timestamp AS timestamp FROM t WHERE DurationMs > $__interval_ms',
       'SELECT $__timeInterval(Timestamp) AS timestamp FROM t',
       'SELECT $__timeGroup(Timestamp, 1m) AS timestamp FROM t',
-    ])('declines an interval macro in the head (%s)', (rawSql) => {
+    ])('declines an interval macro in the projection (%s)', (rawSql) => {
       expectDeclined(planSqlLogsVolume(rawSql, HOURLY, timeColumns()), 'IntervalMacro');
     });
 
@@ -335,7 +342,7 @@ describe('planSqlLogsVolume', () => {
     it('declines a qualified first projection it cannot interpret', () => {
       expectDeclined(
         planSqlLogsVolume('SELECT l.Timestamp FROM t AS l', HOURLY, timeColumns()),
-        'ProjectionUnparseable'
+        'ProjectionUnreadable'
       );
     });
 
@@ -366,8 +373,10 @@ describe('identifier escaping', () => {
     const plan = expectPlan(planSqlLogsVolume('SELECT Timestamp AS "we""ird" FROM t', HOURLY, timeColumns()));
 
     expect(plan.timeName).toBe('we"ird');
-    expect(plan.sql).toContain('toStartOfInterval(src."we""ird", INTERVAL 1 HOUR)');
-    expect(plan.sql).toContain('WHERE src."we""ird" >= $__fromTime AND src."we""ird" <= $__toTime');
+    expect(plan.sql).toContain('toStartOfInterval(toDateTime(src."we""ird"), INTERVAL 1 HOUR)');
+    expect(plan.sql).toContain(
+      'WHERE toDateTime(src."we""ird") >= $__fromTime AND toDateTime(src."we""ird") <= $__toTime'
+    );
   });
 
   it('re-escapes a quote in the projected level name', () => {
@@ -439,13 +448,71 @@ describe('planSqlLogsVolume wildcard trust', () => {
 });
 
 describe('planSqlLogsVolume statement macros', () => {
-  it.each(['$__columns(Timestamp)', '$__rateColumns(a, b)', '$__perSecondColumns(a, b)', '$__lttb(a, b)'])(
-    'declines %s, which the backend expands into a whole SELECT list',
-    (macro) => {
-      expectDeclined(
-        planSqlLogsVolume(`SELECT Timestamp, ${macro} FROM t`, HOURLY, new Map([[ColumnHint.Time, 'Timestamp']])),
-        'StatementMacro'
-      );
-    }
-  );
+  it.each([
+    '$__columns(Timestamp)',
+    '$__rateColumns(a, b)',
+    '$__perSecondColumns(a, b)',
+    '$__increaseColumns(a, b)',
+    '$__lttb(a, b)',
+  ])('declines %s, which the backend expands into a whole SELECT list', (macro) => {
+    expectDeclined(
+      planSqlLogsVolume(`SELECT Timestamp, ${macro} FROM t`, HOURLY, new Map([[ColumnHint.Time, 'Timestamp']])),
+      'StatementMacro'
+    );
+  });
+});
+
+describe('planSqlLogsVolume declines introduced by review findings', () => {
+  const columns = () =>
+    new Map<ColumnHint, string>([
+      [ColumnHint.Time, 'Timestamp'],
+      [ColumnHint.LogLevel, 'SeverityText'],
+    ]);
+
+  it('declines a trailing row cap it cannot parse', () => {
+    // Left in the head this would cap the derived table, leaving every bucket short.
+    expectDeclined(
+      planSqlLogsVolume(
+        'SELECT Timestamp, SeverityText FROM demo.otel_logs WHERE (Timestamp >= $__fromTime AND Timestamp <= $__toTime) LIMIT (500)',
+        HOURLY,
+        columns()
+      ),
+      'UnrecognizedTail'
+    );
+  });
+
+  it('declines a wildcard over a CTE that shadows the configured logs table', () => {
+    expectDeclined(
+      planSqlLogsVolume('WITH otel_logs AS (SELECT 1 AS x) SELECT * FROM otel_logs', HOURLY, columns(), {
+        table: 'otel_logs',
+      }),
+      'WildcardOverUnknownTable'
+    );
+  });
+
+  it('still accepts a wildcard when an unrelated CTE is present', () => {
+    expect(
+      planSqlLogsVolume('WITH x AS (SELECT 1) SELECT * FROM otel_logs', HOURLY, columns(), { table: 'otel_logs' }).ok
+    ).toBe(true);
+  });
+
+  it('declines an alias it cannot reproduce exactly', () => {
+    expectDeclined(
+      planSqlLogsVolume('SELECT Timestamp AS "a\\"b", SeverityText FROM t', HOURLY, columns()),
+      'ProjectionUnreadable'
+    );
+  });
+
+  it('does not read a level column out of an array literal', () => {
+    const plan = expectPlan(
+      planSqlLogsVolume(
+        'SELECT Timestamp, Body, [ServiceName, SeverityText, ScopeName] AS labels FROM demo.otel_logs',
+        HOURLY,
+        columns()
+      )
+    );
+    expect(plan.levelName).toBeUndefined();
+    expect(plan.sql).toContain('count(*) AS "logs"');
+    expect(plan.sql).not.toContain('src."SeverityText"');
+  });
 });

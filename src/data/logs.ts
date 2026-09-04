@@ -52,7 +52,7 @@ export function getTimeFieldRoundingInterval(scopedVars: ScopedVars): string {
 }
 
 export function getTimeFieldRoundingClause(scopedVars: ScopedVars, timeField: string): string {
-  return `toStartOfInterval("${timeField}", INTERVAL 1 ${getTimeFieldRoundingInterval(scopedVars)})`;
+  return `toStartOfInterval(toDateTime("${timeField}"), INTERVAL 1 ${getTimeFieldRoundingInterval(scopedVars)})`;
 }
 
 export const TIME_FIELD_ALIAS = 'time';
@@ -64,20 +64,24 @@ export const DEFAULT_LOGS_ALIAS = 'logs';
  *
  * For example: trace -> IN ('trace', 'TRACE', 'Trace')
  *
+ * Spellings follow Grafana's LogLevel enum so a row lands in the same band as in the log list.
+ *
  * @see {LogLevel} for reference values
  */
-type LogLevelToInClause = Record<'critical' | 'error' | 'warn' | 'info' | 'debug' | 'trace' | 'unknown', string>;
+type NamedLogLevel = 'critical' | 'error' | 'warn' | 'info' | 'debug' | 'trace';
+/** The named levels plus `unknown`, their complement. */
+export type LogLevelAlias = NamedLogLevel | 'unknown';
+type LogLevelToInClause = Record<NamedLogLevel, string>;
 export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
-  const levels = {
-    critical: ['critical', 'fatal', 'crit', 'alert', 'emerg'],
+  const levels: Record<NamedLogLevel, string[]> = {
+    critical: ['critical', 'fatal', 'crit', 'alert', 'emerg', 'emergency'],
     error: ['error', 'err', 'eror'],
     warn: ['warn', 'warning'],
-    info: ['info', 'information', 'informational'],
+    info: ['info', 'information', 'informational', 'notice'],
     debug: ['debug', 'dbug'],
     trace: ['trace'],
-    unknown: ['unknown'],
   };
-  return (Object.keys(levels) as Array<keyof typeof levels>).reduce((allLevels, level) => {
+  return (Object.keys(levels) as NamedLogLevel[]).reduce((allLevels, level) => {
     allLevels[level] = `${[
       ...levels[level].map((l) => `'${l}'`),
       ...levels[level].map((l) => `'${l.toUpperCase()}'`),
@@ -87,43 +91,28 @@ export const LOG_LEVEL_TO_IN_CLAUSE: LogLevelToInClause = (() => {
   }, {} as LogLevelToInClause);
 })();
 
-/** The six named levels, so `unknown` can be defined as their complement. */
-const KNOWN_LOG_LEVEL_IN_CLAUSE: string = [
-  LOG_LEVEL_TO_IN_CLAUSE.critical,
-  LOG_LEVEL_TO_IN_CLAUSE.error,
-  LOG_LEVEL_TO_IN_CLAUSE.warn,
-  LOG_LEVEL_TO_IN_CLAUSE.info,
-  LOG_LEVEL_TO_IN_CLAUSE.debug,
-  LOG_LEVEL_TO_IN_CLAUSE.trace,
-].join(',');
+const KNOWN_LOG_LEVEL_IN_CLAUSE: string = Object.values(LOG_LEVEL_TO_IN_CLAUSE).join(',');
 
 /**
  * One boolean expression per canonical level, for `sum(...)`, given the already-quoted level
  * column (`"SeverityText"`, or `src."level"`).
  *
- * The levels partition the rows exactly, so summing the series reproduces `count()`. Matching is
- * exact rather than substring: a value like `debug-trace` contains two level names and would
- * otherwise land in two series at once. ifNull keeps a Nullable column from dropping its NULL
- * rows out of every series, which would make the total fall short of count().
+ * Matching is exact, or `debug-trace` would land in two series; ifNull keeps a Nullable
+ * column's NULLs from falling out of all of them.
  */
 export function buildLogLevelAggregateExpressions(
   quotedLevelColumn: string
-): Array<{ alias: keyof LogLevelToInClause; expression: string }> {
-  const aggregates: Array<{ alias: keyof LogLevelToInClause; expression: string }> = [];
+): Array<{ alias: LogLevelAlias; expression: string }> {
   const levelExpression = `ifNull(toString(${quotedLevelColumn}), '')`;
-
-  let level: keyof LogLevelToInClause;
-  for (level in LOG_LEVEL_TO_IN_CLAUSE) {
-    aggregates.push({
-      alias: level,
-      expression:
-        level === 'unknown'
-          ? `${levelExpression} NOT IN (${KNOWN_LOG_LEVEL_IN_CLAUSE})`
-          : `${levelExpression} IN (${LOG_LEVEL_TO_IN_CLAUSE[level]})`,
-    });
-  }
-
-  return aggregates;
+  const named = (Object.keys(LOG_LEVEL_TO_IN_CLAUSE) as NamedLogLevel[]).map((alias) => ({
+    alias,
+    expression: `${levelExpression} IN (${LOG_LEVEL_TO_IN_CLAUSE[alias]})`,
+  }));
+  // Emitted here, not driven off the record, so editing the level lists cannot drop it.
+  return [
+    ...named,
+    { alias: 'unknown' as const, expression: `${levelExpression} NOT IN (${KNOWN_LOG_LEVEL_IN_CLAUSE})` },
+  ];
 }
 
 export function splitLogsVolumeFrames(data: DataFrame[], logVolumePrefix: string): DataFrame[] {
@@ -163,23 +152,3 @@ export function splitLogsVolumeFrames(data: DataFrame[], logVolumePrefix: string
   }
   return result;
 }
-
-export const allLogLevels = [
-  'critical',
-  'fatal',
-  'crit',
-  'alert',
-  'emerg',
-  'error',
-  'err',
-  'eror',
-  'warn',
-  'warning',
-  'info',
-  'information',
-  'informational',
-  'debug',
-  'dbug',
-  'trace',
-  'unknown',
-];

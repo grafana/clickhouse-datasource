@@ -1533,6 +1533,7 @@ describe('ClickHouseDatasource', () => {
       });
 
       it('should return LogsVolume and LogsSample when all targets use Builder editor', async () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
@@ -1583,6 +1584,7 @@ describe('ClickHouseDatasource', () => {
 
       it('should ignore hidden targets when deciding', async () => {
         mockDefaultLogColumns();
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
@@ -1642,6 +1644,69 @@ describe('ClickHouseDatasource', () => {
           ],
         };
         expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should offer nothing for a single SQL target that explicitly declares Table', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [{ ...sqlLogsTarget('SELECT created_at, level FROM logs LIMIT 10'), queryType: QueryType.Table }],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should not let an explicit Table target inflate a sibling logs histogram', async () => {
+        mockDefaultLogColumns();
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1d' });
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, refId: 'A', editorType: EditorType.Builder },
+            {
+              ...sqlLogsTarget('SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 10'),
+              refId: 'B',
+              queryType: QueryType.Table,
+              format: 1,
+            },
+          ],
+        };
+
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsVolume);
+        const emitted = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, dsRequest);
+        expect(emitted?.targets.map((t) => t.refId)).toEqual(['log-volume-A']);
+      });
+
+      it('should return [] rather than propagate when a target throws', async () => {
+        jest.spyOn(datasource, 'getSupplementaryLogsVolumeQuery').mockImplementation(() => {
+          throw new Error('boom');
+        });
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [{ ...query, editorType: EditorType.Builder }],
+        };
+
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).not.toContain(
+          SupplementaryQueryType.LogsVolume
+        );
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+
+      it('should offer LogsSample for a builder Table query on the default logs table', async () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              ...query,
+              editorType: EditorType.Builder,
+              builderOptions: { ...query.builderOptions, queryType: QueryType.Table },
+            },
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsSample);
       });
 
       it('should return both types when called without a request', async () => {
@@ -1740,13 +1805,13 @@ describe('ClickHouseDatasource', () => {
         // column in the partition, so the stacked total equals count().
         expect(result?.rawSql).toEqual(
           `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", ` +
-            `sum(ifNull(toString("level"), '') IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg')) as critical, ` +
+            `sum(ifNull(toString("level"), '') IN ('critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency')) as critical, ` +
             `sum(ifNull(toString("level"), '') IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
             `sum(ifNull(toString("level"), '') IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
-            `sum(ifNull(toString("level"), '') IN ('info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational')) as info, ` +
+            `sum(ifNull(toString("level"), '') IN ('info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice')) as info, ` +
             `sum(ifNull(toString("level"), '') IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
             `sum(ifNull(toString("level"), '') IN ('trace','TRACE','Trace')) as trace, ` +
-            `sum(ifNull(toString("level"), '') NOT IN ('critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg','error','err','eror','ERROR','ERR','EROR','Error','Err','Eror','warn','warning','WARN','WARNING','Warn','Warning','info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational','debug','dbug','DEBUG','DBUG','Debug','Dbug','trace','TRACE','Trace')) as unknown ` +
+            `sum(ifNull(toString("level"), '') NOT IN ('critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency','error','err','eror','ERROR','ERR','EROR','Error','Err','Eror','warn','warning','WARN','WARNING','Warn','Warning','info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice','debug','dbug','DEBUG','DBUG','Debug','Dbug','trace','TRACE','Trace')) as unknown ` +
             `FROM "default"."logs" ` +
             `GROUP BY time ` +
             `ORDER BY time ASC`
@@ -1826,6 +1891,10 @@ describe('ClickHouseDatasource', () => {
 
         expect(result).toBeDefined();
         expect(result?.editorType).toBe(EditorType.SQL);
+        // format 0 is what shapes the response into the stacked series Explore draws.
+        expect(result?.format).toBe(0);
+        expect(result?.queryType).toBe(QueryType.TimeSeries);
+        expect(result?.refId).toBe('');
         // The row limit and ordering are what cap Grafana's own histogram, so they must go.
         expect(result?.rawSql).not.toContain('LIMIT');
         expect(result?.rawSql).not.toContain('ORDER BY created_at');
@@ -1841,7 +1910,9 @@ describe('ClickHouseDatasource', () => {
           sqlLogsTarget('SELECT created_at AS ts, level AS lvl FROM logs LIMIT 10')
         );
 
-        expect(result?.rawSql).toContain('WHERE src."ts" >= $__fromTime AND src."ts" <= $__toTime');
+        expect(result?.rawSql).toContain(
+          'WHERE toDateTime(src."ts") >= $__fromTime AND toDateTime(src."ts") <= $__toTime'
+        );
         expect(result?.rawSql).toContain('toString(src."lvl")');
       });
 

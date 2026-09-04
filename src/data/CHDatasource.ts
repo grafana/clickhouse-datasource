@@ -246,7 +246,7 @@ export class Datasource
     this.annotations = createAnnotationSupport(this);
   }
 
-  private lastDeclinedLogsVolumeSql?: string;
+  private readonly declinedLogsVolumeSql = new Set<string>();
 
   static logVolumePrefix = 'log-volume-';
   static logsSamplePrefix = 'logs-sample-';
@@ -275,8 +275,11 @@ export class Datasource
       }
 
       const targets: CHQuery[] = [];
+      const visibleTargets = logsVolumeRequest.targets.filter((t) => !t.hide);
       logsVolumeRequest.targets.forEach((target) => {
-        const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
+        const supplementaryQuery = this.wantsLogsVolume(target, visibleTargets)
+          ? this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target)
+          : undefined;
         if (supplementaryQuery !== undefined) {
           targets.push({ ...supplementaryQuery, refId: `${Datasource.logVolumePrefix}${target.refId}` });
         }
@@ -311,13 +314,7 @@ export class Datasource
     return undefined;
   }
 
-  /**
-   * Grafana only consults its row-based fallback histogram when a type is absent from this
-   * list, so declining later (from getSupplementaryRequest) renders an empty panel instead.
-   * Feasibility therefore has to be decided here, for the whole request at once.
-   *
-   * Called with no request by the logs sample panel.
-   */
+  /** Grafana only offers its row-based fallback when a type is absent here, so decline early. */
   getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
     if (!dsRequest) {
       return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
@@ -336,26 +333,38 @@ export class Datasource
       }
     });
 
-    // A target wants a histogram if it declares itself as logs, or if it is SQL that aggregates
-    // cleanly — the SQL editor defaults queryType to Table, so a hand-written logs query often
-    // does not declare itself. Anything that declares logs but cannot be built vetoes the whole
-    // request, since Grafana merges every volume frame into one chart.
-    const wantsVolume = probed.filter(
-      ({ target, built }) =>
-        this.isDeclaredLogsQuery(target) || (target.editorType === EditorType.SQL && built !== undefined)
-    );
+    const wantsVolume = probed.filter(({ target }) => this.wantsLogsVolume(target, visibleTargets));
     if (wantsVolume.length > 0 && wantsVolume.every(({ built }) => built !== undefined)) {
       types.push(SupplementaryQueryType.LogsVolume);
     }
 
-    if (
-      visibleTargets.some((t) => this.isDeclaredLogsQuery(t)) &&
-      visibleTargets.every((t) => t.editorType === EditorType.Builder)
-    ) {
+    // Explore renders the sample only when the pane has no logs result (Explore.tsx), so the
+    // precondition is "can produce a sample", not "is a logs query".
+    const canSample = visibleTargets.some((target) => {
+      try {
+        return this.getSupplementaryLogsSampleQuery(target) !== undefined;
+      } catch (error) {
+        console.warn('[clickhouse] logs sample feasibility check failed, falling back', error);
+        return false;
+      }
+    });
+    if (canSample) {
       types.push(SupplementaryQueryType.LogsSample);
     }
 
     return types;
+  }
+
+  /**
+   * The SQL editor defaults queryType to Table, so an undeclared SQL target counts too, but only
+   * alone in the pane: Grafana sums every emitted volume frame into one chart.
+   */
+  private wantsLogsVolume(query: CHQuery, visibleTargets: CHQuery[]): boolean {
+    if (this.isDeclaredLogsQuery(query)) {
+      return true;
+    }
+
+    return query.editorType === EditorType.SQL && query.queryType === undefined && visibleTargets.length === 1;
   }
 
   private isDeclaredLogsQuery(query: CHQuery): boolean {
@@ -397,8 +406,6 @@ export class Datasource
   }
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
-    // The volume request bypasses the query runner that drops hidden responses, and the
-    // targets built below carry no hide flag, so counting a hidden target would inflate.
     if (query.hide) {
       return undefined;
     }
@@ -433,8 +440,7 @@ export class Datasource
 
     const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
     if (logLevelColumn) {
-      // Generates aggregates like
-      // sum(ifNull(toString("log_level"), '') IN ('dbug','debug','DBUG','DEBUG','Dbug','Debug')) AS debug
+      // sum(ifNull(toString("log_level"), '') IN ('dbug','debug',...)) AS debug
       for (const { alias, expression } of buildLogLevelAggregateExpressions(escapeIdentifier(logLevelColumn.name))) {
         aggregates.push({
           aggregateType: AggregateType.Sum,
@@ -489,11 +495,6 @@ export class Datasource
     };
   }
 
-  /**
-   * The user's SQL becomes a derived table, and only its trailing row limit and ordering are
-   * removed — those are what cap Grafana's own histogram to the visible page of logs.
-   * Undefined for anything not positively recognized, which makes the gate decline.
-   */
   private getSqlSupplementaryLogsVolumeQuery(
     logsVolumeRequest: DataQueryRequest<CHQuery>,
     query: CHQuery
@@ -503,9 +504,11 @@ export class Datasource
       table: this.getDefaultLogsTable(),
     });
     if (!plan.ok) {
-      // Once per query text rather than per render, so it cannot spam.
-      if (this.lastDeclinedLogsVolumeSql !== query.rawSql) {
-        this.lastDeclinedLogsVolumeSql = query.rawSql;
+      if (!this.declinedLogsVolumeSql.has(query.rawSql)) {
+        if (this.declinedLogsVolumeSql.size > 100) {
+          this.declinedLogsVolumeSql.clear();
+        }
+        this.declinedLogsVolumeSql.add(query.rawSql);
         console.warn('Aggregated logs volume will be skipped for this query:', plan.reason);
       }
       return undefined;
