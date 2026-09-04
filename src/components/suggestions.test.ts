@@ -101,7 +101,11 @@ describe('Suggestions', () => {
         { label: 'query', type: 'String' } as TableColumn,
         { label: 'EventDate', type: 'DateTime' } as TableColumn,
       ],
-      functions: async (): Promise<SqlFunction[]> => [{ name: 'toDateTime' } as SqlFunction],
+      functions: async (): Promise<SqlFunction[]> => [
+        { name: 'toDateTime' } as SqlFunction,
+        { name: '__actionName', origin: 'System' } as SqlFunction,
+        { name: '__my_helper', origin: 'SQLUserDefined' } as SqlFunction,
+      ],
       defaultDatabase: 'default',
     };
 
@@ -130,6 +134,9 @@ describe('Suggestions', () => {
     for (let macro of pluginMacros) {
       const macroSuggestion = suggestionsByLabel.get(macro.name);
       expect(macroSuggestion).not.toBeUndefined();
+      // Monaco never includes `$` in the word it scores against, so macros must be
+      // filtered on their name without it.
+      expect(macroSuggestion?.filterText).toBe(macro.name.substring(1));
     }
 
     // Should have current columns in context
@@ -143,5 +150,9 @@ describe('Suggestions', () => {
     // Should show functions
     const functionToDateTime = suggestionsByLabel.get('toDateTime');
     expect(functionToDateTime).not.toBeUndefined();
+
+    // Should hide ClickHouse internal functions, but keep a user-defined one named like them
+    expect(suggestionsByLabel.get('__actionName')).toBeUndefined();
+    expect(suggestionsByLabel.get('__my_helper')).not.toBeUndefined();
   });
 });
