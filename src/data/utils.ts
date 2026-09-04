@@ -813,14 +813,23 @@ export const foldDiscoveredLogFieldsIntoLabels = (
       .map((c) => c.name);
     const sourceFields = discovered
       .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
-      .filter((f): f is DataFrame['fields'][number] => f !== undefined);
+      .filter((f): f is DataFrame['fields'][number] => f !== undefined)
+      // Backstop for a configured column whose schema type was not resolved (for example the classic
+      // builder's new-query path before the schema loads): the frame field's own type is reliable, so
+      // skip time-typed (raw epoch) and object-typed (Map/collection -> [object Object]) fields here too.
+      .filter((f) => f.type !== FieldType.time && f.type !== FieldType.other);
     if (sourceFields.length === 0) {
       continue;
     }
 
-    // Do not overwrite a real table column that happens to be named `labels`.
+    // Do not overwrite a real table column that happens to be named `labels`. It is a real column when
+    // the query selects one named `labels` (the backend attribute map is synthesized, never selected);
+    // the value-shape check is a fallback for frames whose column metadata is absent.
+    const labelsIsSelectedColumn = (builderOptions.columns || []).some(
+      (c) => (c.alias || c.name).split('[')[0] === labelsFieldName || c.name.split('[')[0] === labelsFieldName
+    );
     const existingLabels = frame.fields.find((f) => f.name === labelsFieldName);
-    if (existingLabels && !isBackendLabelsField(existingLabels)) {
+    if (existingLabels && (labelsIsSelectedColumn || !isBackendLabelsField(existingLabels))) {
       continue;
     }
 

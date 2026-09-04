@@ -1443,6 +1443,64 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
     expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toBe('prod');
   });
 
+  it('does not clobber a selected labels column even when its value parses as a JSON object', () => {
+    // A real `labels` column selected in the query, whose value happens to be a JSON-object string,
+    // must be left intact. The structural check (labels is a selected column, never the synthesized
+    // backend attribute map) catches this even though the value parses as an object.
+    const ds = withFeature(['service', 'labels']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'service', type: 'String' },
+        { name: 'labels', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('service', ['cart']), field(labelsFieldName, ['{"real":"value"}'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'service', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toBe('{"real":"value"}');
+  });
+
+  it('skips a configured column by its frame type when the schema type is unresolved', () => {
+    // No `type` on the builder columns (the classic builder's new-query path before the schema loads).
+    // The frame field type is the reliable signal, so a time field folds to nothing (would be a raw
+    // epoch) and an object/Map field folds to nothing (would be [object Object]); only the scalar folds.
+    const ds = withFeature(['created', 'attrs', 'service']);
+    const [req, res] = buildLogsRequestResponse(
+      [{ name: 'Body', hint: ColumnHint.LogMessage }, { name: 'created' }, { name: 'attrs' }, { name: 'service' }],
+      [
+        field('Body', ['hi']),
+        field('created', [1710495000000], FieldType.time),
+        field('attrs', [{ k: 'v' }], FieldType.other),
+        field('service', ['cart']),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // created (time) and attrs (object) stay standalone; only service folds.
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'created', 'attrs', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({ service: 'cart' });
+  });
+
+  it('folds every row across a multi-row frame', () => {
+    const ds = withFeature(['service']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'service', type: 'String' },
+      ],
+      [field('Body', ['a', 'b', 'c']), field('service', ['api', 'worker', 'db'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // the per-row loop folds every row, not just the first
+    const labels = (res.data[0] as DataFrame).fields.find((f) => f.name === labelsFieldName)!;
+    expect(labels.values).toEqual([{ service: 'api' }, { service: 'worker' }, { service: 'db' }]);
+  });
+
   it('skips frames that share the query columns but carry none of them (logs-volume)', () => {
     const ds = withFeature(['ServiceName']);
     const [req, res] = buildLogsRequestResponse(

@@ -390,7 +390,8 @@ describe('LogsConfig', () => {
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(1);
     });
 
-    it('falls back to text inputs and the tags input when uid is absent (not single-table backed)', async () => {
+    it('falls back to text inputs and the tags input when uid is absent (no fetch fires)', async () => {
+      jest.useFakeTimers();
       const result = render(
         <LogsConfig
           {...noopHandlers}
@@ -399,23 +400,23 @@ describe('LogsConfig', () => {
         />
       );
 
-      // No uid means the fetch guard returns early: role fields stay as text inputs and Columns stays
-      // as the tags input. waitFor guards against any late state update flipping the controls.
-      await waitFor(() => {
-        expect(
-          result.getByPlaceholderText(
-            columnLabelToPlaceholder(allLabels.components.Config.LogsConfig.columns.time.label)
-          )
-        ).toBeInTheDocument();
+      // No uid: the fetch guard returns early and no debounce is scheduled. Advance the clock anyway
+      // so this exercises the settle window rather than the identical first render; the fallback holds.
+      await act(async () => {
+        jest.advanceTimersByTime(500);
       });
+
       for (const placeholder of rolePlaceholders) {
         expect(result.getByPlaceholderText(placeholder)).toBeInTheDocument();
       }
-      // Columns stays a TagsInput here, so both it and Context Columns share the placeholder: 2 inputs.
+      // Columns stays a TagsInput (no ColumnsEditor multiselect), so it and Context Columns share the
+      // placeholder: 2 tags inputs. No schema-backed combobox renders in the fallback layout.
+      expect(
+        result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+      ).not.toBeInTheDocument();
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(2);
-      // No schema-backed selects render in the fallback layout, and OtelVersionSelect's Select is
-      // disabled (otelEnabled false), so no combobox is present at all.
       expect(result.queryAllByRole('combobox')).toHaveLength(0);
+      jest.useRealTimers();
     });
 
     // T1: "Add all columns" must skip the columns already projected as role columns (time/level/

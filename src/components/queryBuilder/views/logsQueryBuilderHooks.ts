@@ -14,7 +14,8 @@ export const useLogDefaultsOnMount = (
   datasource: Datasource,
   isNewQuery: boolean,
   builderOptions: QueryBuilderOptions,
-  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
+  allColumns: readonly TableColumn[] = []
 ) => {
   const didSetDefaults = useRef<boolean>(false);
   useEffect(() => {
@@ -48,10 +49,9 @@ export const useLogDefaultsOnMount = (
       }
     }
 
-    // Extra fields configured in Default columns. No schema here (new-query defaults),
-    // so only the explicit list applies; the "all" mode is handled by useOtelColumns
-    // and the compact editor, which have the column list.
-    appendAdditionalLogColumns(datasource, [], nextColumns, includedColumns);
+    // Extra fields configured via the Columns setting. Pass the fetched schema (when it is loaded)
+    // so each column carries its type; the fold uses that to skip collection- and date-typed columns.
+    appendAdditionalLogColumns(datasource, allColumns, nextColumns, includedColumns);
 
     builderOptionsDispatch(
       setOptions({
@@ -66,6 +66,7 @@ export const useLogDefaultsOnMount = (
     );
     didSetDefaults.current = true;
   }, [
+    allColumns,
     builderOptions.columns,
     builderOptions.orderBy,
     builderOptions.table,
