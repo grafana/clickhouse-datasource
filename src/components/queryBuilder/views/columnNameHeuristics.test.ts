@@ -41,6 +41,12 @@ describe('findColumnByNameHeuristic', () => {
     }
   });
 
+  it('matches conventional log-message names', () => {
+    for (const name of ['body', 'Body', 'message', 'msg', 'log_message']) {
+      expect(findColumnByNameHeuristic([col(name, 'String')], ColumnHint.LogMessage)?.name).toBe(name);
+    }
+  });
+
   it('matches conventional trace column names (mirrors OTel map)', () => {
     const cases: Array<[ColumnHint, string]> = [
       [ColumnHint.TraceId, 'TraceId'],

@@ -80,8 +80,16 @@ export const trackClickhouseConfigV2LogsConfig = (props: {
   messageColumn?: string;
   selectContextColumns?: boolean;
   contextColumns?: string[];
+  additionalColumns?: string[];
 }) => {
-  reportInteraction('clickhouse_config_v2_logs_config', props);
+  // Report counts, not names: the column lists are the customer's schema, and one "Add all columns"
+  // click on a wide table would otherwise ship every column name in a single telemetry event.
+  const { additionalColumns, contextColumns, ...rest } = props;
+  reportInteraction('clickhouse_config_v2_logs_config', {
+    ...rest,
+    additionalColumnsCount: additionalColumns?.length ?? 0,
+    contextColumnsCount: contextColumns?.length ?? 0,
+  });
 };
 
 // Traces config section

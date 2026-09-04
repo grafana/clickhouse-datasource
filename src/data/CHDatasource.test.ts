@@ -1,7 +1,11 @@
 import {
   arrayToDataFrame,
   CoreApp,
+  DataFrame,
   DataQueryRequest,
+  DataQueryResponse,
+  Field,
+  FieldType,
   LoadingState,
   SupplementaryQueryType,
   TimeRange,
@@ -1383,16 +1387,42 @@ describe('ClickHouseDatasource', () => {
   });
 
   describe('filterQuery', () => {
-    it('returns true when hide is not set', () => {
-      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
+    it('returns true for a non-hidden query with SQL', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: 'SELECT 1' } as CHQuery)).toBe(true);
     });
 
-    it('returns true when hide is false', () => {
-      expect(mockDatasource.filterQuery({ refId: '1', hide: false } as CHQuery)).toBe(true);
+    it('returns true when hide is false and SQL is present', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', hide: false, rawSql: 'SELECT 1' } as CHQuery)).toBe(true);
     });
 
     it('returns false when hide is true', () => {
-      expect(mockDatasource.filterQuery({ refId: '1', hide: true } as CHQuery)).toBe(false);
+      expect(mockDatasource.filterQuery({ refId: '1', hide: true, rawSql: 'SELECT 1' } as CHQuery)).toBe(false);
+    });
+
+    it('skips only an empty-rawSql logs builder query (its transient pre-schema state)', () => {
+      // A logs builder query has an empty rawSql until its columns resolve (e.g. a non-OTel table
+      // in the compact editor before the schema fetch returns). Running it would 400 at the backend.
+      const emptyLogsBuilder = {
+        refId: '1',
+        rawSql: '',
+        editorType: EditorType.Builder,
+        builderOptions: { queryType: QueryType.Logs },
+      } as CHQuery;
+      const blankLogsBuilder = {
+        refId: '1',
+        rawSql: '   ',
+        editorType: EditorType.Builder,
+        builderOptions: { queryType: QueryType.Logs },
+      } as CHQuery;
+      expect(mockDatasource.filterQuery(emptyLogsBuilder)).toBe(false);
+      expect(mockDatasource.filterQuery(blankLogsBuilder)).toBe(false);
+    });
+
+    it('runs an empty-rawSql query that is not a logs builder query, so its error still surfaces', () => {
+      // The guard is narrowed to the transient logs-builder case only. An empty SQL-editor query (or
+      // any other type) runs as before, so a broken query errors visibly instead of failing silently.
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '', editorType: EditorType.SQL } as CHQuery)).toBe(true);
+      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
     });
   });
 
@@ -1459,6 +1489,72 @@ describe('ClickHouseDatasource', () => {
       expect(response.data).toEqual([]);
       expect(response.errors?.[0]?.message).toBe('connection refused');
       consoleSpy.mockRestore();
+    });
+
+    // End-to-end guard for the discovered-fields fold: query() runs foldDiscoveredLogFieldsIntoLabels
+    // on the backend response, so a logs Builder query whose datasource configures a column via the
+    // Columns setting must come back with that column folded into `labels` and dropped as a standalone
+    // frame field. This mirrors the pure-fold assertion in utils.test.ts, but through the real query()
+    // pipeline.
+    it('folds a configured column into labels through the query() pipeline', async () => {
+      const instance = cloneDeep(mockDatasource);
+      // The fold is gated on the datasource's configured Columns setting (additionalColumns).
+      instance.settings.jsonData.logs = { ...instance.settings.jsonData.logs, additionalColumns: ['ServiceName'] };
+
+      const logsQuery: CHBuilderQuery = {
+        refId: 'A',
+        editorType: EditorType.Builder,
+        rawSql: '',
+        pluginVersion: '',
+        builderOptions: {
+          database: 'otel',
+          table: 'otel_logs',
+          queryType: QueryType.Logs,
+          columns: [
+            { name: 'Timestamp', hint: ColumnHint.Time },
+            { name: 'Body', hint: ColumnHint.LogMessage },
+            { name: 'ServiceName', type: 'String' }, // configured via the Columns setting -> folds into labels
+          ],
+        },
+      };
+
+      // Backend frame carries the role fields, the scalar ServiceName field, and an existing labels
+      // field (JSON string, the backend-serialized shape). The trace/log-link transform is a no-op
+      // here since there is no traceID field, so the fold is the only thing that mutates the frame.
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        fields: [
+          { name: 'Timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'Body', type: FieldType.string, config: {}, values: ['hello'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+          {
+            name: 'labels',
+            type: FieldType.other,
+            config: {},
+            values: ['{"LogAttributes.http.method":"GET"}'],
+          } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [logsQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      const frame = response.data[0] as DataFrame;
+      // ServiceName removed as a standalone field; role fields + labels kept.
+      expect(frame.fields.map((f) => f.name)).toEqual(['Timestamp', 'Body', 'labels']);
+      // ServiceName folded into labels next to the existing attribute key, written back as a JSON
+      // string in the same shape it arrived in.
+      const labels = frame.fields.find((f) => f.name === 'labels')!.values[0];
+      expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
     });
   });
 
@@ -2559,23 +2655,13 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns null for the Body core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('Body', undefined, null)).toBeNull();
-      });
-
-      it('returns null for the TraceId core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('TraceId', undefined, null)).toBeNull();
-      });
-
-      it('returns null for the bare "ResourceAttributes" without a dot', () => {
-        // The backend's flatten always emits at least one nested key, so the
-        // bare column name never reaches Grafana's label list. Guard against
-        // mis-grouping if a custom schema ever surfaces it.
-        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBeNull();
-      });
-
-      it('returns null for an arbitrary user-defined column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+      it('returns "Fields" for an unprefixed key (a folded top-level column)', () => {
+        // foldDiscoveredLogFieldsIntoLabels merges selected top-level columns into `labels` under
+        // their plain, unprefixed names. The backend only emits prefixed attribute keys, so an
+        // unprefixed key is always a folded column and groups under a "Fields" section.
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBe('Fields');
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBe('Fields');
+        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBe('Fields');
       });
     });
 

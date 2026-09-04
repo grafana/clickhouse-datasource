@@ -1,4 +1,4 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, TimeRange } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, FieldType, TimeRange } from '@grafana/data';
 import {
   BuilderMode,
   ColumnHint,
@@ -12,6 +12,7 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { isCollectionColumnType, isDateTimeColumnType } from 'components/queryBuilder/views/columnNameHeuristics';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
@@ -718,4 +719,172 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   const labelKeys = Object.keys(labels);
 
   return labelKeys.includes(name);
+};
+
+/**
+ * Heuristic: does a `labels` frame field hold the backend's serialized attribute
+ * map (an object, or a JSON-object string) rather than a real table column that
+ * happens to be named `labels`? Samples the first non-empty value. Used so the
+ * fold never overwrites a user's own `labels` column.
+ */
+const isBackendLabelsField = (field: DataFrame['fields'][number]): boolean => {
+  const values = field.values as unknown as unknown[];
+  const len = values?.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const v = values[i];
+    if (v === null || v === undefined || v === '') {
+      continue;
+    }
+    if (typeof v === 'object') {
+      return true; // already-parsed attribute map
+    }
+    if (typeof v === 'string') {
+      try {
+        const parsed = JSON.parse(v);
+        return parsed !== null && typeof parsed === 'object';
+      } catch {
+        return false; // a real string column named `labels`
+      }
+    }
+    return false; // a numeric / boolean column named `labels`
+  }
+  return true; // empty labels field: safe to treat as the (empty) attribute map
+};
+
+/**
+ * Folds the datasource's configured extra log columns (the "Columns" setting,
+ * jsonData.logs.additionalColumns) into the frame's `labels` field under their
+ * plain names, so they surface as flat, filterable fields alongside the grouped
+ * OTel attributes, and removes them as standalone frame fields. Real column names
+ * are used so a filter-for click resolves in both the main and logs-volume queries.
+ *
+ * Scope is limited to the configured columns on purpose:
+ *   - Columns picked by hand in the query builder stay as standalone frame fields,
+ *     so a Table panel on a logs builder query keeps its columns.
+ *   - Context columns (Show-context) are never folded away, so
+ *     getLogContextColumnsFromLogRow can still match them by name.
+ *   - Collection columns (Map/Array/...) and date/time columns are skipped: the
+ *     former have no scalar label value, the latter would serialize to a raw
+ *     epoch. Grafana renders those from the frame field itself.
+ *
+ * Creates `labels` when the frame has none (non-OTel tables). Leaves the frame
+ * untouched when an existing `labels` field is a real table column rather than the
+ * backend-serialized attribute map, so the user's data is not clobbered. When no
+ * columns are configured this is a no-op.
+ */
+export const foldDiscoveredLogFieldsIntoLabels = (
+  datasource: Datasource,
+  req: DataQueryRequest<CHQuery>,
+  res: DataQueryResponse
+): DataQueryResponse => {
+  const configured = new Set(datasource.getAdditionalLogColumns().map((c) => c.split('[')[0]));
+  if (configured.size === 0) {
+    return res;
+  }
+  const contextColumns = new Set(datasource.getLogContextColumnNames().map((c) => c.split('[')[0]));
+  const targetsByRefId = new Map(req.targets.map((t) => [t.refId, t]));
+
+  for (const frame of (res.data as DataFrame[]) || []) {
+    const target = targetsByRefId.get(frame.refId ?? '');
+    if (!target || target.editorType !== EditorType.Builder) {
+      continue;
+    }
+    const builderOptions = (target as CHBuilderQuery).builderOptions;
+    if (!builderOptions || builderOptions.queryType !== QueryType.Logs) {
+      continue;
+    }
+
+    // Only the configured extra columns fold. Role columns (time / body / level /
+    // trace id) carry a hint; attribute maps are collection-typed; date/time
+    // columns serialize to a raw epoch; context columns are needed by
+    // Show-context; a column aliased to a different name would break filter-for in
+    // the logs-volume query. A column whose alias equals its name (how the builder
+    // tags a plain pick) folds like an unaliased one.
+    const discovered = (builderOptions.columns || [])
+      .filter(
+        (c) =>
+          c.hint === undefined &&
+          !isCollectionColumnType(c.type) &&
+          !isDateTimeColumnType(c.type) &&
+          (!c.alias || c.alias === c.name) &&
+          configured.has(c.name) &&
+          !contextColumns.has(c.name)
+      )
+      .map((c) => c.name);
+    const sourceFields = discovered
+      .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
+      .filter((f): f is DataFrame['fields'][number] => f !== undefined)
+      // Backstop for a configured column whose schema type was not resolved (for example the classic
+      // builder's new-query path before the schema loads): the frame field's own type is reliable, so
+      // skip time-typed (raw epoch) and object-typed (Map/collection -> [object Object]) fields here too.
+      .filter((f) => f.type !== FieldType.time && f.type !== FieldType.other);
+    if (sourceFields.length === 0) {
+      continue;
+    }
+
+    // Do not overwrite a real table column that happens to be named `labels`. It is a real column when
+    // the query selects one named `labels` (the backend attribute map is synthesized, never selected);
+    // the value-shape check is a fallback for frames whose column metadata is absent.
+    const labelsIsSelectedColumn = (builderOptions.columns || []).some(
+      (c) => (c.alias || c.name).split('[')[0] === labelsFieldName || c.name.split('[')[0] === labelsFieldName
+    );
+    const existingLabels = frame.fields.find((f) => f.name === labelsFieldName);
+    if (existingLabels && (labelsIsSelectedColumn || !isBackendLabelsField(existingLabels))) {
+      continue;
+    }
+
+    const rowLen = frame.length ?? frame.fields[0]?.values.length ?? 0;
+
+    let labelsField = existingLabels;
+    if (!labelsField) {
+      labelsField = {
+        name: labelsFieldName,
+        type: FieldType.other,
+        config: {},
+        values: Array.from({ length: rowLen }, () => ({})),
+      } as unknown as DataFrame['fields'][number];
+      frame.fields.push(labelsField);
+    }
+
+    // Fold every column into `labels` with a single parse/serialize per row, rather than one
+    // round trip per column per row (which is quadratic on a wide table).
+    for (let i = 0; i < rowLen; i++) {
+      // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
+      // or already-parsed objects (a frame we just created). Handle both and write back in kind.
+      const raw = labelsField.values[i];
+      const wasString = typeof raw === 'string';
+      let obj: Record<string, unknown>;
+      if (wasString) {
+        try {
+          obj = JSON.parse(raw as string) as Record<string, unknown>;
+        } catch {
+          obj = {};
+        }
+      } else {
+        obj = (raw as Record<string, unknown>) || {};
+      }
+      if (!obj || typeof obj !== 'object') {
+        obj = {};
+      }
+
+      let folded = false;
+      for (const src of sourceFields) {
+        const v = src.values[i];
+        if (v === null || v === undefined || v === '') {
+          continue;
+        }
+        obj[src.name] = typeof v === 'string' ? v : String(v);
+        folded = true;
+      }
+
+      if (folded) {
+        labelsField.values[i] = wasString ? JSON.stringify(obj) : obj;
+      }
+    }
+
+    const foldedNames = new Set(sourceFields.map((f) => f.name));
+    frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
+  }
+
+  return res;
 };

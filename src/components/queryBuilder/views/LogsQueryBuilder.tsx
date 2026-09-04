@@ -14,7 +14,13 @@ import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import { Alert, Button, InlineField, InlineFieldRow, InlineFormLabel, Input, Stack } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
-import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
+import {
+  BuilderOptionsReducerAction,
+  mergeColumns,
+  setOptions,
+  setOtelEnabled,
+  setOtelVersion,
+} from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import {
   useDefaultFilters,
@@ -100,7 +106,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
     );
   }, builderState);
 
-  useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch);
+  useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch, allColumns);
   useOtelColumns(datasource, allColumns, builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
   useDefaultTimeColumn(
     datasource,
@@ -154,10 +160,11 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         testIdLink={allSelectors.QueryBuilder.LogsQueryBuilder.columnRolesHelpLink}
       />
       <ColumnsEditor
-        disabled={builderState.otelEnabled}
         allColumns={allColumns}
         selectedColumns={builderState.selectedColumns}
         onSelectedColumnsChange={onOptionChange('selectedColumns')}
+        showAddAllOption
+        onAddAllColumns={(toAdd) => builderOptionsDispatch(mergeColumns(toAdd))}
       />
       <InlineFieldRow>
         <ColumnSelect
