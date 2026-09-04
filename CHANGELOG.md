@@ -5,9 +5,12 @@
 ### Features
 
 - Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
+- Support JSON-typed columns (e.g. the OTel JSON schema's `LogAttributes`/`ResourceAttributes`) in ad-hoc filters: JSON sub-paths are discovered for the key dropdown and rendered as backtick-quoted dot-access cast to `Nullable(String)`, so every filter operator works and values read back over the native protocol. Keys are minted in a stateless self-describing form (building on #2079), so a saved JSON filter applies correctly on a fresh dashboard load (#2094)
 
 ### Fixes
 
+- Escape ad-hoc filter values, including `IN`/`NOT IN` list elements, so a crafted value can't break out of the `additional_table_filters` clause. Previously a value with unbalanced parentheses bypassed the filter (no quote required), `NOT IN` was a silent no-op that returned every row, and values containing a backslash matched the wrong rows (#2095)
+- Bound the ad-hoc value-suggestion query to the dashboard time range (falling back to a recent window) on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
 ## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)
