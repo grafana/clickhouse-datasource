@@ -97,6 +97,70 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 	})
 }
 
+func TestWarnUnsupportedTimeSeriesFields(t *testing.T) {
+	t.Run("attaches warning notice when JSON-shaped columns are present", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+			Fields: []*data.Field{
+				data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+				data.NewField("MetricName", nil, []string{"m"}),
+				data.NewField("ResourceAttributes", nil, []json.RawMessage{json.RawMessage(`{"foo":"bar"}`)}),
+				data.NewField("Attributes", nil, []json.RawMessage{json.RawMessage(`{"x":"y"}`)}),
+				data.NewField("Value", nil, []float64{1.0}),
+			},
+		}
+
+		warnUnsupportedTimeSeriesFields(frame)
+
+		require.NotNil(t, frame.Meta)
+		require.Len(t, frame.Meta.Notices, 1)
+		notice := frame.Meta.Notices[0]
+		assert.Equal(t, data.NoticeSeverityWarning, notice.Severity)
+		assert.Contains(t, notice.Text, "ResourceAttributes")
+		assert.Contains(t, notice.Text, "Attributes")
+		assert.Contains(t, notice.Text, "ResourceAttributes['some_key'] as some_key")
+	})
+
+	t.Run("no notice when no JSON-shaped columns present", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+			Fields: []*data.Field{
+				data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+				data.NewField("MetricName", nil, []string{"m"}),
+				data.NewField("Value", nil, []float64{1.0}),
+			},
+		}
+
+		warnUnsupportedTimeSeriesFields(frame)
+
+		assert.Empty(t, frame.Meta.Notices)
+	})
+
+	t.Run("MutateResponse attaches notice only for graph frames", func(t *testing.T) {
+		makeFrame := func(vis data.VisType) *data.Frame {
+			return &data.Frame{
+				Meta: &data.FrameMeta{PreferredVisualization: vis},
+				Fields: []*data.Field{
+					data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+					data.NewField("ResourceAttributes", nil, []json.RawMessage{json.RawMessage(`{"foo":"bar"}`)}),
+					data.NewField("Value", nil, []float64{1.0}),
+				},
+			}
+		}
+
+		h := &Clickhouse{}
+		graph := makeFrame(data.VisTypeGraph)
+		table := makeFrame(data.VisTypeTable)
+
+		_, err := h.MutateResponse(context.Background(), data.Frames{graph, table})
+		require.NoError(t, err)
+
+		require.Len(t, graph.Meta.Notices, 1)
+		assert.Equal(t, data.NoticeSeverityWarning, graph.Meta.Notices[0].Severity)
+		assert.Empty(t, table.Meta.Notices)
+	})
+}
+
 func TestAssignFlattenedPath(t *testing.T) {
 	t.Run("simple value", func(t *testing.T) {
 		flatMap := make(map[string]any)

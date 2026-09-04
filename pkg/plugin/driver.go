@@ -613,6 +613,10 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 			}
 		}
 
+		if frame.Meta.PreferredVisualization == data.VisTypeGraph {
+			warnUnsupportedTimeSeriesFields(frame)
+		}
+
 		if shouldConvertFields(frame.Meta.PreferredVisualization) {
 			if err := convertNullableJSONFields(frame); err != nil {
 				return res, err
@@ -620,6 +624,44 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 		}
 	}
 	return res, nil
+}
+
+// warnUnsupportedTimeSeriesFields attaches a warning notice to a time-series
+// frame when it contains columns that cannot participate in series identity.
+//
+// ClickHouse Map/Array/Tuple/Variant/Dynamic/JSON columns are surfaced by the
+// converter registry as data.FieldTypeJSON. sqlds' FrameToTimeSeries only
+// promotes plain string columns to per-series labels (Field.Labels), so these
+// JSON-shaped columns are silently ignored for series identity: all rows collapse
+// into a single series even though the user selected columns intended to
+// distinguish them. This is particularly confusing for OTel metrics-schema
+// tables where ResourceAttributes/Attributes are Map(...) columns.
+//
+// See https://github.com/grafana/clickhouse-datasource/issues/2126.
+func warnUnsupportedTimeSeriesFields(frame *data.Frame) {
+	var unsupported []string
+	for _, field := range frame.Fields {
+		if field.Type() == data.FieldTypeJSON || field.Type() == data.FieldTypeNullableJSON {
+			unsupported = append(unsupported, field.Name)
+		}
+	}
+	if len(unsupported) == 0 {
+		return
+	}
+
+	text := fmt.Sprintf(
+		"The following selected columns have a Map/Array/Tuple/JSON type and cannot be used to distinguish time series: %s. "+
+			"All rows will collapse into a single series regardless of these columns' values. "+
+			"Extract specific keys instead by typing an expression such as %s['some_key'] as some_key directly into the Columns selector (the 'as some_key' suffix names the resulting series/label), or switch to the SQL editor to hand-write the query.",
+		strings.Join(unsupported, ", "),
+		unsupported[0],
+	)
+
+	frame.AppendNotices(data.Notice{
+		Severity: data.NoticeSeverityWarning,
+		Text:     text,
+		Inspect:  data.InspectTypeData,
+	})
 }
 
 // shouldConvertFields determines whether field conversion is needed based on visualization type.
