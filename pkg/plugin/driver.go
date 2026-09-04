@@ -259,8 +259,14 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		httpHeaders[k] = v
 	}
 
-	if settings.OAuthPassThru && tlsConfig == nil {
-		return nil, backend.DownstreamError(fmt.Errorf("JWT authentication requires a secure (TLS) connection"))
+	// Forwarding a user token over a plaintext connection exposes it on the
+	// wire, so require TLS by default. allowCleartextJWTForwarding lifts the
+	// requirement for deployments that delegate TLS termination and
+	// origination to a proxy alongside Grafana (an Istio/Envoy sidecar, for
+	// example), where this hop is loopback to the sidecar and the encrypted
+	// hop is one the plugin cannot observe.
+	if settings.OAuthPassThru && tlsConfig == nil && !settings.AllowCleartextJWTForwarding {
+		return nil, backend.DownstreamError(fmt.Errorf("JWT authentication requires a secure (TLS) connection; if TLS is terminated and originated by a proxy in front of ClickHouse (for example an Istio/Envoy sidecar), enable \"Allow cleartext JWT forwarding\" on the data source"))
 	}
 
 	// Forwarding a real user's token over a connection whose server
