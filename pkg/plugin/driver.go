@@ -42,14 +42,22 @@ type grafanaHeaders struct {
 // Clickhouse defines how to connect to a Clickhouse datasource
 type Clickhouse struct{}
 
+// hostPort builds a dialable "host:port" address. A bare IPv6 literal has to
+// be bracketed or net.Dial rejects it ("too many colons in address"); hosts is
+// a hand-edited provisioning field, so the brackets may or may not already be
+// there and a second pair would be just as broken.
+func hostPort(host string, port int64) string {
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	return net.JoinHostPort(host, strconv.FormatInt(port, 10))
+}
+
 // connectionAddresses returns the "host:port" addresses passed to
-// clickhouse-go, which natively load-balances and fails over across multiple
-// entries (see #279). Settings.Hosts takes precedence when set; otherwise the
-// single Host/Port pair is used. A node without its own port falls back to the
-// shared port.
+// clickhouse-go, which fails over across every entry (see #279).
+// Settings.Hosts takes precedence when set; otherwise the single Host/Port
+// pair is used. A node without its own port falls back to the shared port.
 func connectionAddresses(settings Settings) []string {
 	if len(settings.Hosts) == 0 {
-		return []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)}
+		return []string{hostPort(settings.Host, settings.Port)}
 	}
 
 	addrs := make([]string, 0, len(settings.Hosts))
@@ -58,7 +66,7 @@ func connectionAddresses(settings Settings) []string {
 		if port == 0 {
 			port = settings.Port
 		}
-		addrs = append(addrs, fmt.Sprintf("%s:%d", host.Host, port))
+		addrs = append(addrs, hostPort(host.Host, port))
 	}
 	return addrs
 }
@@ -69,8 +77,11 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 	// ServerName is deliberately left unset. clickhouse-go hands this one
 	// tls.Config to every address it dials, so a name pinned here would be sent
 	// for all nodes and fail verification on every host but the one it names.
-	// Left empty, crypto/tls infers the name per connection from the address
-	// being dialled, which is correct for both a single host and a list.
+	// Left empty, the name is inferred per connection from the address being
+	// dialled: tls.DialWithDialer for the native protocol and net/http for
+	// HTTP both do this. tls.Client does not, which is why proxyDialContext
+	// below sets ServerName itself for the PDC path — a new dial path has to
+	// make the same arrangement rather than assume crypto/tls covers it.
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: settings.InsecureSkipVerify,
 	}
@@ -318,8 +329,10 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 
 	auth, getJWT := resolveJWTAuth(settings, httpHeaders)
 
+	addrs := connectionAddresses(settings)
+
 	opts := &clickhouse.Options{
-		Addr: connectionAddresses(settings),
+		Addr: addrs,
 		Auth: auth,
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
@@ -335,6 +348,16 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		ReadTimeout: time.Duration(qt) * time.Second,
 		Settings:    customSettings,
 		TLS:         tlsConfig,
+	}
+
+	// clickhouse-go leaves ConnOpenStrategy at ConnOpenInOrder, which dials the
+	// second node only once the first is unreachable — failover, but not the
+	// load balancing #279 also asks for. Spread new pooled connections across
+	// the nodes instead. Single-host setups keep the default: with one address
+	// the two strategies are identical, and not setting it keeps the option
+	// exactly as it was for every existing datasource.
+	if len(addrs) > 1 {
+		opts.ConnOpenStrategy = clickhouse.ConnOpenRoundRobin
 	}
 
 	// dialCtx is used to create a connection to PDC, if it is enabled above
