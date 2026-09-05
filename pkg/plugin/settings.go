@@ -17,11 +17,16 @@ import (
 
 // Settings - data loaded from grafana settings database
 type Settings struct {
-	Host     string `json:"host,omitempty"`
-	Port     int64  `json:"port,omitempty"`
-	Protocol string `json:"protocol"`
-	Secure   bool   `json:"secure,omitempty"`
-	Path     string `json:"path,omitempty"`
+	// Hosts is the optional list of nodes to connect to. When non-empty it takes
+	// precedence over Host/Port, which stay supported for existing data sources.
+	// clickhouse-go load-balances and fails over across the entries. A node
+	// without its own Port falls back to the shared Port.
+	Hosts    []HostAddress `json:"hosts,omitempty"`
+	Host     string        `json:"host,omitempty"`
+	Port     int64         `json:"port,omitempty"`
+	Protocol string        `json:"protocol"`
+	Secure   bool          `json:"secure,omitempty"`
+	Path     string        `json:"path,omitempty"`
 
 	InsecureSkipVerify bool `json:"tlsSkipVerify,omitempty"`
 	TlsClientAuth      bool `json:"tlsAuth,omitempty"`
@@ -51,9 +56,9 @@ type Settings struct {
 	// they fall back to the configured username/password (service account).
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
-	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	OAuthPassThruAllowFallback bool            `json:"oauthPassThruAllowFallback,omitempty"`
+	CustomSettings             []CustomSetting `json:"customSettings"`
+	ProxyOptions               *proxy.Options
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -77,6 +82,12 @@ type Settings struct {
 	SchemaCacheTTLSeconds int `json:"schemaCacheTTLSeconds,omitempty"`
 }
 
+// HostAddress is a single node in Settings.Hosts.
+type HostAddress struct {
+	Host string `json:"host"`
+	Port int64  `json:"port,omitempty"`
+}
+
 type CustomSetting struct {
 	Setting string `json:"setting"`
 	Value   string `json:"value"`
@@ -85,6 +96,17 @@ type CustomSetting struct {
 const secureHeaderKeyPrefix = "secureHttpHeaders."
 
 func (settings *Settings) isValid() (err error) {
+	if len(settings.Hosts) > 0 {
+		for _, host := range settings.Hosts {
+			if host.Host == "" {
+				return backend.DownstreamError(ErrorMessageInvalidHost)
+			}
+			if host.Port == 0 && settings.Port == 0 {
+				return backend.DownstreamError(ErrorMessageInvalidPort)
+			}
+		}
+		return nil
+	}
 	if settings.Host == "" {
 		return backend.DownstreamError(ErrorMessageInvalidHost)
 	}
@@ -92,6 +114,72 @@ func (settings *Settings) isValid() (err error) {
 		return backend.DownstreamError(ErrorMessageInvalidPort)
 	}
 	return nil
+}
+
+// parsePort reads a port that may arrive as a JSON number or a string.
+func parsePort(value interface{}) (int64, error) {
+	var port int64
+	switch v := value.(type) {
+	case string:
+		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 0, 64)
+		if err != nil {
+			return 0, fmt.Errorf("could not parse port value: %w", err)
+		}
+		port = parsed
+	case float64:
+		port = int64(v)
+	default:
+		return 0, fmt.Errorf("could not parse port value: unexpected type %T", value)
+	}
+	// A port outside the TCP range can only fail at dial time, with an error
+	// that points at the network rather than at the config that caused it.
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("could not parse port value: %d is out of range (1-65535)", port)
+	}
+	return port, nil
+}
+
+// parseHosts deserializes the "hosts" field. An entry without a usable host
+// name is an error rather than a skip: this field is hand-edited in
+// provisioning, so a dropped entry is a typo silently costing a node, not a
+// blank row from a form.
+func parseHosts(value interface{}) ([]HostAddress, error) {
+	entries, ok := value.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("could not parse hosts value: expected a list, got %T", value)
+	}
+
+	hosts := make([]HostAddress, 0, len(entries))
+	for i, entry := range entries {
+		fields, ok := entry.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("could not parse hosts value: expected a list of objects, got %T", entry)
+		}
+
+		var host HostAddress
+		if fields["host"] != nil {
+			name, ok := fields["host"].(string)
+			if !ok {
+				return nil, fmt.Errorf("could not parse hosts value: host must be a string, got %T", fields["host"])
+			}
+			host.Host = strings.TrimSpace(name)
+		}
+		if host.Host == "" {
+			return nil, fmt.Errorf("could not parse hosts value: entry %d has no host", i)
+		}
+
+		if fields["port"] != nil {
+			port, err := parsePort(fields["port"])
+			if err != nil {
+				return nil, err
+			}
+			host.Port = port
+		}
+
+		hosts = append(hosts, host)
+	}
+
+	return hosts, nil
 }
 
 // LoadSettings will read and validate Settings from the DataSourceConfig
@@ -110,13 +198,19 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	}
 
 	if jsonData["port"] != nil {
-		if port, ok := jsonData["port"].(string); ok {
-			settings.Port, err = strconv.ParseInt(port, 0, 64)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse port value: %w", err))
-			}
-		} else {
-			settings.Port = int64(jsonData["port"].(float64))
+		settings.Port, err = parsePort(jsonData["port"])
+		if err != nil {
+			return settings, backend.DownstreamError(err)
+		}
+	}
+
+	// Hosts supersedes Host/Port when set, in the same way Host supersedes the
+	// deprecated "server" above. Existing single-host configs keep working
+	// untouched, so no migration is needed.
+	if jsonData["hosts"] != nil {
+		settings.Hosts, err = parseHosts(jsonData["hosts"])
+		if err != nil {
+			return settings, backend.DownstreamError(err)
 		}
 	}
 	if jsonData["protocol"] != nil {

@@ -14,6 +14,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoadSettings(t *testing.T) {
@@ -114,17 +115,17 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:               "test",
-					Port:               443,
-					Path:               "custom-path",
-					InsecureSkipVerify: true,
-					TlsClientAuth:      true,
-					TlsAuthWithCACert:  true,
-					ConnMaxLifetime:    "5",
-					DialTimeout:        "10",
-					MaxIdleConns:       "25",
-					MaxOpenConns:       "50",
-					QueryTimeout:       "60",
+					Host:                  "test",
+					Port:                  443,
+					Path:                  "custom-path",
+					InsecureSkipVerify:    true,
+					TlsClientAuth:         true,
+					TlsAuthWithCACert:     true,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
+					QueryTimeout:          "60",
 					ProxyOptions:          nil,
 					EnableRowLimit:        true,
 					RowLimit:              1000000,
@@ -143,12 +144,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "10",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "60",
 					RowLimit:              1000000,
 					EnableRowLimit:        true,
@@ -234,12 +235,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "15",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "15",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "120",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -257,12 +258,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "25",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "25",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "60",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -280,12 +281,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: "5",
-					DialTimeout:     "10",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       "5",
+					DialTimeout:           "10",
+					MaxIdleConns:          "25",
+					MaxOpenConns:          "50",
 					QueryTimeout:          "60",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -467,5 +468,121 @@ func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.False(t, settings.OAuthPassThruAllowFallback)
+	})
+}
+
+func TestLoadSettingsHosts(t *testing.T) {
+	t.Run("parses hosts with per-node and shared ports", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "ch1"}, {"host": "ch2", "port": 9440}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1"}, {Host: "ch2", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("accepts a port given as a string", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "ch1", "port": "9440"}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("trims whitespace around a host name", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": [{"host": "  ch1  "}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1"}}, settings.Hosts)
+	})
+
+	// hosts is hand-edited in provisioning, so an entry with no usable host is
+	// a typo that would otherwise cost a node silently: validation still
+	// passes, Save & test is green, and the operator believes they have one
+	// more node than they do.
+	t.Run("an entry without a usable host is rejected, not skipped", func(t *testing.T) {
+		for name, hosts := range map[string]string{
+			"blank host":       `[{"host": "ch1"}, {"host": "   "}]`,
+			"host key missing": `[{"host": "ch1"}, {"port": 9440}]`,
+			"misspelled key":   `[{"host": "ch1"}, {"hostname": "ch2"}]`,
+		} {
+			t.Run(name, func(t *testing.T) {
+				_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+					JSONData:                []byte(`{"port": 9000, "hosts": ` + hosts + `}`),
+					DecryptedSecureJSONData: map[string]string{},
+				})
+
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "entry 1 has no host")
+			})
+		}
+	})
+
+	t.Run("a port outside the TCP range is rejected", func(t *testing.T) {
+		for _, port := range []string{"70000", "-1", "0"} {
+			t.Run(port, func(t *testing.T) {
+				_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+					JSONData:                []byte(`{"hosts": [{"host": "ch1", "port": ` + port + `}]}`),
+					DecryptedSecureJSONData: map[string]string{},
+				})
+
+				require.Error(t, err)
+			})
+		}
+	})
+
+	t.Run("a port given as a padded string is accepted", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1", "port": " 9440 "}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Equal(t, []HostAddress{{Host: "ch1", Port: 9440}}, settings.Hosts)
+	})
+
+	t.Run("existing host/port configs keep working untouched", func(t *testing.T) {
+		settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "ch1", "port": 9000}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+		assert.Empty(t, settings.Hosts)
+		assert.Equal(t, "ch1", settings.Host)
+		assert.Equal(t, int64(9000), settings.Port)
+	})
+
+	t.Run("hosts alone satisfy validation without host/port", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1", "port": 9000}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.Nil(t, err)
+	})
+
+	t.Run("a host without any port is rejected", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"hosts": [{"host": "ch1"}]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.NotNil(t, err)
+	})
+
+	t.Run("a malformed hosts value is reported, not panicked on", func(t *testing.T) {
+		_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"port": 9000, "hosts": "ch1,ch2"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+
+		assert.NotNil(t, err)
 	})
 }
