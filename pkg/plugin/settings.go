@@ -56,9 +56,9 @@ type Settings struct {
 	// they fall back to the configured username/password (service account).
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
-	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	OAuthPassThruAllowFallback bool            `json:"oauthPassThruAllowFallback,omitempty"`
+	CustomSettings             []CustomSetting `json:"customSettings"`
+	ProxyOptions               *proxy.Options
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -118,22 +118,31 @@ func (settings *Settings) isValid() (err error) {
 
 // parsePort reads a port that may arrive as a JSON number or a string.
 func parsePort(value interface{}) (int64, error) {
-	switch port := value.(type) {
+	var port int64
+	switch v := value.(type) {
 	case string:
-		parsed, err := strconv.ParseInt(port, 0, 64)
+		parsed, err := strconv.ParseInt(strings.TrimSpace(v), 0, 64)
 		if err != nil {
 			return 0, fmt.Errorf("could not parse port value: %w", err)
 		}
-		return parsed, nil
+		port = parsed
 	case float64:
-		return int64(port), nil
+		port = int64(v)
 	default:
 		return 0, fmt.Errorf("could not parse port value: unexpected type %T", value)
 	}
+	// A port outside the TCP range can only fail at dial time, with an error
+	// that points at the network rather than at the config that caused it.
+	if port < 1 || port > 65535 {
+		return 0, fmt.Errorf("could not parse port value: %d is out of range (1-65535)", port)
+	}
+	return port, nil
 }
 
-// parseHosts deserializes the "hosts" field. Entries without a host name are
-// skipped so a trailing blank row in the UI does not become an empty address.
+// parseHosts deserializes the "hosts" field. An entry without a usable host
+// name is an error rather than a skip: this field is hand-edited in
+// provisioning, so a dropped entry is a typo silently costing a node, not a
+// blank row from a form.
 func parseHosts(value interface{}) ([]HostAddress, error) {
 	entries, ok := value.([]interface{})
 	if !ok {
@@ -141,7 +150,7 @@ func parseHosts(value interface{}) ([]HostAddress, error) {
 	}
 
 	hosts := make([]HostAddress, 0, len(entries))
-	for _, entry := range entries {
+	for i, entry := range entries {
 		fields, ok := entry.(map[string]interface{})
 		if !ok {
 			return nil, fmt.Errorf("could not parse hosts value: expected a list of objects, got %T", entry)
@@ -156,7 +165,7 @@ func parseHosts(value interface{}) ([]HostAddress, error) {
 			host.Host = strings.TrimSpace(name)
 		}
 		if host.Host == "" {
-			continue
+			return nil, fmt.Errorf("could not parse hosts value: entry %d has no host", i)
 		}
 
 		if fields["port"] != nil {

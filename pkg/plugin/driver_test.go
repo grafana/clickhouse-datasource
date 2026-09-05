@@ -870,12 +870,28 @@ func TestConnectionAddresses(t *testing.T) {
 			expected: []string{"ch1:9440"},
 		},
 		{
-			name: "IPv6 hosts are bracketed by the caller",
+			// hosts is hand-edited, so an IPv6 literal arrives with or without
+			// brackets depending on who wrote it. Both have to dial: bare is
+			// what net.Dial rejects, doubled brackets would be just as broken.
+			name: "bare IPv6 hosts are bracketed",
+			settings: Settings{
+				Port:  9440,
+				Hosts: []HostAddress{{Host: "2001:db8::1", Port: 9000}, {Host: "ch2"}},
+			},
+			expected: []string{"[2001:db8::1]:9000", "ch2:9440"},
+		},
+		{
+			name: "already-bracketed IPv6 hosts are left alone",
 			settings: Settings{
 				Port:  9440,
 				Hosts: []HostAddress{{Host: "[::1]", Port: 9000}, {Host: "ch2"}},
 			},
 			expected: []string{"[::1]:9000", "ch2:9440"},
+		},
+		{
+			name:     "a bare IPv6 Host/Port pair is bracketed too",
+			settings: Settings{Host: "::1", Port: 9000},
+			expected: []string{"[::1]:9000"},
 		},
 	}
 
@@ -885,6 +901,46 @@ func TestConnectionAddresses(t *testing.T) {
 			assert.Equal(t, tt.expected, got)
 		})
 	}
+}
+
+// connectionAddresses is only useful if what it returns reaches the driver, so
+// assert the wiring, not just the helper: a regression that collapsed Addr back
+// to a single address would leave TestConnectionAddresses green.
+func TestBuildClickHouseOptionsMultiHost(t *testing.T) {
+	settings := Settings{
+		Port:         9000,
+		Protocol:     "native",
+		Hosts:        []HostAddress{{Host: "ch1"}, {Host: "ch2", Port: 9001}},
+		DialTimeout:  "5",
+		QueryTimeout: "30",
+	}
+
+	opts, err := buildClickHouseOptions(t.Context(), settings, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"ch1:9000", "ch2:9001"}, opts.Addr)
+	// ConnOpenInOrder (the zero value) would send every new pooled connection
+	// to ch1 until it goes down — failover, not the load balancing #279 asks
+	// for.
+	assert.Equal(t, clickhouse.ConnOpenRoundRobin, opts.ConnOpenStrategy)
+}
+
+func TestBuildClickHouseOptionsSingleHostKeepsDefaultStrategy(t *testing.T) {
+	settings := Settings{
+		Host:         "ch1",
+		Port:         9000,
+		Protocol:     "native",
+		DialTimeout:  "5",
+		QueryTimeout: "30",
+	}
+
+	opts, err := buildClickHouseOptions(t.Context(), settings, nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, []string{"ch1:9000"}, opts.Addr)
+	// With one address the strategies are indistinguishable; leaving the option
+	// untouched keeps existing datasources byte-identical.
+	assert.Equal(t, clickhouse.ConnOpenInOrder, opts.ConnOpenStrategy)
 }
 
 // The TLS config is handed to clickhouse-go once and reused for every address
