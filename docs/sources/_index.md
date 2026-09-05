@@ -41,7 +41,8 @@ The ClickHouse data source plugin allows you to query and visualize ClickHouse d
 {{< admonition type="note" >}}
 
 - Ad hoc filters require ClickHouse 22.7 or later (from plugin v2.0 onward).
-- Log volume queries in the SQL editor require Grafana 12.4.0 or later.
+- Log volume queries in the SQL editor fall back to Grafana's row-based histogram on Grafana 12.4.0 and later.
+  On earlier versions a query the plugin cannot aggregate shows no volume chart.
   {{< /admonition >}}
 
 ## Get started
