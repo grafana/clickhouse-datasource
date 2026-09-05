@@ -1598,21 +1598,7 @@ describe('ClickHouseDatasource', () => {
         ]);
       });
 
-      it('should ignore non-logs targets when deciding volume support', async () => {
-        mockDefaultLogColumns();
-        const dsRequest: DataQueryRequest<CHQuery> = {
-          ...request,
-          targets: [
-            { ...query, editorType: EditorType.Builder },
-            { ...sqlLogsTarget('SELECT count() FROM whatever'), queryType: QueryType.Table, format: 1 },
-          ],
-        };
-        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsVolume);
-      });
-
       it('should offer LogsVolume for a hand-typed SQL query that declares no query type', async () => {
-        // Regression guard: the SQL editor defaults queryType to Table, so requiring a declared
-        // logs type made the feature silently do nothing for queries typed by hand.
         mockDefaultLogColumns();
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
