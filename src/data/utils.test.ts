@@ -1,4 +1,12 @@
-import { ColumnHint, QueryBuilderOptions, QueryType, TableColumn, TimeUnit } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  QueryBuilderOptions,
+  QueryType,
+  TableColumn,
+  TimeUnit,
+} from 'types/queryBuilder';
 import {
   applyTraceSearchFieldConfig,
   columnLabelToPlaceholder,
@@ -11,7 +19,7 @@ import {
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, dateTime, Field, FieldType } from '@grafana/data';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import otel from 'otel';
@@ -303,7 +311,11 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       requestId: '',
       interval: '',
       intervalMs: 0,
-      range: {} as any,
+      range: {
+        from: dateTime(1735689600000), // 2025-01-01T00:00:00Z
+        to: dateTime(1735693200000), // 2025-01-01T01:00:00Z
+        raw: { from: 'now-1h', to: 'now' },
+      },
       scopedVars: {} as any,
       targets: [inputQuery],
       timezone: '',
@@ -817,6 +829,173 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       expect(traceQuery.rawSql).not.toContain('trace_id_ts');
       expect(traceQuery.builderOptions.meta?.hasTraceTimestampTable).toBe(false);
     });
+  });
+
+  describe('trace logs link time range', () => {
+    // Concrete bounds baked from the request range (see buildTestRequestResponse)
+    const expectedFrom = 'toDateTime(1735689600)';
+    const expectedTo = 'toDateTime(1735693200)';
+
+    const getViewLogsQuery = (out: DataQueryResponse): CHBuilderQuery =>
+      out?.data[0]?.fields[0]?.config?.links?.find((link: any) => link.title === 'View logs')?.internal
+        ?.query as CHBuilderQuery;
+
+    it('trace→logs link seeds default filters including the time-range bound', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+      const filters: any[] = logsQuery.builderOptions.filters || [];
+
+      const timeFilter = filters.find((f) => f.operator === FilterOperator.WithInGrafanaTimeRange);
+      expect(timeFilter).toBeDefined();
+      expect(timeFilter.hint).toBe(ColumnHint.FilterTime);
+      const traceIdFilter = filters.find((f) => f.hint === ColumnHint.TraceId);
+      expect(traceIdFilter).toBeDefined();
+      expect(traceIdFilter.value).toBe('${__value.raw}');
+    });
+
+    it('logs→logs link preserves the origin time-range filter, drops other filters', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+      configureOtelTraces(mockDatasource);
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Logs,
+        database: 'otel',
+        table: 'otel_logs',
+        columns: [
+          { name: 'Timestamp', hint: ColumnHint.Time },
+          { name: 'TraceId', hint: ColumnHint.TraceId },
+        ],
+        filters: [
+          {
+            type: 'datetime',
+            operator: FilterOperator.WithInGrafanaTimeRange,
+            filterType: 'custom',
+            key: 'CustomTime',
+            condition: 'AND',
+          },
+          {
+            type: 'string',
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: 'ServiceName',
+            condition: 'AND',
+            value: 'checkout',
+          },
+          {
+            type: 'string',
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: 'TraceId',
+            hint: ColumnHint.TraceId,
+            condition: 'AND',
+            value: 'old-trace-id',
+          },
+        ] as any[],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+      const filters: any[] = logsQuery.builderOptions.filters || [];
+
+      expect(filters).toHaveLength(2);
+      // The origin's own time bound is kept (preserves custom keys/columns)
+      expect(filters[0].operator).toBe(FilterOperator.WithInGrafanaTimeRange);
+      expect(filters[0].key).toBe('CustomTime');
+      // The stale TraceId filter is replaced with the clicked value, other filters dropped
+      expect(filters[1].hint).toBe(ColumnHint.TraceId);
+      expect(filters[1].value).toBe('${__value.raw}');
+      expect(filters.some((f) => f.key === 'ServiceName')).toBe(false);
+      expect(logsQuery.builderOptions.mode).toBe(BuilderMode.List);
+    });
+
+    it('trace→logs link query supports the logs volume supplementary query', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+
+      // getSupplementaryLogsVolumeQuery requires list mode, a database/table, and a
+      // resolvable time column; a link query missing any of them silently loses the
+      // logs volume histogram until the editor merges query defaults on a re-run
+      expect(logsQuery.builderOptions.mode).toBe(BuilderMode.List);
+      const volumeQuery = mockDatasource.getSupplementaryLogsVolumeQuery(request, logsQuery);
+      expect(volumeQuery).toBeDefined();
+      expect(volumeQuery?.rawSql).toContain('toStartOfInterval');
+      expect(volumeQuery?.rawSql).toContain('GROUP BY');
+    });
+
+    it('logs→logs link falls back to the default time filter when the origin has none', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+      configureOtelTraces(mockDatasource);
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Logs,
+        database: 'otel',
+        table: 'otel_logs',
+        columns: [{ name: 'Timestamp', hint: ColumnHint.Time }],
+        filters: [],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+      const filters: any[] = logsQuery.builderOptions.filters || [];
+
+      const timeFilter = filters.find((f) => f.operator === FilterOperator.WithInGrafanaTimeRange);
+      expect(timeFilter).toBeDefined();
+      expect(timeFilter.hint).toBe(ColumnHint.FilterTime);
+      expect(filters.find((f) => f.hint === ColumnHint.TraceId)).toBeDefined();
+    });
+
+    it.each([CoreApp.Explore, CoreApp.Dashboard])(
+      'binds concrete time bounds into rawSql with no macro tokens (%s)',
+      async (app) => {
+        const mockDatasource = newMockDatasource();
+        configureOtelLogs(mockDatasource);
+
+        const [request, response] = buildTestRequestResponse({
+          queryType: QueryType.Traces,
+          columns: [{ name: 'a' }],
+        });
+        request.app = app;
+        const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+        const logsQuery = getViewLogsQuery(out);
+
+        // Non-empty so the pane's first auto-run executes instead of failing with
+        // ClickHouse "Empty query" (code 62) on Grafana versions that run before
+        // the editor regenerates SQL from builderOptions
+        expect(logsQuery.rawSql).not.toBe('');
+        expect(logsQuery.rawSql).toContain(expectedFrom);
+        expect(logsQuery.rawSql).toContain(expectedTo);
+        // No macro tokens: Grafana hides data links whose serialized query contains
+        // $-variables it cannot resolve, and these macros are backend-only
+        expect(logsQuery.rawSql).not.toContain('$__fromTime');
+        expect(logsQuery.rawSql).not.toContain('$__toTime');
+        // The trace id token must be quoted in rawSql: escapeValue leaves $-values
+        // unquoted, but Grafana substitutes a bare hex id at click time and Grafana
+        // ≤12 executes this SQL verbatim on first run
+        expect(logsQuery.rawSql).toContain("= '${__value.raw}'");
+        expect(logsQuery.rawSql).not.toMatch(/= \$\{__value\.raw\}/);
+      }
+    );
   });
 
   it('does not inject "View trace" link when showTraceLinks is false', async () => {

@@ -1,6 +1,8 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, TimeRange } from '@grafana/data';
 import {
+  BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -13,6 +15,7 @@ import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
+import { getDefaultLogsFilters } from 'components/queryBuilder/defaultQueryOptions';
 import otel from 'otel';
 
 /**
@@ -319,6 +322,45 @@ function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[])
 }
 
 /**
+ * Matches filters that bind a query to the Grafana time range, i.e. the ones that
+ * render as `>= $__fromTime AND <= $__toTime` in the generated SQL.
+ */
+const isTimeRangeFilter = (filter: Filter): boolean =>
+  filter.operator === FilterOperator.WithInGrafanaTimeRange &&
+  (filter.hint === ColumnHint.FilterTime ||
+    filter.hint === ColumnHint.Time ||
+    (filter.type || '').toLowerCase().startsWith('date'));
+
+/**
+ * Replaces the plugin's time macros with concrete bounds from the given range, matching
+ * the backend's expansion (`toDateTime(<unix seconds>)`); `from` is floored and `to` is
+ * ceiled so sub-second edges are never clipped. Data-link queries need this because
+ * Grafana's link variable check treats `$__fromTime`/`$__toTime` as template variables
+ * and hides links whose serialized query contains variables it cannot resolve.
+ */
+const bindTimeRangeMacros = (sql: string, range?: TimeRange): string => {
+  if (!range?.from || !range?.to) {
+    return sql;
+  }
+  return sql
+    .replaceAll('$__fromTime', `toDateTime(${Math.floor(range.from.valueOf() / 1000)})`)
+    .replaceAll('$__toTime', `toDateTime(${Math.ceil(range.to.valueOf() / 1000)})`);
+};
+
+/**
+ * escapeValue() in the SQL generator leaves filter values containing '$' unquoted so
+ * template variables can be used raw — which also applies to the data link's
+ * '${__value.raw}' trace id token. Grafana substitutes a plain hex id into it at click
+ * time, so the pre-generated rawSql must carry the quotes itself (the trace-ID query
+ * does the same in generateTraceQuery). builderOptions is left untouched: by the time
+ * the editor regenerates SQL, the value is a plain string and escapeValue quotes it.
+ */
+const quoteTraceIdValueToken = (sql: string): string => {
+  const token = '${__value.raw}';
+  return sql.includes(`'${token}'`) ? sql : sql.replaceAll(token, `'${token}'`);
+};
+
+/**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view on the explore page
  * with the selected trace ID.
@@ -364,6 +406,16 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     // Use traces config traceIdColumn if available, otherwise fallback to logs default
     const traceIdColumnName =
       datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
+
+    const traceIdFilter: StringFilter = {
+      type: 'string',
+      operator: FilterOperator.Equals,
+      filterType: 'custom',
+      key: traceIdColumnName,
+      hint: ColumnHint.TraceId,
+      condition: 'AND',
+      value: '${__value.raw}',
+    };
 
     const traceIdQuery: CHBuilderQuery = {
       // Embed only a datasource ref ({ uid, type }), never the live Datasource instance:
@@ -527,20 +579,18 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     };
 
     if (originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs) {
-      // Copy fields directly from log search
+      // Copy fields directly from log search. Only its time-range filter is carried
+      // over: the pivot should show every log row for the trace, and dropping the
+      // rest also discards any TraceId filter left from a previous pivot.
+      const originalTimeFilters = (originalQuery.builderOptions.filters || []).filter(isTimeRangeFilter);
+      const timeFilters =
+        originalTimeFilters.length > 0 ? originalTimeFilters : getDefaultLogsFilters().filter(isTimeRangeFilter);
       traceLogsQuery.builderOptions = {
         ...originalQuery.builderOptions,
-        filters: [
-          {
-            type: 'string',
-            operator: FilterOperator.Equals,
-            filterType: 'custom',
-            key: traceIdColumnName,
-            hint: ColumnHint.TraceId,
-            condition: 'AND',
-            value: '${__value.raw}',
-          } as StringFilter,
-        ],
+        // List mode is required by getSupplementaryLogsVolumeQuery; without it the
+        // logs volume histogram is skipped until the editor merges query defaults
+        mode: BuilderMode.List,
+        filters: [...timeFilters, traceIdFilter],
         orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
         meta: {
           ...originalQuery.builderOptions.meta,
@@ -558,19 +608,13 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           datasource.getDefaultDatabase(),
         table: datasource.getDefaultLogsTable() || datasource.getDefaultTable() || traceLogsQuery.builderOptions.table,
         queryType: QueryType.Logs,
+        // List mode is required by getSupplementaryLogsVolumeQuery; without it the
+        // logs volume histogram is skipped until the editor merges query defaults
+        mode: BuilderMode.List,
         columns: [],
         orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
-        filters: [
-          {
-            type: 'string',
-            operator: FilterOperator.Equals,
-            filterType: 'custom',
-            key: traceIdColumnName,
-            hint: ColumnHint.TraceId,
-            condition: 'AND',
-            value: '${__value.raw}',
-          } as StringFilter,
-        ],
+        // The default filters carry the time-range bound so the time picker constrains the query
+        filters: [...getDefaultLogsFilters(), traceIdFilter],
         meta: {
           minimized: true,
           otelEnabled: Boolean(otelVersion),
@@ -590,13 +634,11 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       traceLogsQuery.builderOptions = options;
     }
 
-    // Generate rawSql for Dashboard mode to preserve query through serialization
     const openInNewWindow = req.app !== CoreApp.Explore;
-    if (openInNewWindow) {
-      traceLogsQuery.rawSql = generateSql(traceLogsQuery.builderOptions || {});
-    } else {
-      traceLogsQuery.rawSql = '';
-    }
+    // Pre-generate rawSql so the first auto-run executes immediately.
+    traceLogsQuery.rawSql = quoteTraceIdValueToken(
+      bindTimeRangeMacros(generateSql(traceLogsQuery.builderOptions || {}), req.range)
+    );
     traceLogsQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceLogsQuery.builderOptions);
     traceField.config.links = [];
     const canLinkToTraces =
