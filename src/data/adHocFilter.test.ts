@@ -65,6 +65,34 @@ describe('AdHocManager', () => {
     ] as AdHocVariableFilter[]);
     expect(val).toEqual('select stuff FROM foo');
   });
+  it('applies ad hoc filter to a query using ClickHouse SAMPLE syntax', () => {
+    const ahm = new AdHocFilter();
+    // Previously threw in setTargetTableFromQuery because getTable returned ''.
+    ahm.setTargetTableFromQuery('SELECT * FROM otel_logs SAMPLE 0.1');
+    const val = ahm.apply('SELECT * FROM otel_logs SAMPLE 0.1', [
+      { key: 'ServiceName', operator: '=', value: 'cart' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT * FROM otel_logs SAMPLE 0.1 settings additional_table_filters={'otel_logs' : ' ServiceName = \\'cart\\' '}`
+    );
+  });
+  it('applies ad hoc filter to a backtick-quoted table name', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM `my-db`.`my-table`');
+    const val = ahm.apply('SELECT * FROM `my-db`.`my-table`', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      "SELECT * FROM `my-db`.`my-table` settings additional_table_filters={'my-db.my-table' : ' key = \\'val\\' '}"
+    );
+  });
+  it('does not throw when the target table name contains regex metacharacters', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM `a[b`');
+    expect(() =>
+      ahm.apply('SELECT * FROM `a[b`', [{ key: 'key', operator: '=', value: 'val' }] as AdHocVariableFilter[])
+    ).not.toThrow();
+  });
   it('apply ad hoc filter when the ad hoc options are from a query with a from inline query', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM (select * FROM foo) bar');
@@ -184,6 +212,26 @@ describe('AdHocManager', () => {
     expect(val).toEqual(
       `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (1, 2, 3) '}`
     );
+  });
+
+  it('apply ad hoc filter to a query using ClickHouse INTERVAL syntax', () => {
+    const ahm = new AdHocFilter();
+    // The previous pgsql-based parser threw on the unquoted INTERVAL and dropped the filter.
+    const sql =
+      'SELECT ServiceName, count() c FROM otel.otel_logs WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY ServiceName';
+    ahm.setTargetTableFromQuery(sql);
+    const val = ahm.apply(sql, [{ key: 'ServiceName', operator: '=', value: 'frontend' }] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `${sql} settings additional_table_filters={'otel.otel_logs' : ' ServiceName = \\'frontend\\' '}`
+    );
+  });
+
+  it('apply ad hoc filter to a query using a ClickHouse lambda', () => {
+    const ahm = new AdHocFilter();
+    const sql = 'SELECT count() c FROM events WHERE arrayExists(x -> x > 1, spans)';
+    ahm.setTargetTableFromQuery(sql);
+    const val = ahm.apply(sql, [{ key: 'kind', operator: '=', value: 'server' }] as AdHocVariableFilter[]);
+    expect(val).toEqual(`${sql} settings additional_table_filters={'events' : ' kind = \\'server\\' '}`);
   });
 
   it('does not apply an adhoc filter without "operator"', () => {
