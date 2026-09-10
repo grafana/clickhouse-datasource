@@ -1,40 +1,22 @@
+// E2E coverage for Monaco autocomplete registration in the SQL editor. Unit
+// tests cover the suggestion providers in isolation; only E2E confirms that
+// remounting SqlEditor (navigating away from Explore and back) does not
+// re-register completion providers and duplicate every suggestion.
+
 import { expect, test } from '@grafana/plugin-e2e';
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { exploreUrl } from '../helpers/explore';
 
-const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
-
-// GRAFANA_URL is set only by the Cloud cron workflow (see .github/workflows/cron.yml).
-const isCloudRun = !!process.env.GRAFANA_URL;
-
-const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
-const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
-const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
-
-function exploreUrl(): string {
-  const query: Record<string, unknown> = {
-    refId: 'A',
-    datasource: { type: PLUGIN_TYPE, uid: DATASOURCE_UID },
-    editorType: 'sql',
-    pluginVersion: '',
-    rawSql: '',
-  };
-
-  const panes = JSON.stringify({
-    explore: {
-      datasource: DATASOURCE_UID,
-      queries: [query],
-      range: { from: 'now-1h', to: 'now' },
-    },
-  });
-
-  return `/explore?orgId=1&schemaVersion=1&panes=${encodeURIComponent(panes)}`;
-}
-
-async function focusEditorAndType(page: Page, text: string) {
+/**
+ * Type SQL and leave the Monaco suggest widget open. The shared enterSql
+ * helper ends with an Escape press to dismiss the autocomplete popup, but
+ * this spec asserts on that popup's contents, so it needs a local variant
+ * without the dismissal.
+ */
+async function typeSqlLeavingSuggestionsOpen(page: Page, text: string) {
   const editor = page.getByRole('code');
   await editor.click();
   await page.keyboard.press('ControlOrMeta+a');
-  await page.keyboard.press('Delete');
   await page.keyboard.type(text);
 }
 
@@ -42,7 +24,10 @@ async function focusEditorAndType(page: Page, text: string) {
 // a deterministic target across local fixture and Cloud cron runs.
 async function captureMacroLabels(page: Page): Promise<string[]> {
   const widget = page.locator('.monaco-editor .suggest-widget.visible');
-  await widget.waitFor({ timeout: 5000 });
+  // 15s ceiling rather than the 5s default: on the shared Cloud instance each
+  // test's fresh browser context re-downloads the Monaco assets, and the widget
+  // repeatedly took longer than 5s on the nightly cron (fails through retries).
+  await widget.waitFor({ timeout: 15_000 });
   const labels = await page.locator('.monaco-editor .suggest-widget .monaco-list-row .label-name').allTextContents();
   return labels.map((l) => l.trim()).filter((l) => l.startsWith('$__'));
 }
@@ -58,7 +43,7 @@ test.describe('SQL editor autocomplete', () => {
   test('does not duplicate suggestions after editor remount', async ({ page }) => {
     await page.goto(exploreUrl());
     // `$` is a registered trigger character; `$__` narrows the popup to plugin macros.
-    await focusEditorAndType(page, 'SELECT * FROM t WHERE $__');
+    await typeSqlLeavingSuggestionsOpen(page, 'SELECT * FROM t WHERE $__');
 
     const firstMountLabels = await captureMacroLabels(page);
     expect(firstMountLabels.length, 'first mount surfaces plugin macros').toBeGreaterThan(0);
@@ -67,7 +52,7 @@ test.describe('SQL editor autocomplete', () => {
     // Navigate away and back to force SqlEditor to unmount and remount.
     await page.goto('/');
     await page.goto(exploreUrl());
-    await focusEditorAndType(page, 'SELECT * FROM t WHERE $__');
+    await typeSqlLeavingSuggestionsOpen(page, 'SELECT * FROM t WHERE $__');
 
     const secondMountLabels = await captureMacroLabels(page);
     expect(findDuplicates(secondMountLabels), 'second mount has no duplicate macros').toEqual([]);

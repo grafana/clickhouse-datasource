@@ -7,7 +7,10 @@
 
 CREATE DATABASE IF NOT EXISTS e2e_test;
 
-CREATE TABLE IF NOT EXISTS e2e_test.events
+DROP TABLE IF EXISTS e2e_test.events;
+-- Dropped and recreated on every load so re-running the e2e-data-loader
+-- (e.g. docker compose up against an existing stack) cannot duplicate rows.
+CREATE TABLE e2e_test.events
 (
     timestamp DateTime,
     level     LowCardinality(String),
@@ -39,7 +42,10 @@ INSERT INTO e2e_test.events (timestamp, level, message, value, service) VALUES
 -- CLICKHOUSE_VERSION in docker-compose.yaml.
 SET enable_json_type = 1;
 
-CREATE TABLE IF NOT EXISTS e2e_test.json_events
+DROP TABLE IF EXISTS e2e_test.json_events;
+-- Dropped and recreated on every load so re-running the e2e-data-loader
+-- (e.g. docker compose up against an existing stack) cannot duplicate rows.
+CREATE TABLE e2e_test.json_events
 (
     timestamp  DateTime,
     message    String,

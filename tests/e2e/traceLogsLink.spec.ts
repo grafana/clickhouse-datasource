@@ -14,7 +14,7 @@ import { Page, Response, request as apiRequest } from '@playwright/test';
 //   3. Drop the origin's non-time filters so the pivot shows every log row
 //      for the trace
 //
-// Fixture: tests/e2e/fixtures/trace_links_logs.sql seeds logs correlated with
+// Fixture: tests/fixtures/trace_links_logs.sql seeds logs correlated with
 // the trace_spans fixture. Row counts disambiguate failure modes:
 //   3 rows = correct | 4 rows = time bound missing | 2 rows = origin filters
 //   wrongly carried over
@@ -276,7 +276,7 @@ test.describe('trace→logs "View logs" data link', () => {
   test.beforeEach(() => {
     test.skip(
       isCloudRun,
-      'Depends on the local trace_links_logs fixture (tests/e2e/fixtures/trace_links_logs.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
+      'Depends on the local trace_links_logs fixture (tests/fixtures/trace_links_logs.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
     );
   });
 
