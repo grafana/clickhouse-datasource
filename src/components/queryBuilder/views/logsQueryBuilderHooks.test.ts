@@ -83,6 +83,25 @@ describe('useLogDefaultsOnMount', () => {
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
+
+  it('appends the explicit additionalColumns list on mount', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getLogsOtelVersion').mockReturnValue(undefined);
+    jest
+      .spyOn(mockDatasource, 'getDefaultLogsColumns')
+      .mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));
+    jest.spyOn(mockDatasource, 'getAdditionalLogColumns').mockReturnValue(['method', 'status']);
+
+    renderHook(() => useLogDefaultsOnMount(mockDatasource, true, {} as QueryBuilderOptions, builderOptionsDispatch));
+
+    // additionalColumns needs no schema, so it is applied here at mount alongside the default columns
+    const dispatched = builderOptionsDispatch.mock.calls[0][0].payload.columns as SelectedColumn[];
+    expect(dispatched.map((c) => c.name)).toEqual(['timestamp', 'method', 'status']);
+
+    // This suite does not auto-restore spies; clean up so getAdditionalLogColumns does not leak.
+    jest.restoreAllMocks();
+  });
 });
 
 describe('useOtelColumns', () => {

@@ -1,11 +1,20 @@
 import { Datasource } from 'data/CHDatasource';
 import {
+  appendAdditionalLogColumns,
   buildCompactQueryDefaults,
   isCompactQueryTypeMismatch,
   isDefaultCompactQuery,
   shouldBuildCompactQueryDefaults,
 } from './compactQueryDefaults';
-import { BuilderMode, ColumnHint, OrderByDirection, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+  SelectedColumn,
+  TableColumn,
+} from 'types/queryBuilder';
 import { SignalType } from 'types/config';
 import otel from 'otel';
 
@@ -123,6 +132,7 @@ describe('buildCompactQueryDefaults', () => {
     );
     mockDs.shouldSelectLogContextColumns = jest.fn(() => false);
     mockDs.getLogContextColumnNames = jest.fn(() => []);
+    mockDs.getAdditionalLogColumns = jest.fn(() => []);
     return mockDs;
   };
 
@@ -142,15 +152,20 @@ describe('buildCompactQueryDefaults', () => {
   // otel_logs table created by clickhouseexporter v0.151.0+, which dropped TimestampTime.
   const v151ColumnNames = preV151ColumnNames.filter((name) => name !== 'TimestampTime');
 
+  const toColumns = (names: string[]): TableColumn[] =>
+    names.map((name) => ({ name, type: 'String', picklistValues: [] }));
+  const preV151Columns = toColumns(preV151ColumnNames);
+  const v151Columns = toColumns(v151ColumnNames);
+
   it('resolves the pre-v0.151.0 log schema when otel version is "latest" and the table has TimestampTime', () => {
-    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', preV151ColumnNames);
+    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', preV151Columns);
 
     expect(options.columns).toContainEqual({ name: 'TimestampTime', hint: ColumnHint.FilterTime });
     expect(options.columns).toContainEqual({ name: 'Timestamp', hint: ColumnHint.Time });
   });
 
   it('resolves the latest log schema when otel version is "latest" and the table has no TimestampTime', () => {
-    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', v151ColumnNames);
+    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', v151Columns);
 
     expect(options.columns).toContainEqual({ name: 'Timestamp', hint: ColumnHint.Time });
     expect(options.columns?.some((column) => column.hint === ColumnHint.FilterTime)).toBe(false);
@@ -168,19 +183,50 @@ describe('buildCompactQueryDefaults', () => {
     const pinnedOlder = createLogsDatasource('1.29.0');
 
     // Pinned 1.30.0 keeps its FilterTime-less map even though the table has TimestampTime.
-    const pinnedLatestOptions = buildCompactQueryDefaults(pinnedLatest, 'logs', '', preV151ColumnNames);
+    const pinnedLatestOptions = buildCompactQueryDefaults(pinnedLatest, 'logs', '', preV151Columns);
     expect(pinnedLatestOptions.columns?.some((column) => column.hint === ColumnHint.FilterTime)).toBe(false);
     expect(pinnedLatest.getDefaultLogsColumns).toHaveBeenCalled();
 
     // Pinned 1.29.0 keeps its TimestampTime mapping even though the table lacks the column.
-    const pinnedOlderOptions = buildCompactQueryDefaults(pinnedOlder, 'logs', '', v151ColumnNames);
+    const pinnedOlderOptions = buildCompactQueryDefaults(pinnedOlder, 'logs', '', v151Columns);
     expect(pinnedOlderOptions.columns).toContainEqual({ name: 'TimestampTime', hint: ColumnHint.FilterTime });
   });
 
   it('keeps the configured meta values when detection resolves an older schema', () => {
-    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', preV151ColumnNames);
+    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', preV151Columns);
 
     expect(options.meta?.otelEnabled).toBe(true);
     expect(options.meta?.otelVersion).toBe('latest');
+  });
+});
+
+describe('appendAdditionalLogColumns', () => {
+  const makeDatasource = (opts: { additional?: string[] }): Datasource => {
+    const ds = {} as Datasource;
+    ds.getAdditionalLogColumns = jest.fn(() => opts.additional ?? []);
+    return ds;
+  };
+
+  describe('additional columns (explicit list)', () => {
+    it('appends the configured columns in order', () => {
+      const ds = makeDatasource({ additional: ['method', 'status'] });
+      const columns: SelectedColumn[] = [];
+      const included = new Set<string>();
+
+      appendAdditionalLogColumns(ds, [], columns, included);
+
+      expect(columns.map((c) => c.name)).toEqual(['method', 'status']);
+    });
+
+    it('skips an already-selected column and a map key whose base column is already selected', () => {
+      const ds = makeDatasource({ additional: ['method', "ResourceAttributes['k8s.pod']"] });
+      const columns: SelectedColumn[] = [{ name: 'method' }, { name: 'ResourceAttributes' }];
+      const included = new Set<string>(['method', 'ResourceAttributes']);
+
+      appendAdditionalLogColumns(ds, [], columns, included);
+
+      // method is already present; the map key dedupes against its base ResourceAttributes column
+      expect(columns.map((c) => c.name)).toEqual(['method', 'ResourceAttributes']);
+    });
   });
 });

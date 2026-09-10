@@ -51,7 +51,7 @@ import {
   TableColumn,
   TimeUnit,
 } from 'types/queryBuilder';
-import { CHQuery, EditorType } from 'types/sql';
+import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
@@ -63,7 +63,11 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import {
+  foldDiscoveredLogFieldsIntoLabels,
+  labelsFieldName,
+  transformQueryResponseWithTraceAndLogLinks,
+} from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -947,6 +951,11 @@ export class Datasource
     return this.settings.jsonData.logs?.selectContextColumns || false;
   }
 
+  // Explicit list of extra columns to surface as fields.
+  getAdditionalLogColumns(): string[] {
+    return this.settings.jsonData.logs?.additionalColumns?.length ? this.settings.jsonData.logs.additionalColumns : [];
+  }
+
   getLogContextColumnNames(): string[] {
     return this.settings.jsonData.logs?.contextColumns?.length ? this.settings.jsonData.logs?.contextColumns : [];
   }
@@ -1453,7 +1462,23 @@ export class Datasource
   }
 
   filterQuery(query: CHQuery): boolean {
-    return !query.hide;
+    if (query.hide) {
+      return false;
+    }
+
+    // A logs builder query carries an empty rawSql until its columns resolve (for example a
+    // non-OTel table in the compact editor before the schema fetch returns); running it would send
+    // an empty statement that ClickHouse rejects with a 400. Skip only that transient case. Every
+    // other query type runs as before, so an empty or invalid SQL-editor query still surfaces its
+    // error to the user instead of being dropped silently.
+    const isBuilderLogsQuery =
+      query.editorType === EditorType.Builder &&
+      (query as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs;
+    if (isBuilderLogsQuery && !(query.rawSql && query.rawSql.trim().length > 0)) {
+      return false;
+    }
+
+    return true;
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
@@ -1474,7 +1499,8 @@ export class Datasource
       })
       .pipe(
         concatMap(async (res: DataQueryResponse) => {
-          const transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          let transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
+          transformed = foldDiscoveredLogFieldsIntoLabels(this, request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
@@ -2106,10 +2132,14 @@ export class Datasource
    * (e.g. "ResourceAttributes.service.name"). This method tells Grafana
    * how to bucket those keys into named, collapsible sections.
    *
-   * Returning null leaves the field under Grafana's default "Fields"
-   * section. Filtering is unaffected: `modifyQuery` already splits the
-   * same prefix back when a user clicks "Filter for value", so the
-   * visual grouping and the filter routing stay aligned.
+   * Unprefixed keys are the top-level scalar columns that
+   * `foldDiscoveredLogFieldsIntoLabels` merged into `labels` (the field
+   * options feature). They are bucketed under a plain "Fields" section so
+   * they sit next to the grouped attributes in the log-row details flyout,
+   * with the same filter-for / filter-out buttons. Filtering is unaffected:
+   * `modifyQuery` resolves a bare key to the real column (and splits the
+   * `<map>.` prefix back for the attribute keys), so grouping and filter
+   * routing stay aligned.
    *
    * Strings are plain English; the plugin codebase does not currently
    * use `@grafana/i18n`, so a future i18n pass would localize these
@@ -2125,7 +2155,14 @@ export class Datasource
     if (labelKey.startsWith('LogAttributes.')) {
       return 'Log attributes';
     }
-    return null;
+    // Group unprefixed keys under a "Fields" section next to the attribute groups. The backend only
+    // writes prefixed attribute keys (ResourceAttributes.* / ScopeAttributes.* / LogAttributes.*),
+    // so an unprefixed key is normally a scalar column that foldDiscoveredLogFieldsIntoLabels merged
+    // into `labels`. A table that already exposes its own `labels` map would also land here; grouping
+    // those under "Fields" is intentional and harmless (the section renders much the same). Keeping
+    // it ungated also groups columns selected ad hoc in the query editor, not only ones configured on
+    // the datasource.
+    return 'Fields';
   }
 
   async testDatasource(): Promise<{ status: string; message: string }> {

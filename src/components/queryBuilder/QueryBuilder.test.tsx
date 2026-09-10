@@ -3,8 +3,18 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, ColumnHint, FilterOperator, OrderByDirection, QueryType, TimeUnit } from 'types/queryBuilder';
-import { setColumnByHint } from 'hooks/useBuilderOptionsState';
+import { generateSql } from 'data/sqlGenerator';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+  TimeUnit,
+} from 'types/queryBuilder';
+import { setColumnByHint, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
 
 jest.mock('./views/TableQueryBuilder', () => ({
@@ -40,6 +50,7 @@ describe('QueryBuilder', () => {
   mockDs.getDefaultDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceColumns = jest.fn((_db?: string) => new Map());
   mockDs.shouldSelectLogContextColumns = jest.fn((_db?: string) => false);
+  mockDs.getAdditionalLogColumns = jest.fn(() => []);
   mockDs.getDefaultTable = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceTable = jest.fn((_db?: string) => '');
@@ -325,6 +336,61 @@ describe('QueryBuilder', () => {
         queryType: QueryType.Logs,
       })
     );
+  });
+
+  // Drive the REAL reducer (not a jest.fn dispatch) through CompactQueryEditor so the test observes
+  // the composed column set after every hook has run, and can catch a duplicate projection.
+  const renderCompactWithRealReducer = (datasource: Datasource): (() => QueryBuilderOptions) => {
+    let latest: QueryBuilderOptions = defaultCHBuilderQuery.builderOptions;
+    const Harness = () => {
+      const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState(defaultCHBuilderQuery.builderOptions);
+      latest = builderOptions;
+      return (
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+          onQueryChange={jest.fn()}
+        />
+      );
+    };
+    render(<Harness />);
+    return () => latest;
+  };
+
+  it('emits no runnable query for a non-OTel compact logs table before its schema loads', async () => {
+    // Cold-load transient: fetchColumns has not returned, so no time/message/scalar column can be
+    // resolved. The logs query must be empty rather than an invalid `SELECT  FROM host_logs`, which
+    // ClickHouse rejects with a 400. generateSql returns '' for a columns-less logs query, and
+    // filterQuery (tested in CHDatasource) skips an empty query so Grafana never sends it.
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'logs'),
+      getDefaultLogsTable: jest.fn(() => 'host_logs'),
+      getDefaultLogsColumns: jest.fn(() => new Map()),
+      getLogsOtelVersion: jest.fn(() => undefined),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      getAdditionalLogColumns: jest.fn(() => []),
+      fetchColumns: jest.fn(() => Promise.resolve([])),
+    } as unknown as Datasource;
+
+    const getOptions = renderCompactWithRealReducer(compactDs);
+
+    await waitFor(() => {
+      expect(getOptions().queryType).toBe(QueryType.Logs);
+    });
+
+    const options = getOptions();
+    // No column could be resolved from an empty schema, so nothing is projected...
+    expect(options.columns || []).toHaveLength(0);
+    // ...and the generated logs query is empty rather than `SELECT  FROM "logs"."host_logs"`.
+    expect(generateSql(options)).toBe('');
   });
 
   it('preserves an authored query when its type does not match the datasource signal', async () => {

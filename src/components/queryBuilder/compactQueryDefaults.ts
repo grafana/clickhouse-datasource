@@ -1,5 +1,12 @@
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType, SelectedColumn } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  QueryBuilderOptions,
+  QueryType,
+  SelectedColumn,
+  TableColumn,
+} from 'types/queryBuilder';
 import { SignalType } from 'types/config';
 import { isBuilderOptionsRunnable } from 'data/utils';
 import otel from 'otel';
@@ -9,6 +16,31 @@ import {
   getDefaultTraceFilters,
   getDefaultTraceOrderBy,
 } from './defaultQueryOptions';
+
+/**
+ * Appends the datasource's configured extra log columns (`additionalColumns`, an explicit list) so
+ * they surface as first-class fields. Mutates `columns` / `includedColumns` in place.
+ */
+export const appendAdditionalLogColumns = (
+  datasource: Datasource,
+  allColumns: readonly TableColumn[],
+  columns: SelectedColumn[],
+  includedColumns: Set<string>
+): void => {
+  for (const columnName of datasource.getAdditionalLogColumns()) {
+    const baseName = columnName.split('[')[0];
+    if (includedColumns.has(columnName) || includedColumns.has(baseName)) {
+      continue;
+    }
+    // Carry the schema type so downstream consumers (e.g. the labels fold's
+    // collection/date checks) can reason about the column. `allColumns` is the
+    // fetched table schema; it is empty on a cold load before the schema
+    // resolves, in which case the type stays undefined (best effort).
+    const type = allColumns.find((c) => c.name === columnName || c.name === baseName)?.type;
+    columns.push(type ? { name: columnName, type } : { name: columnName });
+    includedColumns.add(columnName);
+  }
+};
 
 export const getCompactQueryType = (signalType: SignalType): QueryType => {
   return signalType === 'logs' ? QueryType.Logs : QueryType.Traces;
@@ -50,22 +82,22 @@ export function buildCompactQueryDefaults(
   datasource: Datasource,
   signalType: SignalType,
   fallbackTable = '',
-  tableColumnNames: readonly string[] = []
+  allColumns: readonly TableColumn[] = []
 ): QueryBuilderOptions {
   return signalType === 'logs'
-    ? buildCompactLogsDefaults(datasource, fallbackTable, tableColumnNames)
+    ? buildCompactLogsDefaults(datasource, fallbackTable, allColumns)
     : buildCompactTracesDefaults(datasource, fallbackTable);
 }
 
 const buildCompactLogsDefaults = (
   datasource: Datasource,
   fallbackTable: string,
-  tableColumnNames: readonly string[]
+  allColumns: readonly TableColumn[]
 ): QueryBuilderOptions => {
   const defaultDb = datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase();
   const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable() || fallbackTable;
   const otelVersion = datasource.getLogsOtelVersion();
-  const columns = getLogsDefaultColumns(datasource, tableColumnNames);
+  const columns = getLogsDefaultColumns(datasource, allColumns);
 
   return {
     database: defaultDb,
@@ -126,8 +158,13 @@ const getLogsDefaultColumnMap = (
   return datasource.getDefaultLogsColumns();
 };
 
-const getLogsDefaultColumns = (datasource: Datasource, tableColumnNames: readonly string[]): SelectedColumn[] => {
-  const nextColumns = getDefaultColumns(getLogsDefaultColumnMap(datasource, tableColumnNames));
+const getLogsDefaultColumns = (datasource: Datasource, allColumns: readonly TableColumn[]): SelectedColumn[] => {
+  const nextColumns = getDefaultColumns(
+    getLogsDefaultColumnMap(
+      datasource,
+      allColumns.map((column) => column.name)
+    )
+  );
   const includedColumns = new Set(nextColumns.map((c) => c.name));
 
   if (datasource.shouldSelectLogContextColumns()) {
@@ -142,6 +179,8 @@ const getLogsDefaultColumns = (datasource: Datasource, tableColumnNames: readonl
       includedColumns.add(columnName);
     }
   }
+
+  appendAdditionalLogColumns(datasource, allColumns, nextColumns, includedColumns);
 
   return nextColumns;
 };
