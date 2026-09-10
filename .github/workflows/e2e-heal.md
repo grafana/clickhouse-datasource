@@ -93,7 +93,11 @@ steps:
           "$LOG" | head -60 > "$DIR/hints/job-$JOB.txt" 2>/dev/null || true
       done
 
-      INSTALLED=$(jq -r '.devDependencies["@grafana/plugin-e2e"] // .dependencies["@grafana/plugin-e2e"] // "absent"' package.json)
+      if [ -f package.json ]; then
+        INSTALLED=$(jq -r '.devDependencies["@grafana/plugin-e2e"] // .dependencies["@grafana/plugin-e2e"] // "absent"' package.json)
+      else
+        INSTALLED="unknown (package.json not in workspace)"
+      fi
       LATEST=$(curl -s --max-time 20 https://registry.npmjs.org/@grafana/plugin-e2e \
                  | jq -r '."dist-tags".latest' 2>/dev/null || echo "unknown")
       printf '@grafana/plugin-e2e installed: %s\n@grafana/plugin-e2e npm latest: %s\n' \
