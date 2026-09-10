@@ -181,9 +181,58 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
       { key: 'key', operator: 'IN', value: '(1, 2, 3)' },
     ] as AdHocVariableFilter[]);
+    // Elements are quoted for safety; ClickHouse coerces quoted numerics.
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (1, 2, 3) '}`
+      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (\\'1\\', \\'2\\', \\'3\\') '}`
     );
+  });
+
+  it('escapes each IN element so a crafted value cannot break out of the filter', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "1) OR 1=1 OR ServiceName IN (1" },
+    ] as AdHocVariableFilter[]);
+    // The whole payload becomes a single quoted literal element, not injected SQL.
+    expect(result).toContain("k IN (\\'1) OR 1=1 OR ServiceName IN (1\\')");
+    // The unquoted injected form (which the old single-layer escaping produced) is gone.
+    expect(result).not.toContain('IN (1) OR 1=1');
+  });
+
+  it('builds the IN list from the structured values array and escapes each element', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: 'ignored', values: ["a'b", 'c'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\', \\'c\\') ");
+  });
+
+  it('handles NOT IN with per-element escaping', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'NOT IN', value: 'ignored', values: ['x', 'y'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k NOT IN (\\'x\\', \\'y\\') ");
+  });
+
+  it('splits an IN value string on commas outside quotes (comma inside a value stays intact)', () => {
+    // grafana/scenes leaves `values` undefined for IN, so real IN filters take
+    // the string-parsing path; a value containing a comma must not be torn apart.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "'gzip, deflate','identity'" },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'gzip, deflate\\', \\'identity\\') ");
+  });
+
+  it('escapes quotes in IN elements taken from the value string (no values array)', () => {
+    // Pins the escaping on the parseInListItems path — a mutant that escapes
+    // only the `values` array elements would leave this quote un-escaped.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "a'b" },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\') ");
+    expect(result).not.toContain("a'b");
   });
 
   it('does not apply an adhoc filter without "operator"', () => {
@@ -258,10 +307,12 @@ describe('AdHocManager', () => {
     const ahm = new AdHocFilter();
     const result = ahm.apply(
       'SELECT * FROM foo',
-      [{ key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      [{ key: 'ResourceAttributes.cloud.region', operator: '=', value: 'test' }] as AdHocVariableFilter[],
       true
     );
-    expect(result).toContain('ResourceAttributes.cloud.region');
+    // useJSON forces JSON dot-access on the default OTel column, cast to
+    // Nullable(String) — an uncast Dynamic sub-path reads back all-null.
+    expect(result).toContain('ResourceAttributes.`cloud`.`region`::Nullable(String)');
   });
 
   describe('buildFilterString', () => {
@@ -296,6 +347,28 @@ describe('AdHocManager', () => {
       const ahm = new AdHocFilter();
       const result = ahm.buildFilterString([{ key: 'key', operator: '!~', value: 'val' }] as AdHocVariableFilter[]);
       expect(result).toEqual(" key NOT REGEXP \\'val\\' ");
+    });
+
+    it('two-layer escapes a backslash in a regex value so the pattern reaches ClickHouse literally', () => {
+      // `=~` rides the scalar value branch; a `\d+` pattern must survive both the
+      // outer additional_table_filters string and the inner literal so the regex
+      // engine receives `\d+`. Verified live: this form matches the same rows as
+      // an inline `REGEXP '\d+'`.
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=~', value: '\\d+' }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k REGEXP \\'\\\\\\\\d+\\' ");
+    });
+
+    it('escapes backslashes in scalar filter values', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: 'a\\b' }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k = \\'a\\\\\\\\b\\' ");
+    });
+
+    it('escapes single quotes in filter values so they cannot break out of the filter string', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: "x'" }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k = \\'x\\\\\\'\\' ");
     });
 
     it('builds filter string with IN operator', () => {
@@ -446,7 +519,7 @@ describe('AdHocManager', () => {
         [{ key: "events.metadata['region']", operator: '=', value: 'eu' }] as AdHocVariableFilter[],
         true
       );
-      expect(val).toContain("metadata.region = \\'eu\\'");
+      expect(val).toContain("metadata.`region`::Nullable(String) = \\'eu\\'");
     });
 
     it('legacy dotted keys still render via the registered Map-column set', () => {
@@ -458,6 +531,43 @@ describe('AdHocManager', () => {
         { key: 'events.metadata.region', operator: '=', value: 'eu' },
       ] as AdHocVariableFilter[]);
       expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+  });
+
+  describe('self-describing JSON keys (#2094)', () => {
+    // getTagKeys mints JSON sub-paths in a backtick form (`col.`seg`.`seg``).
+    // escapeKey renders them cast to Nullable(String) with NO column cache, so
+    // a saved JSON filter applies correctly on a fresh dashboard load.
+    it('renders a minted JSON key statelessly (no setMapColumns/setJSONColumns)', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: 'otel_logs.ResourceAttributes.`k8s`.`pod`.`name`', operator: '=', value: 'api' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain(
+        "ResourceAttributes.`k8s`.`pod`.`name`::Nullable(String) = \\'api\\'"
+      );
+    });
+
+    it('renders a single-segment minted JSON key with hideTableName-style key', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: 'ResourceAttributes.`level`', operator: '=', value: 'error' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`level`::Nullable(String) = \\'error\\'");
+    });
+
+    it('escapes a quote in a JSON path segment for the outer filter string', () => {
+      // The rendered access is embedded inside the single-quoted
+      // additional_table_filters string, so a `'` in a path segment must be
+      // escaped over the whole expression — otherwise it breaks the string.
+      // Pins the outer-escape layer (buildJSONAccessForOuterFilter); an empty
+      // implementation would emit the un-escaped `` `a'b` `` form and fail here.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: "otel_logs.ResourceAttributes.`a'b`", operator: '=', value: 'v' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`a\\'b`::Nullable(String)");
+      expect(val).not.toContain("`a'b`");
     });
   });
 });

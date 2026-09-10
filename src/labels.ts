@@ -183,12 +183,12 @@ export default {
           tooltip: 'Validate SQL in the editor.',
         },
         enableMapKeysDiscovery: {
-          label: 'Suggest Map keys in filter editor',
+          label: 'Suggest Map keys and JSON paths in filter editor',
           testid: 'data-testid enable-map-keys-discovery-switch',
           tooltip:
-            'When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. ' +
-            'On large tables with high-cardinality maps this probe can scan billions of rows. ' +
-            'Disable to suppress the probe — operators can still type Map keys manually. Defaults to enabled.',
+            'When enabled, the filter editor probes Map(...) and JSON columns for distinct keys/paths to populate the key-suggestion dropdown. ' +
+            'On large tables with high-cardinality maps or JSON this probe can scan billions of rows. ' +
+            'Disable to suppress the probe — operators can still type Map keys and JSON paths manually. Defaults to enabled.',
         },
       },
       TracesConfig: {

@@ -14,6 +14,7 @@ import {
   TimeUnit,
 } from 'types/queryBuilder';
 import otel from 'otel';
+import { buildJSONPathAccess } from './jsonPath';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -884,15 +885,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
       const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
       type = valueType;
     } else if (filter.mapKey && type.startsWith('JSON')) {
-      const escapedJSONPaths = filter.mapKey
-        .split('.')
-        .map((p) => `\`${p}\``)
-        .join('.');
       // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
-      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
-      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
-      // that signal), and `=` / `!=` / `LIKE` are unaffected.
-      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // with ILLEGAL_TYPE_OF_ARGUMENT. buildJSONPathAccess casts to Nullable(String) so
+      // every filter operator works — `IS NULL` still detects missing keys (a plain
+      // ::String cast would swallow that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = buildJSONPathAccess(column, filter.mapKey);
       // Update type so filter value generation routes through the string-aware branches.
       type = 'String';
     }
