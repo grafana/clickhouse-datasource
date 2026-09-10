@@ -55,15 +55,16 @@ import { CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import { AdHocFilter } from './adHocFilter';
 import {
+  buildLogLevelAggregateExpressions,
   DEFAULT_LOGS_ALIAS,
   getIntervalInfo,
   getTimeFieldRoundingClause,
-  LOG_LEVEL_TO_IN_CLAUSE,
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
-import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
+import { planSqlLogsVolume } from './logsVolumeSql';
+import { labelsFieldName, mapGrafanaFormatToQueryType, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -245,6 +246,8 @@ export class Datasource
     this.annotations = createAnnotationSupport(this);
   }
 
+  private readonly declinedLogsVolumeSql = new Set<string>();
+
   static logVolumePrefix = 'log-volume-';
   static logsSamplePrefix = 'logs-sample-';
 
@@ -272,8 +275,11 @@ export class Datasource
       }
 
       const targets: CHQuery[] = [];
+      const visibleTargets = logsVolumeRequest.targets.filter((t) => !t.hide);
       logsVolumeRequest.targets.forEach((target) => {
-        const supplementaryQuery = this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target);
+        const supplementaryQuery = this.wantsLogsVolume(target, visibleTargets)
+          ? this.getSupplementaryLogsVolumeQuery(logsVolumeRequest, target)
+          : undefined;
         if (supplementaryQuery !== undefined) {
           targets.push({ ...supplementaryQuery, refId: `${Datasource.logVolumePrefix}${target.refId}` });
         }
@@ -308,11 +314,65 @@ export class Datasource
     return undefined;
   }
 
-  getSupportedSupplementaryQueryTypes(dsRequest: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
-    if (dsRequest && dsRequest.targets.some((t) => t.editorType !== EditorType.Builder)) {
-      return [];
+  /** Grafana only offers its row-based fallback when a type is absent here, so decline early. */
+  getSupportedSupplementaryQueryTypes(dsRequest?: DataQueryRequest<CHQuery>): SupplementaryQueryType[] {
+    if (!dsRequest) {
+      return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
     }
-    return [SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample];
+
+    const types: SupplementaryQueryType[] = [];
+    // Hidden targets are not rendered, so they must not influence the decision or be counted.
+    const visibleTargets = dsRequest.targets.filter((t) => !t.hide);
+
+    const probed = visibleTargets.map((target) => {
+      try {
+        return { target, built: this.getSupplementaryLogsVolumeQuery(dsRequest, target) };
+      } catch (error) {
+        console.warn('[clickhouse] logs volume feasibility check failed, falling back', error);
+        return { target, built: undefined };
+      }
+    });
+
+    const wantsVolume = probed.filter(({ target }) => this.wantsLogsVolume(target, visibleTargets));
+    if (wantsVolume.length > 0 && wantsVolume.every(({ built }) => built !== undefined)) {
+      types.push(SupplementaryQueryType.LogsVolume);
+    }
+
+    // Explore renders the sample only when the pane has no logs result (Explore.tsx), so the
+    // precondition is "can produce a sample", not "is a logs query".
+    const canSample = visibleTargets.some((target) => {
+      try {
+        return this.getSupplementaryLogsSampleQuery(target) !== undefined;
+      } catch (error) {
+        console.warn('[clickhouse] logs sample feasibility check failed, falling back', error);
+        return false;
+      }
+    });
+    if (canSample) {
+      types.push(SupplementaryQueryType.LogsSample);
+    }
+
+    return types;
+  }
+
+  /**
+   * The SQL editor defaults queryType to Table, so an undeclared SQL target counts too, but only
+   * alone in the pane: Grafana sums every emitted volume frame into one chart.
+   */
+  private wantsLogsVolume(query: CHQuery, visibleTargets: CHQuery[]): boolean {
+    if (this.isDeclaredLogsQuery(query)) {
+      return true;
+    }
+
+    return query.editorType === EditorType.SQL && query.queryType === undefined && visibleTargets.length === 1;
+  }
+
+  private isDeclaredLogsQuery(query: CHQuery): boolean {
+    if (query.editorType === EditorType.Builder) {
+      return query.builderOptions?.queryType === QueryType.Logs;
+    }
+
+    return (query.queryType ?? mapGrafanaFormatToQueryType(query.format)) === QueryType.Logs;
   }
 
   /**
@@ -346,12 +406,19 @@ export class Datasource
   }
 
   getSupplementaryLogsVolumeQuery(logsVolumeRequest: DataQueryRequest<CHQuery>, query: CHQuery): CHQuery | undefined {
+    if (query.hide) {
+      return undefined;
+    }
+
+    if (query.editorType === EditorType.SQL) {
+      return this.getSqlSupplementaryLogsVolumeQuery(logsVolumeRequest, query);
+    }
+
     if (
-      query.editorType !== EditorType.Builder ||
-      query.builderOptions.queryType !== QueryType.Logs ||
-      query.builderOptions.mode !== BuilderMode.List ||
-      query.builderOptions.database === '' ||
-      query.builderOptions.table === ''
+      query.builderOptions?.queryType !== QueryType.Logs ||
+      query.builderOptions?.mode !== BuilderMode.List ||
+      !query.builderOptions?.database ||
+      !query.builderOptions?.table
     ) {
       return undefined;
     }
@@ -373,15 +440,12 @@ export class Datasource
 
     const logLevelColumn = getColumnByHint(query.builderOptions, ColumnHint.LogLevel);
     if (logLevelColumn) {
-      // Generates aggregates like
-      // sum(toString("log_level") IN ('dbug', 'debug', 'DBUG', 'DEBUG', 'Dbug', 'Debug')) AS debug
-      const llf = `toString("${logLevelColumn.name}")`;
-      let level: keyof typeof LOG_LEVEL_TO_IN_CLAUSE;
-      for (level in LOG_LEVEL_TO_IN_CLAUSE) {
+      // sum(ifNull(toString("log_level"), '') IN ('dbug','debug',...)) AS debug
+      for (const { alias, expression } of buildLogLevelAggregateExpressions(escapeIdentifier(logLevelColumn.name))) {
         aggregates.push({
           aggregateType: AggregateType.Sum,
-          column: `multiSearchAny(${llf}, [${LOG_LEVEL_TO_IN_CLAUSE[level]}])`,
-          alias: level,
+          column: expression,
+          alias,
         });
       }
     } else {
@@ -431,11 +495,45 @@ export class Datasource
     };
   }
 
+  private getSqlSupplementaryLogsVolumeQuery(
+    logsVolumeRequest: DataQueryRequest<CHQuery>,
+    query: CHQuery
+  ): CHQuery | undefined {
+    const plan = planSqlLogsVolume(query.rawSql, logsVolumeRequest.scopedVars, this.getDefaultLogsColumns(), {
+      database: this.getDefaultLogsDatabase(),
+      table: this.getDefaultLogsTable(),
+    });
+    if (!plan.ok) {
+      if (!this.declinedLogsVolumeSql.has(query.rawSql)) {
+        if (this.declinedLogsVolumeSql.size > 100) {
+          this.declinedLogsVolumeSql.clear();
+        }
+        this.declinedLogsVolumeSql.add(query.rawSql);
+        console.warn('Aggregated logs volume will be skipped for this query:', plan.reason);
+      }
+      return undefined;
+    }
+
+    return {
+      pluginVersion,
+      editorType: EditorType.SQL,
+      // Time series, so the backend shapes buckets as it does for the builder volume query.
+      queryType: QueryType.TimeSeries,
+      format: 0,
+      rawSql: plan.sql,
+      refId: '',
+    };
+  }
+
   getSupplementaryLogsSampleQuery(query: CHQuery): CHQuery | undefined {
+    if (query.hide) {
+      return undefined;
+    }
+
     if (
       query.editorType !== EditorType.Builder ||
-      !query.builderOptions.database ||
-      query.builderOptions.table !== this.getDefaultLogsTable()
+      !query.builderOptions?.database ||
+      query.builderOptions?.table !== this.getDefaultLogsTable()
     ) {
       return undefined;
     }
@@ -451,11 +549,13 @@ export class Datasource
     const timeHint = timeColumn.hint ?? ColumnHint.Time;
 
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
-      if (f.hint && !f.key) {
-        const originalColumn = getColumnByHint(query.builderOptions, f.hint);
-        f.key = originalColumn?.alias || originalColumn?.name || '';
+      // Clone so resolving the key does not write back into the user's query.
+      const next = { ...f };
+      if (next.hint && !next.key) {
+        const originalColumn = getColumnByHint(query.builderOptions, next.hint);
+        next.key = originalColumn?.alias || originalColumn?.name || '';
       }
-      return { ...f };
+      return next;
     });
 
     const messageFilter = this.getLogMessageSearchFilter(query.builderOptions);

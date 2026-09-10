@@ -28,12 +28,16 @@ import { Datasource } from './CHDatasource';
 import * as logs from './logs';
 
 jest.mock('./logs', () => ({
-  getTimeFieldRoundingClause: jest.fn(),
+  // Default to a plausible clause: the generator dereferences it, so a bare jest.fn()
+  // returning undefined would make every volume query throw rather than build.
+  getTimeFieldRoundingClause: jest.fn(() => 'toStartOfInterval("created_at", INTERVAL 1 DAY)'),
   getIntervalInfo: jest.fn(),
+  getTimeFieldRoundingInterval: jest.requireActual('./logs').getTimeFieldRoundingInterval,
   queryLogsVolume: jest.fn(),
   TIME_FIELD_ALIAS: jest.requireActual('./logs').TIME_FIELD_ALIAS,
   DEFAULT_LOGS_ALIAS: jest.requireActual('./logs').DEFAULT_LOGS_ALIAS,
   LOG_LEVEL_TO_IN_CLAUSE: jest.requireActual('./logs').LOG_LEVEL_TO_IN_CLAUSE,
+  buildLogLevelAggregateExpressions: jest.requireActual('./logs').buildLogLevelAggregateExpressions,
 }));
 
 interface InstanceConfig {
@@ -1501,14 +1505,35 @@ describe('ClickHouseDatasource', () => {
       datasource = cloneDeep(mockDatasource);
     });
 
+    /** A SQL editor logs target carrying the given raw SQL. */
+    const sqlLogsTarget = (rawSql: string): CHQuery =>
+      ({
+        pluginVersion: '',
+        refId: 'A',
+        editorType: EditorType.SQL,
+        queryType: QueryType.Logs,
+        rawSql,
+      }) as CHQuery;
+
+    const mockDefaultLogColumns = () =>
+      jest.spyOn(datasource, 'getDefaultLogsColumns').mockReturnValue(
+        new Map<ColumnHint, string>([
+          [ColumnHint.Time, 'created_at'],
+          [ColumnHint.LogLevel, 'level'],
+        ])
+      );
+
     describe('getSupportedSupplementaryQueryTypes', () => {
-      it('should return LogsVolume and LogsSample for empty dsRequest', async () => {
+      it('should offer nothing when no target is a logs query', async () => {
+        // There is nothing to draw for a non-logs pane, and advertising a type without emitting
+        // a target would replace Grafana's fallback with an empty state.
         const dsRequest = { targets: [{ editorType: EditorType.Builder }] } as DataQueryRequest<CHQuery>;
         const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
-        expect(result).toEqual([SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample]);
+        expect(result).toEqual([]);
       });
 
       it('should return LogsVolume and LogsSample when all targets use Builder editor', async () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
@@ -1522,19 +1547,159 @@ describe('ClickHouseDatasource', () => {
         expect(result).toEqual([SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample]);
       });
 
-      it('should return empty array when any target uses SQL editor', async () => {
+      it('should return empty array when a SQL editor target cannot be aggregated', async () => {
+        // No default log columns configured, so there is no column to bucket on.
+        jest.spyOn(datasource, 'getDefaultLogsColumns').mockReturnValue(new Map<ColumnHint, string>());
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [sqlLogsTarget('SELECT Timestamp, Body FROM otel_logs LIMIT 100')],
+        };
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([]);
+      });
+
+      it('should return LogsVolume (but not LogsSample) for an aggregatable SQL editor target', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [sqlLogsTarget('SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 100')],
+        };
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should decline for the whole request when one SQL target is not aggregatable', async () => {
+        mockDefaultLogColumns();
+        // All or nothing: Grafana renders one stacked histogram for the pane, so emitting
+        // volume for a subset of targets would show a silent under-count.
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, editorType: EditorType.Builder },
+            sqlLogsTarget('SELECT created_at FROM logs SETTINGS max_threads = 4'),
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should ignore hidden targets when deciding', async () => {
+        mockDefaultLogColumns();
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, editorType: EditorType.Builder },
+            { ...sqlLogsTarget('SELECT anything FROM nowhere SETTINGS x = 1'), hide: true },
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([
+          SupplementaryQueryType.LogsVolume,
+          SupplementaryQueryType.LogsSample,
+        ]);
+      });
+
+      it('should offer LogsVolume for a hand-typed SQL query that declares no query type', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              pluginVersion: '',
+              refId: 'A',
+              editorType: EditorType.SQL,
+              format: 1,
+              rawSql: 'SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 10',
+            } as CHQuery,
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should offer nothing for a SQL query that neither declares logs nor aggregates', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              pluginVersion: '',
+              refId: 'A',
+              editorType: EditorType.SQL,
+              format: 1,
+              rawSql: 'SELECT count() FROM logs',
+            } as CHQuery,
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should offer nothing for a single SQL target that explicitly declares Table', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [{ ...sqlLogsTarget('SELECT created_at, level FROM logs LIMIT 10'), queryType: QueryType.Table }],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should not let an explicit Table target inflate a sibling logs histogram', async () => {
+        mockDefaultLogColumns();
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1d' });
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, refId: 'A', editorType: EditorType.Builder },
+            {
+              ...sqlLogsTarget('SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 10'),
+              refId: 'B',
+              queryType: QueryType.Table,
+              format: 1,
+            },
+          ],
+        };
+
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsVolume);
+        const emitted = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, dsRequest);
+        expect(emitted?.targets.map((t) => t.refId)).toEqual(['log-volume-A']);
+      });
+
+      it('should return [] rather than propagate when a target throws', async () => {
+        jest.spyOn(datasource, 'getSupplementaryLogsVolumeQuery').mockImplementation(() => {
+          throw new Error('boom');
+        });
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [{ ...query, editorType: EditorType.Builder }],
+        };
+
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).not.toContain(
+          SupplementaryQueryType.LogsVolume
+        );
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+
+      it('should offer LogsSample for a builder Table query on the default logs table', async () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
             {
               ...query,
-              editorType: EditorType.SQL,
-              queryType: query.builderOptions.queryType,
+              editorType: EditorType.Builder,
+              builderOptions: { ...query.builderOptions, queryType: QueryType.Table },
             },
           ],
         };
-        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
-        expect(result).toEqual([]);
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsSample);
+      });
+
+      it('should return both types when called without a request', async () => {
+        expect(datasource.getSupportedSupplementaryQueryTypes()).toEqual([
+          SupplementaryQueryType.LogsVolume,
+          SupplementaryQueryType.LogsSample,
+        ]);
       });
     });
 
@@ -1622,15 +1787,17 @@ describe('ClickHouseDatasource', () => {
           .spyOn(logs, 'getTimeFieldRoundingClause')
           .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
         const result = datasource.getSupplementaryLogsVolumeQuery(request, query);
+        // Levels match exactly, `unknown` is their complement, and ifNull keeps a Nullable
+        // column in the partition, so the stacked total equals count().
         expect(result?.rawSql).toEqual(
           `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", ` +
-            `sum(multiSearchAny(toString("level"), ['critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg'])) as critical, ` +
-            `sum(multiSearchAny(toString("level"), ['error','err','eror','ERROR','ERR','EROR','Error','Err','Eror'])) as error, ` +
-            `sum(multiSearchAny(toString("level"), ['warn','warning','WARN','WARNING','Warn','Warning'])) as warn, ` +
-            `sum(multiSearchAny(toString("level"), ['info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational'])) as info, ` +
-            `sum(multiSearchAny(toString("level"), ['debug','dbug','DEBUG','DBUG','Debug','Dbug'])) as debug, ` +
-            `sum(multiSearchAny(toString("level"), ['trace','TRACE','Trace'])) as trace, ` +
-            `sum(multiSearchAny(toString("level"), ['unknown','UNKNOWN','Unknown'])) as unknown ` +
+            `sum(ifNull(toString("level"), '') IN ('critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency')) as critical, ` +
+            `sum(ifNull(toString("level"), '') IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
+            `sum(ifNull(toString("level"), '') IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
+            `sum(ifNull(toString("level"), '') IN ('info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice')) as info, ` +
+            `sum(ifNull(toString("level"), '') IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
+            `sum(ifNull(toString("level"), '') IN ('trace','TRACE','Trace')) as trace, ` +
+            `sum(ifNull(toString("level"), '') NOT IN ('critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency','error','err','eror','ERROR','ERR','EROR','Error','Err','Eror','warn','warning','WARN','WARNING','Warn','Warning','info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice','debug','dbug','DEBUG','DBUG','Debug','Dbug','trace','TRACE','Trace')) as unknown ` +
             `FROM "default"."logs" ` +
             `GROUP BY time ` +
             `ORDER BY time ASC`
@@ -1694,6 +1861,101 @@ describe('ClickHouseDatasource', () => {
         });
         expect(result).toBeDefined();
         expect(result?.rawSql).not.toContain('LIKE');
+      });
+    });
+
+    describe('getSupplementaryLogsVolumeQuery for SQL editor queries', () => {
+      beforeEach(() => {
+        mockDefaultLogColumns();
+      });
+
+      it('should wrap the user SQL as a derived table and drop the trailing ORDER BY and LIMIT', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(
+          request,
+          sqlLogsTarget("SELECT created_at, level FROM logs WHERE level = 'ERROR' ORDER BY created_at DESC LIMIT 100")
+        );
+
+        expect(result).toBeDefined();
+        expect(result?.editorType).toBe(EditorType.SQL);
+        // format 0 is what shapes the response into the stacked series Explore draws.
+        expect(result?.format).toBe(0);
+        expect(result?.queryType).toBe(QueryType.TimeSeries);
+        expect(result?.refId).toBe('');
+        // The row limit and ordering are what cap Grafana's own histogram, so they must go.
+        expect(result?.rawSql).not.toContain('LIMIT');
+        expect(result?.rawSql).not.toContain('ORDER BY created_at');
+        // The user's filter rides along verbatim inside the subquery.
+        expect(result?.rawSql).toContain("WHERE level = 'ERROR'");
+        expect(result?.rawSql).toContain('FROM (');
+        expect(result?.rawSql).toContain('GROUP BY "time"');
+      });
+
+      it('should bucket on the projected alias rather than the physical column', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(
+          request,
+          sqlLogsTarget('SELECT created_at AS ts, level AS lvl FROM logs LIMIT 10')
+        );
+
+        expect(result?.rawSql).toContain(
+          'WHERE toDateTime(src."ts") >= $__fromTime AND toDateTime(src."ts") <= $__toTime'
+        );
+        expect(result?.rawSql).toContain('toString(src."lvl")');
+      });
+
+      it('should fall back to a single count series when the level column is not projected', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(
+          request,
+          sqlLogsTarget('SELECT created_at, message FROM logs LIMIT 10')
+        );
+
+        expect(result?.rawSql).toContain('count(*) AS "logs"');
+        expect(result?.rawSql).not.toContain('toString(');
+      });
+
+      it('should return undefined for a hidden target', () => {
+        expect(
+          datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...sqlLogsTarget('SELECT created_at FROM logs'),
+            hide: true,
+          })
+        ).toBeUndefined();
+      });
+
+      it('should build a volume query whatever query type the target declares', () => {
+        // The SQL editor defaults queryType to Table, so a hand-written logs query usually does
+        // not declare itself as logs. Whether to offer a histogram is the gate's decision.
+        expect(
+          datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...sqlLogsTarget('SELECT created_at, level FROM logs'),
+            queryType: QueryType.Table,
+          })
+        ).toBeDefined();
+      });
+
+      it('should return undefined when the SQL cannot be safely aggregated', () => {
+        // A subquery LIMIT must not be mistaken for a trailing one, but SETTINGS, LIMIT BY and
+        // WITH FILL all change which rows exist and so must decline outright.
+        [
+          'SELECT created_at FROM logs SETTINGS max_threads = 4',
+          'SELECT created_at FROM logs ORDER BY created_at LIMIT 2 BY level',
+          'SELECT created_at FROM logs ORDER BY created_at WITH FILL STEP 1',
+          'SELECT created_at FROM a UNION ALL SELECT created_at FROM b',
+          'SELECT message, created_at FROM logs',
+          'SELECT created_at - INTERVAL 5 HOUR AS created_at FROM logs',
+        ].forEach((rawSql) => {
+          expect(datasource.getSupplementaryLogsVolumeQuery(request, sqlLogsTarget(rawSql))).toBeUndefined();
+        });
+      });
+    });
+
+    describe('hidden targets', () => {
+      it('should not build a volume query for a hidden builder target', () => {
+        expect(datasource.getSupplementaryLogsVolumeQuery(request, { ...query, hide: true })).toBeUndefined();
+      });
+
+      it('should not build a sample query for a hidden builder target', () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        expect(datasource.getSupplementaryLogsSampleQuery({ ...query, hide: true })).toBeUndefined();
       });
     });
 
@@ -1872,7 +2134,7 @@ describe('ClickHouseDatasource', () => {
         const supplementaryQuery = { rawSql: 'SELECT * FROM logs', refId: '', format: 2 } as CHSqlQuery;
         jest.spyOn(Datasource.prototype, 'getSupplementaryLogsSampleQuery').mockReturnValue(supplementaryQuery);
         const result = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, {
-          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          targets: [{ refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } }],
         } as any);
         expect(result).toMatchObject({
           hideFromInspector: true,
@@ -1905,7 +2167,7 @@ describe('ClickHouseDatasource', () => {
           scopedVars: {
             __interval: {},
           },
-          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          targets: [{ refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } }],
           range,
         } as any);
         expect(result).toMatchObject({
