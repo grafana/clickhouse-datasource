@@ -100,22 +100,24 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
   [
     BuilderOptionsActionType.SetDatabase,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Clear table and reset editor when database changes
+      // Clear table and reset editor when database changes, but keep limit
       return buildInitialState({
         database: action.payload.database,
         table: '',
         queryType: state.queryType,
+        limit: state.limit,
       });
     },
   ],
   [
     BuilderOptionsActionType.SetTable,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Reset editor when table changes
+      // Reset editor when table changes, but keep limit
       return buildInitialState({
         database: state.database,
         table: action.payload.table,
         queryType: state.queryType,
+        limit: state.limit,
       });
     },
   ],
