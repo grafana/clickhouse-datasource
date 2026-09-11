@@ -3,6 +3,7 @@ package macros
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -138,6 +139,44 @@ func IntervalSeconds(ctx macropro.QueryContext[struct{}], args []string) (string
 	return fmt.Sprintf("%d", int(seconds)), nil
 }
 
+// FromGrafanaInterval converts a Grafana interval variable to ClickHouse INTERVAL syntax.
+// $__fromGrafanaInterval(5m) → 5 minute
+func FromGrafanaInterval(_ macropro.QueryContext[struct{}], args []string) (string, error) {
+	if len(args) != 1 {
+		return "", badArgsErr("$__fromGrafanaInterval", 1, len(args))
+	}
+
+	interval := strings.Trim(strings.TrimSpace(args[0]), "'\"")
+	if interval == "" {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: invalid interval %q", interval))
+	}
+	units := map[string]string{
+		"ms": "millisecond",
+		"s":  "second",
+		"m":  "minute",
+		"h":  "hour",
+		"d":  "day",
+		"w":  "week",
+		"M":  "month",
+		"y":  "year",
+	}
+
+	unitSuffix := interval[len(interval)-1:]
+	if strings.HasSuffix(interval, "ms") {
+		unitSuffix = "ms"
+	}
+	unit, ok := units[unitSuffix]
+	if !ok {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: unsupported interval %q", interval))
+	}
+
+	value, err := strconv.ParseUint(strings.TrimSuffix(interval, unitSuffix), 10, 64)
+	if err != nil || value == 0 {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: invalid interval %q", interval))
+	}
+	return fmt.Sprintf("%d %s", value, unit), nil
+}
+
 // TimeFrom overrides the dialect-neutral $__timeFrom default with a
 // ClickHouse-native filter expression. sqlutil's default renders an
 // RFC 3339 string literal that only works via implicit String→DateTime
@@ -202,17 +241,18 @@ var ClickHouseMacros = macropro.MergeMacros(
 		"timeGroup":  TimeGroup,
 
 		// ClickHouse-specific extensions (no SDK-default equivalent).
-		"fromTime":        FromTimeFilter,
-		"toTime":          ToTimeFilter,
-		"fromTime_ms":     FromTimeFilterMs,
-		"toTime_ms":       ToTimeFilterMs,
-		"timeFilter_ms":   TimeFilterMs,
-		"dateFilter":      DateFilter,
-		"dateTimeFilter":  DateTimeFilter,
-		"dt":              DateTimeFilter,
-		"timeInterval":    TimeInterval,
-		"timeInterval_ms": TimeIntervalMs,
-		"interval_s":      IntervalSeconds,
+		"fromTime":            FromTimeFilter,
+		"toTime":              ToTimeFilter,
+		"fromTime_ms":         FromTimeFilterMs,
+		"toTime_ms":           ToTimeFilterMs,
+		"timeFilter_ms":       TimeFilterMs,
+		"dateFilter":          DateFilter,
+		"dateTimeFilter":      DateTimeFilter,
+		"dt":                  DateTimeFilter,
+		"timeInterval":        TimeInterval,
+		"timeInterval_ms":     TimeIntervalMs,
+		"interval_s":          IntervalSeconds,
+		"fromGrafanaInterval": FromGrafanaInterval,
 	},
 )
 
