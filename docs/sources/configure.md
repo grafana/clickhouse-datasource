@@ -131,6 +131,7 @@ After adding the data source, configure the following settings.
 | **Username**          | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions).                                                                         |
 | **Password**          | ClickHouse user password.                                                                                                                               |
 | **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings). See [Forward OAuth Identity](#forward-oauth-identity). |
+| **Allow cleartext JWT forwarding** | Only shown when **Forward OAuth Identity** is enabled. Lifts the TLS requirement for token forwarding, for deployments where TLS is terminated and originated by a proxy alongside Grafana. See [Delegating TLS to a proxy](#delegating-tls-to-a-proxy). |
 | **Default database**  | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`.                                      |
 | **Default table**     | The default table used by the query builder.                                                                                                            |
 
@@ -297,7 +298,7 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
 
 ### Requirements and behavior
 
-- **A secure (TLS) connection is required.** Enable **Secure connection** and set the **Port** to a TLS-enabled port. The plugin rejects the connection if JWT authentication is enabled without TLS. It also rejects the connection when **Skip TLS Verify** is enabled, because forwarding a real user's token over an unverified connection exposes it to interception.
+- **A secure (TLS) connection is required.** Enable **Secure connection** and set the **Port** to a TLS-enabled port. The plugin rejects the connection if JWT authentication is enabled without TLS. It also rejects the connection when **Skip TLS Verify** is enabled, because forwarding a real user's token over an unverified connection exposes it to interception. If TLS is handled by a proxy rather than by the plugin, refer to [Delegating TLS to a proxy](#delegating-tls-to-a-proxy).
 - **Credentials are suppressed on query connections.** When enabled, the configured username and password are not sent on per-query connections; the forwarded token is the sole credential.
 - **Health checks fall back to username and password.** **Save & test** and other health checks run outside a user request, where no user token is available, so they use the configured username and password. Keep valid credentials configured so connection tests can succeed.
 - **Alerting is blocked by default.** Alert rule evaluation also runs outside a user session, so there is no identity to forward. By default these queries are **rejected** rather than run as a shared account. To keep alerting working, enable **Allow service account fallback** in the **Database credentials** section.
@@ -306,6 +307,18 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
   Enabling **Allow service account fallback** lets alert rules and other backend queries fall back to the configured username and password. Those queries then authenticate as the shared service account and are **not** subject to the per-user [row policies](https://clickhouse.com/docs/en/operations/access-rights/#row-policies), quotas, or query-log attribution that OAuth pass-through enforces for interactive queries. As a result, an alert may read rows a given dashboard user could not see interactively. Scope the configured service account to the least privilege your alert queries require. The plugin emits a backend warning log each time this fallback is exercised.
   {{< /admonition >}}
 - **Connections are keyed per user.** Enabling JWT authentication automatically turns on header forwarding, so each Grafana user opens a separate ClickHouse connection. See [Connection pool implications](#connection-pool-implications) for sizing guidance.
+
+### Delegating TLS to a proxy
+
+Some deployments do not let the plugin establish TLS itself. In a service mesh such as [Istio](https://istio.io/), an [Envoy](https://www.envoyproxy.io/) sidecar deployed next to Grafana intercepts the plugin's outbound connection, terminates it locally, and originates a new TLS connection to ClickHouse. From the plugin's point of view the connection is plaintext, even though every hop that leaves the pod is encrypted.
+
+In that topology, **Secure connection** must stay off. Turning it on would make the plugin negotiate TLS with a sidecar that expects plaintext. The JWT-over-TLS requirement would then block **Forward OAuth Identity** entirely. Enable **Allow cleartext JWT forwarding** to lift that requirement.
+
+{{< admonition type="warning" >}}
+**Allow cleartext JWT forwarding** disables a safety check; it does not make the connection secure. The plugin cannot verify that there's a proxy handling TLS or warn you if it isn't. Only enable it when you have confirmed that a proxy terminates and re-originates TLS for this data source.
+{{< /admonition >}}
+
+This option does not affect the **Skip TLS Verify** restriction: when the plugin does establish TLS, the server certificate must still be verified.
 
 ## Verify the connection
 
@@ -357,6 +370,7 @@ datasources:
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
       # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
+      # allowCleartextJWTForwarding: <bool>  # forward the JWT without TLS; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
       # path: <string>  # HTTP URL path (HTTP protocol only)
       # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
@@ -400,6 +414,7 @@ resource "grafana_data_source" "clickhouse" {
     # validateSql     = true
     # enableRowLimit  = true
     # oauthPassThru   = true  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure = true
+    # allowCleartextJWTForwarding = true  # forward the JWT without TLS; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
   })
 
   secure_json_data_encoded = jsonencode({

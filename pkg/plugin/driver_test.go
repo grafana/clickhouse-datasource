@@ -736,6 +736,41 @@ func TestBuildClickHouseOptionsJWTRequiresTLS(t *testing.T) {
 	assert.Contains(t, err.Error(), "secure (TLS) connection")
 }
 
+func TestBuildClickHouseOptionsJWTAllowsCleartextWhenOptedIn(t *testing.T) {
+	// Deployments that delegate TLS termination and origination to a proxy
+	// alongside Grafana (an Istio/Envoy sidecar) dial the sidecar in
+	// plaintext; the plugin cannot observe the encrypted hop, so the TLS
+	// requirement is opt-out.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.Secure = false
+	settings.AllowCleartextJWTForwarding = true
+
+	opts, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.NoError(t, err)
+
+	require.NotNil(t, opts.GetJWT, "the forwarded token must still be used for authentication")
+	token, err := opts.GetJWT(t.Context())
+	require.NoError(t, err)
+	assert.Equal(t, "my-jwt-token", token)
+	assert.Nil(t, opts.TLS, "no TLS config is expected on a cleartext connection")
+}
+
+func TestBuildClickHouseOptionsJWTCleartextOptInDoesNotAllowSkipTLSVerify(t *testing.T) {
+	// allowCleartextJWTForwarding covers "no TLS at all, terminated by a
+	// proxy". Unverified TLS is a different problem and stays rejected.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.InsecureSkipVerify = true
+	settings.AllowCleartextJWTForwarding = true
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Skip TLS Verify")
+}
+
 func TestBuildClickHouseOptionsJWTRejectsSkipTLSVerify(t *testing.T) {
 	// Forwarding a user token over a connection whose server certificate is
 	// not verified would expose it to interception.
