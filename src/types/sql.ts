@@ -7,6 +7,19 @@ import { BuilderMode, QueryType, QueryBuilderOptions } from './queryBuilder';
 export enum EditorType {
   SQL = 'sql',
   Builder = 'builder',
+  Schema = 'schema',
+}
+
+/** Persisted on the query so reopening a saved panel returns to the same selection. */
+export interface SchemaExplorerState {
+  database?: string;
+  table?: string;
+  selectedColumns?: string[];
+  /**
+   * Column used for `$__timeFilter()` in generated SQL. Empty string means the
+   * user explicitly chose no time filter; undefined means "resolve a default".
+   */
+  timeColumn?: string;
 }
 
 export interface CHQueryBase extends DataQuery {
@@ -41,7 +54,18 @@ export interface CHBuilderQuery extends CHQueryBase {
   };
 }
 
-export type CHQuery = CHSqlQuery | CHBuilderQuery;
+/** Schema Explorer query. */
+export interface CHSchemaQuery extends CHQueryBase {
+  editorType: EditorType.Schema;
+  queryType?: QueryType;
+  schemaExplorer?: SchemaExplorerState;
+  meta?: {
+    timezone?: string;
+    builderOptions?: QueryBuilderOptions;
+  };
+}
+
+export type CHQuery = CHSqlQuery | CHBuilderQuery | CHSchemaQuery;
 
 // TODO: these aren't really types
 export const defaultEditorType: EditorType = EditorType.Builder;

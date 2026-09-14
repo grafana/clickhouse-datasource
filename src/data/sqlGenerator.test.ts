@@ -11,6 +11,7 @@ import {
 } from 'types/queryBuilder';
 import {
   _testExports,
+  ALL_COLUMNS,
   generateSql,
   getColumnByHint,
   getColumnIndexByHint,
@@ -124,6 +125,132 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('keeps the all-columns sentinel in list mode', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      columns: [{ name: ALL_COLUMNS }],
+      limit: 1000,
+      filters: [],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT * FROM "default"."sample" LIMIT 1000');
+  });
+
+  it('keeps the all-columns sentinel in aggregate mode with no aggregates and no groupBy', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [{ name: ALL_COLUMNS }],
+      aggregates: [],
+      limit: 1000,
+      filters: [],
+      groupBy: [],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT * FROM "default"."sample" LIMIT 1000');
+  });
+
+  it('replaces the all-columns sentinel with the grouped columns when groupBy has no aggregates', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [{ name: ALL_COLUMNS }],
+      aggregates: [],
+      limit: 1000,
+      filters: [],
+      groupBy: ['b'],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT b FROM "default"."sample" GROUP BY b LIMIT 1000');
+  });
+
+  it('drops the all-columns sentinel in aggregate mode with aggregates but no groupBy', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [{ name: ALL_COLUMNS }],
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*', alias: 'c' }],
+      limit: 1000,
+      filters: [],
+      groupBy: [],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT count(*) as c FROM "default"."sample" LIMIT 1000');
+  });
+
+  it('drops the all-columns sentinel from the select list in aggregate mode', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [{ name: ALL_COLUMNS }, { name: 'b', type: 'String' }],
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*', alias: 'c' }],
+      limit: 1000,
+      filters: [],
+      groupBy: ['b'],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT b, count(*) as c FROM "default"."sample" GROUP BY b LIMIT 1000');
+  });
+
+  it('drops the all-columns sentinel and does not gain the groupBy column when an aggregate already fills the select list', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [{ name: ALL_COLUMNS }],
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*', alias: 'c' }],
+      limit: 1000,
+      filters: [],
+      groupBy: ['b'],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT count(*) as c FROM "default"."sample" GROUP BY b LIMIT 1000');
+  });
+
+  it('drops the all-columns sentinel from ORDER BY', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'sample',
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      columns: [{ name: 'b', type: 'String' }],
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*', alias: 'c' }],
+      limit: 1000,
+      filters: [],
+      groupBy: ['b'],
+      orderBy: [
+        { name: ALL_COLUMNS, dir: OrderByDirection.ASC },
+        { name: 'b', dir: OrderByDirection.DESC },
+      ],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toEqual('SELECT b, count(*) as c FROM "default"."sample" GROUP BY b ORDER BY b DESC LIMIT 1000');
   });
 
   it('generates logs query', () => {
@@ -1130,6 +1257,18 @@ describe('getOrderBy', () => {
     } as QueryBuilderOptions;
     const sql = _testExports.getOrderBy(options);
     const expectedSql = 'normal ASC, order DESC';
+    expect(sql).toEqual(expectedSql);
+  });
+
+  it('drops an order By entry resolving to the all-columns sentinel', () => {
+    const options = {
+      orderBy: [
+        { name: ALL_COLUMNS, dir: OrderByDirection.ASC },
+        { name: 'normal', dir: OrderByDirection.DESC },
+      ],
+    } as QueryBuilderOptions;
+    const sql = _testExports.getOrderBy(options);
+    const expectedSql = 'normal DESC';
     expect(sql).toEqual(expectedSql);
   });
 

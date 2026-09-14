@@ -35,6 +35,8 @@ describe('analyzeQueries', () => {
     builder_query_type_traces_id: 0,
     builder_minimized_queries: 0,
     builder_otel_queries: 0,
+
+    schema_queries: 0,
   };
 
   const cases: AnalyzeQueriesTestCase[] = [

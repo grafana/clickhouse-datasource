@@ -15,6 +15,9 @@ import {
 } from 'types/queryBuilder';
 import otel from 'otel';
 
+/** Sentinel column name for the "all columns" option offered by ColumnsEditor. */
+export const ALL_COLUMNS = '*';
+
 /**
  * Generates a SQL string for the given QueryBuilderOptions
  */
@@ -600,7 +603,15 @@ const generateTableQuery = (options: QueryBuilderOptions): string => {
   const selectParts: string[] = [];
   const selectNames = new Set<string>();
 
+  // ClickHouse rejects `*` once anything aggregates: with an aggregate function, with
+  // GROUP BY, or both. `SELECT *` on its own stays valid in aggregate mode.
+  const aggregates = isAggregateMode && ((options.aggregates?.length || 0) > 0 || (options.groupBy?.length || 0) > 0);
+
   options.columns?.forEach((c) => {
+    if (aggregates && c.name === ALL_COLUMNS) {
+      return;
+    }
+
     selectParts.push(getColumnIdentifier(c));
     selectNames.add(c.alias || c.name);
   });
@@ -622,6 +633,12 @@ const generateTableQuery = (options: QueryBuilderOptions): string => {
       // user must manually select groupBys, for flexibility
       // selectParts.push(g)
     });
+
+    // Dropping the all-columns sentinel can empty the select list, which is a syntax
+    // error. The grouped columns are the meaningful projection in that case.
+    if (selectParts.length === 0) {
+      options.groupBy?.forEach((g) => selectParts.push(g));
+    }
   }
 
   const selectPartsSql = selectParts.join(', ');
@@ -794,7 +811,7 @@ const getOrderBy = (options: QueryBuilderOptions, hintsToGroup?: Set<ColumnHint>
         colName = hintedColumn.alias || hintedColumn.name;
       }
 
-      if (!colName) {
+      if (!colName || colName === ALL_COLUMNS) {
         return;
       }
 

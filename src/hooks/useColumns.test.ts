@@ -1,7 +1,7 @@
 import { renderHook } from '@testing-library/react';
 import { act } from 'react';
 import { Datasource } from 'data/CHDatasource';
-import useColumns from './useColumns';
+import useColumns, { useColumnsState } from './useColumns';
 import { TableColumn } from 'types/queryBuilder';
 
 describe('useColumns', () => {
@@ -56,5 +56,21 @@ describe('useColumns', () => {
     });
 
     expect(result!.current).toHaveLength(2);
+  });
+
+  it('should treat colliding (database, table) pairs as distinct', async () => {
+    const mockDs = {} as Datasource;
+    mockDs.fetchColumns = jest.fn((db: string, table: string) => Promise.resolve([]));
+
+    const { rerender } = renderHook(({ db, table }) => useColumnsState(mockDs, db, table), {
+      initialProps: { db: 'a', table: 'bc' },
+    });
+
+    await act(async () => {
+      rerender({ db: 'ab', table: 'c' });
+    });
+
+    expect(mockDs.fetchColumns).toHaveBeenCalledTimes(2);
+    expect(mockDs.fetchColumns).toHaveBeenNthCalledWith(2, 'ab', 'c');
   });
 });

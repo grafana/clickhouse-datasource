@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { CHQueryEditor } from './CHQueryEditor';
 import * as ui from '@grafana/ui';
 import { mockDatasource, newMockDatasource } from '__mocks__/datasource';
-import { EditorType } from 'types/sql';
+import { CHSchemaQuery, EditorType } from 'types/sql';
 import { ColumnHint, FilterOperator, QueryType } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { selectors } from 'selectors';
@@ -20,6 +20,28 @@ jest.mock('@grafana/ui', () => ({
       };
     };
     return <div data-testid="code-editor">{`${value}`}</div>;
+  },
+}));
+
+jest.mock('components/schemaExplorer/SchemaExplorer', () => ({
+  SchemaExplorer: function SchemaExplorer({ onStateChange, onSendToBuilder, onSendToSql }: any) {
+    const columns = [{ name: 'col1', type: 'String', picklistValues: [] }];
+    return (
+      <div data-testid="schema-explorer-stub">
+        <button onClick={() => onStateChange({ database: 'db1', table: undefined, selectedColumns: [] }, columns)}>
+          Change State
+        </button>
+        <button
+          onClick={() =>
+            onStateChange({ database: 'db1', table: 'table1', selectedColumns: ['col1'], timeColumn: 'ts' }, columns)
+          }
+        >
+          Browse To Table
+        </button>
+        <button onClick={() => onSendToBuilder('db1', 'table1', ['col1'], 'ts', columns)}>Send To Builder</button>
+        <button onClick={() => onSendToSql('db1', 'table1', ['col1'], 'ts', columns)}>Send To SQL</button>
+      </div>
+    );
   },
 }));
 
@@ -588,6 +610,122 @@ describe('Query Editor', () => {
       expect(propagated.builderOptions?.meta?.traceId).toEqual(userTraceId);
       expect(propagated.rawSql).toContain(userTraceId);
       expect(propagated.rawSql).not.toContain(linkedTraceId);
+    });
+  });
+
+  describe('Schema Explorer', () => {
+    const schemaQuery = (): CHSchemaQuery => ({
+      pluginVersion,
+      refId: 'A',
+      editorType: EditorType.Schema,
+      rawSql: 'SELECT * FROM db1.table1',
+      schemaExplorer: { database: 'db1', table: 'table1' },
+    });
+
+    it('Should render Schema Explorer when editorType is Schema', () => {
+      render(
+        <CHQueryEditor query={schemaQuery()} onChange={jest.fn()} onRunQuery={jest.fn()} datasource={mockDatasource} />
+      );
+
+      expect(screen.getByTestId('query-editor-section-schema')).toBeInTheDocument();
+      expect(screen.queryByTestId('query-editor-section-sql')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('code-editor')).not.toBeInTheDocument();
+    });
+
+    it('sends a schema selection to the SQL editor', () => {
+      const onChange = jest.fn();
+      const onRunQuery = jest.fn();
+
+      render(
+        <CHQueryEditor query={schemaQuery()} onChange={onChange} onRunQuery={onRunQuery} datasource={mockDatasource} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Send To SQL' }));
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          editorType: EditorType.SQL,
+          rawSql: 'SELECT "col1" FROM "db1"."table1" WHERE $__timeFilter("ts") LIMIT 1000',
+        })
+      );
+      expect(onRunQuery).toHaveBeenCalled();
+    });
+
+    it('sends a schema selection to the Query Builder', () => {
+      const onChange = jest.fn();
+      const onRunQuery = jest.fn();
+
+      render(
+        <CHQueryEditor query={schemaQuery()} onChange={onChange} onRunQuery={onRunQuery} datasource={mockDatasource} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Send To Builder' }));
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          editorType: EditorType.Builder,
+          builderOptions: expect.objectContaining({
+            database: 'db1',
+            table: 'table1',
+            columns: [{ name: 'col1', type: 'String' }],
+          }),
+        })
+      );
+      expect(onRunQuery).toHaveBeenCalled();
+    });
+
+    it('propagates schema explorer state changes without leaving Schema editor type', () => {
+      const onChange = jest.fn();
+
+      render(
+        <CHQueryEditor query={schemaQuery()} onChange={onChange} onRunQuery={jest.fn()} datasource={mockDatasource} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change State' }));
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          editorType: EditorType.Schema,
+          schemaExplorer: { database: 'db1', table: undefined, selectedColumns: [] },
+        })
+      );
+    });
+
+    it('leaves rawSql unchanged when a state change clears the selected table', () => {
+      const onChange = jest.fn();
+
+      render(
+        <CHQueryEditor query={schemaQuery()} onChange={onChange} onRunQuery={jest.fn()} datasource={mockDatasource} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Change State' }));
+
+      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ rawSql: 'SELECT * FROM db1.table1' }));
+    });
+
+    it('regenerates rawSql and meta.builderOptions to match the browsed table while browsing', () => {
+      const onChange = jest.fn();
+
+      render(
+        <CHQueryEditor query={schemaQuery()} onChange={onChange} onRunQuery={jest.fn()} datasource={mockDatasource} />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Browse To Table' }));
+
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          editorType: EditorType.Schema,
+          rawSql: 'SELECT "col1" FROM "db1"."table1" WHERE $__timeFilter("ts") LIMIT 1000',
+          queryType: QueryType.Table,
+          meta: expect.objectContaining({
+            builderOptions: expect.objectContaining({
+              database: 'db1',
+              table: 'table1',
+              columns: [{ name: 'col1', type: 'String' }],
+            }),
+          }),
+        })
+      );
     });
   });
 });

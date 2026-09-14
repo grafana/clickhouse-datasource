@@ -173,6 +173,17 @@ export const Components = {
       input: 'query-builder__trace-id-input__input',
     },
   },
+  SchemaExplorer: {
+    container: 'schema-explorer__container',
+    databasesPane: 'schema-explorer__databases',
+    tablesPane: 'schema-explorer__tables',
+    columnsPane: 'schema-explorer__columns',
+    timeColumnSelect: 'schema-explorer__time-column-select',
+    sendToBuilderButton: 'schema-explorer__send-to-builder-button',
+    sendToSqlButton: 'schema-explorer__send-to-sql-button',
+    row: 'schema-explorer__row',
+    list: 'schema-explorer__list',
+  },
 };
 export const selectors: { components: E2ESelectors<typeof Components> } = {
   components: Components,

@@ -372,7 +372,7 @@ export default {
     },
     EditorTypeSwitcher: {
       label: 'Editor Type',
-      tooltip: 'Switches between the raw SQL Editor and the Query Builder.',
+      tooltip: 'Switches between the raw SQL Editor, the Query Builder, and the Schema Explorer.',
       switcher: {
         title: 'Are you sure?',
         body: 'Queries that are too complex for the Query Builder will be altered.',
@@ -407,6 +407,35 @@ export default {
     ColumnsEditor: {
       label: 'Columns',
       tooltip: 'A list of columns to include in the query',
+    },
+    SchemaExplorer: {
+      databases: {
+        title: 'Databases',
+        searchPlaceholder: 'Search databases',
+        empty: 'No databases found',
+      },
+      tables: {
+        title: 'Tables',
+        searchPlaceholder: 'Search tables',
+        empty: 'No tables found',
+        emptyNoDatabase: 'Select a database to see its tables',
+      },
+      columns: {
+        title: 'Columns',
+        selectAll: 'Select all',
+        clear: 'Clear',
+        empty: 'No columns found',
+        emptyNoTable: 'Select a table to see its columns',
+        loading: 'Loading columns...',
+      },
+      timeColumn: {
+        label: 'Time filter column',
+        tooltip: 'Column used for the dashboard time range filter',
+        noneOption: 'No time filter',
+        loading: 'Loading...',
+      },
+      sendToBuilder: 'Send to Query Builder',
+      sendToSql: 'Send to SQL Editor',
     },
     OtelVersionSelect: {
       label: 'Use OTel',
@@ -615,6 +644,7 @@ export default {
     EditorType: {
       sql: 'SQL Editor',
       builder: 'Query Builder',
+      schema: 'Schema Explorer',
     },
     QueryType: {
       table: 'Table',

@@ -4,14 +4,21 @@ import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
 import { Button, ConfirmModal, ErrorBoundaryAlert, InlineFieldRow, Stack } from '@grafana/ui';
-import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { CHBuilderQuery, CHQuery, CHSchemaQuery, EditorType, SchemaExplorerState } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
 import { generateSql } from 'data/sqlGenerator';
 import { SqlEditor } from 'components/SqlEditor';
-import { isBuilderOptionsRunnable, mapQueryBuilderOptionsToGrafanaFormat } from 'data/utils';
+import {
+  isBuilderOptionsRunnable,
+  mapQueryBuilderOptionsToGrafanaFormat,
+  mapQueryTypeToGrafanaFormat,
+  stripBuilderOptions,
+} from 'data/utils';
+import { SchemaExplorer } from 'components/schemaExplorer/SchemaExplorer';
+import { buildBuilderOptionsFromSchema, generateSchemaExplorerSql } from 'data/schemaExplorer';
 import { setAllOptions, setOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
-import { QueryBuilderOptions } from 'types/queryBuilder';
+import { QueryBuilderOptions, QueryType, TableColumn } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
 import useHasTraceTimestampTable from 'hooks/useHasTraceTimestampTable';
@@ -176,7 +183,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   ]);
 
   useEffect(() => {
-    if (shouldSkipChanges.current || query.editorType === EditorType.SQL) {
+    if (shouldSkipChanges.current || query.editorType === EditorType.SQL || query.editorType === EditorType.Schema) {
       return;
     }
 
@@ -207,14 +214,89 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     [onChange, query]
   );
 
+  const onSchemaStateChange = useCallback(
+    (schemaExplorer: SchemaExplorerState, columns: readonly TableColumn[]) => {
+      const { database = '', table = '', selectedColumns = [], timeColumn } = schemaExplorer;
+      const schemaQuery = query as CHSchemaQuery;
+
+      if (!table) {
+        onChange({ ...schemaQuery, pluginVersion, editorType: EditorType.Schema, schemaExplorer });
+        return;
+      }
+
+      // Keep rawSql and the stashed builder options tracking the browsed selection, so
+      // Run Query and a switch to either other editor act on what the panes are showing.
+      onChange({
+        ...schemaQuery,
+        pluginVersion,
+        editorType: EditorType.Schema,
+        schemaExplorer,
+        rawSql: generateSchemaExplorerSql({ database, table, columns: selectedColumns, timeColumn }),
+        queryType: QueryType.Table,
+        format: mapQueryTypeToGrafanaFormat(QueryType.Table),
+        meta: {
+          ...schemaQuery.meta,
+          builderOptions: buildBuilderOptionsFromSchema(database, table, columns, selectedColumns, timeColumn),
+        },
+      });
+    },
+    [onChange, query]
+  );
+
+  const onSendToBuilder = useCallback(
+    (
+      database: string,
+      table: string,
+      selectedColumns: string[],
+      timeColumn: string,
+      columns: readonly TableColumn[]
+    ) => {
+      const newOptions = buildBuilderOptionsFromSchema(database, table, columns, selectedColumns, timeColumn);
+      builderOptionsDispatch(setAllOptions(newOptions));
+      onChange({
+        ...query,
+        pluginVersion,
+        editorType: EditorType.Builder,
+        rawSql: generateSql(newOptions),
+        builderOptions: newOptions,
+        format: mapQueryBuilderOptionsToGrafanaFormat(newOptions),
+      });
+      onRunQuery();
+    },
+    [builderOptionsDispatch, onChange, onRunQuery, query]
+  );
+
+  const onSendToSql = useCallback(
+    (
+      database: string,
+      table: string,
+      selectedColumns: string[],
+      timeColumn: string,
+      columns: readonly TableColumn[]
+    ) => {
+      const builderOptions = buildBuilderOptionsFromSchema(database, table, columns, selectedColumns);
+      const baseQuery = stripBuilderOptions(query as CHBuilderQuery);
+
+      onChange({
+        ...baseQuery,
+        pluginVersion,
+        editorType: EditorType.SQL,
+        rawSql: generateSchemaExplorerSql({ database, table, columns: selectedColumns, timeColumn }),
+        queryType: QueryType.Table,
+        format: mapQueryTypeToGrafanaFormat(QueryType.Table),
+        meta: {
+          ...baseQuery.meta,
+          builderOptions,
+        },
+      });
+      onRunQuery();
+    },
+    [onChange, onRunQuery, query]
+  );
+
   const onEditAsSql = useCallback(
     (newOptions: QueryBuilderOptions) => {
-      const {
-        builderOptions: discardedBuilderOptions,
-        queryType: discardedQueryType,
-        ...baseQuery
-      } = query as CHBuilderQuery;
-      void discardedBuilderOptions;
+      const { queryType: discardedQueryType, ...baseQuery } = stripBuilderOptions(query as CHBuilderQuery);
       void discardedQueryType;
 
       onChange({
@@ -237,6 +319,20 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     return (
       <div data-testid="query-editor-section-sql">
         <SqlEditor {...props} />
+      </div>
+    );
+  }
+
+  if (query.editorType === EditorType.Schema) {
+    return (
+      <div data-testid="query-editor-section-schema">
+        <SchemaExplorer
+          datasource={props.datasource}
+          state={query.schemaExplorer || {}}
+          onStateChange={onSchemaStateChange}
+          onSendToBuilder={onSendToBuilder}
+          onSendToSql={onSendToSql}
+        />
       </div>
     );
   }
