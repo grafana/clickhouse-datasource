@@ -10,6 +10,21 @@
 
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.21.3](https://github.com/grafana/clickhouse-datasource/compare/v4.21.2...v4.21.3) (2026-09-15)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** bump brace-expansion override to 5.0.9 ([4d58c70](https://github.com/grafana/clickhouse-datasource/commit/4d58c70f23e22f88fcb404136c4508eb9b9a48cb))
+* **deps:** bump brace-expansion to resolve HIGH severity CVEs ([#2166](https://github.com/grafana/clickhouse-datasource/issues/2166)) ([4d58c70](https://github.com/grafana/clickhouse-datasource/commit/4d58c70f23e22f88fcb404136c4508eb9b9a48cb))
+* **deps:** update backend dependencies ([#2120](https://github.com/grafana/clickhouse-datasource/issues/2120)) ([84c172a](https://github.com/grafana/clickhouse-datasource/commit/84c172abeae068bfd9ed31b3ffd8df9d4d8b4585))
+* trace logs linking with timeframe ([#2111](https://github.com/grafana/clickhouse-datasource/issues/2111)) ([801725f](https://github.com/grafana/clickhouse-datasource/commit/801725f674249600a3204b65eee8bbc3037c1457))
+
+
+### 🤖 Continuous Integration
+
+* forward the bundled pipeline's ref input on manual dispatch ([#2148](https://github.com/grafana/clickhouse-datasource/issues/2148)) ([3d00b58](https://github.com/grafana/clickhouse-datasource/commit/3d00b5820a0e51f184b48d4718f50f070baa03f9))
+
 ## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)
 
 
