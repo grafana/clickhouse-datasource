@@ -24,6 +24,7 @@ import {
   ScopedVars,
   SupplementaryQueryOptions,
   SupplementaryQueryType,
+  TimeRange,
   ToggleFilterAction,
   TypedVariableModel,
 } from '@grafana/data';
@@ -63,6 +64,7 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { labelsFieldName, transformQueryResponseWithTraceAndLogLinks } from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
@@ -94,6 +96,9 @@ const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
 // Row cap for the Map-key discovery probe on free-form tables (no known time
 // column to prune by). Bounds the scan to a sample instead of the whole column.
 const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
+// Recent-data window used to bound attribute-discovery/value probes on a table
+// with a known time column, so they prune instead of scanning the full column.
+const ADHOC_PROBE_TIME_WINDOW = 'INTERVAL 6 HOUR';
 
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
@@ -225,6 +230,13 @@ export class Datasource
   // `asMapAccess()` strips any `db.` prefix from the lookup source so callers
   // can pass either form.
   private mapColumnsByTable: Map<string, Set<string>> = new Map();
+  // JSON-typed columns; same keying/lifecycle as `mapColumnsByTable`. Not
+  // republished to AdHocFilter — JSON keys carry their type in the minted
+  // backtick form, so escapeKey renders them statelessly.
+  private jsonColumnsByTable: Map<string, Set<string>> = new Map();
+  // Bare table names whose Map/JSON column kinds are already resolved — avoids
+  // redundant system.columns lookups.
+  private attributeSchemaFetched: Set<string> = new Set();
   private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
   // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
   // companion, keyed by the qualified companion table name (`${database}.${table}${suffix}`)
@@ -1204,7 +1216,7 @@ export class Datasource
     const tableIdentifier = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
     const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
     const source = timeColumn
-      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - INTERVAL 6 HOUR`
+      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`
       : `(SELECT ${escapedColumn} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
     // mapKeys() rather than the `.keys` sub-column: ClickHouse's old analyzer
     // (the default before 24.3) cannot resolve sub-columns on subquery results
@@ -1217,6 +1229,34 @@ export class Datasource
     const rawSql = keysColumn
       ? `SELECT DISTINCT arrayJoin(${escapeIdentifier(keysColumn)}) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`
       : `SELECT DISTINCT arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)})) as path FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} LIMIT 1000`;
+    return this.fetchData(rawSql);
+  }
+
+  /**
+   * JSON-path discovery for adhoc tag-key expansion. Twin of `fetchUniqueMapKeys`:
+   * same discovery toggle and bounding (time-window on the known OTel table, else
+   * a row sample) since `JSONAllPaths` over a full column is a scan. Reads a
+   * companion `<col>Keys` array column directly when present.
+   */
+  async fetchUniqueJSONPathsForAdhoc(
+    jsonColumn: string,
+    db: string,
+    table: string,
+    keysColumn?: string
+  ): Promise<string[]> {
+    if (!this.isMapKeysDiscoveryEnabled()) {
+      return [];
+    }
+    const tableIdentifier = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
+    const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
+    const pathExpr = keysColumn
+      ? `arrayJoin(${escapeIdentifier(keysColumn)})`
+      : `arrayJoin(JSONAllPaths(${escapeIdentifier(jsonColumn)}))`;
+    const projected = keysColumn ? escapeIdentifier(keysColumn) : escapeIdentifier(jsonColumn);
+    const source = timeColumn
+      ? `${tableIdentifier} WHERE ${escapeIdentifier(timeColumn)} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`
+      : `(SELECT ${projected} FROM ${tableIdentifier} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
+    const rawSql = `SELECT DISTINCT ${pathExpr} as path FROM ${source} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1533,71 +1573,74 @@ export class Datasource
       text: hideTableName ? item[0] : `${item[2]}.${item[0]}`,
     }));
 
-    // Collect Map columns per-table and populate both the datasource cache
-    // (consumed by fetchTagValuesFromSchema) and the AdHocFilter cache
-    // (consumed by escapeKey). Done regardless of whether Map expansion is
-    // feasible for this context — the caches are used even when expansion
-    // bails out.
+    // Classify attribute columns per-table into the datasource caches (used by
+    // fetchTagValuesFromSchema) and, below, the AdHocFilter caches (used by
+    // escapeKey), even when expansion bails out. A column is at most one kind.
     this.mapColumnsByTable = new Map();
+    this.jsonColumnsByTable = new Map();
     const mapCols: Array<{ name: string; table: string }> = [];
+    const jsonCols: Array<{ name: string; table: string }> = [];
+    const columnNamesByTable = new Map<string, Set<string>>();
     view.forEach((item) => {
-      if (isMapColumnType(item[1])) {
-        const tableKey = item[2];
-        let set = this.mapColumnsByTable.get(tableKey);
-        if (!set) {
-          set = new Set<string>();
-          this.mapColumnsByTable.set(tableKey, set);
-        }
-        set.add(item[0]);
-        mapCols.push({ name: item[0], table: item[2] });
+      const name = item[0];
+      const colType = item[1];
+      const table = item[2];
+      this.addColumnToTableCache(columnNamesByTable, table, name);
+      if (isMapColumnType(colType)) {
+        this.addColumnToTableCache(this.mapColumnsByTable, table, name);
+        mapCols.push({ name, table });
+      } else if (isJSONColumnType(colType)) {
+        this.addColumnToTableCache(this.jsonColumnsByTable, table, name);
+        jsonCols.push({ name, table });
       }
     });
+    // Every table classified above is now "known" — the lazy value-fetch path
+    // (ensureAttributeColumnCache) uses this to avoid re-querying their schema.
+    this.attributeSchemaFetched = new Set(columnNamesByTable.keys());
+    this.publishAttributeColumnsToFilter();
 
-    // Republish the flattened Map-column set to the AdHocFilter so its
-    // escapeKey can disambiguate `col.key` references.
-    const allMapCols = new Set<string>();
-    for (const set of this.mapColumnsByTable.values()) {
-      for (const c of set) {
-        allMapCols.add(c);
-      }
-    }
-    this.adHocFilter.setMapColumns(allMapCols);
-
-    // Map-key expansion only runs when the adhoc context points at a
-    // specific `db.table` — otherwise we'd need to probe every table in a
-    // database, which is too expensive to do on every dashboard render.
-    // The same opt-out that disables the per-filter probe also short-circuits
-    // this fan-out, so disabling the setting kills *all* probe traffic.
+    // Key/path expansion only runs against a specific `db.table` — probing every
+    // table in a database on each render is too expensive. The discovery opt-out
+    // short-circuits this fan-out too.
     const db = this.resolveAdhocDatabase(frame);
     const singleTable = this.resolveAdhocSingleTable();
-    if (!db || !singleTable || mapCols.length === 0 || !this.isMapKeysDiscoveryEnabled()) {
+    if (!db || !singleTable || (mapCols.length === 0 && jsonCols.length === 0) || !this.isMapKeysDiscoveryEnabled()) {
       return keys;
     }
 
-    // Only probe Map columns that belong to the targeted table.
-    const probeTargets = mapCols.filter((c) => c.table === singleTable);
-    if (probeTargets.length === 0) {
+    // Only probe attribute columns that belong to the targeted table.
+    const mapProbe = mapCols.filter((c) => c.table === singleTable);
+    const jsonProbe = jsonCols.filter((c) => c.table === singleTable);
+    if (mapProbe.length === 0 && jsonProbe.length === 0) {
       return keys;
     }
 
-    const probed = await Promise.all(
-      probeTargets.map(async (c) => {
+    const columnNames = columnNamesByTable.get(singleTable) ?? new Set<string>();
+    const probed = await Promise.all([
+      ...mapProbe.map(async (c) => {
         try {
-          const mapKeys = await this.fetchUniqueMapKeys(c.name, db, c.table);
-          return { col: c, keys: mapKeys };
+          return { col: c, keys: await this.fetchUniqueMapKeys(c.name, db, c.table) };
         } catch (ex) {
           console.warn(`Failed to fetch map keys for ${db}.${c.table}.${c.name}:`, ex);
           return { col: c, keys: [] as string[] };
         }
-      })
-    );
+      }),
+      ...jsonProbe.map(async (c) => {
+        // A companion `<col>Keys` array column, when present, is a cheaper
+        // path source than introspecting the JSON via JSONAllPaths.
+        const keysColumn = columnNames.has(`${c.name}Keys`) ? `${c.name}Keys` : undefined;
+        try {
+          return { col: c, keys: await this.fetchUniqueJSONPathsForAdhoc(c.name, db, c.table, keysColumn) };
+        } catch (ex) {
+          console.warn(`Failed to fetch JSON paths for ${db}.${c.table}.${c.name}:`, ex);
+          return { col: c, keys: [] as string[] };
+        }
+      }),
+    ]);
 
-    // Replace each top-level Map-column entry with one entry per discovered
-    // map key. If probing returned nothing (empty set, stripped by the
-    // filter), keep the original entry as a no-op fallback. Keys are minted
-    // in explicit bracket form (`col['key']`) so that filter application is
-    // stateless: a saved filter must render correct SQL on fresh dashboard
-    // load, before this method has run and populated the Map-column caches.
+    // Replace each attribute-column entry with one per discovered key/path
+    // (minted self-describing so filter application stays stateless); if probing
+    // returned nothing, keep the original entry as a no-op fallback.
     const expandedKeyByCol = new Map<string, string[]>();
     for (const p of probed) {
       if (p.keys.length > 0) {
@@ -1613,13 +1656,18 @@ export class Datasource
       const col = item[0];
       const table = item[2];
       const baseText = hideTableName ? col : `${table}.${col}`;
-      const mapKeys = expandedKeyByCol.get(col);
-      if (!mapKeys || table !== singleTable) {
+      const subKeys = expandedKeyByCol.get(col);
+      if (!subKeys || table !== singleTable) {
         expanded.push({ text: baseText });
         return;
       }
-      for (const k of mapKeys) {
-        expanded.push({ text: `${baseText}['${escapeCHStringLiteral(k)}']` });
+      // JSON columns mint the self-describing backtick path form; Map columns
+      // keep #2079's stateless bracket form.
+      const isJsonCol = this.jsonColumnsByTable.get(singleTable)?.has(col) ?? false;
+      for (const k of subKeys) {
+        expanded.push({
+          text: isJsonCol ? mintJSONAdhocKey(baseText, k) : `${baseText}['${escapeCHStringLiteral(k)}']`,
+        });
       }
     });
     return expanded;
@@ -1656,7 +1704,16 @@ export class Datasource
     const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
     const defaultSource = this.getDefaultAdhocSource();
     const raw = source === '$clickhouse_adhoc_query' ? defaultSource : source;
-    if (!raw || raw.toLowerCase().startsWith('select')) {
+    if (!raw) {
+      return defaultSource?.split('.')[0];
+    }
+    if (raw.toLowerCase().startsWith('select')) {
+      // Query-mode ($__adhoc_column): use the FROM-clause database (the same
+      // table fetchTags queries), else the configured default.
+      const table = this.extractTableNameFromQuery(raw);
+      if (table && table.includes('.')) {
+        return table.split('.')[0];
+      }
       return defaultSource?.split('.')[0];
     }
     return raw.includes('.') ? raw.split('.')[0] : raw;
@@ -1671,19 +1728,28 @@ export class Datasource
   private resolveAdhocSingleTable(): string | undefined {
     const source = getTemplateSrv().replace('$clickhouse_adhoc_query');
     const raw = source === '$clickhouse_adhoc_query' ? this.getDefaultAdhocSource() : source;
-    if (!raw || raw.toLowerCase().startsWith('select')) {
+    if (!raw) {
       return undefined;
+    }
+    if (raw.toLowerCase().startsWith('select')) {
+      // Query-mode ($__adhoc_column): the FROM table (first one, best-effort for
+      // joins — the same table fetchTags queries).
+      const table = this.extractTableNameFromQuery(raw);
+      if (!table) {
+        return undefined;
+      }
+      return table.includes('.') ? table.split('.')[1] : table;
     }
     return raw.includes('.') ? raw.split('.')[1] : undefined;
   }
 
-  async getTagValues({ key }: any): Promise<MetricFindValue[]> {
+  async getTagValues({ key, timeRange }: any): Promise<MetricFindValue[]> {
     const { type } = this.getTagSource();
     this.skipAdHocFilter = true;
     if (type === TagType.query) {
       return this.fetchTagValuesFromQuery(key);
     }
-    return this.fetchTagValuesFromSchema(key);
+    return this.fetchTagValuesFromSchema(key, timeRange);
   }
 
   private fieldValuesToMetricFindValues(field: Field): MetricFindValue[] {
@@ -1695,7 +1761,7 @@ export class Datasource
       });
   }
 
-  private async fetchTagValuesFromSchema(key: string): Promise<MetricFindValue[]> {
+  private async fetchTagValuesFromSchema(key: string, timeRange?: TimeRange): Promise<MetricFindValue[]> {
     const { from } = this.getTagSource();
     const hideTableName = this.settings.jsonData.hideTableNameInAdhocFilters || false;
 
@@ -1709,28 +1775,146 @@ export class Datasource
     } else {
       // When hideTableNameInAdhocFilters is false, key is 'table.column' format (e.g., 'foo.bar')
       const [table, ...colParts] = key.split('.');
-      col = colParts.join('.');
+      // A single-segment key (no `table.` prefix) leaves colParts empty; fall
+      // back to the whole key so we never emit `select distinct  from …`.
+      col = colParts.length ? colParts.join('.') : key;
       source = from?.includes('.') ? `${from.split('.')[0]}.${table}` : table;
     }
 
-    // If `col` is of the form `<mapCol>.<mapKey>` and <mapCol> is known to
-    // be a Map-typed column, rewrite to bracket-access so the SELECT pulls
-    // distinct Map values rather than stringified Map objects (which the
-    // Grafana frame layer renders as `[object Object]`). The map key is
-    // escaped for CH string-literal embedding so that keys containing `'`
-    // or `\` produce valid SQL. Keys minted by getTagKeys arrive already in
-    // bracket form (`mapCol['key']`, literal body pre-escaped) and pass
-    // through unchanged as valid bracket access.
-    const mapAccess = this.asMapAccess(col, source);
-    const selectExpr = mapAccess ? `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']` : col;
-
-    const rawSql = `select distinct ${selectExpr} from ${source} limit 1000`;
+    // Warm the Map/JSON caches for this table in case getTagKeys hasn't run
+    // (e.g. editing a saved filter value on a restored dashboard) so JSON paths
+    // are cast rather than emitted uncast (Dynamic → all-null).
+    await this.ensureAttributeColumnCache(source);
+    const selectExpr = this.buildAdhocColumnExpr(col, source);
+    // Bound the DISTINCT scan by time when the target is the configured OTel
+    // logs/traces table — otherwise `select distinct <expr>` scans the whole
+    // column (a full-table scan, worse for JSON paths). Prefer the dashboard's
+    // own range so values within view aren't hidden; fall back to a recent
+    // window only when no range is supplied.
+    const valueTable = source.includes('.') ? source.split('.')[1] : source;
+    const valueDb = source.includes('.') ? source.split('.')[0] : this.getDefaultDatabase();
+    const timeColumn = valueDb ? this.getMapKeyProbeTimeColumn(valueDb, valueTable) : undefined;
+    let whereClause = '';
+    if (timeColumn) {
+      const tc = escapeIdentifier(timeColumn);
+      const fromMs = timeRange?.from?.valueOf?.();
+      const toMs = timeRange?.to?.valueOf?.();
+      whereClause =
+        typeof fromMs === 'number' && typeof toMs === 'number'
+          ? ` where ${tc} >= fromUnixTimestamp(${Math.floor(fromMs / 1000)}) and ${tc} <= fromUnixTimestamp(${Math.floor(toMs / 1000)})`
+          : ` where ${tc} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`;
+    }
+    const rawSql = `select distinct ${selectExpr} from ${source}${whereClause} limit 1000`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
     }
     const field = frame.fields[0];
     return this.fieldValuesToMetricFindValues(field);
+  }
+
+  /**
+   * Resolve a table's attribute-column set from the per-table cache. An ABSENT
+   * entry for a known table means "no columns of this kind", not "unknown", so
+   * return an empty set — the cross-table union would let a same-named column
+   * from another table (e.g. `logs.attrs` JSON vs `events.attrs` Map)
+   * misclassify. The union is used only when the table is entirely unknown.
+   */
+  private attributeColumnsForTable(cache: Map<string, Set<string>>, tableKey: string): ReadonlySet<string> {
+    const set = cache.get(tableKey);
+    if (set) {
+      return set;
+    }
+    // "Known" means the table's schema was fetched — NOT that it has attribute
+    // columns. A fetched table with no Map/JSON column is absent from both
+    // caches, but must still return an empty set (not the cross-table union),
+    // otherwise a same-named column from another table would misclassify it.
+    if (this.attributeSchemaFetched.has(tableKey)) {
+      return EMPTY_COLUMN_SET;
+    }
+    return cache === this.mapColumnsByTable ? this.getFlatMapColumnSet() : this.getFlatJSONColumnSet();
+  }
+
+  /**
+   * Build the SQL column expression for an ad-hoc value lookup: JSON → cast
+   * backtick access (an uncast `Dynamic` sub-path reads all-null over the native
+   * protocol), Map → bracket access, else the column as-is. Shared by schema-mode
+   * and query-mode ($__adhoc_column) so both emit identical, cast-correct access.
+   */
+  private buildAdhocColumnExpr(col: string, source: string): string {
+    // Self-describing JSON key minted by getTagKeys: the backtick form carries
+    // its own type, so it casts with no column cache.
+    const mintedJSON = parseJSONAdhocKey(col);
+    if (mintedJSON) {
+      return buildJSONPathAccess(mintedJSON.column, mintedJSON.path);
+    }
+    // Legacy dotted JSON key (`col.path`): resolved via the per-table cache.
+    const jsonAccess = this.asJSONAccess(col, source);
+    if (jsonAccess) {
+      return buildJSONPathAccess(jsonAccess.column, jsonAccess.path);
+    }
+    const mapAccess = this.asMapAccess(col, source);
+    if (mapAccess) {
+      return `${mapAccess.column}['${escapeCHStringLiteral(mapAccess.key)}']`;
+    }
+    return col;
+  }
+
+  private addColumnToTableCache(cache: Map<string, Set<string>>, table: string, name: string) {
+    let set = cache.get(table);
+    if (!set) {
+      set = new Set<string>();
+      cache.set(table, set);
+    }
+    set.add(name);
+  }
+
+  /**
+   * Publish only the flattened Map-column set to the AdHocFilter, so escapeKey
+   * can disambiguate a legacy dotted `col.key` Map reference (and honor the
+   * `clickhouse_adhoc_use_json` opt-in). JSON keys carry their type in the
+   * minted backtick form, so escapeKey renders them statelessly — nothing to
+   * publish.
+   */
+  private publishAttributeColumnsToFilter() {
+    this.adHocFilter.setMapColumns(this.getFlatMapColumnSet());
+  }
+
+  /**
+   * Populate the Map/JSON column-kind caches for `source`'s table. getTagKeys
+   * normally fills these, but Grafana can call getTagValues first (e.g. editing
+   * a saved filter's value on a restored dashboard); on a cold cache the value
+   * SELECT would emit an uncast JSON sub-path (`Dynamic` → all-null), so resolve
+   * the table's column kinds lazily here.
+   */
+  private async ensureAttributeColumnCache(source: string): Promise<void> {
+    const table = source.includes('.') ? source.split('.')[1] : source;
+    if (!table || this.attributeSchemaFetched.has(table)) {
+      return;
+    }
+    const db = source.includes('.') ? source.split('.')[0] : this.getDefaultDatabase();
+    // Mark fetched up front so concurrent value lookups don't double-probe.
+    this.attributeSchemaFetched.add(table);
+    try {
+      this.skipAdHocFilter = true;
+      const rawSql = `SELECT name, type FROM system.columns WHERE database = '${db}' AND table = '${table}'`;
+      const frame = await this.runQuery({ rawSql });
+      const view = new DataFrameView<{ 0: string; 1: string }>(frame);
+      view.forEach((item) => {
+        const name = item[0];
+        const colType = item[1];
+        if (isMapColumnType(colType)) {
+          this.addColumnToTableCache(this.mapColumnsByTable, table, name);
+        } else if (isJSONColumnType(colType)) {
+          this.addColumnToTableCache(this.jsonColumnsByTable, table, name);
+        }
+      });
+      this.publishAttributeColumnsToFilter();
+    } catch (ex) {
+      // Allow a later retry rather than caching the failure.
+      this.attributeSchemaFetched.delete(table);
+      console.warn(`Failed to resolve attribute column kinds for ${db}.${table}:`, ex);
+    }
   }
 
   /**
@@ -1746,7 +1930,7 @@ export class Datasource
     }
     const parts = col.split('.');
     const tableKey = source.includes('.') ? source.split('.')[1] : source;
-    const mapCols = this.mapColumnsByTable.get(tableKey) ?? this.getFlatMapColumnSet();
+    const mapCols = this.attributeColumnsForTable(this.mapColumnsByTable, tableKey);
     if (!mapCols.has(parts[0])) {
       return undefined;
     }
@@ -1763,13 +1947,64 @@ export class Datasource
     return flat;
   }
 
+  /**
+   * JSON twin of `asMapAccess`: returns `{column, path}` when the leading
+   * segment of a dotted tag key refers to a JSON-typed column in the given
+   * source. The source may be `db.table` or a bare table name.
+   */
+  private asJSONAccess(col: string, source: string): { column: string; path: string } | undefined {
+    if (!col.includes('.')) {
+      return undefined;
+    }
+    const parts = col.split('.');
+    const tableKey = source.includes('.') ? source.split('.')[1] : source;
+    const jsonCols = this.attributeColumnsForTable(this.jsonColumnsByTable, tableKey);
+    if (!jsonCols.has(parts[0])) {
+      return undefined;
+    }
+    return { column: parts[0], path: parts.slice(1).join('.') };
+  }
+
+  private getFlatJSONColumnSet(): Set<string> {
+    const flat = new Set<string>();
+    for (const set of this.jsonColumnsByTable.values()) {
+      for (const c of set) {
+        flat.add(c);
+      }
+    }
+    return flat;
+  }
+
   private async fetchTagValuesFromQuery(key: string): Promise<MetricFindValue[]> {
     const tagSource = this.getTagSource();
 
     // Check if the query contains the $__adhoc_column macro
     if (tagSource.source && tagSource.source.includes('$__adhoc_column')) {
-      // Replace the macro with the actual column name
-      const queryWithColumn = tagSource.source.replace(/\$__adhoc_column/g, key);
+      // Substitute the selected key with a cast-correct column expression, not
+      // the raw dotted key. A JSON sub-path (e.g. `ResourceAttributes.k8s.pod.name`)
+      // is `Dynamic` and reads back as all-null over Grafana's native protocol
+      // unless cast to Nullable(String); Map keys need bracket access. The table
+      // comes from the query's own FROM clause (same one used for key discovery).
+      const from = this.extractTableNameFromQuery(tagSource.source);
+      let columnExpr = key;
+      if (from) {
+        // Warm the caches for the query's table so a JSON path is cast even when
+        // getTagKeys hasn't populated them yet (cold-cache value fetch).
+        await this.ensureAttributeColumnCache(from);
+        const bareTable = from.includes('.') ? from.split('.')[1] : from;
+        const parts = key.split('.');
+        // Strip a leading `<table>.` prefix (present unless hideTableName) before
+        // resolving the column against the per-table attribute caches.
+        // Only strip a leading `<table>.` prefix; a single-segment key that
+        // equals the table name must stay as the column (else the substitution
+        // becomes empty and yields `SELECT  FROM <table>`).
+        const col = parts.length > 1 && parts[0] === bareTable ? parts.slice(1).join('.') : key;
+        columnExpr = this.buildAdhocColumnExpr(col, from);
+      }
+      // Use a function replacer so `$`-sequences in columnExpr (e.g. a Map key
+      // like `a$&b`) are inserted literally rather than interpreted by
+      // String.replace as `$&`/`$1`/`$'` replacement patterns.
+      const queryWithColumn = tagSource.source.replace(/\$__adhoc_column/g, () => columnExpr);
       this.skipAdHocFilter = true;
       const frame = await this.runQuery({ rawSql: queryWithColumn });
 
@@ -1806,7 +2041,15 @@ export class Datasource
         // Extract table name from the query and get column list from system.columns
         const tableName = this.extractTableNameFromQuery(tagSource.source);
         if (tableName) {
-          this.adHocFilter.setTargetTableFromQuery(tagSource.source.replace(/\$__adhoc_column/g, '*'));
+          try {
+            this.adHocFilter.setTargetTableFromQuery(tagSource.source.replace(/\$__adhoc_column/g, '*'));
+          } catch (ex) {
+            // getTable() uses a pgsql AST parser that can't parse some valid
+            // ClickHouse SQL (e.g. backtick-quoted identifiers). Don't let that
+            // abort key discovery — apply() re-derives the target table from the
+            // actual panel query when _targetTable is unset.
+            console.warn('Could not derive adhoc target table from tag query:', ex);
+          }
 
           // Parse database.table format
           const parts = tableName.split('.');
@@ -1830,9 +2073,13 @@ export class Datasource
   }
 
   private extractTableNameFromQuery(query: string): string | null {
-    // Try to extract table name from FROM clause
-    // Supports formats: FROM table, FROM database.table, FROM "database"."table"
-    const fromMatch = query.match(/FROM\s+(?:"?(\w+)"?\.)?"?(\w+)"?/i);
+    // Best-effort table extraction from the first FROM clause. Supports bare,
+    // double-quoted, and backtick-quoted identifiers, optionally
+    // database-qualified: `FROM t`, `FROM db.t`, `FROM "db"."t"`, `` FROM `db`.`t` ``.
+    // Quoted identifiers are common in ClickHouse; not matching them left the
+    // table unresolved, which silently dropped the JSON `::Nullable(String)`
+    // cast. Joins/subqueries/CTEs still resolve to the first FROM token only.
+    const fromMatch = query.match(/FROM\s+(?:["`]?(\w+)["`]?\.)?["`]?(\w+)["`]?/i);
     if (fromMatch) {
       const database = fromMatch[1];
       const table = fromMatch[2];
@@ -2190,8 +2437,24 @@ function isMapColumnType(type: string | undefined): boolean {
   if (!type) {
     return false;
   }
-  return /^(?:Nullable\(|LowCardinality\()?Map\(/.test(type);
+  return /^(?:Nullable\(|LowCardinality\()?Map\(/i.test(type);
 }
+
+/**
+ * Returns true when a ClickHouse type string describes a JSON column. Matches
+ * the modern `JSON` / `Nullable(JSON)` / `LowCardinality(JSON)` forms as well
+ * as the legacy `Object('json')` type, case-insensitively.
+ */
+function isJSONColumnType(type: string | undefined): boolean {
+  if (!type) {
+    return false;
+  }
+  return /^(?:Nullable\(|LowCardinality\()?(?:JSON|Object\('json'\))/i.test(type);
+}
+
+// Shared empty set returned when a table is known to have no attribute columns
+// of a given kind — avoids per-call allocation.
+const EMPTY_COLUMN_SET: ReadonlySet<string> = new Set();
 
 // Escape a string for embedding inside a single-quoted ClickHouse string
 // literal: backslash and single quote are the only characters that need
