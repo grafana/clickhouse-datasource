@@ -147,4 +147,25 @@ describe('OTel dashboards', () => {
       expect(content).not.toMatch(/= '\$\{?\w+\}?'/);
     });
   });
+
+  describe('template variable quoting', () => {
+    // Guard every bundled dashboard, so a bare interpolation added to any of them is caught.
+    const allDashboards = (
+      JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')) as { includes: Array<{ type: string; path: string }> }
+    ).includes
+      .filter((i) => i.type === 'dashboard')
+      .map((i) => path.basename(i.path));
+
+    it.each(allDashboards)('%s quotes template variables in SQL', (filename) => {
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+      // Template variables must be interpolated with :singlequote, not bare. The datasource's
+      // default formatter (CHDatasource.format) already renders a multi-value selection as
+      // 'a','b', but it does not escape a single quote inside a value, so a value such as
+      // bob's-service produces invalid SQL. :singlequote escapes the quote; the plain formatter
+      // does not. Dashboards mix uppercase IN and lowercase in, so match case-insensitively.
+      // ($__... macros are excluded.)
+      expect(content).not.toMatch(/IN \(\$\{?(?!__)\w+\}?\)/i);
+      expect(content).not.toMatch(/= '\$\{?\w+\}?'/i);
+    });
+  });
 });
