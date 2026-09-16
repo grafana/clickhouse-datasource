@@ -1,0 +1,26 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [{ "key": "service.name", "value": { "stringValue": "schema-canary" } }]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "schema-canary" },
+          "spans": [
+            {
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174",
+              "name": "schema-canary-span",
+              "kind": 2,
+              "startTimeUnixNano": "1735689600000000000",
+              "endTimeUnixNano": "1735689601000000000",
+              "attributes": [{ "key": "canary", "value": { "stringValue": "true" } }],
+              "status": { "code": 1 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

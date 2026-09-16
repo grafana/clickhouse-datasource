@@ -20,6 +20,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/tracing"
+	"github.com/grafana/grafana-plugin-sdk-go/backend/useragent"
 	"github.com/grafana/grafana-plugin-sdk-go/build/buildinfo"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
@@ -127,7 +128,7 @@ func proxyDialContext(base proxy.ContextDialer, tlsConfig *tls.Config, protocol 
 }
 
 func getClientInfoProducts(ctx context.Context) (products []struct{ Name, Version string }) {
-	version := backend.UserAgentFromContext(ctx).GrafanaVersion()
+	version := useragent.FromContext(ctx).GrafanaVersion()
 
 	if version != "" {
 		products = append(products, struct{ Name, Version string }{
