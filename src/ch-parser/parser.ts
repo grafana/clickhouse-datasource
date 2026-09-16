@@ -92,6 +92,9 @@ export interface IdentifierQueryNode extends QueryNode {
 
 export interface SelectQueryNode extends QueryNode {
   from?: FromQueryNode;
+  // CTE bodies defined in this level's WITH clause, keyed by alias, so a FROM
+  // that references a CTE can resolve to the CTE's underlying table.
+  withAliases?: Map<string, SelectQueryNode>;
 }
 
 // Clause-starting keywords are never a table name in the FROM position.
@@ -187,6 +190,10 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
 
   let parenDepth = 0;
   let fromAwaitingSubquery: FromQueryNode | undefined;
+  // The two previous significant tokens, used to spot a `<name> AS (` CTE
+  // definition when its subquery opens.
+  let prev1: Token | undefined;
+  let prev2: Token | undefined;
   let endOfNode = false;
   while (!endOfNode && parser.hasNext()) {
     const token = parser.next();
@@ -252,6 +259,15 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
           fromAwaitingSubquery.subquery = nestedNode;
           fromAwaitingSubquery = undefined;
         }
+        // `<name> AS ( <subquery> )` is a CTE definition. Record it so a FROM
+        // that references the CTE can resolve to its underlying table.
+        if (
+          prev1?.matchKeyword('AS') &&
+          prev2 &&
+          (prev2.type === TokenType.BareWord || prev2.type === TokenType.QuotedIdentifier)
+        ) {
+          (node.withAliases ??= new Map()).set(prev2.text, nestedNode);
+        }
       }
     } else if (token.type === TokenType.ClosingRoundBracket) {
       if (parenDepth === 0) {
@@ -297,6 +313,9 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
     } else {
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.None });
     }
+
+    prev2 = prev1;
+    prev1 = token;
   }
 
   return node;

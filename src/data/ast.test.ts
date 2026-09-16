@@ -170,12 +170,30 @@ describe('ast', () => {
       expect(getTable(sql)).toBe(expected);
     });
 
-    // Known limitation, tracked as a follow-up: a query that selects directly
-    // from a CTE resolves to the CTE alias. ClickHouse ignores an
-    // additional_table_filters entry keyed on a CTE, so the filter is a no-op,
-    // exactly as it was before this change. Full CTE resolution is out of scope.
-    it('returns the CTE alias for a query that selects directly from a CTE', () => {
-      expect(getTable('WITH lookup AS (SELECT id FROM dim_services) SELECT * FROM lookup')).toBe('lookup');
+    // A FROM that references a CTE resolves to the CTE's underlying table,
+    // rather than the alias (which ClickHouse would ignore).
+    it.each([
+      [
+        'a query selecting directly from a CTE',
+        'WITH lookup AS (SELECT id FROM dim_services) SELECT * FROM lookup',
+        'dim_services',
+      ],
+      [
+        'a CTE reference with a WHERE clause',
+        'WITH cte AS (SELECT * FROM real_table) SELECT * FROM cte WHERE ts > now() - INTERVAL 1 DAY',
+        'real_table',
+      ],
+      [
+        'the referenced CTE among several',
+        'WITH a AS (SELECT * FROM t_a), b AS (SELECT * FROM t_b) SELECT * FROM b',
+        't_b',
+      ],
+    ])('resolves the table for %s', (_label, sql, expected) => {
+      expect(getTable(sql)).toBe(expected);
+    });
+
+    it('returns no table for a CTE with no underlying table', () => {
+      expect(getTable('WITH x AS (SELECT 1) SELECT * FROM x')).toBe('');
     });
   });
 });

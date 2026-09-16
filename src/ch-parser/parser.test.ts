@@ -119,4 +119,12 @@ describe('parseSelect', () => {
       expect(parseSelect(q)?.from?.isTableFunction).toBe(true);
     }
   });
+
+  it('captures CTE bodies keyed by alias', () => {
+    const node = parseSelect('WITH lookup AS (SELECT id FROM dim_services) SELECT * FROM lookup');
+    expect(node?.withAliases?.get('lookup')?.from?.table).toBe('dim_services');
+    const multi = parseSelect('WITH a AS (SELECT * FROM t_a), b AS (SELECT * FROM t_b) SELECT * FROM b');
+    expect(multi?.withAliases?.get('a')?.from?.table).toBe('t_a');
+    expect(multi?.withAliases?.get('b')?.from?.table).toBe('t_b');
+  });
 });

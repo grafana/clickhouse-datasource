@@ -141,11 +141,20 @@ function qualifiedTableName(node: FromQueryNode): string | undefined {
 // Resolves the table the outer FROM reads from at this select level. When the
 // FROM is a subquery it descends into that subquery, and only that subquery, so
 // a scalar subquery in the SELECT list or a sibling CTE body is never mistaken
-// for the target. A table-function FROM resolves to undefined.
+// for the target. A FROM that references a CTE resolves to the CTE's underlying
+// table. A table-function FROM resolves to undefined.
 function firstPhysicalTable(node: SelectQueryNode): string | undefined {
   const from = node.from;
   if (!from) {
     return undefined;
+  }
+  // An unqualified FROM target that names a CTE defined at this level resolves
+  // to the CTE body's table, not the alias (which ClickHouse would ignore).
+  if (from.table && !from.database && !from.isTableFunction) {
+    const cteBody = node.withAliases?.get(from.table);
+    if (cteBody) {
+      return firstPhysicalTable(cteBody);
+    }
   }
   const name = qualifiedTableName(from);
   if (name) {
@@ -167,8 +176,8 @@ function firstPhysicalTable(node: SelectQueryNode): string | undefined {
  * and on a throw the old implementation returned '', so the ad-hoc filter was
  * silently dropped (grafana/clickhouse-datasource#958). The ClickHouse parser
  * tokenizes that syntax instead of failing, and resolves through a subquery
- * FROM, keyword-named tables, and Grafana variables while rejecting table
- * functions and honoring statement boundaries.
+ * FROM, CTE references, keyword-named tables, and Grafana variables while
+ * rejecting table functions and honoring statement boundaries.
  */
 export function getTable(sql: string): string {
   const root = parseSelect(sql);

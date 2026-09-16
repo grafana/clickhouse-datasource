@@ -102,7 +102,9 @@ export class AdHocFilter {
     // bare replace(';', '') would delete the first semicolon anywhere, e.g.
     // inside splitByChar(';', col).
     sql = sql.replace(/;\s*$/, '');
-    return `${sql} settings additional_table_filters={'${targetTable}' : '${filters}'}`;
+    // Append on a new line so a trailing line comment (`-- ...`) cannot swallow
+    // the settings clause and silently drop the filter.
+    return `${sql}\nsettings additional_table_filters={'${targetTable}' : '${filters}'}`;
   }
 }
 
