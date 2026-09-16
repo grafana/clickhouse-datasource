@@ -10,6 +10,11 @@ const CLOUD_DEFAULT_UID = 'clickhouse-native-ds-m';
 const LOCAL_DEFAULT_UID = 'clickhouse-e2e';
 const DATASOURCE_UID = process.env.DS_E2E_UID || (isCloudRun ? CLOUD_DEFAULT_UID : LOCAL_DEFAULT_UID);
 
+// Playwright starts each test with a blank browser context
+// each test re-downloads the plugin bundle and Monaco assets
+// this process can last longer on a cloud run
+const SUGGEST_WIDGET_TIMEOUT = isCloudRun ? 15_000 : 5_000;
+
 function exploreUrl(): string {
   const query: Record<string, unknown> = {
     refId: 'A',
@@ -42,7 +47,7 @@ async function focusEditorAndType(page: Page, text: string) {
 // a deterministic target across local fixture and Cloud cron runs.
 async function captureMacroLabels(page: Page): Promise<string[]> {
   const widget = page.locator('.monaco-editor .suggest-widget.visible');
-  await widget.waitFor({ timeout: 5000 });
+  await widget.waitFor({ timeout: SUGGEST_WIDGET_TIMEOUT });
   const labels = await page.locator('.monaco-editor .suggest-widget .monaco-list-row .label-name').allTextContents();
   return labels.map((l) => l.trim()).filter((l) => l.startsWith('$__'));
 }
