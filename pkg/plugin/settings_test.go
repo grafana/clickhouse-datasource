@@ -557,7 +557,8 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true,
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
-			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120
+			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120,
+			"skipConnectionPings": true, "keepCookies": ["session"], "forceCookieForwarding": true
 		}`),
 		DecryptedSecureJSONData: map[string]string{
 			"password":                 "bar",
@@ -577,4 +578,97 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			t.Errorf("Settings.%s = %v with every key set, the same as with none: add its key to this fixture or a parsing branch to LoadSettings", name, everyValue.Field(i).Interface())
 		}
 	}
+}
+
+func TestLoadSettingsSkipConnectionPings(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse skipConnectionPings as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "skipConnectionPings": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.SkipConnectionPings)
+	})
+
+	t.Run("should parse skipConnectionPings as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "skipConnectionPings": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.SkipConnectionPings)
+	})
+
+	t.Run("should default skipConnectionPings to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.SkipConnectionPings)
+	})
+}
+
+func TestLoadSettingsKeepCookiesConfigured(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should detect a non-empty keepCookies list", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "keepCookies": ["session"]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.KeepCookiesConfigured)
+	})
+
+	t.Run("should not detect an empty keepCookies list", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "keepCookies": []}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.KeepCookiesConfigured)
+	})
+
+	t.Run("should default KeepCookiesConfigured to false when keepCookies is absent", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.KeepCookiesConfigured)
+	})
+}
+
+func TestLoadSettingsForceCookieForwarding(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse forceCookieForwarding as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "forceCookieForwarding": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.ForceCookieForwarding)
+	})
+
+	t.Run("should parse forceCookieForwarding as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "forceCookieForwarding": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.ForceCookieForwarding)
+	})
+
+	t.Run("should default forceCookieForwarding to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.ForceCookieForwarding)
+	})
 }

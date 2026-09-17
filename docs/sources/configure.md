@@ -273,6 +273,10 @@ When the toggle is on, the following headers are forwarded on each ClickHouse co
 | `X-Dashboard-Uid`, `X-Panel-Id`, `X-Panel-Plugin-Id`, `X-Dashboard-Title`, `X-Panel-Title` | Identifiers set by Grafana when the query originates from a dashboard panel.                                                                                                    |
 | `X-Grafana-Org-Id`, `X-Query-Group-Id`, `X-Grafana-From-Expr`, `X-Datasource-Uid`          | Request-context headers set by Grafana core.                                                                                                                                    |
 
+{{< admonition type="note" >}}
+On the **HTTP** protocol, if Grafana's own **Forward cookies** data source option (`keepCookies`) lists at least one cookie, `Cookie` is forwarded to ClickHouse regardless of this toggle, matching the Prometheus data source. Enabling **Forward Grafana HTTP headers to data source** is only required for the headers in the table above and for custom `http_`-prefixed headers. If a `Cookie` header reaches the plugin by some other means (for example a reverse proxy in front of Grafana) and **Forward cookies** does not apply, set `forceCookieForwarding: true` (provisioning only; there is no UI toggle) to force it through instead.
+{{< /admonition >}}
+
 ### Use cases
 
 - **Query-log attribution**: ClickHouse records the forwarded headers in `system.query_log.http_user_agent` and related fields, so operators can correlate queries back to the Grafana user and dashboard that triggered them.
@@ -280,7 +284,7 @@ When the toggle is on, the following headers are forwarded on each ClickHouse co
 
 ### Connection pool implications
 
-With header forwarding enabled, connections are keyed by the forwarded header set, which means each distinct Grafana user opens their own ClickHouse connection. Expect the connection count to scale with concurrent unique users and size `max_connections` on your ClickHouse server accordingly.
+With header forwarding enabled (via the toggle above, `keepCookies`, or `forceCookieForwarding`), connections are keyed by the whole forwarded header set, not just the Grafana user: each distinct combination of forwarded headers opens its own ClickHouse connection, and the pool never evicts old entries. Expect the connection count to scale with concurrent unique users, dashboards, and panels, and size `max_connections` on your ClickHouse server accordingly. This is also why `Cookie` forwarding on the HTTP protocol requires `keepCookies` or `forceCookieForwarding` rather than being unconditional: turning it on for every HTTP data source would grow this cache with headers most data sources never asked to forward.
 
 ### Custom headers
 
@@ -288,9 +292,13 @@ To forward headers other than the Grafana-set ones (for example, bearer tokens o
 
 ### Skip connection pings behind a fail-closed proxy
 
-On every query, and once at data source creation, the plugin pings ClickHouse to catch connection errors early. That initial ping carries no forwarded headers.
+Once at data source creation, and again on the first query for each new forwarded header set, the plugin pings ClickHouse to catch connection errors early. That ping carries no forwarded headers.
 
-If ClickHouse sits behind a proxy that requires a forwarded header on every request and rejects requests that lack it, that ping fails even though real per-user queries would succeed. For example, proxy might require the presence of a cookie retained via Grafana's own **Forward cookies** data source option. Set `skipConnectionPings: true` (provisioning only; there is no UI toggle) to disable pings in this case. Real queries are unaffected: they always carry the forwarded headers, so ClickHouse connection errors are still caught on the first query.
+If ClickHouse sits behind a proxy that requires a forwarded header on every request and rejects requests that lack it, that ping fails even though real per-user queries would succeed. For example, a proxy might require the presence of a cookie retained via Grafana's own **Forward cookies** data source option. Set `skipConnectionPings: true` (provisioning only; there is no UI toggle) to disable pings in this case. Real queries are unaffected: they always carry the forwarded headers, so ClickHouse connection errors are still caught on the first query.
+
+{{< admonition type="note" >}}
+This setting does not affect **Save & test** on the data source configuration page: Grafana pings the bootstrap connection directly, bypassing `skipConnectionPings`. Behind a fail-closed proxy, **Save & test** keeps failing even after provisioning succeeds with this setting enabled; that failure does not indicate a broken data source.
+{{< /admonition >}}
 
 ## Forward OAuth Identity
 
@@ -367,7 +375,8 @@ datasources:
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
       # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
-      # skipConnectionPings: <bool>  # see "Forward Grafana HTTP headers" for when this is needed
+      # skipConnectionPings: <bool>  # see "Skip connection pings behind a fail-closed proxy" for when this is needed
+      # forceCookieForwarding: <bool>  # forward Cookie on the http protocol without keepCookies; see "Forward Grafana HTTP headers"
       # path: <string>  # HTTP URL path (HTTP protocol only)
       # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
