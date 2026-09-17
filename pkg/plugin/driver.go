@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/textproto"
 	"regexp"
 	"strconv"
 	"strings"
@@ -250,7 +251,19 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		customSettings["limit"] = settings.RowLimit
 	}
 
-	httpHeaders, err := extractForwardedHeadersFromMessage(message)
+	// When the operator has explicitly opted into arbitrary header
+	// forwarding (forwardGrafanaHeaders) or OAuth pass-through, we surface
+	// everything sqlds marshalled into the message. Otherwise we restrict
+	// the extractor to the SDK's unprefixed whitelist so that Cookie /
+	// Authorization / X-Id-Token can flow (matching Prometheus) without
+	// broadening the arbitrary-http_-headers pass-through contract.
+	//
+	// Note this only bounds which headers reach the wire: sqlds hashes the
+	// full forwarded header set into its connection-pool cache key before
+	// Connect is ever called, so this filter does not reduce the number of
+	// cached *sql.DB pools per distinct header set.
+	restrictToSDKWhitelist := !settings.ForwardGrafanaHeaders && !settings.OAuthPassThru
+	httpHeaders, err := extractForwardedHeadersFromMessage(message, restrictToSDKWhitelist)
 	if err != nil {
 		return nil, err
 	}
@@ -373,12 +386,30 @@ func (h *Clickhouse) Connect(
 	// `sqlds` normally calls `db.PingContext()` to check if the connection is alive,
 	// however, as ClickHouse returns its own non-standard `Exception` type, we need
 	// to handle it here so that we can categorize and surface the error correctly.
-	if err := db.PingContext(ctx); err != nil {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
-		}
+	//
+	// sqlds calls Connect(ctx, settings, nil) at bootstrap (NewConnector) with no
+	// per-request headers. On a cache miss, GetConnectionFromQuery then calls the
+	// per-args Connect once, which actually carries the user's Cookie / Authorization
+	// / X-Id-Token. For most data sources that nil-message bootstrap ping is exactly
+	// what we want: it catches a bad host/port/credentials eagerly, at data source
+	// creation time. But the result would be misleading if the backend or a proxy in
+	// front of it requires a header or cookie to be forwarded from the client HTTP
+	// context and fails-closed if it's absent; that's why we have the
+	// `skipConnectionPings` option. We can't just add the client http context to the
+	// ping as one may not exist at the time a ping is called for.
+	//
+	// The per-args Connect (message != nil) still pings here. That ping carries
+	// the forwarded headers so genuine wire-level errors on real queries are still
+	// reported.
+	shouldPing := message != nil || !settings.SkipConnectionPings
+	if shouldPing {
+		if err := db.PingContext(ctx); err != nil {
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
+			}
 
-		return nil, wrapCategorizedConnectionError(err)
+			return nil, wrapCategorizedConnectionError(err)
+		}
 	}
 
 	// Honor the (nil-resource-on-error) contract so callers can rely on
@@ -473,7 +504,29 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
+		// On the HTTP protocol, route through the sqlds header-forwarding
+		// machinery whenever there is a Cookie worth forwarding: either
+		// Grafana's own keepCookies is configured for this data source, or
+		// the operator forced it via forceCookieForwarding. This propagates
+		// the subset of cookies listed in `keepCookies` as a `Cookie` header
+		// on the outbound HTTP connection.
+		//
+		// We deliberately do not turn this on unconditionally for every
+		// HTTP-protocol data source: sqlds hashes the whole forwarded
+		// header set into its connection-pool cache key, which never
+		// evicts, so doing so would grow that cache with per-panel and
+		// per-dashboard headers on data sources that never asked for
+		// cookie forwarding in the first place.
+		//
+		// The extractor (see extractForwardedHeadersFromMessage)
+		// applies an allow-list filter when forwardGrafanaHeaders is
+		// off so that arbitrary http_-prefixed headers still require
+		// the existing opt-in.
+		//
+		// Useless for the native protocol because clickhouse-go drops
+		// headers anyway.
+		ForwardHeaders: settings.ForwardGrafanaHeaders || settings.OAuthPassThru ||
+			(settings.Protocol == "http" && (settings.KeepCookiesConfigured || settings.ForceCookieForwarding)),
 		RowCapacityHint: settings.RowCapacityHint,
 	}
 }
@@ -671,7 +724,18 @@ func convertFieldToString(field *data.Field) (*data.Field, error) {
 	return newField, nil
 }
 
-func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {
+// extractForwardedHeadersFromMessage decodes the grafana-http-headers blob
+// that sqlds writes into the query message's ConnectionArgs. When
+// restrictToSDKWhitelist is true, only three unprefixed keys pass through:
+// Cookie, Authorization, and X-Id-Token, matching the header-forwarding
+// surface of the Grafana HTTP client (used by the Prometheus plugin).
+// Authorization and X-Id-Token are only ever present when oauthPassThru is
+// set, and that flag alone already selects restrictToSDKWhitelist=false, so
+// in practice restricted mode only ever sees Cookie flow through this path.
+// This lets Cookie / OAuth flow on the HTTP protocol without also
+// broadening the pass-through to arbitrary http_-prefixed headers, which
+// remains gated behind forwardGrafanaHeaders.
+func extractForwardedHeadersFromMessage(message json.RawMessage, restrictToSDKWhitelist bool) (map[string]string, error) {
 	// An example of the message we're trying to parse:
 	// {
 	//   "grafana-http-headers": {
@@ -698,6 +762,15 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 		}
 
 		for k, v := range fwdHeaders {
+			if restrictToSDKWhitelist {
+				canonical := textproto.CanonicalMIMEHeaderKey(k)
+				if canonical != backend.CookiesHeaderName &&
+					canonical != backend.OAuthIdentityTokenHeaderName &&
+					canonical != backend.OAuthIdentityIDTokenHeaderName {
+					continue
+				}
+			}
+
 			anyHeadersArr, ok := v.([]interface{})
 			if !ok {
 				return nil, fmt.Errorf("couldn't parse header %s as an array", k)

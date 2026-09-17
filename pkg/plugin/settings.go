@@ -52,8 +52,39 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	// SkipConnectionPings disables the bootstrap ping that Connect otherwise
+	// performs with no per-user forwarded headers, at data source creation
+	// and on the first query for a given header set. Use this when a proxy
+	// in front of the data source requires forwarded headers (for example
+	// Cookie via Grafana's keepCookies) on every request and fails closed on
+	// requests that lack them: the bootstrap ping carries no forwarded
+	// headers, so such a proxy would reject it even though real, per-user
+	// queries would be permitted.
+	//
+	// This does not affect the "Save & test" ping in the data source config
+	// page: sqlds pings the bootstrap pool directly in CheckHealth, bypassing
+	// this setting, so "Save & test" still fails behind such a proxy even
+	// after provisioning with skipConnectionPings: true.
+	SkipConnectionPings bool            `json:"skipConnectionPings,omitempty"`
+	CustomSettings      []CustomSetting `json:"customSettings"`
+	ProxyOptions        *proxy.Options
+
+	// KeepCookiesConfigured is true when the data source's own jsonData.keepCookies
+	// (Grafana's generic "Forward cookies" HTTP setting, shared with datasources
+	// like Prometheus) lists at least one cookie name. This plugin does not declare
+	// keepCookies itself: it is detected directly from the raw provisioned/UI JSON,
+	// since Grafana core filters the client's cookies against that list and only
+	// ever hands the plugin the resulting (possibly empty) Cookie header.
+	KeepCookiesConfigured bool `json:"-"`
+	// ForceCookieForwarding is a manual override for routing HTTP-protocol queries
+	// through the sqlds header-forwarding machinery so Cookie reaches ClickHouse,
+	// for setups where keepCookies is not what puts a Cookie header on the request
+	// (for example, a reverse proxy in front of Grafana injecting its own cookie).
+	// Prefer Grafana's keepCookies option (detected automatically, see
+	// KeepCookiesConfigured) where it applies: forcing this on for every query
+	// widens the sqlds connection-pool cache key to the whole forwarded header
+	// set for this data source.
+	ForceCookieForwarding bool `json:"forceCookieForwarding,omitempty"`
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -246,6 +277,35 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			}
 		} else {
 			settings.OAuthPassThruAllowFallback = jsonData["oauthPassThruAllowFallback"].(bool)
+		}
+	}
+
+	if jsonData["skipConnectionPings"] != nil {
+		if val, ok := jsonData["skipConnectionPings"].(string); ok {
+			settings.SkipConnectionPings, err = strconv.ParseBool(val)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse skipConnectionPings value: %w", err))
+			}
+		} else {
+			settings.SkipConnectionPings = jsonData["skipConnectionPings"].(bool)
+		}
+	}
+
+	// keepCookies is Grafana's own jsonData field for the "Forward cookies" HTTP
+	// setting; it is not declared by this plugin, so read it straight from the
+	// generic jsonData map rather than the Settings struct.
+	if keepCookies, ok := jsonData["keepCookies"].([]interface{}); ok && len(keepCookies) > 0 {
+		settings.KeepCookiesConfigured = true
+	}
+
+	if jsonData["forceCookieForwarding"] != nil {
+		if val, ok := jsonData["forceCookieForwarding"].(string); ok {
+			settings.ForceCookieForwarding, err = strconv.ParseBool(val)
+			if err != nil {
+				return settings, backend.DownstreamError(fmt.Errorf("could not parse forceCookieForwarding value: %w", err))
+			}
+		} else {
+			settings.ForceCookieForwarding = jsonData["forceCookieForwarding"].(bool)
 		}
 	}
 
