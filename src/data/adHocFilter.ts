@@ -102,10 +102,12 @@ export class AdHocFilter {
     if (filters === '') {
       return sql;
     }
-    // Strip only a trailing semicolon before appending the settings clause. A
-    // bare replace(';', '') would delete the first semicolon anywhere, e.g.
-    // inside splitByChar(';', col).
-    sql = sql.replace(/;\s*$/, '');
+    // Strip a trailing statement terminator before appending the settings
+    // clause: a `;` followed only by whitespace and comments. Otherwise the
+    // clause lands after `;`, which ClickHouse rejects as multiple statements.
+    // The pattern is anchored to the end so a `;` inside a literal, e.g.
+    // splitByChar(';', col), is left intact.
+    sql = sql.replace(/;(?:\s|--[^\n]*|\/\*[\s\S]*?\*\/)*$/, '');
     // Append on a new line so a trailing line comment (`-- ...`) cannot swallow
     // the settings clause and silently drop the filter.
     return `${sql}\nsettings additional_table_filters={'${targetTable}' : '${filters}'}`;

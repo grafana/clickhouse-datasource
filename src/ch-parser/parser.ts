@@ -95,26 +95,18 @@ export interface SelectQueryNode extends QueryNode {
   // CTE bodies defined in this level's WITH clause, keyed by alias, so a FROM
   // that references a CTE can resolve to the CTE's underlying table.
   withAliases?: Map<string, SelectQueryNode>;
-  // True when a top-level UNION combines several selects; a single-table target
-  // is not meaningful for the whole statement then.
-  hasUnion?: boolean;
+  // True when a top-level set operation (UNION / INTERSECT / EXCEPT) combines
+  // several selects; a single-table target is not meaningful for the whole
+  // statement then.
+  hasSetOperation?: boolean;
 }
 
-// Clause-starting keywords are never a table name in the FROM position.
-// Without this guard `SELECT * FROM  WHERE ...` would take `WHERE` as the table
-// while the user is mid-edit, and no clause node would be created.
-const RESERVED_FROM_KEYWORDS = new Set([
-  'WHERE',
-  'GROUP',
-  'ORDER',
-  'HAVING',
-  'LIMIT',
-  'SETTINGS',
-  'PREWHERE',
-  'JOIN',
-  'FORMAT',
-  'UNION',
-]);
+// Clause-starting keywords are never a table name in the FROM position. Without
+// this guard `SELECT * FROM  WHERE ...` would take `WHERE` as the table while
+// the user is mid-edit, and no clause node would be created. FORMAT and PREWHERE
+// are intentionally absent: pgsql-ast-parser did not reserve them, so they
+// resolved as table names before, and neither can begin a statement.
+const RESERVED_FROM_KEYWORDS = new Set(['WHERE', 'GROUP', 'ORDER', 'HAVING', 'LIMIT', 'SETTINGS', 'JOIN', 'UNION']);
 
 // A table/database name in a FROM clause. Keywords are accepted here because
 // ClickHouse allows keyword-named tables (e.g. `default.values`, `sample`).
@@ -303,9 +295,9 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
       node.children!.push({ type: QueryNodeType.Default, token: parser.next(), clause: ClauseType.OrderBy });
     } else if (token.matchKeyword('LIMIT')) {
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Limit });
-    } else if (token.matchKeyword('UNION')) {
+    } else if (token.matchKeyword('UNION') || token.matchKeyword('INTERSECT') || token.matchKeyword('EXCEPT')) {
       if (parenDepth === 0) {
-        node.hasUnion = true;
+        node.hasSetOperation = true;
       }
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.None });
     } else if (token.type === TokenType.BareWord && !token.isKeyword()) {
