@@ -53,6 +53,8 @@ describe('ast', () => {
       ['lambda', 'SELECT arrayMap(x -> x + 1, arr) AS a FROM otel_logs', 'otel_logs'],
       ['a db-qualified keyword table name', 'SELECT * FROM default.order', 'default.order'],
       ['a quoted keyword table name', 'SELECT * FROM `order`', 'order'],
+      ['an unqualified FORMAT table (pgsql did not reserve it)', 'SELECT * FROM format', 'format'],
+      ['an unqualified PREWHERE table', 'SELECT * FROM prewhere', 'prewhere'],
       ['Grafana variables on both sides of the dot', 'SELECT * FROM ${db}.${table}', '${db}.${table}'],
       ['qualified name + SAMPLE', 'SELECT * FROM db.otel_logs SAMPLE 1/10 WHERE x > 1', 'db.otel_logs'],
       ['subquery with ClickHouse syntax', 'SELECT * FROM (SELECT * FROM physical SAMPLE 0.1) sub', 'physical'],
@@ -122,8 +124,9 @@ describe('ast', () => {
       ],
       ['a clause keyword in place of a missing table', 'SELECT * FROM WHERE Timestamp > now()', ''],
       ['a missing table before WHERE', 'SELECT * FROM  WHERE ', ''],
-      ['an unqualified reserved-keyword table (must be quoted to resolve)', 'SELECT * FROM format', ''],
       ['a top-level UNION (per-branch keying is a follow-up)', 'SELECT a FROM t1 UNION ALL SELECT a FROM t2', ''],
+      ['a top-level INTERSECT', 'SELECT a FROM t1 INTERSECT SELECT a FROM t2', ''],
+      ['a top-level EXCEPT', 'SELECT a FROM t1 EXCEPT SELECT a FROM t2', ''],
       ['a CTE with no underlying table', 'WITH x AS (SELECT 1) SELECT * FROM x', ''],
     ])('returns no table for %s', (_label, sql, expected) => {
       expect(getTable(sql)).toBe(expected);
