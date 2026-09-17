@@ -22,14 +22,15 @@ async function configurePDC(page: Page, networkName: string) {
 
 /**
  * Waits for the config editor to fully render, then returns true if V2
- * (newClickhouseConfigPageDesign) is active. Uses waitForSelector so it
- * handles both slow plugin initialization and CI environments reliably —
- * unlike isVisible(), which returns immediately without waiting.
+ * (newClickhouseConfigPageDesign) is active. The wait is an `expect`, so it
+ * inherits `expect.timeout` from playwright.config.ts (raised for Cloud runs,
+ * where the editor takes longer than a fixed 10 s ceiling to render) instead
+ * of a timeout of its own. `isVisible()` alone returns at once without waiting.
  */
 async function isV2Editor(page: Page): Promise<boolean> {
-  await page.waitForSelector('[placeholder="Enter server address"], [placeholder="Server address"]', {
-    timeout: 10000,
-  });
+  await expect(
+    page.locator('[placeholder="Enter server address"], [placeholder="Server address"]').first()
+  ).toBeVisible();
   return page.locator('[placeholder="Enter server address"]').isVisible();
 }
 
