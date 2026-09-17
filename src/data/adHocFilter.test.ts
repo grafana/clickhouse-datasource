@@ -272,6 +272,17 @@ describe('AdHocManager', () => {
     expect(val).toContain('-- note\nsettings additional_table_filters=');
   });
 
+  it('strips a trailing semicolon that is followed only by a comment', () => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply('SELECT count() FROM default.tbl; -- note', [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    // The `;` (and the trailing comment) is removed so the clause is not a
+    // second statement, which ClickHouse rejects as "Multi-statements".
+    expect(val).not.toContain(';');
+    expect(val).toContain("default.tbl\nsettings additional_table_filters={'default.tbl'");
+  });
+
   it('applies to a query that selects from a CTE, keyed on the underlying table', () => {
     const ahm = new AdHocFilter();
     const sql = 'WITH lookup AS (SELECT id, name FROM dim_services) SELECT * FROM lookup';
