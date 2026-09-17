@@ -42,7 +42,10 @@ async function focusEditorAndType(page: Page, text: string) {
 // a deterministic target across local fixture and Cloud cron runs.
 async function captureMacroLabels(page: Page): Promise<string[]> {
   const widget = page.locator('.monaco-editor .suggest-widget.visible');
-  await widget.waitFor({ timeout: 5000 });
+  // Assert rather than `waitFor`: web-first assertions read `expect.timeout` from
+  // playwright.config.ts, which is already raised for Cloud runs. `waitFor` reads
+  // `actionTimeout` instead, so it would need its own constant kept in sync.
+  await expect(widget).toBeVisible();
   const labels = await page.locator('.monaco-editor .suggest-widget .monaco-list-row .label-name').allTextContents();
   return labels.map((l) => l.trim()).filter((l) => l.startsWith('$__'));
 }
