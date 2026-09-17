@@ -257,6 +257,11 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	// the extractor to the SDK's unprefixed whitelist so that Cookie /
 	// Authorization / X-Id-Token can flow (matching Prometheus) without
 	// broadening the arbitrary-http_-headers pass-through contract.
+	//
+	// Note this only bounds which headers reach the wire: sqlds hashes the
+	// full forwarded header set into its connection-pool cache key before
+	// Connect is ever called, so this filter does not reduce the number of
+	// cached *sql.DB pools per distinct header set.
 	restrictToSDKWhitelist := !settings.ForwardGrafanaHeaders && !settings.OAuthPassThru
 	httpHeaders, err := extractForwardedHeadersFromMessage(message, restrictToSDKWhitelist)
 	if err != nil {
@@ -383,8 +388,8 @@ func (h *Clickhouse) Connect(
 	// to handle it here so that we can categorize and surface the error correctly.
 	//
 	// sqlds calls Connect(ctx, settings, nil) at bootstrap (NewConnector) with no
-	// per-request headers, and again from GetConnectionFromQuery before dispatching
-	// to the per-args Connect that actually carries the user's Cookie / Authorization
+	// per-request headers. On a cache miss, GetConnectionFromQuery then calls the
+	// per-args Connect once, which actually carries the user's Cookie / Authorization
 	// / X-Id-Token. For most data sources that nil-message bootstrap ping is exactly
 	// what we want: it catches a bad host/port/credentials eagerly, at data source
 	// creation time. But the result would be misleading if the backend or a proxy in
@@ -499,10 +504,19 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		// On the HTTP protocol we always route through the sqlds
-		// header-forwarding machinery. This enables the  subset of cookies
-		// listed in `keepCookies` to be propagated as a `Cookie` header
+		// On the HTTP protocol, route through the sqlds header-forwarding
+		// machinery whenever there is a Cookie worth forwarding: either
+		// Grafana's own keepCookies is configured for this data source, or
+		// the operator forced it via forceCookieForwarding. This propagates
+		// the subset of cookies listed in `keepCookies` as a `Cookie` header
 		// on the outbound HTTP connection.
+		//
+		// We deliberately do not turn this on unconditionally for every
+		// HTTP-protocol data source: sqlds hashes the whole forwarded
+		// header set into its connection-pool cache key, which never
+		// evicts, so doing so would grow that cache with per-panel and
+		// per-dashboard headers on data sources that never asked for
+		// cookie forwarding in the first place.
 		//
 		// The extractor (see extractForwardedHeadersFromMessage)
 		// applies an allow-list filter when forwardGrafanaHeaders is
@@ -511,7 +525,8 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		//
 		// Useless for the native protocol because clickhouse-go drops
 		// headers anyway.
-		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru || settings.Protocol == "http",
+		ForwardHeaders: settings.ForwardGrafanaHeaders || settings.OAuthPassThru ||
+			(settings.Protocol == "http" && (settings.KeepCookiesConfigured || settings.ForceCookieForwarding)),
 		RowCapacityHint: settings.RowCapacityHint,
 	}
 }
@@ -711,13 +726,15 @@ func convertFieldToString(field *data.Field) (*data.Field, error) {
 
 // extractForwardedHeadersFromMessage decodes the grafana-http-headers blob
 // that sqlds writes into the query message's ConnectionArgs. When
-// restrictToSDKWhitelist is true, only the three unprefixed keys the
-// grafana-plugin-sdk-go http-header helper exposes to backend plugins —
-// Cookie, Authorization, and X-Id-Token — pass through, matching the
-// header-forwarding surface of the Grafana HTTP client (used by the
-// Prometheus plugin). This lets Cookie / OAuth flow on the HTTP protocol
-// without also broadening the pass-through to arbitrary http_-prefixed
-// headers, which remains gated behind forwardGrafanaHeaders.
+// restrictToSDKWhitelist is true, only three unprefixed keys pass through:
+// Cookie, Authorization, and X-Id-Token, matching the header-forwarding
+// surface of the Grafana HTTP client (used by the Prometheus plugin).
+// Authorization and X-Id-Token are only ever present when oauthPassThru is
+// set, and that flag alone already selects restrictToSDKWhitelist=false, so
+// in practice restricted mode only ever sees Cookie flow through this path.
+// This lets Cookie / OAuth flow on the HTTP protocol without also
+// broadening the pass-through to arbitrary http_-prefixed headers, which
+// remains gated behind forwardGrafanaHeaders.
 func extractForwardedHeadersFromMessage(message json.RawMessage, restrictToSDKWhitelist bool) (map[string]string, error) {
 	// An example of the message we're trying to parse:
 	// {

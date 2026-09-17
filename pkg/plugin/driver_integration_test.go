@@ -1381,13 +1381,13 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 	// client requests.
 	// The ClickHouse plugin used to only forward headers if forwardGrafanaHeaders
 	// or oauthPassThru were enabled, so an operator who configured keepCookies
-	// but not that toggle would see no cookies reach ClickHouse. On protocol: http
-	// the plugin now forwards the SDK's unprefixed whitelist unconditionally so
-	// keepCookies works out of the box.
+	// but not that toggle would see no cookies reach ClickHouse. On protocol: http,
+	// when keepCookies is configured, the plugin now forwards the SDK's unprefixed
+	// whitelist so keepCookies works out of the box.
 	// This aligns it with the Prometheus datasource, which routes queries through
 	// grafana-plugin-sdk-go's HTTP client to get cookie-forwarding automatically.
-	t.Run("should forward the Cookie header out of the box on http protocol (parity with Prometheus keepCookies)", func(t *testing.T) {
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http"}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+	t.Run("should forward the Cookie header out of the box on http protocol when keepCookies is configured (parity with Prometheus keepCookies)", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "keepCookies": ["x_authorized_project_ids"]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		// Permissive handler during NewDatasource's ping. We only care
 		// about headers on the actual QueryData call below.
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{})
@@ -1409,15 +1409,42 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 		}
 
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"Cookie": "x_authorized_project_ids=proj-a,proj-b"})
-		_, err = ds.QueryData(ctx, cookieReq)
+		resp, err := ds.QueryData(ctx, cookieReq)
 		assert.Equal(t, nil, err)
+		require.NoError(t, resp.Responses["A"].Error)
+	})
+
+	t.Run("should not forward the Cookie header on http protocol when keepCookies is not configured and forceCookieForwarding is not set", func(t *testing.T) {
+		// Without keepCookies (or the forceCookieForwarding override), the
+		// plugin does not opt this data source into sqlds header forwarding,
+		// so a client-set Cookie header must not reach ClickHouse.
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http"}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{})
+		dsInstance, err := NewDatasource(ctx, settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+		cookieReq := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Headers: map[string]string{
+				"Cookie": "x_authorized_project_ids=proj-a,proj-b",
+			},
+			Queries: []backend.DataQuery{{RefID: "A", JSON: []byte(`{"rawSql": "SELECT 1"}`)}},
+		}
+
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"Cookie": ""})
+		resp, err := ds.QueryData(ctx, cookieReq)
+		assert.Equal(t, nil, err)
+		require.NoError(t, resp.Responses["A"].Error)
 	})
 
 	t.Run("should not forward arbitrary http_-prefixed headers when forwardGrafanaHeaders is off, even with a Cookie present", func(t *testing.T) {
 		// Confirms the parity fix does not broaden the existing
 		// arbitrary-header opt-in contract: X-Test must only be emitted when
 		// forwardGrafanaHeaders is true even on the HTTP protocol.
-		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http"}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "keepCookies": ["x_authorized_project_ids"]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{})
 		dsInstance, err := NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
@@ -1438,8 +1465,9 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 			"Cookie": "x_authorized_project_ids=proj-a",
 			"X-Test": "",
 		})
-		_, err = ds.QueryData(ctx, mixedReq)
+		resp, err := ds.QueryData(ctx, mixedReq)
 		assert.Equal(t, nil, err)
+		require.NoError(t, resp.Responses["A"].Error)
 	})
 }
 

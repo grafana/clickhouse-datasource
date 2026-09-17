@@ -535,21 +535,44 @@ func TestSettingsForwardHeadersWithJWT(t *testing.T) {
 		assert.False(t, ds.ForwardHeaders)
 	})
 
-	t.Run("ForwardHeaders is true on the http protocol so keepCookies flows without forwardGrafanaHeaders", func(t *testing.T) {
-		// Cookie parity with the Prometheus data source: on protocol: http
-		// we route through the sqlds header-forwarding machinery so that
-		// Cookie / Authorization / X-Id-Token (populated by Grafana's
-		// CookiesMiddleware from keepCookies, or by oauthPassThru) reach
-		// the ClickHouse HTTP endpoint out of the box.
+	t.Run("ForwardHeaders is true on the http protocol when keepCookies is configured, without forwardGrafanaHeaders", func(t *testing.T) {
+		// Cookie parity with the Prometheus data source: on protocol: http,
+		// when Grafana's own keepCookies data source setting lists at least
+		// one cookie, we route through the sqlds header-forwarding machinery
+		// so that Cookie reaches the ClickHouse HTTP endpoint out of the box.
 		// buildClickHouseOptions still restricts what actually flows to
 		// the SDK's unprefixed whitelist so arbitrary http_-headers stay
 		// opt-in behind forwardGrafanaHeaders.
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "protocol": "http", "keepCookies": ["session"]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.True(t, ds.ForwardHeaders)
+	})
+
+	t.Run("ForwardHeaders is true on the http protocol when forceCookieForwarding is set, without keepCookies", func(t *testing.T) {
+		// Manual override for setups where a Cookie header reaches the
+		// plugin by some means other than Grafana's keepCookies (for
+		// example a reverse proxy in front of Grafana).
+		config := backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "protocol": "http", "forceCookieForwarding": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		}
+		ds := h.Settings(t.Context(), config)
+		assert.True(t, ds.ForwardHeaders)
+	})
+
+	t.Run("ForwardHeaders remains false on the http protocol when neither keepCookies nor forceCookieForwarding is set", func(t *testing.T) {
+		// Avoids widening the sqlds connection-pool cache key to the whole
+		// forwarded header set for data sources that never asked for
+		// cookie forwarding.
 		config := backend.DataSourceInstanceSettings{
 			JSONData:                []byte(`{"host": "test", "port": 443, "protocol": "http"}`),
 			DecryptedSecureJSONData: map[string]string{},
 		}
 		ds := h.Settings(t.Context(), config)
-		assert.True(t, ds.ForwardHeaders)
+		assert.False(t, ds.ForwardHeaders)
 	})
 
 	t.Run("ForwardHeaders remains false on the native protocol when no opt-in is set", func(t *testing.T) {
@@ -585,10 +608,10 @@ func TestExtractForwardedHeadersWithAuthorization(t *testing.T) {
 		assert.Empty(t, headers)
 	})
 
-	// Grafana's plugin SDK filters the headers plugins can see so most client
-	// headers never reach the plugin. At time of writing these were, depending
-	// on configuration options, Authorization, X-Id-Token, and a subset of
-	// entries in the Cookie header. This checks cookie forwarding.
+	// Grafana core middlewares (not the SDK) build the header set the plugin
+	// receives, and it is wider than the three unprefixed keys tested here —
+	// it also includes org, dashboard and panel headers. This test only
+	// checks cookie forwarding through that set.
 	// `sqlds` marshals the resulting `http.Header` verbatim.
 	t.Run("extracts Cookie header verbatim in unrestricted mode", func(t *testing.T) {
 		message := json.RawMessage(`{
@@ -623,6 +646,21 @@ func TestExtractForwardedHeadersWithAuthorization(t *testing.T) {
 		assert.Equal(t, "some-id-token", headers["X-Id-Token"])
 		assert.NotContains(t, headers, "X-Test", "arbitrary headers must not flow in restricted mode")
 		assert.NotContains(t, headers, "X-Grafana-Org-Id", "arbitrary headers must not flow in restricted mode")
+	})
+
+	t.Run("unrestricted mode is what oauthPassThru selects, so a non-whitelisted header still flows", func(t *testing.T) {
+		message := json.RawMessage(`{
+			"grafana-http-headers": {
+				"Authorization":    ["Bearer some-token"],
+				"X-Grafana-Org-Id": ["42"]
+			}
+		}`)
+		// buildClickHouseOptions passes restrictToSDKWhitelist=false whenever
+		// settings.OAuthPassThru is true, regardless of forwardGrafanaHeaders.
+		headers, err := extractForwardedHeadersFromMessage(message, false)
+		assert.NoError(t, err)
+		assert.Equal(t, "Bearer some-token", headers["Authorization"])
+		assert.Equal(t, "42", headers["X-Grafana-Org-Id"], "oauthPassThru selects unrestricted mode, so arbitrary headers pass too")
 	})
 }
 
@@ -917,8 +955,22 @@ func TestConnectPingsInForwardHeadersModeWithoutSkipOptIn(t *testing.T) {
 	require.Error(t, err, "forwardGrafanaHeaders alone, without skipConnectionPings, must still probe the wire on Connect")
 }
 
+// TestConnectPingsOnPerArgsConnectRegardlessOfSkipOptIn asserts that the
+// message != nil half of the ping gate in Connect always pings, even with
+// skipConnectionPings set: only the nil-message bootstrap ping is skippable.
+func TestConnectPingsOnPerArgsConnectRegardlessOfSkipOptIn(t *testing.T) {
+	h := &Clickhouse{}
+	settings := backend.DataSourceInstanceSettings{
+		JSONData:                []byte(`{"host": "127.0.0.1", "port": 1, "protocol": "http", "skipConnectionPings": true, "dialTimeout": "1", "queryTimeout": "1"}`),
+		DecryptedSecureJSONData: map[string]string{},
+	}
+	message := json.RawMessage(`{"grafana-http-headers": {"Cookie": ["a=b"]}}`)
+	_, err := h.Connect(t.Context(), settings, message)
+	require.Error(t, err, "skipConnectionPings must not suppress the per-args ping on a non-nil message")
+}
+
 // TestConnectSkipsBootstrapPingWithSkipConnectionPingsOptIn covers the case
-// where the downstream is a a data source that fails-closed if a required cookie
+// where the downstream is a data source that fails-closed if a required cookie
 // or header is missing. This relies solely on Grafana's own keepCookies
 // forwarding. The operator must opt in explicitly with skipConnectionPings
 // to allow this as there's no way to auto-detect it.
