@@ -128,7 +128,7 @@ To apply equivalent filtering in an alert rule, add the filter conditions direct
 
 ### Row limit
 
-If **Enable row limit** is turned on in the data source [configuration](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/), ClickHouse applies a `limit` setting to every query, including alert queries. This can silently truncate results, causing alerts to evaluate against incomplete data. Disable the row limit or ensure it is set high enough to capture the full result set for your alert queries.
+The plugin limits every query result, including alert queries, to the Grafana row limit setting (`dataproxy.row_limit`, default `1000000` rows). Truncation can cause alerts to evaluate against incomplete data. If your alert queries can return more rows than the limit, raise `dataproxy.row_limit` in the Grafana configuration. If **Enable row limit** is turned on in the data source [configuration](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/), the same limit is also applied as a `limit` setting on the ClickHouse server.
 
 ### Forward OAuth Identity
 
