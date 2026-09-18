@@ -600,6 +600,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               <Divider />
               <LogsConfig
                 variant="single-table"
+                uid={options.uid}
                 logsConfig={jsonData.logs}
                 onDefaultDatabaseChange={(db) => onLogsConfigChange('defaultDatabase', db)}
                 onDefaultTableChange={(table) => onLogsConfigChange('defaultTable', table)}
@@ -612,6 +613,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onSelectContextColumnsChange={(c) => onLogsConfigChange('selectContextColumns', c)}
                 onContextColumnsChange={(c) => onLogsConfigChange('contextColumns', c)}
                 onShowLogLinksChange={(v) => onLogsConfigChange('showLogLinks', v)}
+                onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
               />
             </>
           )}
@@ -790,6 +792,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onShowLogLinksChange={(v) => {
                 onLogsConfigChange('showLogLinks', v);
               }}
+              onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
             />
 
             <Divider />
