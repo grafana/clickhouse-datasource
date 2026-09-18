@@ -3,7 +3,7 @@ import { AnnotationQuery, AnnotationSupport, GrafanaTheme2, QueryEditorProps } f
 import { Box, InlineField, InlineFormLabel, Select, Text, TextArea, useStyles2 } from '@grafana/ui';
 import { css } from '@emotion/css';
 import { Datasource } from './CHDatasource';
-import { escapeIdentifier, getTableIdentifier } from './sqlGenerator';
+import { escapeIdentifier, getJsonPathAccessor, getTableIdentifier } from './sqlGenerator';
 import { CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { SchemaPicker, SchemaPickerValue } from 'components/queryBuilder/SchemaPicker';
@@ -15,8 +15,8 @@ type AnnotationPreset = 'custom' | 'change_detection';
 
 /**
  * Builder state for the change-detection preset: a schema selection, the watched
- * column's type (so a Map column can require a key before generating), and a
- * group-by column.
+ * column's type (so a Map or JSON column can require a key before generating),
+ * and a group-by column.
  */
 type ChangeDetectionState = SchemaPickerValue & { groupBy?: string; columnType?: string };
 
@@ -88,24 +88,35 @@ export function resolveTraceSchema(datasource: Datasource): { database: string; 
  * outer prev_version != '' guard drops each group's first bucket in the window,
  * where lagInFrame() returns '' and would otherwise mark every group at the
  * left edge of the dashboard range.
- * Identifiers are escaped; the watched map key is emitted as a quoted string literal.
+ * Identifiers are escaped; a watched map key is emitted as a quoted string
+ * literal, and a watched JSON path as backtick-quoted path access cast to
+ * Nullable(String) (the same shape the query builder emits for JSON filters).
  */
 export function generateChangeDetectionSQL(opts: ChangeDetectionState): string {
   const { database, table, column, mapKey, groupBy, columnType } = opts;
   if (!table || !column) {
     return CHANGE_DETECTION_PLACEHOLDER;
   }
-  // A Map column is only usable once a key is chosen: without one the generated
-  // query would compare the whole Map to '' and ClickHouse rejects it (code 27).
+  const isJsonColumn = columnType?.startsWith('JSON') === true;
+  // A Map or JSON column is only usable once a key is chosen: without one the
+  // generated query would compare the whole column to '' and ClickHouse rejects
+  // it (code 27 for Map, an impossible ''-to-JSON conversion for JSON).
   // Wait for the key rather than emitting a query that cannot run.
-  if (columnType?.startsWith('Map(') && !mapKey) {
+  if ((columnType?.startsWith('Map(') === true || isJsonColumn) && !mapKey) {
     return CHANGE_DETECTION_PLACEHOLDER;
   }
 
   const fullTable = getTableIdentifier(database || '', table);
-  const columnExpr = mapKey
-    ? `${escapeIdentifier(column)}['${escapeStringContent(mapKey)}']`
-    : escapeIdentifier(column);
+  const escapedColumn = escapeIdentifier(column);
+  let columnExpr = escapedColumn;
+  if (mapKey) {
+    // JSON path access returns Dynamic, so cast to Nullable(String): topK and
+    // concat then work on strings, and rows without the path become NULL and
+    // fail the != '' guard, just as rows missing a map key do.
+    columnExpr = isJsonColumn
+      ? `${getJsonPathAccessor(escapedColumn, mapKey)}::Nullable(String)`
+      : `${escapedColumn}['${escapeStringContent(mapKey)}']`;
+  }
   const groupByCol = escapeIdentifier(groupBy || 'ServiceName');
   const displayLabel = escapeStringContent(mapKey ? `${column}.${mapKey}` : column);
 
@@ -137,7 +148,8 @@ export function generateChangeDetectionSQL(opts: ChangeDetectionState): string {
 /**
  * Build the Group By options for the change-detection builder. ServiceName leads
  * (the OTel convention and the default), followed by columns that make sense to
- * group by: Map columns, the timestamp, the watched column itself, and a duplicate
+ * group by: Map and JSON columns (neither is groupable as a whole), the timestamp,
+ * the watched column itself, and a duplicate
  * ServiceName are excluded. A saved group-by that the filter would drop (for
  * example a Map or the timestamp from an older query) is appended so the Select
  * shows the real value instead of rendering blank while the SQL still references it.
@@ -152,7 +164,11 @@ export function buildGroupByOptions(
     ...columns
       .filter(
         (c) =>
-          !c.type.startsWith('Map(') && c.name !== 'Timestamp' && c.name !== 'ServiceName' && c.name !== watchColumn
+          !c.type.startsWith('Map(') &&
+          !c.type.startsWith('JSON') &&
+          c.name !== 'Timestamp' &&
+          c.name !== 'ServiceName' &&
+          c.name !== watchColumn
       )
       .map((c) => ({ label: c.name, value: c.name })),
   ];
@@ -216,7 +232,10 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
       if (value === 'change_detection') {
         // Seed sensible deployment defaults so the builder opens populated with a
         // working query (instead of an empty builder and a placeholder), and stash
-        // the current Custom SQL so switching back restores it.
+        // the current Custom SQL so switching back restores it. The seed assumes
+        // the conventional Map schema: the live column types are not known here
+        // (useColumns is keyed on the previous selection), so on a JSON-schema
+        // table re-picking the watch column corrects columnType to JSON.
         const seeded: ChangeDetectionState =
           cd.table && cd.column
             ? cd
@@ -286,7 +305,8 @@ const AnnotationQueryEditor = (props: AnnotationEditorProps) => {
             value={cd}
             onChange={onSchemaChange}
             level="mapKey"
-            labels={{ column: 'Watch Column', mapKey: 'Map Key' }}
+            enableJsonPaths
+            labels={{ column: 'Watch Column' }}
           />
 
           {cd.column && (
