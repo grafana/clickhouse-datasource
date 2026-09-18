@@ -62,6 +62,7 @@ import {
   splitLogsVolumeFrames,
   TIME_FIELD_ALIAS,
 } from './logs';
+import { applyMinIntervalToScopedVars } from './queryInterval';
 import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
@@ -633,7 +634,7 @@ export class Datasource
 
     // resolve template variables
     rawQuery = this.applyConditionalAll(rawQuery, templateSrvVariables);
-    rawQuery = this.replace(rawQuery, scoped) || '';
+    rawQuery = this.replace(rawQuery, applyMinIntervalToScopedVars(scoped, query.timeInterval)) || '';
 
     if (!this.skipAdHocFilter) {
       if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters.length > 0) {
