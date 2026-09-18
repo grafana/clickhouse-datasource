@@ -16,8 +16,8 @@ import (
 // makeCtx is a test helper that builds a macropro.QueryContext from time range and interval.
 func makeCtx(from, to time.Time, interval time.Duration) macropro.QueryContext[struct{}] {
 	return macropro.QueryContext[struct{}]{
-		TimeRange: macropro.TimeRange{From: from, To: to},
-		Interval:  interval,
+		TimeRange:  macropro.TimeRange{From: from, To: to},
+		Interval:   interval,
 		IntervalMS: interval.Milliseconds(),
 	}
 }
@@ -192,6 +192,35 @@ func TestMacroIntervalSeconds(t *testing.T) {
 	assert.Equal(t, "20", got)
 }
 
+func TestMacroFromGrafanaInterval(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	tests := map[string]string{
+		"250ms": "250 millisecond",
+		"1s":    "1 second",
+		"5m":    "5 minute",
+		"2h":    "2 hour",
+		"3d":    "3 day",
+		"1w":    "1 week",
+		"6M":    "6 month",
+		"1y":    "1 year",
+	}
+	for input, expected := range tests {
+		t.Run(input, func(t *testing.T) {
+			got, err := FromGrafanaInterval(ctx, []string{input})
+			require.NoError(t, err)
+			assert.Equal(t, expected, got)
+		})
+	}
+
+	for _, input := range []string{"", "0m", "1", "minute", "-1h"} {
+		t.Run("rejects_"+input, func(t *testing.T) {
+			_, err := FromGrafanaInterval(ctx, []string{input})
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestMacroTimeFrom(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
@@ -252,6 +281,7 @@ func TestMacroErrorsAreDownstream(t *testing.T) {
 		{"DateTimeFilter wrong arity", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }},
 		{"TimeInterval wrong arity", func() error { _, err := TimeInterval(ctx, nil); return err }},
 		{"TimeIntervalMs wrong arity", func() error { _, err := TimeIntervalMs(ctx, nil); return err }},
+		{"FromGrafanaInterval wrong arity", func() error { _, err := FromGrafanaInterval(ctx, nil); return err }},
 		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, nil); return err }},
 		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, nil); return err }},
 		{"TimeGroup wrong arity", func() error { _, err := TimeGroup(ctx, []string{"ts"}); return err }},
@@ -290,6 +320,7 @@ func TestInterpolate(t *testing.T) {
 	}
 
 	tests := []test{
+		{input: "select toStartOfInterval(time, INTERVAL $__fromGrafanaInterval(5m))", output: "select toStartOfInterval(time, INTERVAL 5 minute)", name: "Grafana dashboard interval"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter with empty spaces"},
 		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms"},
