@@ -5,6 +5,7 @@ import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from
 import { selectors } from 'selectors';
 import {
   BooleanFilter,
+  ColumnHint,
   DateFilter,
   Filter,
   FilterOperator,
@@ -493,6 +494,38 @@ describe('FilterEditor', () => {
       const emitted = onFilterChange.mock.calls[0][0] as NumberFilter;
       expect(emitted.value).toBe(1_200_000_000);
       expect(emitted.rawInput).toBe('1.2s');
+    });
+
+    it('renders the duration editor for the default hinted duration filter (key: "", hint: TraceDurationTime)', async () => {
+      const filter: NumberFilter = {
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.TraceDurationTime,
+        operator: FilterOperator.GreaterThan,
+        type: 'UInt64',
+        condition: 'AND',
+        value: 0,
+      };
+      const onFilterChange = jest.fn();
+      const result = render(
+        <FilterValueEditor
+          allColumns={[]}
+          filter={filter}
+          onFilterChange={onFilterChange}
+          durationFilterContext={{ columnKey: 'Duration', unit: 'nanoseconds' as any }}
+        />
+      );
+      expect(result.getByTestId('query-builder-filters-duration-value-container')).toBeInTheDocument();
+      expect(result.queryByTestId('query-builder-filters-number-value-container')).toBeNull();
+
+      const input = result.getByTestId('query-builder-filters-duration-value-input') as HTMLInputElement;
+      await userEvent.clear(input);
+      await userEvent.type(input, '500ms');
+      fireEvent.blur(input);
+      expect(onFilterChange).toHaveBeenCalledTimes(1);
+      const emitted = onFilterChange.mock.calls[0][0] as NumberFilter;
+      expect(emitted.value).toBe(500_000_000);
+      expect(emitted.rawInput).toBe('500ms');
     });
 
     it('falls back to the number editor when the filter is not on the duration column', () => {

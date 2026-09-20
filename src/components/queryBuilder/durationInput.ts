@@ -26,7 +26,7 @@ const SUFFIX_TO_UNIT: Record<string, TimeUnit> = {
 const SUFFIXES_LONGEST_FIRST = ['ms', 'ns', 'us', 'µs', 's'];
 
 export interface ParsedDuration {
-  /** Value normalised to nanoseconds. May be a floating-point number. */
+  /** Value normalized to nanoseconds. May be a floating-point number. */
   nanoseconds: number;
   /** Whether the input used an explicit unit suffix (false = bare number). */
   hadSuffix: boolean;
@@ -66,12 +66,12 @@ export const parseDurationInput = (text: string): ParsedDuration | { error: stri
   }
 
   if (!/^-?\d+(\.\d+)?$/.test(numberPart) && !/^-?\.\d+$/.test(numberPart)) {
-    return { error: `Unrecognised duration: "${text}"` };
+    return { error: `Unrecognized duration: "${text}"` };
   }
 
   const n = Number(numberPart);
   if (!Number.isFinite(n)) {
-    return { error: `Unrecognised duration: "${text}"` };
+    return { error: `Unrecognized duration: "${text}"` };
   }
   if (n < 0) {
     return { error: 'Duration must be non-negative' };
