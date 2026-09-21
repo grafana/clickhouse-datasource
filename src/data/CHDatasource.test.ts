@@ -161,6 +161,37 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, editorType: EditorType.SQL });
     });
+    it('raises $__interval to the per-query min interval', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $__interval', editorType: EditorType.SQL, minInterval: '5m' } as CHQuery;
+      const scoped = {
+        __interval: { text: '30s', value: '30s' },
+        __interval_ms: { text: '30000', value: 30000 },
+      };
+
+      createInstance({}).applyTemplateVariables(query, scoped);
+
+      expect(spyOnReplace).toHaveBeenCalledWith(
+        'select $__interval',
+        {
+          __interval: { text: '5m', value: '5m' },
+          __interval_ms: { text: '300000', value: 300000 },
+        },
+        expect.any(Function)
+      );
+    });
+    it('leaves $__interval alone without a per-query min interval', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $__interval', editorType: EditorType.SQL } as CHQuery;
+      const scoped = {
+        __interval: { text: '30s', value: '30s' },
+        __interval_ms: { text: '30000', value: 30000 },
+      };
+
+      createInstance({}).applyTemplateVariables(query, scoped);
+
+      expect(spyOnReplace).toHaveBeenCalledWith('select $__interval', scoped, expect.any(Function));
+    });
     it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];
@@ -2437,6 +2468,42 @@ describe('ClickHouseDatasource', () => {
             targets: ['foo', 'bar'],
           } as any)
         ).toBeUndefined();
+      });
+
+      it('applies the min interval of each target to its own volume query', async () => {
+        // The histogram buckets from scopedVars.__interval_ms, which is shared by the whole
+        // request, so a per-query floor only reaches it if it is folded in per target.
+        const seen: Array<number | undefined> = [];
+        jest.spyOn(Datasource.prototype, 'getSupplementaryLogsVolumeQuery').mockImplementation((volumeRequest: any) => {
+          seen.push(volumeRequest.scopedVars.__interval_ms?.value);
+          return { rawSql: 'supplementaryQuery', refId: '' } as CHSqlQuery;
+        });
+        jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1m', intervalMs: 60000 });
+
+        datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
+          scopedVars: { __interval: {} },
+          targets: [
+            { refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } },
+            {
+              refId: 'B',
+              minInterval: '1h',
+              editorType: EditorType.Builder,
+              builderOptions: { queryType: QueryType.Logs },
+            },
+            {
+              refId: 'C',
+              minInterval: '1s',
+              editorType: EditorType.Builder,
+              builderOptions: { queryType: QueryType.Logs },
+            },
+          ],
+          range: ['from', 'to'],
+        } as any);
+
+        // getSupportedSupplementaryQueryTypes probes each target first, so only the last three
+        // calls are the real volume queries. A: no floor, B: raised to 1h, C: floor below the
+        // derived interval, so unchanged.
+        expect(seen.slice(-3)).toEqual([60000, 60 * 60 * 1000, 60000]);
       });
 
       it('should return a modified request with log-volume targets', async () => {

@@ -16,6 +16,7 @@ import {
 import { setColumnByHint, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
 import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
+import { selectors } from 'selectors';
 
 jest.mock('./views/TableQueryBuilder', () => ({
   TableQueryBuilder: () => <div data-testid="table-component" />,
@@ -114,6 +115,32 @@ describe('QueryBuilder', () => {
       )
     );
     expect(result.container.firstChild).not.toBeNull();
+  });
+
+  it('renders the min interval field under the query type row', async () => {
+    const onMinIntervalChange = jest.fn();
+    const result = await waitFor(() =>
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={{
+            queryType: QueryType.Table,
+            mode: BuilderMode.List,
+            database: 'db',
+            table: 'foo',
+            columns: [],
+            filters: [],
+          }}
+          builderOptionsDispatch={() => {}}
+          datasource={mockDs}
+          generatedSql=""
+          minInterval="5m"
+          onMinIntervalChange={onMinIntervalChange}
+        />
+      )
+    );
+
+    expect(result.getByTestId(selectors.components.QueryEditor.MinIntervalEditor.input)).toHaveValue('5m');
   });
 
   describe('compact filter chip label', () => {
