@@ -30,7 +30,7 @@ jobs:
   ci:
     name: CI
     if: github.event_name == 'pull_request'
-    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v10.1.0
+    uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v11.1.1
     permissions:
       contents: read
       id-token: write
@@ -58,7 +58,7 @@ jobs:
     secrets: inherit
 
   publish-dev:
-    name: Publish to Dev Catalog and Deploy
+    name: Publish to Dev Catalog
     needs: cicd
     # Normal pushes to main (no release cut) publish the latest build to the dev
     # catalog. Skipped when release-please cut a release, since cicd already
@@ -76,3 +76,7 @@ jobs:
     with:
       go-version: '1.26.5'
       golangci-lint-version: '2.10.1'
+      # The backend ships to dev0 per merge through the bundled pipeline
+      # (bundled-image.yml), so this job publishes the frontend to the dev catalog
+      # and does not also trigger the backend rollout.
+      deploy: false

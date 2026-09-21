@@ -74,16 +74,26 @@ export class AdHocFilter {
       return sql;
     }
 
-    // sql can contain a query with double quotes around the database and table name, e.g. "default"."table", so we remove those
-    if (this._targetTable !== '' && !sql.replace(/"/g, '').match(new RegExp(`.*\\b${this._targetTable}\\b.*`, 'gi'))) {
+    // Resolve the target table for THIS query. An explicit target set via
+    // setTargetTableFromQuery (the tag-source path) takes precedence; otherwise
+    // resolve from this query. A single AdHocFilter is shared across panels, so
+    // a query-derived target is intentionally not cached back onto the instance:
+    // caching it would let the first panel to render decide the table for every
+    // later panel.
+    const explicitTarget = this._targetTable !== '';
+    const targetTable = explicitTarget ? this._targetTable : getTable(sql);
+
+    if (targetTable === '') {
       return sql;
     }
 
-    if (this._targetTable === '') {
-      this._targetTable = getTable(sql);
-    }
-
-    if (this._targetTable === '') {
+    // Only re-check that the target appears in this query for an explicit
+    // tag-source target; a target just parsed from this same query is by
+    // definition present, and the ASCII \b guard would only produce false
+    // negatives for non-ASCII or spaced names. Quoting is stripped first (e.g.
+    // "default"."table" or `default`.`table`) and the name is regex-escaped so a
+    // name with regex metacharacters (e.g. `a[b`) neither throws nor mismatches.
+    if (explicitTarget && !sql.replace(/["`]/g, '').match(new RegExp(`.*\\b${escapeRegExp(targetTable)}\\b.*`, 'gi'))) {
       return sql;
     }
 
@@ -92,14 +102,24 @@ export class AdHocFilter {
     if (filters === '') {
       return sql;
     }
-    // Semicolons are not required and cause problems when building the SQL
-    sql = sql.replace(';', '');
-    return `${sql} settings additional_table_filters={'${this._targetTable}' : '${filters}'}`;
+    // Strip only a trailing semicolon before appending the settings clause. A
+    // bare replace(';', '') would delete the first semicolon anywhere, e.g.
+    // inside splitByChar(';', col).
+    sql = sql.replace(/;\s*$/, '');
+    // Append on a new line so a trailing line comment (`-- ...`) cannot swallow
+    // the settings clause and silently drop the filter.
+    return `${sql}\nsettings additional_table_filters={'${targetTable}' : '${filters}'}`;
   }
 }
 
 function isValid(filter: AdHocVariableFilter): boolean {
   return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
+}
+
+// Escape regex metacharacters so a table name can be interpolated into a
+// RegExp safely (a `.` in db.table stays literal, `[` etc. do not throw).
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 // Two-layer escape for Map keys embedded as `MapCol[\'<key>\']` inside the

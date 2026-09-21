@@ -1,6 +1,8 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, FieldType, TimeRange } from '@grafana/data';
 import {
+  BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -10,9 +12,11 @@ import {
   TableColumn,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
+import { isCollectionColumnType, isDateTimeColumnType } from 'components/queryBuilder/views/columnNameHeuristics';
 import { Datasource } from './CHDatasource';
 import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
+import { getDefaultLogsFilters } from 'components/queryBuilder/defaultQueryOptions';
 import otel from 'otel';
 
 /**
@@ -319,6 +323,45 @@ function stampJsonColumnTypes(columns: SelectedColumn[], allCols: TableColumn[])
 }
 
 /**
+ * Matches filters that bind a query to the Grafana time range, i.e. the ones that
+ * render as `>= $__fromTime AND <= $__toTime` in the generated SQL.
+ */
+const isTimeRangeFilter = (filter: Filter): boolean =>
+  filter.operator === FilterOperator.WithInGrafanaTimeRange &&
+  (filter.hint === ColumnHint.FilterTime ||
+    filter.hint === ColumnHint.Time ||
+    (filter.type || '').toLowerCase().startsWith('date'));
+
+/**
+ * Replaces the plugin's time macros with concrete bounds from the given range, matching
+ * the backend's expansion (`toDateTime(<unix seconds>)`); `from` is floored and `to` is
+ * ceiled so sub-second edges are never clipped. Data-link queries need this because
+ * Grafana's link variable check treats `$__fromTime`/`$__toTime` as template variables
+ * and hides links whose serialized query contains variables it cannot resolve.
+ */
+const bindTimeRangeMacros = (sql: string, range?: TimeRange): string => {
+  if (!range?.from || !range?.to) {
+    return sql;
+  }
+  return sql
+    .replaceAll('$__fromTime', `toDateTime(${Math.floor(range.from.valueOf() / 1000)})`)
+    .replaceAll('$__toTime', `toDateTime(${Math.ceil(range.to.valueOf() / 1000)})`);
+};
+
+/**
+ * escapeValue() in the SQL generator leaves filter values containing '$' unquoted so
+ * template variables can be used raw — which also applies to the data link's
+ * '${__value.raw}' trace id token. Grafana substitutes a plain hex id into it at click
+ * time, so the pre-generated rawSql must carry the quotes itself (the trace-ID query
+ * does the same in generateTraceQuery). builderOptions is left untouched: by the time
+ * the editor regenerates SQL, the value is a plain string and escapeValue quotes it.
+ */
+const quoteTraceIdValueToken = (sql: string): string => {
+  const token = '${__value.raw}';
+  return sql.includes(`'${token}'`) ? sql : sql.replaceAll(token, `'${token}'`);
+};
+
+/**
  * Mutates the DataQueryResponse to include trace/log links on the traceID field.
  * The link will open a second query editor in split view on the explore page
  * with the selected trace ID.
@@ -364,6 +407,16 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     // Use traces config traceIdColumn if available, otherwise fallback to logs default
     const traceIdColumnName =
       datasource.getTracesTraceIdColumn() || defaultLogsColumns.get(ColumnHint.TraceId) || 'TraceId';
+
+    const traceIdFilter: StringFilter = {
+      type: 'string',
+      operator: FilterOperator.Equals,
+      filterType: 'custom',
+      key: traceIdColumnName,
+      hint: ColumnHint.TraceId,
+      condition: 'AND',
+      value: '${__value.raw}',
+    };
 
     const traceIdQuery: CHBuilderQuery = {
       // Embed only a datasource ref ({ uid, type }), never the live Datasource instance:
@@ -527,20 +580,18 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     };
 
     if (originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs) {
-      // Copy fields directly from log search
+      // Copy fields directly from log search. Only its time-range filter is carried
+      // over: the pivot should show every log row for the trace, and dropping the
+      // rest also discards any TraceId filter left from a previous pivot.
+      const originalTimeFilters = (originalQuery.builderOptions.filters || []).filter(isTimeRangeFilter);
+      const timeFilters =
+        originalTimeFilters.length > 0 ? originalTimeFilters : getDefaultLogsFilters().filter(isTimeRangeFilter);
       traceLogsQuery.builderOptions = {
         ...originalQuery.builderOptions,
-        filters: [
-          {
-            type: 'string',
-            operator: FilterOperator.Equals,
-            filterType: 'custom',
-            key: traceIdColumnName,
-            hint: ColumnHint.TraceId,
-            condition: 'AND',
-            value: '${__value.raw}',
-          } as StringFilter,
-        ],
+        // List mode is required by getSupplementaryLogsVolumeQuery; without it the
+        // logs volume histogram is skipped until the editor merges query defaults
+        mode: BuilderMode.List,
+        filters: [...timeFilters, traceIdFilter],
         orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
         meta: {
           ...originalQuery.builderOptions.meta,
@@ -558,19 +609,13 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           datasource.getDefaultDatabase(),
         table: datasource.getDefaultLogsTable() || datasource.getDefaultTable() || traceLogsQuery.builderOptions.table,
         queryType: QueryType.Logs,
+        // List mode is required by getSupplementaryLogsVolumeQuery; without it the
+        // logs volume histogram is skipped until the editor merges query defaults
+        mode: BuilderMode.List,
         columns: [],
         orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC }],
-        filters: [
-          {
-            type: 'string',
-            operator: FilterOperator.Equals,
-            filterType: 'custom',
-            key: traceIdColumnName,
-            hint: ColumnHint.TraceId,
-            condition: 'AND',
-            value: '${__value.raw}',
-          } as StringFilter,
-        ],
+        // The default filters carry the time-range bound so the time picker constrains the query
+        filters: [...getDefaultLogsFilters(), traceIdFilter],
         meta: {
           minimized: true,
           otelEnabled: Boolean(otelVersion),
@@ -590,13 +635,11 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       traceLogsQuery.builderOptions = options;
     }
 
-    // Generate rawSql for Dashboard mode to preserve query through serialization
     const openInNewWindow = req.app !== CoreApp.Explore;
-    if (openInNewWindow) {
-      traceLogsQuery.rawSql = generateSql(traceLogsQuery.builderOptions || {});
-    } else {
-      traceLogsQuery.rawSql = '';
-    }
+    // Pre-generate rawSql so the first auto-run executes immediately.
+    traceLogsQuery.rawSql = quoteTraceIdValueToken(
+      bindTimeRangeMacros(generateSql(traceLogsQuery.builderOptions || {}), req.range)
+    );
     traceLogsQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceLogsQuery.builderOptions);
     traceField.config.links = [];
     const canLinkToTraces =
@@ -676,4 +719,172 @@ export const dataFrameHasLogLabelWithName = (frame: DataFrame | undefined, name:
   const labelKeys = Object.keys(labels);
 
   return labelKeys.includes(name);
+};
+
+/**
+ * Heuristic: does a `labels` frame field hold the backend's serialized attribute
+ * map (an object, or a JSON-object string) rather than a real table column that
+ * happens to be named `labels`? Samples the first non-empty value. Used so the
+ * fold never overwrites a user's own `labels` column.
+ */
+const isBackendLabelsField = (field: DataFrame['fields'][number]): boolean => {
+  const values = field.values as unknown as unknown[];
+  const len = values?.length ?? 0;
+  for (let i = 0; i < len; i++) {
+    const v = values[i];
+    if (v === null || v === undefined || v === '') {
+      continue;
+    }
+    if (typeof v === 'object') {
+      return true; // already-parsed attribute map
+    }
+    if (typeof v === 'string') {
+      try {
+        const parsed = JSON.parse(v);
+        return parsed !== null && typeof parsed === 'object';
+      } catch {
+        return false; // a real string column named `labels`
+      }
+    }
+    return false; // a numeric / boolean column named `labels`
+  }
+  return true; // empty labels field: safe to treat as the (empty) attribute map
+};
+
+/**
+ * Folds the datasource's configured extra log columns (the "Columns" setting,
+ * jsonData.logs.additionalColumns) into the frame's `labels` field under their
+ * plain names, so they surface as flat, filterable fields alongside the grouped
+ * OTel attributes, and removes them as standalone frame fields. Real column names
+ * are used so a filter-for click resolves in both the main and logs-volume queries.
+ *
+ * Scope is limited to the configured columns on purpose:
+ *   - Columns picked by hand in the query builder stay as standalone frame fields,
+ *     so a Table panel on a logs builder query keeps its columns.
+ *   - Context columns (Show-context) are never folded away, so
+ *     getLogContextColumnsFromLogRow can still match them by name.
+ *   - Collection columns (Map/Array/...) and date/time columns are skipped: the
+ *     former have no scalar label value, the latter would serialize to a raw
+ *     epoch. Grafana renders those from the frame field itself.
+ *
+ * Creates `labels` when the frame has none (non-OTel tables). Leaves the frame
+ * untouched when an existing `labels` field is a real table column rather than the
+ * backend-serialized attribute map, so the user's data is not clobbered. When no
+ * columns are configured this is a no-op.
+ */
+export const foldDiscoveredLogFieldsIntoLabels = (
+  datasource: Datasource,
+  req: DataQueryRequest<CHQuery>,
+  res: DataQueryResponse
+): DataQueryResponse => {
+  const configured = new Set(datasource.getAdditionalLogColumns().map((c) => c.split('[')[0]));
+  if (configured.size === 0) {
+    return res;
+  }
+  const contextColumns = new Set(datasource.getLogContextColumnNames().map((c) => c.split('[')[0]));
+  const targetsByRefId = new Map(req.targets.map((t) => [t.refId, t]));
+
+  for (const frame of (res.data as DataFrame[]) || []) {
+    const target = targetsByRefId.get(frame.refId ?? '');
+    if (!target || target.editorType !== EditorType.Builder) {
+      continue;
+    }
+    const builderOptions = (target as CHBuilderQuery).builderOptions;
+    if (!builderOptions || builderOptions.queryType !== QueryType.Logs) {
+      continue;
+    }
+
+    // Only the configured extra columns fold. Role columns (time / body / level /
+    // trace id) carry a hint; attribute maps are collection-typed; date/time
+    // columns serialize to a raw epoch; context columns are needed by
+    // Show-context; a column aliased to a different name would break filter-for in
+    // the logs-volume query. A column whose alias equals its name (how the builder
+    // tags a plain pick) folds like an unaliased one.
+    const discovered = (builderOptions.columns || [])
+      .filter(
+        (c) =>
+          c.hint === undefined &&
+          !isCollectionColumnType(c.type) &&
+          !isDateTimeColumnType(c.type) &&
+          (!c.alias || c.alias === c.name) &&
+          configured.has(c.name) &&
+          !contextColumns.has(c.name)
+      )
+      .map((c) => c.name);
+    const sourceFields = discovered
+      .map((name) => frame.fields.find((f) => f.name === name && f.name !== labelsFieldName))
+      .filter((f): f is DataFrame['fields'][number] => f !== undefined)
+      // Backstop for a configured column whose schema type was not resolved (for example the classic
+      // builder's new-query path before the schema loads): the frame field's own type is reliable, so
+      // skip time-typed (raw epoch) and object-typed (Map/collection -> [object Object]) fields here too.
+      .filter((f) => f.type !== FieldType.time && f.type !== FieldType.other);
+    if (sourceFields.length === 0) {
+      continue;
+    }
+
+    // Do not overwrite a real table column that happens to be named `labels`. It is a real column when
+    // the query selects one named `labels` (the backend attribute map is synthesized, never selected);
+    // the value-shape check is a fallback for frames whose column metadata is absent.
+    const labelsIsSelectedColumn = (builderOptions.columns || []).some(
+      (c) => (c.alias || c.name).split('[')[0] === labelsFieldName || c.name.split('[')[0] === labelsFieldName
+    );
+    const existingLabels = frame.fields.find((f) => f.name === labelsFieldName);
+    if (existingLabels && (labelsIsSelectedColumn || !isBackendLabelsField(existingLabels))) {
+      continue;
+    }
+
+    const rowLen = frame.length ?? frame.fields[0]?.values.length ?? 0;
+
+    let labelsField = existingLabels;
+    if (!labelsField) {
+      labelsField = {
+        name: labelsFieldName,
+        type: FieldType.other,
+        config: {},
+        values: Array.from({ length: rowLen }, () => ({})),
+      } as unknown as DataFrame['fields'][number];
+      frame.fields.push(labelsField);
+    }
+
+    // Fold every column into `labels` with a single parse/serialize per row, rather than one
+    // round trip per column per row (which is quadratic on a wide table).
+    for (let i = 0; i < rowLen; i++) {
+      // `labels` values may be JSON strings (how the backend serializes the OTel attribute maps)
+      // or already-parsed objects (a frame we just created). Handle both and write back in kind.
+      const raw = labelsField.values[i];
+      const wasString = typeof raw === 'string';
+      let obj: Record<string, unknown>;
+      if (wasString) {
+        try {
+          obj = JSON.parse(raw as string) as Record<string, unknown>;
+        } catch {
+          obj = {};
+        }
+      } else {
+        obj = (raw as Record<string, unknown>) || {};
+      }
+      if (!obj || typeof obj !== 'object') {
+        obj = {};
+      }
+
+      let folded = false;
+      for (const src of sourceFields) {
+        const v = src.values[i];
+        if (v === null || v === undefined || v === '') {
+          continue;
+        }
+        obj[src.name] = typeof v === 'string' ? v : String(v);
+        folded = true;
+      }
+
+      if (folded) {
+        labelsField.values[i] = wasString ? JSON.stringify(obj) : obj;
+      }
+    }
+
+    const foldedNames = new Set(sourceFields.map((f) => f.name));
+    frame.fields = frame.fields.filter((f) => f === labelsField || !foldedNames.has(f.name));
+  }
+
+  return res;
 };

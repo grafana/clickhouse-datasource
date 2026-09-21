@@ -1,0 +1,25 @@
+{
+  "resourceLogs": [
+    {
+      "resource": {
+        "attributes": [{ "key": "service.name", "value": { "stringValue": "schema-canary" } }]
+      },
+      "scopeLogs": [
+        {
+          "scope": { "name": "schema-canary" },
+          "logRecords": [
+            {
+              "timeUnixNano": "1735689600000000000",
+              "severityText": "INFO",
+              "severityNumber": 9,
+              "body": { "stringValue": "schema canary log record" },
+              "attributes": [{ "key": "canary", "value": { "stringValue": "true" } }],
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

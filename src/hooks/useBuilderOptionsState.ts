@@ -11,6 +11,7 @@ enum BuilderOptionsActionType {
   SetOtelEnabled = 'set_otel_enabled',
   SetOtelVersion = 'set_otel_version',
   SetColumnByHint = 'set_column_by_hint',
+  MergeColumns = 'merge_columns',
   SetBuilderMinimized = 'set_builder_minimized',
 }
 
@@ -47,6 +48,8 @@ export const setOtelVersion = (otelVersion: string): BuilderOptionsReducerAction
   createAction(BuilderOptionsActionType.SetOtelVersion, { meta: { otelVersion } });
 export const setColumnByHint = (column: SelectedColumn): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.SetColumnByHint, { column });
+export const mergeColumns = (columns: SelectedColumn[]): GenericReducerAction =>
+  createGenericAction(BuilderOptionsActionType.MergeColumns, { columns });
 export const setBuilderMinimized = (minimized: boolean): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.SetBuilderMinimized, { minimized });
 
@@ -143,11 +146,35 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     BuilderOptionsActionType.SetColumnByHint,
     (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
       const col = action.payload.column as SelectedColumn;
-      const nextColumns = (state.columns || []).filter((c) => c.hint !== col.hint);
+      // Drop the column that currently holds this hint, and any hint-less column of the same name.
+      // The latter is a plain column (for example one added by the "Include all columns" option)
+      // being promoted to a role; without this it would stay selected and get projected twice.
+      // Columns that hold a different hint are kept, so a column can still fill more than one role.
+      const nextColumns = (state.columns || []).filter(
+        (c) => c.hint !== col.hint && !(c.hint === undefined && c.name === col.name)
+      );
       nextColumns.push(col);
 
       return mergeBuilderOptionsState(state, {
         columns: nextColumns,
+      });
+    },
+  ],
+  [
+    BuilderOptionsActionType.MergeColumns,
+    (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
+      // Append columns whose name is not already selected, keeping every existing column
+      // (including role columns set by hint). Merging against live state keeps this safe
+      // regardless of dispatch ordering relative to setColumnByHint.
+      const incoming = (action.payload.columns as SelectedColumn[]) || [];
+      const existingNames = new Set((state.columns || []).map((c) => c.name));
+      const additions = incoming.filter((c) => !existingNames.has(c.name));
+      if (additions.length === 0) {
+        return state;
+      }
+
+      return mergeBuilderOptionsState(state, {
+        columns: [...(state.columns || []), ...additions],
       });
     },
   ],

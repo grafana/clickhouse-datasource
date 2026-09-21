@@ -171,6 +171,21 @@ describe('SQL Generator', () => {
     expect(sql).toEqual(expectedSqlParts.join(' '));
   });
 
+  it('returns an empty query when a logs query has no selected columns', () => {
+    // Cold-load transient in the compact editor: a non-OTel table has no columns until the
+    // schema fetch resolves and the default-column hooks run. Emitting `SELECT  FROM table`
+    // would be rejected by ClickHouse with a syntax error, so the generator emits nothing.
+    const opts: QueryBuilderOptions = {
+      database: 'system',
+      table: 'query_log',
+      queryType: QueryType.Logs,
+      columns: [],
+      limit: 1000,
+    };
+
+    expect(generateSql(opts)).toEqual('');
+  });
+
   // Regression test for #1882: opentelemetry-collector-contrib clickhouseexporter v0.151.0
   // dropped the TimestampTime column from otel_logs. The default WHERE filter and ORDER BY
   // entries the logs query builder installs reference ColumnHint.FilterTime; when that hint

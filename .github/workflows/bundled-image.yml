@@ -8,10 +8,12 @@
 # unchanged in every plugin repo that adopts bundled images. Keep it that way: anything that has to
 # differ per repo belongs in the shared workflow's defaults, not copied into three callers.
 #
-# Manual dispatch only, deliberately. Bundled delivery is being rolled out to the pilot data
-# sources one step at a time, and a push trigger would build an image for every commit to main
-# before the rollout is proven. When the push trigger is added it wants a paths filter, so a
-# docs-only or test-only commit does not rebuild the image.
+# Push events ship every merge to main to the dev0 wave through the shared pipeline: the
+# build is pushed and the `<plugin-id>-dev` rollout is triggered, gated and benched. The
+# paths filter keeps docs- and test-only commits from rebuilding the image. A published
+# release builds from the tag and triggers the full rollout, so merging a release PR
+# delivers it to Cloud. Manual dispatch keeps the explicit inputs, targets the full
+# rollout, and stays as the fallback.
 #
 # Note on the app grant:
 # The shared workflow reads the Grafana base image from one line of a private infrastructure repo.
@@ -22,8 +24,24 @@
 name: Plugins - Bundled image
 
 on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**/*.md"
+      - docs/**
+      - tests/**
   workflow_dispatch:
     inputs:
+      ref:
+        description: >-
+          Tag or commit SHA to build. Leave empty to build the commit the run starts from. Set it
+          to the release tag when a release build is re-run, so the image matches the published
+          version and not the current main HEAD.
+        type: string
+        required: false
+        default: ""
       grafana-image:
         description: >-
           Grafana base image to bundle onto. Leave empty to read the first wave's current image.
@@ -63,6 +81,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      ref: ${{ inputs.ref }}
       grafana-image: ${{ inputs.grafana-image }}
       push-image: ${{ inputs.push-image }}
       trigger-argo: ${{ inputs.trigger-argo }}
