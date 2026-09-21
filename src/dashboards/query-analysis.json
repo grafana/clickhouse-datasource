@@ -670,7 +670,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT\n  $__timeInterval(query_start_time) as time,\n  any(normalizeQuery(query)) AS normalized_query,\n  avg(query_duration_ms) as avg_query_duration\nFROM ${query_log}\nWHERE type != 'QueryStart'\n  AND $__conditionalAll(initial_user IN (${user:singlequote}), $user)\n  AND $__conditionalAll(query_kind IN (${query_kind:singlequote}), $query_kind)\n  AND $__timeFilter(event_time)\n  AND normalized_query_hash IN (\n    SELECT normalized_query_hash\n    FROM ${query_log}\n    WHERE\n      $__conditionalAll(type IN (${type:singlequote}), $type)\n      AND $__conditionalAll(initial_user IN (${user:singlequote}), $user)\n      AND $__conditionalAll(query_kind IN (${query_kind:singlequote}), $query_kind)\n      AND $__timeFilter(event_time)\n    GROUP BY normalized_query_hash\n    ORDER BY avg(query_duration_ms) DESC\n    LIMIT 10\n  )\nGROUP BY normalized_query_hash, time\nORDER BY time",
+          "rawSql": "SELECT\n  $__timeInterval(query_start_time) as time,\n  any(normalizeQuery(query)) AS normalized_query,\n  avg(query_duration_ms) as avg_query_duration\nFROM ${query_log}\nWHERE type != 'QueryStart'\n  AND $__conditionalAll(type IN (${type:singlequote}), $type)\n  AND $__conditionalAll(initial_user IN (${user:singlequote}), $user)\n  AND $__conditionalAll(query_kind IN (${query_kind:singlequote}), $query_kind)\n  AND $__timeFilter(event_time)\n  AND normalized_query_hash IN (\n    SELECT normalized_query_hash\n    FROM ${query_log}\n    WHERE\n      $__conditionalAll(type IN (${type:singlequote}), $type)\n      AND $__conditionalAll(initial_user IN (${user:singlequote}), $user)\n      AND $__conditionalAll(query_kind IN (${query_kind:singlequote}), $query_kind)\n      AND $__timeFilter(event_time)\n    GROUP BY normalized_query_hash\n    ORDER BY avg(query_duration_ms) DESC\n    LIMIT 10\n  )\nGROUP BY normalized_query_hash, time\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -890,7 +890,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT\n  $__timeInterval(query_start_time) as time,\n  max(memory_usage) as \"Max Memory Usage\"\nFROM ${query_log}\nWHERE $__timeFilter(event_time)\nGROUP BY time\nORDER BY time DESC",
+          "rawSql": "SELECT\n  $__timeInterval(query_start_time) as time,\n  max(memory_usage) as \"Max Memory Usage\"\nFROM ${query_log}\nWHERE\n  $__conditionalAll(type IN (${type:singlequote}), $type)\n  AND $__conditionalAll(initial_user IN (${user:singlequote}), $user)\n  AND $__conditionalAll(query_kind IN (${query_kind:singlequote}), $query_kind)\n  AND $__timeFilter(event_time)\nGROUP BY time\nORDER BY time",
           "refId": "A"
         }
       ],
@@ -1018,7 +1018,7 @@
             }
           },
           "queryType": "sql",
-          "rawSql": "SELECT\n  toStartOfInterval(toDateTime(event_time), INTERVAL 60 second),\n  sum(read_rows) read_rows,\n  sum(written_rows) written_rows\nFROM ${query_log}\nWHERE $__timeFilter(event_time)\nGROUP BY event_time\nORDER BY event_time ASC",
+          "rawSql": "SELECT\n  $__timeInterval(event_time) as time,\n  sum(read_rows) read_rows,\n  sum(written_rows) written_rows\nFROM ${query_log}\nWHERE\n  $__conditionalAll(type IN (${type:singlequote}), $type)\n  AND $__conditionalAll(initial_user IN (${user:singlequote}), $user)\n  AND $__conditionalAll(query_kind IN (${query_kind:singlequote}), $query_kind)\n  AND $__timeFilter(event_time)\nGROUP BY time\nORDER BY time ASC",
           "refId": "A"
         }
       ],

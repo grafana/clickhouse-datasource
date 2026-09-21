@@ -164,6 +164,57 @@ describe('OTel dashboards', () => {
     });
   });
 
+  describe('query-analysis query_log source', () => {
+    const QUERY_ANALYSIS = 'query-analysis.json';
+    const readDashboard = () =>
+      JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, QUERY_ANALYSIS), 'utf8')) as {
+        templating?: { list?: Array<{ name?: string; type?: string; query?: unknown }> };
+      };
+
+    it('exposes query_log as a constant variable defaulting to the local system table', () => {
+      const variable = readDashboard().templating?.list?.find((v) => v.name === 'query_log');
+      expect(variable).toBeDefined();
+      expect(variable?.type).toBe('constant');
+      expect(variable?.query).toBe('system.query_log');
+    });
+
+    it('reads every panel and variable through ${query_log}', () => {
+      // A single hard-coded system.query_log would silently pin that panel to the local node
+      // while the rest of the dashboard followed the selected source.
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, QUERY_ANALYSIS), 'utf8');
+      const sources = content.match(/(?:FROM|JOIN)\s+(?:\$\{query_log\}|[\w.]*query_log)/g) ?? [];
+      expect(sources.length).toBeGreaterThan(0);
+      for (const source of sources) {
+        expect(source.replace(/(?:FROM|JOIN)\s+/, '')).toBe('${query_log}');
+      }
+    });
+
+    it('filters every panel by the dashboard variables', () => {
+      // Two panels used to read the whole query_log regardless of the Query status, user and
+      // query kind selections, which reads as a rendering bug rather than a filter.
+      const dashboard = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, QUERY_ANALYSIS), 'utf8')) as {
+        panels?: Array<{ title?: string; targets?: Array<{ rawSql?: string }>; panels?: unknown }>;
+      };
+      const flatten = (panels: typeof dashboard.panels = []): NonNullable<typeof dashboard.panels> =>
+        panels.flatMap((panel) => [panel, ...flatten((panel.panels as typeof dashboard.panels) ?? [])]);
+
+      const queries = flatten(dashboard.panels).flatMap((panel) =>
+        (panel.targets ?? []).map((target) => ({ title: panel.title ?? '', sql: target.rawSql ?? '' }))
+      );
+      expect(queries.length).toBeGreaterThan(0);
+
+      for (const { title, sql } of queries.filter(({ sql }) => sql.includes('${query_log}'))) {
+        for (const column of ['type', 'initial_user', 'query_kind']) {
+          // Either the variable drives the column, or the panel constrains that column itself
+          // — "Query requests by user" picks its own top ten, as it does on main.
+          const constrained =
+            sql.includes(`$__conditionalAll(${column} IN (`) || new RegExp(`\\b${column} (?:IN|!=|=) `).test(sql);
+          expect(`${title} constrains ${column}`).toBe(constrained ? `${title} constrains ${column}` : sql);
+        }
+      }
+    });
+  });
+
   describe('template variable quoting', () => {
     // allDashboards covers every bundled dashboard, so a bare interpolation added to any of
     // them is caught.
