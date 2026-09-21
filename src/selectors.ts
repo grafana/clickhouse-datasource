@@ -6,6 +6,9 @@ export const Components = {
       container: 'data-testid-code-editor-container',
       Expand: 'data-testid-code-editor-expand-button',
     },
+    MinIntervalEditor: {
+      input: 'query-editor__min-interval-editor__input',
+    },
     Format: {
       label: 'Format',
       tooltip: 'Query Type',

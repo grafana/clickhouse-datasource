@@ -32,6 +32,7 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 | **Editor type** | Switch between **SQL** (write raw SQL) and **Query builder** (build queries with drop-downs and filters).                                                                                  |
 | **Run Query**   | Runs the current query and refreshes the panel. In the SQL editor you can also use **Ctrl+Enter** (Windows/Linux) or **Cmd+Enter** (macOS).                                                |
 | **Query type**  | Choose the result format: **Table**, **Logs**, **Time series**, or **Traces**. This sets how Grafana interprets and visualizes the results. Available in both SQL and Query builder modes. |
+| **Min interval** | A lower bound for this query's interval, as one number plus a unit of `ms`, `s`, `m`, `h`, `d` or `w` (for example `10s`, `5m`, `1d`). It raises the interval Grafana derives from the time range and panel width, so `$__timeInterval`, `$__timeInterval_ms`, `$__interval_s`, `$__timeGroup`, `$__interval` and `$__interval_ms` never bucket finer than the value you set; it never lowers the interval. Leave it empty to use the interval Grafana picks. Explore has no panel-level **Min interval**, so this is the only way to control bucket size there. The floor applies in Explore, dashboard panels and alert rules alike, and to the Explore log volume histogram. Values outside that grammar, including `1M` and `1y`, are rejected in the editor and ignored by the backend. |
 
 **In SQL mode:**
 
