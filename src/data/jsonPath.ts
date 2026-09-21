@@ -14,7 +14,7 @@ export function escapeJSONPathSegment(segment: string): string {
 // callers pass a schema column name and see no change, but an ad-hoc filter key
 // can be typed/unusual — quoting keeps the generated SQL well-formed instead of
 // splicing arbitrary text into the expression.
-function quoteColumnIfUnsafe(column: string): string {
+export function quoteColumnIfUnsafe(column: string): string {
   if (/^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$/.test(column)) {
     return column;
   }

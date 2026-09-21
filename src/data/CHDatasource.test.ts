@@ -1213,7 +1213,9 @@ describe('ClickHouseDatasource', () => {
       const valueSql = spyOnQuery.mock.calls
         .map((c) => (c[0] as any).targets[0].rawSql ?? '')
         .find((s: string) => s.includes('select distinct'));
-      expect(valueSql).toContain('where "Timestamp" >= fromUnixTimestamp(1600000000) and "Timestamp" <= fromUnixTimestamp(1600086400) limit 1000');
+      expect(valueSql).toContain(
+        'where "Timestamp" >= fromUnixTimestamp(1600000000) and "Timestamp" <= fromUnixTimestamp(1600086400) limit 1000'
+      );
       expect(valueSql).not.toContain('INTERVAL 6 HOUR');
     });
   });

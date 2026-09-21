@@ -1613,8 +1613,7 @@ export class Datasource
     // other query type runs as before, so an empty or invalid SQL-editor query still surfaces its
     // error to the user instead of being dropped silently.
     const isBuilderLogsQuery =
-      query.editorType === EditorType.Builder &&
-      (query as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs;
+      query.editorType === EditorType.Builder && (query as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs;
     if (isBuilderLogsQuery && !(query.rawSql && query.rawSql.trim().length > 0)) {
       return false;
     }
@@ -1924,10 +1923,12 @@ export class Datasource
     let whereClause = '';
     if (timeColumn) {
       const tc = escapeIdentifier(timeColumn);
-      const fromMs = timeRange?.from?.valueOf?.();
-      const toMs = timeRange?.to?.valueOf?.();
+      // Number.isFinite rather than a typeof check: an invalid TimeRange yields
+      // NaN, which is a number and would emit fromUnixTimestamp(NaN).
+      const fromMs = Number(timeRange?.from?.valueOf?.());
+      const toMs = Number(timeRange?.to?.valueOf?.());
       whereClause =
-        typeof fromMs === 'number' && typeof toMs === 'number'
+        Number.isFinite(fromMs) && Number.isFinite(toMs)
           ? ` where ${tc} >= fromUnixTimestamp(${Math.floor(fromMs / 1000)}) and ${tc} <= fromUnixTimestamp(${Math.floor(toMs / 1000)})`
           : ` where ${tc} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`;
     }
@@ -2024,7 +2025,7 @@ export class Datasource
     this.attributeSchemaFetched.add(table);
     try {
       this.skipAdHocFilter = true;
-      const rawSql = `SELECT name, type FROM system.columns WHERE database = '${db}' AND table = '${table}'`;
+      const rawSql = `SELECT name, type FROM system.columns WHERE database = '${escapeCHStringLiteral(db)}' AND table = '${escapeCHStringLiteral(table)}'`;
       const frame = await this.runQuery({ rawSql });
       const view = new DataFrameView<{ 0: string; 1: string }>(frame);
       view.forEach((item) => {

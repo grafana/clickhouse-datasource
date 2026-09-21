@@ -1,6 +1,6 @@
 import { AdHocVariableFilter } from '@grafana/data';
 import { getTable } from './ast';
-import { buildJSONPathAccess, parseJSONAdhocKey } from './jsonPath';
+import { buildJSONPathAccess, parseJSONAdhocKey, quoteColumnIfUnsafe } from './jsonPath';
 
 // OTel-standard Map columns. Retained as a fallback so behavior does not
 // regress when schema info has not been populated (e.g. in tests that
@@ -135,7 +135,6 @@ function escapeRegExp(value: string): string {
 // each `'` produces `\\\'` and each `\` produces `\\\\` at SQL source level.
 function escapeForOuterFilterLiteral(value: string): string {
   return value.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
-
 }
 
 // Self-describing Map access minted by getTagKeys: `MapCol['key']` or
@@ -157,6 +156,21 @@ function buildJSONAccessForOuterFilter(col: string, path: string): string {
   return expr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 }
 
+// A column identifier emitted straight into the `additional_table_filters`
+// expression. Ad-hoc filter keys are URL-settable, and this identifier used to
+// be emitted verbatim, so a crafted key such as `ServiceName = 'x' OR 1=1 --`
+// spliced raw SQL into the filter predicate and bypassed the filter. Plain and
+// dotted identifiers pass through unchanged; anything else is backtick-quoted
+// (identifier layer first, then the outer single-quoted filter string) so the
+// query fails closed with UNKNOWN_IDENTIFIER rather than running the injection.
+function safeColumnRef(id: string): string {
+  const quoted = quoteColumnIfUnsafe(id);
+  if (quoted === id) {
+    return id;
+  }
+  return quoted.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
@@ -164,7 +178,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const match = s.match(/arrayElement\((.*?),\s*['"](.*?)['"]\)/);
     if (match) {
       const [_, array, key] = match;
-      return `${array}[\\'${escapeForOuterFilterLiteral(key)}\\']`;
+      return `${safeColumnRef(array)}[\\'${escapeForOuterFilterLiteral(key)}\\']`;
     }
   }
 
@@ -179,7 +193,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
+    return `${safeColumnRef(mapCol)}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Stateless JSON path form minted by getTagKeys (`col.`seg``): the backtick
@@ -202,7 +216,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
+    return `${safeColumnRef(mapCol)}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Non-prefixed Map access: `MapCol.key1.key2` (hideTableName=true or
@@ -214,12 +228,12 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     if (isJSON) {
       return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
+    return `${safeColumnRef(mapCol)}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Default: bare column, or `table.col` reference where col isn't a Map.
   // Strip the leading table prefix if present.
-  return s.includes('.') ? s.split('.').slice(1).join('.') : s;
+  return safeColumnRef(s.includes('.') ? s.split('.').slice(1).join('.') : s);
 }
 
 function escapeValueBasedOnOperator(s: string, operator: string, values?: string[]): string {
@@ -271,7 +285,12 @@ function parseInListItems(raw: string): string[] {
   }
   items.push(cur);
   return items
-    .map((item) => item.trim().replace(/^'([\s\S]*)'$/, '$1').replace(/''/g, "'"))
+    .map((item) =>
+      item
+        .trim()
+        .replace(/^'([\s\S]*)'$/, '$1')
+        .replace(/''/g, "'")
+    )
     .filter((item) => item.length > 0);
 }
 

@@ -74,7 +74,7 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 // generation), so they hand-type the SQL rather than invoking those methods.
 // ---------------------------------------------------------------------------
 
-test.describe('JSON column adhoc filters', () => {
+test.describe('ClickHouse accepts the SQL shapes the JSON adhoc path emits', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeEach(() => {
@@ -89,7 +89,10 @@ test.describe('JSON column adhoc filters', () => {
     // Shape emitted by fetchUniqueJSONPathsForAdhoc(), which getTagKeys()
     // invokes when it sees a JSON-typed column. Nested keys are returned as
     // flattened dot-paths (`http.status_code`).
-    await enterSql(page, 'SELECT DISTINCT arrayJoin(JSONAllPaths(attributes)) AS path FROM e2e_test.json_events ORDER BY path');
+    await enterSql(
+      page,
+      'SELECT DISTINCT arrayJoin(JSONAllPaths(attributes)) AS path FROM e2e_test.json_events ORDER BY path'
+    );
 
     const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();

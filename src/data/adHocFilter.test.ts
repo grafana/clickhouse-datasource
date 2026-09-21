@@ -160,6 +160,40 @@ describe('AdHocManager', () => {
     expect(val).toEqual(`SELECT foo.stuff FROM foo\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
 
+  it('does not let a crafted ad-hoc filter key inject SQL (fails closed)', () => {
+    // Ad-hoc keys are attacker-influenceable (URL-settable). A key carrying raw
+    // SQL must be emitted as a single (invalid) backtick identifier, not injected
+    // into the additional_table_filters predicate — otherwise `OR 1=1 --` would
+    // bypass the filter and expose the whole table.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: "ServiceName = 'nginx' OR 1=1 --", operator: '=', value: 'x' },
+    ] as AdHocVariableFilter[]);
+    // The whole crafted key is backtick-quoted (and quote-escaped for the outer
+    // string), so ClickHouse reads it as one nonexistent column name.
+    expect(result).toContain("`ServiceName = \\'nginx\\' OR 1=1 --`");
+    // The pre-fix, un-quoted injection form must not appear.
+    expect(result).not.toContain(" ServiceName = 'nginx' OR 1=1");
+  });
+
+  it('leaves a plain column key unchanged (no backtick churn)', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([{ key: 'ServiceName', operator: '=', value: 'x' }] as AdHocVariableFilter[]);
+    expect(result).toBe(" ServiceName = \\'x\\' ");
+  });
+
+  it('quotes a crafted Map column and a crafted key separately', () => {
+    // The Map branch emits the column as an identifier and the key as a nested
+    // string literal, so both layers have to hold.
+    const ahm = new AdHocFilter();
+    ahm.setMapColumns(new Set(["labels']) OR 1=1 --"]));
+    const result = ahm.buildFilterString([
+      { key: "labels']) OR 1=1 --.k", operator: '=', value: 'x' },
+    ] as AdHocVariableFilter[]);
+    expect(result).toContain('`labels');
+    expect(result).not.toMatch(/\)\s*OR 1=1 --\[/);
+  });
+
   it('apply ad hoc filter converts "=~" to "REGEXP"', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM foo');
@@ -291,7 +325,7 @@ describe('AdHocManager', () => {
   it('escapes each IN element so a crafted value cannot break out of the filter', () => {
     const ahm = new AdHocFilter();
     const result = ahm.buildFilterString([
-      { key: 'k', operator: 'IN', value: "1) OR 1=1 OR ServiceName IN (1" },
+      { key: 'k', operator: 'IN', value: '1) OR 1=1 OR ServiceName IN (1' },
     ] as AdHocVariableFilter[]);
     // The whole payload becomes a single quoted literal element, not injected SQL.
     expect(result).toContain("k IN (\\'1) OR 1=1 OR ServiceName IN (1\\')");
@@ -305,6 +339,17 @@ describe('AdHocManager', () => {
       { key: 'k', operator: 'IN', value: 'ignored', values: ["a'b", 'c'] },
     ] as AdHocVariableFilter[]);
     expect(result).toBe(" k IN (\\'a\\\\\\'b\\', \\'c\\') ");
+  });
+
+  it('renders an empty IN list as (NULL) so the SQL stays valid', () => {
+    // ClickHouse rejects `IN ()`, and nothing else pins this spelling.
+    const ahm = new AdHocFilter();
+    expect(ahm.buildFilterString([{ key: 'k', operator: 'IN', value: '', values: [] }] as AdHocVariableFilter[])).toBe(
+      ' k IN (NULL) '
+    );
+    expect(
+      ahm.buildFilterString([{ key: 'k', operator: 'NOT IN', value: '', values: [] }] as AdHocVariableFilter[])
+    ).toBe(' k NOT IN (NULL) ');
   });
 
   it('handles NOT IN with per-element escaping', () => {
@@ -329,9 +374,7 @@ describe('AdHocManager', () => {
     // Pins the escaping on the parseInListItems path — a mutant that escapes
     // only the `values` array elements would leave this quote un-escaped.
     const ahm = new AdHocFilter();
-    const result = ahm.buildFilterString([
-      { key: 'k', operator: 'IN', value: "a'b" },
-    ] as AdHocVariableFilter[]);
+    const result = ahm.buildFilterString([{ key: 'k', operator: 'IN', value: "a'b" }] as AdHocVariableFilter[]);
     expect(result).toBe(" k IN (\\'a\\\\\\'b\\') ");
     expect(result).not.toContain("a'b");
   });
@@ -644,9 +687,7 @@ describe('AdHocManager', () => {
       const val = ahm.apply('SELECT * FROM otel_logs', [
         { key: 'otel_logs.ResourceAttributes.`k8s`.`pod`.`name`', operator: '=', value: 'api' },
       ] as AdHocVariableFilter[]);
-      expect(val).toContain(
-        "ResourceAttributes.`k8s`.`pod`.`name`::Nullable(String) = \\'api\\'"
-      );
+      expect(val).toContain("ResourceAttributes.`k8s`.`pod`.`name`::Nullable(String) = \\'api\\'");
     });
 
     it('renders a single-segment minted JSON key with hideTableName-style key', () => {
