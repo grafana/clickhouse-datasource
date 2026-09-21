@@ -23,7 +23,7 @@ review_date: 2026-08-12
 
 The plugin ships four pre-built dashboards for OpenTelemetry data stored in ClickHouse. Three cover top-down log exploration, service topology and trace search, and a single-service deep dive that ties RED metrics, errors, logs, and trace detail into one view; a fourth is a variant of the logs explorer for tables that store OTel attributes as the native JSON type.
 
-The core three dashboards link to each other via dashboard data links: clicking a service or operation in one dashboard preserves the time range and datasource and lands you on the matching view in another.
+The core three dashboards link to each other via dashboard data links: clicking a service or operation in one dashboard preserves the time range, datasource and selected database, and lands you on the matching view in another.
 
 ## Required schema
 

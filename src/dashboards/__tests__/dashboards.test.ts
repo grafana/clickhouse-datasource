@@ -211,14 +211,22 @@ describe('OTel dashboards', () => {
       expect(sql).toContain('count(DISTINCT name) = 2');
     });
 
+    const crossLinksIn = (filename: string) =>
+      fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8').match(/\/d\/otel-[a-z-]+\?[^"]*/g) ?? [];
+
     it.each(linkedOtelDashboards)('%s carries the database through drill-through links', (filename) => {
       // Nothing else covers link forwarding, so a dropped parameter would leave CI green while
       // silently sending the target dashboard to whichever database it defaults to.
-      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
-      const crossLinks = content.match(/\/d\/otel-[a-z-]+\?[^"]*/g) ?? [];
-      for (const url of crossLinks) {
+      for (const url of crossLinksIn(filename)) {
         expect(url).toContain('var-database=${database}');
       }
+    });
+
+    it('otel-service-dashboard.json has drill-through links for that guard to check', () => {
+      // The panel drill-throughs live only on the service dashboard, so the loop above runs
+      // zero times for the two explorers. Pin the count here: deleting the links would
+      // otherwise make the guard pass vacuously.
+      expect(crossLinksIn('otel-service-dashboard.json').length).toBeGreaterThan(0);
     });
 
     it.each(otelDashboards)('%s exposes a "database" query variable', (filename) => {
