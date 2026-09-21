@@ -130,7 +130,7 @@ After adding the data source, configure the following settings.
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
 | **Username**          | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions).                                                                         |
 | **Password**          | ClickHouse user password.                                                                                                                               |
-| **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings). See [Forward OAuth Identity](#forward-oauth-identity). |
+| **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings), unless **Allow cleartext JWT forwarding** is enabled. See [Forward OAuth Identity](#forward-oauth-identity). |
 | **Allow cleartext JWT forwarding** | Only shown when **Forward OAuth Identity** is enabled. Lifts the TLS requirement for token forwarding, for deployments where TLS is terminated and originated by a proxy alongside Grafana. See [Delegating TLS to a proxy](#delegating-tls-to-a-proxy). |
 | **Default database**  | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`.                                      |
 | **Default table**     | The default table used by the query builder.                                                                                                            |
@@ -371,7 +371,7 @@ datasources:
       # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled)
       # enableMapKeysDiscovery: <bool>  # probe Map columns for filter-editor key suggestions (default true)
       # forwardGrafanaHeaders: <bool>
-      # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
+      # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true, unless allowCleartextJWTForwarding is set
       # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
       # allowCleartextJWTForwarding: <bool>  # forward the JWT without TLS; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
       # path: <string>  # HTTP URL path (HTTP protocol only)
@@ -416,7 +416,7 @@ resource "grafana_data_source" "clickhouse" {
     # queryTimeout    = "60"
     # validateSql     = true
     # enableRowLimit  = true
-    # oauthPassThru   = true  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure = true
+    # oauthPassThru   = true  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure = true, unless allowCleartextJWTForwarding is set
     # allowCleartextJWTForwarding = true  # forward the JWT without TLS; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
   })
 
