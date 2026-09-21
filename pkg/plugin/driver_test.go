@@ -118,7 +118,28 @@ func TestWarnUnsupportedTimeSeriesFields(t *testing.T) {
 		assert.Equal(t, data.NoticeSeverityWarning, notice.Severity)
 		assert.Contains(t, notice.Text, "ResourceAttributes")
 		assert.Contains(t, notice.Text, "Attributes")
-		assert.Contains(t, notice.Text, "ResourceAttributes['some_key'] as some_key")
+		// Column names are reported in sorted order; "Attributes" sorts before "ResourceAttributes".
+		assert.Contains(t, notice.Text, "Attributes['some_key'] as some_key")
+	})
+
+	t.Run("dedups repeated JSON-shaped column names from wide-format frames", func(t *testing.T) {
+		// LongToWide duplicates non-label fields once per output series, so a
+		// JSON-shaped column can appear multiple times with the same name.
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+			Fields: []*data.Field{
+				data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+				data.NewField("Attributes", nil, []json.RawMessage{json.RawMessage(`{"x":"1"}`)}),
+				data.NewField("Attributes", nil, []json.RawMessage{json.RawMessage(`{"x":"2"}`)}),
+			},
+		}
+
+		warnUnsupportedTimeSeriesFields(frame)
+
+		require.Len(t, frame.Meta.Notices, 1)
+		notice := frame.Meta.Notices[0]
+		assert.Contains(t, notice.Text, "columns have a Map/Array/Tuple/JSON type and cannot be used to distinguish time series: Attributes.",
+			"column name should be listed exactly once, not duplicated, got: %s", notice.Text)
 	})
 
 	t.Run("no notice when no JSON-shaped columns present", func(t *testing.T) {

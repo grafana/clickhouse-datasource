@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -595,29 +597,35 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 // frame when it contains columns that cannot participate in series identity.
 //
 // ClickHouse Map/Array/Tuple/Variant/Dynamic/JSON columns are surfaced by the
-// converter registry as data.FieldTypeJSON. sqlds' FrameToTimeSeries only
-// promotes plain string columns to per-series labels (Field.Labels), so these
+// converter registry as data.FieldTypeJSON. sqlds' LongToWide only promotes
+// plain string columns to per-series labels (Field.Labels), so these
 // JSON-shaped columns are silently ignored for series identity: all rows collapse
 // into a single series even though the user selected columns intended to
 // distinguish them. This is particularly confusing for OTel metrics-schema
 // tables where ResourceAttributes/Attributes are Map(...) columns.
 //
+// LongToWide also duplicates non-label fields once per output series, so a
+// single JSON-shaped column can appear multiple times in frame.Fields; column
+// names are collected into a set and reported in sorted order.
+//
 // See https://github.com/grafana/clickhouse-datasource/issues/2126.
 func warnUnsupportedTimeSeriesFields(frame *data.Frame) {
-	var unsupported []string
+	seen := make(map[string]bool)
 	for _, field := range frame.Fields {
-		if field.Type() == data.FieldTypeJSON || field.Type() == data.FieldTypeNullableJSON {
-			unsupported = append(unsupported, field.Name)
+		if field.Type().JSON() {
+			seen[field.Name] = true
 		}
 	}
-	if len(unsupported) == 0 {
+	if len(seen) == 0 {
 		return
 	}
+
+	unsupported := slices.Sorted(maps.Keys(seen))
 
 	text := fmt.Sprintf(
 		"The following selected columns have a Map/Array/Tuple/JSON type and cannot be used to distinguish time series: %s. "+
 			"All rows will collapse into a single series regardless of these columns' values. "+
-			"Extract specific keys instead by typing an expression such as %s['some_key'] as some_key directly into the Columns selector (the 'as some_key' suffix names the resulting series/label), or switch to the SQL editor to hand-write the query.",
+			"Extract specific keys instead, e.g. %s['some_key'] as some_key for a Map column, directly into the Columns selector (the 'as some_key' suffix names the resulting series/label), or switch to the SQL editor to hand-write the query.",
 		strings.Join(unsupported, ", "),
 		unsupported[0],
 	)
