@@ -55,6 +55,9 @@ export const MinIntervalEditor = (props: MinIntervalEditorProps) => {
         width={10}
         value={draft}
         invalid={invalid}
+        aria-label={label}
+        aria-invalid={invalid}
+        aria-errormessage={invalid ? error : undefined}
         placeholder={placeholder}
         onChange={(e) => setDraft(e.currentTarget.value)}
         onBlur={commit}

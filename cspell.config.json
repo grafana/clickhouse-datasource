@@ -52,6 +52,7 @@
     "fixedstring",
     "fromtime",
     "godoc",
+    "gtime",
     "goproxy",
     "Grafana",
     "grafanalabs",

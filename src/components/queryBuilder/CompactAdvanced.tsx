@@ -118,6 +118,9 @@ const CompactMinInterval = (props: { minInterval?: string; onMinIntervalChange: 
       value={draft}
       width={10}
       invalid={invalid}
+      aria-label={labels.components.MinIntervalEditor.label}
+      aria-invalid={invalid}
+      aria-errormessage={invalid ? error : undefined}
       // The compact strip has no room for error text below the field, so the
       // shared message rides along as a native tooltip instead.
       title={invalid ? error : undefined}

@@ -120,12 +120,12 @@ export const SqlEditor = (props: SqlEditorProps) => {
       </InlineFieldRow>
       <InlineFieldRow className={styles.QueryEditor.queryType}>
         <MinIntervalEditor
-          minInterval={sqlQuery.timeInterval}
-          onMinIntervalChange={(timeInterval) => {
+          minInterval={sqlQuery.minInterval}
+          onMinIntervalChange={(minInterval) => {
             // Deliberately not saveChanges: that recomputes `format` from
             // queryType, which flips a hand-authored model carrying only
             // { editorType, format } to the Table format.
-            onChange({ ...sqlQuery, timeInterval: timeInterval || undefined });
+            onChange({ ...sqlQuery, minInterval: minInterval || undefined });
             onRunQuery();
           }}
         />

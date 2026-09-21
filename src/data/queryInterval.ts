@@ -14,6 +14,11 @@ import { ScopedVars } from '@grafana/data';
  */
 const MIN_INTERVAL_PATTERN = /^(\d+)(ms|s|m|h|d|w)$/;
 
+// Trimmed explicitly rather than with trim()/TrimSpace: JS strips U+FEFF but not
+// U+0085 and Go does the reverse, so each would accept a value the other ignores.
+// This set is spelled the same way in parseMinInterval (pkg/plugin/driver.go).
+const SURROUNDING_SPACE = /^[ \t\n\v\f\r\u0085\u00a0\ufeff]+|[ \t\n\v\f\r\u0085\u00a0\ufeff]+$/g;
+
 const UNIT_MS: Record<string, number> = {
   ms: 1,
   s: 1000,
@@ -36,7 +41,13 @@ export const MAX_MIN_INTERVAL_MS = 365 * UNIT_MS.d;
  * "no floor".
  */
 export const parseMinIntervalMs = (minInterval?: string): number | undefined => {
-  const matches = minInterval?.trim().match(MIN_INTERVAL_PATTERN);
+  // A hand-written dashboard can save a number here, and this runs inside
+  // applyTemplateVariables, where a throw takes the whole query down.
+  if (typeof minInterval !== 'string') {
+    return undefined;
+  }
+
+  const matches = minInterval.replace(SURROUNDING_SPACE, '').match(MIN_INTERVAL_PATTERN);
   if (!matches) {
     return undefined;
   }
@@ -67,7 +78,7 @@ export const applyMinIntervalToScopedVars = (scoped: ScopedVars, minInterval?: s
     return scoped;
   }
 
-  const text = (minInterval || '').trim();
+  const text = (minInterval || '').replace(SURROUNDING_SPACE, '');
   return {
     ...scoped,
     __interval: { text, value: text },

@@ -571,7 +571,10 @@ var minIntervalUnits = map[string]time.Duration{
 // parseMinInterval returns the per-query interval floor, or 0 when the value is
 // absent or outside the shared grammar (in which case no floor is applied).
 func parseMinInterval(value string) time.Duration {
-	matches := minIntervalPattern.FindStringSubmatch(strings.TrimSpace(value))
+	// strings.TrimSpace strips U+0085 but not U+FEFF, and JS trim() does the
+	// reverse, so trim both explicitly: a stray BOM must not be accepted by one
+	// side and ignored by the other.
+	matches := minIntervalPattern.FindStringSubmatch(strings.Trim(value, " \t\n\v\f\r\u0085\u00a0\ufeff"))
 	if matches == nil {
 		return 0
 	}
@@ -629,16 +632,27 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		// Per-query minimum interval. Raises the interval Grafana derived from
 		// the time range and panel width, so $__timeInterval and friends bucket
 		// no finer than this. Explore has no built-in equivalent.
-		TimeInterval string `json:"timeInterval"`
+		//
+		// Decoded leniently: a hand-written dashboard may carry a number here,
+		// and a type error on this one field must not cost the timezone
+		// handling below. A value that is not a string simply applies no floor.
+		MinInterval json.RawMessage `json:"minInterval"`
 	}
 
 	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
 		return ctx, req
 	}
 
+	var minIntervalValue string
+	if len(dataQuery.MinInterval) > 0 {
+		// Ignore the error: a non-string leaves minIntervalValue empty, which
+		// parseMinInterval reads as "no floor".
+		_ = json.Unmarshal(dataQuery.MinInterval, &minIntervalValue)
+	}
+
 	// Clamped here rather than in the interpolator because sqlutil.Query drops
 	// unknown query fields, and MutateQuery runs before it is built.
-	if minInterval := parseMinInterval(dataQuery.TimeInterval); minInterval > req.Interval {
+	if minInterval := parseMinInterval(minIntervalValue); minInterval > req.Interval {
 		req.Interval = minInterval
 	}
 

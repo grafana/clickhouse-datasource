@@ -122,7 +122,7 @@ describe('SQL Editor', () => {
     fireEvent.blur(input);
 
     expect(onChange).toHaveBeenCalledWith(
-      expect.objectContaining({ timeInterval: '5m', format: 2, editorType: EditorType.SQL })
+      expect.objectContaining({ minInterval: '5m', format: 2, editorType: EditorType.SQL })
     );
     expect(onRunQuery).toHaveBeenCalledTimes(1);
   });

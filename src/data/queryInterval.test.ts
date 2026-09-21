@@ -29,6 +29,20 @@ describe('parseMinIntervalMs', () => {
     expect(parseMinIntervalMs('-5m')).toBeUndefined();
   });
 
+  it('returns undefined for a value that is not a string', () => {
+    // A hand-written dashboard can save a number; applyTemplateVariables must not throw.
+    expect(parseMinIntervalMs(60 as unknown as string)).toBeUndefined();
+    expect(parseMinIntervalMs(null as unknown as string)).toBeUndefined();
+    expect(parseMinIntervalMs({ value: '5m' } as unknown as string)).toBeUndefined();
+  });
+
+  it('trims the same whitespace set as the backend', () => {
+    // JS trim() strips U+FEFF but not U+0085, and Go's TrimSpace does the reverse.
+    expect(parseMinIntervalMs('\ufeff5m')).toBe(5 * 60 * 1000);
+    expect(parseMinIntervalMs('\u00855m\u0085')).toBe(5 * 60 * 1000);
+    expect(parseMinIntervalMs('\u00a05m')).toBe(5 * 60 * 1000);
+  });
+
   // Month and year mean different lengths on the two sides (30d vs 365.25/12 d).
   it('rejects month and year units', () => {
     expect(parseMinIntervalMs('1M')).toBeUndefined();
