@@ -306,8 +306,7 @@ describe('OTel dashboards', () => {
       panels?: Array<Panel & { panels?: Panel[] }>;
     };
 
-    const flatten = (d: Dashboard): Panel[] =>
-      (d.panels ?? []).flatMap((p) => [p, ...(p.panels ?? [])]);
+    const flatten = (d: Dashboard): Panel[] => (d.panels ?? []).flatMap((p) => [p, ...(p.panels ?? [])]);
 
     it.each(otelDashboards)('%s exposes an "interval" interval variable', (filename) => {
       const d = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as Dashboard;
@@ -327,16 +326,25 @@ describe('OTel dashboards', () => {
       }
     });
 
-    it.each(otelDashboards)('%s forwards the interval selection, not the resolved bucket', (filename) => {
-      // A data link interpolates ${interval} through to the concrete bucket size, so drilling
-      // through while "auto" is selected would pin that bucket on the target dashboard. The
-      // :text formatter forwards the selection as displayed ("auto", "30s"), which the target
-      // matches back to the same option — auto stays auto, an explicit choice stays explicit.
-      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
-      const forwarding = content.match(/var-interval=\$\{interval[^}]*\}/g) ?? [];
-      for (const param of forwarding) {
-        expect(param).toBe('var-interval=${interval:text}');
+    const intervalLinksIn = (filename: string) =>
+      fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8').match(/var-interval=\$\{interval[^}]*\}/g) ?? [];
+
+    it.each(otelDashboards)('%s forwards the interval through drill-through links', (filename) => {
+      // Plain ${interval}, not :text. On scenes, IntervalVariable defines no getValueText, so
+      // the :text formatter falls through to getValue() and forwards the resolved bucket
+      // anyway; and the target's updateFromUrl takes any non-sentinel string verbatim, so
+      // var-interval=auto would set a literal "auto" that is not one of its options. A
+      // drill-through therefore pins the bucket that was in effect, which is at least a value
+      // the target can honour. The dashboard-level menu link keeps auto via includeVars.
+      for (const param of intervalLinksIn(filename)) {
+        expect(param).toBe('var-interval=${interval}');
       }
+    });
+
+    it('otel-service-dashboard.json has interval-forwarding links for that guard to check', () => {
+      // The loop above runs zero times for the two explorers, so without this the guard would
+      // still pass if the parameter were dropped from every link.
+      expect(intervalLinksIn('otel-service-dashboard.json').length).toBeGreaterThan(0);
     });
   });
 });
