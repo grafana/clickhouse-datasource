@@ -139,13 +139,6 @@ describe('OTel dashboards', () => {
       const content = fs.readFileSync(filepath, 'utf8');
       expect(content).toContain("ResourceAttributes['service.version']");
     });
-
-    it('quotes template variables in SQL', () => {
-      // Same guard as the other bundled dashboards ($__... macros excluded).
-      const content = fs.readFileSync(filepath, 'utf8');
-      expect(content).not.toMatch(/IN \(\$\{?(?!__)\w+\}?\)/);
-      expect(content).not.toMatch(/= '\$\{?\w+\}?'/);
-    });
   });
 
   describe('importable', () => {
@@ -168,6 +161,22 @@ describe('OTel dashboards', () => {
       const inputName = dashboard.__inputs?.find((i) => i.type === 'datasource')?.name;
       const dsVar = dashboard.templating?.list?.find((v) => v.type === 'datasource');
       expect(dsVar?.current?.value).toBe(`\${${inputName}}`);
+    });
+  });
+
+  describe('template variable quoting', () => {
+    // allDashboards covers every bundled dashboard, so a bare interpolation added to any of
+    // them is caught.
+    it.each(allDashboards)('%s quotes template variables in SQL', (filename) => {
+      const content = fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8');
+      // Template variables must be interpolated with :singlequote, not bare. The datasource's
+      // default formatter (CHDatasource.format) already renders a multi-value selection as
+      // 'a','b', but it does not escape a single quote inside a value, so a value such as
+      // bob's-service produces invalid SQL. :singlequote escapes the quote; the plain formatter
+      // does not. Dashboards mix uppercase IN and lowercase in, so match case-insensitively.
+      // ($__... macros are excluded.)
+      expect(content).not.toMatch(/IN \(\$\{?(?!__)\w+\}?\)/i);
+      expect(content).not.toMatch(/= '\$\{?\w+\}?'/i);
     });
   });
 });
