@@ -170,6 +170,14 @@ func TestConnect(t *testing.T) {
 		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
+	t.Run("should apply connection pool settings from jsonData", func(t *testing.T) {
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "maxOpenConns": 5, "maxIdleConns": "2", "connMaxLifetime": 60 }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		db, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
+		assert.Equal(t, nil, err)
+		assert.Equal(t, 5, db.Stats().MaxOpenConnections)
+	})
 }
 
 func TestHTTPConnect(t *testing.T) {

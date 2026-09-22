@@ -469,3 +469,71 @@ func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 		assert.False(t, settings.OAuthPassThruAllowFallback)
 	})
 }
+
+func TestLoadSettingsConnectionPool(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse pool settings given as numbers", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": 60, "maxIdleConns": 2, "maxOpenConns": 5}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "60", settings.ConnMaxLifetime)
+		assert.Equal(t, "2", settings.MaxIdleConns)
+		assert.Equal(t, "5", settings.MaxOpenConns)
+	})
+
+	t.Run("should parse pool settings given as strings", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": "60", "maxIdleConns": "2", "maxOpenConns": "5"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "60", settings.ConnMaxLifetime)
+		assert.Equal(t, "2", settings.MaxIdleConns)
+		assert.Equal(t, "5", settings.MaxOpenConns)
+	})
+
+	t.Run("should fall back to defaults for empty pool settings", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": "", "maxIdleConns": " ", "maxOpenConns": ""}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "5", settings.ConnMaxLifetime)
+		assert.Equal(t, "25", settings.MaxIdleConns)
+		assert.Equal(t, "50", settings.MaxOpenConns)
+	})
+
+	t.Run("should truncate decimal and exponent strings from the number input", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": "1.5", "maxIdleConns": "1e1", "maxOpenConns": "2.9"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "1", settings.ConnMaxLifetime)
+		assert.Equal(t, "10", settings.MaxIdleConns)
+		assert.Equal(t, "2", settings.MaxOpenConns)
+	})
+
+	t.Run("should reject out-of-range pool settings", func(t *testing.T) {
+		for _, raw := range []string{`"Inf"`, `"NaN"`, `1e300`} {
+			_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+				JSONData:                []byte(`{"host": "test", "port": 9000, "maxOpenConns": ` + raw + `}`),
+				DecryptedSecureJSONData: map[string]string{},
+			})
+			assert.Error(t, err, raw)
+			assert.True(t, backend.IsDownstreamError(err), raw)
+		}
+	})
+
+	t.Run("should reject non-numeric pool settings", func(t *testing.T) {
+		_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 9000, "maxOpenConns": "five"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.Error(t, err)
+		assert.True(t, backend.IsDownstreamError(err))
+	})
+}

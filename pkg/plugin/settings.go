@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -202,6 +203,15 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			settings.QueryTimeout = fmt.Sprintf("%d", int64(val))
 		}
 	}
+	if settings.ConnMaxLifetime, err = intSetting(jsonData, "connMaxLifetime"); err != nil {
+		return settings, err
+	}
+	if settings.MaxIdleConns, err = intSetting(jsonData, "maxIdleConns"); err != nil {
+		return settings, err
+	}
+	if settings.MaxOpenConns, err = intSetting(jsonData, "maxOpenConns"); err != nil {
+		return settings, err
+	}
 	if jsonData["customSettings"] != nil {
 		customSettingsRaw := jsonData["customSettings"].([]interface{})
 		customSettings := make([]CustomSetting, len(customSettingsRaw))
@@ -399,4 +409,38 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 	}
 
 	return httpHeaders
+}
+
+// intSetting reads an integer jsonData key into the string form Settings
+// stores. Provisioned YAML gives a JSON number; the config editor gives a
+// numeric string, which its number input lets carry a fraction or an
+// exponent. Both paths truncate to an integer so the same value behaves the
+// same from either producer. An empty string means "not set", so the caller
+// applies its default. Anything else is a downstream error.
+func intSetting(jsonData map[string]interface{}, key string) (string, error) {
+	var f float64
+	switch v := jsonData[key].(type) {
+	case nil:
+		return "", nil
+	case float64:
+		f = v
+	case string:
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return "", nil
+		}
+		parsed, err := strconv.ParseFloat(v, 64)
+		if err != nil {
+			return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: %w", key, err))
+		}
+		f = parsed
+	default:
+		return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: unexpected type %T", key, v))
+	}
+	// int32 bounds keep the int64 conversion defined for NaN, Inf and huge
+	// values; pool sizes and lifetimes beyond int32 are never meaningful.
+	if math.IsNaN(f) || f > math.MaxInt32 || f < math.MinInt32 {
+		return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: %v is out of range", key, f))
+	}
+	return strconv.FormatInt(int64(f), 10), nil
 }
