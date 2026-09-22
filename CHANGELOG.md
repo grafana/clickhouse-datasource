@@ -5,10 +5,43 @@
 ### Features
 
 - Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
+- Support JSON-typed columns (e.g. the OTel JSON schema's `LogAttributes`/`ResourceAttributes`) in ad-hoc filters: JSON sub-paths are discovered for the key dropdown and rendered as backtick-quoted dot-access cast to `Nullable(String)`, so every filter operator works and values read back over the native protocol. Keys are minted in a stateless self-describing form (building on #2079), so a saved JSON filter applies correctly on a fresh dashboard load (#2094)
 
 ### Fixes
 
+- Escape ad-hoc filter values, including `IN`/`NOT IN` list elements, so a crafted value can't break out of the `additional_table_filters` clause. Previously a value with unbalanced parentheses bypassed the filter (no quote required), `NOT IN` was a silent no-op that returned every row, and values containing a backslash matched the wrong rows (#2095)
+- Bound the ad-hoc value-suggestion query to the dashboard time range (falling back to a recent window) on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
+- Quote ad-hoc filter keys that are not plain identifiers, so a crafted key is read as one (nonexistent) column name instead of being spliced into the `additional_table_filters` predicate. Plain and dotted column names are unchanged (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
+
+## [4.21.3](https://github.com/grafana/clickhouse-datasource/compare/v4.21.2...v4.21.3) (2026-09-15)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** bump brace-expansion override to 5.0.9 ([4d58c70](https://github.com/grafana/clickhouse-datasource/commit/4d58c70f23e22f88fcb404136c4508eb9b9a48cb))
+* **deps:** bump brace-expansion to resolve HIGH severity CVEs ([#2166](https://github.com/grafana/clickhouse-datasource/issues/2166)) ([4d58c70](https://github.com/grafana/clickhouse-datasource/commit/4d58c70f23e22f88fcb404136c4508eb9b9a48cb))
+* **deps:** update backend dependencies ([#2120](https://github.com/grafana/clickhouse-datasource/issues/2120)) ([84c172a](https://github.com/grafana/clickhouse-datasource/commit/84c172abeae068bfd9ed31b3ffd8df9d4d8b4585))
+* trace logs linking with timeframe ([#2111](https://github.com/grafana/clickhouse-datasource/issues/2111)) ([801725f](https://github.com/grafana/clickhouse-datasource/commit/801725f674249600a3204b65eee8bbc3037c1457))
+
+
+### 🤖 Continuous Integration
+
+* forward the bundled pipeline's ref input on manual dispatch ([#2148](https://github.com/grafana/clickhouse-datasource/issues/2148)) ([3d00b58](https://github.com/grafana/clickhouse-datasource/commit/3d00b5820a0e51f184b48d4718f50f070baa03f9))
+
+## [4.21.2](https://github.com/grafana/clickhouse-datasource/compare/v4.21.1...v4.21.2) (2026-09-01)
+
+
+### 🐛 Bug Fixes
+
+* **autocomplete:** show query macros instead of ClickHouse internal functions ([#2153](https://github.com/grafana/clickhouse-datasource/issues/2153)) ([4b1f085](https://github.com/grafana/clickhouse-datasource/commit/4b1f085bc3c340663c0bd63d48fbd83301b9bb7e))
+
+## [4.21.1](https://github.com/grafana/clickhouse-datasource/compare/v4.21.0...v4.21.1) (2026-08-27)
+
+
+### 🐛 Bug Fixes
+
+* **pdc:** apply TLS to native protocol connections made through PDC ([#2146](https://github.com/grafana/clickhouse-datasource/issues/2146)) ([8ee9a17](https://github.com/grafana/clickhouse-datasource/commit/8ee9a1732e00db79bee9d1e808899a0fd5e6324a))
 
 ## [4.21.0](https://github.com/grafana/clickhouse-datasource/compare/v4.20.0...v4.21.0) (2026-08-27)
 
