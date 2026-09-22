@@ -298,4 +298,53 @@ describe('OTel dashboards', () => {
       expect(content).toMatch(/(?:FROM|JOIN)\s+\$\{database\}\.otel_(?:logs|traces)\b/);
     });
   });
+
+  describe('interval variable', () => {
+    type Panel = { gridPos?: unknown; interval?: string; targets?: Array<{ rawSql?: string }> };
+    type Dashboard = {
+      templating?: { list?: Array<{ name?: string; type?: string }> };
+      panels?: Array<Panel & { panels?: Panel[] }>;
+    };
+
+    const flatten = (d: Dashboard): Panel[] => (d.panels ?? []).flatMap((p) => [p, ...(p.panels ?? [])]);
+
+    it.each(otelDashboards)('%s exposes an "interval" interval variable', (filename) => {
+      const d = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as Dashboard;
+      const variable = d.templating?.list?.find((v) => v.name === 'interval');
+      expect(variable).toBeDefined();
+      expect(variable?.type).toBe('interval');
+    });
+
+    it.each(otelDashboards)('%s sets min interval on every $__interval_s panel', (filename) => {
+      const d = JSON.parse(fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8')) as Dashboard;
+      const bucketed = flatten(d).filter((p) =>
+        (p.targets ?? []).some((t) => (t.rawSql ?? '').includes('$__interval_s'))
+      );
+      expect(bucketed.length).toBeGreaterThan(0);
+      for (const panel of bucketed) {
+        expect(panel.interval).toBe('${interval}');
+      }
+    });
+
+    const intervalLinksIn = (filename: string) =>
+      fs.readFileSync(path.join(DASHBOARDS_DIR, filename), 'utf8').match(/var-interval=\$\{interval[^}]*\}/g) ?? [];
+
+    it.each(otelDashboards)('%s forwards the interval through drill-through links', (filename) => {
+      // Plain ${interval}, not :text. On scenes, IntervalVariable defines no getValueText, so
+      // the :text formatter falls through to getValue() and forwards the resolved bucket
+      // anyway; and the target's updateFromUrl takes any non-sentinel string verbatim, so
+      // var-interval=auto would set a literal "auto" that is not one of its options. A
+      // drill-through therefore pins the bucket that was in effect, which is at least a value
+      // the target can honour. The dashboard-level menu link keeps auto via includeVars.
+      for (const param of intervalLinksIn(filename)) {
+        expect(param).toBe('var-interval=${interval}');
+      }
+    });
+
+    it('otel-service-dashboard.json has interval-forwarding links for that guard to check', () => {
+      // The loop above runs zero times for the two explorers, so without this the guard would
+      // still pass if the parameter were dropped from every link.
+      expect(intervalLinksIn('otel-service-dashboard.json').length).toBeGreaterThan(0);
+    });
+  });
 });
