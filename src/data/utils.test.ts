@@ -1,8 +1,17 @@
-import { ColumnHint, QueryBuilderOptions, QueryType, TableColumn, TimeUnit } from 'types/queryBuilder';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  QueryBuilderOptions,
+  QueryType,
+  TableColumn,
+  TimeUnit,
+} from 'types/queryBuilder';
 import {
   applyTraceSearchFieldConfig,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
+  foldDiscoveredLogFieldsIntoLabels,
   getBuilderOptions,
   isBuilderOptionsRunnable,
   labelsFieldName,
@@ -11,7 +20,7 @@ import {
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from '@grafana/data';
+import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, dateTime, Field, FieldType } from '@grafana/data';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import otel from 'otel';
@@ -303,7 +312,11 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
       requestId: '',
       interval: '',
       intervalMs: 0,
-      range: {} as any,
+      range: {
+        from: dateTime(1735689600000), // 2025-01-01T00:00:00Z
+        to: dateTime(1735693200000), // 2025-01-01T01:00:00Z
+        raw: { from: 'now-1h', to: 'now' },
+      },
       scopedVars: {} as any,
       targets: [inputQuery],
       timezone: '',
@@ -819,6 +832,173 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     });
   });
 
+  describe('trace logs link time range', () => {
+    // Concrete bounds baked from the request range (see buildTestRequestResponse)
+    const expectedFrom = 'toDateTime(1735689600)';
+    const expectedTo = 'toDateTime(1735693200)';
+
+    const getViewLogsQuery = (out: DataQueryResponse): CHBuilderQuery =>
+      out?.data[0]?.fields[0]?.config?.links?.find((link: any) => link.title === 'View logs')?.internal
+        ?.query as CHBuilderQuery;
+
+    it('trace→logs link seeds default filters including the time-range bound', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+      const filters: any[] = logsQuery.builderOptions.filters || [];
+
+      const timeFilter = filters.find((f) => f.operator === FilterOperator.WithInGrafanaTimeRange);
+      expect(timeFilter).toBeDefined();
+      expect(timeFilter.hint).toBe(ColumnHint.FilterTime);
+      const traceIdFilter = filters.find((f) => f.hint === ColumnHint.TraceId);
+      expect(traceIdFilter).toBeDefined();
+      expect(traceIdFilter.value).toBe('${__value.raw}');
+    });
+
+    it('logs→logs link preserves the origin time-range filter, drops other filters', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+      configureOtelTraces(mockDatasource);
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Logs,
+        database: 'otel',
+        table: 'otel_logs',
+        columns: [
+          { name: 'Timestamp', hint: ColumnHint.Time },
+          { name: 'TraceId', hint: ColumnHint.TraceId },
+        ],
+        filters: [
+          {
+            type: 'datetime',
+            operator: FilterOperator.WithInGrafanaTimeRange,
+            filterType: 'custom',
+            key: 'CustomTime',
+            condition: 'AND',
+          },
+          {
+            type: 'string',
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: 'ServiceName',
+            condition: 'AND',
+            value: 'checkout',
+          },
+          {
+            type: 'string',
+            operator: FilterOperator.Equals,
+            filterType: 'custom',
+            key: 'TraceId',
+            hint: ColumnHint.TraceId,
+            condition: 'AND',
+            value: 'old-trace-id',
+          },
+        ] as any[],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+      const filters: any[] = logsQuery.builderOptions.filters || [];
+
+      expect(filters).toHaveLength(2);
+      // The origin's own time bound is kept (preserves custom keys/columns)
+      expect(filters[0].operator).toBe(FilterOperator.WithInGrafanaTimeRange);
+      expect(filters[0].key).toBe('CustomTime');
+      // The stale TraceId filter is replaced with the clicked value, other filters dropped
+      expect(filters[1].hint).toBe(ColumnHint.TraceId);
+      expect(filters[1].value).toBe('${__value.raw}');
+      expect(filters.some((f) => f.key === 'ServiceName')).toBe(false);
+      expect(logsQuery.builderOptions.mode).toBe(BuilderMode.List);
+    });
+
+    it('trace→logs link query supports the logs volume supplementary query', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Traces,
+        columns: [{ name: 'a' }],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+
+      // getSupplementaryLogsVolumeQuery requires list mode, a database/table, and a
+      // resolvable time column; a link query missing any of them silently loses the
+      // logs volume histogram until the editor merges query defaults on a re-run
+      expect(logsQuery.builderOptions.mode).toBe(BuilderMode.List);
+      const volumeQuery = mockDatasource.getSupplementaryLogsVolumeQuery(request, logsQuery);
+      expect(volumeQuery).toBeDefined();
+      expect(volumeQuery?.rawSql).toContain('toStartOfInterval');
+      expect(volumeQuery?.rawSql).toContain('GROUP BY');
+    });
+
+    it('logs→logs link falls back to the default time filter when the origin has none', async () => {
+      const mockDatasource = newMockDatasource();
+      configureOtelLogs(mockDatasource);
+      configureOtelTraces(mockDatasource);
+      jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+      const [request, response] = buildTestRequestResponse({
+        queryType: QueryType.Logs,
+        database: 'otel',
+        table: 'otel_logs',
+        columns: [{ name: 'Timestamp', hint: ColumnHint.Time }],
+        filters: [],
+      });
+      const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+      const logsQuery = getViewLogsQuery(out);
+      const filters: any[] = logsQuery.builderOptions.filters || [];
+
+      const timeFilter = filters.find((f) => f.operator === FilterOperator.WithInGrafanaTimeRange);
+      expect(timeFilter).toBeDefined();
+      expect(timeFilter.hint).toBe(ColumnHint.FilterTime);
+      expect(filters.find((f) => f.hint === ColumnHint.TraceId)).toBeDefined();
+    });
+
+    it.each([CoreApp.Explore, CoreApp.Dashboard])(
+      'binds concrete time bounds into rawSql with no macro tokens (%s)',
+      async (app) => {
+        const mockDatasource = newMockDatasource();
+        configureOtelLogs(mockDatasource);
+
+        const [request, response] = buildTestRequestResponse({
+          queryType: QueryType.Traces,
+          columns: [{ name: 'a' }],
+        });
+        request.app = app;
+        const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+        const logsQuery = getViewLogsQuery(out);
+
+        // Non-empty so the pane's first auto-run executes instead of failing with
+        // ClickHouse "Empty query" (code 62) on Grafana versions that run before
+        // the editor regenerates SQL from builderOptions
+        expect(logsQuery.rawSql).not.toBe('');
+        expect(logsQuery.rawSql).toContain(expectedFrom);
+        expect(logsQuery.rawSql).toContain(expectedTo);
+        // No macro tokens: Grafana hides data links whose serialized query contains
+        // $-variables it cannot resolve, and these macros are backend-only
+        expect(logsQuery.rawSql).not.toContain('$__fromTime');
+        expect(logsQuery.rawSql).not.toContain('$__toTime');
+        // The trace id token must be quoted in rawSql: escapeValue leaves $-values
+        // unquoted, but Grafana substitutes a bare hex id at click time and Grafana
+        // ≤12 executes this SQL verbatim on first run
+        expect(logsQuery.rawSql).toContain("= '${__value.raw}'");
+        expect(logsQuery.rawSql).not.toMatch(/= \$\{__value\.raw\}/);
+      }
+    );
+  });
+
   it('does not inject "View trace" link when showTraceLinks is false', async () => {
     const mockDatasource = newMockDatasource();
     configureOtelLogs(mockDatasource);
@@ -1082,5 +1262,313 @@ describe('dataFrameHasLogLabelWithName', () => {
       ],
     } as any as DataFrame;
     expect(dataFrameHasLogLabelWithName(frame, 'testLabel')).toBe(false);
+  });
+});
+
+describe('foldDiscoveredLogFieldsIntoLabels', () => {
+  const buildLogsRequestResponse = (
+    columns: Array<{ name: string; hint?: ColumnHint; type?: string; alias?: string }>,
+    frameFields: Field[]
+  ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
+    const inputQuery: CHBuilderQuery = {
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: { database: 'otel', table: 'otel_logs', queryType: QueryType.Logs, columns },
+      pluginVersion: '',
+      rawSql: '',
+    };
+    const request = { targets: [inputQuery] } as any as DataQueryRequest<CHQuery>;
+    const data: DataFrame[] = [{ fields: frameFields, length: frameFields[0]?.values.length ?? 0, refId: 'A' }];
+    return [request, { data }];
+  };
+
+  // Folding is driven by the datasource's configured Columns setting
+  // (additionalColumns): only those columns fold. Context columns and columns
+  // picked by hand in the query builder are intentionally left standalone.
+  const withFeature = (additional: string[] = [], contextColumns: string[] = []) => {
+    const ds = newMockDatasource();
+    ds.settings.jsonData.logs = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: 'latest',
+      additionalColumns: additional,
+      contextColumns,
+    };
+    return ds;
+  };
+
+  const field = (name: string, values: any[], type = FieldType.string): Field => ({ name, type, config: {}, values });
+
+  it('folds configured scalar columns into an existing labels field and removes them as columns', () => {
+    const ds = withFeature(['ServiceName', 'SpanId']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Timestamp', hint: ColumnHint.Time },
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'LowCardinality(String)' },
+        { name: 'SpanId', type: 'String' },
+      ],
+      [
+        field('Timestamp', [1]),
+        field('Body', ['hello']),
+        field('ServiceName', ['cart']),
+        field('SpanId', ['abc']),
+        field(labelsFieldName, [{ 'ResourceAttributes.k8s.pod.name': 'pod-1' }], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    const names = frame.fields.map((f) => f.name);
+
+    // configured columns removed as standalone fields, role columns + labels kept
+    expect(names).toEqual(['Timestamp', 'Body', labelsFieldName]);
+    // configured values folded into labels under their plain names, next to the attribute keys
+    const labels = frame.fields.find((f) => f.name === labelsFieldName)!.values[0];
+    expect(labels).toEqual({ 'ResourceAttributes.k8s.pod.name': 'pod-1', ServiceName: 'cart', SpanId: 'abc' });
+  });
+
+  it('parses and rewrites a JSON-string labels value (backend-serialized shape)', () => {
+    const ds = withFeature(['ServiceName']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [
+        field('Body', ['hi']),
+        field('ServiceName', ['cart']),
+        field(labelsFieldName, ['{"LogAttributes.http.method":"GET"}'], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const labels = (res.data[0] as DataFrame).fields.find((f) => f.name === labelsFieldName)!.values[0];
+    // written back as a JSON string, in the same shape it arrived in
+    expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
+  });
+
+  it('creates a labels field when the frame has none (non-OTel table) and stringifies non-string values', () => {
+    const ds = withFeature(['method', 'status']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'event_time', hint: ColumnHint.Time },
+        { name: 'method', type: 'String' },
+        { name: 'status', type: 'UInt16' },
+      ],
+      // status arrives as a real number, so this exercises the String(v) coercion path.
+      [field('event_time', [1]), field('method', ['GET']), field('status', [200], FieldType.number)]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    expect(frame.fields.map((f) => f.name)).toEqual(['event_time', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({ method: 'GET', status: '200' });
+  });
+
+  it('does not fold a hint-less column that is not in the Columns setting', () => {
+    // ServiceName is selected in the builder but not configured, so it stays a standalone field
+    // (a Table panel on a logs builder query keeps its columns).
+    const ds = withFeature([]);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('ServiceName', ['cart'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'ServiceName']);
+  });
+
+  it('is a no-op when no columns are configured (roles only)', () => {
+    const ds = withFeature([]);
+    const [req, res] = buildLogsRequestResponse(
+      [{ name: 'Body', hint: ColumnHint.LogMessage }],
+      [field('Body', ['hi'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body']);
+  });
+
+  it('does not fold a configured column that is also a context column (Show-context needs it)', () => {
+    // service is configured AND a context column: it must stay a standalone field so
+    // getLogContextColumnsFromLogRow can still match it by name.
+    const ds = withFeature(['service'], ['service']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'service', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('service', ['cart'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'service']);
+  });
+
+  it('skips a configured date/time column (would serialize to a raw epoch)', () => {
+    const ds = withFeature(['created']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'created', type: 'DateTime64(3)' },
+      ],
+      [field('Body', ['hi']), field('created', [1710495000000], FieldType.time)]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // created stays a standalone field; Grafana renders it with its own time processor.
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Body', 'created']);
+  });
+
+  it('does not clobber a real table column named labels', () => {
+    // A non-attribute-map `labels` column (plain string values) must be left intact.
+    const ds = withFeature(['ServiceName']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('ServiceName', ['cart']), field(labelsFieldName, ['prod'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // fold skipped: ServiceName stays standalone and the real labels value is preserved.
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'ServiceName', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toBe('prod');
+  });
+
+  it('does not clobber a selected labels column even when its value parses as a JSON object', () => {
+    // A real `labels` column selected in the query, whose value happens to be a JSON-object string,
+    // must be left intact. The structural check (labels is a selected column, never the synthesized
+    // backend attribute map) catches this even though the value parses as an object.
+    const ds = withFeature(['service', 'labels']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'service', type: 'String' },
+        { name: 'labels', type: 'String' },
+      ],
+      [field('Body', ['hi']), field('service', ['cart']), field(labelsFieldName, ['{"real":"value"}'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'service', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toBe('{"real":"value"}');
+  });
+
+  it('skips a configured column by its frame type when the schema type is unresolved', () => {
+    // No `type` on the builder columns (the classic builder's new-query path before the schema loads).
+    // The frame field type is the reliable signal, so a time field folds to nothing (would be a raw
+    // epoch) and an object/Map field folds to nothing (would be [object Object]); only the scalar folds.
+    const ds = withFeature(['created', 'attrs', 'service']);
+    const [req, res] = buildLogsRequestResponse(
+      [{ name: 'Body', hint: ColumnHint.LogMessage }, { name: 'created' }, { name: 'attrs' }, { name: 'service' }],
+      [
+        field('Body', ['hi']),
+        field('created', [1710495000000], FieldType.time),
+        field('attrs', [{ k: 'v' }], FieldType.other),
+        field('service', ['cart']),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // created (time) and attrs (object) stay standalone; only service folds.
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'created', 'attrs', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({ service: 'cart' });
+  });
+
+  it('folds every row across a multi-row frame', () => {
+    const ds = withFeature(['service']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'service', type: 'String' },
+      ],
+      [field('Body', ['a', 'b', 'c']), field('service', ['api', 'worker', 'db'])]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // the per-row loop folds every row, not just the first
+    const labels = (res.data[0] as DataFrame).fields.find((f) => f.name === labelsFieldName)!;
+    expect(labels.values).toEqual([{ service: 'api' }, { service: 'worker' }, { service: 'db' }]);
+  });
+
+  it('skips frames that share the query columns but carry none of them (logs-volume)', () => {
+    const ds = withFeature(['ServiceName']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String' },
+      ],
+      [field('Time', [1], FieldType.time), field('count', [5], FieldType.number)]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    // no configured field present to fold, so no labels field is added to the volume frame
+    expect((res.data[0] as DataFrame).fields.map((f) => f.name)).toEqual(['Time', 'count']);
+  });
+
+  it('folds a column aliased to its own name but not one aliased to a different name', () => {
+    // alias === name is how the query builder tags a plain column pick, so it folds like an unaliased
+    // column. A column aliased to a *different* name is skipped: a filter-for click keys on the alias,
+    // which the logs-volume query cannot resolve, so it stays a standalone field.
+    const ds = withFeature(['ServiceName', 'Namespace']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String', alias: 'ServiceName' },
+        { name: 'Namespace', type: 'String', alias: 'svc' },
+      ],
+      [
+        field('Body', ['hi']),
+        field('ServiceName', ['cart']),
+        field('svc', ['ns-1']),
+        field(labelsFieldName, [{ 'LogAttributes.x': 'y' }], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // ServiceName (alias === name) is folded and removed; the alias-mismatched column (field 'svc')
+    // stays standalone. Body (a role) and labels are kept.
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'svc', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({
+      'LogAttributes.x': 'y',
+      ServiceName: 'cart',
+    });
+  });
+
+  it('leaves an aliased column as a standalone field so its filter keys on the real column', () => {
+    const ds = withFeature(['ServiceName', 'SpanId']);
+    const [req, res] = buildLogsRequestResponse(
+      [
+        { name: 'Body', hint: ColumnHint.LogMessage },
+        { name: 'ServiceName', type: 'String', alias: 'svc' },
+        { name: 'SpanId', type: 'String' },
+      ],
+      [
+        field('Body', ['hi']),
+        field('svc', ['cart']),
+        field('SpanId', ['abc']),
+        field(labelsFieldName, [{ 'LogAttributes.x': 'y' }], FieldType.other),
+      ]
+    );
+
+    foldDiscoveredLogFieldsIntoLabels(ds, req, res);
+    const frame = res.data[0] as DataFrame;
+    // aliased svc stays a standalone field (not folded); only SpanId, which has no alias, is folded in
+    expect(frame.fields.map((f) => f.name)).toEqual(['Body', 'svc', labelsFieldName]);
+    expect(frame.fields.find((f) => f.name === labelsFieldName)!.values[0]).toEqual({
+      'LogAttributes.x': 'y',
+      SpanId: 'abc',
+    });
   });
 });

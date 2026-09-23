@@ -35,7 +35,7 @@ import {
   isCompactQueryTypeMismatch,
   shouldBuildCompactQueryDefaults,
 } from './compactQueryDefaults';
-import { useDefaultLogColumnsByName } from './views/logsQueryBuilderHooks';
+import { useDefaultLogColumnsByName, useDefaultTimeColumn } from './views/logsQueryBuilderHooks';
 import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
@@ -43,6 +43,7 @@ import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
 import { isEqual } from 'lodash';
+import { MinIntervalEditor } from 'components/MinIntervalEditor';
 
 interface QueryBuilderProps {
   app: CoreApp | undefined;
@@ -50,14 +51,25 @@ interface QueryBuilderProps {
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
   datasource: Datasource;
   generatedSql: string;
+  minInterval?: string;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+  onMinIntervalChange?: (minInterval: string) => void;
   onRunQuery?: () => void;
 }
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
-  const { datasource, builderOptions, builderOptionsDispatch, generatedSql, onQueryChange, onEditAsSql, onRunQuery } =
-    props;
+  const {
+    datasource,
+    builderOptions,
+    builderOptionsDispatch,
+    generatedSql,
+    minInterval,
+    onQueryChange,
+    onEditAsSql,
+    onMinIntervalChange,
+    onRunQuery,
+  } = props;
   const signalType = datasource.getSignalType();
   const singleTableMode = datasource.isSingleTableMode();
 
@@ -91,8 +103,10 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           builderOptionsDispatch={builderOptionsDispatch}
           generatedSql={generatedSql}
           signalType={signalType}
+          minInterval={minInterval}
           onQueryChange={onQueryChange}
           onEditAsSql={onEditAsSql}
+          onMinIntervalChange={onMinIntervalChange}
           onRunQuery={onRunQuery}
         />
       );
@@ -113,6 +127,11 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       <InlineFieldRow className={styles.QueryEditor.queryType}>
         <QueryTypeSwitcher queryType={builderOptions.queryType} onChange={onQueryTypeChange} />
       </InlineFieldRow>
+      {onMinIntervalChange && (
+        <InlineFieldRow className={styles.QueryEditor.queryType}>
+          <MinIntervalEditor minInterval={minInterval} onMinIntervalChange={onMinIntervalChange} />
+        </InlineFieldRow>
+      )}
 
       {builderOptions.queryType === QueryType.Table && (
         <TableQueryBuilder
@@ -167,8 +186,10 @@ interface CompactQueryEditorProps {
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
   generatedSql: string;
   signalType: SignalType;
+  minInterval?: string;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
+  onMinIntervalChange?: (minInterval: string) => void;
   onRunQuery?: () => void;
 }
 
@@ -179,8 +200,10 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     builderOptionsDispatch,
     generatedSql,
     signalType,
+    minInterval,
     onQueryChange,
     onEditAsSql,
+    onMinIntervalChange,
     onRunQuery,
   } = props;
   // Defaults are built in two passes: database and table never depend on the
@@ -209,21 +232,34 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
       return;
     }
 
+    // The key flips once column names arrive (tableColumnNames.length > 0), so with
+    // "Include all columns" on the editor initializes with base defaults and re-runs
+    // with the full column set when the schema loads. Waiting for the schema here
+    // instead would deadlock when the fetch fails or the table is empty, since
+    // useColumns swallows errors and keeps returning [], and the gate would never lift.
     const initializationKey = `${datasource.uid}:${signalType}:${builderOptions.table}:${tableColumnNames.length > 0}`;
     if (lastInitializationKey.current === initializationKey) {
       return;
     }
     lastInitializationKey.current = initializationKey;
 
-    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table, tableColumnNames);
+    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns);
     if (!isEqual(builderOptions, nextOptions)) {
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
     }
-  }, [builderOptions, builderOptionsDispatch, datasource, needsInitialization, signalType, tableColumnNames]);
+  }, [
+    builderOptions,
+    builderOptionsDispatch,
+    datasource,
+    needsInitialization,
+    signalType,
+    tableColumnNames,
+    allColumns,
+  ]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, tableColumnNames)
+    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns)
     : builderOptions;
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 
@@ -235,6 +271,17 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   // Configured columns already carry the hint, so they are never overridden.
   // A query whose defaults are still being built is the compact equivalent of
   // a new query: saved compact queries keep deliberately cleared slots.
+  // A non-OTel table has no configured Time column, so the compact defaults leave the Time role
+  // empty and the logs query has no time field to render. Fill it from the schema by convention,
+  // the same hook the classic builder uses. No-op when OTel is on (the OTel map provides Time).
+  useDefaultTimeColumn(
+    datasource,
+    signalType === 'logs' ? allColumns : [],
+    activeOptions.table,
+    getColumnByHint(activeOptions, ColumnHint.Time),
+    activeOptions.meta?.otelEnabled || false,
+    builderOptionsDispatch
+  );
   useDefaultLogColumnsByName(
     signalType === 'logs' ? allColumns : [],
     activeOptions.table,
@@ -244,7 +291,6 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     activeOptions.meta?.otelEnabled || false,
     builderOptionsDispatch
   );
-
   const onActiveOptionsChange = (nextOptions: QueryBuilderOptions, shouldRunQuery = false) => {
     builderOptionsDispatch(setAllOptions(nextOptions));
     onQueryChange?.(nextOptions);
@@ -289,8 +335,10 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         <CompactAdvanced
           builderOptions={activeOptions}
           allColumns={allColumns}
+          minInterval={minInterval}
           onOrderByChange={(orderBy: OrderBy[]) => mergeActiveOptions({ orderBy }, true)}
           onLimitChange={(limit: number) => mergeActiveOptions({ limit }, true)}
+          onMinIntervalChange={onMinIntervalChange}
         />
       )}
 
