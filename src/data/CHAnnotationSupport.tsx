@@ -37,6 +37,16 @@ type AnnotationEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig> & {
 
 const ANNOTATION_REF_ID = 'annotation';
 
+/**
+ * sqlutil.FormatOptionTable. Annotations must be requested as a table: the
+ * backend's default format is time series, which runs LongToWide on any frame
+ * that has a time field, another non-string field and a string field. A region
+ * annotation (time, timeEnd, text, tags) is exactly that shape, so timeEnd
+ * becomes the value field and text/tags collapse into labels
+ * (`timeEnd{tags="...", text="..."}`), leaving them unmappable. See #2174.
+ */
+const ANNOTATION_FORMAT_TABLE = 1;
+
 /** Minimal defaults used only when Grafana mounts the editor without an existing annotation. */
 const DEFAULT_ANNOTATION: CHAnnotationQuery = { name: '', enable: true, iconColor: 'red' };
 
@@ -58,6 +68,7 @@ const buildTarget = (existing: Partial<CHQuery> | undefined, rawSql: string): CH
   editorType: EditorType.SQL,
   rawSql,
   refId: existing?.refId || ANNOTATION_REF_ID,
+  format: ANNOTATION_FORMAT_TABLE,
 });
 
 /**
@@ -348,8 +359,16 @@ export function createAnnotationSupport(datasource: Datasource): AnnotationSuppo
       // it into the modern target shape once. `rawQuery` is read via the
       // AnnotationQuery index signature, so no cast is needed.
       const legacyRawQuery: string | undefined = json?.rawQuery;
-      const prepared: CHAnnotationQuery =
+      let prepared: CHAnnotationQuery =
         legacyRawQuery && !json?.target?.rawSql ? { ...json, target: buildTarget(json.target, legacyRawQuery) } : json;
+
+      // Annotations saved before the format was set carry no format, so the
+      // backend still applies its time series default and mangles region
+      // queries (see ANNOTATION_FORMAT_TABLE). Backfill it on load so existing
+      // dashboards are fixed without the user having to re-edit the query.
+      if (prepared?.target && prepared.target.format !== ANNOTATION_FORMAT_TABLE) {
+        prepared = { ...prepared, target: { ...prepared.target, format: ANNOTATION_FORMAT_TABLE } };
+      }
 
       // Dashboards may carry a preset id unknown to this editor (early
       // bundled dashboards shipped 'deployment_detection'). Migrate it to
@@ -373,6 +392,7 @@ export function createAnnotationSupport(datasource: Datasource): AnnotationSuppo
       editorType: EditorType.SQL,
       rawSql: '',
       refId: ANNOTATION_REF_ID,
+      format: ANNOTATION_FORMAT_TABLE,
     }),
 
     QueryEditor: AnnotationQueryEditor,

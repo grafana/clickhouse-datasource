@@ -203,6 +203,7 @@ describe('createAnnotationSupport: prepareAnnotation', () => {
     expect(migrated?.target?.rawSql).toBe('SELECT 1 AS time');
     expect(migrated?.target?.editorType).toBe(EditorType.SQL);
     expect(migrated?.target?.refId).toBe('annotation');
+    expect(migrated?.target?.format).toBe(1);
   });
 
   it('leaves a modern annotation untouched', () => {
@@ -280,6 +281,34 @@ describe('createAnnotationSupport: prepareAnnotation', () => {
     const result = support.prepareAnnotation?.({ name: 'bare', enable: true, iconColor: 'red' });
     expect(result?.preset).toBeUndefined();
     expect(result?.customSql).toBeUndefined();
+  });
+});
+
+describe('annotation queries request the table format (issue #2174)', () => {
+  // Without an explicit format the backend falls back to sqlds' time series
+  // format, which runs LongToWide on any frame that has a time field, a second
+  // non-string field and a string field. A region annotation (time, timeEnd,
+  // text, tags) matches exactly that shape, so timeEnd becomes the value field
+  // and text/tags collapse into labels: timeEnd{tags="...", text="..."}.
+  const support = createAnnotationSupport(buildDatasource());
+
+  it('asks for the table format in the default query', () => {
+    expect(support.getDefaultQuery?.()?.format).toBe(1);
+  });
+
+  it('backfills the table format on an already saved annotation', () => {
+    const saved: AnnotationQuery<CHQuery> = {
+      name: 'regions',
+      enable: true,
+      iconColor: 'red',
+      target: {
+        refId: 'anno',
+        pluginVersion: '',
+        editorType: EditorType.SQL,
+        rawSql: 'SELECT start_time AS time, end_time AS timeEnd, host AS text, host AS tags FROM t',
+      },
+    };
+    expect(support.prepareAnnotation?.(saved)?.target?.format).toBe(1);
   });
 });
 
@@ -368,6 +397,8 @@ describe('AnnotationQueryEditor', () => {
     fireEvent.change(result.getByRole('textbox'), { target: { value: 'SELECT 99 AS time' } });
     expect(onAnnotationChange).toHaveBeenCalledTimes(1);
     expect(onAnnotationChange.mock.calls[0][0].target.rawSql).toBe('SELECT 99 AS time');
+    // The edited target must keep asking for the table format (see issue #2174).
+    expect(onAnnotationChange.mock.calls[0][0].target.format).toBe(1);
   });
 
   it('is a no-op when no onAnnotationChange handler is provided', async () => {
