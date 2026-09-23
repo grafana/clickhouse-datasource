@@ -342,4 +342,31 @@ describe('Query Editor Version Migration', () => {
     const migratedQuery = migrateCHQuery(v3Query);
     expect(migratedQuery).toEqual(latestQuery);
   });
+
+  it('preserves explicit queryType when pluginVersion is empty on v4 SQL query', () => {
+    const query = {
+      refId: 'A',
+      editorType: EditorType.SQL,
+      pluginVersion: '',
+      rawSql: 'SELECT now() AS time, 1 AS value',
+      queryType: QueryType.TimeSeries,
+    } as unknown as CHQuery;
+
+    const migratedQuery = migrateCHQuery(query);
+    expect(migratedQuery).toEqual(query);
+    expect(migratedQuery.queryType).toBe(QueryType.TimeSeries);
+  });
+
+  it('preserves explicit queryType when pluginVersion is undefined on v4 SQL query', () => {
+    const query = {
+      refId: 'A',
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT * FROM logs',
+      queryType: QueryType.Logs,
+    } as unknown as CHQuery;
+
+    const migratedQuery = migrateCHQuery(query);
+    expect(migratedQuery).toEqual(query);
+    expect(migratedQuery.queryType).toBe(QueryType.Logs);
+  });
 });

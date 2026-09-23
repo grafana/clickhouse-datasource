@@ -51,6 +51,9 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
     return builderQuery;
   }
 
+  const isV4QueryType =
+    savedQuery.queryType && savedQuery.queryType !== 'sql' && savedQuery.queryType !== 'builder';
+
   // Raw SQL Query
   const rawSqlQuery: CHSqlQuery = {
     ...savedQuery,
@@ -59,7 +62,7 @@ const migrateV3CHQuery = (savedQuery: AnyCHQuery): CHQuery => {
     rawSql: savedQuery.rawSql || '',
     refId: savedQuery.refId || '',
     format: savedQuery.format,
-    queryType: mapGrafanaFormatToQueryType(savedQuery.format),
+    queryType: isV4QueryType ? (savedQuery.queryType as QueryType) : mapGrafanaFormatToQueryType(savedQuery.format),
     meta: {},
   };
 
@@ -174,10 +177,30 @@ const migrateV3QueryBuilderOptions = (savedOptions: AnyQueryBuilderOptions): Que
  * Checks if CHQuery is from <= v3 options.
  */
 const isV3CHQuery = (savedQuery: AnyCHQuery): boolean => {
+  // If the query was explicitly saved with v3 queryType ('sql' or 'builder'), it is v3
+  const oldQueryType = savedQuery['queryType'] === 'sql' || savedQuery['queryType'] === 'builder';
+  if (oldQueryType) {
+    return true;
+  }
+
+  // If the query already has v4 editorType, it is a v4 query
+  if (savedQuery['editorType'] === EditorType.SQL || savedQuery['editorType'] === EditorType.Builder) {
+    return false;
+  }
+
+  // If the query has a valid v4 queryType (not v3 'sql'/'builder')
+  if (
+    savedQuery['queryType'] === QueryType.Table ||
+    savedQuery['queryType'] === QueryType.TimeSeries ||
+    savedQuery['queryType'] === QueryType.Logs ||
+    savedQuery['queryType'] === QueryType.Traces
+  ) {
+    return false;
+  }
+
   // pluginVersion was added in v4
   const oldPluginVersion = !savedQuery['pluginVersion'] || !isVersionGtOrEq(savedQuery.pluginVersion, '4.0.0');
-  const oldQueryType = savedQuery['queryType'] === 'sql' || savedQuery['queryType'] === 'builder';
-  return oldPluginVersion || oldQueryType;
+  return oldPluginVersion;
 };
 
 /**
