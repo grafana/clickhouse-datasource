@@ -130,6 +130,17 @@ export interface CHLogsConfig {
   // Show-context feature. `additionalColumns` is an explicit list; defaults to
   // empty, so existing datasources keep their current behavior.
   additionalColumns?: string[];
+
+  // JSON/Map columns whose keys are flattened into log labels (like the OTel
+  // LogAttributes column) so their paths surface as fields in Explore. These
+  // columns are also selected into log queries. Empty by default.
+  attributeColumns?: string[];
+
+  // Flattened label paths to drop, matched by subtree: "JsonBody.content.forter"
+  // also removes "JsonBody.content.forter.email" and any leaf under it. Applied
+  // after flattening (covers the OTel columns too). Use it to keep sensitive
+  // paths out of the Fields list. Empty by default.
+  attributeColumnExclusions?: string[];
 }
 
 export interface CHTracesConfig {

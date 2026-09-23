@@ -351,6 +351,22 @@ export default {
             description:
               'These columns are projected in addition to the time, level, and message columns above. When Use OTel is on, they are added on top of the OTel default columns.',
           },
+          attributeColumns: {
+            label: 'Attribute columns',
+            tooltip:
+              'JSON or Map columns whose keys are flattened into log labels, like the OTel LogAttributes column. Each nested path (e.g. message.status) becomes a filterable field in the Fields list. The columns are also projected into the query. Leave empty to add none.',
+            placeholder: 'JSON/Map column name (enter key to add)',
+            description:
+              'Use this for non-OTel JSON columns (e.g. a JSON body) so their paths surface as fields instead of one opaque value.',
+          },
+          attributeColumnExclusions: {
+            label: 'Excluded paths',
+            tooltip:
+              'Flattened label paths to keep out of the Fields list, matched by subtree: an entry like JsonBody.content.forter also removes JsonBody.content.forter.email and any leaf under it. Applies to the attribute columns above and the OTel columns. Leave empty to exclude none.',
+            placeholder: 'Column.path prefix (enter key to add)',
+            description:
+              'Use this to keep sensitive paths (e.g. emails, cookies, client IPs) out of the flattened fields.',
+          },
         },
         traceIdCorrelation: {
           title: 'Trace ID correlation',

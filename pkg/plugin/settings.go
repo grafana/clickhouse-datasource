@@ -76,6 +76,20 @@ type Settings struct {
 	// are considered fresh. Defaults to 60. Set lower if users commonly run
 	// ALTER TABLE and expect the builder to reflect changes immediately.
 	SchemaCacheTTLSeconds int `json:"schemaCacheTTLSeconds,omitempty"`
+
+	// LogsAttributeColumns lists JSON/Map columns whose keys are flattened into
+	// log labels (like the OTel LogAttributes column) so they appear as fields
+	// in Explore. Parsed from jsonData.logs.attributeColumns. Empty by default,
+	// so existing datasources are unaffected.
+	LogsAttributeColumns []string `json:"-"`
+
+	// LogsAttributeColumnExclusions lists flattened label paths to drop, matched
+	// by subtree: an entry "JsonBody.content.rodan.forter" also removes
+	// "JsonBody.content.rodan.forter.email" and any future leaf under it. Applied
+	// after flattening, so it covers the OTel columns too. Parsed from
+	// jsonData.logs.attributeColumnExclusions. Empty by default, so nothing is
+	// dropped unless a path is listed.
+	LogsAttributeColumnExclusions []string `json:"-"`
 }
 
 type CustomSetting struct {
@@ -339,6 +353,23 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 
 		settings.RowLimit = sqlCfg.RowLimit
+	}
+
+	if logs, ok := jsonData["logs"].(map[string]interface{}); ok {
+		if cols, ok := logs["attributeColumns"].([]interface{}); ok {
+			for _, c := range cols {
+				if name, ok := c.(string); ok && name != "" {
+					settings.LogsAttributeColumns = append(settings.LogsAttributeColumns, name)
+				}
+			}
+		}
+		if paths, ok := logs["attributeColumnExclusions"].([]interface{}); ok {
+			for _, p := range paths {
+				if path, ok := p.(string); ok && path != "" {
+					settings.LogsAttributeColumnExclusions = append(settings.LogsAttributeColumnExclusions, path)
+				}
+			}
+		}
 	}
 
 	return settings, settings.isValid()
