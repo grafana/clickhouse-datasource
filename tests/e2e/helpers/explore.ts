@@ -11,25 +11,12 @@ export interface ExploreUrlOptions {
 }
 
 /**
- * Build an Explore URL encoding the full pane state.
- *
- * The query defaults to editorType 'sql' (the SQL Editor). When builderOptions
- * is supplied the query is builder-shaped, so editorType becomes 'builder':
- * the datasource's frontend transform branches on editorType === 'builder'
- * (e.g. transformQueryResponseWithTraceAndLogLinks in src/data/utils.ts only
- * attaches View trace / View logs links to builder queries unless
- * datasource-level trace defaults are configured, and the local e2e
- * datasource has none). rawSql is passed alongside so the query runs
- * deterministically on load without depending on editor re-generation.
- * queryType is restored via the query's top-level queryType field (used by
- * SQL mode). Tests that need the Query Builder UI without pre-built
- * builderOptions should call switchToBuilderMode after
- * page.goto(exploreUrl(...)).
- *
- * TODO: the pane-state/panes-URL shape here is Grafana-generic, not
- * ClickHouse-specific (the query record is the only plugin-specific part).
- * Worth proposing as a shared builder in @grafana/plugin-e2e if other
- * datasource plugins hit the same need.
+ * Build an Explore URL that opens on a ready-to-run query. With builderOptions
+ * the query is builder-shaped (editorType 'builder'). This matters for the link
+ * specs: without datasource trace defaults, the frontend attaches View trace
+ * and View logs links to builder queries only. The e2e datasource has none.
+ * To use the Query Builder UI without pre-built builderOptions, call
+ * switchToBuilderMode after page.goto.
  */
 export function exploreUrl(opts: ExploreUrlOptions = {}): string {
   const { datasourceUid = DATASOURCE_UID, queryType, from = 'now-1h', to = 'now', rawSql = '', builderOptions } = opts;
@@ -46,8 +33,7 @@ export function exploreUrl(opts: ExploreUrlOptions = {}): string {
   }
   if (builderOptions !== undefined) {
     query.builderOptions = builderOptions;
-    // Builder-shaped queries also carry format so the supplied rawSql runs
-    // deterministically on load without depending on editor re-generation.
+    // format keeps a builder query running the supplied rawSql on load instead of re-generating it.
     query.format = 1;
   }
 
