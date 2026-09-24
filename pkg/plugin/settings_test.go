@@ -76,10 +76,10 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
 					ConnMaxLifetime:    5,
-					DialTimeout:        "10",
+					DialTimeout:        10,
 					MaxIdleConns:       25,
 					MaxOpenConns:       50,
-					QueryTimeout:       "60",
+					QueryTimeout:       60,
 					HttpHeaders: map[string]string{
 						"test-plain-1":  "value-1",
 						"test-secure-2": "value-2",
@@ -121,10 +121,10 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientAuth:      true,
 					TlsAuthWithCACert:  true,
 					ConnMaxLifetime:    5,
-					DialTimeout:        "10",
+					DialTimeout:        10,
 					MaxIdleConns:       25,
 					MaxOpenConns:       50,
-					QueryTimeout:       "60",
+					QueryTimeout:       60,
 					ProxyOptions:          nil,
 					EnableRowLimit:        true,
 					RowLimit:              1000000,
@@ -146,10 +146,10 @@ func TestLoadSettings(t *testing.T) {
 					Host:            "test",
 					Port:            443,
 					ConnMaxLifetime: 5,
-					DialTimeout:     "10",
+					DialTimeout:     10,
 					MaxIdleConns:    25,
 					MaxOpenConns:    50,
-					QueryTimeout:          "60",
+					QueryTimeout:          60,
 					RowLimit:              1000000,
 					EnableRowLimit:        true,
 					EnableSchemaCache:     true,
@@ -197,10 +197,10 @@ func TestLoadSettings(t *testing.T) {
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
 					ConnMaxLifetime:    5,
-					DialTimeout:        "10",
+					DialTimeout:        10,
 					MaxIdleConns:       25,
 					MaxOpenConns:       50,
-					QueryTimeout:       "60",
+					QueryTimeout:       60,
 					HttpHeaders: map[string]string{
 						"test-plain-1":  "value-1",
 						"test-secure-2": "value-2",
@@ -237,10 +237,10 @@ func TestLoadSettings(t *testing.T) {
 					Host:            "test",
 					Port:            443,
 					ConnMaxLifetime: 5,
-					DialTimeout:     "15",
+					DialTimeout:     15,
 					MaxIdleConns:    25,
 					MaxOpenConns:    50,
-					QueryTimeout:          "120",
+					QueryTimeout:          120,
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
 					SchemaCacheTTLSeconds: 60,
@@ -260,33 +260,10 @@ func TestLoadSettings(t *testing.T) {
 					Host:            "test",
 					Port:            443,
 					ConnMaxLifetime: 5,
-					DialTimeout:     "25",
+					DialTimeout:     25,
 					MaxIdleConns:    25,
 					MaxOpenConns:    50,
-					QueryTimeout:          "60",
-					EnableRowLimit:        false,
-					EnableSchemaCache:     true,
-					SchemaCacheTTLSeconds: 60,
-				},
-				wantErr: nil,
-				testCtx: ctx,
-			},
-			{
-				name: "should accept numeric timeout values with floating point precision",
-				args: args{
-					config: backend.DataSourceInstanceSettings{
-						JSONData:                []byte(`{"host": "test", "port": 443, "dialTimeout": 10.5, "queryTimeout": 60.7}`),
-						DecryptedSecureJSONData: map[string]string{},
-					},
-				},
-				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: 5,
-					DialTimeout:     "10",
-					MaxIdleConns:    25,
-					MaxOpenConns:    50,
-					QueryTimeout:          "60",
+					QueryTimeout:          60,
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
 					SchemaCacheTTLSeconds: 60,
@@ -306,10 +283,10 @@ func TestLoadSettings(t *testing.T) {
 					Host:                  "ch.example.com",
 					Port:                  443,
 					ConnMaxLifetime:       5,
-					DialTimeout:           "10",
+					DialTimeout:           10,
 					MaxIdleConns:          25,
 					MaxOpenConns:          50,
-					QueryTimeout:          "60",
+					QueryTimeout:          60,
 					EnableSchemaCache:     true,
 					SchemaCacheTTLSeconds: 60,
 				},
@@ -328,10 +305,10 @@ func TestLoadSettings(t *testing.T) {
 					Host:                  "ch.example.com",
 					Port:                  443,
 					ConnMaxLifetime:       5,
-					DialTimeout:           "10",
+					DialTimeout:           10,
 					MaxIdleConns:          25,
 					MaxOpenConns:          50,
-					QueryTimeout:          "60",
+					QueryTimeout:          60,
 					EnableSchemaCache:     true,
 					SchemaCacheTTLSeconds: 60,
 				},
@@ -468,6 +445,45 @@ func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, settings.OAuthPassThruAllowFallback)
 	})
+}
+
+func TestLoadSettingsTimeouts(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		description string
+		jsonData    string
+		wantDial    int
+		wantQuery   int
+		wantErr     bool
+	}{
+		{description: "absent keys use the defaults", jsonData: `{"host": "test", "port": 9000}`, wantDial: 10, wantQuery: 60},
+		{description: "empty strings use the defaults", jsonData: `{"host": "test", "port": 9000, "dialTimeout": "", "queryTimeout": " "}`, wantDial: 10, wantQuery: 60},
+		{description: "numbers", jsonData: `{"host": "test", "port": 9000, "dialTimeout": 15, "queryTimeout": 120}`, wantDial: 15, wantQuery: 120},
+		{description: "numeric strings", jsonData: `{"host": "test", "port": 9000, "dialTimeout": "15", "queryTimeout": "120"}`, wantDial: 15, wantQuery: 120},
+		{description: "legacy timeout sets dialTimeout", jsonData: `{"host": "test", "port": 9000, "timeout": 25}`, wantDial: 25, wantQuery: 60},
+		{description: "dialTimeout wins over legacy timeout", jsonData: `{"host": "test", "port": 9000, "timeout": 25, "dialTimeout": 15}`, wantDial: 15, wantQuery: 60},
+		{description: "empty dialTimeout falls back to legacy timeout", jsonData: `{"host": "test", "port": 9000, "timeout": "25", "dialTimeout": ""}`, wantDial: 25, wantQuery: 60},
+		{description: "decimal number is rejected", jsonData: `{"host": "test", "port": 9000, "dialTimeout": 10.5}`, wantErr: true},
+		{description: "decimal string is rejected", jsonData: `{"host": "test", "port": 9000, "queryTimeout": "60.7"}`, wantErr: true},
+		{description: "decimal legacy timeout is rejected", jsonData: `{"host": "test", "port": 9000, "timeout": 2.5}`, wantErr: true},
+		{description: "non-numeric string is rejected", jsonData: `{"host": "test", "port": 9000, "queryTimeout": "soon"}`, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			got, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+				JSONData:                []byte(tc.jsonData),
+				DecryptedSecureJSONData: map[string]string{},
+			})
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.True(t, backend.IsDownstreamError(err))
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantDial, got.DialTimeout)
+			assert.Equal(t, tc.wantQuery, got.QueryTimeout)
+		})
+	}
 }
 
 func TestLoadSettingsConnectionPool(t *testing.T) {

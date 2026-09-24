@@ -708,8 +708,8 @@ func TestBuildClickHouseOptionsJWTBothProtocols(t *testing.T) {
 				OAuthPassThru: true,
 				Username:      "svc",
 				Password:      "fallback",
-				DialTimeout:   "5",
-				QueryTimeout:  "30",
+				DialTimeout:   5,
+				QueryTimeout:  30,
 			}
 
 			opts, err := buildClickHouseOptions(t.Context(), settings, message)
@@ -737,8 +737,8 @@ func baseJWTSettings() Settings {
 		OAuthPassThru: true,
 		Username:      "svc",
 		Password:      "fallback",
-		DialTimeout:   "5",
-		QueryTimeout:  "30",
+		DialTimeout:   5,
+		QueryTimeout:  30,
 	}
 }
 

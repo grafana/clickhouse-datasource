@@ -36,11 +36,11 @@ type Settings struct {
 
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 
-	ConnMaxLifetime int    `json:"connMaxLifetime"`
-	DialTimeout     string `json:"dialTimeout,omitempty"`
-	QueryTimeout    string `json:"queryTimeout,omitempty"`
-	MaxIdleConns    int    `json:"maxIdleConns"`
-	MaxOpenConns    int    `json:"maxOpenConns"`
+	ConnMaxLifetime int `json:"connMaxLifetime"`
+	DialTimeout     int `json:"dialTimeout"`
+	QueryTimeout    int `json:"queryTimeout"`
+	MaxIdleConns    int `json:"maxIdleConns"`
+	MaxOpenConns    int `json:"maxOpenConns"`
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
@@ -176,32 +176,15 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	}
 
 	// Deprecated: Replaced with DialTimeout for v4. Deserializes "timeout" field for old v3 configs.
-	if jsonData["timeout"] != nil {
-		if val, ok := jsonData["timeout"].(string); !ok {
-			if val, ok := jsonData["timeout"].(float64); ok {
-				settings.DialTimeout = fmt.Sprintf("%d", int64(val))
-			}
-		} else {
-			settings.DialTimeout = val
-		}
+	legacyTimeout, err := intSetting(jsonData, "timeout", 10)
+	if err != nil {
+		return settings, err
 	}
-	if jsonData["dialTimeout"] != nil {
-		if val, ok := jsonData["dialTimeout"].(string); !ok {
-			if val, ok := jsonData["dialTimeout"].(float64); ok {
-				settings.DialTimeout = fmt.Sprintf("%d", int64(val))
-			}
-		} else {
-			settings.DialTimeout = val
-		}
+	if settings.DialTimeout, err = intSetting(jsonData, "dialTimeout", legacyTimeout); err != nil {
+		return settings, err
 	}
-
-	if jsonData["queryTimeout"] != nil {
-		if val, ok := jsonData["queryTimeout"].(string); ok {
-			settings.QueryTimeout = val
-		}
-		if val, ok := jsonData["queryTimeout"].(float64); ok {
-			settings.QueryTimeout = fmt.Sprintf("%d", int64(val))
-		}
+	if settings.QueryTimeout, err = intSetting(jsonData, "queryTimeout", 60); err != nil {
+		return settings, err
 	}
 	if settings.ConnMaxLifetime, err = intSetting(jsonData, "connMaxLifetime", 5); err != nil {
 		return settings, err
@@ -318,14 +301,6 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		settings.RowCapacityHint = 0
 	}
 
-	// Set default values
-	if strings.TrimSpace(settings.DialTimeout) == "" {
-		settings.DialTimeout = "10"
-	}
-	if strings.TrimSpace(settings.QueryTimeout) == "" {
-		settings.QueryTimeout = "60"
-	}
-
 	// Load secure settings
 	password, ok := config.DecryptedSecureJSONData["password"]
 	if ok {
@@ -351,12 +326,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	proxyOpts, err := config.ProxyOptionsFromContext(ctx)
 
 	if err == nil && proxyOpts != nil {
-		// the sdk expects the timeout to not be a string
-		timeout, err := strconv.ParseFloat(settings.DialTimeout, 64)
-		if err == nil {
-			proxyOpts.Timeouts.Timeout = time.Duration(timeout) * time.Second
-		}
-
+		proxyOpts.Timeouts.Timeout = time.Duration(settings.DialTimeout) * time.Second
 		settings.ProxyOptions = proxyOpts
 	}
 
