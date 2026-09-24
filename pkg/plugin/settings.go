@@ -36,11 +36,11 @@ type Settings struct {
 
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 
-	ConnMaxLifetime string `json:"connMaxLifetime,omitempty"`
+	ConnMaxLifetime int    `json:"connMaxLifetime"`
 	DialTimeout     string `json:"dialTimeout,omitempty"`
 	QueryTimeout    string `json:"queryTimeout,omitempty"`
-	MaxIdleConns    string `json:"maxIdleConns,omitempty"`
-	MaxOpenConns    string `json:"maxOpenConns,omitempty"`
+	MaxIdleConns    int    `json:"maxIdleConns"`
+	MaxOpenConns    int    `json:"maxOpenConns"`
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
@@ -203,13 +203,13 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			settings.QueryTimeout = fmt.Sprintf("%d", int64(val))
 		}
 	}
-	if settings.ConnMaxLifetime, err = intSetting(jsonData, "connMaxLifetime"); err != nil {
+	if settings.ConnMaxLifetime, err = intSetting(jsonData, "connMaxLifetime", 5); err != nil {
 		return settings, err
 	}
-	if settings.MaxIdleConns, err = intSetting(jsonData, "maxIdleConns"); err != nil {
+	if settings.MaxIdleConns, err = intSetting(jsonData, "maxIdleConns", 25); err != nil {
 		return settings, err
 	}
-	if settings.MaxOpenConns, err = intSetting(jsonData, "maxOpenConns"); err != nil {
+	if settings.MaxOpenConns, err = intSetting(jsonData, "maxOpenConns", 50); err != nil {
 		return settings, err
 	}
 	if jsonData["customSettings"] != nil {
@@ -325,15 +325,6 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	if strings.TrimSpace(settings.QueryTimeout) == "" {
 		settings.QueryTimeout = "60"
 	}
-	if strings.TrimSpace(settings.ConnMaxLifetime) == "" {
-		settings.ConnMaxLifetime = "5"
-	}
-	if strings.TrimSpace(settings.MaxIdleConns) == "" {
-		settings.MaxIdleConns = "25"
-	}
-	if strings.TrimSpace(settings.MaxOpenConns) == "" {
-		settings.MaxOpenConns = "50"
-	}
 
 	// Load secure settings
 	password, ok := config.DecryptedSecureJSONData["password"]
@@ -411,36 +402,31 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 	return httpHeaders
 }
 
-// intSetting reads an integer jsonData key into the string form Settings
-// stores. Provisioned YAML gives a JSON number; the config editor gives a
-// numeric string, which its number input lets carry a fraction or an
-// exponent. Both paths truncate to an integer so the same value behaves the
-// same from either producer. An empty string means "not set", so the caller
-// applies its default. Anything else is a downstream error.
-func intSetting(jsonData map[string]interface{}, key string) (string, error) {
-	var f float64
+// intSetting reads a whole-number jsonData key, given as a JSON number or a
+// numeric string, and returns def when the key is absent or empty.
+func intSetting(jsonData map[string]interface{}, key string, def int) (int, error) {
 	switch v := jsonData[key].(type) {
 	case nil:
-		return "", nil
+		return def, nil
 	case float64:
-		f = v
+		if v != math.Trunc(v) {
+			return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: %v is not a whole number", key, v))
+		}
+		if v > math.MaxInt32 || v < math.MinInt32 {
+			return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: %v is out of range", key, v))
+		}
+		return int(v), nil
 	case string:
 		v = strings.TrimSpace(v)
 		if v == "" {
-			return "", nil
+			return def, nil
 		}
-		parsed, err := strconv.ParseFloat(v, 64)
+		parsed, err := strconv.ParseInt(v, 10, 32)
 		if err != nil {
-			return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: %w", key, err))
+			return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: %w", key, err))
 		}
-		f = parsed
+		return int(parsed), nil
 	default:
-		return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: unexpected type %T", key, v))
+		return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: unexpected type %T", key, v))
 	}
-	// int32 bounds keep the int64 conversion defined for NaN, Inf and huge
-	// values; pool sizes and lifetimes beyond int32 are never meaningful.
-	if math.IsNaN(f) || f > math.MaxInt32 || f < math.MinInt32 {
-		return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: %v is out of range", key, f))
-	}
-	return strconv.FormatInt(int64(f), 10), nil
 }

@@ -75,10 +75,10 @@ func TestLoadSettings(t *testing.T) {
 					TlsCACert:          "caCert",
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
-					ConnMaxLifetime:    "5",
+					ConnMaxLifetime:    5,
 					DialTimeout:        "10",
-					MaxIdleConns:       "25",
-					MaxOpenConns:       "50",
+					MaxIdleConns:       25,
+					MaxOpenConns:       50,
 					QueryTimeout:       "60",
 					HttpHeaders: map[string]string{
 						"test-plain-1":  "value-1",
@@ -120,10 +120,10 @@ func TestLoadSettings(t *testing.T) {
 					InsecureSkipVerify: true,
 					TlsClientAuth:      true,
 					TlsAuthWithCACert:  true,
-					ConnMaxLifetime:    "5",
+					ConnMaxLifetime:    5,
 					DialTimeout:        "10",
-					MaxIdleConns:       "25",
-					MaxOpenConns:       "50",
+					MaxIdleConns:       25,
+					MaxOpenConns:       50,
 					QueryTimeout:       "60",
 					ProxyOptions:          nil,
 					EnableRowLimit:        true,
@@ -145,10 +145,10 @@ func TestLoadSettings(t *testing.T) {
 				wantSettings: Settings{
 					Host:            "test",
 					Port:            443,
-					ConnMaxLifetime: "5",
+					ConnMaxLifetime: 5,
 					DialTimeout:     "10",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					MaxIdleConns:    25,
+					MaxOpenConns:    50,
 					QueryTimeout:          "60",
 					RowLimit:              1000000,
 					EnableRowLimit:        true,
@@ -196,10 +196,10 @@ func TestLoadSettings(t *testing.T) {
 					TlsCACert:          "caCert",
 					TlsClientCert:      "clientCert",
 					TlsClientKey:       "clientKey",
-					ConnMaxLifetime:    "5",
+					ConnMaxLifetime:    5,
 					DialTimeout:        "10",
-					MaxIdleConns:       "25",
-					MaxOpenConns:       "50",
+					MaxIdleConns:       25,
+					MaxOpenConns:       50,
 					QueryTimeout:       "60",
 					HttpHeaders: map[string]string{
 						"test-plain-1":  "value-1",
@@ -236,10 +236,10 @@ func TestLoadSettings(t *testing.T) {
 				wantSettings: Settings{
 					Host:            "test",
 					Port:            443,
-					ConnMaxLifetime: "5",
+					ConnMaxLifetime: 5,
 					DialTimeout:     "15",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					MaxIdleConns:    25,
+					MaxOpenConns:    50,
 					QueryTimeout:          "120",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -259,10 +259,10 @@ func TestLoadSettings(t *testing.T) {
 				wantSettings: Settings{
 					Host:            "test",
 					Port:            443,
-					ConnMaxLifetime: "5",
+					ConnMaxLifetime: 5,
 					DialTimeout:     "25",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					MaxIdleConns:    25,
+					MaxOpenConns:    50,
 					QueryTimeout:          "60",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -282,10 +282,10 @@ func TestLoadSettings(t *testing.T) {
 				wantSettings: Settings{
 					Host:            "test",
 					Port:            443,
-					ConnMaxLifetime: "5",
+					ConnMaxLifetime: 5,
 					DialTimeout:     "10",
-					MaxIdleConns:    "25",
-					MaxOpenConns:    "50",
+					MaxIdleConns:    25,
+					MaxOpenConns:    50,
 					QueryTimeout:          "60",
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -305,10 +305,10 @@ func TestLoadSettings(t *testing.T) {
 				wantSettings: Settings{
 					Host:                  "ch.example.com",
 					Port:                  443,
-					ConnMaxLifetime:       "5",
+					ConnMaxLifetime:       5,
 					DialTimeout:           "10",
-					MaxIdleConns:          "25",
-					MaxOpenConns:          "50",
+					MaxIdleConns:          25,
+					MaxOpenConns:          50,
 					QueryTimeout:          "60",
 					EnableSchemaCache:     true,
 					SchemaCacheTTLSeconds: 60,
@@ -327,10 +327,10 @@ func TestLoadSettings(t *testing.T) {
 				wantSettings: Settings{
 					Host:                  "ch.example.com",
 					Port:                  443,
-					ConnMaxLifetime:       "5",
+					ConnMaxLifetime:       5,
 					DialTimeout:           "10",
-					MaxIdleConns:          "25",
-					MaxOpenConns:          "50",
+					MaxIdleConns:          25,
+					MaxOpenConns:          50,
 					QueryTimeout:          "60",
 					EnableSchemaCache:     true,
 					SchemaCacheTTLSeconds: 60,
@@ -472,68 +472,44 @@ func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 
 func TestLoadSettingsConnectionPool(t *testing.T) {
 	ctx := context.Background()
-
-	t.Run("should parse pool settings given as numbers", func(t *testing.T) {
-		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": 60, "maxIdleConns": 2, "maxOpenConns": 5}`),
-			DecryptedSecureJSONData: map[string]string{},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "60", settings.ConnMaxLifetime)
-		assert.Equal(t, "2", settings.MaxIdleConns)
-		assert.Equal(t, "5", settings.MaxOpenConns)
-	})
-
-	t.Run("should parse pool settings given as strings", func(t *testing.T) {
-		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": "60", "maxIdleConns": "2", "maxOpenConns": "5"}`),
-			DecryptedSecureJSONData: map[string]string{},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "60", settings.ConnMaxLifetime)
-		assert.Equal(t, "2", settings.MaxIdleConns)
-		assert.Equal(t, "5", settings.MaxOpenConns)
-	})
-
-	t.Run("should fall back to defaults for empty pool settings", func(t *testing.T) {
-		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": "", "maxIdleConns": " ", "maxOpenConns": ""}`),
-			DecryptedSecureJSONData: map[string]string{},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "5", settings.ConnMaxLifetime)
-		assert.Equal(t, "25", settings.MaxIdleConns)
-		assert.Equal(t, "50", settings.MaxOpenConns)
-	})
-
-	t.Run("should truncate decimal and exponent strings from the number input", func(t *testing.T) {
-		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 9000, "connMaxLifetime": "1.5", "maxIdleConns": "1e1", "maxOpenConns": "2.9"}`),
-			DecryptedSecureJSONData: map[string]string{},
-		})
-		assert.NoError(t, err)
-		assert.Equal(t, "1", settings.ConnMaxLifetime)
-		assert.Equal(t, "10", settings.MaxIdleConns)
-		assert.Equal(t, "2", settings.MaxOpenConns)
-	})
-
-	t.Run("should reject out-of-range pool settings", func(t *testing.T) {
-		for _, raw := range []string{`"Inf"`, `"NaN"`, `1e300`} {
-			_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-				JSONData:                []byte(`{"host": "test", "port": 9000, "maxOpenConns": ` + raw + `}`),
+	tests := []struct {
+		description  string
+		jsonData     string
+		wantLifetime int
+		wantIdle     int
+		wantOpen     int
+		wantErr      bool
+	}{
+		{description: "absent keys use the defaults", jsonData: `{"host": "test", "port": 9000}`, wantLifetime: 5, wantIdle: 25, wantOpen: 50},
+		{description: "empty strings use the defaults", jsonData: `{"host": "test", "port": 9000, "connMaxLifetime": "", "maxIdleConns": " ", "maxOpenConns": ""}`, wantLifetime: 5, wantIdle: 25, wantOpen: 50},
+		{description: "numbers", jsonData: `{"host": "test", "port": 9000, "connMaxLifetime": 60, "maxIdleConns": 2, "maxOpenConns": 5}`, wantLifetime: 60, wantIdle: 2, wantOpen: 5},
+		{description: "numeric strings", jsonData: `{"host": "test", "port": 9000, "connMaxLifetime": "60", "maxIdleConns": "2", "maxOpenConns": "5"}`, wantLifetime: 60, wantIdle: 2, wantOpen: 5},
+		{description: "zero is kept", jsonData: `{"host": "test", "port": 9000, "connMaxLifetime": 0, "maxIdleConns": "0", "maxOpenConns": 0}`},
+		{description: "negative is kept", jsonData: `{"host": "test", "port": 9000, "connMaxLifetime": -1, "maxIdleConns": "-1", "maxOpenConns": -1}`, wantLifetime: -1, wantIdle: -1, wantOpen: -1},
+		{description: "decimal string is rejected", jsonData: `{"host": "test", "port": 9000, "connMaxLifetime": "1.5"}`, wantErr: true},
+		{description: "exponent string is rejected", jsonData: `{"host": "test", "port": 9000, "maxIdleConns": "1e1"}`, wantErr: true},
+		{description: "decimal number is rejected", jsonData: `{"host": "test", "port": 9000, "maxOpenConns": 0.5}`, wantErr: true},
+		{description: "huge number is rejected", jsonData: `{"host": "test", "port": 9000, "maxOpenConns": 1e300}`, wantErr: true},
+		{description: "Inf string is rejected", jsonData: `{"host": "test", "port": 9000, "maxOpenConns": "Inf"}`, wantErr: true},
+		{description: "NaN string is rejected", jsonData: `{"host": "test", "port": 9000, "maxOpenConns": "NaN"}`, wantErr: true},
+		{description: "non-numeric string is rejected", jsonData: `{"host": "test", "port": 9000, "maxOpenConns": "five"}`, wantErr: true},
+		{description: "unexpected type is rejected", jsonData: `{"host": "test", "port": 9000, "maxOpenConns": true}`, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			got, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+				JSONData:                []byte(tc.jsonData),
 				DecryptedSecureJSONData: map[string]string{},
 			})
-			assert.Error(t, err, raw)
-			assert.True(t, backend.IsDownstreamError(err), raw)
-		}
-	})
-
-	t.Run("should reject non-numeric pool settings", func(t *testing.T) {
-		_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 9000, "maxOpenConns": "five"}`),
-			DecryptedSecureJSONData: map[string]string{},
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.True(t, backend.IsDownstreamError(err))
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantLifetime, got.ConnMaxLifetime)
+			assert.Equal(t, tc.wantIdle, got.MaxIdleConns)
+			assert.Equal(t, tc.wantOpen, got.MaxOpenConns)
 		})
-		assert.Error(t, err)
-		assert.True(t, backend.IsDownstreamError(err))
-	})
+	}
 }
