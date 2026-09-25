@@ -12,6 +12,9 @@ package models
 type ClickHouseSettingsJSON struct {
 	Version string `json:"version,omitempty"`
 
+	ConfigMode string `json:"configMode,omitempty"`
+	SignalType string `json:"signalType,omitempty"`
+
 	Host     string `json:"host,omitempty"`
 	Port     int64  `json:"port,omitempty"`
 	Protocol string `json:"protocol,omitempty"`
@@ -45,6 +48,11 @@ type ClickHouseSettingsJSON struct {
 	CustomSettings         []CustomSetting `json:"customSettings,omitempty"`
 	EnableSecureSocksProxy bool            `json:"enableSecureSocksProxy,omitempty"`
 	EnableRowLimit         bool            `json:"enableRowLimit,omitempty"`
+	RowLimit               int64           `json:"rowLimit,omitempty"`
+
+	EnableMapKeysDiscovery bool `json:"enableMapKeysDiscovery,omitempty"`
+	EnableSchemaCache      bool `json:"enableSchemaCache,omitempty"`
+	SchemaCacheTTLSeconds  int  `json:"schemaCacheTTLSeconds,omitempty"`
 
 	HideTableNameInAdhocFilters bool `json:"hideTableNameInAdhocFilters,omitempty"`
 }
@@ -96,6 +104,8 @@ type TracesConfig struct {
 	TraceEventsColumnPrefix string `json:"traceEventsColumnPrefix,omitempty"`
 	TraceLinksColumnPrefix  string `json:"traceLinksColumnPrefix,omitempty"`
 	ShowTraceLinks          bool   `json:"showTraceLinks,omitempty"`
+
+	TraceTimestampTableSuffix string `json:"traceTimestampTableSuffix,omitempty"`
 }
 
 // HTTPHeader backs an entry in the jsonData.httpHeaders array.

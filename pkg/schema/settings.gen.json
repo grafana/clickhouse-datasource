@@ -87,6 +87,11 @@
             "type": "boolean",
             "default": true
           },
+          "enableSecureSocksProxy": {
+            "description": "Enable proxying the datasource connection through the secure socks proxy to a different network. Only rendered in the configuration editor when the Grafana instance has secure_socks_datasource_proxy configured (Grafana \u003e= 10.0.0), but the value can always be set through provisioning.",
+            "type": "boolean",
+            "default": false
+          },
           "forwardGrafanaHeaders": {
             "description": "Forward Grafana HTTP Headers to datasource.",
             "type": "boolean",

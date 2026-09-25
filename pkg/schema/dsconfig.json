@@ -1032,6 +1032,18 @@
       "target": "jsonData"
     },
     {
+      "id": "jsonData_enableSecureSocksProxy",
+      "key": "enableSecureSocksProxy",
+      "label": "Enable Secure Socks Proxy",
+      "description": "Enable proxying the datasource connection through the secure socks proxy to a different network. Only rendered in the configuration editor when the Grafana instance has secure_socks_datasource_proxy configured (Grafana >= 10.0.0), but the value can always be set through provisioning.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
       "id": "jsonData_hideTableNameInAdhocFilters",
       "key": "hideTableNameInAdhocFilters",
       "label": "Hide table name in ad hoc filters",
@@ -1180,6 +1192,7 @@
         "jsonData_aliasTables",
         "jsonData_customSettings",
         "jsonData_enableRowLimit",
+        "jsonData_enableSecureSocksProxy",
         "jsonData_hideTableNameInAdhocFilters"
       ]
     }
