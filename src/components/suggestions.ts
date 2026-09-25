@@ -104,6 +104,20 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
     }
   }
 
+  // When the cursor is in a FROM/JOIN position on a `$`-prefixed target, surface
+  // that target (the nearest FROM/JOIN before the cursor) so variable
+  // completions are offered for a JOIN target too, not just the first FROM. The
+  // clause guard keeps this from changing a later clause's column context.
+  if (cursorData.clause === ClauseType.From || cursorData.clause === ClauseType.Join) {
+    for (const node of root.children) {
+      const fromNode = node as FromQueryNode;
+      if (node.type === QueryNodeType.From && fromNode.table?.startsWith('$') && node.token.begin <= cursorPosition) {
+        cursorData.database = fromNode.database;
+        cursorData.table = fromNode.table;
+      }
+    }
+  }
+
   return cursorData;
 }
 
