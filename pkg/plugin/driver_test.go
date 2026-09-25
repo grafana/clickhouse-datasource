@@ -430,6 +430,69 @@ func TestMutateQuery_GrafanaMetadata(t *testing.T) {
 	})
 }
 
+func TestMutateQuery_MinInterval(t *testing.T) {
+	h := &Clickhouse{}
+
+	cases := []struct {
+		name         string
+		json         string
+		interval     time.Duration
+		wantInterval time.Duration
+	}{
+		{"raises the interval", `{"minInterval":"5m"}`, 30 * time.Second, 5 * time.Minute},
+		{"never lowers the interval", `{"minInterval":"1s"}`, 30 * time.Second, 30 * time.Second},
+		{"supports day units", `{"minInterval":"1d"}`, time.Hour, 24 * time.Hour},
+		{"supports week units", `{"minInterval":"1w"}`, time.Hour, 7 * 24 * time.Hour},
+		{"trims surrounding space", `{"minInterval":" 5m "}`, 30 * time.Second, 5 * time.Minute},
+		// The frontend trims the same explicit set, so neither side accepts a
+		// value the other ignores.
+		{"trims a byte order mark", "{\"minInterval\":\"\ufeff5m\"}", 30 * time.Second, 5 * time.Minute},
+		{"trims a next line character", "{\"minInterval\":\"\u00855m\"}", 30 * time.Second, 5 * time.Minute},
+		{"trims a non-breaking space", "{\"minInterval\":\"\u00a05m\"}", 30 * time.Second, 5 * time.Minute},
+		{"ignores an empty value", `{}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value it cannot parse", `{"minInterval":"soon"}`, 30 * time.Second, 30 * time.Second},
+		// The frontend refuses these too (src/data/queryInterval.ts); both sides
+		// share one grammar so $__interval and $__timeInterval cannot disagree.
+		{"ignores a unit-less value", `{"minInterval":"60"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores trailing garbage", `{"minInterval":"5minutes"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a fractional value", `{"minInterval":"1.5m"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a compound duration", `{"minInterval":"1h30m"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores month and year units", `{"minInterval":"1M"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value past the upper bound", `{"minInterval":"366d"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value that would overflow", `{"minInterval":"9999999999d"}`, 30 * time.Second, 30 * time.Second},
+		// A hand-written dashboard can carry a number here; it must degrade to
+		// no floor rather than failing the whole decode.
+		{"ignores a numeric value", `{"minInterval":60}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a null value", `{"minInterval":null}`, 30 * time.Second, 30 * time.Second},
+		{"ignores an object value", `{"minInterval":{"value":"5m"}}`, 30 * time.Second, 30 * time.Second},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, req := h.MutateQuery(t.Context(), backend.DataQuery{
+				JSON:     []byte(tc.json),
+				Interval: tc.interval,
+			})
+
+			assert.Equal(t, tc.wantInterval, req.Interval)
+		})
+	}
+}
+
+func TestMutateQuery_MinIntervalDoesNotBreakTimezone(t *testing.T) {
+	h := &Clickhouse{}
+
+	// A numeric minInterval used to fail json.Unmarshal for the whole struct, and
+	// the early return took the timezone handling with it.
+	ctx, req := h.MutateQuery(t.Context(), backend.DataQuery{
+		JSON:     []byte(`{"minInterval":60,"meta":{"timezone":"Europe/Lisbon"}}`),
+		Interval: 30 * time.Second,
+	})
+
+	assert.Equal(t, 30*time.Second, req.Interval)
+	assert.NotEqual(t, t.Context(), ctx, "timezone should still have been applied to the context")
+}
+
 func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	h := &Clickhouse{}
 

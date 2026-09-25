@@ -183,12 +183,12 @@ export default {
           tooltip: 'Validate SQL in the editor.',
         },
         enableMapKeysDiscovery: {
-          label: 'Suggest Map keys in filter editor',
+          label: 'Suggest Map keys and JSON paths in filter editor',
           testid: 'data-testid enable-map-keys-discovery-switch',
           tooltip:
-            'When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. ' +
-            'On large tables with high-cardinality maps this probe can scan billions of rows. ' +
-            'Disable to suppress the probe — operators can still type Map keys manually. Defaults to enabled.',
+            'When enabled, the filter editor probes Map(...) and JSON columns for distinct keys/paths to populate the key-suggestion dropdown. ' +
+            'On large tables with high-cardinality maps or JSON this probe can scan billions of rows. ' +
+            'Disable to suppress the probe — operators can still type Map keys and JSON paths manually. Defaults to enabled.',
         },
       },
       TracesConfig: {
@@ -422,6 +422,15 @@ export default {
       tooltip:
         'Enables Open Telemetry schema versioning. The auto option matches the logs schema version to the table columns. Pick a specific version to override.',
     },
+    MinIntervalEditor: {
+      label: 'Min interval',
+      placeholder: 'e.g. 1m',
+      tooltip:
+        "Lower bound for this query's interval. Raises the interval Grafana derives from the time range, so " +
+        '$__timeInterval, $__interval and friends bucket no finer than this. One number plus one unit — ms, s, m, ' +
+        'h, d or w (e.g. 10s, 5m, 1d). Leave empty to use the interval Grafana picks.',
+      error: 'Invalid duration. Use one number plus a unit of ms, s, m, h, d or w — for example 10s, 5m or 1d.',
+    },
     LimitEditor: {
       label: 'Limit',
       tooltip: 'Limits the number of rows returned by the query',
@@ -448,6 +457,10 @@ export default {
       addLabel: 'Filter',
       mapKeyPlaceholder: 'map key',
       jsonPathPlaceholder: 'json path',
+      durationFilter: {
+        tooltip:
+          'Accepts a unit suffix: ns, us (or µs), ms, s (integer or decimal, e.g. "1.2s"). A bare number is treated as nanoseconds. Values are converted to the column\u2019s configured Duration Unit before being compared.',
+      },
     },
     GroupByEditor: {
       label: 'Group By',
