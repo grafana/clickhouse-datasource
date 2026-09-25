@@ -529,3 +529,52 @@ func TestLoadSettingsConnectionPool(t *testing.T) {
 		})
 	}
 }
+
+// TestLoadSettingsSetsEveryField fails when a Settings field has no parsing
+// branch or no key in this fixture: no field may equal its no-keys value.
+func TestLoadSettingsSetsEveryField(t *testing.T) {
+	ctx := sdkconfig.WithGrafanaConfig(context.Background(), sdkconfig.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+	none, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+		JSONData:                []byte(`{"host": "test", "port": 9000}`),
+		DecryptedSecureJSONData: map[string]string{},
+	})
+	if err != nil {
+		t.Fatalf("LoadSettings() with no optional keys: %v", err)
+	}
+	every, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+		UID: "ds-uid",
+		JSONData: []byte(`{
+			"host": "foo", "port": 443, "protocol": "http", "secure": true, "path": "custom-path",
+			"tlsSkipVerify": true, "tlsAuth": true, "tlsAuthWithCACert": true,
+			"username": "baz", "defaultDatabase": "example",
+			"connMaxLifetime": 60, "dialTimeout": "20", "queryTimeout": "120", "maxIdleConns": 2, "maxOpenConns": 3,
+			"httpHeaders": [{ "name": "x-plain", "value": "value-1", "secure": false }],
+			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true,
+			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
+			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
+			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120
+		}`),
+		DecryptedSecureJSONData: map[string]string{
+			"password":                 "bar",
+			"tlsCACert":                "caCert",
+			"tlsClientCert":            "clientCert",
+			"tlsClientKey":             "clientKey",
+			"secureSocksProxyPassword": "proxy-secret",
+		},
+	})
+	if err != nil {
+		t.Fatalf("LoadSettings() with every key: %v", err)
+	}
+	everyValue, noneValue := reflect.ValueOf(every), reflect.ValueOf(none)
+	for i := 0; i < everyValue.NumField(); i++ {
+		name := everyValue.Type().Field(i).Name
+		if reflect.DeepEqual(everyValue.Field(i).Interface(), noneValue.Field(i).Interface()) {
+			t.Errorf("Settings.%s = %v with every key set, the same as with none: add its key to this fixture or a parsing branch to LoadSettings", name, everyValue.Field(i).Interface())
+		}
+	}
+}
