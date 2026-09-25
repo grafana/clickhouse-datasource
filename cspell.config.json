@@ -149,6 +149,7 @@
     "browsable",
     "projectable",
     "unaliased",
-    "ungated"
+    "ungated",
+    "dsconfig"
   ]
 }
