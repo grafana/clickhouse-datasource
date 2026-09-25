@@ -222,15 +222,6 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		}
 	}
 
-	t, err := strconv.Atoi(settings.DialTimeout)
-	if err != nil {
-		return nil, backend.DownstreamError(fmt.Errorf("invalid timeout: %s", settings.DialTimeout))
-	}
-	qt, err := strconv.Atoi(settings.QueryTimeout)
-	if err != nil {
-		return nil, backend.DownstreamError(fmt.Errorf("invalid query timeout: %s", settings.QueryTimeout))
-	}
-
 	protocol := clickhouse.Native
 	if settings.Protocol == "http" {
 		protocol = clickhouse.HTTP
@@ -305,12 +296,12 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		Compression: &clickhouse.Compression{
 			Method: compression,
 		},
-		DialTimeout: time.Duration(t) * time.Second,
+		DialTimeout: time.Duration(settings.DialTimeout) * time.Second,
 		GetJWT:      getJWT,
 		HttpHeaders: httpHeaders,
 		HttpUrlPath: settings.Path,
 		Protocol:    protocol,
-		ReadTimeout: time.Duration(qt) * time.Second,
+		ReadTimeout: time.Duration(settings.QueryTimeout) * time.Second,
 		Settings:    customSettings,
 		TLS:         tlsConfig,
 	}
@@ -355,15 +346,9 @@ func (h *Clickhouse) Connect(
 	db := clickhouse.OpenDB(opts)
 
 	// Set connection pool settings
-	if i, err := strconv.Atoi(settings.ConnMaxLifetime); err == nil {
-		db.SetConnMaxLifetime(time.Duration(i) * time.Minute)
-	}
-	if i, err := strconv.Atoi(settings.MaxIdleConns); err == nil {
-		db.SetMaxIdleConns(i)
-	}
-	if i, err := strconv.Atoi(settings.MaxOpenConns); err == nil {
-		db.SetMaxOpenConns(i)
-	}
+	db.SetConnMaxLifetime(time.Duration(settings.ConnMaxLifetime) * time.Minute)
+	db.SetMaxIdleConns(settings.MaxIdleConns)
+	db.SetMaxOpenConns(settings.MaxOpenConns)
 
 	select {
 	case <-ctx.Done():
@@ -465,10 +450,7 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	settings, err := LoadSettings(ctx, config)
 	timeout := 60
 	if err == nil {
-		t, err := strconv.Atoi(settings.QueryTimeout)
-		if err == nil {
-			timeout = t
-		}
+		timeout = settings.QueryTimeout
 	}
 	return sqlds.DriverSettings{
 		Timeout: time.Second * time.Duration(timeout),
