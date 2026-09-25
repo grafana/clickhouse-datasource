@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -168,6 +169,14 @@ func TestConnect(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
+	})
+	t.Run("should apply connection pool settings from jsonData", func(t *testing.T) {
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "maxOpenConns": 5, "maxIdleConns": "2", "connMaxLifetime": 60 }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		db, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
+		assert.Equal(t, nil, err)
+		assert.Equal(t, 5, db.Stats().MaxOpenConnections)
 	})
 }
 
@@ -1248,38 +1257,26 @@ func TestConvertNullableIPv6(t *testing.T) {
 func TestHTTPConnectWithHeaders(t *testing.T) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxyHost := "localhost"
-	proxyPort := getEnv("CLICKHOUSE_PROXY_PORT", "8122")
 	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
 	host := getEnv("CLICKHOUSE_HOST", "localhost")
 
+	// Bind synchronously so the port is already accepting connections before any
+	// request is sent to it, rather than racing a background ListenAndServe against
+	// the rest of the test. An ephemeral port (":0") also avoids collisions with a
+	// leftover listener from a prior run, since nothing else can be bound to it yet.
+	listener, err := net.Listen("tcp", net.JoinHostPort(proxyHost, "0"))
+	require.NoError(t, err)
+	proxyPort := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+
+	server := &http.Server{Handler: proxy}
 	go func() {
-		err := http.ListenAndServe(fmt.Sprintf("%s:%s", proxyHost, proxyPort), proxy)
-		assert.Equal(t, nil, err)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			assert.NoError(t, err)
+		}
 	}()
-
-	// Wait for proxy server to be ready
-	proxyAddr := net.JoinHostPort(proxyHost, proxyPort)
-
-	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	d := &net.Dialer{}
-	tick := time.NewTicker(100 * time.Millisecond)
-	defer tick.Stop()
-
-	for {
-		conn, err := d.DialContext(waitCtx, "tcp", proxyAddr)
-		if err == nil {
-			_ = conn.Close()
-			break
-		}
-
-		select {
-		case <-waitCtx.Done():
-			t.Fatalf("proxy server failed to start within 5s: %v", err)
-		case <-tick.C:
-		}
-	}
+	t.Cleanup(func() {
+		_ = server.Shutdown(context.Background())
+	})
 
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
@@ -1416,9 +1413,8 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 	}
 	dsInstance, err := NewDatasource(ctx, settings)
 	require.NoError(t, err)
-	// NewDatasource returns a *clickhouseInstance that embeds *sqlds.SQLDatasource
-	// (promoting QueryData), or the bare *sqlds.SQLDatasource on the defensive
-	// fallback path. Assert on the QueryDataHandler interface so either works.
+	// NewDatasource returns a *sqlds.SQLDatasource (promoting QueryData).
+	// Assert on the QueryDataHandler interface.
 	ds, ok := dsInstance.(backend.QueryDataHandler)
 	require.True(t, ok)
 
@@ -1454,6 +1450,36 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		gotTo, _ := frames[0].Fields[1].ConcreteAt(0)
 		assert.EqualValues(t, from.Unix(), gotFrom)
 		assert.EqualValues(t, to.Unix(), gotTo)
+	})
+
+	t.Run("nested macro expands before execution", func(t *testing.T) {
+		// Regression guard: $__timeInterval($__fromTime) must expand the
+		// inner macro too. After the macropro migration it reached ClickHouse
+		// verbatim and the query failed with UNKNOWN_IDENTIFIER. The window
+		// starts exactly on a minute boundary, so flooring it to the interval
+		// start is the identity and the value round-trips.
+		req := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Queries: []backend.DataQuery{
+				{
+					RefID:     "A",
+					TimeRange: timeRange,
+					Interval:  time.Minute,
+					JSON:      []byte(`{"rawSql":"SELECT toUnixTimestamp($__timeInterval($__fromTime)) AS f"}`),
+				},
+			},
+		}
+
+		resp, err := ds.QueryData(ctx, req)
+		require.NoError(t, err)
+		require.Contains(t, resp.Responses, "A")
+		require.NoError(t, resp.Responses["A"].Error, "nested-macro query should run cleanly")
+
+		frames := resp.Responses["A"].Frames
+		require.Len(t, frames, 1)
+		require.Equal(t, 1, len(frames[0].Fields))
+		gotFrom, _ := frames[0].Fields[0].ConcreteAt(0)
+		assert.EqualValues(t, from.Unix(), gotFrom)
 	})
 
 	t.Run("macro expansion failure surfaces a downstream error", func(t *testing.T) {

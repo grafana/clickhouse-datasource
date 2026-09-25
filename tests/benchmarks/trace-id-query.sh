@@ -129,13 +129,13 @@ SLOW_SQL="SELECT /* ${SLOW_TAG} */ * FROM ${CH_DB}.bench_traces WHERE TraceId = 
 # Optimized: the exact shape generateTraceIdQuery() emits today when
 # applyTraceIdOptimization fires.
 FAST_SQL="WITH /* ${FAST_TAG} */
-  '${TARGET_TRACE_ID}' AS trace_id,
-  (SELECT min(Start) FROM ${CH_DB}.bench_traces_trace_id_ts WHERE TraceId = trace_id) AS trace_start,
-  (SELECT max(End) + 1 FROM ${CH_DB}.bench_traces_trace_id_ts WHERE TraceId = trace_id) AS trace_end
+  '${TARGET_TRACE_ID}' AS __gf_trace_id,
+  (SELECT min(Start) FROM ${CH_DB}.bench_traces_trace_id_ts WHERE TraceId = __gf_trace_id) AS __gf_trace_start,
+  (SELECT max(End) + 1 FROM ${CH_DB}.bench_traces_trace_id_ts WHERE TraceId = __gf_trace_id) AS __gf_trace_end
 SELECT * FROM ${CH_DB}.bench_traces
-WHERE TraceId = trace_id
-  AND Timestamp >= trace_start
-  AND Timestamp <= trace_end
+WHERE TraceId = __gf_trace_id
+  AND Timestamp >= __gf_trace_start
+  AND Timestamp <= __gf_trace_end
 FORMAT Null"
 
 run_sql "SET use_query_cache = 0; ${SLOW_SQL};"

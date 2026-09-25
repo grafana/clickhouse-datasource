@@ -3,8 +3,20 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
-import { BuilderMode, ColumnHint, FilterOperator, QueryType, TimeUnit } from 'types/queryBuilder';
+import { generateSql } from 'data/sqlGenerator';
+import {
+  BuilderMode,
+  ColumnHint,
+  FilterOperator,
+  OrderByDirection,
+  QueryBuilderOptions,
+  QueryType,
+  TimeUnit,
+} from 'types/queryBuilder';
+import { setColumnByHint, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
+import { selectors } from 'selectors';
 
 jest.mock('./views/TableQueryBuilder', () => ({
   TableQueryBuilder: () => <div data-testid="table-component" />,
@@ -39,6 +51,7 @@ describe('QueryBuilder', () => {
   mockDs.getDefaultDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceColumns = jest.fn((_db?: string) => new Map());
   mockDs.shouldSelectLogContextColumns = jest.fn((_db?: string) => false);
+  mockDs.getAdditionalLogColumns = jest.fn(() => []);
   mockDs.getDefaultTable = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceTable = jest.fn((_db?: string) => '');
@@ -102,6 +115,32 @@ describe('QueryBuilder', () => {
       )
     );
     expect(result.container.firstChild).not.toBeNull();
+  });
+
+  it('renders the min interval field under the query type row', async () => {
+    const onMinIntervalChange = jest.fn();
+    const result = await waitFor(() =>
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={{
+            queryType: QueryType.Table,
+            mode: BuilderMode.List,
+            database: 'db',
+            table: 'foo',
+            columns: [],
+            filters: [],
+          }}
+          builderOptionsDispatch={() => {}}
+          datasource={mockDs}
+          generatedSql=""
+          minInterval="5m"
+          onMinIntervalChange={onMinIntervalChange}
+        />
+      )
+    );
+
+    expect(result.getByTestId(selectors.components.QueryEditor.MinIntervalEditor.input)).toHaveValue('5m');
   });
 
   describe('compact filter chip label', () => {
@@ -326,6 +365,170 @@ describe('QueryBuilder', () => {
     );
   });
 
+  // Drive the REAL reducer (not a jest.fn dispatch) through CompactQueryEditor so the test observes
+  // the composed column set after every hook has run, and can catch a duplicate projection.
+  const renderCompactWithRealReducer = (datasource: Datasource): (() => QueryBuilderOptions) => {
+    let latest: QueryBuilderOptions = defaultCHBuilderQuery.builderOptions;
+    const Harness = () => {
+      const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState(defaultCHBuilderQuery.builderOptions);
+      latest = builderOptions;
+      return (
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+          onQueryChange={jest.fn()}
+        />
+      );
+    };
+    render(<Harness />);
+    return () => latest;
+  };
+
+  it('emits no runnable query for a non-OTel compact logs table before its schema loads', async () => {
+    // Cold-load transient: fetchColumns has not returned, so no time/message/scalar column can be
+    // resolved. The logs query must be empty rather than an invalid `SELECT  FROM host_logs`, which
+    // ClickHouse rejects with a 400. generateSql returns '' for a columns-less logs query, and
+    // filterQuery (tested in CHDatasource) skips an empty query so Grafana never sends it.
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'logs'),
+      getDefaultLogsTable: jest.fn(() => 'host_logs'),
+      getDefaultLogsColumns: jest.fn(() => new Map()),
+      getLogsOtelVersion: jest.fn(() => undefined),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      getAdditionalLogColumns: jest.fn(() => []),
+      fetchColumns: jest.fn(() => Promise.resolve([])),
+    } as unknown as Datasource;
+
+    const getOptions = renderCompactWithRealReducer(compactDs);
+
+    await waitFor(() => {
+      expect(getOptions().queryType).toBe(QueryType.Logs);
+    });
+
+    const options = getOptions();
+    // No column could be resolved from an empty schema, so nothing is projected...
+    expect(options.columns || []).toHaveLength(0);
+    // ...and the generated logs query is empty rather than `SELECT  FROM "logs"."host_logs"`.
+    expect(generateSql(options)).toBe('');
+  });
+
+  it('preserves an authored query when its type does not match the datasource signal', async () => {
+    const compactDs = {
+      ...mockDs,
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'otel_logs'),
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => '1.29.0'),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+    } as unknown as Datasource;
+    const builderOptionsDispatch = jest.fn();
+    const onQueryChange = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.TimeSeries,
+          mode: BuilderMode.Trend,
+          database: 'metrics_db',
+          table: 'requests',
+          columns: [{ name: 'created_at', hint: ColumnHint.Time }, { name: 'requests_count' }],
+          filters: [],
+          orderBy: [{ name: 'created_at', dir: OrderByDirection.ASC }],
+        }}
+        builderOptionsDispatch={builderOptionsDispatch}
+        datasource={compactDs}
+        generatedSql=""
+        onQueryChange={onQueryChange}
+      />
+    );
+
+    // The authored time series query falls back to the classic builder instead of being
+    // replaced with compact logs defaults.
+    expect(await screen.findByTestId('time-series-component')).toBeInTheDocument();
+    expect(screen.queryByTestId('compact-mode-bar')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('compact-filter-bar')).not.toBeInTheDocument();
+    expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+    expect(onQueryChange).not.toHaveBeenCalled();
+  });
+
+  it('re-resolves compact logs defaults to the pre-v0.151.0 otel schema once table columns load', async () => {
+    const compactDs = {
+      ...mockDs,
+      uid: 'compact-otel-latest',
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'otel_logs'),
+      // The static "latest" schema has no filter_time mapping, so the initial
+      // defaults order and filter on Timestamp only.
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => 'latest'),
+      shouldSelectLogContextColumns: jest.fn(() => false),
+      getLogContextColumnNames: jest.fn(() => []),
+      // The table itself is the older schema, identified by TimestampTime.
+      fetchColumns: jest.fn(() =>
+        Promise.resolve([
+          { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+          { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+          { name: 'Body', type: 'String', picklistValues: [] },
+        ])
+      ),
+    } as unknown as Datasource;
+    const onQueryChange = jest.fn();
+
+    render(
+      <QueryBuilder
+        app={CoreApp.PanelEditor}
+        builderOptions={{
+          queryType: QueryType.Table,
+          mode: BuilderMode.List,
+          database: '',
+          table: '',
+          columns: [],
+          filters: [],
+        }}
+        builderOptionsDispatch={jest.fn()}
+        datasource={compactDs}
+        generatedSql=""
+        onQueryChange={onQueryChange}
+      />
+    );
+
+    await waitFor(() =>
+      expect(onQueryChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          columns: expect.arrayContaining([{ name: 'TimestampTime', hint: ColumnHint.FilterTime }]),
+        })
+      )
+    );
+  });
+
   it('renders traces compact mode without database/table or query type selectors', async () => {
     const compactDs = {
       ...mockDs,
@@ -375,5 +578,88 @@ describe('QueryBuilder', () => {
     await waitFor(() =>
       expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }))
     );
+  });
+
+  describe('compact logs message column detection', () => {
+    const buildCompactLogsDs = (defaultColumns: Map<ColumnHint, string>): Datasource =>
+      ({
+        ...mockDs,
+        getSignalType: jest.fn(() => 'logs'),
+        getConfigMode: jest.fn(() => 'single-table'),
+        isSingleTableMode: jest.fn(() => true),
+        getDefaultLogsDatabase: jest.fn(() => 'default'),
+        getDefaultLogsTable: jest.fn(() => 'app_logs'),
+        getDefaultLogsColumns: jest.fn(() => defaultColumns),
+        getLogsOtelVersion: jest.fn(() => ''),
+        shouldSelectLogContextColumns: jest.fn(() => false),
+        getLogContextColumnNames: jest.fn(() => []),
+        fetchColumns: jest.fn(() =>
+          Promise.resolve([
+            { name: 'timestamp', type: 'DateTime', picklistValues: [] },
+            { name: 'message', type: 'String', picklistValues: [] },
+            { name: 'level', type: 'LowCardinality(String)', picklistValues: [] },
+          ])
+        ),
+      }) as unknown as Datasource;
+
+    const initialBuilderOptions = {
+      queryType: QueryType.Table,
+      mode: BuilderMode.List,
+      database: '',
+      table: '',
+      columns: [],
+      filters: [],
+    };
+
+    it('detects LogMessage and LogLevel columns by name when config has no columns', async () => {
+      const datasource = buildCompactLogsDs(new Map());
+      const builderOptionsDispatch = jest.fn();
+
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={initialBuilderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+        />
+      );
+
+      await waitFor(() =>
+        expect(builderOptionsDispatch).toHaveBeenCalledWith(
+          setColumnByHint({ name: 'message', type: 'String', hint: ColumnHint.LogMessage })
+        )
+      );
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(
+        setColumnByHint({ name: 'level', type: 'LowCardinality(String)', hint: ColumnHint.LogLevel })
+      );
+    });
+
+    it('never overrides an explicitly configured message column', async () => {
+      const datasource = buildCompactLogsDs(new Map([[ColumnHint.LogMessage, 'my_msg_col']]));
+      const builderOptionsDispatch = jest.fn();
+
+      render(
+        <QueryBuilder
+          app={CoreApp.PanelEditor}
+          builderOptions={initialBuilderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+        />
+      );
+
+      // The level slot is not configured, so detection has run once this dispatch appears
+      await waitFor(() =>
+        expect(builderOptionsDispatch).toHaveBeenCalledWith(
+          setColumnByHint({ name: 'level', type: 'LowCardinality(String)', hint: ColumnHint.LogLevel })
+        )
+      );
+
+      const logMessageDispatches = builderOptionsDispatch.mock.calls.filter(
+        ([action]) => action.type === 'set_column_by_hint' && action.payload?.column?.hint === ColumnHint.LogMessage
+      );
+      expect(logMessageDispatches).toHaveLength(0);
+    });
   });
 });

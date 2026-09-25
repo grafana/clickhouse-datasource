@@ -88,9 +88,14 @@ export function generateVariableSql(query: CHVariableQuery, defaultDatabase: str
         return '';
       }
       const column = escapeIdentifier(query.column);
-      const target =
-        query.columnIsMap && query.mapKey ? `${column}['${escapeCHStringLiteral(query.mapKey)}']` : column;
-      return `SELECT DISTINCT ${target} AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE ${target} IS NOT NULL ORDER BY value LIMIT 1000`;
+      if (query.columnIsMap && query.mapKey) {
+        // Map subscript on a missing key returns the value type's default
+        // (e.g. '' for String), never NULL, so an IS NOT NULL guard would be a
+        // no-op and add a spurious empty entry. Guard with mapContains instead.
+        const mapKey = `'${escapeCHStringLiteral(query.mapKey)}'`;
+        return `SELECT DISTINCT ${column}[${mapKey}] AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE mapContains(${column}, ${mapKey}) ORDER BY value LIMIT 1000`;
+      }
+      return `SELECT DISTINCT ${column} AS value FROM ${escapeIdentifier(db)}.${escapeIdentifier(query.table)} WHERE ${column} IS NOT NULL ORDER BY value LIMIT 1000`;
     }
     case 'sql':
     default:
@@ -266,9 +271,11 @@ export class CHVariableSupport extends CustomVariableSupport<Datasource, CHVaria
     }
     // Pass rawSql as a string. metricFindQuery accepts (CHQuery | string) and
     // wraps a string into a minimal SQL-mode CHQuery internally; that keeps
-    // pluginVersion / refId concerns where they already live.
+    // pluginVersion / refId concerns where they already live. Forward
+    // scopedVars so scoped variables and __searchFilter resolve inside
+    // variable queries (they reach applyTemplateVariables via runQuery).
     const promise = this.datasource
-      .metricFindQuery(rawSql, { range: request.range })
+      .metricFindQuery(rawSql, { range: request.range, scopedVars: request.scopedVars })
       .then((values: MetricFindValue[]) => ({
         // Emit text and value separately so a `SELECT value, label` query
         // substitutes the value while displaying the label. Fall back to text

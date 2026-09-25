@@ -3,7 +3,7 @@ import { QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
-import { Button, ConfirmModal, InlineFieldRow, Stack } from '@grafana/ui';
+import { Button, ConfirmModal, ErrorBoundaryAlert, InlineFieldRow, Stack } from '@grafana/ui';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { QueryBuilder } from 'components/queryBuilder/QueryBuilder';
@@ -21,28 +21,59 @@ import { isEqual } from 'lodash';
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 /**
- * Top level query editor component
+ * Grafana core injects a one-shot top-level `query` field into the pane query when a span
+ * link is followed (see Datasource.retargetSpanLinkTrace). The injected value must only
+ * apply until the user next edits the query, so drop it from every change the editor
+ * propagates. Otherwise it survives in the saved model and pins every run to the linked
+ * trace, even after the user targets a different trace id.
+ */
+const removeSpanLinkQueryField = (query: CHQuery): CHQuery => {
+  if (!('query' in query)) {
+    return query;
+  }
+
+  const { query: discardedSpanLinkQuery, ...rest } = query;
+  void discardedSpanLinkQuery;
+  return rest;
+};
+
+/**
+ * Top level query editor component.
+ * Wrapped in an error boundary so a crash while rendering the editor surfaces
+ * an alert instead of breaking the panel edit view (#1931).
  */
 export const CHQueryEditor = (props: CHQueryEditorProps) => {
-  const { datasource, query: savedQuery, onRunQuery } = props;
-  const query = migrateCHQuery(savedQuery);
+  return (
+    <ErrorBoundaryAlert title="ClickHouse query editor failed to load" style="alertbox">
+      <CHQueryEditorContent {...props} />
+    </ErrorBoundaryAlert>
+  );
+};
+
+const CHQueryEditorContent = (props: CHQueryEditorProps) => {
+  const { datasource, query: savedQuery, onChange, onRunQuery } = props;
+  // Fold a span-link injected trace id into the builder options before rendering, so the
+  // editor shows the linked trace and the first propagated change keeps targeting it once
+  // removeSpanLinkQueryField drops the one-shot field.
+  const query = datasource.retargetSpanLinkTrace(migrateCHQuery(savedQuery));
+  const handleChange = useCallback((nextQuery: CHQuery) => onChange(removeSpanLinkQueryField(nextQuery)), [onChange]);
   const singleTableMode = datasource.isSingleTableMode();
 
   if (singleTableMode && query.editorType === EditorType.SQL) {
-    return <CompactSqlMode {...props} query={query} />;
+    return <CompactSqlMode {...props} query={query} onChange={handleChange} />;
   }
 
   if (singleTableMode) {
-    return <CHEditorByType {...props} query={query} />;
+    return <CHEditorByType {...props} query={query} onChange={handleChange} />;
   }
 
   return (
     <>
       <InlineFieldRow className={styles.QueryEditor.queryType}>
-        <EditorTypeSwitcher {...props} query={query} datasource={datasource} />
+        <EditorTypeSwitcher {...props} query={query} onChange={handleChange} datasource={datasource} />
         <Button onClick={() => onRunQuery()}>Run Query</Button>
       </InlineFieldRow>
-      <CHEditorByType {...props} query={query} />
+      <CHEditorByType {...props} query={query} onChange={handleChange} />
     </>
   );
 };
@@ -110,7 +141,10 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const hasTraceTimestampTable = useHasTraceTimestampTable(
     props.datasource,
     needsTraceTableCheck ? builderOptions.database || '' : '',
-    needsTraceTableCheck ? builderOptions.table || '' : ''
+    needsTraceTableCheck ? builderOptions.table || '' : '',
+    // Probe the companion table the generated SQL will reference: a saved
+    // query's baked suffix wins over the current datasource config suffix.
+    builderOptions.meta?.traceTimestampTableSuffix
   );
 
   useEffect(() => {
@@ -173,6 +207,14 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     [onChange, query]
   );
 
+  const onMinIntervalChange = useCallback(
+    (minInterval: string) => {
+      onChange({ ...query, minInterval: minInterval || undefined });
+      onRunQuery();
+    },
+    [onChange, onRunQuery, query]
+  );
+
   const onEditAsSql = useCallback(
     (newOptions: QueryBuilderOptions) => {
       const {
@@ -214,8 +256,10 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptionsDispatch={builderOptionsDispatch}
       generatedSql={query.rawSql}
       app={app}
+      minInterval={query.minInterval}
       onQueryChange={onQueryChange}
       onEditAsSql={onEditAsSql}
+      onMinIntervalChange={onMinIntervalChange}
       onRunQuery={onRunQuery}
     />
   );

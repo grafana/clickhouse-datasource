@@ -47,6 +47,8 @@ export interface CHConfig extends DataSourceJsonData {
 
   httpHeaders?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
+  oauthPassThru?: boolean;
+  oauthPassThruAllowFallback?: boolean;
 
   customSettings?: CHCustomSetting[];
   enableSecureSocksProxy?: boolean;
@@ -66,7 +68,7 @@ export interface CHConfig extends DataSourceJsonData {
   /**
    * Controls the Map-column key discovery probe that populates the filter-key
    * dropdown for `Map(...)` columns. The probe issues
-   * `SELECT DISTINCT arrayJoin(col.keys) FROM db.table LIMIT 1000` and can be
+   * `SELECT DISTINCT arrayJoin(mapKeys(col)) FROM db.table LIMIT 1000` and can be
    * expensive on large tables when the map has high key cardinality. Defaults
    * to true to preserve existing UX; operators on large OTel logs/traces tables
    * may want to disable it. See issue #1843.
@@ -122,6 +124,12 @@ export interface CHLogsConfig {
   selectContextColumns?: boolean;
   contextColumns?: string[];
   showLogLinks?: boolean;
+
+  // Extra top-level columns to select into log queries so they surface as
+  // first-class fields (Fields sidebar, flyout, filters). Independent of the
+  // Show-context feature. `additionalColumns` is an explicit list; defaults to
+  // empty, so existing datasources keep their current behavior.
+  additionalColumns?: string[];
 }
 
 export interface CHTracesConfig {

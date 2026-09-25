@@ -150,6 +150,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   useDefaultTraceColumnsByName(
     allColumns,
     builderOptions.table,
+    isNewQuery,
     {
       traceId: builderState.traceIdColumn,
       spanId: builderState.spanIdColumn,
@@ -445,6 +446,14 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           datasource={datasource}
           database={builderOptions.database}
           table={builderOptions.table}
+          durationFilterContext={
+            builderState.durationTimeColumn && builderState.durationUnit
+              ? {
+                  columnKey: builderState.durationTimeColumn.alias || builderState.durationTimeColumn.name,
+                  unit: builderState.durationUnit,
+                }
+              : undefined
+          }
         />
       </Collapse>
       {builderState.isTraceIdMode && (

@@ -4,7 +4,19 @@ import {
   onUpdateDatasourceJsonDataOption,
   onUpdateDatasourceSecureJsonDataOption,
 } from '@grafana/data';
-import { RadioButtonGroup, Switch, Input, SecretInput, Button, Field, Alert, Stack } from '@grafana/ui';
+import {
+  RadioButtonGroup,
+  Switch,
+  Input,
+  SecretInput,
+  Button,
+  Field,
+  Alert,
+  Stack,
+  TextLink,
+  Tooltip,
+  Icon,
+} from '@grafana/ui';
 import { CertificationKey } from '../components/ui/CertificationKey';
 import {
   CHConfig,
@@ -96,15 +108,16 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
 
   const fieldErrors = validation?.getErrors() ?? {};
 
-  // When the clickHouseConfigValidation feature toggle is off (the default),
-  // `validation` is undefined and `fieldErrors` is always empty — which dropped
-  // the inline required-field indicator that shipped in v4.17.0. Fall back to a
-  // structural empty check so the required host/port fields still surface an
-  // inline error on the default install, before Save & Test round-trips.
-  const hostInvalid = validation ? Boolean(fieldErrors.host) : !jsonData.host;
-  const hostError = validation ? fieldErrors.host : jsonData.host ? undefined : labels.serverAddress.error;
-  const portInvalid = validation ? Boolean(fieldErrors.port) : !jsonData.port;
-  const portError = validation ? fieldErrors.port : jsonData.port ? undefined : labels.serverPort.error;
+  // The structural empty check must run regardless of the validation plumbing:
+  // with the clickHouseConfigValidation toggle off `validation` is undefined,
+  // and with it on the local ValidationAPI only gains errors once Grafana
+  // calls validate() (13.1+). Either way an empty required host/port field
+  // must surface an inline error immediately, as it did in v4.17.0, with any
+  // API-driven error message taking precedence when present.
+  const hostInvalid = Boolean(fieldErrors.host) || !jsonData.host;
+  const hostError = fieldErrors.host || (jsonData.host ? undefined : labels.serverAddress.error);
+  const portInvalid = Boolean(fieldErrors.port) || !jsonData.port;
+  const portError = fieldErrors.port || (jsonData.port ? undefined : labels.serverPort.error);
 
   const onPortChange = (port: string) => {
     onOptionsChange({
@@ -477,6 +490,61 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             onChange={onUpdateDatasourceSecureJsonDataOption(props, 'password')}
           />
         </Field>
+        <Field label={labels.oauthPassThru.label} description={
+          <>
+            {'Authenticate using '}
+            <TextLink
+              variant="bodySmall"
+              href="https://clickhouse.com/docs/en/operations/external-authenticators/jwt"
+              external
+            >
+              JWT
+            </TextLink>
+            {' '}
+            <Tooltip content="ClickHouse Cloud only" placement="top">
+              <Icon name="info-circle" size="sm" />
+            </Tooltip>
+            {'. When enabled, credentials are only used for health checks.'}
+          </>
+        }>
+          <Switch
+            id="oauthPassThru"
+            className="gf-form"
+            value={jsonData.oauthPassThru || false}
+            onChange={(e) => {
+              const checked = e.currentTarget.checked;
+              onOptionsChange({
+                ...options,
+                jsonData: {
+                  ...jsonData,
+                  oauthPassThru: checked,
+                },
+              });
+            }}
+          />
+        </Field>
+        {jsonData.oauthPassThru && (
+          <Field
+            label={labels.oauthPassThruAllowFallback.label}
+            description={labels.oauthPassThruAllowFallback.tooltip}
+          >
+            <Switch
+              id="oauthPassThruAllowFallback"
+              className="gf-form"
+              value={jsonData.oauthPassThruAllowFallback || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    oauthPassThruAllowFallback: checked,
+                  },
+                });
+              }}
+            />
+          </Field>
+        )}
       </ConfigSection>
 
       <Divider />
@@ -532,6 +600,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               <Divider />
               <LogsConfig
                 variant="single-table"
+                uid={options.uid}
                 logsConfig={jsonData.logs}
                 onDefaultDatabaseChange={(db) => onLogsConfigChange('defaultDatabase', db)}
                 onDefaultTableChange={(table) => onLogsConfigChange('defaultTable', table)}
@@ -544,6 +613,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onSelectContextColumnsChange={(c) => onLogsConfigChange('selectContextColumns', c)}
                 onContextColumnsChange={(c) => onLogsConfigChange('contextColumns', c)}
                 onShowLogLinksChange={(v) => onLogsConfigChange('showLogLinks', v)}
+                onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
               />
             </>
           )}
@@ -641,6 +711,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               queryTimeout={jsonData.queryTimeout}
               rowCapacityHint={jsonData.rowCapacityHint}
               validateSql={jsonData.validateSql}
+              enableMapKeysDiscovery={jsonData.enableMapKeysDiscovery}
               onDialTimeoutChange={(e) => {
                 trackingV1.trackClickhouseConfigV1QuerySettings({ dialTimeout: Number(e.currentTarget.value) });
                 onUpdateDatasourceJsonDataOption(props, 'dialTimeout')(e);
@@ -721,6 +792,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onShowLogLinksChange={(v) => {
                 onLogsConfigChange('showLogLinks', v);
               }}
+              onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
             />
 
             <Divider />

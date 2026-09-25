@@ -11,7 +11,7 @@ menuTitle: Query editor
 title: ClickHouse query editor
 weight: 30
 version: 0.1
-last_reviewed: 2026-04-24
+review_date: 2026-08-12
 ---
 
 # ClickHouse query editor
@@ -32,19 +32,20 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 | **Editor type** | Switch between **SQL** (write raw SQL) and **Query builder** (build queries with drop-downs and filters).                                                                                  |
 | **Run Query**   | Runs the current query and refreshes the panel. In the SQL editor you can also use **Ctrl+Enter** (Windows/Linux) or **Cmd+Enter** (macOS).                                                |
 | **Query type**  | Choose the result format: **Table**, **Logs**, **Time series**, or **Traces**. This sets how Grafana interprets and visualizes the results. Available in both SQL and Query builder modes. |
+| **Min interval** | A lower bound for this query's interval, as one number plus a unit of `ms`, `s`, `m`, `h`, `d` or `w` (for example `10s`, `5m`, `1d`). It raises the interval Grafana derives from the time range and panel width, so `$__timeInterval`, `$__timeInterval_ms`, `$__interval_s`, `$__timeGroup`, `$__interval` and `$__interval_ms` never bucket finer than the value you set; it never lowers the interval. Leave it empty to use the interval Grafana picks. Explore has no panel-level **Min interval**, so this is the only way to control bucket size there. The floor applies in Explore, dashboard panels and alert rules alike, and to the Explore log volume histogram. Values outside that grammar, including `1M` and `1y`, are rejected in the editor and ignored by the backend. |
 
 **In SQL mode:**
 
-- **SQL editor** — A code editor where you write ClickHouse SQL. It provides schema suggestions (databases, tables, columns) as you type. If SQL validation is enabled in the data source settings, the editor marks invalid syntax.
-- **Format code** — Use the editor toolbar to format your SQL.
-- **Query type** — Select **Table**, **Logs**, **Time series**, or **Traces** so the panel uses the correct visualization.
+- **SQL editor**: A code editor where you write ClickHouse SQL. It provides schema suggestions (databases, tables, columns) as you type. If SQL validation is enabled in the data source settings, the editor marks invalid syntax.
+- **Format code**: Use the editor toolbar to format your SQL.
+- **Query type**: Select **Table**, **Logs**, **Time series**, or **Traces** so the panel uses the correct visualization.
 
 **In Query builder mode:**
 
-- **Database** and **Table** — Select the database and table to query from the drop-downs.
-- **Query type** — Select **Table**, **Logs**, **Time series**, or **Traces**. The builder shows options that match the type (for example, time column and value columns for time series; columns, filters, group by, and order by for tables).
-- **Type-specific options** — Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
-- **SQL preview** — At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
+- **Database** and **Table**: Select the database and table to query from the drop-downs.
+- **Query type**: Select **Table**, **Logs**, **Time series**, or **Traces**. The builder shows options that match the type (for example, time column and value columns for time series; columns, filters, group by, and order by for tables).
+- **Type-specific options**: Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
+- **SQL preview**: At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
 
 If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
 
@@ -70,10 +71,36 @@ When using the query builder, the available options depend on the selected **que
 
 | Query type      | Builder modes                    | Description                                                                                                                                                             |
 | --------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Table**       | **List** or **Aggregate**        | List returns raw rows. Aggregate lets you add functions like `count()`, `avg()`, and `GROUP BY`.                                                                        |
+| **Table**       | **Simple** or **Aggregate**      | Simple returns raw rows. Aggregate lets you add functions like `count()`, `avg()`, and `GROUP BY`.                                                                      |
 | **Time series** | **Trend**                        | Automatically groups by time using `$__timeInterval()` and applies aggregate functions. Select a time column, one or more value columns, and optional grouping columns. |
-| **Logs**        | **List** or **Aggregate**        | List returns log rows. Aggregate supports grouping for log volume histograms.                                                                                           |
+| **Logs**        | **Simple** or **Aggregate**      | Simple returns log rows. Aggregate supports grouping for log volume histograms.                                                                                         |
 | **Traces**      | **Trace ID** or **Trace search** | Trace ID fetches a single trace by ID. Trace search finds traces matching filters (service name, duration, time range).                                                 |
+
+### Aggregate mode
+
+Selecting **Aggregate** as the builder mode (available for the **Table** and **Logs** query types) computes aggregate functions with a `GROUP BY`. The builder exposes these fields:
+
+| Field           | Description                                                                                                                                    |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Columns**     | Plain columns to return alongside the aggregates.                                                                                               |
+| **Aggregates**  | One or more aggregate functions to compute, such as `count()`, `avg(Duration)`, or `sum(Bytes)`. Click **Aggregate** to add each one, and optionally alias it. |
+| **Group By**    | Columns to group the aggregates by. The drop-down lists every column in the selected table, so it can be long on wide tables.                   |
+| **Order By**    | Columns or aggregates to sort by, each ascending or descending.                                                                                |
+| **Limit**       | Maximum number of rows to return. Set to `0` to omit the `LIMIT` clause.                                                                        |
+| **Filters**     | `WHERE` conditions, combined with `AND` or `OR`.                                                                                                |
+
+The builder assembles these into a single query, selecting the grouped columns before the aggregate expressions. For example, grouping by `Datacenter` with a row count and average duration produces:
+
+```sql
+SELECT
+  Datacenter,
+  count() AS count,
+  avg(Duration) AS avg_duration
+FROM mydb.GENERATED_LOGS
+GROUP BY Datacenter
+ORDER BY count DESC
+LIMIT 1000
+```
 
 ### Logs query builder
 
@@ -88,12 +115,14 @@ The logs query builder provides structured fields for common log exploration pat
 
 You can also filter by log message text using the search field, and add column filters for resource, scope, or log attributes.
 
+Columns configured through the data source **Columns** setting are projected into new logs queries automatically, so they appear here as browsable, filterable fields without editing the query. See [Logs configuration](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/#logs-configuration).
+
 ### Traces query builder
 
 The traces query builder supports two modes:
 
-- **Trace ID mode** — Enter a trace ID (or use a template variable like `$traceId`) to fetch all spans for that trace.
-- **Trace search mode** — Filter traces by service name, span name, duration range, and time range.
+- **Trace ID mode**: Enter a trace ID (or use a template variable like `$traceId`) to fetch all spans for that trace.
+- **Trace search mode**: Filter traces by service name, span name, duration range, and time range.
 
 When **Use OTel** is enabled, column mappings are pre-filled for the OpenTelemetry schema. You can also configure:
 
@@ -106,7 +135,7 @@ When **Use OTel** is enabled, column mappings are pre-filled for the OpenTelemet
 
 ### JSON-type OTel attribute columns
 
-The [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/README.md#experimental-json-support) supports an experimental mode (enabled by setting `enable_json_type: true` in the collector config) that stores attribute maps — `SpanAttributes`, `ResourceAttributes`, `LogAttributes`, `ScopeAttributes`, and event/link attribute columns — as ClickHouse's native `JSON` type instead of `Map(String, String)`.
+The [OpenTelemetry ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/exporter/clickhouseexporter/README.md#experimental-json-support) supports an experimental mode (enabled by setting `enable_json_type: true` in the collector config) that stores attribute maps (`SpanAttributes`, `ResourceAttributes`, `LogAttributes`, `ScopeAttributes`, and event/link attribute columns) as ClickHouse's native `JSON` type instead of `Map(String, String)`.
 
 The plugin auto-detects JSON-typed attribute columns at query time. No manual configuration is required.
 
@@ -129,15 +158,37 @@ JSON-type attribute columns require ClickHouse 26 or later and the OTel Collecto
 
 ### Log volume and logs sample
 
-When using the **query builder** in Explore with the **Logs** query type, Grafana automatically shows a **log volume** histogram above the log results and can display a **logs sample** panel. These supplementary queries are generated by the plugin and run alongside your main query.
+In Explore with the **Logs** query type, Grafana automatically shows a **log volume** histogram above the log results and can display a **logs sample** panel. These supplementary queries are generated by the plugin and run alongside your main query.
+
+Log volume works for queries written in either the **query builder** or the **SQL editor**. For a SQL editor query, the plugin aggregates over your query as a subquery, so your filters, joins, CTEs, macros, and template variables are preserved, and it removes your `ORDER BY` and `LIMIT` so the histogram covers the whole selected time range instead of just the rows your query returns. Log level series require a log level column configured under **Logs** in the data source settings and projected by your query.
+
+When the plugin cannot guarantee a correct count it declines, and Grafana draws its row-based histogram instead. It declines when:
+
+- No log timestamp column is configured, so there is nothing to bucket on. A data source configured with only a lower-precision _filter_ timestamp declines too.
+- The query does not select the configured timestamp column first, or selects it as an expression.
+- A `SELECT *` query reads anything other than the configured logs table, including a CTE that shadows its name.
+- The query uses a construct that changes which rows exist: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `UNION`, an interval macro, or more than one statement.
+- The query ends in a row limit the plugin cannot parse, such as `LIMIT (500)` or `LIMIT ${maxRows}`.
+
+Grafana renders one histogram per panel, so a single query that cannot be aggregated makes every query in that panel fall back, including query builder queries.
 
 {{< admonition type="note" >}}
-Log volume and logs sample are only available when all queries in the panel use the **query builder**. If any query uses the **SQL editor**, supplementary queries are disabled.
+Falling back to the row-based histogram requires Grafana 12.4.0 or later. On earlier versions the aggregated histogram still works, but a query the plugin declines shows no volume chart at all.
 {{< /admonition >}}
 
 ## Time series
 
 For time series visualizations, your query must include a `datetime` column. Use an alias of `time` for the timestamp column. Grafana treats timestamp rows without an explicit time zone as UTC. Any column other than `time` is treated as a value column.
+
+Example of a single series bucketed to the panel interval (replace `mgbench.logs1` with your database and table):
+
+```sql
+SELECT $__timeInterval(log_time) AS time, avg(disk_free) AS avg_disk_free
+FROM mgbench.logs1
+WHERE $__timeFilter(log_time)
+GROUP BY time
+ORDER BY time
+```
 
 ## Multi-line time series
 
@@ -162,22 +213,25 @@ Table visualizations are available for any valid ClickHouse query. Select **Tabl
 
 ## Visualize logs with the Logs panel
 
-To use the Logs panel, your query must return a timestamp and string values. To default to the logs visualization in Explore, set the timestamp column alias to `log_time`.
+To use the Logs panel, your query must return a time column and one or more string columns. Set the **Query type** to **Logs** so Grafana renders the results in the logs visualization. In the query builder, select the **Logs** query type; in the SQL editor, set the **Query type** (Format) to **Logs**. Aliasing the message column to `body`, the time column to `timestamp`, and the level column to `level` matches what the Logs panel and the query builder expect.
 
-Example (replace `logs1` with your database and table, for example `mydb.logs`):
+Example (replace `mydb.logs` with your database and table):
 
 ```sql
-SELECT log_time AS log_time, machine_group, toString(avg(disk_free)) AS avg_disk_free
-FROM logs1
-GROUP BY machine_group, log_time
-ORDER BY log_time
+SELECT
+  Timestamp AS timestamp,
+  Body AS body,
+  SeverityText AS level,
+  ServiceName
+FROM mydb.logs
+WHERE $__timeFilter(Timestamp)
+ORDER BY Timestamp DESC
+LIMIT 1000
 ```
-
-When you don't have a `log_time` column, set **Format** to **Logs** to force logs rendering (available from plugin version 2.2.0).
 
 ## Visualize traces with the Traces panel
 
-To use the Traces panel, your data must meet the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). Set **Format** to **Trace** when building the query (available from plugin version 2.2.0).
+To use the Traces panel, your data must meet the [requirements of the traces panel](https://grafana.com/docs/grafana/latest/explore/trace-integration/#data-api). Set the **Query type** to **Traces** when building the query.
 
 If you use the [OpenTelemetry Collector and ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter), the following query returns the required column names (case sensitive). Replace the trace ID in the WHERE clause with your trace ID or a template variable (for example `$traceId`).
 
@@ -200,7 +254,7 @@ WHERE TraceId = '61d489320c01243966700e172ab37081'
 ORDER BY startTime ASC
 ```
 
-For tables with **`JSON`-type attribute columns** (ClickHouse 26+ with `enable_json_type: true`), select the attribute columns directly — `mapKeys()` does not work on the `JSON` type:
+For tables with **`JSON`-type attribute columns** (ClickHouse 26+ with `enable_json_type: true`), select the attribute columns directly, because `mapKeys()` does not work on the `JSON` type:
 
 ```sql
 SELECT
@@ -287,8 +341,11 @@ WHERE $__timeFilter(date_time)
 | `$__dateFilter(columnName)`                  | Filters by the panel date range using the given column.                                          | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')`                                                                       |
 | `$__timeFilter(columnName)`                  | Filters by the panel time range (seconds).                                                       | `time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)`                                                                   |
 | `$__timeFilter_ms(columnName)`               | Filters by the panel time range (milliseconds).                                                  | `time >= fromUnixTimestamp64Milli(1415792726123) AND time <= fromUnixTimestamp64Milli(1447328726456)`                                 |
-| `$__dateTimeFilter(dateColumn, timeColumn)`  | Combines date and time filters for separate Date and DateTime columns.                           | `date >= toDate('2022-10-21') AND date <= toDate('2022-10-23') AND time >= toDateTime(1415792726) AND time <= toDateTime(1447328726)` |
+| `$__dateTimeFilter(dateColumn, timeColumn)`  | Combines date and time filters for separate Date and DateTime columns.                           | `(date >= toDate('2022-10-21') AND date <= toDate('2022-10-23')) AND (time >= toDateTime(1415792726) AND time <= toDateTime(1447328726))` |
 | `$__dt(dateColumn, timeColumn)`              | Shorthand alias for `$__dateTimeFilter`.                                                         | Same as `$__dateTimeFilter`.                                                                                                          |
+| `$__timeFrom(columnName)`                    | Filters rows at or after the panel time range start.                                             | `time >= toDateTime(1415792726)`                                                                                                    |
+| `$__timeTo(columnName)`                      | Filters rows at or before the panel time range end.                                              | `time <= toDateTime(1447328726)`                                                                                                    |
+| `$__timeGroup(columnName, period)`           | Buckets the time column into fixed intervals for grouping. Accepts a duration such as `5m`.      | `toStartOfInterval(toDateTime(column), INTERVAL 300 second)`                                                                        |
 | `$__fromTime`                                | Start of the panel time range as `DateTime`.                                                     | `toDateTime(1415792726)`                                                                                                              |
 | `$__toTime`                                  | End of the panel time range as `DateTime`.                                                       | `toDateTime(1447328726)`                                                                                                              |
 | `$__fromTime_ms`                             | Start of the panel time range as `DateTime64(3)`.                                                | `fromUnixTimestamp64Milli(1415792726123)`                                                                                             |
@@ -300,7 +357,38 @@ WHERE $__timeFilter(date_time)
 
 You can also use brace notation `{}` when the macro parameter must contain a query or other expression.
 
+### Statement macros
+
+Statement macros expand to a complete query rather than a single expression. Write the macro in place of the `SELECT` clause, followed by the rest of the query. Everything from the macro to the end of the query is replaced with a generated statement that applies the panel time filter, buckets timestamps with `$__timeInterval()`, and returns one series per key value.
+
+| Macro                                         | Description                                                                                                                                                                                   |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `$__columns(timeColumn, key, value)`          | One series per `key` value, with `value` aggregated per time bucket.                                                                                                                          |
+| `$__rateColumns(timeColumn, key, value)`      | Like `$__columns`, but divides the aggregated value by the number of seconds since the previous bucket of the same series. Use it to smooth gauge-style values into per-second rates.         |
+| `$__perSecondColumns(timeColumn, key, value)` | Per-second rate of a monotonic counter per series, like the Prometheus `rate()` function. `value` is aggregated with `max()`.                                                                 |
+| `$__increaseColumns(timeColumn, key, value)`  | Raw increase of a monotonic counter per bucket and series, like the Prometheus `increase()` function. `value` is aggregated with `max()`.                                                     |
+| `$__lttb(buckets, x, y)`                      | Downsamples dense series with ClickHouse's `lttb()` aggregate function (Largest-Triangle-Three-Buckets). Pass a bucket count, or `auto` to derive one from the panel time range and interval. |
+
+For example, the following query returns one series per service, with the request count aggregated into each time bucket:
+
+```sql
+$__columns(EventTime, ServiceName, count() AS c) FROM requests WHERE ServiceName != ''
+```
+
+For a monotonic counter, the following query charts the per-second request rate of every service:
+
+```sql
+$__perSecondColumns(EventTime, ServiceName, RequestsTotal) FROM requests WHERE ServiceName != ''
+```
+
+Usage notes:
+
+- The key column is converted to a string and defaults to the alias `metric`. Provide your own alias with `AS`, for example `ServiceName AS service`. The value column defaults to the alias `value`.
+- A `WHERE` clause in the query is combined with the generated time filter. `HAVING`, `ORDER BY`, `LIMIT`, and `SETTINGS` clauses are kept. The `*Columns` macros generate their own `GROUP BY`, so the query must not contain one. `$__lttb` runs a `GROUP BY` in a subquery so the rows are aggregated before they are downsampled, which allows an aggregate `y` expression such as `avg(value)`.
+- The first point of each series, and any point where a counter resets, is returned as `nan`.
+- Only one statement macro can be used per query, and it must be at the top level of the statement rather than inside a subquery. Text before the macro, such as a `WITH` clause, is preserved.
+
 ## Next steps
 
-- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/) — Use variables in dashboards and queries.
-- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/) — Connection and authentication options.
+- [ClickHouse template variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/): Use variables in dashboards and queries.
+- [Configure the ClickHouse data source](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/configure/): Connection and authentication options.

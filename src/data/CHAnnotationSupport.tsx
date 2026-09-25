@@ -348,13 +348,22 @@ export function createAnnotationSupport(datasource: Datasource): AnnotationSuppo
       // it into the modern target shape once. `rawQuery` is read via the
       // AnnotationQuery index signature, so no cast is needed.
       const legacyRawQuery: string | undefined = json?.rawQuery;
-      if (legacyRawQuery && !json?.target?.rawSql) {
+      const prepared: CHAnnotationQuery =
+        legacyRawQuery && !json?.target?.rawSql ? { ...json, target: buildTarget(json.target, legacyRawQuery) } : json;
+
+      // Dashboards may carry a preset id unknown to this editor (early
+      // bundled dashboards shipped 'deployment_detection'). Migrate it to
+      // 'custom' and seed the customSql stash from the shipped SQL, otherwise
+      // the preset round trip would overwrite the query with an empty string.
+      const preset: string | undefined = prepared.preset;
+      if (preset !== undefined && preset !== 'custom' && preset !== 'change_detection') {
         return {
-          ...json,
-          target: buildTarget(json.target, legacyRawQuery),
+          ...prepared,
+          preset: 'custom',
+          customSql: prepared.customSql || prepared.target?.rawSql || legacyRawQuery || '',
         };
       }
-      return json;
+      return prepared;
     },
 
     getDefaultQuery: (): Partial<CHQuery> => ({

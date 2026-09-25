@@ -220,6 +220,67 @@ describe('createAnnotationSupport: prepareAnnotation', () => {
     const result = support.prepareAnnotation?.({ name: 'empty', enable: true, iconColor: 'red' });
     expect(result?.target).toBeUndefined();
   });
+
+  it('migrates an unknown preset id to custom and seeds customSql from the target SQL', () => {
+    // Early bundled dashboards shipped 'deployment_detection', a preset id
+    // unknown to the editor. Without the migration, switching the unmatched Type
+    // select to Custom SQL would overwrite the query with an empty stash.
+    const result = support.prepareAnnotation?.({
+      name: 'Deployments (service.version)',
+      enable: true,
+      iconColor: '#73BF69',
+      preset: 'deployment_detection',
+      target: { refId: 'anno', pluginVersion: '', editorType: EditorType.SQL, rawSql: 'SELECT 3 AS time' },
+    });
+    expect(result?.preset).toBe('custom');
+    expect(result?.customSql).toBe('SELECT 3 AS time');
+    expect(result?.target?.rawSql).toBe('SELECT 3 AS time');
+  });
+
+  it('seeds customSql from a legacy rawQuery when migrating an unknown preset', () => {
+    const result = support.prepareAnnotation?.({
+      name: 'legacy-preset',
+      enable: true,
+      iconColor: 'red',
+      preset: 'deployment_detection',
+      rawQuery: 'SELECT 4 AS time',
+    });
+    expect(result?.preset).toBe('custom');
+    expect(result?.customSql).toBe('SELECT 4 AS time');
+    expect(result?.target?.rawSql).toBe('SELECT 4 AS time');
+  });
+
+  it('keeps an existing customSql stash when migrating an unknown preset', () => {
+    const result = support.prepareAnnotation?.({
+      name: 'stashed',
+      enable: true,
+      iconColor: 'red',
+      preset: 'deployment_detection',
+      customSql: 'SELECT stashed AS time',
+      target: { refId: 'anno', pluginVersion: '', editorType: EditorType.SQL, rawSql: 'SELECT 5 AS time' },
+    });
+    expect(result?.preset).toBe('custom');
+    expect(result?.customSql).toBe('SELECT stashed AS time');
+  });
+
+  it.each(['custom', 'change_detection'])('leaves the known %s preset untouched', (preset) => {
+    const result = support.prepareAnnotation?.({
+      name: 'known',
+      enable: true,
+      iconColor: 'red',
+      preset,
+      target: { refId: 'anno', pluginVersion: '', editorType: EditorType.SQL, rawSql: 'SELECT 6 AS time' },
+    });
+    expect(result?.preset).toBe(preset);
+    expect(result?.customSql).toBeUndefined();
+    expect(result?.target?.rawSql).toBe('SELECT 6 AS time');
+  });
+
+  it('does not add a preset to an annotation that has none', () => {
+    const result = support.prepareAnnotation?.({ name: 'bare', enable: true, iconColor: 'red' });
+    expect(result?.preset).toBeUndefined();
+    expect(result?.customSql).toBeUndefined();
+  });
 });
 
 describe('createAnnotationSupport: getDefaultQuery', () => {

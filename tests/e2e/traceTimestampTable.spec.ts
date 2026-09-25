@@ -5,7 +5,7 @@ import { Page } from '@playwright/test';
 // regression guard. The tests exercise the two SQL shapes the plugin
 // generates against real ClickHouse:
 //
-//   Optimized  – WITH trace_id / trace_start / trace_end + Timestamp bounds
+//   Optimized  – WITH __gf_trace_id / __gf_trace_start / __gf_trace_end + Timestamp bounds
 //   Fallback   – plain WHERE traceID = '<id>'
 //
 // Fixture: tests/e2e/fixtures/trace_id_ts.sql creates
@@ -35,14 +35,14 @@ const TRACE_B_SPAN_COUNT = 1;
 // SQL the plugin generates with hasTraceTimestampTable: true
 function optimizedSql(traceId: string): string {
   return [
-    `WITH '${traceId}' as trace_id,`,
-    `(SELECT min(Start) FROM "e2e_test"."trace_ts_spans_trace_id_ts" WHERE TraceId = trace_id) as trace_start,`,
-    `(SELECT max(End) + 1 FROM "e2e_test"."trace_ts_spans_trace_id_ts" WHERE TraceId = trace_id) as trace_end`,
+    `WITH '${traceId}' as __gf_trace_id,`,
+    `(SELECT min(Start) FROM "e2e_test"."trace_ts_spans_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_start,`,
+    `(SELECT max(End) + 1 FROM "e2e_test"."trace_ts_spans_trace_id_ts" WHERE TraceId = __gf_trace_id) as __gf_trace_end`,
     `SELECT "TraceId" as traceID, "SpanId" as spanID`,
     `FROM "e2e_test"."trace_ts_spans"`,
-    `WHERE traceID = trace_id`,
-    `AND "Timestamp" >= trace_start`,
-    `AND "Timestamp" <= trace_end`,
+    `WHERE traceID = __gf_trace_id`,
+    `AND "Timestamp" >= __gf_trace_start`,
+    `AND "Timestamp" <= __gf_trace_end`,
   ].join(' ');
 }
 

@@ -14,6 +14,7 @@ import {
   TimeUnit,
 } from 'types/queryBuilder';
 import otel from 'otel';
+import { buildJSONPathAccess } from './jsonPath';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -281,10 +282,14 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     const traceIdValue = options.meta!.traceId;
     const suffix = options.meta?.traceTimestampTableSuffix || otel.traceTimestampTableSuffix;
     const timestampTable = getTableIdentifier(database, table + suffix);
+    // The WITH aliases are prefixed so they cannot collide with physical columns
+    // on the main traces table. A bare `trace_id` alias shadows a physical
+    // `trace_id` column, turning `WHERE traceID = trace_id` into a tautology
+    // that returns every span in the time window.
     queryParts.push('WITH');
-    queryParts.push(`'${traceIdValue}' as trace_id,`);
-    queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = trace_id) as trace_start,`);
-    queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = trace_id) as trace_end`);
+    queryParts.push(`'${traceIdValue}' as __gf_trace_id,`);
+    queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = __gf_trace_id) as __gf_trace_start,`);
+    queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = __gf_trace_id) as __gf_trace_end`);
   }
 
   queryParts.push('SELECT');
@@ -299,11 +304,11 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
   }
 
   if (applyTraceIdOptimization) {
-    queryParts.push('traceID = trace_id');
+    queryParts.push('traceID = __gf_trace_id');
     queryParts.push('AND');
-    queryParts.push(`${escapeIdentifier(traceStartTime.name)} >= trace_start`);
+    queryParts.push(`${escapeIdentifier(traceStartTime.name)} >= __gf_trace_start`);
     queryParts.push('AND');
-    queryParts.push(`${escapeIdentifier(traceStartTime.name)} <= trace_end`);
+    queryParts.push(`${escapeIdentifier(traceStartTime.name)} <= __gf_trace_end`);
   } else if (hasTraceIdFilter) {
     const traceId = options.meta!.traceId;
     queryParts.push(`traceID = '${traceId}'`);
@@ -397,6 +402,16 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
     .forEach((c) => selectParts.push(getColumnIdentifier(c)));
 
   const selectPartsSql = selectParts.join(', ');
+
+  // A logs query with no selected columns would generate `SELECT  FROM table`, which
+  // ClickHouse rejects with a syntax error. This happens transiently in the compact
+  // editor on a cold load: a non-OTel table has no columns until the schema fetch
+  // resolves and the default-column hooks populate the roles / include-all set. Emit
+  // no query in that window so Grafana skips it rather than issuing an invalid one; a
+  // valid query is generated on the next render once the columns arrive.
+  if (selectParts.length === 0) {
+    return '';
+  }
 
   queryParts.push('SELECT');
   queryParts.push(selectPartsSql);
@@ -682,7 +697,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
     colName.includes(')') ||
     colName.includes('"') ||
     colName.includes('"') ||
-    colName.includes(' as ')
+    /\sas\s/i.test(colName)
   ) {
     colName = col.name;
   } else if (colName.includes(' ') || colName.includes(':')) {
@@ -880,15 +895,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
       const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
       type = valueType;
     } else if (filter.mapKey && type.startsWith('JSON')) {
-      const escapedJSONPaths = filter.mapKey
-        .split('.')
-        .map((p) => `\`${p}\``)
-        .join('.');
       // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
-      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
-      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
-      // that signal), and `=` / `!=` / `LIKE` are unaffected.
-      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // with ILLEGAL_TYPE_OF_ARGUMENT. buildJSONPathAccess casts to Nullable(String) so
+      // every filter operator works — `IS NULL` still detects missing keys (a plain
+      // ::String cast would swallow that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = buildJSONPathAccess(column, filter.mapKey);
       // Update type so filter value generation routes through the string-aware branches.
       type = 'String';
     }

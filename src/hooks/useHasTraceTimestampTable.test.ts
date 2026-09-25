@@ -14,7 +14,7 @@ describe('useHasTraceTimestampTable', () => {
     // The async check cannot have settled yet, so a `true` on the first render
     // proves the value was seeded synchronously from the cache peek.
     expect(result.current).toBe(true);
-    expect(mockDs.peekTraceTimestampTable).toHaveBeenCalledWith('otel', 'otel_traces');
+    expect(mockDs.peekTraceTimestampTable).toHaveBeenCalledWith('otel', 'otel_traces', undefined);
 
     await act(async () => {}); // flush the pending async check
     expect(result.current).toBe(true);
@@ -49,6 +49,22 @@ describe('useHasTraceTimestampTable', () => {
 
     await act(async () => {});
     expect(result.current).toBe(false);
+  });
+
+  it('passes the per-query suffix through to the peek and the async check', async () => {
+    // A saved query can bake a meta.traceTimestampTableSuffix that differs
+    // from the datasource config suffix. The hook must probe the companion
+    // table the SQL generator will reference, not the config one.
+    const mockDs = {} as Datasource;
+    mockDs.peekTraceTimestampTable = jest.fn(() => undefined);
+    mockDs.hasTraceTimestampTable = jest.fn(() => Promise.resolve(true));
+
+    const { result } = renderHook(() => useHasTraceTimestampTable(mockDs, 'otel', 'otel_traces', '_saved_ts'));
+
+    await act(async () => {});
+    expect(result.current).toBe(true);
+    expect(mockDs.peekTraceTimestampTable).toHaveBeenCalledWith('otel', 'otel_traces', '_saved_ts');
+    expect(mockDs.hasTraceTimestampTable).toHaveBeenCalledWith('otel', 'otel_traces', '_saved_ts');
   });
 
   it('returns false when database or table is empty', async () => {

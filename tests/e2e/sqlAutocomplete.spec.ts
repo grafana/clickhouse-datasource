@@ -42,7 +42,10 @@ async function focusEditorAndType(page: Page, text: string) {
 // a deterministic target across local fixture and Cloud cron runs.
 async function captureMacroLabels(page: Page): Promise<string[]> {
   const widget = page.locator('.monaco-editor .suggest-widget.visible');
-  await widget.waitFor({ timeout: 5000 });
+  // Assert rather than `waitFor`: web-first assertions read `expect.timeout` from
+  // playwright.config.ts, which is already raised for Cloud runs. `waitFor` reads
+  // `actionTimeout` instead, so it would need its own constant kept in sync.
+  await expect(widget).toBeVisible();
   const labels = await page.locator('.monaco-editor .suggest-widget .monaco-list-row .label-name').allTextContents();
   return labels.map((l) => l.trim()).filter((l) => l.startsWith('$__'));
 }
@@ -52,6 +55,33 @@ function findDuplicates(labels: string[]): string[] {
   const dupes = new Set<string>();
   labels.forEach((l) => (seen.has(l) ? dupes.add(l) : seen.add(l)));
   return [...dupes];
+}
+
+/**
+ * Remount SqlEditor inside the same document by toggling the editor type.
+ * registerSQL registers the completion provider against the global 'sql' language, so only
+ * an in-document remount can leave a stale provider answering alongside the new one. A full
+ * page navigation tears Monaco down with the rest of the document and always re-registers
+ * cleanly, which is why it cannot catch a missing dispose.
+ */
+async function remountSqlEditor(page: Page) {
+  // Close the open suggest widget so the next capture cannot read the previous one.
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('radio', { name: 'Query Builder' }).click();
+  // Grafana asks for confirmation when the SQL does not convert to builder options.
+  const continueButton = page.getByRole('button', { name: 'Continue' });
+  const needsConfirm = await continueButton
+    .waitFor({ state: 'visible', timeout: 3000 })
+    .then(() => true)
+    .catch(() => false);
+  if (needsConfirm) {
+    await continueButton.click();
+  }
+  await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
+
+  await page.getByRole('radio', { name: 'SQL Editor' }).click();
+  await expect(page.getByRole('radio', { name: 'SQL Editor' })).toBeChecked();
 }
 
 test.describe('SQL editor autocomplete', () => {
@@ -64,9 +94,7 @@ test.describe('SQL editor autocomplete', () => {
     expect(firstMountLabels.length, 'first mount surfaces plugin macros').toBeGreaterThan(0);
     expect(findDuplicates(firstMountLabels), 'first mount has no duplicate macros').toEqual([]);
 
-    // Navigate away and back to force SqlEditor to unmount and remount.
-    await page.goto('/');
-    await page.goto(exploreUrl());
+    await remountSqlEditor(page);
     await focusEditorAndType(page, 'SELECT * FROM t WHERE $__');
 
     const secondMountLabels = await captureMacroLabels(page);

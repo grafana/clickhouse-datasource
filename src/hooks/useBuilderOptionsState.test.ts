@@ -1,5 +1,6 @@
 import { ColumnHint, QueryType } from 'types/queryBuilder';
 import {
+  mergeColumns,
   setAllOptions,
   setBuilderMinimized,
   setColumnByHint,
@@ -130,12 +131,57 @@ describe('reducer', () => {
     // Updated column is filtered and pushed to end of array
     expect(nextState.columns![3].name).toEqual('next_timestamp');
   });
+  it('applies SetColumnByHint action, dropping a same-named hint-less column so it is not projected twice', async () => {
+    // SeverityText was added as a plain column (for example by "Include all columns") and is now
+    // promoted to the Level role; it must end up selected once, not once plain and once hinted.
+    const prevState = buildInitialState({
+      columns: [{ name: 'Timestamp', hint: ColumnHint.Time }, { name: 'SeverityText' }],
+    });
+    const action = setColumnByHint({ name: 'SeverityText', hint: ColumnHint.LogLevel });
+
+    const nextState = reducer(prevState, action);
+    expect(nextState.columns).toEqual([
+      { name: 'Timestamp', hint: ColumnHint.Time },
+      { name: 'SeverityText', hint: ColumnHint.LogLevel },
+    ]);
+  });
+  it('applies SetColumnByHint action, keeping a same-named column that holds a different hint', async () => {
+    // The dedup only drops a hint-less twin; a column that legitimately fills two roles under the
+    // same name (e.g. one column as both FilterTime and Time) must keep both entries.
+    const prevState = buildInitialState({
+      columns: [{ name: 'Timestamp', hint: ColumnHint.FilterTime }, { name: 'a' }],
+    });
+    const action = setColumnByHint({ name: 'Timestamp', hint: ColumnHint.Time });
+
+    const nextState = reducer(prevState, action);
+    expect(nextState.columns).toEqual([
+      { name: 'Timestamp', hint: ColumnHint.FilterTime },
+      { name: 'a' },
+      { name: 'Timestamp', hint: ColumnHint.Time },
+    ]);
+  });
   it('applies SetBuilderMinimized action', async () => {
     const prevState = buildInitialState();
     const action = setBuilderMinimized(true);
 
     const nextState = reducer(prevState, action);
     expect(nextState.meta?.minimized).toBe(true);
+  });
+  it('applies MergeColumns action, appending only columns whose name is not already selected', async () => {
+    const prevState = buildInitialState({
+      columns: [{ name: 'Timestamp', hint: ColumnHint.Time }, { name: 'ServiceName' }],
+    });
+    const action = mergeColumns([{ name: 'ServiceName' }, { name: 'StatusCode' }, { name: 'SpanId' }]);
+
+    const nextState = reducer(prevState, action);
+    // ServiceName is already present, so it is not duplicated; the new columns append in order
+    expect(nextState.columns!.map((c) => c.name)).toEqual(['Timestamp', 'ServiceName', 'StatusCode', 'SpanId']);
+  });
+  it('returns the same state reference when MergeColumns adds nothing new', async () => {
+    const prevState = buildInitialState({ columns: [{ name: 'ServiceName' }] });
+
+    const nextState = reducer(prevState, mergeColumns([{ name: 'ServiceName' }]));
+    expect(nextState).toBe(prevState);
   });
 });
 

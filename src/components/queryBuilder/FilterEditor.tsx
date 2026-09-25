@@ -11,7 +11,7 @@ import {
   RadioButtonGroup,
   Stack,
 } from '@grafana/ui';
-import { Filter, FilterOperator, TableColumn, NullFilter } from 'types/queryBuilder';
+import { Filter, FilterOperator, TableColumn, NullFilter, TimeUnit, ColumnHint, NumberFilter } from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
 import { styles } from 'styles';
@@ -19,6 +19,7 @@ import { Datasource } from 'data/CHDatasource';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
 import { getFilterOperatorsByType } from './filterOperatorOptions';
+import { DurationFilterInput } from './DurationFilterInput';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -44,6 +45,17 @@ export const defaultNewFilter: NullFilter = {
 };
 export interface PredefinedFilter {
   restrictToFields?: readonly TableColumn[];
+}
+
+/**
+ * Context enabling a human-friendly duration input for a specific numeric
+ * column (currently the trace Duration column). When provided, filters
+ * matching `columnKey` or hinted `TraceDurationTime` render
+ * `DurationFilterInput` instead of the plain number input.
+ */
+export interface DurationFilterContext {
+  columnKey: string;
+  unit: TimeUnit;
 }
 
 const toComboboxOptions = <T extends string | number>(
@@ -105,8 +117,9 @@ export const FilterValueEditor = (props: {
   allColumns: readonly TableColumn[];
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
+  durationFilterContext?: DurationFilterContext;
 }) => {
-  const { filter, onFilterChange, allColumns: fieldsList } = props;
+  const { filter, onFilterChange, allColumns: fieldsList, durationFilterContext } = props;
   const getOptions = () => {
     const matchedFilter = fieldsList.find((f) => f.name === filter.key);
     return matchedFilter?.picklistValues || [];
@@ -125,6 +138,20 @@ export const FilterValueEditor = (props: {
       </div>
     );
   } else if (utils.isNumberFilter(filter)) {
+    const isDurationFilter =
+      !!durationFilterContext &&
+      (filter.hint === ColumnHint.TraceDurationTime || filter.key === durationFilterContext.columnKey);
+    if (isDurationFilter) {
+      const numberFilter = filter as NumberFilter;
+      return (
+        <DurationFilterInput
+          value={numberFilter.value}
+          rawInput={numberFilter.rawInput}
+          storedUnit={durationFilterContext!.unit}
+          onChange={({ value, rawInput }) => onFilterChange({ ...numberFilter, value, rawInput })}
+        />
+      );
+    }
     return <FilterValueNumberItem value={filter.value} onChange={(value) => onFilterChange({ ...filter, value })} />;
   } else if (utils.isDateFilter(filter)) {
     if (utils.isDateFilterWithOutValue(filter)) {
@@ -207,8 +234,9 @@ export const FilterEditor = (props: {
   datasource: Datasource;
   database: string;
   table: string;
+  durationFilterContext?: DurationFilterContext;
 }) => {
-  const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter } = props;
+  const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter, durationFilterContext } = props;
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
@@ -354,7 +382,7 @@ export const FilterEditor = (props: {
         options={toComboboxOptions(getFilterOperatorsByType(filter.type, isJSONType))}
         onChange={(option) => option && onFilterOperatorChange(option.value)}
       />
-      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} />
+      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} durationFilterContext={durationFilterContext} />
       <Button
         data-testid="query-builder-filters-remove-button"
         icon="trash-alt"
@@ -375,8 +403,9 @@ export const FiltersEditor = (props: {
   datasource: Datasource;
   database: string;
   table: string;
+  durationFilterContext?: DurationFilterContext;
 }) => {
-  const { filters = [], onFiltersChange, allColumns: fieldsList = [], datasource, database, table } = props;
+  const { filters = [], onFiltersChange, allColumns: fieldsList = [], datasource, database, table, durationFilterContext } = props;
   const { label, tooltip, addLabel } = labels.components.FilterEditor;
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
@@ -438,6 +467,7 @@ export const FiltersEditor = (props: {
               datasource={datasource}
               database={database}
               table={table}
+              durationFilterContext={durationFilterContext}
             />
           </InlineField>
         );

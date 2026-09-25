@@ -10,7 +10,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
+      `SELECT stuff FROM foo WHERE col = test\nsettings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with no inner query and no existing WHERE', () => {
@@ -21,7 +21,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
+      `SELECT stuff FROM foo\nsettings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with an inner query without existing WHERE', () => {
@@ -32,7 +32,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM (SELECT * FROM foo) as r , bar GROUP BY s ORDER BY s settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
+      `SELECT stuff FROM (SELECT * FROM foo) as r , bar GROUP BY s ORDER BY s\nsettings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with an inner from query with existing WHERE', () => {
@@ -43,7 +43,7 @@ describe('AdHocManager', () => {
       { key: 'keyNum', operator: '=', value: '123' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM (SELECT * FROM foo WHERE col = test) as r GROUP BY s ORDER BY s settings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
+      `SELECT stuff FROM (SELECT * FROM foo WHERE col = test) as r GROUP BY s ORDER BY s\nsettings additional_table_filters={'foo' : ' key = \\'val\\' AND keyNum = \\'123\\' '}`
     );
   });
   it('apply ad hoc filter with an inner where query with existing WHERE', () => {
@@ -54,7 +54,7 @@ describe('AdHocManager', () => {
       [{ key: 'key', operator: '=', value: 'val' }] as AdHocVariableFilter[]
     );
     expect(val).toEqual(
-      `SELECT * FROM foo WHERE (name = stuff) AND (name IN ( SELECT * FROM foo WHERE (field = 'hello') GROUP BY name ORDER BY count() DESC LIMIT 10 )) GROUP BY name , time ORDER BY time settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
+      `SELECT * FROM foo WHERE (name = stuff) AND (name IN ( SELECT * FROM foo WHERE (field = 'hello') GROUP BY name ORDER BY count() DESC LIMIT 10 )) GROUP BY name , time ORDER BY time\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`
     );
   });
   it('does not apply ad hoc filter when the target table is not in the query', () => {
@@ -65,13 +65,42 @@ describe('AdHocManager', () => {
     ] as AdHocVariableFilter[]);
     expect(val).toEqual('select stuff FROM foo');
   });
+  it('applies ad hoc filter to a query using ClickHouse SAMPLE syntax', () => {
+    const ahm = new AdHocFilter();
+    // Previously threw in setTargetTableFromQuery because getTable returned ''.
+    ahm.setTargetTableFromQuery('SELECT * FROM otel_logs SAMPLE 0.1');
+    const val = ahm.apply('SELECT * FROM otel_logs SAMPLE 0.1', [
+      { key: 'ServiceName', operator: '=', value: 'cart' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT * FROM otel_logs SAMPLE 0.1\nsettings additional_table_filters={'otel_logs' : ' ServiceName = \\'cart\\' '}`
+    );
+  });
+  it('applies ad hoc filter to a backtick-quoted table name', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM `my-db`.`my-table`');
+    const val = ahm.apply('SELECT * FROM `my-db`.`my-table`', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      "SELECT * FROM `my-db`.`my-table`\nsettings additional_table_filters={'my-db.my-table' : ' key = \\'val\\' '}"
+    );
+  });
+  it('applies to a target table name containing regex metacharacters', () => {
+    const ahm = new AdHocFilter();
+    ahm.setTargetTableFromQuery('SELECT * FROM `a[b`');
+    const val = ahm.apply('SELECT * FROM `a[b`', [
+      { key: 'key', operator: '=', value: 'val' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toContain("additional_table_filters={'a[b' :");
+  });
   it('apply ad hoc filter when the ad hoc options are from a query with a from inline query', () => {
     const ahm = new AdHocFilter();
     ahm.setTargetTableFromQuery('SELECT * FROM (select * FROM foo) bar');
     const val = ahm.apply('select stuff FROM foo', [
       { key: 'key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`select stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
+    expect(val).toEqual(`select stuff FROM foo\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
   it('apply ad hoc filter when the ad hoc options are from a query with a where inline query', () => {
     const ahm = new AdHocFilter();
@@ -81,7 +110,7 @@ describe('AdHocManager', () => {
     const val = ahm.apply('select stuff FROM foo', [
       { key: 'key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`select stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
+    expect(val).toEqual(`select stuff FROM foo\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
   it('apply ad hoc filter to complex join statement', () => {
     const ahm = new AdHocFilter();
@@ -93,7 +122,7 @@ describe('AdHocManager', () => {
       [{ key: 'key', operator: '=', value: 'val' }] as AdHocVariableFilter[]
     );
     expect(val).toEqual(
-      `SELECT number, letter FROM foo AS x INNER JOIN (SELECT number FROM system.numbers LIMIT 5) AS inner_numbers ON inner_numbers.number = x.number ARRAY JOIN ['a', 'b'] AS letter LIMIT 5 settings additional_table_filters={'foo' : ' key = \\'val\\' '}`
+      `SELECT number, letter FROM foo AS x INNER JOIN (SELECT number FROM system.numbers LIMIT 5) AS inner_numbers ON inner_numbers.number = x.number ARRAY JOIN ['a', 'b'] AS letter LIMIT 5\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`
     );
   });
   it('throws an error when the adhoc filter select cannot be parsed', () => {
@@ -109,7 +138,7 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM fooTable settings additional_table_filters={'fooTable' : ' key = \\'val\\' '}`
+      `SELECT stuff FROM fooTable\nsettings additional_table_filters={'fooTable' : ' key = \\'val\\' '}`
     );
   });
   it('apply ad hoc filter with default schema', () => {
@@ -119,7 +148,7 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM default.foo settings additional_table_filters={'default.foo' : ' key = \\'val\\' '}`
+      `SELECT stuff FROM default.foo\nsettings additional_table_filters={'default.foo' : ' key = \\'val\\' '}`
     );
   });
   it('apply ad hoc filter and does not include the table reference in the selected fields of the function', () => {
@@ -128,7 +157,41 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT foo.stuff FROM foo', [
       { key: 'foo.key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`SELECT foo.stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
+    expect(val).toEqual(`SELECT foo.stuff FROM foo\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
+  });
+
+  it('does not let a crafted ad-hoc filter key inject SQL (fails closed)', () => {
+    // Ad-hoc keys are attacker-influenceable (URL-settable). A key carrying raw
+    // SQL must be emitted as a single (invalid) backtick identifier, not injected
+    // into the additional_table_filters predicate — otherwise `OR 1=1 --` would
+    // bypass the filter and expose the whole table.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: "ServiceName = 'nginx' OR 1=1 --", operator: '=', value: 'x' },
+    ] as AdHocVariableFilter[]);
+    // The whole crafted key is backtick-quoted (and quote-escaped for the outer
+    // string), so ClickHouse reads it as one nonexistent column name.
+    expect(result).toContain("`ServiceName = \\'nginx\\' OR 1=1 --`");
+    // The pre-fix, un-quoted injection form must not appear.
+    expect(result).not.toContain(" ServiceName = 'nginx' OR 1=1");
+  });
+
+  it('leaves a plain column key unchanged (no backtick churn)', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([{ key: 'ServiceName', operator: '=', value: 'x' }] as AdHocVariableFilter[]);
+    expect(result).toBe(" ServiceName = \\'x\\' ");
+  });
+
+  it('quotes a crafted Map column and a crafted key separately', () => {
+    // The Map branch emits the column as an identifier and the key as a nested
+    // string literal, so both layers have to hold.
+    const ahm = new AdHocFilter();
+    ahm.setMapColumns(new Set(["labels']) OR 1=1 --"]));
+    const result = ahm.buildFilterString([
+      { key: "labels']) OR 1=1 --.k", operator: '=', value: 'x' },
+    ] as AdHocVariableFilter[]);
+    expect(result).toContain('`labels');
+    expect(result).not.toMatch(/\)\s*OR 1=1 --\[/);
   });
 
   it('apply ad hoc filter converts "=~" to "REGEXP"', () => {
@@ -138,7 +201,7 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '=~', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key REGEXP \\'val\\' '}`
+      `SELECT stuff FROM foo WHERE col = test\nsettings additional_table_filters={'foo' : ' key REGEXP \\'val\\' '}`
     );
   });
 
@@ -149,7 +212,7 @@ describe('AdHocManager', () => {
       { key: 'key', operator: '!~', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key NOT REGEXP \\'val\\' '}`
+      `SELECT stuff FROM foo WHERE col = test\nsettings additional_table_filters={'foo' : ' key NOT REGEXP \\'val\\' '}`
     );
   });
 
@@ -160,7 +223,7 @@ describe('AdHocManager', () => {
       { key: 'key', operator: 'IN', value: "('val1', 'val2')" },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (\\'val1\\', \\'val2\\') '}`
+      `SELECT stuff FROM foo WHERE col = test\nsettings additional_table_filters={'foo' : ' key IN (\\'val1\\', \\'val2\\') '}`
     );
   });
 
@@ -171,7 +234,7 @@ describe('AdHocManager', () => {
       { key: 'key', operator: 'IN', value: "'val1', 'val2'" },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (\\'val1\\', \\'val2\\') '}`
+      `SELECT stuff FROM foo WHERE col = test\nsettings additional_table_filters={'foo' : ' key IN (\\'val1\\', \\'val2\\') '}`
     );
   });
 
@@ -181,9 +244,139 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT stuff FROM foo WHERE col = test', [
       { key: 'key', operator: 'IN', value: '(1, 2, 3)' },
     ] as AdHocVariableFilter[]);
+    // Elements are quoted for safety; ClickHouse coerces quoted numerics.
     expect(val).toEqual(
-      `SELECT stuff FROM foo WHERE col = test settings additional_table_filters={'foo' : ' key IN (1, 2, 3) '}`
+      `SELECT stuff FROM foo WHERE col = test\nsettings additional_table_filters={'foo' : ' key IN (\\'1\\', \\'2\\', \\'3\\') '}`
     );
+  });
+
+  it('apply ad hoc filter to a query using ClickHouse INTERVAL syntax', () => {
+    const ahm = new AdHocFilter();
+    // The previous pgsql-based parser threw on the unquoted INTERVAL and dropped the filter.
+    const sql =
+      'SELECT ServiceName, count() c FROM otel.otel_logs WHERE Timestamp >= now() - INTERVAL 1 HOUR GROUP BY ServiceName';
+    ahm.setTargetTableFromQuery(sql);
+    const val = ahm.apply(sql, [{ key: 'ServiceName', operator: '=', value: 'frontend' }] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `${sql}\nsettings additional_table_filters={'otel.otel_logs' : ' ServiceName = \\'frontend\\' '}`
+    );
+  });
+
+  it('apply ad hoc filter to a query using a ClickHouse lambda', () => {
+    const ahm = new AdHocFilter();
+    const sql = 'SELECT count() c FROM events WHERE arrayExists(x -> x > 1, spans)';
+    ahm.setTargetTableFromQuery(sql);
+    const val = ahm.apply(sql, [{ key: 'kind', operator: '=', value: 'server' }] as AdHocVariableFilter[]);
+    expect(val).toEqual(`${sql}\nsettings additional_table_filters={'events' : ' kind = \\'server\\' '}`);
+  });
+
+  it('resolves the table per apply() call instead of caching the first panel', () => {
+    // One AdHocFilter is shared across a dashboard's panels; each apply() must
+    // resolve its own query rather than reuse the first panel's table.
+    const ahm = new AdHocFilter();
+    const p1 = ahm.apply('SELECT count() FROM default.tbl_a', [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    const p2 = ahm.apply('SELECT count() FROM default.tbl_b', [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    expect(p1).toContain("additional_table_filters={'default.tbl_a'");
+    expect(p2).toContain("additional_table_filters={'default.tbl_b'");
+  });
+
+  it('strips a trailing semicolon but not one inside a string literal', () => {
+    const ahm = new AdHocFilter();
+    const inLiteral = ahm.apply("SELECT splitByChar(';', col) FROM default.tbl", [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    expect(inLiteral).toContain("splitByChar(';', col)");
+    expect(inLiteral).toContain("additional_table_filters={'default.tbl'");
+
+    const trailing = ahm.apply('SELECT * FROM default.tbl;', [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    expect(trailing).toContain("default.tbl\nsettings additional_table_filters={'default.tbl'");
+    expect(trailing).not.toContain(';\nsettings');
+  });
+
+  it('appends the settings clause on a new line after a trailing comment', () => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply('SELECT * FROM foo -- note', [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toContain('-- note\nsettings additional_table_filters=');
+  });
+
+  it('applies to a query that selects from a CTE, keyed on the underlying table', () => {
+    const ahm = new AdHocFilter();
+    const sql = 'WITH lookup AS (SELECT id, name FROM dim_services) SELECT * FROM lookup';
+    const val = ahm.apply(sql, [{ key: 'name', operator: '=', value: 'cart' }] as AdHocVariableFilter[]);
+    expect(val).toContain("additional_table_filters={'dim_services' : ' name = \\'cart\\' '}");
+  });
+
+  it('applies to a spaced-dot table name (a parsed target is not re-checked)', () => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply('SELECT count() FROM default . otel_logs', [
+      { key: 'k', operator: '=', value: 'v' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toContain("additional_table_filters={'default.otel_logs' :");
+  });
+
+  it('escapes each IN element so a crafted value cannot break out of the filter', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: '1) OR 1=1 OR ServiceName IN (1' },
+    ] as AdHocVariableFilter[]);
+    // The whole payload becomes a single quoted literal element, not injected SQL.
+    expect(result).toContain("k IN (\\'1) OR 1=1 OR ServiceName IN (1\\')");
+    // The unquoted injected form (which the old single-layer escaping produced) is gone.
+    expect(result).not.toContain('IN (1) OR 1=1');
+  });
+
+  it('builds the IN list from the structured values array and escapes each element', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: 'ignored', values: ["a'b", 'c'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\', \\'c\\') ");
+  });
+
+  it('renders an empty IN list as (NULL) so the SQL stays valid', () => {
+    // ClickHouse rejects `IN ()`, and nothing else pins this spelling.
+    const ahm = new AdHocFilter();
+    expect(ahm.buildFilterString([{ key: 'k', operator: 'IN', value: '', values: [] }] as AdHocVariableFilter[])).toBe(
+      ' k IN (NULL) '
+    );
+    expect(
+      ahm.buildFilterString([{ key: 'k', operator: 'NOT IN', value: '', values: [] }] as AdHocVariableFilter[])
+    ).toBe(' k NOT IN (NULL) ');
+  });
+
+  it('handles NOT IN with per-element escaping', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'NOT IN', value: 'ignored', values: ['x', 'y'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k NOT IN (\\'x\\', \\'y\\') ");
+  });
+
+  it('splits an IN value string on commas outside quotes (comma inside a value stays intact)', () => {
+    // grafana/scenes leaves `values` undefined for IN, so real IN filters take
+    // the string-parsing path; a value containing a comma must not be torn apart.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: 'IN', value: "'gzip, deflate','identity'" },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'gzip, deflate\\', \\'identity\\') ");
+  });
+
+  it('escapes quotes in IN elements taken from the value string (no values array)', () => {
+    // Pins the escaping on the parseInListItems path — a mutant that escapes
+    // only the `values` array elements would leave this quote un-escaped.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([{ key: 'k', operator: 'IN', value: "a'b" }] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\') ");
+    expect(result).not.toContain("a'b");
   });
 
   it('does not apply an adhoc filter without "operator"', () => {
@@ -234,7 +427,7 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT stuff FROM foo', [
       { key: 'key', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
+    expect(val).toEqual(`SELECT stuff FROM foo\nsettings additional_table_filters={'foo' : ' key = \\'val\\' '}`);
   });
 
   it('converts arrayElement with single quotes', () => {
@@ -258,10 +451,12 @@ describe('AdHocManager', () => {
     const ahm = new AdHocFilter();
     const result = ahm.apply(
       'SELECT * FROM foo',
-      [{ key: "ResourceAttributes.cloud.region'", operator: '=', value: 'test' }] as AdHocVariableFilter[],
+      [{ key: 'ResourceAttributes.cloud.region', operator: '=', value: 'test' }] as AdHocVariableFilter[],
       true
     );
-    expect(result).toContain('ResourceAttributes.cloud.region');
+    // useJSON forces JSON dot-access on the default OTel column, cast to
+    // Nullable(String) — an uncast Dynamic sub-path reads back all-null.
+    expect(result).toContain('ResourceAttributes.`cloud`.`region`::Nullable(String)');
   });
 
   describe('buildFilterString', () => {
@@ -298,6 +493,28 @@ describe('AdHocManager', () => {
       expect(result).toEqual(" key NOT REGEXP \\'val\\' ");
     });
 
+    it('two-layer escapes a backslash in a regex value so the pattern reaches ClickHouse literally', () => {
+      // `=~` rides the scalar value branch; a `\d+` pattern must survive both the
+      // outer additional_table_filters string and the inner literal so the regex
+      // engine receives `\d+`. Verified live: this form matches the same rows as
+      // an inline `REGEXP '\d+'`.
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=~', value: '\\d+' }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k REGEXP \\'\\\\\\\\d+\\' ");
+    });
+
+    it('escapes backslashes in scalar filter values', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: 'a\\b' }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k = \\'a\\\\\\\\b\\' ");
+    });
+
+    it('escapes single quotes in filter values so they cannot break out of the filter string', () => {
+      const ahm = new AdHocFilter();
+      const result = ahm.buildFilterString([{ key: 'k', operator: '=', value: "x'" }] as AdHocVariableFilter[]);
+      expect(result).toBe(" k = \\'x\\\\\\'\\' ");
+    });
+
     it('builds filter string with IN operator', () => {
       const ahm = new AdHocFilter();
       const result = ahm.buildFilterString([
@@ -321,7 +538,7 @@ describe('AdHocManager', () => {
     const val = ahm.apply('SELECT stuff FROM foo', [
       { key: 'TABLE.key.key2', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
-    expect(val).toEqual(`SELECT stuff FROM foo settings additional_table_filters={'foo' : ' key.key2 = \\'val\\' '}`);
+    expect(val).toEqual(`SELECT stuff FROM foo\nsettings additional_table_filters={'foo' : ' key.key2 = \\'val\\' '}`);
   });
 
   describe('schema-driven Map column detection (#1434)', () => {
@@ -398,6 +615,101 @@ describe('AdHocManager', () => {
         { key: 'labels.a\\b', operator: '=', value: 'x' },
       ] as AdHocVariableFilter[]);
       expect(val).toContain("labels[\\'a\\\\\\\\b\\']");
+    });
+  });
+
+  describe('self-describing bracketed Map keys (#2043)', () => {
+    it('renders a bracketed key without any setMapColumns call (table-prefixed)', () => {
+      // Saved filters must apply on a fresh dashboard load, before
+      // getTagKeys has run, because the key itself carries the Map access.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "events.metadata['region']", operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+
+    it('renders a bracketed key without any setMapColumns call (hideTableName)', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "metadata['region']", operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+
+    it('renders a bracketed key whose map key contains dots', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "events.labels['http.method']", operator: '=', value: 'GET' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("labels[\\'http.method\\'] = \\'GET\\'");
+    });
+
+    it('re-escapes quotes from the minted string-literal body for the outer filter string', () => {
+      // getTagKeys mints `labels['weird\'key']` for the raw map key
+      // `weird'key`. The outer additional_table_filters embedding needs the
+      // same two-layer escape as the legacy dotted form.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: "events.labels['weird\\'key']", operator: '=', value: 'x' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("labels[\\'weird\\\\\\'key\\']");
+    });
+
+    it('renders a bracketed key as dot access when useJSON is set', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply(
+        'SELECT * FROM events',
+        [{ key: "events.metadata['region']", operator: '=', value: 'eu' }] as AdHocVariableFilter[],
+        true
+      );
+      expect(val).toContain("metadata.`region`::Nullable(String) = \\'eu\\'");
+    });
+
+    it('legacy dotted keys still render via the registered Map-column set', () => {
+      // Already-saved dashboards persist the dotted form; it must keep
+      // working when getTagKeys has populated the column set.
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['metadata']));
+      const val = ahm.apply('SELECT * FROM events', [
+        { key: 'events.metadata.region', operator: '=', value: 'eu' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("metadata[\\'region\\'] = \\'eu\\'");
+    });
+  });
+
+  describe('self-describing JSON keys (#2094)', () => {
+    // getTagKeys mints JSON sub-paths in a backtick form (`col.`seg`.`seg``).
+    // escapeKey renders them cast to Nullable(String) with NO column cache, so
+    // a saved JSON filter applies correctly on a fresh dashboard load.
+    it('renders a minted JSON key statelessly (no setMapColumns/setJSONColumns)', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: 'otel_logs.ResourceAttributes.`k8s`.`pod`.`name`', operator: '=', value: 'api' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`k8s`.`pod`.`name`::Nullable(String) = \\'api\\'");
+    });
+
+    it('renders a single-segment minted JSON key with hideTableName-style key', () => {
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: 'ResourceAttributes.`level`', operator: '=', value: 'error' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`level`::Nullable(String) = \\'error\\'");
+    });
+
+    it('escapes a quote in a JSON path segment for the outer filter string', () => {
+      // The rendered access is embedded inside the single-quoted
+      // additional_table_filters string, so a `'` in a path segment must be
+      // escaped over the whole expression — otherwise it breaks the string.
+      // Pins the outer-escape layer (buildJSONAccessForOuterFilter); an empty
+      // implementation would emit the un-escaped `` `a'b` `` form and fail here.
+      const ahm = new AdHocFilter();
+      const val = ahm.apply('SELECT * FROM otel_logs', [
+        { key: "otel_logs.ResourceAttributes.`a'b`", operator: '=', value: 'v' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("ResourceAttributes.`a\\'b`::Nullable(String)");
+      expect(val).not.toContain("`a'b`");
     });
   });
 });
