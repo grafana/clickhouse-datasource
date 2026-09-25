@@ -531,7 +531,7 @@ func TestLoadSettingsConnectionPool(t *testing.T) {
 }
 
 // TestLoadSettingsSetsEveryField fails when a Settings field has no parsing
-// branch: with every key set, no field may equal its value with none set.
+// branch or no key in this fixture: no field may equal its no-keys value.
 func TestLoadSettingsSetsEveryField(t *testing.T) {
 	ctx := sdkconfig.WithGrafanaConfig(context.Background(), sdkconfig.NewGrafanaCfg(map[string]string{
 		"GF_SQL_ROW_LIMIT":                         "1000000",
