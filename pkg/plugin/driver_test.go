@@ -122,7 +122,7 @@ func TestWarnUnsupportedTimeSeriesFields(t *testing.T) {
 		assert.Contains(t, notice.Text, "Attributes['some_key'] as some_key")
 	})
 
-	t.Run("dedups repeated JSON-shaped column names from wide-format frames", func(t *testing.T) {
+	t.Run("deduplicates repeated JSON-shaped column names from wide-format frames", func(t *testing.T) {
 		// LongToWide duplicates non-label fields once per output series, so a
 		// JSON-shaped column can appear multiple times with the same name.
 		frame := &data.Frame{
