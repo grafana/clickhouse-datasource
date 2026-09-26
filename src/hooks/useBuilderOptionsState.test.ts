@@ -73,6 +73,7 @@ describe('reducer', () => {
       table: 'prev_table',
       queryType: QueryType.Logs,
       groupBy: ['will', 'be', 'reset'],
+      limit: 50,
     });
     const action = setDatabase('next_db');
 
@@ -81,6 +82,7 @@ describe('reducer', () => {
     expect(nextState.table).toEqual('');
     expect(nextState.queryType).toEqual(QueryType.Logs);
     expect(nextState.groupBy).toBeFalsy();
+    expect(nextState.limit).toEqual(50);
   });
   it('applies SetTable to reset settings but preserve db/queryType', async () => {
     const prevState = buildInitialState({
@@ -88,6 +90,7 @@ describe('reducer', () => {
       table: 'prev_table',
       queryType: QueryType.Logs,
       groupBy: ['will', 'be', 'reset'],
+      limit: 50,
     });
     const action = setTable('next_table');
 
@@ -96,6 +99,7 @@ describe('reducer', () => {
     expect(nextState.table).toEqual('next_table');
     expect(nextState.queryType).toEqual(QueryType.Logs);
     expect(nextState.groupBy).toBeFalsy();
+    expect(nextState.limit).toEqual(50);
   });
   it('applies SetOtelEnabled action', async () => {
     const prevState = buildInitialState({
