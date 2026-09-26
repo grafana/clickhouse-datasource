@@ -360,6 +360,42 @@ describe('AdHocManager', () => {
     expect(result).toBe(" k NOT IN (\\'x\\', \\'y\\') ");
   });
 
+  it('maps "=|" (equals any of multiple values) to IN, same as the IN operator', () => {
+    // grafana/scenes' multi-value ad-hoc operator sends this literal symbol
+    // with a `values` array, not the string 'IN'.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: '=|', value: 'ignored', values: ['a', 'b'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\', \\'b\\') ");
+  });
+
+  it('maps "!=|" (not equal any of multiple values) to NOT IN, same as the NOT IN operator', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: '!=|', value: 'ignored', values: ['a', 'b'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k NOT IN (\\'a\\', \\'b\\') ");
+  });
+
+  it('renders an empty "=|" / "!=|" list as (NULL) so the SQL stays valid', () => {
+    const ahm = new AdHocFilter();
+    expect(ahm.buildFilterString([{ key: 'k', operator: '=|', value: '', values: [] }] as AdHocVariableFilter[])).toBe(
+      ' k IN (NULL) '
+    );
+    expect(
+      ahm.buildFilterString([{ key: 'k', operator: '!=|', value: '', values: [] }] as AdHocVariableFilter[])
+    ).toBe(' k NOT IN (NULL) ');
+  });
+
+  it('escapes each "=|" element so a crafted value cannot break out of the filter', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'k', operator: '=|', value: 'ignored', values: ["a'b", 'c'] },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" k IN (\\'a\\\\\\'b\\', \\'c\\') ");
+  });
+
   it('splits an IN value string on commas outside quotes (comma inside a value stays intact)', () => {
     // grafana/scenes leaves `values` undefined for IN, so real IN filters take
     // the string-parsing path; a value containing a comma must not be torn apart.
