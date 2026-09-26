@@ -1077,6 +1077,10 @@ export class Datasource
     return this.settings.jsonData.logs?.additionalColumns?.length ? this.settings.jsonData.logs.additionalColumns : [];
   }
 
+  getLogAttributeColumns(): string[] {
+    return this.settings.jsonData.logs?.attributeColumns?.length ? this.settings.jsonData.logs.attributeColumns : [];
+  }
+
   getLogContextColumnNames(): string[] {
     return this.settings.jsonData.logs?.contextColumns?.length ? this.settings.jsonData.logs?.contextColumns : [];
   }

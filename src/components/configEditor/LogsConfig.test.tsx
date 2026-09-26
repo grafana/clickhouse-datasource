@@ -55,6 +55,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -77,6 +79,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -106,6 +110,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -163,6 +169,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -192,6 +200,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -223,6 +233,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -254,6 +266,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -285,6 +299,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -316,6 +332,8 @@ describe('LogsConfig', () => {
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={onShowLogLinksChange}
         onAdditionalColumnsChange={() => {}}
+        onAttributeColumnsChange={() => {}}
+        onAttributeColumnExclusionsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
@@ -342,6 +360,8 @@ describe('LogsConfig', () => {
       onContextColumnsChange: () => {},
       onShowLogLinksChange: () => {},
       onAdditionalColumnsChange: () => {},
+      onAttributeColumnsChange: () => {},
+      onAttributeColumnExclusionsChange: () => {},
     };
 
     // Placeholders the role text inputs use before the schema loads; once columns are fetched the
@@ -452,6 +472,8 @@ describe('LogsConfig', () => {
             additionalColumns: ['ServiceName'],
           }}
           onAdditionalColumnsChange={onAdditionalColumnsChange}
+          onAttributeColumnsChange={() => {}}
+          onAttributeColumnExclusionsChange={() => {}}
         />
       );
 

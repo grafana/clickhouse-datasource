@@ -33,6 +33,8 @@ interface LogsConfigProps {
   onContextColumnsChange: (v: string[]) => void;
   onShowLogLinksChange: (v: boolean) => void;
   onAdditionalColumnsChange: (v: string[]) => void;
+  onAttributeColumnsChange: (v: string[]) => void;
+  onAttributeColumnExclusionsChange: (v: string[]) => void;
 }
 
 export const LogsConfig = (props: LogsConfigProps) => {
@@ -49,6 +51,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onContextColumnsChange,
     onShowLogLinksChange,
     onAdditionalColumnsChange,
+    onAttributeColumnsChange,
+    onAttributeColumnExclusionsChange,
   } = props;
   let {
     defaultDatabase,
@@ -63,6 +67,8 @@ export const LogsConfig = (props: LogsConfigProps) => {
     contextColumns,
     showLogLinks,
     additionalColumns,
+    attributeColumns,
+    attributeColumnExclusions,
   } = props.logsConfig || {};
   const labels = allLabels.components.Config.LogsConfig;
   const sectionLabels = props.variant === 'single-table' ? labels.variants.singleTable : labels;
@@ -286,6 +292,44 @@ export const LogsConfig = (props: LogsConfigProps) => {
             {`Not found in ${defaultTable}: ${unknownColumns.join(', ')}. These will fail log queries until corrected.`}
           </Text>
         )}
+        <InlineField
+          label={
+            <InlineFormLabel width={12} className="query-keyword" tooltip={labels.columns.attributeColumns.tooltip}>
+              {labels.columns.attributeColumns.label}
+            </InlineFormLabel>
+          }
+        >
+          <TagsInput
+            placeholder={labels.columns.attributeColumns.placeholder}
+            tags={attributeColumns || []}
+            onChange={(tags) => onAttributeColumnsChange(tags.map((t) => t.trim()).filter(Boolean))}
+            width={60}
+          />
+        </InlineField>
+        <Text variant="bodySmall" color="secondary">
+          {labels.columns.attributeColumns.description}
+        </Text>
+        <InlineField
+          label={
+            <InlineFormLabel
+              width={12}
+              className="query-keyword"
+              tooltip={labels.columns.attributeColumnExclusions.tooltip}
+            >
+              {labels.columns.attributeColumnExclusions.label}
+            </InlineFormLabel>
+          }
+        >
+          <TagsInput
+            placeholder={labels.columns.attributeColumnExclusions.placeholder}
+            tags={attributeColumnExclusions || []}
+            onChange={(tags) => onAttributeColumnExclusionsChange(tags.map((t) => t.trim()).filter(Boolean))}
+            width={60}
+          />
+        </InlineField>
+        <Text variant="bodySmall" color="secondary">
+          {labels.columns.attributeColumnExclusions.description}
+        </Text>
       </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.traceIdCorrelation.title} description={labels.traceIdCorrelation.description}>

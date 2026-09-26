@@ -52,6 +52,7 @@ describe('QueryBuilder', () => {
   mockDs.getDefaultTraceColumns = jest.fn((_db?: string) => new Map());
   mockDs.shouldSelectLogContextColumns = jest.fn((_db?: string) => false);
   mockDs.getAdditionalLogColumns = jest.fn(() => []);
+  mockDs.getLogAttributeColumns = jest.fn(() => []);
   mockDs.getDefaultTable = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceDatabase = jest.fn((_db?: string) => '');
   mockDs.getDefaultTraceTable = jest.fn((_db?: string) => '');
@@ -404,6 +405,7 @@ describe('QueryBuilder', () => {
       shouldSelectLogContextColumns: jest.fn(() => false),
       getLogContextColumnNames: jest.fn(() => []),
       getAdditionalLogColumns: jest.fn(() => []),
+      getLogAttributeColumns: jest.fn(() => []),
       fetchColumns: jest.fn(() => Promise.resolve([])),
     } as unknown as Datasource;
 

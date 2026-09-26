@@ -557,7 +557,8 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true,
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
-			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120
+			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120,
+			"logs": { "attributeColumns": ["JsonBody"], "attributeColumnExclusions": ["JsonBody.client"] }
 		}`),
 		DecryptedSecureJSONData: map[string]string{
 			"password":                 "bar",

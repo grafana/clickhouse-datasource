@@ -657,9 +657,17 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 
 	defer span.End()
 
+	var logsAttributeColumns, logsAttributeColumnExclusions []string
+	if pCtx := backend.PluginConfigFromContext(ctx); pCtx.DataSourceInstanceSettings != nil {
+		if settings, err := LoadSettings(ctx, *pCtx.DataSourceInstanceSettings); err == nil {
+			logsAttributeColumns = settings.LogsAttributeColumns
+			logsAttributeColumnExclusions = settings.LogsAttributeColumnExclusions
+		}
+	}
+
 	for _, frame := range res {
 		if frame.Meta.PreferredVisualization == data.VisTypeLogs {
-			err := mergeOpenTelemetryLabels(frame)
+			err := mergeOpenTelemetryLabels(frame, logsAttributeColumns, logsAttributeColumnExclusions)
 			if err != nil {
 				return nil, err
 			}
@@ -814,7 +822,7 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 	return httpHeaders, nil
 }
 
-func mergeOpenTelemetryLabels(frame *data.Frame) error {
+func mergeOpenTelemetryLabels(frame *data.Frame, extraAttributeColumns []string, excludedPaths []string) error {
 	var attrFields []*data.Field
 	for _, field := range frame.Fields {
 		if field.Name == "labels" {
@@ -825,7 +833,7 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 			continue
 		}
 
-		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
+		if isLogAttributeColumn(field.Name, extraAttributeColumns) {
 			attrFields = append(attrFields, field)
 		}
 	}
@@ -865,6 +873,12 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 
 	allLabelsValuesJSON := make([]json.RawMessage, rowLen)
 	for i, value := range allLabelsValues {
+		for key := range value {
+			if isExcludedPath(key, excludedPaths) {
+				delete(value, key)
+			}
+		}
+
 		valueJSON, err := json.Marshal(value)
 		if err != nil {
 			return err
@@ -876,7 +890,7 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 
 	filteredFields := make([]*data.Field, 0, len(frame.Fields)-len(attrFields))
 	for _, field := range frame.Fields {
-		if field.Name == "ResourceAttributes" || field.Name == "ScopeAttributes" || field.Name == "LogAttributes" {
+		if isLogAttributeColumn(field.Name, extraAttributeColumns) {
 			continue
 		}
 
@@ -886,6 +900,35 @@ func mergeOpenTelemetryLabels(frame *data.Frame) error {
 	frame.Fields = filteredFields
 
 	return nil
+}
+
+// isLogAttributeColumn reports whether a field should be flattened into log
+// labels. The OTel attribute columns are always included; extra names come from
+// the datasource's Logs attribute-columns setting, letting non-OTel JSON columns
+// (e.g. a JSON body) surface their paths as fields.
+func isLogAttributeColumn(name string, extraAttributeColumns []string) bool {
+	switch name {
+	case "ResourceAttributes", "ScopeAttributes", "LogAttributes":
+		return true
+	}
+	for _, c := range extraAttributeColumns {
+		if c == name {
+			return true
+		}
+	}
+	return false
+}
+
+// isExcludedPath reports whether a flattened label path should be dropped. An
+// entry matches its exact path and any path below it, so "a.b" excludes "a.b"
+// and "a.b.c" but not "a.bc".
+func isExcludedPath(path string, excludedPaths []string) bool {
+	for _, e := range excludedPaths {
+		if path == e || strings.HasPrefix(path, e+".") {
+			return true
+		}
+	}
+	return false
 }
 
 // assignFlattenedPath will flatten a nested map into a map with top level keys separated by dots.
