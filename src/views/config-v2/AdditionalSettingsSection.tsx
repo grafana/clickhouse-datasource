@@ -240,6 +240,7 @@ export const AdditionalSettingsSection = (props: Props) => {
               onSelectContextColumnsChange={(c) => onUpdateLogsConfig('selectContextColumns', c)}
               onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
               onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
+              onAdditionalColumnsChange={(c) => onUpdateLogsConfig('additionalColumns', c)}
             />
 
             <Divider />

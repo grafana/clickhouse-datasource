@@ -1,5 +1,12 @@
 import { FieldType } from '@grafana/data';
-import { getIntervalInfo, getTimeFieldRoundingClause, LOG_LEVEL_TO_IN_CLAUSE, splitLogsVolumeFrames } from './logs';
+import {
+  buildLogLevelAggregateExpressions,
+  getTimeFieldRoundingInterval,
+  getIntervalInfo,
+  getTimeFieldRoundingClause,
+  LOG_LEVEL_TO_IN_CLAUSE,
+  splitLogsVolumeFrames,
+} from './logs';
 
 describe('logs', () => {
   describe('getIntervalInfo', () => {
@@ -50,7 +57,9 @@ describe('logs', () => {
 
   describe('getTimeFieldRoundingClause', () => {
     it('should fall back to DAY grouping when no interval info is provided', async () => {
-      expect(getTimeFieldRoundingClause({}, 'created_at')).toEqual('toStartOfInterval("created_at", INTERVAL 1 DAY)');
+      expect(getTimeFieldRoundingClause({}, 'created_at')).toEqual(
+        'toStartOfInterval(toDateTime("created_at"), INTERVAL 1 DAY)'
+      );
     });
     it('should do buckets per day when the provided interval greater than an hour', async () => {
       expect(
@@ -63,7 +72,7 @@ describe('logs', () => {
           },
           'created_at'
         )
-      ).toEqual('toStartOfInterval("created_at", INTERVAL 1 DAY)');
+      ).toEqual('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 DAY)');
     });
     it('should do buckets per hour when the provided interval greater than a minute', async () => {
       expect(
@@ -76,7 +85,7 @@ describe('logs', () => {
           },
           'created_at'
         )
-      ).toEqual('toStartOfInterval("created_at", INTERVAL 1 HOUR)');
+      ).toEqual('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 HOUR)');
     });
     it('should do buckets per minute when the provided interval greater than a second', async () => {
       expect(
@@ -89,7 +98,7 @@ describe('logs', () => {
           },
           'created_at'
         )
-      ).toEqual('toStartOfInterval("created_at", INTERVAL 1 MINUTE)');
+      ).toEqual('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 MINUTE)');
     });
     it('should do buckets per second', async () => {
       expect(
@@ -102,7 +111,7 @@ describe('logs', () => {
           },
           'created_at'
         )
-      ).toEqual('toStartOfInterval("created_at", INTERVAL 1 SECOND)');
+      ).toEqual('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 SECOND)');
     });
   });
 
@@ -194,14 +203,77 @@ describe('logs', () => {
     it('should generate correct IN clauses', async () => {
       expect(LOG_LEVEL_TO_IN_CLAUSE).toEqual({
         critical:
-          "'critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg'",
+          "'critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency'",
         debug: "'debug','dbug','DEBUG','DBUG','Debug','Dbug'",
         error: "'error','err','eror','ERROR','ERR','EROR','Error','Err','Eror'",
-        info: "'info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational'",
+        info: "'info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice'",
         trace: "'trace','TRACE','Trace'",
-        unknown: "'unknown','UNKNOWN','Unknown'",
         warn: "'warn','warning','WARN','WARNING','Warn','Warning'",
       });
     });
+  });
+});
+
+describe('buildLogLevelAggregateExpressions', () => {
+  const expressions = buildLogLevelAggregateExpressions('"level"');
+  const level = `ifNull(toString("level"), '')`;
+
+  it('should return one expression per canonical level', () => {
+    expect(expressions.map((e) => e.alias)).toEqual(['critical', 'error', 'warn', 'info', 'debug', 'trace', 'unknown']);
+  });
+
+  it('should match levels exactly so a value cannot be counted twice', () => {
+    // Substring matching would count a value like 'debug-trace' in both the debug and the
+    // trace series, making the stacked total exceed count().
+    const debug = expressions.find((e) => e.alias === 'debug')!;
+    expect(debug.expression).toBe(`${level} IN (${LOG_LEVEL_TO_IN_CLAUSE.debug})`);
+    expect(debug.expression).not.toContain('multiSearchAny');
+  });
+
+  it('should define unknown as the complement of the named levels so nothing goes uncounted', () => {
+    // An empty severity, a NOTICE, or a bare severity number matches none of the named levels
+    // and must still appear somewhere, or the total falls short of count().
+    const unknown = expressions.find((e) => e.alias === 'unknown')!;
+    expect(unknown.expression).toBe(
+      `${level} NOT IN (` +
+        [
+          LOG_LEVEL_TO_IN_CLAUSE.critical,
+          LOG_LEVEL_TO_IN_CLAUSE.error,
+          LOG_LEVEL_TO_IN_CLAUSE.warn,
+          LOG_LEVEL_TO_IN_CLAUSE.info,
+          LOG_LEVEL_TO_IN_CLAUSE.debug,
+          LOG_LEVEL_TO_IN_CLAUSE.trace,
+        ].join(',') +
+        `)`
+    );
+  });
+
+  it('should use the caller-provided column verbatim', () => {
+    expect(buildLogLevelAggregateExpressions('src."SeverityText"')[0].expression).toContain(
+      `ifNull(toString(src."SeverityText"), '')`
+    );
+  });
+
+  it('should guard against a Nullable level column dropping rows from every series', () => {
+    // Without ifNull a NULL severity matches neither the named levels nor the complement, so
+    // the series would sum to less than count().
+    expressions.forEach((e) => expect(e.expression).toContain('ifNull('));
+  });
+});
+
+describe('getTimeFieldRoundingInterval', () => {
+  // The branches compare with `>`, so each boundary value lands in the finer band.
+  it.each([
+    { intervalMs: undefined, expected: 'DAY' },
+    { intervalMs: 1, expected: 'SECOND' },
+    { intervalMs: 1000, expected: 'SECOND' },
+    { intervalMs: 1001, expected: 'MINUTE' },
+    { intervalMs: 60_000, expected: 'MINUTE' },
+    { intervalMs: 60_001, expected: 'HOUR' },
+    { intervalMs: 3_600_000, expected: 'HOUR' },
+    { intervalMs: 3_600_001, expected: 'DAY' },
+  ])('returns $expected for an interval of $intervalMs ms', ({ intervalMs, expected }) => {
+    const scopedVars = intervalMs === undefined ? {} : { __interval_ms: { text: '', value: intervalMs } };
+    expect(getTimeFieldRoundingInterval(scopedVars)).toBe(expected);
   });
 });

@@ -14,6 +14,7 @@ import {
   TimeUnit,
 } from 'types/queryBuilder';
 import otel from 'otel';
+import { buildJSONPathAccess } from './jsonPath';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -402,6 +403,16 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
 
   const selectPartsSql = selectParts.join(', ');
 
+  // A logs query with no selected columns would generate `SELECT  FROM table`, which
+  // ClickHouse rejects with a syntax error. This happens transiently in the compact
+  // editor on a cold load: a non-OTel table has no columns until the schema fetch
+  // resolves and the default-column hooks populate the roles / include-all set. Emit
+  // no query in that window so Grafana skips it rather than issuing an invalid one; a
+  // valid query is generated on the next render once the columns arrive.
+  if (selectParts.length === 0) {
+    return '';
+  }
+
   queryParts.push('SELECT');
   queryParts.push(selectPartsSql);
   queryParts.push('FROM');
@@ -686,7 +697,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
     colName.includes(')') ||
     colName.includes('"') ||
     colName.includes('"') ||
-    colName.includes(' as ')
+    /\sas\s/i.test(colName)
   ) {
     colName = col.name;
   } else if (colName.includes(' ') || colName.includes(':')) {
@@ -884,15 +895,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
       const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
       type = valueType;
     } else if (filter.mapKey && type.startsWith('JSON')) {
-      const escapedJSONPaths = filter.mapKey
-        .split('.')
-        .map((p) => `\`${p}\``)
-        .join('.');
       // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
-      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
-      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
-      // that signal), and `=` / `!=` / `LIKE` are unaffected.
-      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // with ILLEGAL_TYPE_OF_ARGUMENT. buildJSONPathAccess casts to Nullable(String) so
+      // every filter operator works — `IS NULL` still detects missing keys (a plain
+      // ::String cast would swallow that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = buildJSONPathAccess(column, filter.mapKey);
       // Update type so filter value generation routes through the string-aware branches.
       type = 'String';
     }

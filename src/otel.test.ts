@@ -89,6 +89,44 @@ describe('detectLogsVersion', () => {
   });
 });
 
+describe('canary schema snapshot (tests/canary/expected-columns.json)', () => {
+  // The scheduled canary workflow (.github/workflows/otel-schema-canary.yml)
+  // diffs the schema a live collector creates against the snapshot. These
+  // tests close the other half of the loop: they run on every PR and fail
+  // when the plugin's latest column maps reference columns the snapshot
+  // doesn't have, so the snapshot and src/otel.ts can't drift apart silently.
+  const expectedColumns: Record<
+    string,
+    Array<{ name: string; type: string }>
+  > = require('../tests/canary/expected-columns.json');
+
+  it('latest log column map only references columns the collector creates', () => {
+    const names = new Set(expectedColumns['otel_logs'].map((c) => c.name));
+    const missing = Array.from(getLatestVersion().logColumnMap.values()).filter((c) => !names.has(c));
+    expect(missing).toEqual([]);
+  });
+
+  it('latest trace column map only references columns the collector creates', () => {
+    const names = new Set(expectedColumns['otel_traces'].map((c) => c.name));
+    const missing = Array.from(getLatestVersion().traceColumnMap.values()).filter((c) => !names.has(c));
+    expect(missing).toEqual([]);
+  });
+
+  it('trace events and links column prefixes match the collector columns', () => {
+    const names = new Set(expectedColumns['otel_traces'].map((c) => c.name));
+    const latest = getLatestVersion();
+    expect(names.has(`${latest.traceEventsColumnPrefix}.Timestamp`)).toBe(true);
+    expect(names.has(`${latest.traceLinksColumnPrefix}.TraceId`)).toBe(true);
+  });
+
+  it('trace timestamp lookup table has the columns the generated WITH clause hardcodes', () => {
+    const names = new Set(expectedColumns['otel_traces_trace_id_ts'].map((c) => c.name));
+    for (const column of ['TraceId', 'Start', 'End']) {
+      expect(names.has(column)).toBe(true);
+    }
+  });
+});
+
 describe('otel default export', () => {
   it('exposes versions, getLatestVersion, getVersion, and traceTimestampTableSuffix', () => {
     expect(otel.versions).toBe(versions);

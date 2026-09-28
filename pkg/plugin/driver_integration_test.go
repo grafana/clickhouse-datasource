@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -168,6 +169,14 @@ func TestConnect(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "queryTimeout": %d }`, host, port, username, ssl, queryTimeoutNumber)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
+	})
+	t.Run("should apply connection pool settings from jsonData", func(t *testing.T) {
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "maxOpenConns": 5, "maxIdleConns": "2", "connMaxLifetime": 60 }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		db, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
+		assert.Equal(t, nil, err)
+		assert.Equal(t, 5, db.Stats().MaxOpenConnections)
 	})
 }
 
@@ -1248,38 +1257,26 @@ func TestConvertNullableIPv6(t *testing.T) {
 func TestHTTPConnectWithHeaders(t *testing.T) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxyHost := "localhost"
-	proxyPort := getEnv("CLICKHOUSE_PROXY_PORT", "8122")
 	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
 	host := getEnv("CLICKHOUSE_HOST", "localhost")
 
+	// Bind synchronously so the port is already accepting connections before any
+	// request is sent to it, rather than racing a background ListenAndServe against
+	// the rest of the test. An ephemeral port (":0") also avoids collisions with a
+	// leftover listener from a prior run, since nothing else can be bound to it yet.
+	listener, err := net.Listen("tcp", net.JoinHostPort(proxyHost, "0"))
+	require.NoError(t, err)
+	proxyPort := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+
+	server := &http.Server{Handler: proxy}
 	go func() {
-		err := http.ListenAndServe(fmt.Sprintf("%s:%s", proxyHost, proxyPort), proxy)
-		assert.Equal(t, nil, err)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			assert.NoError(t, err)
+		}
 	}()
-
-	// Wait for proxy server to be ready
-	proxyAddr := net.JoinHostPort(proxyHost, proxyPort)
-
-	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	d := &net.Dialer{}
-	tick := time.NewTicker(100 * time.Millisecond)
-	defer tick.Stop()
-
-	for {
-		conn, err := d.DialContext(waitCtx, "tcp", proxyAddr)
-		if err == nil {
-			_ = conn.Close()
-			break
-		}
-
-		select {
-		case <-waitCtx.Done():
-			t.Fatalf("proxy server failed to start within 5s: %v", err)
-		case <-tick.C:
-		}
-	}
+	t.Cleanup(func() {
+		_ = server.Shutdown(context.Background())
+	})
 
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")

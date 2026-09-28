@@ -1,7 +1,6 @@
 import { getTemplateSrv } from '@grafana/runtime';
 import { Monaco, monacoTypes } from '@grafana/ui';
 import { Range } from './sqlProvider';
-import { Lexer } from 'ch-parser/lexer';
 import { keywords, TokenType } from 'ch-parser/types';
 import { SqlFunction, TableColumn } from 'types/queryBuilder';
 import { pluginMacros } from 'ch-parser/pluginMacros';
@@ -9,8 +8,7 @@ import {
   ClauseType,
   FromQueryNode,
   IdentifierQueryNode,
-  parseSelectQueryNode,
-  QueryNodeParser,
+  parseSelect,
   QueryNodeType,
   SelectQueryNode,
 } from 'ch-parser/parser';
@@ -115,23 +113,7 @@ export async function getSuggestions(
   range: Range,
   cursorPosition: number
 ): Promise<monacoTypes.languages.CompletionItem[]> {
-  const lexer = new Lexer(text);
-  const tokens = [];
-  while (true) {
-    const token = lexer.nextToken();
-    if (token.isEnd()) {
-      break;
-    }
-
-    if (!token.isSignificant()) {
-      continue;
-    }
-
-    tokens.push(token);
-  }
-
-  const parser = new QueryNodeParser(tokens);
-  const selectNode = parseSelectQueryNode(parser);
+  const selectNode = parseSelect(text);
 
   if (!selectNode) {
     return [];
@@ -198,6 +180,10 @@ async function getSuggestionsFromCursorData(
   const contextType = mapping[data.clause];
 
   const db = data.database || schema.defaultDatabase || 'default';
+  // A `$`-prefixed FROM target means the user is typing a Grafana variable as
+  // the table (e.g. the shipped `FROM ${database}.otel_traces`), so offer
+  // variables there alongside databases and tables.
+  const typingVariable = (data.table || data.database || '').startsWith('$');
   switch (contextType) {
     case 'database':
       results = await fetchDatabaseSuggestions(schema, range);
@@ -208,10 +194,16 @@ async function getSuggestionsFromCursorData(
       const defaultTables = await fetchTableSuggestions(schema, range, db, data.prefix);
 
       results = [...databases, ...defaultTables];
+      if (typingVariable) {
+        results.push(...(await getVariableSuggestions(range)));
+      }
       break;
 
     case 'table':
       results = await fetchTableSuggestions(schema, range, db, data.prefix);
+      if (typingVariable) {
+        results.push(...(await getVariableSuggestions(range)));
+      }
       break;
 
     case 'column':
@@ -220,14 +212,19 @@ async function getSuggestionsFromCursorData(
       const variables = await getVariableSuggestions(range);
       results.push(...variables);
 
-      results.push({
-        label: 'NULL',
-        insertText: 'NULL',
-        sortText: '!!!NULL',
-        kind: monaco.languages.CompletionItemKind.Keyword,
-        documentation: '',
-        range,
-      });
+      // After a bare `$` Monaco has an empty word to match on, because `$` is a word
+      // separator, so it filters nothing and the order is pure sortText. NULL sorts above
+      // every macro there, so it has to exclude itself by prefix the way columns already do.
+      if (!data.prefix || 'null'.startsWith(data.prefix.toLowerCase())) {
+        results.push({
+          label: 'NULL',
+          insertText: 'NULL',
+          sortText: '!!!NULL',
+          kind: monaco.languages.CompletionItemKind.Keyword,
+          documentation: '',
+          range,
+        });
+      }
 
       const sqlFunctions = await fetchFunctionSuggestions(schema, range);
       results.push(...sqlFunctions);

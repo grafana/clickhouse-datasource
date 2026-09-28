@@ -3,6 +3,13 @@ import { getSuggestions, Schema } from './suggestions';
 import { Range } from './sqlProvider';
 import { pluginMacros } from 'ch-parser/pluginMacros';
 
+jest.mock('@grafana/runtime', () => ({
+  getTemplateSrv: () => ({
+    getVariables: () => [{ name: 'table' }, { name: 'database' }],
+    replace: (s: string) => s,
+  }),
+}));
+
 describe('Suggestions', () => {
   it('matches columns case-insensitively when a prefix is typed', async () => {
     // User types lowercase "codefile" but the column is named "CodeFile"
@@ -63,8 +70,8 @@ describe('Suggestions', () => {
         { label: 'EventDate', name: 'EventDate', type: 'DateTime' } as TableColumn,
       ],
       functions: async (): Promise<SqlFunction[]> => [
-        { name: 'toDateTime' } as SqlFunction,
-        { name: 'toDateTime' } as SqlFunction,
+        { name: 'toDateTime', origin: 'System' } as SqlFunction,
+        { name: 'toDateTime', origin: 'System' } as SqlFunction,
       ],
       defaultDatabase: 'system',
     };
@@ -102,7 +109,7 @@ describe('Suggestions', () => {
         { label: 'EventDate', type: 'DateTime' } as TableColumn,
       ],
       functions: async (): Promise<SqlFunction[]> => [
-        { name: 'toDateTime' } as SqlFunction,
+        { name: 'toDateTime', origin: 'System' } as SqlFunction,
         { name: '__actionName', origin: 'System' } as SqlFunction,
         { name: '__my_helper', origin: 'SQLUserDefined' } as SqlFunction,
       ],
@@ -117,6 +124,7 @@ describe('Suggestions', () => {
           Variable: 4,
           Class: 5,
           Module: 8,
+          Keyword: 13,
         },
         CompletionItemInsertTextRule: {
           InsertAsSnippet: 4,
@@ -147,12 +155,117 @@ describe('Suggestions', () => {
     const columnEventDate = suggestionsByLabel.get('EventDate');
     expect(columnEventDate).not.toBeUndefined();
 
-    // Should show functions
+    // Should show functions. Every built-in reports `origin: 'System'`, including ordinary
+    // ones, so this guards against the internal-function filter keying on origin alone.
     const functionToDateTime = suggestionsByLabel.get('toDateTime');
     expect(functionToDateTime).not.toBeUndefined();
 
     // Should hide ClickHouse internal functions, but keep a user-defined one named like them
     expect(suggestionsByLabel.get('__actionName')).toBeUndefined();
     expect(suggestionsByLabel.get('__my_helper')).not.toBeUndefined();
+
+    // Should show NULL where nothing has been typed to exclude it
+    expect(suggestionsByLabel.get('NULL')).not.toBeUndefined();
+  });
+
+  it('omits NULL when the typed prefix cannot match it', async () => {
+    const sql = 'SELECT * FROM system.query_log WHERE $';
+    const cursorPosition = sql.length;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['system'],
+      tables: async (): Promise<string[]> => ['query_log'],
+      columns: async (): Promise<TableColumn[]> => [],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'system',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const suggestions = await getSuggestions(sql, schema, range, cursorPosition);
+    const labels = suggestions.map((s) => s.label);
+
+    expect(labels).not.toContain('NULL');
+    expect(labels).toContain('$__dateFilter');
+  });
+
+  it('resolves columns for a keyword-named table (e.g. FROM sample)', async () => {
+    // `sample` is a ClickHouse keyword; the parser must still treat it as the
+    // FROM table so column suggestions resolve to it.
+    const sql = 'SELECT * FROM sample WHERE ';
+    const cursorPosition = 27; // end of string, in the WHERE clause
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['default'],
+      tables: async (): Promise<string[]> => ['sample'],
+      columns: async (_db: string, table: string): Promise<TableColumn[]> =>
+        table === 'sample'
+          ? [{ label: 'ServiceName', name: 'ServiceName', type: 'String' } as TableColumn]
+          : [{ label: 'WRONG_TABLE', name: 'WRONG_TABLE', type: 'String' } as TableColumn],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'default',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const labels = (await getSuggestions(sql, schema, range, cursorPosition)).map((s) => s.label);
+    expect(labels).toContain('ServiceName');
+    expect(labels).not.toContain('WRONG_TABLE');
+  });
+
+  it('offers Grafana variables when a variable is typed as the FROM table', async () => {
+    // The shipped OTel dashboards use `FROM ${database}.otel_traces`, so a
+    // `$`-prefixed FROM target must still offer variable completions.
+    const sql = 'SELECT * FROM ${';
+    const cursorPosition = sql.length;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['default'],
+      tables: async (): Promise<string[]> => ['otel_logs'],
+      columns: async (): Promise<TableColumn[]> => [],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'default',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const labels = (await getSuggestions(sql, schema, range, cursorPosition)).map((s) =>
+      typeof s.label === 'string' ? s.label : s.label.label
+    );
+    expect(labels).toContain('${table}');
+    expect(labels).toContain('${database}');
   });
 });

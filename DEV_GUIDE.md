@@ -116,3 +116,16 @@ SELECT my_time_column_on_my_table as logTime FROM logs ORDER BY logTime ASC
 ```
 
 By adding a simple hint, we can apply filters, orderBys, and other behaviors to the SQL generator without having to reference specific columns. This simplifies the UI logic and user experience by reducing the number of places where a column name needs to be updated.
+
+## Dense demo logs for manual testing
+
+`tests/e2e/fixtures/` is loaded automatically by the compose stack, so it is kept small and
+deterministic. For a histogram with realistic density, load the demo fixture by hand:
+
+```sh
+docker exec -i clickhouse-server clickhouse-client --multiquery < tests/dev-fixtures/demo_otel_logs.sql
+```
+
+It creates `demo.otel_logs` in the collector v0.151.0 layout with roughly 170 lines per minute
+over the last 24 hours and an error burst four hours back. Point a data source's **Logs** settings
+at `demo.otel_logs` with the OTel toggle on and every column is configured for you.

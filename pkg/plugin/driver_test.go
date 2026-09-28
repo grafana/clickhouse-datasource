@@ -97,6 +97,91 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 	})
 }
 
+func TestWarnUnsupportedTimeSeriesFields(t *testing.T) {
+	t.Run("attaches warning notice when JSON-shaped columns are present", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+			Fields: []*data.Field{
+				data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+				data.NewField("MetricName", nil, []string{"m"}),
+				data.NewField("ResourceAttributes", nil, []json.RawMessage{json.RawMessage(`{"foo":"bar"}`)}),
+				data.NewField("Attributes", nil, []json.RawMessage{json.RawMessage(`{"x":"y"}`)}),
+				data.NewField("Value", nil, []float64{1.0}),
+			},
+		}
+
+		warnUnsupportedTimeSeriesFields(frame)
+
+		require.NotNil(t, frame.Meta)
+		require.Len(t, frame.Meta.Notices, 1)
+		notice := frame.Meta.Notices[0]
+		assert.Equal(t, data.NoticeSeverityWarning, notice.Severity)
+		assert.Contains(t, notice.Text, "ResourceAttributes")
+		assert.Contains(t, notice.Text, "Attributes")
+		// Column names are reported in sorted order; "Attributes" sorts before "ResourceAttributes".
+		assert.Contains(t, notice.Text, "Attributes['some_key'] as some_key")
+	})
+
+	t.Run("deduplicates repeated JSON-shaped column names from wide-format frames", func(t *testing.T) {
+		// LongToWide duplicates non-label fields once per output series, so a
+		// JSON-shaped column can appear multiple times with the same name.
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+			Fields: []*data.Field{
+				data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+				data.NewField("Attributes", nil, []json.RawMessage{json.RawMessage(`{"x":"1"}`)}),
+				data.NewField("Attributes", nil, []json.RawMessage{json.RawMessage(`{"x":"2"}`)}),
+			},
+		}
+
+		warnUnsupportedTimeSeriesFields(frame)
+
+		require.Len(t, frame.Meta.Notices, 1)
+		notice := frame.Meta.Notices[0]
+		assert.Contains(t, notice.Text, "columns have a Map/Array/Tuple/JSON type and cannot be used to distinguish time series: Attributes.",
+			"column name should be listed exactly once, not duplicated, got: %s", notice.Text)
+	})
+
+	t.Run("no notice when no JSON-shaped columns present", func(t *testing.T) {
+		frame := &data.Frame{
+			Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+			Fields: []*data.Field{
+				data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+				data.NewField("MetricName", nil, []string{"m"}),
+				data.NewField("Value", nil, []float64{1.0}),
+			},
+		}
+
+		warnUnsupportedTimeSeriesFields(frame)
+
+		assert.Empty(t, frame.Meta.Notices)
+	})
+
+	t.Run("MutateResponse attaches notice only for graph frames", func(t *testing.T) {
+		makeFrame := func(vis data.VisType) *data.Frame {
+			return &data.Frame{
+				Meta: &data.FrameMeta{PreferredVisualization: vis},
+				Fields: []*data.Field{
+					data.NewField("time", nil, []time.Time{time.Unix(0, 0)}),
+					data.NewField("ResourceAttributes", nil, []json.RawMessage{json.RawMessage(`{"foo":"bar"}`)}),
+					data.NewField("Value", nil, []float64{1.0}),
+				},
+			}
+		}
+
+		h := &Clickhouse{}
+		graph := makeFrame(data.VisTypeGraph)
+		table := makeFrame(data.VisTypeTable)
+
+		_, err := h.MutateResponse(context.Background(), data.Frames{graph, table})
+		require.NoError(t, err)
+
+		require.Len(t, graph.Meta.Notices, 1)
+		assert.Equal(t, data.NoticeSeverityWarning, graph.Meta.Notices[0].Severity)
+		assert.Empty(t, table.Meta.Notices)
+	})
+}
+
 func TestAssignFlattenedPath(t *testing.T) {
 	t.Run("simple value", func(t *testing.T) {
 		flatMap := make(map[string]any)
@@ -430,6 +515,69 @@ func TestMutateQuery_GrafanaMetadata(t *testing.T) {
 	})
 }
 
+func TestMutateQuery_MinInterval(t *testing.T) {
+	h := &Clickhouse{}
+
+	cases := []struct {
+		name         string
+		json         string
+		interval     time.Duration
+		wantInterval time.Duration
+	}{
+		{"raises the interval", `{"minInterval":"5m"}`, 30 * time.Second, 5 * time.Minute},
+		{"never lowers the interval", `{"minInterval":"1s"}`, 30 * time.Second, 30 * time.Second},
+		{"supports day units", `{"minInterval":"1d"}`, time.Hour, 24 * time.Hour},
+		{"supports week units", `{"minInterval":"1w"}`, time.Hour, 7 * 24 * time.Hour},
+		{"trims surrounding space", `{"minInterval":" 5m "}`, 30 * time.Second, 5 * time.Minute},
+		// The frontend trims the same explicit set, so neither side accepts a
+		// value the other ignores.
+		{"trims a byte order mark", "{\"minInterval\":\"\ufeff5m\"}", 30 * time.Second, 5 * time.Minute},
+		{"trims a next line character", "{\"minInterval\":\"\u00855m\"}", 30 * time.Second, 5 * time.Minute},
+		{"trims a non-breaking space", "{\"minInterval\":\"\u00a05m\"}", 30 * time.Second, 5 * time.Minute},
+		{"ignores an empty value", `{}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value it cannot parse", `{"minInterval":"soon"}`, 30 * time.Second, 30 * time.Second},
+		// The frontend refuses these too (src/data/queryInterval.ts); both sides
+		// share one grammar so $__interval and $__timeInterval cannot disagree.
+		{"ignores a unit-less value", `{"minInterval":"60"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores trailing garbage", `{"minInterval":"5minutes"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a fractional value", `{"minInterval":"1.5m"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a compound duration", `{"minInterval":"1h30m"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores month and year units", `{"minInterval":"1M"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value past the upper bound", `{"minInterval":"366d"}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a value that would overflow", `{"minInterval":"9999999999d"}`, 30 * time.Second, 30 * time.Second},
+		// A hand-written dashboard can carry a number here; it must degrade to
+		// no floor rather than failing the whole decode.
+		{"ignores a numeric value", `{"minInterval":60}`, 30 * time.Second, 30 * time.Second},
+		{"ignores a null value", `{"minInterval":null}`, 30 * time.Second, 30 * time.Second},
+		{"ignores an object value", `{"minInterval":{"value":"5m"}}`, 30 * time.Second, 30 * time.Second},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, req := h.MutateQuery(t.Context(), backend.DataQuery{
+				JSON:     []byte(tc.json),
+				Interval: tc.interval,
+			})
+
+			assert.Equal(t, tc.wantInterval, req.Interval)
+		})
+	}
+}
+
+func TestMutateQuery_MinIntervalDoesNotBreakTimezone(t *testing.T) {
+	h := &Clickhouse{}
+
+	// A numeric minInterval used to fail json.Unmarshal for the whole struct, and
+	// the early return took the timezone handling with it.
+	ctx, req := h.MutateQuery(t.Context(), backend.DataQuery{
+		JSON:     []byte(`{"minInterval":60,"meta":{"timezone":"Europe/Lisbon"}}`),
+		Interval: 30 * time.Second,
+	})
+
+	assert.Equal(t, 30*time.Second, req.Interval)
+	assert.NotEqual(t, t.Context(), ctx, "timezone should still have been applied to the context")
+}
+
 func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	h := &Clickhouse{}
 
@@ -645,8 +793,8 @@ func TestBuildClickHouseOptionsJWTBothProtocols(t *testing.T) {
 				OAuthPassThru: true,
 				Username:      "svc",
 				Password:      "fallback",
-				DialTimeout:   "5",
-				QueryTimeout:  "30",
+				DialTimeout:   5,
+				QueryTimeout:  30,
 			}
 
 			opts, err := buildClickHouseOptions(t.Context(), settings, message)
@@ -674,8 +822,8 @@ func baseJWTSettings() Settings {
 		OAuthPassThru: true,
 		Username:      "svc",
 		Password:      "fallback",
-		DialTimeout:   "5",
-		QueryTimeout:  "30",
+		DialTimeout:   5,
+		QueryTimeout:  30,
 	}
 }
 

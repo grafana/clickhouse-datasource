@@ -5,6 +5,7 @@ import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'ty
 import otel from 'otel';
 import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
 import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOptions';
+import { appendAdditionalLogColumns } from '../compactQueryDefaults';
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -13,7 +14,8 @@ export const useLogDefaultsOnMount = (
   datasource: Datasource,
   isNewQuery: boolean,
   builderOptions: QueryBuilderOptions,
-  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
+  allColumns: readonly TableColumn[] = []
 ) => {
   const didSetDefaults = useRef<boolean>(false);
   useEffect(() => {
@@ -47,6 +49,10 @@ export const useLogDefaultsOnMount = (
       }
     }
 
+    // Extra fields configured via the Columns setting. Pass the fetched schema (when it is loaded)
+    // so each column carries its type; the fold uses that to skip collection- and date-typed columns.
+    appendAdditionalLogColumns(datasource, allColumns, nextColumns, includedColumns);
+
     builderOptionsDispatch(
       setOptions({
         database: defaultDb,
@@ -60,6 +66,7 @@ export const useLogDefaultsOnMount = (
     );
     didSetDefaults.current = true;
   }, [
+    allColumns,
     builderOptions.columns,
     builderOptions.orderBy,
     builderOptions.table,
@@ -124,6 +131,9 @@ export const useOtelColumns = (
         includedColumns.add(columnName);
       }
     }
+
+    // Extra fields configured in Default columns (all detected scalars, or an explicit list).
+    appendAdditionalLogColumns(datasource, allColumns, columns, includedColumns);
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;
