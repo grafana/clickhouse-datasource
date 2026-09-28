@@ -71,8 +71,8 @@ jobs:
             # the decision.
             skip=$(jq -r --arg sha "$sha" '
               if   ([.reviews[] | select(.state == "CHANGES_REQUESTED")] | length) > 0 then "a human requested changes"
-              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login | startswith("grafana-plugins-platform-bot")))] | length) > 0 then "already approved"
-              elif ([.comments[] | select((.author.login | startswith("grafana-plugins-platform-bot")) and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
+              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login | startswith("data-sources-bot")))] | length) > 0 then "already approved"
+              elif ([.comments[] | select((.author.login | startswith("data-sources-bot")) and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
               else "" end' <<<"$pr_data")
             if [ -n "$skip" ]; then
               echo "PR #$pr: skipping, $skip"
@@ -169,7 +169,7 @@ jobs:
         id: app-token
         uses: grafana/shared-workflows/actions/create-github-app-token@46f48da11e78ebdba7a8747ae456b11062fac83e # create-github-app-token/v0.3.1
         with:
-          github_app: grafana-plugins-platform-bot
+          github_app: data-sources-bot
 
       - name: Approve clear-cut update
         if: matrix.pr.mode == 'direct'
@@ -301,7 +301,7 @@ jobs:
           # anyway: only a reviewer's current position should count here.
           reviews=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json latestReviews)
           changes_requested=$(jq '[.latestReviews[] | select(.state == "CHANGES_REQUESTED")] | length' <<<"$reviews")
-          bot_approved=$(jq '[.latestReviews[] | select((.author.login | startswith("grafana-plugins-platform-bot")) and .state == "APPROVED")] | length' <<<"$reviews")
+          bot_approved=$(jq '[.latestReviews[] | select((.author.login | startswith("data-sources-bot")) and .state == "APPROVED")] | length' <<<"$reviews")
 
           case "$verdict" in
             "VERDICT: approve"*)
