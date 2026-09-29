@@ -697,7 +697,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
     colName.includes(')') ||
     colName.includes('"') ||
     colName.includes('"') ||
-    colName.includes(' as ')
+    /\sas\s/i.test(colName)
   ) {
     colName = col.name;
   } else if (colName.includes(' ') || colName.includes(':')) {

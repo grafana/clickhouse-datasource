@@ -8,8 +8,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -220,15 +222,6 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		}
 	}
 
-	t, err := strconv.Atoi(settings.DialTimeout)
-	if err != nil {
-		return nil, backend.DownstreamError(fmt.Errorf("invalid timeout: %s", settings.DialTimeout))
-	}
-	qt, err := strconv.Atoi(settings.QueryTimeout)
-	if err != nil {
-		return nil, backend.DownstreamError(fmt.Errorf("invalid query timeout: %s", settings.QueryTimeout))
-	}
-
 	protocol := clickhouse.Native
 	if settings.Protocol == "http" {
 		protocol = clickhouse.HTTP
@@ -303,12 +296,12 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		Compression: &clickhouse.Compression{
 			Method: compression,
 		},
-		DialTimeout: time.Duration(t) * time.Second,
+		DialTimeout: time.Duration(settings.DialTimeout) * time.Second,
 		GetJWT:      getJWT,
 		HttpHeaders: httpHeaders,
 		HttpUrlPath: settings.Path,
 		Protocol:    protocol,
-		ReadTimeout: time.Duration(qt) * time.Second,
+		ReadTimeout: time.Duration(settings.QueryTimeout) * time.Second,
 		Settings:    customSettings,
 		TLS:         tlsConfig,
 	}
@@ -353,15 +346,9 @@ func (h *Clickhouse) Connect(
 	db := clickhouse.OpenDB(opts)
 
 	// Set connection pool settings
-	if i, err := strconv.Atoi(settings.ConnMaxLifetime); err == nil {
-		db.SetConnMaxLifetime(time.Duration(i) * time.Minute)
-	}
-	if i, err := strconv.Atoi(settings.MaxIdleConns); err == nil {
-		db.SetMaxIdleConns(i)
-	}
-	if i, err := strconv.Atoi(settings.MaxOpenConns); err == nil {
-		db.SetMaxOpenConns(i)
-	}
+	db.SetConnMaxLifetime(time.Duration(settings.ConnMaxLifetime) * time.Minute)
+	db.SetMaxIdleConns(settings.MaxIdleConns)
+	db.SetMaxOpenConns(settings.MaxOpenConns)
 
 	select {
 	case <-ctx.Done():
@@ -463,10 +450,7 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 	settings, err := LoadSettings(ctx, config)
 	timeout := 60
 	if err == nil {
-		t, err := strconv.Atoi(settings.QueryTimeout)
-		if err == nil {
-			timeout = t
-		}
+		timeout = settings.QueryTimeout
 	}
 	return sqlds.DriverSettings{
 		Timeout: time.Second * time.Duration(timeout),
@@ -681,6 +665,10 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 			}
 		}
 
+		if frame.Meta.PreferredVisualization == data.VisTypeGraph {
+			warnUnsupportedTimeSeriesFields(frame)
+		}
+
 		if shouldConvertFields(frame.Meta.PreferredVisualization) {
 			if err := convertNullableJSONFields(frame); err != nil {
 				return res, err
@@ -688,6 +676,50 @@ func (h *Clickhouse) MutateResponse(ctx context.Context, res data.Frames) (data.
 		}
 	}
 	return res, nil
+}
+
+// warnUnsupportedTimeSeriesFields attaches a warning notice to a time-series
+// frame when it contains columns that cannot participate in series identity.
+//
+// ClickHouse Map/Array/Tuple/Variant/Dynamic/JSON columns are surfaced by the
+// converter registry as data.FieldTypeJSON. sqlds' LongToWide only promotes
+// plain string columns to per-series labels (Field.Labels), so these
+// JSON-shaped columns are silently ignored for series identity: all rows collapse
+// into a single series even though the user selected columns intended to
+// distinguish them. This is particularly confusing for OTel metrics-schema
+// tables where ResourceAttributes/Attributes are Map(...) columns.
+//
+// LongToWide also duplicates non-label fields once per output series, so a
+// single JSON-shaped column can appear multiple times in frame.Fields; column
+// names are collected into a set and reported in sorted order.
+//
+// See https://github.com/grafana/clickhouse-datasource/issues/2126.
+func warnUnsupportedTimeSeriesFields(frame *data.Frame) {
+	seen := make(map[string]bool)
+	for _, field := range frame.Fields {
+		if field.Type().JSON() {
+			seen[field.Name] = true
+		}
+	}
+	if len(seen) == 0 {
+		return
+	}
+
+	unsupported := slices.Sorted(maps.Keys(seen))
+
+	text := fmt.Sprintf(
+		"The following selected columns have a Map/Array/Tuple/JSON type and cannot be used to distinguish time series: %s. "+
+			"All rows will collapse into a single series regardless of these columns' values. "+
+			"Extract specific keys instead, e.g. %s['some_key'] as some_key for a Map column, directly into the Columns selector (the 'as some_key' suffix names the resulting series/label), or switch to the SQL editor to hand-write the query.",
+		strings.Join(unsupported, ", "),
+		unsupported[0],
+	)
+
+	frame.AppendNotices(data.Notice{
+		Severity: data.NoticeSeverityWarning,
+		Text:     text,
+		Inspect:  data.InspectTypeData,
+	})
 }
 
 // shouldConvertFields determines whether field conversion is needed based on visualization type.
