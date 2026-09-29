@@ -642,7 +642,7 @@ export default {
       table: 'Table',
       logs: 'Logs',
       timeseries: 'Time Series',
-      traces: 'Traces',
+      traces: 'Trace',
     },
     ColumnHint: {
       [ColumnHint.FilterTime]: 'Filter Time',
