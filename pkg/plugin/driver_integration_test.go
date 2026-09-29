@@ -1514,3 +1514,73 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		assert.Equal(t, backend.ErrorSourceDownstream, resp.Responses["A"].ErrorSource)
 	})
 }
+
+// The additional_table_filters map value is parsed the same way whether it
+// arrives in a SETTINGS clause (the default ad hoc mode) or as a query setting
+// (URL parameter over HTTP, Settings field over native). The cases are
+// AdHocFilter.buildSetting outputs, which carry two escaping layers.
+func TestAdHocFiltersQuerySettingMatchesSettingsClause(t *testing.T) {
+	cases := map[string]string{
+		"quote":     "{'otel.logs' : ' ServiceName = \\'it\\\\\\'s\\' '}",
+		"backslash": "{'otel.logs' : ' ServiceName = \\'a\\\\\\\\b\\\\\\\\\\' '}",
+		"korean":    "{'otel.logs' : ' ServiceName != \\'한글 값\\' '}",
+		"dotted":    "{'otel.logs' : ' Events.Name = \\'o\\\\\\'k\\' '}",
+		"map key":   "{'otel.logs' : ' LogAttributes[\\'it\\\\\\'s.k\\'] = \\'v\\\\\\'\\\\\\\\x\\' '}",
+		"in":        "{'otel.logs' : ' SeverityText IN (\\'a\\\\\\'b\\', \\'c\\\\\\\\d\\', \\'다\\') '}",
+		"regexp":    "{'otel.logs' : ' Body REGEXP \\'^\\\\\\\\d+\\\\\\'\\' AND x = \\'1\\' '}",
+		"json":      "{'otel.logs' : ' LogAttributes.`http`.`method`::Nullable(String) = \\'G\\\\\\'ET\\' '}",
+	}
+	h := &Clickhouse{}
+	withSetting := func(t *testing.T, setting string) context.Context {
+		queryJSON, err := json.Marshal(map[string]any{"adHocFiltersSetting": setting})
+		require.NoError(t, err)
+		ctx, _ := h.MutateQuery(t.Context(), backend.DataQuery{JSON: queryJSON})
+		return ctx
+	}
+
+	for protoName, protocol := range Protocols {
+		conn := setupConnection(t, protocol, nil)
+		defer func() { _ = conn.Close() }()
+		readFilters := func(t *testing.T, ctx context.Context, sql string) map[string]string {
+			var got map[string]string
+			require.NoError(t, conn.QueryRowContext(ctx, sql).Scan(&got))
+			return got
+		}
+		count := func(t *testing.T, ctx context.Context, sql string) uint64 {
+			var got uint64
+			require.NoError(t, conn.QueryRowContext(ctx, sql).Scan(&got))
+			return got
+		}
+
+		for name, setting := range cases {
+			t.Run(protoName+"/"+name, func(t *testing.T) {
+				// The clause exactly as AdHocFilter.apply appends it.
+				fromClause := readFilters(t, t.Context(), "SELECT getSetting('additional_table_filters')\nsettings additional_table_filters="+setting)
+				fromSetting := readFilters(t, withSetting(t, setting), "SELECT getSetting('additional_table_filters')")
+				assert.Equal(t, fromClause, fromSetting)
+			})
+		}
+
+		t.Run(protoName+"/unescapes the outer layer only", func(t *testing.T) {
+			got := readFilters(t, withSetting(t, cases["quote"]), "SELECT getSetting('additional_table_filters')")
+			assert.Equal(t, map[string]string{"otel.logs": ` ServiceName = 'it\'s' `}, got)
+		})
+
+		t.Run(protoName+"/filters rows", func(t *testing.T) {
+			sql := "SELECT count() FROM system.one"
+			assert.Equal(t, uint64(1), count(t, withSetting(t, `{'system.one' : ' dummy = \'0\' '}`), sql))
+			assert.Equal(t, uint64(0), count(t, withSetting(t, `{'system.one' : ' dummy = \'1\' '}`), sql))
+		})
+
+		t.Run(protoName+"/works with a SETTINGS clause in the query", func(t *testing.T) {
+			ctx := withSetting(t, `{'system.one' : ' dummy = \'1\' '}`)
+			assert.Equal(t, uint64(0), count(t, ctx, "SELECT count() FROM system.one SETTINGS max_threads=1"))
+		})
+
+		t.Run(protoName+"/additional_table_filters in the query takes precedence", func(t *testing.T) {
+			ctx := withSetting(t, `{'system.one' : ' dummy = \'1\' '}`)
+			sql := "SELECT count() FROM system.one SETTINGS additional_table_filters={'system.one' : 'dummy = 0'}"
+			assert.Equal(t, uint64(1), count(t, ctx, sql))
+		})
+	}
+}

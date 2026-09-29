@@ -90,6 +90,12 @@ export default {
           tooltip:
             'Show only column names in ad hoc filter keys instead of the full "table.column" format. This simplifies the filter interface when working with schemas that have many tables. Defaults to false.',
         },
+        adHocFiltersAsQuerySetting: {
+          label: 'Send ad hoc filters as a query setting',
+          testid: 'data-testid adhoc-filters-as-query-setting-switch',
+          tooltip:
+            'Send ad hoc filters as the additional_table_filters query setting instead of appending a SETTINGS clause to the SQL. The SQL sent to ClickHouse stays exactly as written. Does not affect the $__adHocFilters macro. Defaults to false.',
+        },
       },
       HttpHeadersConfig: {
         title: 'HTTP Headers',

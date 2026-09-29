@@ -459,6 +459,44 @@ describe('AdHocManager', () => {
     expect(result).toContain('ResourceAttributes.`cloud`.`region`::Nullable(String)');
   });
 
+  describe('buildSetting', () => {
+    const filters = [{ key: 'k', operator: '=', value: "it's" }] as AdHocVariableFilter[];
+
+    it('returns the additional_table_filters map value for the query', () => {
+      const ahm = new AdHocFilter();
+      expect(ahm.buildSetting('SELECT * FROM default.tbl', filters)).toEqual(
+        `{'default.tbl' : ' k = \\'it\\\\\\'s\\' '}`
+      );
+    });
+
+    it('is exactly what apply appends', () => {
+      const ahm = new AdHocFilter();
+      for (const sql of [
+        'SELECT * FROM default.tbl',
+        'SELECT * FROM default.tbl;',
+        'SELECT * FROM default.tbl -- note',
+        'SELECT * FROM default.tbl SETTINGS max_threads=1',
+      ]) {
+        const setting = ahm.buildSetting(sql, filters);
+        expect(ahm.apply(sql, filters)).toEqual(
+          `${sql.replace(/;\s*$/, '')}\nsettings additional_table_filters=${setting}`
+        );
+      }
+    });
+
+    it('returns null when no filter applies', () => {
+      const ahm = new AdHocFilter();
+      expect(ahm.buildSetting('', filters)).toBeNull();
+      expect(ahm.buildSetting('SELECT * FROM default.tbl', [])).toBeNull();
+      expect(
+        ahm.buildSetting('SELECT * FROM default.tbl', [{ key: '', operator: '=', value: 'v' }] as AdHocVariableFilter[])
+      ).toBeNull();
+
+      ahm.setTargetTableFromQuery('SELECT * FROM other');
+      expect(ahm.buildSetting('SELECT * FROM default.tbl', filters)).toBeNull();
+    });
+  });
+
   describe('buildFilterString', () => {
     it('builds filter string with single filter', () => {
       const ahm = new AdHocFilter();

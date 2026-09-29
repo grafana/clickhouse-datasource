@@ -66,6 +66,13 @@ export interface CHConfig extends DataSourceJsonData {
   hideTableNameInAdhocFilters?: boolean;
 
   /**
+   * Send ad hoc filters as the per-query `additional_table_filters` setting
+   * instead of appending a SETTINGS clause to the SQL. The SQL text is left
+   * unchanged. Defaults to false.
+   */
+  adHocFiltersAsQuerySetting?: boolean;
+
+  /**
    * Controls the Map-column key discovery probe that populates the filter-key
    * dropdown for `Map(...)` columns. The probe issues
    * `SELECT DISTINCT arrayJoin(mapKeys(col)) FROM db.table LIMIT 1000` and can be

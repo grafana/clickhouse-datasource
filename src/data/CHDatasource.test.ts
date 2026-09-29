@@ -437,6 +437,53 @@ describe('ClickHouseDatasource', () => {
       );
     });
 
+    describe('ad hoc filters as a query setting', () => {
+      const adHocFilters = [{ key: 'column', operator: '=', value: 'value' }];
+      const expectedSetting = `{'test_db.test_table' : ' column = \\'value\\' '}`;
+
+      const run = (rawSql: string, asSetting: boolean, extra: Partial<CHQuery> = {}) => {
+        jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+        jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+        const ds = createInstance({});
+        ds.settings.jsonData.adHocFiltersAsQuerySetting = asSetting;
+        const query = { refId: 'A', rawSql, editorType: EditorType.SQL, ...extra } as CHQuery;
+        return ds.applyTemplateVariables(query, {}, adHocFilters);
+      };
+
+      it('rewrites the SQL and sets no field by default', () => {
+        const sql = 'SELECT * FROM test_db.test_table';
+        const result = run(sql, false);
+        expect(result.rawSql).toEqual(`${sql}\nsettings additional_table_filters=${expectedSetting}`);
+        expect(result.adHocFiltersSetting).toBeUndefined();
+      });
+
+      it.each([
+        'SELECT * FROM test_db.test_table',
+        'SELECT * FROM test_db.test_table; -- note',
+        'SELECT * FROM test_db.test_table -- trailing comment',
+        'SELECT * FROM test_db.test_table SETTINGS max_threads=1',
+      ])('leaves the SQL unchanged and carries the setting: %s', (sql) => {
+        const result = run(sql, true);
+        expect(result.rawSql).toEqual(sql);
+        expect(result.adHocFiltersSetting).toEqual(expectedSetting);
+      });
+
+      it('keeps the inline macro expansion and sets no field', () => {
+        const sql = "SELECT * FROM test_db.test_table settings $__adHocFilters('test_db.test_table')";
+        const result = run(sql, true);
+        expect(result.rawSql).toEqual(
+          "SELECT * FROM test_db.test_table settings additional_table_filters={'test_db.test_table': ' column = \\'value\\' '}"
+        );
+        expect(result.adHocFiltersSetting).toBeUndefined();
+      });
+
+      it('drops a value already present on the query', () => {
+        const stale = { adHocFiltersSetting: "{'test_db.test_table' : ' stale = 1 '}" };
+        expect(run('SELECT * FROM test_db.test_table', false, stale).adHocFiltersSetting).toBeUndefined();
+        expect(run('SELECT * FROM test_db.test_table', true, stale).adHocFiltersSetting).toEqual(expectedSetting);
+      });
+    });
+
     describe('span link trace retarget (#1889)', () => {
       const originalTraceId = 'a55d8be622a816047a902c60adedd776';
       const linkedTraceId = '4ea6a6e0d0525ed05ecc350d3cdd66b6';

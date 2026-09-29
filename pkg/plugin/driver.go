@@ -621,10 +621,30 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		// and a type error on this one field must not cost the timezone
 		// handling below. A value that is not a string simply applies no floor.
 		MinInterval json.RawMessage `json:"minInterval"`
+		// additional_table_filters map value built by the frontend from the
+		// dashboard's ad hoc filters when "Send ad hoc filters as a query
+		// setting" is enabled. Decoded leniently like minInterval.
+		AdHocFiltersSetting json.RawMessage `json:"adHocFiltersSetting"`
 	}
 
 	if err := json.Unmarshal(req.JSON, &dataQuery); err != nil {
 		return ctx, req
+	}
+
+	var adHocFiltersSetting string
+	if len(dataQuery.AdHocFiltersSetting) > 0 {
+		// Ignore the error: a non-string leaves the value empty, which applies
+		// no filter.
+		_ = json.Unmarshal(dataQuery.AdHocFiltersSetting, &adHocFiltersSetting)
+	}
+
+	if adHocFiltersSetting != "" {
+		// WithSettings replaces the per-query settings on ctx. Nothing earlier
+		// in the pipeline sets any, and the datasource's own settings live on
+		// the connection, which clickhouse-go sends alongside these.
+		ctx = clickhouse.Context(ctx, clickhouse.WithSettings(clickhouse.Settings{
+			"additional_table_filters": adHocFiltersSetting,
+		}))
 	}
 
 	var minIntervalValue string

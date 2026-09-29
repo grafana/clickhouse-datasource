@@ -75,9 +75,15 @@ export class AdHocFilter {
     return this._mapColumns;
   }
 
-  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  /**
+   * Build the `additional_table_filters` map value (`{'<table>' : '<filters>'}`)
+   * for this query, or null when no filter applies to it. The SQL is only read,
+   * never changed, so the value can be appended as a SETTINGS clause (apply) or
+   * sent as a per-query setting.
+   */
+  buildSetting(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string | null {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
-      return sql;
+      return null;
     }
 
     // Resolve the target table for THIS query. An explicit target set via
@@ -90,7 +96,7 @@ export class AdHocFilter {
     const targetTable = explicitTarget ? this._targetTable : getTable(sql);
 
     if (targetTable === '') {
-      return sql;
+      return null;
     }
 
     // Only re-check that the target appears in this query for an explicit
@@ -100,12 +106,20 @@ export class AdHocFilter {
     // "default"."table" or `default`.`table`) and the name is regex-escaped so a
     // name with regex metacharacters (e.g. `a[b`) neither throws nor mismatches.
     if (explicitTarget && !sql.replace(/["`]/g, '').match(new RegExp(`.*\\b${escapeRegExp(targetTable)}\\b.*`, 'gi'))) {
-      return sql;
+      return null;
     }
 
     const filters = this.buildFilterString(adHocFilters, useJSON);
 
     if (filters === '') {
+      return null;
+    }
+    return `{'${targetTable}' : '${filters}'}`;
+  }
+
+  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+    const setting = this.buildSetting(sql, adHocFilters, useJSON);
+    if (setting === null) {
       return sql;
     }
     // Strip only a trailing semicolon before appending the settings clause. A
@@ -114,7 +128,7 @@ export class AdHocFilter {
     sql = sql.replace(/;\s*$/, '');
     // Append on a new line so a trailing line comment (`-- ...`) cannot swallow
     // the settings clause and silently drop the filter.
-    return `${sql}\nsettings additional_table_filters={'${targetTable}' : '${filters}'}`;
+    return `${sql}\nsettings additional_table_filters=${setting}`;
   }
 }
 

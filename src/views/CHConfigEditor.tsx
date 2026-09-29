@@ -150,6 +150,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       | 'forwardGrafanaHeaders'
       | 'enableRowLimit'
       | 'hideTableNameInAdhocFilters'
+      | 'adHocFiltersAsQuerySetting'
     >,
     value: boolean
   ) => {
@@ -921,6 +922,18 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 data-testid={labels.hideTableNameInAdhocFilters.testid}
                 onChange={(e) => {
                   onSwitchToggle('hideTableNameInAdhocFilters', e.currentTarget.checked);
+                }}
+              />
+            </Field>
+            <Field
+              label={labels.adHocFiltersAsQuerySetting.label}
+              description={labels.adHocFiltersAsQuerySetting.tooltip}
+            >
+              <Switch
+                value={jsonData.adHocFiltersAsQuerySetting || false}
+                data-testid={labels.adHocFiltersAsQuerySetting.testid}
+                onChange={(e) => {
+                  onSwitchToggle('adHocFiltersAsQuerySetting', e.currentTarget.checked);
                 }}
               />
             </Field>
