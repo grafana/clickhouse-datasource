@@ -29,7 +29,7 @@ const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 const QUERY_DATA_URL = /\/api\/ds\/query|\/apis\/[^/]+\/v0alpha1\/namespaces\/[^/]+\/query\b/;
 
 interface QueryDataBody {
-  results?: Record<string, { frames?: Array<{ data?: { values?: unknown[][] } }> }>;
+  results?: Record<string, { status?: number; frames?: Array<{ data?: { values?: unknown[][] } }> }>;
 }
 
 interface ExploreUrlOpts {
@@ -123,16 +123,25 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 // Needs no fixture data, so it runs on Cloud too and exercises the backend there.
 test.describe('Query editor query path', () => {
   test('SELECT 1 returns a single row from the backend', async ({ page }) => {
+    const sql = 'SELECT 1 AS one';
     await page.goto(exploreUrl());
-    await enterSql(page, 'SELECT 1 AS one');
+    await enterSql(page, sql);
+    const runQuery = page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' });
 
-    const responsePromise = page.waitForResponse((r) => QUERY_DATA_URL.test(r.url()));
-    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
-    const response = await responsePromise;
+    // The first queries on Cloud can return no frames while the data source connection warms up.
+    await expect(async () => {
+      const responsePromise = page.waitForResponse(
+        (r) => QUERY_DATA_URL.test(r.url()) && (r.request().postData() ?? '').includes(sql),
+        { timeout: 15_000 }
+      );
+      await runQuery.click();
+      const response = await responsePromise;
 
-    expect(response.status()).toBe(200);
-    const body = (await response.json()) as QueryDataBody;
-    expect(body.results?.A?.frames?.[0]?.data?.values).toEqual([[1]]);
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as QueryDataBody;
+      const result = body.results?.A;
+      expect(result?.frames?.[0]?.data?.values, `query status ${result?.status}`).toEqual([[1]]);
+    }).toPass({ intervals: [1_000, 2_000, 4_000, 8_000], timeout: 60_000 });
   });
 });
 
