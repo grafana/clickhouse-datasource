@@ -25,6 +25,10 @@ const LOCAL_SINGLE_TRACES_UID = 'clickhouse-e2e-single-traces';
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 
+interface QueryDataBody {
+  results?: Record<string, { frames?: Array<{ data?: { values?: unknown[][] } }> }>;
+}
+
 interface ExploreUrlOpts {
   queryType?: QueryType;
   editorType?: EditorType;
@@ -112,6 +116,22 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
   });
   return { responsePromise, getBody: () => body };
 }
+
+// Needs no fixture data, so it runs on Cloud too and exercises the backend there.
+test.describe('Query editor query path', () => {
+  test('SELECT 1 returns a single row from the backend', async ({ page, explorePage }) => {
+    await page.goto(exploreUrl());
+    await enterSql(page, 'SELECT 1 AS one');
+
+    const responsePromise = explorePage.waitForQueryDataResponse();
+    await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
+    const response = await responsePromise;
+
+    expect(response.status()).toBe(200);
+    const body = (await response.json()) as QueryDataBody;
+    expect(body.results?.A?.frames?.[0]?.data?.values).toEqual([[1]]);
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Rendering tests — verify the query editor UI structure without requiring
