@@ -237,7 +237,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
 }
 
 function escapeValueBasedOnOperator(s: string, operator: string, values?: string[]): string {
-  if (operator === 'IN' || operator === 'NOT IN') {
+  if (operator === 'IN' || operator === 'NOT IN' || operator === '=|' || operator === '!=|') {
     // Build the list from the structured `values` array when Grafana provides it
     // (multi-select), otherwise best-effort split of the legacy joined string.
     // Every element is escaped and re-quoted, so no element can break out of the
@@ -304,6 +304,17 @@ function convertOperatorToClickHouseOperator(operator: string): string {
   }
   if (operator === '!~') {
     return 'NOT REGEXP';
+  }
+  // Grafana's multi-value ad-hoc operators ("Equals any of multiple values" /
+  // "Not equal any of multiple values") send the literal symbols =| / !=|
+  // with a `values` array — same shape as this plugin's own IN / NOT IN, so
+  // map them onto the ClickHouse operator escapeValueBasedOnOperator already
+  // builds a parenthesized list for (see grafana/scenes AdHocFiltersCombobox).
+  if (operator === '=|') {
+    return 'IN';
+  }
+  if (operator === '!=|') {
+    return 'NOT IN';
   }
   return operator;
 }
