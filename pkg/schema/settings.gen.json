@@ -215,10 +215,6 @@
             "type": "string",
             "default": "60"
           },
-          "rowLimit": {
-            "description": "Row Limit",
-            "type": "number"
-          },
           "schemaCacheTTLSeconds": {
             "description": "Controls how long schema-introspection results are considered fresh. Not exposed in the configuration editor; backend defaults it to 60 when unset or \u003c=0.",
             "type": "number",

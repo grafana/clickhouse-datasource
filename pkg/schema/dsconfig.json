@@ -1024,14 +1024,6 @@
       }
     },
     {
-      "id": "jsonData_rowLimit",
-      "key": "rowLimit",
-      "label": "Row Limit",
-      "description": "Row Limit",
-      "valueType": "number",
-      "target": "jsonData"
-    },
-    {
       "id": "jsonData_enableSecureSocksProxy",
       "key": "enableSecureSocksProxy",
       "label": "Enable Secure Socks Proxy",

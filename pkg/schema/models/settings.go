@@ -48,7 +48,6 @@ type ClickHouseSettingsJSON struct {
 	CustomSettings         []CustomSetting `json:"customSettings,omitempty"`
 	EnableSecureSocksProxy bool            `json:"enableSecureSocksProxy,omitempty"`
 	EnableRowLimit         bool            `json:"enableRowLimit,omitempty"`
-	RowLimit               int64           `json:"rowLimit,omitempty"`
 
 	EnableMapKeysDiscovery bool `json:"enableMapKeysDiscovery,omitempty"`
 	EnableSchemaCache      bool `json:"enableSchemaCache,omitempty"`
