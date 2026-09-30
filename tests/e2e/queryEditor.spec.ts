@@ -25,6 +25,9 @@ const LOCAL_SINGLE_TRACES_UID = 'clickhouse-e2e-single-traces';
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 
+// Cloud stacks send queries to the query service API instead of /api/ds/query.
+const QUERY_DATA_URL = /\/api\/ds\/query|\/apis\/[^/]+\/v0alpha1\/namespaces\/[^/]+\/query\b/;
+
 interface QueryDataBody {
   results?: Record<string, { frames?: Array<{ data?: { values?: unknown[][] } }> }>;
 }
@@ -119,11 +122,11 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
 
 // Needs no fixture data, so it runs on Cloud too and exercises the backend there.
 test.describe('Query editor query path', () => {
-  test('SELECT 1 returns a single row from the backend', async ({ page, explorePage }) => {
+  test('SELECT 1 returns a single row from the backend', async ({ page }) => {
     await page.goto(exploreUrl());
     await enterSql(page, 'SELECT 1 AS one');
 
-    const responsePromise = explorePage.waitForQueryDataResponse();
+    const responsePromise = page.waitForResponse((r) => QUERY_DATA_URL.test(r.url()));
     await page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' }).click();
     const response = await responsePromise;
 
