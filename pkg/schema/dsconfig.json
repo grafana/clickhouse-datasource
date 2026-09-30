@@ -138,6 +138,30 @@
       }
     },
     {
+      "id": "jsonData_oauthPassThru",
+      "key": "oauthPassThru",
+      "label": "Forward OAuth Identity",
+      "description": "Authenticate using JWT (ClickHouse Cloud only). When enabled, credentials are only used for health checks.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
+      "id": "jsonData_oauthPassThruAllowFallback",
+      "key": "oauthPassThruAllowFallback",
+      "label": "Allow service account fallback",
+      "description": "Run queries with no signed-in user (alert rules and other backend queries) using the configured username and password instead of failing them; per-user row policies and quotas will not apply. Only applies when Forward OAuth Identity is enabled.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
       "id": "jsonData_tlsSkipVerify",
       "key": "tlsSkipVerify",
       "label": "Skip TLS Verify",
@@ -368,6 +392,19 @@
       }
     },
     {
+      "id": "jsonData_rowCapacityHint",
+      "key": "rowCapacityHint",
+      "label": "Row Capacity Hint",
+      "description": "Expected number of rows per query response. Pre-allocates data frames before scanning to avoid repeated reallocation on large results. Applied to every query, so leave at 0 (disabled) unless queries reliably return a similar, large number of rows. A value larger than the typical result wastes memory.",
+      "valueType": "string",
+      "target": "jsonData",
+      "defaultValue": "0",
+      "ui": {
+        "component": "input",
+        "placeholder": "0"
+      }
+    },
+    {
       "id": "jsonData_validateSql",
       "key": "validateSql",
       "label": "Validate SQL",
@@ -509,6 +546,22 @@
       "section": "logs",
       "label": "Context Columns",
       "description": "Comma separated list of column names to use for identifying a log's source",
+      "valueType": "array",
+      "target": "jsonData",
+      "item": {
+        "valueType": "string"
+      },
+      "ui": {
+        "component": "list",
+        "placeholder": "Column name (enter key to add)"
+      }
+    },
+    {
+      "id": "jsonData_logs_additionalColumns",
+      "key": "additionalColumns",
+      "section": "logs",
+      "label": "Columns",
+      "description": "Columns to show as log fields, in addition to the time, level, and message columns. Each one appears in the Fields list, can be filtered, and can be added as a displayed column. When Use OTel is on, they are added on top of the OTel default columns. Leave empty to add none.",
       "valueType": "array",
       "target": "jsonData",
       "item": {
@@ -1106,7 +1159,12 @@
       "id": "credentials",
       "title": "Credentials",
       "order": 3,
-      "fieldRefs": ["jsonData_username", "secureJsonData_password"]
+      "fieldRefs": [
+        "jsonData_username",
+        "secureJsonData_password",
+        "jsonData_oauthPassThru",
+        "jsonData_oauthPassThruAllowFallback"
+      ]
     },
     {
       "id": "configuration-mode",
@@ -1125,6 +1183,7 @@
         "jsonData_logs_messageColumn",
         "jsonData_logs_selectContextColumns",
         "jsonData_logs_contextColumns",
+        "jsonData_logs_additionalColumns",
         "jsonData_logs_showLogLinks",
         "jsonData_traces_defaultDatabase",
         "jsonData_traces_defaultTable",
@@ -1171,6 +1230,7 @@
         "jsonData_connMaxLifetime",
         "jsonData_maxIdleConns",
         "jsonData_maxOpenConns",
+        "jsonData_rowCapacityHint",
         "jsonData_validateSql",
         "jsonData_enableMapKeysDiscovery"
       ]

@@ -25,7 +25,9 @@ type ClickHouseSettingsJSON struct {
 	TLSAuth           bool `json:"tlsAuth,omitempty"`
 	TLSAuthWithCACert bool `json:"tlsAuthWithCACert,omitempty"`
 
-	Username string `json:"username,omitempty"`
+	Username                   string `json:"username,omitempty"`
+	OAuthPassThru              bool   `json:"oauthPassThru,omitempty"`
+	OAuthPassThruAllowFallback bool   `json:"oauthPassThruAllowFallback,omitempty"`
 
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 	DefaultTable    string `json:"defaultTable,omitempty"`
@@ -35,6 +37,7 @@ type ClickHouseSettingsJSON struct {
 	MaxIdleConns    string `json:"maxIdleConns,omitempty"`
 	MaxOpenConns    string `json:"maxOpenConns,omitempty"`
 	QueryTimeout    string `json:"queryTimeout,omitempty"`
+	RowCapacityHint string `json:"rowCapacityHint,omitempty"`
 	ValidateSQL     bool   `json:"validateSql,omitempty"`
 
 	Logs   LogsConfig   `json:"logs"`
@@ -71,6 +74,7 @@ type LogsConfig struct {
 
 	SelectContextColumns bool     `json:"selectContextColumns,omitempty"`
 	ContextColumns       []string `json:"contextColumns,omitempty"`
+	AdditionalColumns    []string `json:"additionalColumns,omitempty"`
 	ShowLogLinks         bool     `json:"showLogLinks,omitempty"`
 }
 

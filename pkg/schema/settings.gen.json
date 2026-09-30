@@ -130,6 +130,13 @@
           "logs": {
             "type": "object",
             "properties": {
+              "additionalColumns": {
+                "description": "Columns to show as log fields, in addition to the time, level, and message columns. Each one appears in the Fields list, can be filtered, and can be added as a displayed column. When Use OTel is on, they are added on top of the OTel default columns. Leave empty to add none.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "contextColumns": {
                 "description": "Comma separated list of column names to use for identifying a log's source",
                 "type": "array",
@@ -191,6 +198,16 @@
             "type": "string",
             "default": "50"
           },
+          "oauthPassThru": {
+            "description": "Authenticate using JWT (ClickHouse Cloud only). When enabled, credentials are only used for health checks.",
+            "type": "boolean",
+            "default": false
+          },
+          "oauthPassThruAllowFallback": {
+            "description": "Run queries with no signed-in user (alert rules and other backend queries) using the configured username and password instead of failing them; per-user row policies and quotas will not apply. Only applies when Forward OAuth Identity is enabled.",
+            "type": "boolean",
+            "default": false
+          },
           "path": {
             "description": "Additional URL path for HTTP requests",
             "type": "string",
@@ -214,6 +231,11 @@
             "description": "Timeout in seconds for read queries",
             "type": "string",
             "default": "60"
+          },
+          "rowCapacityHint": {
+            "description": "Expected number of rows per query response. Pre-allocates data frames before scanning to avoid repeated reallocation on large results. Applied to every query, so leave at 0 (disabled) unless queries reliably return a similar, large number of rows. A value larger than the typical result wastes memory.",
+            "type": "string",
+            "default": "0"
           },
           "schemaCacheTTLSeconds": {
             "description": "Controls how long schema-introspection results are considered fresh. Not exposed in the configuration editor; backend defaults it to 60 when unset or \u003c=0.",
