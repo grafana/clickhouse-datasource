@@ -43,6 +43,7 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  LinkTable,
   OrderByDirection,
   QueryBuilderOptions,
   StringFilter,
@@ -1089,6 +1090,41 @@ export class Datasource
     return logConfig?.otelEnabled ? logConfig.otelVersion || undefined : undefined;
   }
 
+  /**
+   * Resolves the `$clickhouse_link_traces_table` / `$clickhouse_link_logs_table` dashboard
+   * variable to the table that trace and log data links query. The value is `db.table`, or a
+   * bare database that keeps the signal's configured default table. Returns undefined when the
+   * variable is not defined or names no table.
+   */
+  resolveLinkTable(signal: 'traces' | 'logs', scopedVars?: ScopedVars): LinkTable | undefined {
+    const variable = signal === 'traces' ? '$clickhouse_link_traces_table' : '$clickhouse_link_logs_table';
+    const templateSrv = getTemplateSrv();
+    // A table name can't be a list, so a multi-value or All selection keeps its first value.
+    const firstValue = (value: unknown) => String((Array.isArray(value) ? value[0] : value) ?? '');
+    const raw = templateSrv.replace(variable, scopedVars, firstValue);
+    if (!raw || raw === variable) {
+      return undefined;
+    }
+    // Grafana doesn't expand variables nested in a variable's value (a Constant set to
+    // `${database}.otel_traces`), so expand the result once more. A nested variable the
+    // dashboard doesn't define stays literal, and that names no table.
+    const value = templateSrv.replace(raw, scopedVars, firstValue).trim();
+    if (!value || value.includes('$')) {
+      return undefined;
+    }
+
+    const dot = value.indexOf('.');
+    if (dot !== -1) {
+      const database = value.slice(0, dot);
+      const table = value.slice(dot + 1);
+      return database && table ? { database, table } : undefined;
+    }
+
+    // Only the signal's own default table: the generic default table isn't a trace or logs table.
+    const table = signal === 'traces' ? this.getDefaultTraceTable() : this.getDefaultLogsTable();
+    return table ? { database: value, table } : undefined;
+  }
+
   getDefaultTraceDatabase(): string | undefined {
     return this.settings.jsonData.traces?.defaultDatabase;
   }
@@ -1269,7 +1305,7 @@ export class Datasource
   }
 
   async fetchTables(db?: string): Promise<string[]> {
-    const rawSql = db ? `SHOW TABLES FROM "${db}"` : 'SHOW TABLES';
+    const rawSql = db ? `SHOW TABLES FROM ${escapeIdentifier(db)}` : 'SHOW TABLES';
     return this.fetchData(rawSql);
   }
 
@@ -1457,8 +1493,8 @@ export class Datasource
    * Fetches column suggestions from the table schema.
    */
   async fetchColumnsFromTable(database: string | undefined, table: string): Promise<TableColumn[]> {
-    const prefix = Boolean(database) ? `"${database}".` : '';
-    const rawSql = `DESC TABLE ${prefix}"${table}"`;
+    const prefix = database ? `${escapeIdentifier(database)}.` : '';
+    const rawSql = `DESC TABLE ${prefix}${escapeIdentifier(table)}`;
     const frame = await this.runQuery({ rawSql });
     if (frame.fields?.length === 0) {
       return [];
@@ -1548,8 +1584,8 @@ export class Datasource
 
     const aliasDatabase = matchedEntry.aliasDatabase || targetDatabase || null;
     const aliasTable = matchedEntry.aliasTable;
-    const prefix = Boolean(aliasDatabase) ? `"${aliasDatabase}".` : '';
-    return `${prefix}"${aliasTable}"`;
+    const prefix = aliasDatabase ? `${escapeIdentifier(aliasDatabase)}.` : '';
+    return `${prefix}${escapeIdentifier(aliasTable)}`;
   }
 
   async fetchColumns(database: string | undefined, table: string): Promise<TableColumn[]> {
