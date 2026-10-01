@@ -248,7 +248,7 @@
           "text": "",
           "value": ""
         },
-        "description": "Filter to traces lasting at least this many milliseconds. Leave blank for no minimum.",
+        "description": "Minimum duration in milliseconds. Trace Search Results keeps traces lasting at least this long; the per-service panels keep spans lasting at least this long. Leave blank for no minimum.",
         "hide": 0,
         "label": "Min Duration (ms)",
         "name": "min_duration",
@@ -434,7 +434,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  TraceId,\n  any(ServiceName) AS Service,\n  any(SpanName) AS RootOperation,\n  min(Timestamp) AS Time,\n  max(Duration) AS Duration,\n  count() AS Spans,\n  anyIf(StatusCode, StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Status\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation)\n  AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status)\n  AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY TraceId\nHAVING $__conditionalAll(max(Duration) >= toUInt64($min_duration) * 1000000, $min_duration)\nORDER BY Time DESC\nLIMIT 200",
+          "rawSql": "SELECT\n  TraceId,\n  any(ServiceName) AS Service,\n  any(SpanName) AS RootOperation,\n  min(Timestamp) AS Time,\n  max(Duration) AS Duration,\n  count() AS Spans,\n  anyIf(StatusCode, StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Status\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation)\n  AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status)\n  AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY TraceId\nHAVING $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration)\nORDER BY Time DESC\nLIMIT 200",
           "refId": "A"
         }
       ]
@@ -506,7 +506,7 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  Duration / 1000000 AS duration_ms\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\n  AND cityHash64(SpanId) % 500 = 0\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  Duration / 1000000 AS duration_ms\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\n  AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation)\n  AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status)\n  AND $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration)\n  AND cityHash64(SpanId) % 500 = 0\nORDER BY time",
           "refId": "A"
         }
       ]
@@ -533,7 +533,7 @@
       "targets": [{
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "editorType": "sql",
-        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() AS Spans FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
+        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, count() AS Spans FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration) GROUP BY time ORDER BY time",
         "refId": "A",
         "format": 1
       }]
@@ -560,7 +560,7 @@
       "targets": [{
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "editorType": "sql",
-        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
+        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration) GROUP BY time ORDER BY time",
         "refId": "A",
         "format": 1
       }]
@@ -592,7 +592,7 @@
           },
           "editorType": "sql",
           "format": 0,
-          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  quantile(0.99)(Duration) / 1000000 AS p99_ms\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY time\nORDER BY time",
+          "rawSql": "SELECT\n  toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time,\n  quantile(0.99)(Duration) / 1000000 AS p99_ms\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\n  AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation)\n  AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status)\n  AND $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration)\nGROUP BY time\nORDER BY time",
           "refId": "A"
         }
       ]
@@ -619,7 +619,7 @@
       "targets": [{
         "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
         "editorType": "sql",
-        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, avg(Duration) / 1000000 AS \"Avg Duration\" FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY time ORDER BY time",
+        "rawSql": "SELECT toStartOfInterval(Timestamp, INTERVAL $__interval_s second) AS time, avg(Duration) / 1000000 AS \"Avg Duration\" FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation) AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status) AND $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration) GROUP BY time ORDER BY time",
         "refId": "A",
         "format": 1
       }]
@@ -747,7 +747,7 @@
           },
           "editorType": "sql",
           "format": 1,
-          "rawSql": "SELECT\n  SpanName AS Operation,\n  count() AS Count,\n  countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors,\n  round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \"Error %\",\n  quantile(0.5)(Duration) AS P50,\n  quantile(0.99)(Duration) AS P99,\n  anyIf(if(StatusMessage != '', StatusMessage, SpanAttributes['http.status_code']), StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS \"Top Error\"\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\nGROUP BY Operation\nORDER BY Count DESC\nLIMIT 15",
+          "rawSql": "SELECT\n  SpanName AS Operation,\n  count() AS Count,\n  countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS Errors,\n  round(countIf(StatusCode IN ('Error', 'STATUS_CODE_ERROR')) / count() * 100, 2) AS \"Error %\",\n  quantile(0.5)(Duration) AS P50,\n  quantile(0.99)(Duration) AS P99,\n  anyIf(if(StatusMessage != '', StatusMessage, SpanAttributes['http.status_code']), StatusCode IN ('Error', 'STATUS_CODE_ERROR')) AS \"Top Error\"\nFROM ${database}.otel_traces\nWHERE $__timeFilter(Timestamp)\n  AND ServiceName IN (${service:singlequote}) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search)\n  AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation)\n  AND $__conditionalAll(StatusCode IN (${status:singlequote}), $status)\n  AND $__conditionalAll(Duration >= toUInt64($min_duration) * 1000000, $min_duration)\nGROUP BY Operation\nORDER BY Count DESC\nLIMIT 15",
           "refId": "A"
         }
       ]

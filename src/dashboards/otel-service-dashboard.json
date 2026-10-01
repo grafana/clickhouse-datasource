@@ -880,7 +880,7 @@
             "uid": "${datasource}"
           },
           "editorType": "sql",
-          "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \"Last Seen\" FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName, SpanKind, StatusMessage ORDER BY Count DESC LIMIT 20",
+          "rawSql": "SELECT SpanName AS Operation, SpanKind AS Kind, StatusMessage AS Error, count() AS Count, max(Timestamp) AS \"Last Seen\" FROM ${database}.otel_traces WHERE $__timeFilter(Timestamp) AND ServiceName = ${service:singlequote} AND StatusCode IN ('Error', 'STATUS_CODE_ERROR') AND $__conditionalAll(SpanName IN (${operation:singlequote}), $operation) AND $__conditionalAll(positionCaseInsensitive(SpanName, '$search') > 0, $search) GROUP BY SpanName, SpanKind, StatusMessage ORDER BY Count DESC LIMIT 20",
           "refId": "A",
           "format": 1
         }
