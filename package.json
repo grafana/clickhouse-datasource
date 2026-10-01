@@ -12,6 +12,7 @@
     "e2e:report": "npx playwright show-report",
     "e2e:ui": "npx playwright test --ui",
     "e2e": "playwright test",
+    "e2e:cloud": "playwright test --grep-invert @quarantine",
     "gen-dashboards": "node ./gen-db-dashboards",
     "lint:fix": "npm run lint -- --fix && prettier --write --list-different .",
     "lint": "eslint --cache .",
