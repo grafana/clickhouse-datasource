@@ -57,6 +57,7 @@ type ClickHouseSettingsJSON struct {
 	SchemaCacheTTLSeconds  int  `json:"schemaCacheTTLSeconds,omitempty"`
 
 	HideTableNameInAdhocFilters bool `json:"hideTableNameInAdhocFilters,omitempty"`
+	AdHocFiltersAsQuerySetting  bool `json:"adHocFiltersAsQuerySetting,omitempty"`
 }
 
 // LogsConfig backs the jsonData.logs nested object.
