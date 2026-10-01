@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { getTemplateSrv } from '@grafana/runtime';
 import { SelectableValue } from '@grafana/data';
 import {
   Button,
@@ -11,7 +12,17 @@ import {
   RadioButtonGroup,
   Stack,
 } from '@grafana/ui';
-import { Filter, FilterOperator, TableColumn, NullFilter, TimeUnit, ColumnHint, NumberFilter } from 'types/queryBuilder';
+import {
+  Filter,
+  FilterOperator,
+  TableColumn,
+  NullFilter,
+  TimeUnit,
+  ColumnHint,
+  NumberFilter,
+  SelectedColumn,
+  QueryType,
+} from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
 import { styles } from 'styles';
@@ -20,6 +31,7 @@ import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
 import { getFilterOperatorsByType } from './filterOperatorOptions';
 import { DurationFilterInput } from './DurationFilterInput';
+import { getFilters } from 'data/sqlGenerator';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -84,6 +96,9 @@ const FilterValueNumberItem = (props: { value: number; onChange: (value: number)
   );
 };
 
+/** Suggested values for a typed search, most relevant first. */
+type ValueSuggester = (search: string) => Promise<string[]>;
+
 const FilterValueSingleStringItem = (props: { value: string; onChange: (value: string) => void }) => {
   return (
     <div data-testid="query-builder-filters-single-string-value-container">
@@ -93,6 +108,67 @@ const FilterValueSingleStringItem = (props: { value: string; onChange: (value: s
         defaultValue={props.value}
         width={70}
         onBlur={(e) => props.onChange(e.currentTarget.value)}
+      />
+    </div>
+  );
+};
+
+/** Typed text still in the dropdown's input when it loses focus, so it isn't dropped like Grafana's Combobox does. */
+const typedOnBlur = (e: React.FocusEvent) => (e.target instanceof HTMLInputElement ? e.target.value.trim() : '');
+
+const SUGGESTION_CACHE_MS = 60_000;
+
+const splitTyped = (text: string) =>
+  text
+    .split(',')
+    .map((v) => v.trim())
+    .filter(Boolean);
+
+/**
+ * Multi-value filter with suggestions. Like the comma-separated input it replaces, typed text can hold
+ * several values and commits when leaving the field.
+ */
+const FilterValueMultiSuggestItem = (props: {
+  value: string[];
+  onChange: (value: string[]) => void;
+  suggest: ValueSuggester;
+}) => {
+  const wrapper = useRef<HTMLDivElement>(null);
+  // Grafana's MultiCombobox keeps the search text after a selection; that text is consumed, not a value.
+  const consumed = useRef('');
+  const values = (props.value || []).filter(Boolean);
+  const typedText = () => wrapper.current?.querySelector('input')?.value.trim() ?? '';
+  const loadOptions = async (input: string) => (await props.suggest(input)).map((value) => ({ label: value, value }));
+  return (
+    <div
+      ref={wrapper}
+      data-testid="query-builder-filters-multi-string-value-container"
+      onBlurCapture={(e) => {
+        // Focus moving inside the field (e.g. to a pill's remove button) isn't leaving it.
+        if (e.relatedTarget instanceof Node && wrapper.current?.contains(e.relatedTarget)) {
+          return;
+        }
+        const typed = typedOnBlur(e);
+        if (typed && typed !== consumed.current) {
+          props.onChange([...new Set([...values, ...splitTyped(typed)])]);
+        }
+        consumed.current = '';
+      }}
+    >
+      <MultiCombobox
+        value={values}
+        options={loadOptions}
+        onChange={(options) => {
+          const typed = typedText();
+          consumed.current = typed;
+          // Only a value created from the typed text is split on commas; picked values are kept as they are.
+          const next = options.flatMap((o) => (typed && o.value === typed ? splitTyped(o.value) : [o.value]));
+          props.onChange([...new Set(next)]);
+        }}
+        createCustomValue
+        // A numeric width is read as pixels when fitting pills, so let it measure the field.
+        width="auto"
+        minWidth={70}
       />
     </div>
   );
@@ -118,8 +194,10 @@ export const FilterValueEditor = (props: {
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
   durationFilterContext?: DurationFilterContext;
+  /** Suggests the column's values for `=`, `!=`, `IN` and `NOT IN`; typed values are still accepted. */
+  suggestValues?: ValueSuggester;
 }) => {
-  const { filter, onFilterChange, allColumns: fieldsList, durationFilterContext } = props;
+  const { filter, onFilterChange, allColumns: fieldsList, durationFilterContext, suggestValues } = props;
   const getOptions = () => {
     const matchedFilter = fieldsList.find((f) => f.name === filter.key);
     return matchedFilter?.picklistValues || [];
@@ -196,6 +274,31 @@ export const FilterValueEditor = (props: {
       );
     }
 
+    if (suggestValues && (filter.operator === FilterOperator.Equals || filter.operator === FilterOperator.NotEquals)) {
+      const loadOptions = async (input: string) =>
+        (await suggestValues(input)).map((value) => ({ label: value, value }));
+      return (
+        <div
+          data-testid="query-builder-filters-single-string-value-container"
+          onBlurCapture={(e) => {
+            const typed = typedOnBlur(e);
+            if (typed && typed !== filter.value) {
+              onStringFilterValueChange(typed);
+            }
+          }}
+        >
+          <Combobox
+            value={filter.value || null}
+            options={loadOptions}
+            onChange={(option) => onStringFilterValueChange(option?.value ?? '')}
+            createCustomValue
+            isClearable
+            width={70}
+          />
+        </div>
+      );
+    }
+
     return (
       <FilterValueSingleStringItem
         value={filter.value}
@@ -219,10 +322,89 @@ export const FilterValueEditor = (props: {
         </div>
       );
     }
+    if (suggestValues) {
+      return (
+        <FilterValueMultiSuggestItem value={filter.value} onChange={onMultiFilterValueChange} suggest={suggestValues} />
+      );
+    }
     return <FilterValueMultiStringItem value={filter.value} onChange={onMultiFilterValueChange} />;
   } else {
     return <></>;
   }
+};
+
+/**
+ * Suggests the distinct values of the filtered column (for a role filter, the column holding the
+ * role) matching the typed search. When the query has a time role, the lookup is bounded by the
+ * dashboard time range on it, so large tables aren't scanned whole. Exact and prefix matches come
+ * first. Not offered for JSON paths, a Map column without a key, or Array/Tuple/Nested columns.
+ */
+const useValueSuggester = (
+  props: {
+    filter: Filter;
+    datasource: Datasource;
+    database: string;
+    table: string;
+    allColumns: readonly TableColumn[];
+    columns?: readonly SelectedColumn[];
+    otherFilters?: string;
+  },
+  isMapType: boolean,
+  isJSONType: boolean
+): ValueSuggester | undefined => {
+  const { filter, datasource, database, table, allColumns, columns = [], otherFilters } = props;
+  const cache = useRef(new Map<string, { at: number; values: Promise<string[]> }>());
+  const column = filter.hint ? columns.find((c) => c.hint === filter.hint)?.name : filter.key;
+  const columnType = allColumns.find((c) => c.name === column)?.type || filter.type;
+  if (
+    !column ||
+    !database ||
+    !table ||
+    isJSONType ||
+    (isMapType && !filter.mapKey) ||
+    /^(Array|Tuple|Nested)\(/.test(columnType)
+  ) {
+    return undefined;
+  }
+
+  const timeRole =
+    columns.find((c) => c.hint === ColumnHint.FilterTime) || columns.find((c) => c.hint === ColumnHint.Time);
+  const timeColumn = timeRole?.name;
+  const timeColumnType = allColumns.find((c) => c.name === timeColumn)?.type || timeRole?.type;
+
+  return async (search: string) => {
+    const range = (getTemplateSrv() as any)?.timeRange?.raw;
+    const key = JSON.stringify([
+      database,
+      table,
+      column,
+      filter.mapKey,
+      timeColumn,
+      `${range?.from}`,
+      `${range?.to}`,
+      otherFilters,
+      search,
+    ]);
+    let entry = cache.current.get(key);
+    // A relative range moves with time, so cached values expire.
+    if (!entry || Date.now() - entry.at > SUGGESTION_CACHE_MS) {
+      const options = { timeColumn, timeColumnType, search, where: otherFilters };
+      const values = (
+        isMapType
+          ? datasource.fetchDistinctMapValues(column, filter.mapKey!, database, table, options)
+          : datasource.fetchDistinctValues(column, database, table, options)
+      )
+        .then((found) => found.map(String).filter((v) => v !== ''))
+        .catch(() => []);
+      entry = { at: Date.now(), values };
+      cache.current.set(key, entry);
+      // An empty result may be a failed or timed-out lookup: ask again next time.
+      values.then((found) => found.length || cache.current.delete(key));
+    }
+    const needle = search.toLowerCase();
+    const rank = (v: string) => (v.toLowerCase() === needle ? 0 : v.toLowerCase().startsWith(needle) ? 1 : 2);
+    return [...(await entry.values)].sort((a, b) => rank(a) - rank(b));
+  };
 };
 
 export const FilterEditor = (props: {
@@ -235,6 +417,10 @@ export const FilterEditor = (props: {
   database: string;
   table: string;
   durationFilterContext?: DurationFilterContext;
+  /** The query's selected columns, to resolve role filters (e.g. Service Name) and the time column. */
+  columns?: readonly SelectedColumn[];
+  /** SQL condition of the other filters, which narrows this filter's value suggestions. */
+  otherFilters?: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter, durationFilterContext } = props;
   const isMapType = filter.type.startsWith('Map');
@@ -254,6 +440,8 @@ export const FilterEditor = (props: {
   if (filter.mapKey && !subKeyOptions.find((o) => o.value === filter.mapKey)) {
     subKeyOptions.push({ label: filter.mapKey, value: filter.mapKey });
   }
+
+  const suggestValues = useValueSuggester(props, isMapType, isJSONType);
 
   const getFields = () => {
     const values = (filter.restrictToFields || fieldsList).map((f) => {
@@ -334,7 +522,7 @@ export const FilterEditor = (props: {
     newFilter.operator = operator;
     if (utils.isMultiFilter(newFilter)) {
       if (!Array.isArray(newFilter.value)) {
-        newFilter.value = [newFilter.value || ''];
+        newFilter.value = newFilter.value ? [newFilter.value] : [];
       }
     }
     onFilterChange(index, newFilter);
@@ -382,7 +570,13 @@ export const FilterEditor = (props: {
         options={toComboboxOptions(getFilterOperatorsByType(filter.type, isJSONType))}
         onChange={(option) => option && onFilterOperatorChange(option.value)}
       />
-      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} durationFilterContext={durationFilterContext} />
+      <FilterValueEditor
+        filter={filter}
+        onFilterChange={onFilterValueChange}
+        allColumns={fieldsList}
+        durationFilterContext={durationFilterContext}
+        suggestValues={suggestValues}
+      />
       <Button
         data-testid="query-builder-filters-remove-button"
         icon="trash-alt"
@@ -396,6 +590,19 @@ export const FilterEditor = (props: {
   );
 };
 
+const hasValue = (f: Filter) =>
+  !('value' in f) || (Array.isArray(f.value) ? f.value.length > 0 : f.value !== '' && f.value !== undefined);
+
+/** The SQL condition of every filter but the one at `index`, skipping filters not filled in yet. */
+const getOtherFiltersSql = (filters: Filter[], index: number, columns: readonly SelectedColumn[] = []) =>
+  getFilters({
+    database: '',
+    table: '',
+    queryType: QueryType.Table,
+    columns: [...columns],
+    filters: filters.filter((f, i) => i !== index && hasValue(f)),
+  });
+
 export const FiltersEditor = (props: {
   allColumns: readonly TableColumn[];
   filters: Filter[];
@@ -404,8 +611,19 @@ export const FiltersEditor = (props: {
   database: string;
   table: string;
   durationFilterContext?: DurationFilterContext;
+  /** The query's selected columns, to suggest values for role filters and bound them by time. */
+  columns?: readonly SelectedColumn[];
 }) => {
-  const { filters = [], onFiltersChange, allColumns: fieldsList = [], datasource, database, table, durationFilterContext } = props;
+  const {
+    filters = [],
+    onFiltersChange,
+    allColumns: fieldsList = [],
+    datasource,
+    database,
+    table,
+    durationFilterContext,
+    columns,
+  } = props;
   const { label, tooltip, addLabel } = labels.components.FilterEditor;
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
@@ -468,6 +686,8 @@ export const FiltersEditor = (props: {
               database={database}
               table={table}
               durationFilterContext={durationFilterContext}
+              columns={columns}
+              otherFilters={getOtherFiltersSql(filters, index, columns)}
             />
           </InlineField>
         );

@@ -24,7 +24,8 @@ export interface DurationFilterInputProps {
  */
 export const DurationFilterInput = (props: DurationFilterInputProps) => {
   const { value, rawInput, storedUnit, onChange } = props;
-  const initial = rawInput ?? (value ? formatFromStoredUnit(value, storedUnit) : '');
+  // Show a stored 0 too (e.g. the default `> 0` filter); a field the user cleared keeps its empty rawInput.
+  const initial = rawInput ?? (Number.isFinite(value) ? formatFromStoredUnit(value, storedUnit) : '');
   const [text, setText] = useState<string>(initial);
   const [invalid, setInvalid] = useState<boolean>(false);
   const { tooltip } = allLabels.components.FilterEditor.durationFilter;
