@@ -1,4 +1,4 @@
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 
 import { defineConfig, devices } from '@playwright/test';
 import type { PluginOptions } from '@grafana/plugin-e2e';
@@ -47,6 +47,9 @@ export default defineConfig<PluginOptions>({
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
     baseURL: process.env.GRAFANA_URL || `http://localhost:${process.env.PORT || 3000}`,
+
+    // plugin-e2e resolves this against the working directory, which scripts/e2e-matrix.js changes per Grafana version.
+    provisioningRootDir: join(__dirname, 'provisioning'),
 
     launchOptions: {
       executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
