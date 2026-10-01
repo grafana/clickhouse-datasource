@@ -167,6 +167,19 @@ WHERE database IN (${database:singlequote})
 
 When one variable’s query uses another variable (cascading variables) and that other variable is multi-value, Grafana often substitutes only the first selected value. Ensure that the first value alone still gives a valid and useful list for the dependent variable.
 
+## Trace and log link tables
+
+When a query result has a `traceID` or `trace_id` field, the data source adds **View trace** and **View logs** links to its values. If the query was built with the query builder for the same signal, the link reuses that query's database and table. Otherwise the link queries the default trace or logs table from the data source settings.
+
+To point the links at a different table on one dashboard, for example when a variable selects the database, add a dashboard variable named `clickhouse_link_traces_table` or `clickhouse_link_logs_table`. Usually it's a hidden **Constant**. Set its value to one of:
+
+- `database.table` (for example, `${database}.otel_traces`) opens that table. Write the names unquoted; the first `.` separates them.
+- A database name opens the default trace or logs table from the data source settings in that database. Without that default table, the variable is ignored.
+
+The value can reference other dashboard variables. Use a single-value variable: a multi-value variable uses its first selected value (with **All** selected, the first option or the custom all value), and a value that references an undefined variable is ignored. The bundled OpenTelemetry dashboards set them to `${database}.otel_traces` and `${database}.otel_logs`, the tables their panels read.
+
+A link opened from the dashboard keeps these tables when you follow further links in Explore, until you point the opened query at another table. The links still use the trace and logs column settings from the data source configuration.
+
 ## Ad hoc filters
 
 Ad hoc filters let you add key/value filters that are applied to queries that use the ClickHouse data source. You choose filter values from a drop-down in the dashboard without editing the query. Ad hoc filters are supported only with **ClickHouse 22.7 or later**. For an overview, see [Grafana ad hoc filters](https://grafana.com/docs/grafana/latest/variables/variable-types/add-ad-hoc-filters/).
