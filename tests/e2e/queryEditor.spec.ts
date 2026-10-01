@@ -25,6 +25,13 @@ const LOCAL_SINGLE_TRACES_UID = 'clickhouse-e2e-single-traces';
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
 const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 
+// Cloud stacks send queries to the query service API instead of /api/ds/query.
+const QUERY_DATA_URL = /\/api\/ds\/query|\/apis\/[^/]+\/v0alpha1\/namespaces\/[^/]+\/query\b/;
+
+interface QueryDataBody {
+  results?: Record<string, { status?: number; frames?: Array<{ data?: { values?: unknown[][] } }> }>;
+}
+
 interface ExploreUrlOpts {
   queryType?: QueryType;
   editorType?: EditorType;
@@ -112,6 +119,31 @@ async function waitForQueryDataResponseWithBody(explorePage: ExplorePage) {
   });
   return { responsePromise, getBody: () => body };
 }
+
+// Needs no fixture data, so it runs on Cloud too and exercises the backend there.
+test.describe('Query editor query path', () => {
+  test('SELECT 1 returns a single row from the backend', async ({ page }) => {
+    const sql = 'SELECT 1 AS one';
+    await page.goto(exploreUrl());
+    await enterSql(page, sql);
+    const runQuery = page.locator('.query-editor-row').getByRole('button', { name: 'Run Query' });
+
+    // The first queries on Cloud can return no frames while the data source connection warms up.
+    await expect(async () => {
+      const responsePromise = page.waitForResponse(
+        (r) => QUERY_DATA_URL.test(r.url()) && (r.request().postData() ?? '').includes(sql),
+        { timeout: 15_000 }
+      );
+      await runQuery.click();
+      const response = await responsePromise;
+
+      expect(response.status()).toBe(200);
+      const body = (await response.json()) as QueryDataBody;
+      const result = body.results?.A;
+      expect(result?.frames?.[0]?.data?.values, `query status ${result?.status}`).toEqual([[1]]);
+    }).toPass({ intervals: [1_000, 2_000, 4_000, 8_000], timeout: 60_000 });
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Rendering tests — verify the query editor UI structure without requiring
