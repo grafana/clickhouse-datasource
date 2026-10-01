@@ -16,9 +16,11 @@ const DIST_DIR = path.join(REPO_ROOT, 'dist');
 const PLAYWRIGHT_BIN = path.join(REPO_ROOT, 'node_modules', '.bin', 'playwright');
 const STACK_MEMORY_BYTES = 2 * 1024 ** 3;
 const GRAFANA_STARTUP_TIMEOUT_MS = 180_000;
-// Set by the Cloud cron workflow and local reproductions of it; they point the suite at another Grafana.
-const CLOUD_RUN_KEYS = new Set([
+// Shell variables that would point the suite at another Grafana or make plugin-e2e misreport its version.
+const FOREIGN_ENV_KEYS = new Set([
   'GRAFANA_URL',
+  'GRAFANA_VERSION',
+  'GRAFANA_IMAGE',
   'DS_INSTANCE_PORT',
   'DS_INSTANCE_USERNAME',
   'DS_INSTANCE_PASSWORD',
@@ -182,7 +184,7 @@ const formatSummary = (results) => {
 
 const log = (message) => console.log(`[e2e-matrix] ${message}`);
 
-const localEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !CLOUD_RUN_KEYS.has(key)));
+const localEnv = Object.fromEntries(Object.entries(process.env).filter(([key]) => !FOREIGN_ENV_KEYS.has(key)));
 const children = new Set();
 const activeStacks = new Set();
 
@@ -272,7 +274,7 @@ const runVersion = async (image, port, options) => {
         cwd: runDir,
         output,
         env: {
-          ...env,
+          ...localEnv,
           PORT: String(port),
           DS_INSTANCE_HOST: 'clickhouse-server',
           PLAYWRIGHT_HTML_OUTPUT_DIR: reportDir,
