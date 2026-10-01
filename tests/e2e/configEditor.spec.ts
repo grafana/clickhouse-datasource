@@ -12,7 +12,7 @@ const isCloudRun = !!process.env.GRAFANA_URL;
 
 function resolveClickhouseUrl(env = process.env) {
   const { CI, DS_INSTANCE_HOST } = env;
-  return CI ? DS_INSTANCE_HOST || 'clickhouse-server' : 'localhost';
+  return DS_INSTANCE_HOST || (CI ? 'clickhouse-server' : 'localhost');
 }
 
 async function configurePDC(page: Page, networkName: string) {
