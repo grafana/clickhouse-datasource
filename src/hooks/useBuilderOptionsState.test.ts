@@ -1,5 +1,4 @@
-import { ColumnHint, QueryType } from 'types/queryBuilder';
-import { defaultCHBuilderQuery } from 'types/sql';
+import { ColumnHint, FilterOperator, OrderByDirection, QueryType } from 'types/queryBuilder';
 import {
   mergeColumns,
   setAllOptions,
@@ -12,6 +11,7 @@ import {
   setQueryType,
   setTable,
   testFuncs,
+  fillMissingRoles,
 } from './useBuilderOptionsState';
 const { reducer, buildInitialState } = testFuncs;
 
@@ -53,63 +53,64 @@ describe('reducer', () => {
     const nextState = reducer(prevState, action);
     expect(nextState.queryType).toEqual(QueryType.TimeSeries);
   });
-  it('applies SetQueryType to reset settings but preserve db/table', async () => {
-    const prevState = buildInitialState({
+  const authoredState = () =>
+    buildInitialState({
       database: 'prev_db',
       table: 'prev_table',
       queryType: QueryType.Table,
-      groupBy: ['will', 'be', 'reset'],
+      columns: [{ name: 'a' }],
+      groupBy: ['a'],
+      filters: [
+        {
+          type: 'string',
+          operator: FilterOperator.Equals,
+          filterType: 'custom',
+          key: 'a',
+          condition: 'AND',
+          value: 'x',
+        },
+      ],
+      orderBy: [{ name: 'a', dir: OrderByDirection.DESC }],
       limit: 50,
+      meta: { otelEnabled: true },
     });
-    const action = setQueryType(QueryType.Logs);
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.database).toEqual('prev_db');
-    expect(nextState.table).toEqual('prev_table');
-    expect(nextState.queryType).toEqual(QueryType.Logs);
-    expect(nextState.groupBy).toBeFalsy();
-    expect(nextState.limit).toEqual(50);
+  it('applies SetQueryType keeping the rest of the query', async () => {
+    const prevState = authoredState();
+
+    const nextState = reducer(prevState, setQueryType(QueryType.Logs));
+
+    expect(nextState).toEqual({ ...prevState, queryType: QueryType.Logs });
   });
-  it('applies SetDatabase to reset settings but preserve query type', async () => {
-    const prevState = buildInitialState({
-      database: 'prev_db',
-      table: 'prev_table',
+  it('applies SetDatabase keeping the table and the rest of the query', async () => {
+    const prevState = authoredState();
+
+    const nextState = reducer(prevState, setDatabase('next_db'));
+
+    expect(nextState).toEqual({ ...prevState, database: 'next_db' });
+  });
+  it('fills only roles still empty, and only for the same query type', async () => {
+    const state = buildInitialState({
       queryType: QueryType.Logs,
-      groupBy: ['will', 'be', 'reset'],
-      limit: 50,
+      columns: [{ name: 'msg' }, { name: 't', hint: ColumnHint.Time }],
     });
-    const action = setDatabase('next_db');
+    const roles = [
+      { name: 'ts', hint: ColumnHint.Time },
+      { name: 'msg', hint: ColumnHint.LogMessage },
+    ];
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.database).toEqual('next_db');
-    expect(nextState.table).toEqual('');
-    expect(nextState.queryType).toEqual(QueryType.Logs);
-    expect(nextState.groupBy).toBeFalsy();
-    expect(nextState.limit).toEqual(50);
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, roles)).columns).toEqual([
+      { name: 't', hint: ColumnHint.Time },
+      { name: 'msg', hint: ColumnHint.LogMessage },
+    ]);
+    expect(reducer(state, fillMissingRoles(QueryType.Traces, roles))).toBe(state);
   });
-  it('applies SetTable to reset settings but preserve db/queryType', async () => {
-    const prevState = buildInitialState({
-      database: 'prev_db',
-      table: 'prev_table',
-      queryType: QueryType.Logs,
-      groupBy: ['will', 'be', 'reset'],
-      limit: 50,
-    });
-    const action = setTable('next_table');
+  it('applies SetTable keeping the rest of the query', async () => {
+    const prevState = authoredState();
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.database).toEqual('prev_db');
-    expect(nextState.table).toEqual('next_table');
-    expect(nextState.queryType).toEqual(QueryType.Logs);
-    expect(nextState.groupBy).toBeFalsy();
-    expect(nextState.limit).toEqual(50);
-  });
-  it('falls back to default limit on reset when limit is unset', async () => {
-    const prevState = { ...buildInitialState({ table: 'prev_table' }), limit: undefined };
-    const action = setTable('next_table');
+    const nextState = reducer(prevState, setTable('next_table'));
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.limit).toEqual(defaultCHBuilderQuery.builderOptions.limit);
+    expect(nextState).toEqual({ ...prevState, table: 'next_table' });
   });
   it('applies SetOtelEnabled action', async () => {
     const prevState = buildInitialState({

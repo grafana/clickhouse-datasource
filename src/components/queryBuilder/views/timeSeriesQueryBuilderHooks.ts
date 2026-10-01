@@ -25,6 +25,11 @@ export const useDefaultTimeColumn = (
     didSetDefaultTime.current = false;
   }
 
+  if (timeColumn) {
+    lastTable.current = table;
+    didSetDefaultTime.current = true;
+  }
+
   useEffect(() => {
     if (didSetDefaultTime.current || allColumns.length === 0 || !table) {
       return;
@@ -47,42 +52,39 @@ export const useDefaultTimeColumn = (
   }, [allColumns, table, builderOptionsDispatch]);
 };
 
-// Apply default filters on table change
+export const getDefaultTimeSeriesFilters = (): Filter[] => [
+  {
+    type: 'datetime',
+    operator: FilterOperator.WithInGrafanaTimeRange,
+    filterType: 'custom',
+    key: '',
+    hint: ColumnHint.Time,
+    condition: 'AND',
+  } as DateFilterWithoutValue,
+];
+
+export const getDefaultTimeSeriesOrderBy = (): OrderBy[] => [
+  { name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true },
+];
+
+// Apply default filters to a new query once it has a table; a table change keeps the query's filters
 export const useDefaultFilters = (
   table: string,
   isNewQuery: boolean,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
-  const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
 
   useEffect(() => {
     if (!table || appliedDefaultFilters.current) {
       return;
     }
 
-    const defaultFilters: Filter[] = [
-      {
-        type: 'datetime',
-        operator: FilterOperator.WithInGrafanaTimeRange,
-        filterType: 'custom',
-        key: '',
-        hint: ColumnHint.Time,
-        condition: 'AND',
-      } as DateFilterWithoutValue,
-    ];
-
-    const defaultOrderBy: OrderBy[] = [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.ASC, default: true }];
-
-    lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
-        filters: defaultFilters,
-        orderBy: defaultOrderBy,
+        filters: getDefaultTimeSeriesFilters(),
+        orderBy: getDefaultTimeSeriesOrderBy(),
       })
     );
   }, [table, builderOptionsDispatch]);
