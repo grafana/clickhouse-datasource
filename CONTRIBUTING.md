@@ -117,6 +117,21 @@ likely to hit:
 - `SchemaArtifactInSync` — a `.gen.json` file has drifted. Run `go generate ./pkg/schema/...` and commit the result.
 - `JSONDataMatchesStruct` / `JSONDataTypesMatchStruct` — the schema and `ClickHouseSettingsJSON` disagree on keys or types. Update whichever side is behind.
 - `SecureValuesMatchLoadSettings` — the schema's `secureJsonData` fields and `SecureKeys` disagree.
+#### Test quarantine
+
+When a test defect is identified — a test that fails or flakes due to environment, timing, or selector issues rather than a real product bug — demote it with the `@quarantine` tag:
+
+```ts
+test('the flaky test', { tag: '@quarantine' }, async ({ page }) => {
+  // ...
+});
+```
+
+Quarantined tests are excluded from the Cloud gating run (`npm run e2e:cloud` and the in-Argo bench gate) and run separately in a non-gating quarantine suite. This keeps the release gate green while the defect is tracked.
+
+Re-promote a test by removing `{ tag: '@quarantine' }` once the underlying issue is fixed.
+
+See the [test-signal taxonomy](https://github.com/grafana/data-sources/blob/main/docs/testing/test-signal-taxonomy.md) for the full quarantine policy.
 
 ## Create a pull request
 
