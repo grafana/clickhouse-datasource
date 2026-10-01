@@ -20,12 +20,15 @@ import { styles } from 'styles';
 import { TraceQueryBuilder } from './views/TraceQueryBuilder';
 import {
   BuilderOptionsReducerAction,
+  fillMissingRoles,
   setAllOptions,
   setBuilderMinimized,
   setDatabase,
+  setOptions,
   setQueryType,
   setTable,
 } from 'hooks/useBuilderOptionsState';
+import { getQueryTypeChangeDefaults, guessMissingRoles, needsRoleGuess } from './queryTypeDefaults';
 import TraceIdInput from './TraceIdInput';
 import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
@@ -75,7 +78,23 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
 
   const onDatabaseChange = (database: string) => builderOptionsDispatch(setDatabase(database));
   const onTableChange = (table: string) => builderOptionsDispatch(setTable(table));
-  const onQueryTypeChange = (queryType: QueryType) => builderOptionsDispatch(setQueryType(queryType));
+  const onQueryTypeChange = (queryType: QueryType) => {
+    const defaults = getQueryTypeChangeDefaults(datasource, builderOptions, queryType);
+    builderOptionsDispatch(setQueryType(queryType));
+    builderOptionsDispatch(setOptions(defaults));
+
+    // Roles still empty are guessed from the table's column names, once those are fetched. A query
+    // moving to the default table has its configured roles, and a new one gets the builder defaults.
+    const next = { ...builderOptions, ...defaults, queryType };
+    if (Object.keys(defaults).length && !defaults.table && needsRoleGuess(next, queryType) && next.table) {
+      datasource
+        .getColumnsCached(next.database, next.table)
+        .then((columns) =>
+          builderOptionsDispatch(fillMissingRoles(queryType, guessMissingRoles(next, queryType, columns)))
+        )
+        .catch(() => {});
+    }
+  };
 
   if (builderOptions.meta?.minimized) {
     return (
