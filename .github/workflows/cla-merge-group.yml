@@ -1,0 +1,43 @@
+# cla-assistant posts the required license/cla status only on pull request head
+# commits, so this copies it onto each merge group commit.
+name: CLA status for merge queue
+
+on:
+  merge_group:
+
+permissions: {}
+
+jobs:
+  mirror-cla-status:
+    name: Mirror license/cla
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Copy license/cla from the pull request head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUEUE_REF: ${{ github.event.merge_group.head_ref }}
+          QUEUE_SHA: ${{ github.event.merge_group.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Merge group refs are refs/heads/gh-readonly-queue/<base>/pr-<number>-<base sha>.
+          if [[ ! "$QUEUE_REF" =~ /pr-([0-9]+)-[0-9a-f]+$ ]]; then
+            echo "Unexpected merge group ref: $QUEUE_REF" >&2
+            exit 1
+          fi
+          pr_number="${BASH_REMATCH[1]}"
+
+          pr_head_sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq .head.sha)
+          cla_state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$pr_head_sha/status" \
+            --jq '.statuses[] | select(.context == "license/cla") | .state')
+          if [[ "$cla_state" != success ]]; then
+            cla_state=failure
+          fi
+
+          gh api "repos/$GITHUB_REPOSITORY/statuses/$QUEUE_SHA" \
+            -f state="$cla_state" \
+            -f context=license/cla \
+            -f description="Copied from #$pr_number head commit $pr_head_sha" \
+            -f target_url="$RUN_URL"

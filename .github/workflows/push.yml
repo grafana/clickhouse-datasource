@@ -17,6 +17,7 @@ name: Plugins - CI/CD
 
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main]
 
@@ -29,14 +30,14 @@ concurrency:
 jobs:
   ci:
     name: CI
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
     uses: grafana/plugin-ci-workflows/.github/workflows/ci.yml@ci-cd-workflows/v11.1.1
     permissions:
       contents: read
       id-token: write
     with:
-      # Ensure PR builds produce unique plugin versions.
-      plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
+      # Ensure PR and merge queue builds produce unique plugin versions.
+      plugin-version-suffix: ${{ github.event.pull_request.head.sha || github.sha }}
 
   cicd:
     name: CI/CD
