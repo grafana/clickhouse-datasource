@@ -5,9 +5,12 @@ import { CHQueryEditor } from './views/CHQueryEditor';
 import { CHConfig } from 'types/config';
 import { CHQuery } from 'types/sql';
 import { getAppEvents } from '@grafana/runtime';
+import { initAnalyzer } from 'ch-parser/analyzer';
 import { analyzeQueries, trackClickhouseDashboardLoaded } from 'tracking';
 import pluginJson from './plugin.json';
 import clickhouseVersion from '../package.json';
+
+initAnalyzer().catch((err: unknown) => console.warn('ClickHouse analyzer WASM did not load', err));
 
 export const plugin = new DataSourcePlugin<Datasource, CHQuery, CHConfig>(Datasource)
   .setConfigEditor(ConfigEditor)
