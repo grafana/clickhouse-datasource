@@ -1,14 +1,14 @@
 {
   "name": "clickhouse-datasource",
-  "version": "4.21.3",
+  "version": "4.22.0",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=24",
     "npm": ">=11.16.0"
   },
   "scripts": {
-    "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
-    "dev": "webpack -w -c ./.config/webpack/webpack.config.ts --env development",
+    "build": "webpack -c ./webpack.config.ts --env production",
+    "dev": "webpack -w -c ./webpack.config.ts --env development",
     "e2e:report": "npx playwright show-report",
     "e2e:ui": "npx playwright test --ui",
     "e2e": "playwright test",
