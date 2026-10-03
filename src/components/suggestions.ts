@@ -4,6 +4,7 @@ import { Range } from './sqlProvider';
 import { keywords, TokenType } from 'ch-parser/types';
 import { SqlFunction, TableColumn } from 'types/queryBuilder';
 import { pluginMacros } from 'ch-parser/pluginMacros';
+import { quoteColumnIfUnsafe } from 'data/jsonPath';
 import {
   ClauseType,
   FromQueryNode,
@@ -296,8 +297,15 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database: str
   });
 }
 
+// Backtick-quote the segments that are not plain identifiers, so an inserted
+// JSON path such as payload.`weird key` parses.
+const quoteColumnSegments = (name: string): string => name.split('.').map(quoteColumnIfUnsafe).join('.');
+
 async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string, prefix?: string) {
   const columns = await schema.columns(db, table);
+  // Monaco replaces and scores only the word at the cursor, and `.` ends a word,
+  // so the insert and filter texts start after the last dot of the prefix.
+  const typedSegments = prefix ? prefix.lastIndexOf('.') + 1 : 0;
   return columns
     .map((c) => ({
       label: c.label!,
@@ -305,7 +313,8 @@ async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, t
       sortText: `!!!!${c.label}`,
       detail: c.type,
       documentation: c.type,
-      insertText: prefix && prefix.includes('.') ? c.name.substring(prefix?.length || 0) : c.name,
+      filterText: c.name.substring(typedSegments),
+      insertText: quoteColumnSegments(c.name.substring(typedSegments)),
       range,
     }))
     .filter((c) => !prefix || c.label.toLowerCase().startsWith(prefix.toLowerCase()));
