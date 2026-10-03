@@ -106,6 +106,16 @@ const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
 // Recent-data window used to bound attribute-discovery/value probes on a table
 // with a known time column, so they prune instead of scanning the full column.
 const ADHOC_PROBE_TIME_WINDOW = 'INTERVAL 6 HOUR';
+const VALUE_SUGGESTION_TIMEOUT_S = 5;
+
+/** Options for the query builder's filter value suggestions. */
+export interface DistinctValueOptions {
+  timeColumn?: string;
+  timeColumnType?: string;
+  search?: string;
+  /** SQL condition of the query's other filters, so suggestions match what the query would return. */
+  where?: string;
+}
 
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
@@ -1378,9 +1388,50 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
-  async fetchDistinctValues(column: string, db: string, table: string): Promise<Array<string | number | boolean>> {
+  /**
+   * Extra WHERE conditions and settings for a value-suggestion scan: the dashboard time range on
+   * `timeColumn` (falling back to a recent window; without it `SELECT DISTINCT` reads the whole
+   * column), a case-insensitive search on `expr`, and a time cap.
+   */
+  private valueSuggestionClauses(
+    expr: string,
+    options: DistinctValueOptions = {}
+  ): { where: string; settings: string } {
+    let where = '';
+    const { timeColumn, timeColumnType, search, where: otherFilters } = options;
+    if (otherFilters) {
+      where += ` AND (${otherFilters})`;
+    }
+    if (timeColumn) {
+      const tc = escapeIdentifier(timeColumn);
+      // A Date column compares at midnight, so bound it by day.
+      const bound = /^(Nullable\()?Date(32)?\)?$/.test(timeColumnType || '')
+        ? (t: string) => `toDate(${t})`
+        : (t: string) => t;
+      const range = (getTemplateSrv() as any).timeRange;
+      const fromMs = Number(range?.from?.valueOf?.());
+      const toMs = Number(range?.to?.valueOf?.());
+      where +=
+        Number.isFinite(fromMs) && Number.isFinite(toMs)
+          ? ` AND ${tc} >= ${bound(`fromUnixTimestamp(${Math.floor(fromMs / 1000)})`)} AND ${tc} <= ${bound(`fromUnixTimestamp(${Math.ceil(toMs / 1000)})`)}`
+          : ` AND ${tc} >= ${bound(`now() - ${ADHOC_PROBE_TIME_WINDOW}`)}`;
+    }
+    if (search) {
+      where += ` AND positionCaseInsensitiveUTF8(toString(${expr}), '${escapeCHStringLiteral(search)}') > 0`;
+    }
+    // Only max_execution_time: the recommended read-only user may change nothing else (docs/sources/configure.md).
+    return { where, settings: ` SETTINGS max_execution_time=${VALUE_SUGGESTION_TIMEOUT_S}` };
+  }
+
+  async fetchDistinctValues(
+    column: string,
+    db: string,
+    table: string,
+    options?: DistinctValueOptions
+  ): Promise<Array<string | number | boolean>> {
     const escapedColumn = escapeIdentifier(column);
-    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`;
+    const { where, settings } = this.valueSuggestionClauses(escapedColumn, options);
+    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL${where} LIMIT 1000${options ? settings : ''}`;
     return this.fetchData(rawSql);
   }
 
@@ -1388,11 +1439,14 @@ export class Datasource
     mapColumn: string,
     mapKey: string,
     db: string,
-    table: string
+    table: string,
+    options?: DistinctValueOptions
   ): Promise<Array<string | number | boolean>> {
     const escapedMapColumn = escapeIdentifier(mapColumn);
     const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
-    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
+    const expr = `${escapedMapColumn}[${escapedMapKey}]`;
+    const { where, settings } = this.valueSuggestionClauses(expr, options);
+    const rawSql = `SELECT DISTINCT ${expr} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey})${where} LIMIT 1000${options ? settings : ''}`;
     return this.fetchData(rawSql);
   }
 

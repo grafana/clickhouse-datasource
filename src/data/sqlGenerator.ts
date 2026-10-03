@@ -858,7 +858,7 @@ const getLimit = (limit?: number | undefined): string => {
 /**
  * Returns the filters in the WHERE clause, excluding the "WHERE" keyword
  */
-const getFilters = (options: QueryBuilderOptions): string => {
+export const getFilters = (options: QueryBuilderOptions): string => {
   const filters = options.filters || [];
   const builtFilters: string[] = [];
 

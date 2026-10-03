@@ -106,6 +106,7 @@ export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
         datasource={datasource}
         database={builderOptions.database}
         table={builderOptions.table}
+        columns={builderOptions.columns}
       />
     </div>
   );
