@@ -36,7 +36,7 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 
 **In SQL mode:**
 
-- **SQL editor**: A code editor where you write ClickHouse SQL. It provides schema suggestions (databases, tables, columns) as you type. If SQL validation is enabled in the data source settings, the editor marks invalid syntax.
+- **SQL editor**: A code editor where you write ClickHouse SQL. It provides schema suggestions (databases, tables, columns, and the paths inside `JSON` columns) as you type. If SQL validation is enabled in the data source settings, the editor marks invalid syntax.
 - **Format code**: Use the editor toolbar to format your SQL.
 - **Query type**: Select **Table**, **Logs**, **Time series**, or **Traces** so the panel uses the correct visualization.
 

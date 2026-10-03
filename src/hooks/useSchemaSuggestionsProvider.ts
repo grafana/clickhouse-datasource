@@ -1,13 +1,12 @@
 import { Schema } from 'components/suggestions';
 import { Datasource } from 'data/CHDatasource';
 import { useRef } from 'react';
-import { SqlFunction, TableColumn } from 'types/queryBuilder';
+import { SqlFunction } from 'types/queryBuilder';
 
 export interface SchemaCache {
   functions: SqlFunction[] | null;
   databases: string[] | null;
   tables: Map<string, string[]>;
-  columns: Map<string, TableColumn[]>;
 }
 
 function defaultSchemaCache(): SchemaCache {
@@ -15,7 +14,6 @@ function defaultSchemaCache(): SchemaCache {
     functions: null,
     databases: null,
     tables: new Map<string, string[]>(),
-    columns: new Map<string, TableColumn[]>(),
   };
 }
 
@@ -60,24 +58,11 @@ export function useSchemaSuggestionsProvider(datasource: Datasource): Schema {
     return cache.current.tables.get(db)!;
   }
 
-  async function fetchColumns(db: string, table: string) {
-    const key = `${db || ''}.${table || ''}`;
-
-    if (!cache.current.columns.has(key)) {
-      const columns = await datasource.fetchColumnsFromTable(db, table);
-      cache.current.columns.set(key, columns);
-
-      return columns;
-    }
-
-    return cache.current.columns.get(key)!;
-  }
-
   return {
     functions: fetchFunctions,
     databases: fetchDatabases,
     tables: fetchTables,
-    columns: fetchColumns,
+    columns: (db, table) => datasource.getEditorColumnsCached(db, table),
     defaultDatabase: datasource.getDefaultDatabase(),
   };
 }

@@ -189,7 +189,7 @@ Use **Single source** when the data source is dedicated to one logs or traces ta
 | **Validate SQL**             | When enabled, validates SQL syntax in the query editor.                                                                                                                                                                                                                                                                                                |
 | **Enable row limit**         | The plugin always limits query results to the Grafana row limit setting (default `1000000` rows). When enabled, the plugin also applies the limit on the ClickHouse server, so excess rows are not sent over the network.                                                                                                                               |
 | **Row Capacity Hint**        | Optional expected row count for pre-allocating result frames. When set, the plugin pre-sizes each response frame to this many rows, which avoids repeated memory allocation on large results. Leave at `0` (the default, disabled) unless queries from this data source reliably return a similar, large number of rows. A value larger than the typical result wastes memory. Values above `1000000` are clamped. |
-| **Suggest Map keys in filter editor** | When enabled, the filter editor probes `Map(...)` columns for distinct keys to populate key suggestions. On large tables with high-cardinality maps this probe can scan a very large number of rows, so disable it to suppress the probe (you can still type Map keys manually). Default: enabled.                                              |
+| **Suggest Map keys and JSON paths** | When enabled, the filter editor probes `Map(...)` and `JSON` columns for distinct keys and paths, and the SQL editor suggests the paths inside `JSON` columns. Each JSON path lookup reads a sample of at most 100,000 rows. On large tables with high-cardinality maps or JSON these probes can read many rows, so disable it to suppress them (you can still type Map keys and JSON paths manually). Default: enabled. |
 
 ### Custom ClickHouse settings
 
@@ -356,7 +356,7 @@ datasources:
       # validateSql: <bool>
       # enableRowLimit: <bool>
       # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled, max 1000000)
-      # enableMapKeysDiscovery: <bool>  # probe Map columns for filter-editor key suggestions (default true)
+      # enableMapKeysDiscovery: <bool>  # probe Map and JSON columns for key and path suggestions (default true)
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
       # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
