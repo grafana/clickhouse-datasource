@@ -37,7 +37,7 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 			},
 		}
 
-		err := mergeOpenTelemetryLabels(frame)
+		err := mergeOpenTelemetryLabels(frame, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(frame.Fields))
 		assert.Equal(t, "other", frame.Fields[0].Name)
@@ -66,7 +66,7 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 				data.NewField("ResourceAttributes", nil, []json.RawMessage{json.RawMessage(`{"foo":"bar"}`)}),
 			},
 		}
-		err := mergeOpenTelemetryLabels(frame)
+		err := mergeOpenTelemetryLabels(frame, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(frame.Fields))
 		assert.Equal(t, "labels", frame.Fields[0].Name) // Should not modify fields
@@ -76,7 +76,7 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 		frame := &data.Frame{
 			Fields: []*data.Field{},
 		}
-		err := mergeOpenTelemetryLabels(frame)
+		err := mergeOpenTelemetryLabels(frame, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(frame.Fields))
 	})
@@ -89,12 +89,66 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 				data.NewField("ScopeAttributes", nil, []int64{1, 2}),
 			},
 		}
-		err := mergeOpenTelemetryLabels(frame)
+		err := mergeOpenTelemetryLabels(frame, nil, nil)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(frame.Fields))
 		assert.Equal(t, "ResourceAttributes", frame.Fields[0].Name)
 		assert.Equal(t, "ScopeAttributes", frame.Fields[1].Name)
 	})
+
+	t.Run("ExtraAttributeColumn", func(t *testing.T) {
+		// A non-OTel JSON column is flattened when named in the settings.
+		frame := &data.Frame{
+			Fields: []*data.Field{
+				data.NewField("JsonBody", nil, []json.RawMessage{json.RawMessage(`{"message":{"status":"200"}}`)}),
+				data.NewField("other", nil, []int64{1}),
+			},
+		}
+		err := mergeOpenTelemetryLabels(frame, []string{"JsonBody"}, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(frame.Fields))
+		assert.Equal(t, "labels", frame.Fields[1].Name)
+
+		labelValue, _ := frame.Fields[1].ConcreteAt(0)
+		var labelsMap map[string]interface{}
+		assert.NoError(t, json.Unmarshal(labelValue.(json.RawMessage), &labelsMap))
+		assert.Equal(t, "200", labelsMap["JsonBody.message.status"])
+	})
+
+	t.Run("ExcludedPaths", func(t *testing.T) {
+		// An excluded subtree is dropped from the flattened labels; siblings and
+		// a path that only shares a name prefix are kept.
+		frame := &data.Frame{
+			Fields: []*data.Field{
+				data.NewField("JsonBody", nil, []json.RawMessage{json.RawMessage(
+					`{"forter":{"email":"a@b.com","score":"9"},"forterId":"keep","status":"200"}`)}),
+			},
+		}
+		err := mergeOpenTelemetryLabels(frame, []string{"JsonBody"}, []string{"JsonBody.forter"})
+		assert.NoError(t, err)
+		assert.Equal(t, "labels", frame.Fields[0].Name)
+
+		labelValue, _ := frame.Fields[0].ConcreteAt(0)
+		var labelsMap map[string]interface{}
+		assert.NoError(t, json.Unmarshal(labelValue.(json.RawMessage), &labelsMap))
+		_, hasEmail := labelsMap["JsonBody.forter.email"]
+		_, hasScore := labelsMap["JsonBody.forter.score"]
+		assert.False(t, hasEmail)
+		assert.False(t, hasScore)
+		assert.Equal(t, "keep", labelsMap["JsonBody.forterId"])
+		assert.Equal(t, "200", labelsMap["JsonBody.status"])
+	})
+}
+
+func TestIsExcludedPath(t *testing.T) {
+	excluded := []string{"JsonBody.forter", "JsonBody.reqHdr.cookie"}
+	assert.True(t, isExcludedPath("JsonBody.forter", excluded))
+	assert.True(t, isExcludedPath("JsonBody.forter.email", excluded))
+	assert.True(t, isExcludedPath("JsonBody.reqHdr.cookie", excluded))
+	assert.False(t, isExcludedPath("JsonBody.forterId", excluded))
+	assert.False(t, isExcludedPath("JsonBody.reqHdr.accEnc", excluded))
+	assert.False(t, isExcludedPath("JsonBody.status", excluded))
+	assert.False(t, isExcludedPath("JsonBody.status", nil))
 }
 
 func TestWarnUnsupportedTimeSeriesFields(t *testing.T) {

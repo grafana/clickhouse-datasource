@@ -133,6 +133,7 @@ describe('buildCompactQueryDefaults', () => {
     mockDs.shouldSelectLogContextColumns = jest.fn(() => false);
     mockDs.getLogContextColumnNames = jest.fn(() => []);
     mockDs.getAdditionalLogColumns = jest.fn(() => []);
+    mockDs.getLogAttributeColumns = jest.fn(() => []);
     return mockDs;
   };
 
@@ -201,9 +202,10 @@ describe('buildCompactQueryDefaults', () => {
 });
 
 describe('appendAdditionalLogColumns', () => {
-  const makeDatasource = (opts: { additional?: string[] }): Datasource => {
+  const makeDatasource = (opts: { additional?: string[]; attribute?: string[] }): Datasource => {
     const ds = {} as Datasource;
     ds.getAdditionalLogColumns = jest.fn(() => opts.additional ?? []);
+    ds.getLogAttributeColumns = jest.fn(() => opts.attribute ?? []);
     return ds;
   };
 
