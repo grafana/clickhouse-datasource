@@ -177,7 +177,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level\nORDER BY Count DESC",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\n  AND $__conditionalAll(SeverityText IN (${level_filter:singlequote}), $level_filter)\nGROUP BY Level\nORDER BY Count DESC",
           "refId": "A",
           "format": 0
         }
@@ -214,7 +214,7 @@
         {
           "datasource": { "type": "grafana-clickhouse-datasource", "uid": "${datasource}" },
           "editorType": "sql",
-          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
+          "rawSql": "SELECT\n  SeverityText AS Level,\n  ServiceName AS Service,\n  replaceRegexpAll(Body, '(userId|orderId|cartId|requestId|traceId|spanId|ctId)=[a-zA-Z0-9-]+', '\\1=…') AS Message,\n  count() AS Count\nFROM ${database}.otel_logs\nWHERE $__timeFilter(Timestamp)\n  AND SeverityText IN ('ERROR', 'WARN', 'FATAL', 'Error', 'Warning', 'error', 'warning', 'fatal', 'CRITICAL')\n  AND $__conditionalAll(ServiceName IN (${service:singlequote}), $service)\n  AND $__conditionalAll(positionCaseInsensitive(Body, '$search') > 0, $search)\n  AND $__conditionalAll(SeverityText IN (${level_filter:singlequote}), $level_filter)\nGROUP BY Level, Service, Message\nORDER BY Count DESC\nLIMIT 20",
           "refId": "A",
           "format": 0
         }
