@@ -69,6 +69,13 @@ export const pluginMacros: PluginMacro[] = [
     example: '20',
   },
   {
+    name: '$__fromGrafanaInterval',
+    isFunction: true,
+    columnType: 'INTERVAL',
+    documentation: 'Converts a Grafana dashboard interval variable to ClickHouse interval syntax',
+    example: '$__fromGrafanaInterval(5m) → 5 minute',
+  },
+  {
     name: '$__timeInterval',
     isFunction: true,
     columnType: 'DateTime',
