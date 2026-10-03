@@ -64,7 +64,13 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { applyMinIntervalToScopedVars } from './queryInterval';
-import { escapeIdentifier, generateSql, getColumnByHint, logAliasToColumnHints } from './sqlGenerator';
+import {
+  escapeIdentifier,
+  generateSql,
+  getColumnByHint,
+  getTableIdentifier,
+  logAliasToColumnHints,
+} from './sqlGenerator';
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
@@ -106,6 +112,7 @@ const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
 // Recent-data window used to bound attribute-discovery/value probes on a table
 // with a known time column, so they prune instead of scanning the full column.
 const ADHOC_PROBE_TIME_WINDOW = 'INTERVAL 6 HOUR';
+const JSON_PATH_SUGGESTION_LIMIT = 5000;
 
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
@@ -1405,52 +1412,67 @@ export class Datasource
   }
 
   /**
-   * Fetches JSON column suggestions for each specified JSON column.
+   * FROM source for a JSON path probe over `column`: a row sample, taken from
+   * the recent window when the table's time column is known.
+   */
+  private jsonPathProbeSource(database: string | undefined, table: string, column: string): string {
+    const tableIdentifier = getTableIdentifier(database ?? '', table);
+    const timeColumn = database ? this.getMapKeyProbeTimeColumn(database, table) : undefined;
+    const window = timeColumn ? ` WHERE ${escapeIdentifier(timeColumn)} >= now() - ${ADHOC_PROBE_TIME_WINDOW}` : '';
+    return `(SELECT ${column} FROM ${tableIdentifier}${window} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE})`;
+  }
+
+  /**
+   * Fetches the paths inside a JSON column as column suggestions, from a bounded
+   * sample of the table. A path seen with more than one type is `Dynamic`.
    */
   async fetchPathsForJSONColumns(
     database: string | undefined,
     table: string,
     jsonColumnName: string
   ): Promise<TableColumn[]> {
-    const prefix = Boolean(database) ? `"${database}".` : '';
-    const rawSql = `SELECT arrayJoin(distinctJSONPathsAndTypes(${jsonColumnName})) FROM ${prefix}"${table}" SETTINGS max_execution_time=10`;
-    const frame = await this.runQuery({ rawSql });
-    if (frame.fields?.length === 0) {
+    if (!this.isMapKeysDiscoveryEnabled()) {
       return [];
     }
-
-    const view = new DataFrameView(frame);
-    const jsonPathsAndTypes: Array<[string, string]> = [];
-    for (let x of view) {
-      if (!x || !x[0]) {
-        continue;
+    const column = escapeIdentifier(jsonColumnName);
+    const source = this.jsonPathProbeSource(database, table, column);
+    // Scalar output columns only: schema probes run without a query format, and
+    // the backend's time-series conversion nulls out an Array(String) column.
+    const rawSql = `SELECT tupleElement(pt, 1) AS path, if(length(tupleElement(pt, 2)) = 1, tupleElement(pt, 2)[1], 'Dynamic') AS type FROM (SELECT arrayJoin(distinctJSONPathsAndTypes(${column})) AS pt FROM ${source}) LIMIT ${JSON_PATH_SUGGESTION_LIMIT}`;
+    const frame = await this.runQuery({ rawSql });
+    const paths: unknown[] = frame.fields.find((f) => f.name === 'path')?.values ?? [];
+    const types: unknown[] = frame.fields.find((f) => f.name === 'type')?.values ?? [];
+    return paths.flatMap((path, i) => {
+      const type = types[i];
+      // A path with an empty segment, such as `a..b`, has no dotted-access spelling.
+      if (typeof path !== 'string' || path.split('.').includes('') || typeof type !== 'string' || !type) {
+        return [];
       }
+      const name = `${jsonColumnName}.${path}`;
+      return [{ name, label: name, type, picklistValues: [] }];
+    });
+  }
 
-      const kv = typeof x[0] === 'string' ? JSON.parse(x[0]) : x[0];
-      if (!kv.keys || !kv.values) {
-        continue;
-      }
-
-      jsonPathsAndTypes.push([kv.keys, kv.values]);
+  /**
+   * Column suggestions for the paths inside each JSON column of `columns`, for
+   * the SQL editor.
+   */
+  async fetchJSONPathColumns(
+    database: string | undefined,
+    table: string,
+    columns: readonly TableColumn[]
+  ): Promise<TableColumn[]> {
+    const jsonColumns = columns.filter((c) => isJSONColumnType(c.type));
+    if (jsonColumns.length === 0 || !this.isMapKeysDiscoveryEnabled()) {
+      return [];
     }
-
-    const columns: TableColumn[] = [];
-    for (let pathAndTypes of jsonPathsAndTypes) {
-      const path = pathAndTypes[0];
-      const types = pathAndTypes[1];
-      if (!path || !types || types.length === 0) {
-        continue;
-      }
-
-      columns.push({
-        name: `${jsonColumnName}.${path}`,
-        label: `${jsonColumnName}.${path}`,
-        type: types[0],
-        picklistValues: [],
-      });
+    const paths: TableColumn[] = [];
+    // One probe at a time: a probe's peak server memory scales with the JSON
+    // width times the read threads, and parallel probes multiply it.
+    for (const c of jsonColumns) {
+      paths.push(...(await this.fetchPathsForJSONColumns(database, table, c.name)));
     }
-
-    return columns;
+    return paths;
   }
 
   /**
@@ -1464,22 +1486,12 @@ export class Datasource
       return [];
     }
     const view = new DataFrameView(frame);
-    const columns: TableColumn[] = view.map((item) => ({
+    return view.map((item) => ({
       name: item[0],
       type: item[1],
       label: item[0],
       picklistValues: [],
     }));
-
-    return columns;
-
-    // TODO: wait for JSON function perf improvements
-    // const results = await Promise.all(
-    //   columns
-    //     .filter((c) => c.type.startsWith('JSON'))
-    //     .map((c) => this.fetchPathsForJSONColumns(database, table, c.name))
-    // );
-    // return [...columns, ...results.flat()];
   }
 
   /**
@@ -1593,6 +1605,28 @@ export class Datasource
       this._columnCache.set(key, await this.fetchColumns(database, table));
     }
     return this._columnCache.get(key)!;
+  }
+
+  private readonly _editorColumnCache = new Map<string, Promise<TableColumn[]>>();
+
+  /**
+   * Columns for the SQL editor's completions: the schema columns plus the paths
+   * inside each JSON column. The pending fetch is cached per table for the
+   * lifetime of the datasource instance, so Monaco's per-keystroke requests and
+   * every mounted editor share one fetch.
+   */
+  getEditorColumnsCached(database: string | undefined, table: string): Promise<TableColumn[]> {
+    const key = this.columnCacheKey(database, table);
+    const pending = this._editorColumnCache.get(key);
+    if (pending) {
+      return pending;
+    }
+    const columns = this.fetchColumnsFromTable(database, table).then(async (schema) => [
+      ...schema,
+      ...(await this.fetchJSONPathColumns(database, table, schema)),
+    ]);
+    this._editorColumnCache.set(key, columns);
+    return columns;
   }
 
   private async fetchData(rawSql: string) {
