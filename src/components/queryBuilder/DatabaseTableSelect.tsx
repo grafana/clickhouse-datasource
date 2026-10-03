@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { MutableRefObject, useEffect, useRef } from 'react';
 import { InlineField, InlineFieldRow, InlineFormLabel, Select } from '@grafana/ui';
 import { Datasource } from '../../data/CHDatasource';
 import labels from 'labels';
@@ -58,10 +58,12 @@ export type TableSelectProps = {
   database: string;
   table: string;
   onTableChange: (value: string) => void;
+  /** Set by a database change in the dropdown: the kept table is replaced if the new database lacks it. */
+  databaseChanged?: MutableRefObject<boolean>;
 };
 
 export const TableSelect = (props: TableSelectProps) => {
-  const { datasource, onTableChange, database, table } = props;
+  const { datasource, onTableChange, database, table, databaseChanged } = props;
   const tables = useTables(datasource, database);
   const { label, tooltip, empty } = labels.components.TableSelect;
 
@@ -74,11 +76,19 @@ export const TableSelect = (props: TableSelectProps) => {
   }
 
   useEffect(() => {
+    if (!database || tables.length === 0) {
+      return;
+    }
+    // useTables empties the list on a database change, so these are the new database's tables.
+    const missing = Boolean(databaseChanged?.current) && Boolean(table) && !tables.includes(table);
+    if (databaseChanged) {
+      databaseChanged.current = false;
+    }
     // Auto select first/default table
-    if (database && !table && tables.length > 0) {
+    if (!table || missing) {
       onTableChange(datasource.getDefaultTable() || tables[0]);
     }
-  }, [database, table, tables, datasource, onTableChange]);
+  }, [database, table, tables, datasource, onTableChange, databaseChanged]);
 
   return (
     <InlineField
@@ -110,11 +120,22 @@ export type DatabaseTableSelectProps = {
 
 export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
   const { datasource, database, onDatabaseChange, table, onTableChange } = props;
+  const databaseChanged = useRef<boolean>(false);
+  const onSelectDatabase = (value: string) => {
+    databaseChanged.current = true;
+    onDatabaseChange(value);
+  };
 
   return (
     <InlineFieldRow>
-      <DatabaseSelect datasource={datasource} database={database} onDatabaseChange={onDatabaseChange} />
-      <TableSelect datasource={datasource} database={database} table={table} onTableChange={onTableChange} />
+      <DatabaseSelect datasource={datasource} database={database} onDatabaseChange={onSelectDatabase} />
+      <TableSelect
+        datasource={datasource}
+        database={database}
+        table={table}
+        onTableChange={onTableChange}
+        databaseChanged={databaseChanged}
+      />
     </InlineFieldRow>
   );
 };

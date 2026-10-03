@@ -244,24 +244,19 @@ export const useDefaultLogColumnsByName = (
   }, [allColumns, table, messageColumn, logLevelColumn, otelEnabled, builderOptionsDispatch]);
 };
 
-// Apply default filters/orderBy on table change
+// Apply default filters to a new query once it has a table; a table change keeps the query's filters
 export const useDefaultFilters = (
   table: string,
   isNewQuery: boolean,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
-  const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
 
   useEffect(() => {
     if (!table || appliedDefaultFilters.current) {
       return;
     }
 
-    lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
