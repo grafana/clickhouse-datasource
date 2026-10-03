@@ -199,6 +199,7 @@ func TestMacroFromGrafanaInterval(t *testing.T) {
 		"250ms": "250 millisecond",
 		"1s":    "1 second",
 		"5m":    "5 minute",
+		"'5m'":  "5 minute",
 		"2h":    "2 hour",
 		"3d":    "3 day",
 		"1w":    "1 week",
@@ -213,7 +214,7 @@ func TestMacroFromGrafanaInterval(t *testing.T) {
 		})
 	}
 
-	for _, input := range []string{"", "0m", "1", "minute", "-1h"} {
+	for _, input := range []string{"", "0m", "1", "minute", "-1h", "1.5h"} {
 		t.Run("rejects_"+input, func(t *testing.T) {
 			_, err := FromGrafanaInterval(ctx, []string{input})
 			require.Error(t, err)
@@ -282,6 +283,7 @@ func TestMacroErrorsAreDownstream(t *testing.T) {
 		{"TimeInterval wrong arity", func() error { _, err := TimeInterval(ctx, nil); return err }},
 		{"TimeIntervalMs wrong arity", func() error { _, err := TimeIntervalMs(ctx, nil); return err }},
 		{"FromGrafanaInterval wrong arity", func() error { _, err := FromGrafanaInterval(ctx, nil); return err }},
+		{"FromGrafanaInterval bad value", func() error { _, err := FromGrafanaInterval(ctx, []string{"1.5h"}); return err }},
 		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, nil); return err }},
 		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, nil); return err }},
 		{"TimeGroup wrong arity", func() error { _, err := TimeGroup(ctx, []string{"ts"}); return err }},
@@ -321,6 +323,7 @@ func TestInterpolate(t *testing.T) {
 
 	tests := []test{
 		{input: "select toStartOfInterval(time, INTERVAL $__fromGrafanaInterval(5m))", output: "select toStartOfInterval(time, INTERVAL 5 minute)", name: "Grafana dashboard interval"},
+		{input: "select toStartOfInterval(time, INTERVAL $__fromGrafanaInterval('5m'))", output: "select toStartOfInterval(time, INTERVAL 5 minute)", name: "quoted Grafana dashboard interval"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter with empty spaces"},
 		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms"},
