@@ -14,6 +14,13 @@
 - Quote ad-hoc filter keys that are not plain identifiers, so a crafted key is read as one (nonexistent) column name instead of being spliced into the `additional_table_filters` predicate. Plain and dotted column names are unchanged (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.22.1](https://github.com/grafana/clickhouse-datasource/compare/v4.22.0...v4.22.1) (2026-10-02)
+
+
+### 🐛 Bug Fixes
+
+* always apply the Grafana row limit to query results ([#2150](https://github.com/grafana/clickhouse-datasource/issues/2150)) ([0637465](https://github.com/grafana/clickhouse-datasource/commit/06374654e7eef755cadbe667eeaab0a1adb36d44))
+
 ## [4.22.0](https://github.com/grafana/clickhouse-datasource/compare/v4.21.3...v4.22.0) (2026-09-30)
 
 
