@@ -1378,9 +1378,30 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
-  async fetchDistinctValues(column: string, db: string, table: string): Promise<Array<string | number | boolean>> {
+  // Autocomplete must not scan the entire retention window of an OTel table.
+  // Preserve historical browsing by preferring the editor's range over the fallback.
+  private getValueSuggestionTimeFilter(db: string, table: string, timeRange?: TimeRange): string {
+    const timeColumn = this.getMapKeyProbeTimeColumn(db, table);
+    if (!timeColumn) {
+      return '';
+    }
+    const column = escapeIdentifier(timeColumn);
+    const from = timeRange?.from?.valueOf();
+    const to = timeRange?.to?.valueOf();
+    if (from !== undefined && to !== undefined && Number.isFinite(from) && Number.isFinite(to) && from <= to) {
+      return ` AND ${column} >= fromUnixTimestamp64Milli(${from}) AND ${column} <= fromUnixTimestamp64Milli(${to})`;
+    }
+    return ` AND ${column} >= now() - ${ADHOC_PROBE_TIME_WINDOW}`;
+  }
+
+  async fetchDistinctValues(
+    column: string,
+    db: string,
+    table: string,
+    timeRange?: TimeRange
+  ): Promise<Array<string | number | boolean>> {
     const escapedColumn = escapeIdentifier(column);
-    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL${this.getValueSuggestionTimeFilter(db, table, timeRange)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
@@ -1388,11 +1409,12 @@ export class Datasource
     mapColumn: string,
     mapKey: string,
     db: string,
-    table: string
+    table: string,
+    timeRange?: TimeRange
   ): Promise<Array<string | number | boolean>> {
     const escapedMapColumn = escapeIdentifier(mapColumn);
     const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
-    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
+    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey})${this.getValueSuggestionTimeFilter(db, table, timeRange)} LIMIT 1000`;
     return this.fetchData(rawSql);
   }
 
