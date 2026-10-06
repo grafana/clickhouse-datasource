@@ -8,7 +8,8 @@ import { CHQuery, CHSqlQuery, EditorType } from 'types/sql';
 import { CHConfig } from 'types/config';
 import { SchemaPicker, SchemaPickerValue } from 'components/queryBuilder/SchemaPicker';
 import useColumns from 'hooks/useColumns';
-import { TableColumn } from 'types/queryBuilder';
+import { QueryType, TableColumn } from 'types/queryBuilder';
+import { mapQueryTypeToGrafanaFormat } from './utils';
 
 /** Annotation preset types. */
 type AnnotationPreset = 'custom' | 'change_detection';
@@ -58,6 +59,7 @@ const buildTarget = (existing: Partial<CHQuery> | undefined, rawSql: string): CH
   editorType: EditorType.SQL,
   rawSql,
   refId: existing?.refId || ANNOTATION_REF_ID,
+  format: mapQueryTypeToGrafanaFormat(QueryType.Table),
 });
 
 /**
@@ -348,8 +350,18 @@ export function createAnnotationSupport(datasource: Datasource): AnnotationSuppo
       // it into the modern target shape once. `rawQuery` is read via the
       // AnnotationQuery index signature, so no cast is needed.
       const legacyRawQuery: string | undefined = json?.rawQuery;
-      const prepared: CHAnnotationQuery =
+      let prepared: CHAnnotationQuery =
         legacyRawQuery && !json?.target?.rawSql ? { ...json, target: buildTarget(json.target, legacyRawQuery) } : json;
+
+      // Annotations must be requested as a table: the backend's default time
+      // series format runs LongToWide on region annotations (time, timeEnd,
+      // text, tags), collapsing text/tags into labels of timeEnd (see #2174).
+      // Annotations saved before the format was set carry none, so backfill it
+      // on load without the user having to re-edit the query.
+      const tableFormat = mapQueryTypeToGrafanaFormat(QueryType.Table);
+      if (prepared?.target && prepared.target.format !== tableFormat) {
+        prepared = { ...prepared, target: { ...prepared.target, format: tableFormat } };
+      }
 
       // Dashboards may carry a preset id unknown to this editor (early
       // bundled dashboards shipped 'deployment_detection'). Migrate it to
@@ -373,6 +385,7 @@ export function createAnnotationSupport(datasource: Datasource): AnnotationSuppo
       editorType: EditorType.SQL,
       rawSql: '',
       refId: ANNOTATION_REF_ID,
+      format: mapQueryTypeToGrafanaFormat(QueryType.Table),
     }),
 
     QueryEditor: AnnotationQueryEditor,
