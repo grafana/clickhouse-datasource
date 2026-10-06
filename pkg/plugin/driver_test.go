@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -576,6 +578,86 @@ func TestMutateQuery_MinIntervalDoesNotBreakTimezone(t *testing.T) {
 
 	assert.Equal(t, 30*time.Second, req.Interval)
 	assert.NotEqual(t, t.Context(), ctx, "timezone should still have been applied to the context")
+}
+
+// sentRequest runs a query with ctx against a fake ClickHouse HTTP endpoint and
+// returns the request clickhouse-go sent, so tests can check which settings and
+// client info the query context carried onto the wire.
+func sentRequest(t *testing.T, ctx context.Context) *http.Request {
+	t.Helper()
+	requests := make(chan *http.Request, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case requests <- r:
+		default:
+		}
+		http.Error(w, "fake server", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	db := clickhouse.OpenDB(&clickhouse.Options{
+		Addr:     []string{server.Listener.Addr().String()},
+		Protocol: clickhouse.HTTP,
+		Settings: clickhouse.Settings{"max_threads": 3},
+	})
+	defer func() { _ = db.Close() }()
+
+	rows, err := db.QueryContext(ctx, "SELECT 1")
+	if err == nil {
+		_ = rows.Close()
+	}
+	select {
+	case r := <-requests:
+		return r
+	default:
+		t.Fatal("no request reached the fake ClickHouse server")
+		return nil
+	}
+}
+
+func TestMutateQuery_AdHocFiltersSetting(t *testing.T) {
+	h := &Clickhouse{}
+	const setting = `{'default.logs' : ' ServiceName = \'it\\\'s\' '}`
+	queryJSON, err := json.Marshal(map[string]any{"adHocFiltersSetting": setting})
+	require.NoError(t, err)
+
+	t.Run("sends the value as the additional_table_filters setting", func(t *testing.T) {
+		ctx, _ := h.MutateQuery(t.Context(), backend.DataQuery{JSON: queryJSON})
+
+		q := sentRequest(t, ctx).URL.Query()
+		assert.Equal(t, setting, q.Get("additional_table_filters"))
+		assert.Equal(t, "3", q.Get("max_threads"), "connection settings must be kept")
+	})
+
+	t.Run("keeps the Grafana metadata and timezone on the context", func(t *testing.T) {
+		ctx := context.WithValue(t.Context(), grafanaHeadersKey, grafanaHeaders{DashboardUID: "dash-1"})
+		withTimezone, err := json.Marshal(map[string]any{
+			"adHocFiltersSetting": setting,
+			"meta":                map[string]any{"timezone": "Europe/Lisbon"},
+		})
+		require.NoError(t, err)
+
+		ctx, _ = h.MutateQuery(ctx, backend.DataQuery{JSON: withTimezone})
+
+		r := sentRequest(t, ctx)
+		assert.Equal(t, setting, r.URL.Query().Get("additional_table_filters"))
+		assert.Contains(t, r.Header.Get("User-Agent"), "grafana_dashboard:dash-1")
+	})
+
+	for name, body := range map[string]string{
+		"absent":    `{}`,
+		"empty":     `{"adHocFiltersSetting":""}`,
+		"not text":  `{"adHocFiltersSetting":{"default.logs":"x = 1"}}`,
+		"null":      `{"adHocFiltersSetting":null}`,
+		"a number":  `{"adHocFiltersSetting":1}`,
+		"no filter": `{"minInterval":"5m"}`,
+	} {
+		t.Run("sets nothing when the value is "+name, func(t *testing.T) {
+			ctx, _ := h.MutateQuery(t.Context(), backend.DataQuery{JSON: []byte(body)})
+
+			assert.False(t, sentRequest(t, ctx).URL.Query().Has("additional_table_filters"))
+		})
+	}
 }
 
 func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
