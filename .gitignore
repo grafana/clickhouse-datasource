@@ -35,6 +35,7 @@ test_summary.json
 pkg/__debug_bin
 
 **/.DS_Store
+.directory
 .eslintcache
 /test-results/
 /playwright-report/
