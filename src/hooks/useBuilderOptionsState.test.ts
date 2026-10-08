@@ -1,4 +1,5 @@
 import { ColumnHint, QueryType } from 'types/queryBuilder';
+import { defaultCHBuilderQuery } from 'types/sql';
 import {
   mergeColumns,
   setAllOptions,
@@ -58,6 +59,7 @@ describe('reducer', () => {
       table: 'prev_table',
       queryType: QueryType.Table,
       groupBy: ['will', 'be', 'reset'],
+      limit: 50,
     });
     const action = setQueryType(QueryType.Logs);
 
@@ -66,6 +68,7 @@ describe('reducer', () => {
     expect(nextState.table).toEqual('prev_table');
     expect(nextState.queryType).toEqual(QueryType.Logs);
     expect(nextState.groupBy).toBeFalsy();
+    expect(nextState.limit).toEqual(50);
   });
   it('applies SetDatabase to reset settings but preserve query type', async () => {
     const prevState = buildInitialState({
@@ -73,6 +76,7 @@ describe('reducer', () => {
       table: 'prev_table',
       queryType: QueryType.Logs,
       groupBy: ['will', 'be', 'reset'],
+      limit: 50,
     });
     const action = setDatabase('next_db');
 
@@ -81,6 +85,7 @@ describe('reducer', () => {
     expect(nextState.table).toEqual('');
     expect(nextState.queryType).toEqual(QueryType.Logs);
     expect(nextState.groupBy).toBeFalsy();
+    expect(nextState.limit).toEqual(50);
   });
   it('applies SetTable to reset settings but preserve db/queryType', async () => {
     const prevState = buildInitialState({
@@ -88,6 +93,7 @@ describe('reducer', () => {
       table: 'prev_table',
       queryType: QueryType.Logs,
       groupBy: ['will', 'be', 'reset'],
+      limit: 50,
     });
     const action = setTable('next_table');
 
@@ -96,6 +102,14 @@ describe('reducer', () => {
     expect(nextState.table).toEqual('next_table');
     expect(nextState.queryType).toEqual(QueryType.Logs);
     expect(nextState.groupBy).toBeFalsy();
+    expect(nextState.limit).toEqual(50);
+  });
+  it('falls back to default limit on reset when limit is unset', async () => {
+    const prevState = { ...buildInitialState({ table: 'prev_table' }), limit: undefined };
+    const action = setTable('next_table');
+
+    const nextState = reducer(prevState, action);
+    expect(nextState.limit).toEqual(defaultCHBuilderQuery.builderOptions.limit);
   });
   it('applies SetOtelEnabled action', async () => {
     const prevState = buildInitialState({

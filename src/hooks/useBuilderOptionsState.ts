@@ -87,13 +87,14 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
   [
     BuilderOptionsActionType.SetQueryType,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // If switching query type, reset the editor.
+      // If switching query type, reset the editor, but keep limit
       const nextQueryType = action.payload.queryType;
       if (state.queryType !== nextQueryType) {
         return buildInitialState({
           database: state.database,
           table: state.table,
           queryType: nextQueryType,
+          limit: state.limit || defaultCHBuilderQuery.builderOptions.limit,
         });
       }
 
@@ -103,22 +104,24 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
   [
     BuilderOptionsActionType.SetDatabase,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Clear table and reset editor when database changes
+      // Clear table and reset editor when database changes, but keep limit
       return buildInitialState({
         database: action.payload.database,
         table: '',
         queryType: state.queryType,
+        limit: state.limit || defaultCHBuilderQuery.builderOptions.limit,
       });
     },
   ],
   [
     BuilderOptionsActionType.SetTable,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Reset editor when table changes
+      // Reset editor when table changes, but keep limit
       return buildInitialState({
         database: state.database,
         table: action.payload.table,
         queryType: state.queryType,
+        limit: state.limit || defaultCHBuilderQuery.builderOptions.limit,
       });
     },
   ],
