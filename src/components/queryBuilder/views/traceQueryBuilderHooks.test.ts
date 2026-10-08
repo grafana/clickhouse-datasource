@@ -305,7 +305,7 @@ describe('useDefaultFilters', () => {
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
 
-  it('should call builderOptionsDispatch when table changes', async () => {
+  it('keeps the filters of a query whose table changes', async () => {
     const builderOptionsDispatch = jest.fn();
     const tableName = 'timeseries';
     const isTraceIdMode = false;
@@ -316,12 +316,7 @@ describe('useDefaultFilters', () => {
     });
     hook.rerender('other_timeseries');
 
-    const expectedOptions = {
-      filters: [expect.anything(), expect.anything(), expect.anything(), expect.anything()],
-      orderBy: [expect.anything(), expect.anything()],
-    };
-    expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
-    expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
+    expect(builderOptionsDispatch).not.toHaveBeenCalled();
   });
 });
 
@@ -385,9 +380,7 @@ describe('useDefaultTraceColumnsByName', () => {
 
   it('does nothing when OTel mode is enabled', () => {
     const builderOptionsDispatch = jest.fn();
-    renderHook(() =>
-      useDefaultTraceColumnsByName(traceTableColumns, 'traces', true, {}, true, builderOptionsDispatch)
-    );
+    renderHook(() => useDefaultTraceColumnsByName(traceTableColumns, 'traces', true, {}, true, builderOptionsDispatch));
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
 

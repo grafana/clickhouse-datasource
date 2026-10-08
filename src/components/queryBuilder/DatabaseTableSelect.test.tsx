@@ -121,6 +121,56 @@ describe('TableSelect', () => {
   });
 });
 
+describe('TableSelect after a database change', () => {
+  const setup = (tablesByDb: Record<string, string[]>, changedInDropdown: boolean) => {
+    const mockDs = {} as Datasource;
+    mockDs.fetchTables = jest.fn((db?: string) => Promise.resolve(tablesByDb[db!] ?? []));
+    mockDs.getDefaultTable = jest.fn(() => '');
+    const onTableChange = jest.fn();
+    const databaseChanged = { current: false };
+    const select = (database: string) => (
+      <TableSelect
+        datasource={mockDs}
+        database={database}
+        table="logs"
+        onTableChange={onTableChange}
+        databaseChanged={databaseChanged}
+      />
+    );
+    const result = render(select('db_a'));
+    const changeDatabase = (database: string) => {
+      databaseChanged.current = changedInDropdown;
+      result.rerender(select(database));
+    };
+    return { mockDs, onTableChange, changeDatabase };
+  };
+
+  it('keeps the table when the new database has it', async () => {
+    const { mockDs, onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['logs', 'other'] }, true);
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(mockDs.fetchTables).toHaveBeenCalledWith('db_b'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onTableChange).not.toHaveBeenCalled();
+  });
+
+  it('picks another table when the new database lacks it', async () => {
+    const { onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['spans'] }, true);
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(onTableChange).toHaveBeenCalledWith('spans'));
+  });
+
+  it('keeps the table of a query restored with another database', async () => {
+    const { mockDs, onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['spans'] }, false);
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(mockDs.fetchTables).toHaveBeenCalledWith('db_b'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onTableChange).not.toHaveBeenCalled();
+  });
+});
+
 describe('DatabaseTableSelect', () => {
   it('should render the combined components', async () => {
     const mockDs = {} as Datasource;

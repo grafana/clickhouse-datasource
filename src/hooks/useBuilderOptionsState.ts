@@ -13,6 +13,7 @@ enum BuilderOptionsActionType {
   SetColumnByHint = 'set_column_by_hint',
   MergeColumns = 'merge_columns',
   SetBuilderMinimized = 'set_builder_minimized',
+  FillMissingRoles = 'fill_missing_roles',
 }
 
 type QueryBuilderOptionsReducerAction = {
@@ -52,6 +53,9 @@ export const mergeColumns = (columns: SelectedColumn[]): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.MergeColumns, { columns });
 export const setBuilderMinimized = (minimized: boolean): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.SetBuilderMinimized, { minimized });
+/** Adds role columns whose role is still empty, if the query is still of `queryType`. */
+export const fillMissingRoles = (queryType: QueryType, columns: SelectedColumn[]): GenericReducerAction =>
+  createGenericAction(BuilderOptionsActionType.FillMissingRoles, { queryType, columns });
 
 const reducer = (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
   const actionFn = actions.get(action.type);
@@ -87,39 +91,24 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
   [
     BuilderOptionsActionType.SetQueryType,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // If switching query type, reset the editor.
-      const nextQueryType = action.payload.queryType;
-      if (state.queryType !== nextQueryType) {
-        return buildInitialState({
-          database: state.database,
-          table: state.table,
-          queryType: nextQueryType,
-        });
-      }
-
-      return state;
+      // Keep everything: options the new type doesn't use are ignored, and come back if the
+      // type is switched back.
+      return mergeBuilderOptionsState(state, { queryType: action.payload.queryType });
     },
   ],
   [
     BuilderOptionsActionType.SetDatabase,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Clear table and reset editor when database changes
-      return buildInitialState({
-        database: action.payload.database,
-        table: '',
-        queryType: state.queryType,
-      });
+      // Keep the table and the rest of the query; TableSelect picks another table when this
+      // one doesn't exist in the new database.
+      return mergeBuilderOptionsState(state, action.payload);
     },
   ],
   [
     BuilderOptionsActionType.SetTable,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Reset editor when table changes
-      return buildInitialState({
-        database: state.database,
-        table: action.payload.table,
-        queryType: state.queryType,
-      });
+      // Keep the rest of the query, so switching between tables with the same schema keeps it whole.
+      return mergeBuilderOptionsState(state, action.payload);
     },
   ],
   [
@@ -176,6 +165,24 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
       return mergeBuilderOptionsState(state, {
         columns: [...(state.columns || []), ...additions],
       });
+    },
+  ],
+  [
+    BuilderOptionsActionType.FillMissingRoles,
+    (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
+      // Applied after an async column lookup: skip it if the query changed type meanwhile, and never
+      // replace a role that got filled in the meantime.
+      const { queryType, columns: roles } = action.payload as { queryType: QueryType; columns: SelectedColumn[] };
+      if (state.queryType !== queryType) {
+        return state;
+      }
+      let columns = state.columns || [];
+      for (const role of roles) {
+        if (!columns.some((c) => c.hint === role.hint)) {
+          columns = [...columns.filter((c) => !(c.hint === undefined && c.name === role.name)), role];
+        }
+      }
+      return columns === state.columns ? state : mergeBuilderOptionsState(state, { columns });
     },
   ],
   [

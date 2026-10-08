@@ -267,7 +267,7 @@ export const useDefaultTraceColumnsByName = (
   ]);
 };
 
-// Apply default filters on table change
+// Apply default filters to a new query once it has a table; a table change keeps the query's filters
 export const useDefaultFilters = (
   table: string,
   isTraceIdMode: boolean,
@@ -275,17 +275,12 @@ export const useDefaultFilters = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
-  const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
 
   useEffect(() => {
     if (isTraceIdMode || !table || appliedDefaultFilters.current) {
       return;
     }
 
-    lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({
