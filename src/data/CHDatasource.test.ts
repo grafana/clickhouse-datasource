@@ -16,7 +16,7 @@ import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { lastValueFrom, of, throwError } from 'rxjs';
+import { lastValueFrom, of, Subject, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
@@ -1450,77 +1450,93 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe.skip('fetchPathsForJSONColumns', () => {
-    it('sends a correct query when database and table names are provided', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      const expected = {
-        rawSql:
-          'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name" SETTINGS max_execution_time=10',
+  describe('fetchPathsForJSONColumns', () => {
+    const pathsSql = (source: string) =>
+      `SELECT tupleElement(pt, 1) AS path, if(length(tupleElement(pt, 2)) = 1, tupleElement(pt, 2)[1], 'Dynamic') AS type FROM (SELECT arrayJoin(distinctJSONPathsAndTypes("jsonCol")) AS pt FROM ${source}) LIMIT 5000`;
+    const configureOtelLogs = (ds: Datasource) => {
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
       };
+    };
+
+    const cases: Array<{
+      name: string;
+      database: string;
+      table: string;
+      configure?: (ds: Datasource) => void;
+      source: string;
+    }> = [
+      {
+        name: 'reads a row sample of the qualified table',
+        database: 'db_name',
+        table: 'table_name',
+        source: '(SELECT "jsonCol" FROM "db_name"."table_name" LIMIT 100000)',
+      },
+      {
+        name: 'reads a row sample of the unqualified table when no database is given',
+        database: '',
+        table: 'table.name',
+        source: '(SELECT "jsonCol" FROM "table.name" LIMIT 100000)',
+      },
+      {
+        name: 'reads a row sample from the recent time window of the configured logs table',
+        database: 'otel',
+        table: 'otel_logs',
+        configure: configureOtelLogs,
+        source: '(SELECT "jsonCol" FROM "otel"."otel_logs" WHERE "Timestamp" >= now() - INTERVAL 6 HOUR LIMIT 100000)',
+      },
+    ];
+
+    it.each(cases)('$name', async ({ database, table, configure, source }) => {
+      const ds = cloneDeep(mockDatasource);
+      configure?.(ds);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchPathsForJSONColumns(database, table, 'jsonCol');
 
       expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+        expect.objectContaining({
+          targets: expect.arrayContaining([expect.objectContaining({ rawSql: pathsSql(source) })]),
+        })
       );
     });
 
-    it('sends a correct query when only table name is provided', async () => {
+    it('maps each path to a typed column', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
+        { path: 'a.b.c', type: 'Int64' },
+        { path: 'a.b.d', type: 'String' },
+        { path: 'a.b.e', type: 'Dynamic' },
+        { path: 'a..f', type: 'String' },
       ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('', 'table_name', 'jsonCol');
-      const expected = {
-        rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name" SETTINGS max_execution_time=10',
-      };
-
-      expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
-      );
-    });
-
-    it('sends a correct query when table name contains a dot', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('', 'table.name', 'jsonCol');
-      const expected = {
-        rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name" SETTINGS max_execution_time=10',
-      };
-
-      expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
-      );
-    });
-
-    it('returns correct json columns', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
 
       const jsonColumns = await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      expect(jsonColumns).toMatchObject([
+
+      expect(jsonColumns).toEqual([
         { name: 'jsonCol.a.b.c', label: 'jsonCol.a.b.c', type: 'Int64', picklistValues: [] },
         { name: 'jsonCol.a.b.d', label: 'jsonCol.a.b.d', type: 'String', picklistValues: [] },
-        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Bool', picklistValues: [] },
+        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Dynamic', picklistValues: [] },
       ]);
+    });
+
+    it('returns no columns for an empty table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      expect(await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol')).toEqual([]);
+    });
+
+    it('short-circuits to empty when discovery is disabled, without issuing a query', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol')).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
     });
   });
 
@@ -1560,6 +1576,127 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
       );
+    });
+
+    it('reads only the schema, never the JSON path probe', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ name: 'payload', type: 'JSON' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const columns = await ds.fetchColumnsFromTable('db_name', 'table_name');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+      expect(columns).toEqual([{ name: 'payload', type: 'JSON', label: 'payload', picklistValues: [] }]);
+    });
+  });
+
+  describe('fetchJSONPathColumns', () => {
+    const schema: TableColumn[] = [
+      { name: 'ts', type: 'DateTime', label: 'ts', picklistValues: [] },
+      { name: 'payload', type: 'JSON', label: 'payload', picklistValues: [] },
+      { name: 'extra', type: 'Nullable(JSON)', label: 'extra', picklistValues: [] },
+    ];
+    const probedColumn = (sql: string) => sql.match(/distinctJSONPathsAndTypes\("(\w+)"\)/)?.[1];
+
+    it('returns the paths of each JSON column, in schema order', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const column = probedColumn(request.targets[0].rawSql ?? '');
+        return of({ data: [arrayToDataFrame([{ path: `${column}_path`, type: 'String' }])] });
+      });
+
+      const paths = await ds.fetchJSONPathColumns('db_name', 'table_name', schema);
+
+      expect(paths.map((c) => c.name)).toEqual(['payload.payload_path', 'extra.extra_path']);
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('issues no query for a table without JSON columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', [schema[0]])).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
+    });
+
+    it('issues no query when key and path discovery is disabled', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', schema)).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns no paths for a column whose probe fails', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const error = { message: 'Code: 497. DB::Exception: Not enough privileges. (ACCESS_DENIED)' };
+      jest
+        .spyOn(ds, 'query')
+        .mockImplementation(() => of({ data: [], state: LoadingState.Error, error, errors: [error] }));
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', schema)).toEqual([]);
+    });
+
+    it('probes one column at a time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const first = new Subject<DataQueryResponse>();
+      const spyOnQuery = jest
+        .spyOn(ds, 'query')
+        .mockImplementation((request) =>
+          probedColumn(request.targets[0].rawSql ?? '') === 'payload' ? first : of({ data: [arrayToDataFrame([])] })
+        );
+
+      const pending = ds.fetchJSONPathColumns('db_name', 'table_name', schema);
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+
+      first.next({ data: [arrayToDataFrame([{ path: 'p', type: 'String' }])] });
+      first.complete();
+
+      expect((await pending).map((c) => c.name)).toEqual(['payload.p']);
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getEditorColumnsCached', () => {
+    const schemaFrame = () => arrayToDataFrame([{ name: 'payload', type: 'JSON' }]);
+    const pathsFrame = () => arrayToDataFrame([{ path: 'http.status', type: 'Int64' }]);
+    const mockQueries = (ds: Datasource) =>
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        return of({ data: [sql.includes('distinctJSONPathsAndTypes') ? pathsFrame() : schemaFrame()] });
+      });
+
+    it('returns the schema columns followed by the JSON paths', async () => {
+      const ds = cloneDeep(mockDatasource);
+      mockQueries(ds);
+
+      const columns = await ds.getEditorColumnsCached('db_name', 'table_name');
+
+      expect(columns.map((c) => c.name)).toEqual(['payload', 'payload.http.status']);
+    });
+
+    it('shares one fetch between concurrent and later requests for the same table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = mockQueries(ds);
+
+      await Promise.all([
+        ds.getEditorColumnsCached('db_name', 'table_name'),
+        ds.getEditorColumnsCached('db_name', 'table_name'),
+      ]);
+      await ds.getEditorColumnsCached('db_name', 'table_name');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('fetches each table once', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = mockQueries(ds);
+
+      await ds.getEditorColumnsCached('db_name', 'table_name');
+      await ds.getEditorColumnsCached('db_name', 'other_table');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(4);
     });
   });
 

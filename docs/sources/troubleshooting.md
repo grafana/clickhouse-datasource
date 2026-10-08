@@ -311,7 +311,7 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 
 ## Query builder issues
 
-These issues affect the visual query builder's schema drop-downs and autocomplete rather than query execution itself.
+These issues affect the query builder's schema drop-downs and the SQL editor's autocomplete rather than query execution itself.
 
 #### Empty database, table, or column drop-downs
 
@@ -337,6 +337,19 @@ These issues affect the visual query builder's schema drop-downs and autocomplet
 1. Use simpler filter values that you type manually rather than relying on autocomplete.
 2. Create a materialized view or dictionary with pre-aggregated distinct values for frequently filtered columns.
 3. Add a `clickhouse_adhoc_query` variable with a targeted `SELECT` query instead of relying on schema-driven suggestions.
+
+#### JSON path suggestions are missing in the SQL editor
+
+**Symptoms:** After you type a `JSON` column name and a dot in the SQL editor, the suggestions list shows macros and functions but no paths from the column.
+
+**Cause:** The plugin discovers paths with `distinctJSONPathsAndTypes` over a sample of at most 100,000 rows (from the most recent 6 hours for the configured logs or traces table). The lookup returns nothing when the **Suggest Map keys and JSON paths** setting is disabled, when the ClickHouse user has no `SELECT` permission on the column, when the ClickHouse server is older than 24.9, or when the sample contains no rows. The editor does not show the failure. The ClickHouse error is in the response body of the failed `/api/ds/query` request in the browser's Network tab.
+
+**Solution:**
+
+1. Open the browser developer tools (**F12** > **Network**), type the column name and a dot again, and read the response of the `/api/ds/query` request whose body contains `distinctJSONPathsAndTypes`.
+2. Enable **Suggest Map keys and JSON paths** in the data source settings.
+3. Verify the ClickHouse user has `SELECT` permission on the `JSON` column.
+4. Type the path manually. The editor accepts any path, suggested or not.
 
 ## Query errors
 
