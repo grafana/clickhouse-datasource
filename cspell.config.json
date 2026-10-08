@@ -149,6 +149,10 @@
     "browsable",
     "projectable",
     "unaliased",
-    "ungated"
+    "ungated",
+    "dsconfig",
+    "struct",
+    "Struct",
+    "behaviour"
   ]
 }
