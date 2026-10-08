@@ -7,7 +7,10 @@
 
 CREATE DATABASE IF NOT EXISTS e2e_test;
 
-CREATE TABLE IF NOT EXISTS e2e_test.otel_logs_v151
+DROP TABLE IF EXISTS e2e_test.otel_logs_v151;
+-- Dropped and recreated on every load so re-running the e2e-data-loader
+-- (e.g. docker compose up against an existing stack) cannot duplicate rows.
+CREATE TABLE e2e_test.otel_logs_v151
 (
     Timestamp           DateTime64(9),
     TraceId             String,
