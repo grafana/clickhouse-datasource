@@ -469,3 +469,29 @@ func TestInterpolateBacktickAndDollarQuotedRegions(t *testing.T) {
 		})
 	}
 }
+
+func TestMacroInterval(t *testing.T) {
+	from := time.Unix(1415792726, 0)
+	to := time.Unix(1447328726, 0)
+	tests := []struct {
+		name     string
+		interval time.Duration
+		want     string
+	}{
+		{"whole minutes", 5 * time.Minute, "5m"},
+		{"whole hours stay in hours", 24 * time.Hour, "24h"},
+		{"whole days render in hours", 7 * 24 * time.Hour, "168h"},
+		{"minutes that are not whole hours stay exact", 90 * time.Minute, "90m"},
+		{"hours that are not whole days stay exact", 36 * time.Hour, "36h"},
+		{"seconds that are not whole minutes stay exact", 90 * time.Second, "90s"},
+		{"milliseconds that are not whole seconds stay exact", 1500 * time.Millisecond, "1500ms"},
+		{"zero", 0, "0s"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ClickHouseMacros["interval"](makeCtx(from, to, tt.interval), nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
