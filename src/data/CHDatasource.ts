@@ -663,6 +663,7 @@ export class Datasource
       }
 
       const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
+      const tableQualifiedKeys = !this.settings.jsonData.hideTableNameInAdhocFilters;
 
       // Check if query contains $__adHocFilters macro
       const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
@@ -672,7 +673,7 @@ export class Datasource
 
       // Only apply automatic filters if the macro was not used
       if (!hasMacro) {
-        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
+        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON, tableQualifiedKeys);
       }
     }
     this.skipAdHocFilter = false;
