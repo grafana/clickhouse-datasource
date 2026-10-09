@@ -257,7 +257,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -309,7 +309,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -434,6 +434,52 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
       expect(result.rawSql).toEqual(
         "SELECT * FROM complex_table settings additional_table_filters={'table1': ' key = \\'val\\' ', 'table2': ' key = \\'val\\' ', 'table3': ' key = \\'val\\' '}"
+      );
+    });
+
+    it('applies every filter to the $__adHocFilters tables whatever table the key names', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters('web_by_useragent')",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, [
+        { key: 'web.client_asn', operator: '>', value: '0' },
+      ]);
+
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'web_by_useragent': ' client_asn > \\'0\\' '}"
+      );
+    });
+
+    it('leaves a query on another table unfiltered when keys carry the table name', async () => {
+      const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
+
+      expect(result.rawSql).toEqual('SELECT * FROM web_by_useragent');
+    });
+
+    it('applies a table-qualified key to another table when the table name is hidden from keys', async () => {
+      const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
+
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}"
       );
     });
 
