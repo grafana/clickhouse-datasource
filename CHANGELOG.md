@@ -14,6 +14,18 @@
 - Quote ad-hoc filter keys that are not plain identifiers, so a crafted key is read as one (nonexistent) column name instead of being spliced into the `additional_table_filters` predicate. Plain and dotted column names are unchanged (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.22.2](https://github.com/grafana/clickhouse-datasource/compare/v4.22.1...v4.22.2) (2026-10-09)
+
+
+### 📝 Documentation
+
+* add gcx CLI query note to ClickHouse data source ([#2204](https://github.com/grafana/clickhouse-datasource/issues/2204)) ([13c746d](https://github.com/grafana/clickhouse-datasource/commit/13c746d7f3968974065fbea7142698d9133b4e72))
+
+
+### 🤖 Continuous Integration
+
+* **e2e:** add quarantine split to nightly cloud E2E ([#2195](https://github.com/grafana/clickhouse-datasource/issues/2195)) ([52a1bbd](https://github.com/grafana/clickhouse-datasource/commit/52a1bbdf49260edf7ebebc8109eda68f1a164312))
+
 ## [4.22.1](https://github.com/grafana/clickhouse-datasource/compare/v4.22.0...v4.22.1) (2026-10-02)
 
 
