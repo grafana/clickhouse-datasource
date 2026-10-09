@@ -79,15 +79,16 @@ describe('mintJSONAdhocKey / parseJSONAdhocKey round-trip', () => {
     );
   });
 
-  it('parses a minted key back to column + raw path (prefix dropped)', () => {
+  it('parses a minted key back to column + raw path', () => {
     expect(parseJSONAdhocKey('ResourceAttributes.`k8s`.`pod`.`name`')).toEqual({
       column: 'ResourceAttributes',
       path: 'k8s.pod.name',
     });
   });
 
-  it('drops a table prefix when parsing', () => {
+  it('returns the table prefix when parsing', () => {
     expect(parseJSONAdhocKey('otel_logs.ResourceAttributes.`level`')).toEqual({
+      table: 'otel_logs',
       column: 'ResourceAttributes',
       path: 'level',
     });
