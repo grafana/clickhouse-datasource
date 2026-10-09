@@ -165,6 +165,34 @@ describe('DatabaseCredentialsSection', () => {
     expect(toggle).toBeChecked();
   });
 
+  it('sets allowClearTextJWTForwarding when toggled on, and hides it without oauthPassThru', () => {
+    render(<DatabaseCredentialsSection {...defaultProps} />);
+    expect(screen.queryByRole('checkbox', { name: /^allow clear text jwt forwarding/i })).not.toBeInTheDocument();
+
+    const jwtProps = createTestProps({
+      options: {
+        jsonData: {
+          username: 'default',
+          oauthPassThru: true,
+        },
+        secureJsonData: {},
+        secureJsonFields: {},
+      },
+      mocks: {
+        onOptionsChange: onOptionsChangeMock,
+      },
+    });
+
+    render(<DatabaseCredentialsSection {...jwtProps} />);
+
+    const toggle = screen.getByRole('checkbox', { name: /^allow clear text jwt forwarding/i });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+
+    const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+    expect(lastArgs.jsonData?.allowClearTextJWTForwarding).toBe(true);
+  });
+
   it('sets oauthPassThru when toggled on', () => {
     render(<DatabaseCredentialsSection {...defaultProps} />);
 
