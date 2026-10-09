@@ -185,6 +185,26 @@ func FromGrafanaInterval(_ macropro.QueryContext[struct{}], args []string) (stri
 	return fmt.Sprintf("%d %s", value, unit), nil
 }
 
+// Interval renders $__interval as the largest of hours, minutes, seconds or
+// milliseconds that divides the interval exactly, so a per-query min interval
+// such as 90m never renders finer than the floor it sets.
+func Interval(ctx macropro.QueryContext[struct{}], _ []string) (string, error) {
+	d := ctx.Interval
+	if d == 0 {
+		return "0s", nil
+	}
+	switch {
+	case d%time.Hour == 0:
+		return fmt.Sprintf("%dh", int64(d/time.Hour)), nil
+	case d%time.Minute == 0:
+		return fmt.Sprintf("%dm", int64(d/time.Minute)), nil
+	case d%time.Second == 0:
+		return fmt.Sprintf("%ds", int64(d/time.Second)), nil
+	default:
+		return fmt.Sprintf("%dms", int64(d/time.Millisecond)), nil
+	}
+}
+
 // TimeFrom is the ClickHouse-native $__timeFrom, dual mode like the macropro default.
 // $__timeFrom() → toDateTime(<from_unix>), $__timeFrom(col) → col >= toDateTime(<from_unix>)
 func TimeFrom(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
@@ -239,8 +259,9 @@ func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error)
 // Where the dialect-neutral default produces output that does not parse as
 // valid ClickHouse SQL — timeFilter, timeFrom, timeTo, timeGroup — the
 // override below emits ClickHouse-native functions (toDateTime,
-// toStartOfInterval). The remaining defaults (interval, interval_ms, table,
-// column) are format-neutral and reused as-is.
+// toStartOfInterval). interval is overridden so that its rendering does not
+// change with the macropro version. The remaining defaults (interval_ms,
+// table, column) are reused as-is.
 var ClickHouseMacros = macropro.MergeMacros(
 	macropro.DefaultMacros[struct{}](),
 	macropro.MacroMap[struct{}]{
@@ -249,6 +270,7 @@ var ClickHouseMacros = macropro.MergeMacros(
 		"timeFrom":   TimeFrom,
 		"timeTo":     TimeTo,
 		"timeGroup":  TimeGroup,
+		"interval":   Interval,
 
 		// ClickHouse-specific extensions (no SDK-default equivalent).
 		"fromTime":            FromTimeFilter,
