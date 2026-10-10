@@ -381,10 +381,10 @@ These errors occur when a query is sent to ClickHouse but fails during parsing o
    - `$__dateTimeFilter(dateColumn, timeColumn)` - requires 2 arguments
    - `$__timeInterval(column)` - requires 1 argument (the time column)
    - `$__timeInterval_ms(column)` - requires 1 argument (the time column)
-   - `$__timeFrom(column)` - requires 1 argument (the time column)
-   - `$__timeTo(column)` - requires 1 argument (the time column)
+   - `$__timeFrom(column)` - at most 1 argument (the time column). `$__timeFrom()` returns the range start, like `$__fromTime`
+   - `$__timeTo(column)` - at most 1 argument (the time column). `$__timeTo()` returns the range end, like `$__toTime`
    - `$__timeGroup(column, interval)` - requires 2 arguments (the time column and an interval such as `5m`)
-2. Ensure arguments are separated by commas if multiple are required.
+2. Ensure arguments are separated by commas if multiple are required. The error message names the expected form.
 
 #### SQL parse error
 
