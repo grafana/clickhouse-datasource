@@ -16,8 +16,8 @@ import (
 // makeCtx is a test helper that builds a macropro.QueryContext from time range and interval.
 func makeCtx(from, to time.Time, interval time.Duration) macropro.QueryContext[struct{}] {
 	return macropro.QueryContext[struct{}]{
-		TimeRange: macropro.TimeRange{From: from, To: to},
-		Interval:  interval,
+		TimeRange:  macropro.TimeRange{From: from, To: to},
+		Interval:   interval,
 		IntervalMS: interval.Milliseconds(),
 	}
 }
@@ -201,8 +201,18 @@ func TestMacroTimeFrom(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "ts >= toDateTime(1415792726)", got)
 
-	_, err = TimeFrom(ctx, []string{})
+	got, err = TimeFrom(ctx, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, "toDateTime(1415792726)", got)
+
+	got, err = TimeFrom(ctx, []string{""})
+	assert.Nil(t, err)
+	assert.Equal(t, "toDateTime(1415792726)", got)
+
+	_, err = TimeFrom(ctx, []string{"a", "b"})
 	assert.Error(t, err)
+	assert.True(t, stdErrors.Is(err, sqlutil.ErrorBadArgumentCount))
+	assert.Contains(t, err.Error(), "$__timeFrom accepts at most 1 argument, received 2")
 }
 
 func TestMacroTimeTo(t *testing.T) {
@@ -214,8 +224,13 @@ func TestMacroTimeTo(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "ts <= toDateTime(1447328726)", got)
 
-	_, err = TimeTo(ctx, []string{})
+	got, err = TimeTo(ctx, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, "toDateTime(1447328726)", got)
+
+	_, err = TimeTo(ctx, []string{"a", "b"})
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "$__timeTo accepts at most 1 argument, received 2")
 }
 
 func TestMacroTimeGroup(t *testing.T) {
@@ -252,8 +267,8 @@ func TestMacroErrorsAreDownstream(t *testing.T) {
 		{"DateTimeFilter wrong arity", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }},
 		{"TimeInterval wrong arity", func() error { _, err := TimeInterval(ctx, nil); return err }},
 		{"TimeIntervalMs wrong arity", func() error { _, err := TimeIntervalMs(ctx, nil); return err }},
-		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, nil); return err }},
-		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, nil); return err }},
+		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, []string{"a", "b"}); return err }},
+		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, []string{"a", "b"}); return err }},
 		{"TimeGroup wrong arity", func() error { _, err := TimeGroup(ctx, []string{"ts"}); return err }},
 		{"TimeGroup bad duration", func() error { _, err := TimeGroup(ctx, []string{"ts", "nope"}); return err }},
 	}
@@ -468,4 +483,42 @@ func TestInterpolateBacktickAndDollarQuotedRegions(t *testing.T) {
 			assert.Equal(t, tc.output, interpolatedQuery)
 		})
 	}
+}
+
+// Arity errors surface in the panel, so each one names the form the user needs.
+func TestMacroArityErrorsNameTheExpectedForm(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	cases := []struct {
+		name string
+		call func() error
+		want string
+	}{
+		{"timeFilter", func() error { _, err := TimeFilter(ctx, nil); return err }, "usage: $__timeFilter(timeColumn)"},
+		{"timeFilter_ms", func() error { _, err := TimeFilterMs(ctx, nil); return err }, "usage: $__timeFilter_ms(timeColumn)"},
+		{"dateFilter", func() error { _, err := DateFilter(ctx, nil); return err }, "usage: $__dateFilter(dateColumn)"},
+		{"dateTimeFilter", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }, "usage: $__dateTimeFilter(dateColumn, timeColumn)"},
+		{"timeInterval", func() error { _, err := TimeInterval(ctx, []string{"ts", "'1d'"}); return err }, "usage: $__timeInterval(timeColumn), the bucket size comes from the dashboard interval"},
+		{"timeInterval_ms", func() error { _, err := TimeIntervalMs(ctx, nil); return err }, "usage: $__timeInterval_ms(timeColumn), the bucket size comes from the dashboard interval"},
+		{"timeGroup", func() error { _, err := TimeGroup(ctx, nil); return err }, "usage: $__timeGroup(timeColumn, interval)"},
+		{"timeFrom", func() error { _, err := TimeFrom(ctx, []string{"a", "b"}); return err }, "usage: $__timeFrom() or $__timeFrom(timeColumn)"},
+		{"timeTo", func() error { _, err := TimeTo(ctx, []string{"a", "b"}); return err }, "usage: $__timeTo() or $__timeTo(timeColumn)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.call()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestInterpolateTimeBoundaryValueForm(t *testing.T) {
+	from, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26Z")
+	to, _ := time.Parse(time.RFC3339, "2015-11-12T11:45:26Z")
+	q := &sqlutil.Query{TimeRange: backend.TimeRange{From: from, To: to}}
+
+	got, err := Interpolate("SELECT * FROM t WHERE ts >= $__timeFrom() AND ts <= $__timeTo AND $__timeFrom(ts)", q)
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT * FROM t WHERE ts >= toDateTime(1415792726) AND ts <= toDateTime(1447328726) AND ts >= toDateTime(1415792726)", got)
 }
