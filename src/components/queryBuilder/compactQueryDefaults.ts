@@ -182,6 +182,18 @@ const getLogsDefaultColumns = (datasource: Datasource, allColumns: readonly Tabl
 
   appendAdditionalLogColumns(datasource, allColumns, nextColumns, includedColumns);
 
+  // Attribute columns must be projected too, so the backend can flatten their
+  // JSON keys into log labels (Fields sidebar).
+  for (const columnName of datasource.getLogAttributeColumns()) {
+    const baseName = columnName.split('[')[0];
+    if (includedColumns.has(columnName) || includedColumns.has(baseName)) {
+      continue;
+    }
+    const type = allColumns.find((c) => c.name === columnName || c.name === baseName)?.type;
+    nextColumns.push(type ? { name: columnName, type } : { name: columnName });
+    includedColumns.add(columnName);
+  }
+
   return nextColumns;
 };
 
