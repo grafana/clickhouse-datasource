@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './FilterEditor';
 import { selectors } from 'selectors';
@@ -136,6 +136,137 @@ describe('FilterEditor', () => {
       );
       expect(result.container.firstChild).not.toBeNull();
     });
+    const serviceFilter = (overrides: Partial<Filter> = {}) =>
+      ({
+        key: '',
+        hint: ColumnHint.TraceServiceName,
+        operator: FilterOperator.Equals,
+        type: 'string',
+        condition: 'AND',
+        filterType: 'custom',
+        value: '',
+        ...overrides,
+      }) as Filter;
+    const renderWithSuggestions = (filter: Filter, values: string[]) => {
+      const onFilterChange = jest.fn();
+      const ds = { ...mockDatasource, fetchDistinctValues: jest.fn(() => Promise.resolve(values)) } as any;
+      const result = render(
+        <FilterEditor
+          allColumns={[{ name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] }]}
+          filter={filter}
+          index={0}
+          onFilterChange={onFilterChange}
+          removeFilter={() => {}}
+          datasource={ds}
+          database="db"
+          table="spans"
+          columns={[
+            { name: 'ServiceName', hint: ColumnHint.TraceServiceName },
+            { name: 'Timestamp', hint: ColumnHint.Time },
+          ]}
+        />
+      );
+      return { result, ds, onFilterChange };
+    };
+
+    // The options list is virtualised and doesn't render in jsdom, so type and press Enter.
+    it('suggests the values of the column holding a role filter, exact matches first', async () => {
+      const { result, ds, onFilterChange } = renderWithSuggestions(serviceFilter(), ['api-gateway', 'api']);
+      const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'api');
+      await waitFor(() =>
+        expect(ds.fetchDistinctValues).toHaveBeenCalledWith('ServiceName', 'db', 'spans', {
+          timeColumn: 'Timestamp',
+          timeColumnType: 'DateTime64(9)',
+          search: 'api',
+        })
+      );
+      await userEvent.keyboard('{Enter}');
+
+      await waitFor(() => expect(onFilterChange).toHaveBeenCalledWith(0, expect.objectContaining({ value: 'api' })));
+    });
+
+    it('commits a typed value on blur', async () => {
+      const { result, onFilterChange } = renderWithSuggestions(serviceFilter(), []);
+      const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'foo');
+      fireEvent.blur(input);
+
+      expect(onFilterChange).toHaveBeenCalledWith(0, expect.objectContaining({ value: 'foo' }));
+    });
+
+    it('splits comma-separated values and commits typed text on blur for IN', async () => {
+      const { result, onFilterChange } = renderWithSuggestions(
+        serviceFilter({ operator: FilterOperator.In, value: ['a'] } as Partial<Filter>),
+        []
+      );
+      const input = result.getByTestId('query-builder-filters-multi-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'b, c');
+      fireEvent.blur(input);
+
+      expect(onFilterChange).toHaveBeenCalledWith(0, expect.objectContaining({ value: ['a', 'b', 'c'] }));
+    });
+
+    it('narrows suggestions by the other filters, skipping empty ones', async () => {
+      const fetchDistinctValues = jest.fn(() => Promise.resolve(['GET /']));
+      const ds = { ...mockDatasource, fetchDistinctValues } as any;
+      const filters: Filter[] = [
+        serviceFilter({ value: 'api' }),
+        serviceFilter({ hint: undefined, key: 'StatusCode', value: '' }),
+        serviceFilter({ hint: undefined, key: 'SpanName' }),
+      ];
+      const result = render(
+        <FiltersEditor
+          allColumns={[]}
+          filters={filters}
+          onFiltersChange={() => {}}
+          datasource={ds}
+          database="db"
+          table="spans"
+          columns={[{ name: 'ServiceName', hint: ColumnHint.TraceServiceName }]}
+        />
+      );
+      const inputs = result.getAllByTestId('query-builder-filters-single-string-value-container');
+
+      await userEvent.type(inputs[2].querySelector('input')!, 'G');
+
+      await waitFor(() =>
+        expect(fetchDistinctValues).toHaveBeenCalledWith(
+          'SpanName',
+          'db',
+          'spans',
+          expect.objectContaining({ where: "( ServiceName = 'api' )" })
+        )
+      );
+    });
+
+    it('keeps the free-text input for operators without suggestions', async () => {
+      const result = render(
+        <FilterEditor
+          allColumns={[]}
+          filter={{
+            key: 'svc',
+            operator: FilterOperator.Like,
+            type: 'string',
+            condition: 'AND',
+            filterType: 'custom',
+            value: '',
+          }}
+          index={0}
+          onFilterChange={() => {}}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database="db"
+          table="spans"
+        />
+      );
+
+      expect(result.getByTestId('query-builder-filters-single-string-value-input')).toBeInTheDocument();
+    });
+
     it('should select a provided field from the combobox', async () => {
       const onFilterChange = jest.fn();
       const result = render(
@@ -547,6 +678,28 @@ describe('FilterEditor', () => {
       );
       expect(result.getByTestId('query-builder-filters-number-value-container')).toBeInTheDocument();
       expect(result.queryByTestId('query-builder-filters-duration-value-container')).toBeNull();
+    });
+
+    it('shows the stored value of the default duration filter, including 0', () => {
+      const filter: NumberFilter = {
+        filterType: 'custom',
+        key: '',
+        hint: ColumnHint.TraceDurationTime,
+        operator: FilterOperator.GreaterThan,
+        type: 'UInt64',
+        condition: 'AND',
+        value: 0,
+      };
+      const result = render(
+        <FilterValueEditor
+          allColumns={[]}
+          filter={filter}
+          onFilterChange={() => {}}
+          durationFilterContext={{ columnKey: 'Duration', unit: 'nanoseconds' as any }}
+        />
+      );
+
+      expect(result.getByTestId('query-builder-filters-duration-value-input')).toHaveValue('0ns');
     });
 
     it('converts bare-nanosecond input to the configured stored unit (milliseconds)', async () => {

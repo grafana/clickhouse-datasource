@@ -446,6 +446,7 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           datasource={datasource}
           database={builderOptions.database}
           table={builderOptions.table}
+          columns={builderOptions.columns}
           durationFilterContext={
             builderState.durationTimeColumn && builderState.durationUnit
               ? {

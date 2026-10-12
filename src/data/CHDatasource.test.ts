@@ -4,6 +4,7 @@ import {
   DataFrame,
   DataQueryRequest,
   DataQueryResponse,
+  dateTime,
   Field,
   FieldType,
   LoadingState,
@@ -1407,6 +1408,58 @@ describe('ClickHouseDatasource', () => {
       expect(result).toEqual([1, 2]);
       const sql = spy.mock.calls[0][0].targets[0].rawSql!;
       expect(sql).toBe('SELECT DISTINCT "some""col" FROM "db""name"."events" WHERE "some""col" IS NOT NULL LIMIT 1000');
+    });
+
+    const settings = ` SETTINGS max_execution_time=5`;
+
+    it('bounds distinct values by the dashboard time range on the time column', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      (templateSrvMock as any).timeRange = { from: dateTime(1735689600000), to: dateTime(1735693200500) };
+
+      try {
+        await ds.fetchDistinctValues('svc', 'db', 'events', { timeColumn: 'ts', timeColumnType: 'DateTime64(9)' });
+      } finally {
+        delete (templateSrvMock as any).timeRange;
+      }
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        'SELECT DISTINCT "svc" FROM "db"."events" WHERE "svc" IS NOT NULL AND "ts" >= fromUnixTimestamp(1735689600) AND "ts" <= fromUnixTimestamp(1735693201) LIMIT 1000' +
+          settings
+      );
+    });
+
+    it('bounds a Date time column by day, falling back to a recent window', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctMapValues('attrs', 'k', 'db', 'events', { timeColumn: 'd', timeColumnType: 'Date' });
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(`AND "d" >= toDate(now() - INTERVAL 6 HOUR) LIMIT 1000`);
+    });
+
+    it("narrows suggestions by the query's other filters", async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctValues('SpanName', 'db', 'spans', { where: "ServiceName = 'api'" });
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        `SELECT DISTINCT "SpanName" FROM "db"."spans" WHERE "SpanName" IS NOT NULL AND (ServiceName = 'api') LIMIT 1000` +
+          settings
+      );
+    });
+
+    it('searches the typed text case-insensitively', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctValues('svc', 'db', 'events', { search: "o'k" });
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        `SELECT DISTINCT "svc" FROM "db"."events" WHERE "svc" IS NOT NULL AND positionCaseInsensitiveUTF8(toString("svc"), 'o\\'k') > 0 LIMIT 1000` +
+          settings
+      );
     });
 
     it('escapes map identifiers and map key literals for distinct map values', async () => {
