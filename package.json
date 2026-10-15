@@ -82,6 +82,7 @@
   },
   "overrides": {
     "basic-ftp": "6.2.1",
+    "moment": "2.31.0",
     "picomatch": "4.0.5",
     "react-router": "6.30.4"
   },
