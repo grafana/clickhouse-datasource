@@ -212,10 +212,14 @@ The data source includes a dedicated configuration section for log queries. Thes
 | **Log Message column**   | The column containing the log message body.                                                                                                                                                                                                                 |
 | **Columns**              | Extra columns projected into new logs queries; each appears in the Fields list, the expanded log row, and the field filters, and can be shown as a displayed field.                                                                                         |
 | **Context columns**      | Comma-separated list of columns included alongside log messages for additional context.                                                                                                                                                                     |
+| **Attribute columns**    | JSON or `Map` columns whose keys are flattened into log labels, like the OTel `LogAttributes` column, so each nested path (for example `message.status`) becomes a filterable field. The named columns are also projected into new logs queries. |
+| **Excluded paths**       | Flattened label paths to keep out of the Fields list, matched by subtree: an entry like `JsonBody.content.forter` also removes `JsonBody.content.forter.email` and any leaf beneath it. Applies to the attribute columns above and to the OTel columns. |
 
 When **Configuration mode** is set to **Single source** and **Signal type** is set to **Logs**, these settings define the focused logs source.
 
 In **Single source** mode, the **Columns** field is a picker of the selected table's columns with an **Add all columns** shortcut; other configuration modes accept a typed list. The columns work with both OTel and non-OTel log tables; when **Use OTel** is enabled, they are added on top of the OTel default columns.
+
+**Attribute columns** flatten a JSON or `Map` column into individual log fields the same way the OTel `LogAttributes` column is flattened. This is useful for a non-OTel JSON body: its paths surface as filterable fields in Explore instead of one opaque value. **Excluded paths** removes specific flattened paths (matched by subtree) from the Fields list — use it to keep sensitive or high-cardinality paths, such as emails or client IPs, out of the surfaced fields. Both default to empty, so existing data sources are unaffected.
 
 ### Traces configuration
 
