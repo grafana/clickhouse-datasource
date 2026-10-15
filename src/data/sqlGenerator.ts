@@ -3,6 +3,7 @@ import {
   BuilderMode,
   ColumnHint,
   DateFilterWithValue,
+  Filter,
   FilterOperator,
   MultiFilter,
   NumberFilter,
@@ -668,8 +669,38 @@ const generateTableQuery = (options: QueryBuilderOptions): string => {
 };
 
 export const isAggregateQuery = (builder: QueryBuilderOptions): boolean => (builder.aggregates?.length || 0) > 0;
-export const getColumnByHint = (options: QueryBuilderOptions, hint: ColumnHint): SelectedColumn | undefined =>
-  options.columns?.find((c) => c.hint === hint);
+export const getColumnByHint = (
+  options: Pick<QueryBuilderOptions, 'columns'>,
+  hint: ColumnHint
+): SelectedColumn | undefined => options.columns?.find((c) => c.hint === hint);
+
+/** The selected column a hinted filter targets, with Time and FilterTime standing in for each other. */
+export const getHintedFilterColumn = (
+  options: Pick<QueryBuilderOptions, 'columns'>,
+  filter: Filter
+): SelectedColumn | undefined => {
+  if (!filter.hint) {
+    return undefined;
+  }
+  const hintedColumn = getColumnByHint(options, filter.hint);
+  if (filter.hint === ColumnHint.Time && !hintedColumn) {
+    return getColumnByHint(options, ColumnHint.FilterTime);
+  } else if (filter.hint === ColumnHint.FilterTime && !hintedColumn) {
+    return getColumnByHint(options, ColumnHint.Time);
+  }
+  return hintedColumn;
+};
+
+/** The column the query's dashboard time range filter reads, when that filter resolves to a date column. */
+export const getTimeFilterColumn = (options: Pick<QueryBuilderOptions, 'columns' | 'filters'>): string | undefined =>
+  (options.filters ?? [])
+    .filter((filter) => filter.operator === FilterOperator.WithInGrafanaTimeRange)
+    .map((filter) => {
+      const hintedColumn = getHintedFilterColumn(options, filter);
+      return isDateType(hintedColumn?.type || filter.type) ? hintedColumn?.name || filter.key : '';
+    })
+    .find(Boolean);
+
 export const getColumnIndexByHint = (options: QueryBuilderOptions, hint: ColumnHint): number =>
   (options.columns || []).findIndex((c) => c.hint === hint);
 export const getColumnsByHints = (
@@ -744,6 +775,9 @@ const escapeValue = (value: string | number | boolean): string => {
 
   return `'${value}'`;
 };
+
+/** Whether getFilters renders the value as the same quoted literal in every value position, with nothing for template interpolation to expand. */
+export const isPlainStringValue = (value: string): boolean => value === value.trim() && !/[$()'"\\]|\[\[/.test(value);
 
 /**
  * Returns the SELECT column for trace duration.
@@ -878,14 +912,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
 
     let column = filter.key;
     let type = filter.type || '';
-    let hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
-
-    // Fall back to Time/FilterTime if column not found
-    if (filter.hint === ColumnHint.Time && !hintedColumn) {
-      hintedColumn = getColumnByHint(options, ColumnHint.FilterTime);
-    } else if (filter.hint === ColumnHint.FilterTime && !hintedColumn) {
-      hintedColumn = getColumnByHint(options, ColumnHint.Time);
-    }
+    const hintedColumn = getHintedFilterColumn(options, filter);
 
     if (hintedColumn) {
       column = hintedColumn.alias || hintedColumn.name;

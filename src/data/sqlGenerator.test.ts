@@ -2,6 +2,7 @@ import {
   AggregateType,
   BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -15,9 +16,13 @@ import {
   getColumnByHint,
   getColumnIndexByHint,
   getColumnsByHints,
+  getHintedFilterColumn,
+  getTimeFilterColumn,
   isAggregateQuery,
+  isPlainStringValue,
   JSON_SENTINEL_KEY,
 } from './sqlGenerator';
+import { getDefaultLogsFilters, getDefaultTraceFilters } from 'components/queryBuilder/defaultQueryOptions';
 
 describe('SQL Generator', () => {
   it('generates simple table query', () => {
@@ -1067,6 +1072,99 @@ describe('getColumnsByHints', () => {
   });
 });
 
+describe('getHintedFilterColumn', () => {
+  const hintedFilter = (hint?: ColumnHint): Filter => ({
+    filterType: 'custom',
+    condition: 'AND',
+    key: '',
+    type: 'string',
+    hint,
+    operator: FilterOperator.Equals,
+    value: '',
+  });
+  const serviceName: SelectedColumn = { name: 'ServiceName', type: 'String', hint: ColumnHint.TraceServiceName };
+  const time: SelectedColumn = { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time };
+  const filterTime: SelectedColumn = { name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.FilterTime };
+
+  it('returns the column the hint names', () => {
+    expect(getHintedFilterColumn({ columns: [time, serviceName] }, hintedFilter(ColumnHint.TraceServiceName))).toBe(
+      serviceName
+    );
+  });
+
+  it('falls back from Time to FilterTime', () => {
+    expect(getHintedFilterColumn({ columns: [filterTime] }, hintedFilter(ColumnHint.Time))).toBe(filterTime);
+  });
+
+  it('falls back from FilterTime to Time', () => {
+    expect(getHintedFilterColumn({ columns: [time] }, hintedFilter(ColumnHint.FilterTime))).toBe(time);
+  });
+
+  it('returns undefined for a filter without a hint', () => {
+    expect(getHintedFilterColumn({ columns: [time, serviceName] }, hintedFilter())).toBeUndefined();
+  });
+
+  it('returns undefined when no column carries the hint', () => {
+    expect(getHintedFilterColumn({ columns: [time] }, hintedFilter(ColumnHint.LogLevel))).toBeUndefined();
+  });
+});
+
+describe('getTimeFilterColumn', () => {
+  const keyTimeFilter = (operator: FilterOperator): Filter =>
+    ({ filterType: 'custom', condition: 'AND', key: 'ts', type: 'DateTime', operator }) as Filter;
+
+  it('returns the FilterTime column name, not its alias, for the default logs filters', () => {
+    const columns: SelectedColumn[] = [
+      { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+      { name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.FilterTime, alias: 'x' },
+    ];
+    expect(getTimeFilterColumn({ columns, filters: getDefaultLogsFilters() })).toBe('TimestampTime');
+  });
+
+  it('falls back to the filter type for OTel trace columns without a type', () => {
+    const columns: SelectedColumn[] = [
+      { name: 'Timestamp', hint: ColumnHint.Time },
+      { name: 'ServiceName', hint: ColumnHint.TraceServiceName },
+    ];
+    expect(getTimeFilterColumn({ columns, filters: getDefaultTraceFilters() })).toBe('Timestamp');
+  });
+
+  it('returns the key of a time range filter on a date column', () => {
+    expect(getTimeFilterColumn({ columns: [], filters: [keyTimeFilter(FilterOperator.WithInGrafanaTimeRange)] })).toBe(
+      'ts'
+    );
+  });
+
+  it('skips a time range filter that resolves to no column', () => {
+    const unresolved = {
+      filterType: 'custom',
+      condition: 'AND',
+      key: '',
+      type: 'datetime',
+      hint: ColumnHint.Time,
+      operator: FilterOperator.WithInGrafanaTimeRange,
+    } as Filter;
+    expect(
+      getTimeFilterColumn({ columns: [], filters: [unresolved, keyTimeFilter(FilterOperator.WithInGrafanaTimeRange)] })
+    ).toBe('ts');
+  });
+
+  it('returns undefined when the hinted column is not a date type', () => {
+    const columns: SelectedColumn[] = [{ name: 'epoch', type: 'UInt64', hint: ColumnHint.Time }];
+    expect(getTimeFilterColumn({ columns, filters: getDefaultTraceFilters() })).toBeUndefined();
+  });
+
+  it('returns undefined for an outside time range filter', () => {
+    expect(
+      getTimeFilterColumn({ columns: [], filters: [keyTimeFilter(FilterOperator.OutsideGrafanaTimeRange)] })
+    ).toBeUndefined();
+  });
+
+  it('returns undefined without filters', () => {
+    expect(getTimeFilterColumn({ columns: [] })).toBeUndefined();
+  });
+});
+
 describe('getColumnIdentifier', () => {
   const cases: Array<{ input: SelectedColumn; expected: string }> = [
     { input: { name: '' }, expected: `` },
@@ -1153,6 +1251,17 @@ describe('escapeValue', () => {
 
   it.each(nonStringCases)('renders non-string primitive unquoted (case %#)', (c) => {
     expect(_testExports.escapeValue(c.input)).toEqual(c.expected);
+  });
+});
+
+describe('isPlainStringValue', () => {
+  it.each(['api', 'a b', 'a,b', 'café'])('accepts %j, which escapeValue quotes as is', (value) => {
+    expect(isPlainStringValue(value)).toBe(true);
+    expect(_testExports.escapeValue(value)).toBe(`'${value}'`);
+  });
+
+  it.each(['$x', '(', 'x)', "O'Brien", 'say "hi"', 'c\\d', '[[v]]', ' pad', 'pad '])('rejects %j', (value) => {
+    expect(isPlainStringValue(value)).toBe(false);
   });
 });
 

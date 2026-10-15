@@ -45,6 +45,7 @@ The query editor appears in [Explore](https://grafana.com/docs/grafana/latest/vi
 - **Database** and **Table**: Select the database and table to query from the drop-downs.
 - **Query type**: Select **Table**, **Logs**, **Time series**, or **Traces**. The builder shows options that match the type (for example, time column and value columns for time series; columns, filters, group by, and order by for tables).
 - **Type-specific options**: Configure columns, filters, grouping, sorting, limit (max rows), and (for traces) trace ID. The builder generates the SQL for you.
+- **Filter values**: For a string column with `=`, `!=`, `IN` or `NOT IN`, the value field suggests values as you type. Suggestions come from a sample of up to 100,000 rows. If the query's time range filter uses a column in the table's partition key or sorting key, the sample comes from that time range. You can also type any value.
 - **SQL preview**: At the bottom of the builder, you can see the generated SQL. You can switch to SQL mode to edit it manually.
 
 If the data source is configured in **Single source** mode, the query builder uses the configured logs or traces source as its default database, table, and column mapping.
