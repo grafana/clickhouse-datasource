@@ -19,8 +19,8 @@ require (
 
 require (
 	github.com/apache/arrow-go/v18 v18.7.0 // indirect
-	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
-	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
+	github.com/cenkalti/backoff/v7 v7.0.1 // indirect
+	github.com/cenkalti/backoff/v7 v7.0.1 // indirect
 	github.com/clipperhouse/displaywidth v0.11.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
@@ -69,12 +69,12 @@ require (
 	github.com/olekukonko/ll v0.1.8 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/shirou/gopsutil/v4 v4.26.8 // indirect
-	github.com/urfave/cli v1.22.17 // indirect
+	github.com/urfave/cli/v3 v3.14.0 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0 // indirect
 	go.opentelemetry.io/contrib/samplers/jaegerremote v0.37.3 // indirect
-	go.yaml.in/yaml/v2 v2.4.4 // indirect
+	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
