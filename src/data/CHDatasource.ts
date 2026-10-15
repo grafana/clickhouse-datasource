@@ -64,7 +64,15 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { applyMinIntervalToScopedVars } from './queryInterval';
-import { escapeIdentifier, generateSql, getColumnByHint, isStringType, logAliasToColumnHints } from './sqlGenerator';
+import {
+  escapeIdentifier,
+  generateSql,
+  getColumnByHint,
+  getTableIdentifier,
+  isPlainStringValue,
+  isStringType,
+  logAliasToColumnHints,
+} from './sqlGenerator';
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
@@ -1398,6 +1406,53 @@ export class Datasource
     const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
     const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
     return this.fetchData(rawSql);
+  }
+
+  /** Distinct values of a String-family column for filter suggestions, read from a bounded sample and limited to values getFilters renders as plain literals. */
+  async fetchFilterValues(
+    column: string,
+    db: string,
+    table: string,
+    { search = '', timeColumn }: { search?: string; timeColumn?: string } = {}
+  ): Promise<string[]> {
+    // No value that contains this search passes isPlainStringValue, and template interpolation would rewrite the literal.
+    if (!isPlainStringValue(search.trim())) {
+      return [];
+    }
+    const col = escapeIdentifier(column);
+    const templateSrv = getTemplateSrv();
+    const hasRange = 'timeRange' in templateSrv && Boolean(templateSrv.timeRange);
+    const tc =
+      timeColumn && hasRange && (await this.isPartitionOrSortingKeyColumn(db, table, timeColumn))
+        ? escapeIdentifier(timeColumn)
+        : '';
+    const timeFilter = tc ? ` WHERE ${tc} >= $__fromTime AND ${tc} <= $__toTime` : '';
+    const searchFilter = search
+      ? ` AND positionCaseInsensitiveUTF8(toString(${col}), '${escapeCHStringLiteral(search)}') > 0`
+      : '';
+    const rawSql = `SELECT DISTINCT toString(${col}) FROM (SELECT ${col} FROM ${getTableIdentifier(db, table)}${timeFilter} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE}) WHERE ${col} != '' AND isValidUTF8(toString(${col})) AND length(toString(${col})) <= 256${searchFilter} LIMIT 1000`;
+    const values = await this.fetchData(rawSql);
+    return values
+      .map(String)
+      .filter(isPlainStringValue)
+      .sort((a, b) => Number(b === search) - Number(a === search) || a.localeCompare(b));
+  }
+
+  private readonly keyColumnCache = new Map<string, Promise<boolean>>();
+
+  // A time predicate inside the row sample bounds the read only when it can prune parts or granules.
+  private isPartitionOrSortingKeyColumn(db: string, table: string, column: string): Promise<boolean> {
+    const key = `${db}\0${table}\0${column}`;
+    const cached = this.keyColumnCache.get(key);
+    if (cached) {
+      return cached;
+    }
+    const database = db ? `'${escapeCHStringLiteral(db)}'` : 'currentDatabase()';
+    const pending = this.fetchData(
+      `SELECT is_in_partition_key OR is_in_sorting_key FROM system.columns WHERE database = ${database} AND table = '${escapeCHStringLiteral(table)}' AND name = '${escapeCHStringLiteral(column)}'`
+    ).then((values) => Number(values[0]) === 1);
+    this.keyColumnCache.set(key, pending);
+    return pending;
   }
 
   async fetchEntities() {
