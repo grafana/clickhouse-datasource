@@ -3,6 +3,7 @@ package macros
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"time"
 
@@ -10,6 +11,19 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/macropro"
 )
+
+const grafanaIntervalForm = "<integer><unit> (unit one of ms, s, m, h, d, w, M, y)"
+
+var grafanaIntervalUnits = map[string]string{
+	"ms": "millisecond",
+	"s":  "second",
+	"m":  "minute",
+	"h":  "hour",
+	"d":  "day",
+	"w":  "week",
+	"M":  "month",
+	"y":  "year",
+}
 
 // badArgsErr wraps a bad-argument-count error so that downstream callers
 // (sqlds/grafana) classify it as ErrorSourceDownstream rather than a plugin
@@ -138,6 +152,39 @@ func IntervalSeconds(ctx macropro.QueryContext[struct{}], args []string) (string
 	return fmt.Sprintf("%d", int(seconds)), nil
 }
 
+// FromGrafanaInterval converts a Grafana interval variable in <integer><unit> form to
+// ClickHouse INTERVAL syntax. The unit is one of ms, s, m, h, d, w, M, or y.
+// Unlike $__timeGroup, it does not accept compound durations.
+// $__fromGrafanaInterval('5m') → 5 minute
+func FromGrafanaInterval(_ macropro.QueryContext[struct{}], args []string) (string, error) {
+	if len(args) != 1 {
+		return "", badArgsErr("$__fromGrafanaInterval", 1, len(args))
+	}
+
+	interval := strings.Trim(strings.TrimSpace(args[0]), "'\"")
+	if interval == "" {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: expected %s, got empty interval", grafanaIntervalForm))
+	}
+
+	unitSuffix := interval[len(interval)-1:]
+	if strings.HasSuffix(interval, "ms") {
+		unitSuffix = "ms"
+	}
+	unit, ok := grafanaIntervalUnits[unitSuffix]
+	if !ok {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: expected %s, got %q", grafanaIntervalForm, interval))
+	}
+
+	value, err := strconv.ParseUint(strings.TrimSuffix(interval, unitSuffix), 10, 64)
+	if err != nil {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: expected %s, got %q: %w", grafanaIntervalForm, interval, err))
+	}
+	if value == 0 {
+		return "", backend.DownstreamError(fmt.Errorf("$__fromGrafanaInterval: interval must be positive, got %q", interval))
+	}
+	return fmt.Sprintf("%d %s", value, unit), nil
+}
+
 // TimeFrom overrides the dialect-neutral $__timeFrom default with a
 // ClickHouse-native filter expression. sqlutil's default renders an
 // RFC 3339 string literal that only works via implicit String→DateTime
@@ -202,17 +249,18 @@ var ClickHouseMacros = macropro.MergeMacros(
 		"timeGroup":  TimeGroup,
 
 		// ClickHouse-specific extensions (no SDK-default equivalent).
-		"fromTime":        FromTimeFilter,
-		"toTime":          ToTimeFilter,
-		"fromTime_ms":     FromTimeFilterMs,
-		"toTime_ms":       ToTimeFilterMs,
-		"timeFilter_ms":   TimeFilterMs,
-		"dateFilter":      DateFilter,
-		"dateTimeFilter":  DateTimeFilter,
-		"dt":              DateTimeFilter,
-		"timeInterval":    TimeInterval,
-		"timeInterval_ms": TimeIntervalMs,
-		"interval_s":      IntervalSeconds,
+		"fromTime":            FromTimeFilter,
+		"toTime":              ToTimeFilter,
+		"fromTime_ms":         FromTimeFilterMs,
+		"toTime_ms":           ToTimeFilterMs,
+		"timeFilter_ms":       TimeFilterMs,
+		"dateFilter":          DateFilter,
+		"dateTimeFilter":      DateTimeFilter,
+		"dt":                  DateTimeFilter,
+		"timeInterval":        TimeInterval,
+		"timeInterval_ms":     TimeIntervalMs,
+		"interval_s":          IntervalSeconds,
+		"fromGrafanaInterval": FromGrafanaInterval,
 	},
 )
 
