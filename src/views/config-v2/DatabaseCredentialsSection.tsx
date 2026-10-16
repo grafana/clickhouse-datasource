@@ -26,6 +26,7 @@ import {
   trackClickhouseConfigV2DatabaseCredentialsUserInput,
 } from './tracking';
 import { ValidationAPI } from '../CHConfigEditorHooks';
+import { useInstanceSettings } from 'hooks/useInstanceSettings';
 
 export interface Props extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {
   validation?: ValidationAPI;
@@ -37,6 +38,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
   const secureJsonData = (options.secureJsonData || {}) as CHSecureConfig;
   const labels = allLabels.components.Config.ConfigEditor;
   const styles = useStyles2(getStyles);
+  const instanceSettings = useInstanceSettings(options.uid);
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -175,6 +177,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
               jsonData: {
                 ...jsonData,
                 oauthPassThru: checked,
+                allowCleartextJWTForwarding: checked ? jsonData.allowCleartextJWTForwarding : false,
               },
             });
           }}
@@ -192,6 +195,25 @@ export const DatabaseCredentialsSection = (props: Props) => {
                   jsonData: {
                     ...jsonData,
                     oauthPassThruAllowFallback: checked,
+                  },
+                });
+              }}
+            />
+          </Box>
+        )}
+        {jsonData.oauthPassThru && instanceSettings.allowCleartextJWTForwarding && (
+          <Box marginTop={1}>
+            <Checkbox
+              label={labels.allowCleartextJWTForwarding.label}
+              description={labels.allowCleartextJWTForwarding.tooltip}
+              checked={jsonData.allowCleartextJWTForwarding || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    allowCleartextJWTForwarding: checked,
                   },
                 });
               }}

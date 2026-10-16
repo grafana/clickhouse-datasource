@@ -53,8 +53,20 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	// AllowCleartextJWTForwarding lifts the requirement that Forward OAuth
+	// Identity runs over a TLS connection established by the plugin itself.
+	// It exists for deployments where TLS termination and origination are
+	// delegated to a proxy alongside Grafana (an Istio/Envoy sidecar, for
+	// example): the plugin dials the sidecar in plaintext and the sidecar
+	// re-originates TLS to ClickHouse, so the plugin cannot see that the hop
+	// it forwards the token over is encrypted. The operator must ensure that
+	// plaintext hop stays local or otherwise protected; enabling it without
+	// such a proxy sends user tokens in the clear. It does not affect the
+	// separate rejection of Forward OAuth Identity combined with Skip TLS
+	// Verify, which is about unverified TLS rather than no TLS.
+	AllowCleartextJWTForwarding bool            `json:"allowCleartextJWTForwarding,omitempty"`
+	CustomSettings              []CustomSetting `json:"customSettings"`
+	ProxyOptions                *proxy.Options
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -102,6 +114,36 @@ func (settings *Settings) isValid() (err error) {
 	return nil
 }
 
+// forwardsJWTInCleartext reports whether user tokens will be forwarded
+// without TLS established by the plugin, which needs both the data source
+// flag and the instance setting.
+func (settings *Settings) forwardsJWTInCleartext() bool {
+	hasTLS := settings.Secure || settings.TlsClientAuth || settings.TlsAuthWithCACert
+	return settings.OAuthPassThru && !hasTLS &&
+		settings.AllowCleartextJWTForwarding && instanceAllowsCleartextJWTForwarding()
+}
+
+// parseBoolField sets *dst from jsonData[key], which provisioning may supply
+// as either a bool or a string. Missing or null keys leave *dst untouched.
+func parseBoolField(jsonData map[string]interface{}, key string, dst *bool) error {
+	switch v := jsonData[key].(type) {
+	case nil:
+		return nil
+	case bool:
+		*dst = v
+		return nil
+	case string:
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return fmt.Errorf("could not parse %s value: %w", key, err)
+		}
+		*dst = parsed
+		return nil
+	default:
+		return fmt.Errorf("could not parse %s value: unexpected type %T", key, v)
+	}
+}
+
 // LoadSettings will read and validate Settings from the DataSourceConfig
 func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings) (settings Settings, err error) {
 	var jsonData map[string]interface{}
@@ -130,49 +172,21 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	if jsonData["protocol"] != nil {
 		settings.Protocol = jsonData["protocol"].(string)
 	}
-	if jsonData["secure"] != nil {
-		if secure, ok := jsonData["secure"].(string); ok {
-			settings.Secure, err = strconv.ParseBool(secure)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse secure value: %w", err))
-			}
-		} else {
-			settings.Secure = jsonData["secure"].(bool)
-		}
+	if err = parseBoolField(jsonData, "secure", &settings.Secure); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
 	if jsonData["path"] != nil {
 		settings.Path = jsonData["path"].(string)
 	}
 
-	if jsonData["tlsSkipVerify"] != nil {
-		if tlsSkipVerify, ok := jsonData["tlsSkipVerify"].(string); ok {
-			settings.InsecureSkipVerify, err = strconv.ParseBool(tlsSkipVerify)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsSkipVerify value: %w", err))
-			}
-		} else {
-			settings.InsecureSkipVerify = jsonData["tlsSkipVerify"].(bool)
-		}
+	if err = parseBoolField(jsonData, "tlsSkipVerify", &settings.InsecureSkipVerify); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
-	if jsonData["tlsAuth"] != nil {
-		if tlsAuth, ok := jsonData["tlsAuth"].(string); ok {
-			settings.TlsClientAuth, err = strconv.ParseBool(tlsAuth)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsAuth value: %w", err))
-			}
-		} else {
-			settings.TlsClientAuth = jsonData["tlsAuth"].(bool)
-		}
+	if err = parseBoolField(jsonData, "tlsAuth", &settings.TlsClientAuth); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
-	if jsonData["tlsAuthWithCACert"] != nil {
-		if tlsAuthWithCACert, ok := jsonData["tlsAuthWithCACert"].(string); ok {
-			settings.TlsAuthWithCACert, err = strconv.ParseBool(tlsAuthWithCACert)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsAuthWithCACert value: %w", err))
-			}
-		} else {
-			settings.TlsAuthWithCACert = jsonData["tlsAuthWithCACert"].(bool)
-		}
+	if err = parseBoolField(jsonData, "tlsAuthWithCACert", &settings.TlsAuthWithCACert); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
 
 	if jsonData["username"] != nil {
@@ -216,48 +230,26 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 		settings.CustomSettings = customSettings
 	}
-	if jsonData["forwardGrafanaHeaders"] != nil {
-		if forwardGrafanaHeaders, ok := jsonData["forwardGrafanaHeaders"].(string); ok {
-			settings.ForwardGrafanaHeaders, err = strconv.ParseBool(forwardGrafanaHeaders)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse forwardGrafanaHeaders value: %w", err))
-			}
-		} else {
-			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
-		}
+	if err = parseBoolField(jsonData, "forwardGrafanaHeaders", &settings.ForwardGrafanaHeaders); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
 
-	if jsonData["oauthPassThru"] != nil {
-		if oauthPassThru, ok := jsonData["oauthPassThru"].(string); ok {
-			settings.OAuthPassThru, err = strconv.ParseBool(oauthPassThru)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThru value: %w", err))
-			}
-		} else {
-			settings.OAuthPassThru = jsonData["oauthPassThru"].(bool)
-		}
+	if err = parseBoolField(jsonData, "oauthPassThru", &settings.OAuthPassThru); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
 
-	if jsonData["oauthPassThruAllowFallback"] != nil {
-		if allowFallback, ok := jsonData["oauthPassThruAllowFallback"].(string); ok {
-			settings.OAuthPassThruAllowFallback, err = strconv.ParseBool(allowFallback)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThruAllowFallback value: %w", err))
-			}
-		} else {
-			settings.OAuthPassThruAllowFallback = jsonData["oauthPassThruAllowFallback"].(bool)
-		}
+	if err = parseBoolField(jsonData, "oauthPassThruAllowFallback", &settings.OAuthPassThruAllowFallback); err != nil {
+		return settings, backend.DownstreamError(err)
 	}
 
-	if jsonData["enableRowLimit"] != nil {
-		if enableRowLimitString, ok := jsonData["enableRowLimit"].(string); ok {
-			settings.EnableRowLimit, err = strconv.ParseBool(enableRowLimitString)
-			if err != nil {
-				backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "error", err)
-			}
-		} else {
-			settings.EnableRowLimit = jsonData["enableRowLimit"].(bool)
-		}
+	if err = parseBoolField(jsonData, "allowCleartextJWTForwarding", &settings.AllowCleartextJWTForwarding); err != nil {
+		return settings, backend.DownstreamError(err)
+	}
+
+	if err = parseBoolField(jsonData, "enableRowLimit", &settings.EnableRowLimit); err != nil {
+		backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "error", err)
+		settings.EnableRowLimit = false
+		err = nil
 	}
 
 	// Default schema cache on; surface both as booleans and strings to stay

@@ -7,6 +7,10 @@ import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
 import '@testing-library/jest-dom';
 import { CHConfig, Protocol } from 'types/config';
 import allLabels from 'labels';
+import { useInstanceSettings } from 'hooks/useInstanceSettings';
+
+jest.mock('hooks/useInstanceSettings');
+const mockUseInstanceSettings = useInstanceSettings as jest.Mock;
 
 jest.mock('@grafana/runtime', () => {
   const original = jest.requireActual('@grafana/runtime');
@@ -17,6 +21,10 @@ jest.mock('@grafana/runtime', () => {
 });
 
 describe('ConfigEditor', () => {
+  beforeEach(() => {
+    mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: false });
+  });
+
   const labels = allLabels.components.Config.ConfigEditor;
 
   it('new editor', () => {
@@ -139,6 +147,51 @@ describe('ConfigEditor', () => {
     const toggle = document.getElementById('oauthPassThru') as HTMLInputElement;
     expect(toggle).toBeInTheDocument();
     expect(toggle.checked).toBe(true);
+  });
+
+  describe('cleartext JWT forwarding toggle', () => {
+    const toggleId = 'allowCleartextJWTForwarding';
+    const jwtProps = () => mockConfigEditorProps({ oauthPassThru: true, allowCleartextJWTForwarding: true });
+
+    it('is shown when oauthPassThru is on and the instance allows it', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      const { rerender } = render(<ConfigEditor {...mockConfigEditorProps({})} />);
+      expect(document.getElementById(toggleId)).not.toBeInTheDocument();
+
+      rerender(<ConfigEditor {...jwtProps()} />);
+      const toggle = document.getElementById(toggleId) as HTMLInputElement;
+      expect(toggle).toBeInTheDocument();
+      expect(toggle.checked).toBe(true);
+    });
+
+    it('is hidden when the instance does not allow it', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: false });
+      render(<ConfigEditor {...jwtProps()} />);
+      expect(document.getElementById(toggleId)).not.toBeInTheDocument();
+    });
+
+    it('is set when toggled on', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      const props = mockConfigEditorProps({ oauthPassThru: true });
+      render(<ConfigEditor {...props} />);
+
+      fireEvent.click(document.getElementById(toggleId) as HTMLInputElement);
+
+      const lastArgs = (props.onOptionsChange as jest.Mock).mock.lastCall?.[0];
+      expect(lastArgs.jsonData.allowCleartextJWTForwarding).toBe(true);
+    });
+
+    it('is cleared when Forward OAuth Identity is turned off', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      const props = jwtProps();
+      render(<ConfigEditor {...props} />);
+
+      fireEvent.click(document.getElementById('oauthPassThru') as HTMLInputElement);
+
+      const lastArgs = (props.onOptionsChange as jest.Mock).mock.lastCall?.[0];
+      expect(lastArgs.jsonData.oauthPassThru).toBe(false);
+      expect(lastArgs.jsonData.allowCleartextJWTForwarding).toBe(false);
+    });
   });
 
   it('shows the required-field error on an empty host when config validation is not enabled', () => {

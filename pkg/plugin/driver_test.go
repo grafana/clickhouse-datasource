@@ -5,11 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
+	"strconv"
+	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	sdkproxy "github.com/grafana/grafana-plugin-sdk-go/backend/proxy"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/grafana/sqlds/v5"
@@ -717,7 +724,7 @@ func TestResolveJWTAuth(t *testing.T) {
 		s.OAuthPassThru = true
 		headers := map[string]string{"Authorization": "Bearer my-jwt-token"}
 
-		auth, getJWT := resolveJWTAuth(s, headers)
+		auth, getJWT := resolveJWTAuth(s, headers, false)
 
 		assert.Empty(t, auth.Username)
 		assert.Empty(t, auth.Password)
@@ -732,6 +739,19 @@ func TestResolveJWTAuth(t *testing.T) {
 		assert.False(t, exists, "Authorization header should be removed from httpHeaders")
 	})
 
+	t.Run("tokenInHeader keeps the token as a Bearer header and drops credentials", func(t *testing.T) {
+		s := baseSettings
+		s.OAuthPassThru = true
+		headers := map[string]string{"Authorization": "Bearer my-jwt-token"}
+
+		auth, getJWT := resolveJWTAuth(s, headers, true)
+
+		assert.Empty(t, auth.Username)
+		assert.Empty(t, auth.Password)
+		assert.NotNil(t, getJWT)
+		assert.Equal(t, "Bearer my-jwt-token", headers["Authorization"])
+	})
+
 	t.Run("token is read from the SDK OAuth identity header constant", func(t *testing.T) {
 		s := baseSettings
 		s.OAuthPassThru = true
@@ -740,7 +760,7 @@ func TestResolveJWTAuth(t *testing.T) {
 		// header resolveJWTAuth reads.
 		headers := map[string]string{backend.OAuthIdentityTokenHeaderName: "Bearer my-jwt-token"}
 
-		auth, getJWT := resolveJWTAuth(s, headers)
+		auth, getJWT := resolveJWTAuth(s, headers, false)
 
 		assert.Empty(t, auth.Username)
 		assert.Empty(t, auth.Password)
@@ -759,7 +779,7 @@ func TestResolveJWTAuth(t *testing.T) {
 		s.OAuthPassThru = true
 		headers := map[string]string{}
 
-		auth, getJWT := resolveJWTAuth(s, headers)
+		auth, getJWT := resolveJWTAuth(s, headers, false)
 
 		assert.Equal(t, "admin", auth.Username)
 		assert.Equal(t, "secret", auth.Password)
@@ -771,7 +791,7 @@ func TestResolveJWTAuth(t *testing.T) {
 		s.OAuthPassThru = false
 		headers := map[string]string{"Authorization": "Bearer some-token"}
 
-		auth, getJWT := resolveJWTAuth(s, headers)
+		auth, getJWT := resolveJWTAuth(s, headers, false)
 
 		assert.Equal(t, "admin", auth.Username)
 		assert.Equal(t, "secret", auth.Password)
@@ -882,6 +902,213 @@ func TestBuildClickHouseOptionsJWTRequiresTLS(t *testing.T) {
 	_, err := buildClickHouseOptions(t.Context(), settings, message)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "secure (TLS) connection")
+}
+
+func TestBuildClickHouseOptionsJWTAllowsCleartextWhenOptedIn(t *testing.T) {
+	// Deployments that delegate TLS termination and origination to a proxy
+	// alongside Grafana (an Istio/Envoy sidecar) dial the sidecar in
+	// plaintext; the plugin cannot observe the encrypted hop, so the TLS
+	// requirement can be waived. It takes both the data source flag and the
+	// Grafana instance setting, so that provisioning the flag alone (as on
+	// Grafana Cloud) is not enough.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.Secure = false
+	settings.AllowCleartextJWTForwarding = true
+
+	t.Run("data source flag and instance setting", func(t *testing.T) {
+		t.Setenv(cleartextJWTForwardingEnv, "true")
+
+		opts, err := buildClickHouseOptions(t.Context(), settings, message)
+		require.NoError(t, err)
+
+		require.NotNil(t, opts.GetJWT, "the forwarded token must still be used for authentication")
+		token, err := opts.GetJWT(t.Context())
+		require.NoError(t, err)
+		assert.Equal(t, "my-jwt-token", token)
+		assert.Nil(t, opts.TLS, "no TLS config is expected on a cleartext connection")
+	})
+
+	t.Run("data source flag without instance setting", func(t *testing.T) {
+		_, err := buildClickHouseOptions(t.Context(), settings, message)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secure (TLS) connection")
+		assert.Contains(t, err.Error(), "allow_cleartext_jwt_forwarding")
+		assert.Contains(t, err.Error(), "has not set allow_cleartext_jwt_forwarding")
+	})
+
+	t.Run("no data source flag gives the base error only", func(t *testing.T) {
+		off := settings
+		off.AllowCleartextJWTForwarding = false
+
+		_, err := buildClickHouseOptions(t.Context(), off, message)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secure (TLS) connection")
+		assert.NotContains(t, err.Error(), "allow_cleartext_jwt_forwarding")
+	})
+
+	t.Run("rejected with the secure SOCKS proxy enabled", func(t *testing.T) {
+		t.Setenv(cleartextJWTForwardingEnv, "true")
+		withProxy := settings
+		withProxy.ProxyOptions = &sdkproxy.Options{
+			Enabled:   true,
+			ClientCfg: &sdkproxy.ClientCfg{ProxyAddress: "localhost:1080", ServerName: "proxy"},
+			Auth:      &sdkproxy.AuthOptions{Username: "ds-uid", Password: "test"},
+			Timeouts:  &sdkproxy.TimeoutOptions{Timeout: time.Second, KeepAlive: time.Second},
+		}
+
+		_, err := buildClickHouseOptions(t.Context(), withProxy, message)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secure SOCKS proxy")
+	})
+
+	t.Run("flag with Secure on keeps TLS", func(t *testing.T) {
+		t.Setenv(cleartextJWTForwardingEnv, "true")
+		secure := settings
+		secure.Secure = true
+
+		opts, err := buildClickHouseOptions(t.Context(), secure, message)
+		require.NoError(t, err)
+		assert.NotNil(t, opts.TLS, "the flag must never downgrade a connection the plugin would encrypt")
+	})
+
+	t.Run("instance setting without data source flag", func(t *testing.T) {
+		t.Setenv(cleartextJWTForwardingEnv, "true")
+		off := settings
+		off.AllowCleartextJWTForwarding = false
+
+		_, err := buildClickHouseOptions(t.Context(), off, message)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "secure (TLS) connection")
+	})
+
+	t.Run("instance setting false or unparsable", func(t *testing.T) {
+		for _, v := range []string{"false", "", "yes please"} {
+			t.Setenv(cleartextJWTForwardingEnv, v)
+			_, err := buildClickHouseOptions(t.Context(), settings, message)
+			require.Error(t, err, "value %q must not enable the bypass", v)
+		}
+	})
+}
+
+func TestJWTCleartextHTTPSendsBearerToken(t *testing.T) {
+	// clickhouse-go only turns GetJWT into an Authorization header when TLS
+	// is configured, so on a cleartext HTTP connection the forwarded token
+	// must still reach the server some other way.
+	var gotAuth atomic.Value
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth.Store(r.Header.Get("Authorization"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	u, err := url.Parse(srv.URL)
+	require.NoError(t, err)
+	port, err := strconv.Atoi(u.Port())
+	require.NoError(t, err)
+
+	settings := baseJWTSettings()
+	settings.Host = u.Hostname()
+	settings.Port = int64(port)
+	settings.Protocol = "http"
+	settings.Secure = false
+	settings.AllowCleartextJWTForwarding = true
+	t.Setenv(cleartextJWTForwardingEnv, "true")
+
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+	opts, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.NoError(t, err)
+
+	db := clickhouse.OpenDB(opts)
+	defer db.Close()
+	// The fake server does not speak ClickHouse, so the ping result is
+	// irrelevant; only the request it sent matters.
+	_ = db.PingContext(t.Context())
+
+	assert.Equal(t, "Bearer my-jwt-token", gotAuth.Load(), "forwarded JWT must be sent as a Bearer token")
+}
+
+func TestJWTCleartextNativeSendsToken(t *testing.T) {
+	// On the native protocol clickhouse-go carries the token in the hello
+	// packet regardless of TLS, so the cleartext path needs no extra header.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer ln.Close()
+
+	got := make(chan []byte, 1)
+	go func() {
+		conn, err := ln.Accept()
+		if err != nil {
+			got <- nil
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		buf := make([]byte, 4096)
+		n, _ := conn.Read(buf)
+		got <- buf[:n]
+	}()
+
+	settings := baseJWTSettings()
+	settings.Host = "127.0.0.1"
+	settings.Port = int64(ln.Addr().(*net.TCPAddr).Port)
+	settings.Secure = false
+	settings.AllowCleartextJWTForwarding = true
+	t.Setenv(cleartextJWTForwardingEnv, "true")
+
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+	opts, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.NoError(t, err)
+
+	db := clickhouse.OpenDB(opts)
+	defer db.Close()
+	// The fake server does not speak ClickHouse, so the ping result is
+	// irrelevant; only the bytes it received matter.
+	_ = db.PingContext(t.Context())
+
+	hello := <-got
+	assert.Contains(t, string(hello), "my-jwt-token", "native hello packet must carry the forwarded JWT")
+}
+
+func TestInstanceAllowsCleartextJWTForwarding(t *testing.T) {
+	assert.False(t, instanceAllowsCleartextJWTForwarding(), "unset means off")
+	t.Setenv(cleartextJWTForwardingEnv, "true")
+	assert.True(t, instanceAllowsCleartextJWTForwarding())
+	t.Setenv(cleartextJWTForwardingEnv, "false")
+	assert.False(t, instanceAllowsCleartextJWTForwarding())
+}
+
+func TestBuildClickHouseOptionsJWTCleartextOptInDoesNotAllowSkipTLSVerify(t *testing.T) {
+	// allowCleartextJWTForwarding covers "no TLS at all, terminated by a
+	// proxy". Unverified TLS is a different problem and stays rejected.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.InsecureSkipVerify = true
+	settings.AllowCleartextJWTForwarding = true
+	t.Setenv(cleartextJWTForwardingEnv, "true")
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Skip TLS Verify")
+}
+
+func TestBuildClickHouseOptionsJWTCleartextOptInRejectsLeftoverSkipTLSVerify(t *testing.T) {
+	// Skip TLS Verify has no effect without TLS, but it is still rejected
+	// with Forward OAuth Identity so a stale setting is not left behind
+	// unnoticed.
+	message := json.RawMessage(`{"grafana-http-headers":{"Authorization":["Bearer my-jwt-token"]}}`)
+
+	settings := baseJWTSettings()
+	settings.Secure = false
+	settings.InsecureSkipVerify = true
+	settings.AllowCleartextJWTForwarding = true
+	t.Setenv(cleartextJWTForwardingEnv, "true")
+
+	_, err := buildClickHouseOptions(t.Context(), settings, message)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Skip TLS Verify")
 }
 
 func TestBuildClickHouseOptionsJWTRejectsSkipTLSVerify(t *testing.T) {
