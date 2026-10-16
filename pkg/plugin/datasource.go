@@ -2,6 +2,8 @@ package plugin
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
@@ -20,10 +22,24 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	// enableRowLimit datasource option remains separate: it additionally
 	// pushes the same limit down to the ClickHouse server (driver.go).
 	ds.EnableRowLimit = true
+	ds.CustomRoutes = map[string]func(http.ResponseWriter, *http.Request){
+		instanceSettingsRoute: instanceSettingsHandler,
+	}
 	pluginSettings := clickhousePlugin.Settings(ctx, settings)
 	if pluginSettings.ForwardHeaders {
 		ds.EnableMultipleConnections = true
 	}
 
 	return ds.NewDatasource(ctx, settings)
+}
+
+const instanceSettingsRoute = "/instance-settings"
+
+// instanceSettingsHandler tells the config editor which instance-wide
+// Grafana settings are on, so it can hide options the instance forbids.
+func instanceSettingsHandler(rw http.ResponseWriter, _ *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(rw).Encode(map[string]bool{
+		"allowClearTextJWTForwarding": instanceAllowsClearTextJWTForwarding(),
+	})
 }

@@ -29,6 +29,8 @@ type ClickHouseSettingsJSON struct {
 	OAuthPassThru              bool   `json:"oauthPassThru,omitempty"`
 	OAuthPassThruAllowFallback bool   `json:"oauthPassThruAllowFallback,omitempty"`
 
+	AllowClearTextJWTForwarding bool `json:"allowClearTextJWTForwarding,omitempty"`
+
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 	DefaultTable    string `json:"defaultTable,omitempty"`
 

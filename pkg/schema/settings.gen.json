@@ -30,6 +30,11 @@
               }
             }
           },
+          "allowClearTextJWTForwarding": {
+            "description": "Forward the token without a TLS connection established by the plugin, for deployments where a proxy next to Grafana terminates and originates TLS. Only applies when Forward OAuth Identity is enabled, and only takes effect when the Grafana administrator also sets allow_cleartext_jwt_forwarding = true in the [plugin.grafana-clickhouse-datasource] section.",
+            "type": "boolean",
+            "default": false
+          },
           "configMode": {
             "description": "Choose how this datasource is used. 'Single table' provides a focused, compact query editor for one table. 'All databases' gives full access to explore any database and table.",
             "type": "string",

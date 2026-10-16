@@ -130,8 +130,8 @@ After adding the data source, configure the following settings.
 | **Secure connection** | Enable when your ClickHouse server uses TLS. When enabled, update the **Port** to a TLS-enabled port and configure [TLS settings](#tls-settings) below. |
 | **Username**          | ClickHouse user name. Use a [read-only user](#clickhouse-user-and-permissions).                                                                         |
 | **Password**          | ClickHouse user password.                                                                                                                               |
-| **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings), unless **Allow clear text JWT forwarding** is enabled. See [Forward OAuth Identity](#forward-oauth-identity). |
-| **Allow clear text JWT forwarding** | Only shown when **Forward OAuth Identity** is enabled. Lifts the TLS requirement for token forwarding, for deployments where TLS is terminated and originated by a proxy alongside Grafana. See [Delegating TLS to a proxy](#delegating-tls-to-a-proxy). |
+| **Forward OAuth Identity** | Forward the logged-in Grafana user's OAuth token to ClickHouse as a JWT instead of authenticating with the configured username and password. ClickHouse Cloud only; requires a [secure (TLS) connection](#tls-settings), unless [clear text JWT forwarding](#delegating-tls-to-a-proxy) is allowed. See [Forward OAuth Identity](#forward-oauth-identity). |
+| **Allow clear text JWT forwarding** | Only shown when **Forward OAuth Identity** is enabled and the Grafana administrator has allowed it for the instance. Lifts the TLS requirement for token forwarding, for deployments where TLS is terminated and originated by a proxy alongside Grafana. Not available on Grafana Cloud. See [Delegating TLS to a proxy](#delegating-tls-to-a-proxy). |
 | **Default database**  | The database the query builder uses when no database is selected. If left blank, the plugin defaults to `default`.                                      |
 | **Default table**     | The default table used by the query builder.                                                                                                            |
 
@@ -315,10 +315,22 @@ To enable it, turn on **Forward OAuth Identity** in the **Database credentials**
 
 Some deployments do not let the plugin establish TLS itself. In a service mesh such as [Istio](https://istio.io/), an [Envoy](https://www.envoyproxy.io/) sidecar deployed next to Grafana intercepts the plugin's outbound connection, terminates it locally, and originates a new TLS connection to ClickHouse. From the plugin's point of view the connection is plaintext, even though every hop that leaves the pod is encrypted.
 
-In that topology, **Secure connection** must stay off. Turning it on would make the plugin negotiate TLS with a sidecar that expects plaintext. The JWT-over-TLS requirement would then block **Forward OAuth Identity** entirely. Enable **Allow clear text JWT forwarding** to lift that requirement.
+In that topology, **Secure connection** must stay off. Turning it on would make the plugin negotiate TLS with a sidecar that expects plaintext. The JWT-over-TLS requirement would then block **Forward OAuth Identity** entirely. Allowing clear text JWT forwarding lifts that requirement. It takes two settings, and both are required:
+
+1. The Grafana administrator allows it for the whole instance, in `grafana.ini`:
+
+   ```ini
+   [plugin.grafana-clickhouse-datasource]
+   allow_cleartext_jwt_forwarding = true
+   ```
+
+   Grafana only passes plugin settings from sections that exist in its configuration, so to set this with an environment variable instead, keep an (even empty) `[plugin.grafana-clickhouse-datasource]` section in `grafana.ini` and set `GF_PLUGIN_GRAFANA_CLICKHOUSE_DATASOURCE_ALLOW_CLEARTEXT_JWT_FORWARDING=true`. It is off when not set. Restart Grafana after changing it.
+2. **Allow clear text JWT forwarding** is turned on for the data source. The toggle only appears in the data source settings once **Forward OAuth Identity** is on and the instance setting above is on. Setting `allowClearTextJWTForwarding` in provisioning without the instance setting does not lift the requirement: the connection is still rejected.
+
+Grafana Cloud does not set the instance setting, so this option is not available there.
 
 {{< admonition type="warning" >}}
-**Allow clear text JWT forwarding** disables a safety check; it does not make the connection secure. The plugin cannot verify that there's a proxy handling TLS or warn you if it isn't. Only enable it when you have confirmed that a proxy terminates and re-originates TLS for this data source.
+Allowing clear text JWT forwarding disables a safety check; it does not make the connection secure. The plugin cannot verify that there's a proxy handling TLS or warn you if it isn't. Only enable it when you have confirmed that a proxy terminates and re-originates TLS for this data source.
 {{< /admonition >}}
 
 This option does not affect the **Skip TLS Verify** restriction: when the plugin does establish TLS, the server certificate must still be verified.
@@ -373,7 +385,7 @@ datasources:
       # forwardGrafanaHeaders: <bool>
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true, unless allowClearTextJWTForwarding is set
       # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
-      # allowClearTextJWTForwarding: <bool>  # forward the JWT without TLS; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
+      # allowClearTextJWTForwarding: <bool>  # forward the JWT without TLS; also needs allow_cleartext_jwt_forwarding on the Grafana instance; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
       # path: <string>  # HTTP URL path (HTTP protocol only)
       # httpHeaders:     # HTTP protocol only
       #   - name: X-Example-Header
@@ -417,7 +429,7 @@ resource "grafana_data_source" "clickhouse" {
     # validateSql     = true
     # enableRowLimit  = true
     # oauthPassThru   = true  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure = true, unless allowClearTextJWTForwarding is set
-    # allowClearTextJWTForwarding = true  # forward the JWT without TLS; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
+    # allowClearTextJWTForwarding = true  # forward the JWT without TLS; also needs allow_cleartext_jwt_forwarding on the Grafana instance; only enable when a proxy (for example an Istio/Envoy sidecar) terminates and originates TLS
   })
 
   secure_json_data_encoded = jsonencode({

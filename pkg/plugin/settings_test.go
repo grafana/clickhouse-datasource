@@ -439,6 +439,14 @@ func TestLoadSettingsAllowClearTextJWTForwarding(t *testing.T) {
 		assert.True(t, settings.AllowClearTextJWTForwarding)
 	})
 
+	t.Run("should return an error instead of panicking on a non-bool value", func(t *testing.T) {
+		_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowClearTextJWTForwarding": 1}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.ErrorContains(t, err, "allowClearTextJWTForwarding")
+	})
+
 	t.Run("should default allowClearTextJWTForwarding to false", func(t *testing.T) {
 		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
 			JSONData:                []byte(`{"host": "test", "port": 443}`),
@@ -587,7 +595,7 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"username": "baz", "defaultDatabase": "example",
 			"connMaxLifetime": 60, "dialTimeout": "20", "queryTimeout": "120", "maxIdleConns": 2, "maxOpenConns": 3,
 			"httpHeaders": [{ "name": "x-plain", "value": "value-1", "secure": false }],
-			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true,
+			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true, "allowClearTextJWTForwarding": true,
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
 			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120

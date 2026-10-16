@@ -48,6 +48,47 @@ test.describe('Config editor', () => {
       ).toBeVisible();
     });
 
+    test.describe('clear text JWT forwarding toggle', () => {
+      const toggleName = /Allow clear text JWT forwarding/;
+      const mockInstanceSettings = (page: Page, allowClearTextJWTForwarding: boolean) =>
+        page.route('**/resources/instance-settings', (route) =>
+          route.fulfill({ json: { allowClearTextJWTForwarding } })
+        );
+
+      test('is hidden until Forward OAuth Identity is on and the instance allows it', async ({
+        createDataSourceConfigPage,
+        page,
+      }) => {
+        await mockInstanceSettings(page, true);
+        await createDataSourceConfigPage({ type: PLUGIN_UID });
+        await isV2Editor(page);
+
+        await expect(page.getByLabel(toggleName)).toBeHidden();
+        await page.getByLabel(/Forward OAuth Identity/).check({ force: true });
+        await expect(page.getByLabel(toggleName)).toBeVisible();
+      });
+
+      test('stays hidden when the instance does not allow it', async ({ createDataSourceConfigPage, page }) => {
+        await mockInstanceSettings(page, false);
+        await createDataSourceConfigPage({ type: PLUGIN_UID });
+        await isV2Editor(page);
+
+        await page.getByLabel(/Forward OAuth Identity/).check({ force: true });
+        await expect(page.getByLabel(/Allow service account fallback/)).toBeVisible();
+        await expect(page.getByLabel(toggleName)).toBeHidden();
+      });
+
+      test('stays hidden when the instance settings call fails', async ({ createDataSourceConfigPage, page }) => {
+        await page.route('**/resources/instance-settings', (route) => route.fulfill({ status: 500 }));
+        await createDataSourceConfigPage({ type: PLUGIN_UID });
+        await isV2Editor(page);
+
+        await page.getByLabel(/Forward OAuth Identity/).check({ force: true });
+        await expect(page.getByLabel(/Allow service account fallback/)).toBeVisible();
+        await expect(page.getByLabel(toggleName)).toBeHidden();
+      });
+    });
+
     test('should render Server section', async ({ createDataSourceConfigPage, page }) => {
       await createDataSourceConfigPage({ type: PLUGIN_UID });
       const isV2 = await isV2Editor(page);
