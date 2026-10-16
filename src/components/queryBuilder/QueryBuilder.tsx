@@ -37,6 +37,7 @@ import allLabels from 'labels';
 import {
   buildCompactQueryDefaults,
   convertCarriedOverQuery,
+  detectsOtelLogsSchema,
   isCompactQueryTypeMismatch,
   isSameQueryOptions,
   shouldBuildCompactQueryDefaults,
@@ -48,6 +49,7 @@ import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
 import { sourceKey } from 'hooks/useFitQueryToTable';
+import useTableKeys from 'hooks/useTableKeys';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
@@ -244,6 +246,8 @@ interface CompactQueryEditorProps {
   onRunQuery?: () => void;
 }
 
+const NO_COLUMNS: readonly TableColumn[] = [];
+
 const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const {
     datasource,
@@ -263,10 +267,10 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const fallbackTable = isCarriedOver ? '' : builderOptions.table;
   // Defaults are built in two passes: database and table never depend on the
   // table's columns, so a build without column names locates the table for the
-  // columns fetch, and the fetched column names then feed the OTel logs schema
-  // detection inside buildCompactQueryDefaults. Treating a query that still
-  // equals the base defaults as needing initialization lets that detection
-  // correct the defaults once the columns arrive, without clobbering edits:
+  // columns fetch, and the fetched column names and table keys then feed the OTel
+  // logs schema detection inside buildCompactQueryDefaults. Treating a query that
+  // still equals the base defaults as needing initialization lets that detection
+  // correct the defaults once the schema arrives, without clobbering edits:
   // authored queries differ from the generated defaults and are never replaced.
   const baseDefaults = buildCompactQueryDefaults(datasource, signalType, fallbackTable);
   const needsInitialization =
@@ -279,7 +283,14 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const onRunQueryRef = useRef(onRunQuery);
   const locationOptions = needsInitialization ? baseDefaults : builderOptions;
   const allColumns = useColumns(datasource, locationOptions.database, locationOptions.table);
-  const tableColumnNames = useMemo(() => allColumns.map((column) => column.name), [allColumns]);
+  const tableKeys = useTableKeys(
+    datasource,
+    locationOptions.database,
+    needsInitialization && signalType === 'logs' && detectsOtelLogsSchema(datasource) ? locationOptions.table : ''
+  );
+  // Columns stay hidden until the table keys settle, because a query built without the keys is not rebuilt.
+  const schemaColumns = tableKeys === undefined ? NO_COLUMNS : allColumns;
+  const tableColumnNames = useMemo(() => schemaColumns.map((column) => column.name), [schemaColumns]);
 
   useEffect(() => {
     onQueryChangeRef.current = onQueryChange;
@@ -335,7 +346,13 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
     lastInitializationKey.current = initializationKey;
 
-    const defaults = buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns);
+    const defaults = buildCompactQueryDefaults(
+      datasource,
+      signalType,
+      fallbackTable,
+      schemaColumns,
+      tableKeys ?? undefined
+    );
     if (!isSameQueryOptions(builderOptions, defaults)) {
       // Keep the recorded owner, so rebuilding the defaults does not drop it.
       const owner = builderOptions.meta?.datasourceUid;
@@ -352,11 +369,12 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     needsInitialization,
     signalType,
     tableColumnNames,
-    allColumns,
+    schemaColumns,
+    tableKeys,
   ]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns)
+    ? buildCompactQueryDefaults(datasource, signalType, fallbackTable, schemaColumns, tableKeys ?? undefined)
     : builderOptions;
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 
