@@ -66,6 +66,7 @@ describe('QueryBuilder', () => {
     setState();
     return Promise.resolve([]);
   });
+  mockDs.getColumnsCached = jest.fn(() => Promise.resolve([]));
 
   it('omits compact time columns from filter column options', () => {
     const filterColumns = getCompactFilterColumns(
@@ -468,6 +469,185 @@ describe('QueryBuilder', () => {
     expect(screen.queryByTestId('compact-filter-bar')).not.toBeInTheDocument();
     expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
     expect(onQueryChange).not.toHaveBeenCalled();
+  });
+
+  describe('query carried over from another single-table data source', () => {
+    const serviceFilter = {
+      filterType: 'custom',
+      key: 'ServiceName',
+      type: 'LowCardinality(String)',
+      operator: FilterOperator.Equals,
+      value: 'checkout',
+      condition: 'AND',
+    } as const;
+    const severityFilter = { ...serviceFilter, key: 'SeverityText', value: 'ERROR' } as const;
+
+    // A logs query as another single-table data source built it, with a search and two filters.
+    const carriedOverLogsQuery: QueryBuilderOptions = {
+      database: 'otel_v2',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      columns: [
+        { name: 'Timestamp', hint: ColumnHint.Time },
+        { name: 'Body', hint: ColumnHint.LogMessage },
+      ],
+      filters: [serviceFilter, severityFilter],
+      orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC }],
+      limit: 1000,
+      meta: { logMessageLike: 'timeout' },
+    };
+
+    const columnsOf = (types: Record<string, string>) =>
+      Object.entries(types).map(([name, type]) => ({ name, type, picklistValues: [] }));
+
+    const tracesDs = {
+      ...mockDs,
+      uid: 'single-table-traces',
+      getSignalType: jest.fn(() => 'traces'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultTraceDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultTraceTable: jest.fn(() => 'otel_traces'),
+      getDefaultTraceColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['trace_id', 'TraceId'],
+          ])
+      ),
+      getTraceOtelVersion: jest.fn(() => '1.29.0'),
+      getDefaultTraceDurationUnit: jest.fn(() => TimeUnit.Nanoseconds),
+      getColumnsCached: jest.fn(() =>
+        Promise.resolve(
+          columnsOf({ Timestamp: 'DateTime64(9)', TraceId: 'String', ServiceName: 'LowCardinality(String)' })
+        )
+      ),
+    } as unknown as Datasource;
+
+    const otherLogsDs = {
+      ...mockDs,
+      uid: 'single-table-app-logs',
+      getSignalType: jest.fn(() => 'logs'),
+      getConfigMode: jest.fn(() => 'single-table'),
+      isSingleTableMode: jest.fn(() => true),
+      getDefaultLogsDatabase: jest.fn(() => 'otel_v2'),
+      getDefaultLogsTable: jest.fn(() => 'app_logs'),
+      getDefaultLogsColumns: jest.fn(
+        () =>
+          new Map([
+            ['time', 'Timestamp'],
+            ['log_message', 'Body'],
+          ])
+      ),
+      getLogsOtelVersion: jest.fn(() => '1.29.0'),
+      getColumnsCached: jest.fn(() =>
+        Promise.resolve(
+          columnsOf({
+            Timestamp: 'DateTime64(9)',
+            Body: 'String',
+            ServiceName: 'LowCardinality(String)',
+            SeverityText: 'LowCardinality(String)',
+          })
+        )
+      ),
+    } as unknown as Datasource;
+
+    const renderBuilder = (app: CoreApp, datasource: Datasource, builderOptions = carriedOverLogsQuery) => {
+      const builderOptionsDispatch = jest.fn();
+      const onQueryChange = jest.fn();
+      const onRunQuery = jest.fn();
+      render(
+        <QueryBuilder
+          app={app}
+          builderOptions={builderOptions}
+          builderOptionsDispatch={builderOptionsDispatch}
+          datasource={datasource}
+          generatedSql=""
+          onQueryChange={onQueryChange}
+          onRunQuery={onRunQuery}
+        />
+      );
+      return { builderOptionsDispatch, onQueryChange, onRunQuery };
+    };
+
+    it('converts it for the traces data source in Explore, keeping the filters that fit, and runs it', async () => {
+      const { onQueryChange, onRunQuery } = renderBuilder(CoreApp.Explore, tracesDs);
+
+      expect(screen.getByTestId('compact-filter-bar')).toBeInTheDocument();
+      expect(screen.queryByText('Query Type')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('logs-component')).not.toBeInTheDocument();
+      await waitFor(() => expect(onRunQuery).toHaveBeenCalledTimes(1));
+      expect(tracesDs.getColumnsCached).toHaveBeenCalledWith('otel_v2', 'otel_traces');
+      expect(onQueryChange).toHaveBeenCalledTimes(1);
+      const converted = onQueryChange.mock.calls[0][0];
+      expect(converted).toMatchObject({ database: 'otel_v2', table: 'otel_traces', queryType: QueryType.Traces });
+      expect(converted.filters).toContainEqual(serviceFilter);
+      expect(converted.filters).not.toContainEqual(severityFilter);
+      expect(converted.meta.logMessageLike).toBeUndefined();
+    });
+
+    it('still converts and runs it once when the new table columns cannot be fetched', async () => {
+      const failingTracesDs = {
+        ...tracesDs,
+        getColumnsCached: jest.fn(() => Promise.reject(new Error('schema fetch failed'))),
+      } as unknown as Datasource;
+      const { onQueryChange, onRunQuery } = renderBuilder(CoreApp.Explore, failingTracesDs);
+
+      await waitFor(() => expect(onRunQuery).toHaveBeenCalledTimes(1));
+      const converted = onQueryChange.mock.calls[0][0];
+      expect(converted).toMatchObject({ table: 'otel_traces', queryType: QueryType.Traces });
+      expect(converted.filters).not.toContainEqual(serviceFilter);
+    });
+
+    it('retargets it to another logs table in Explore, keeping the search text and filters', async () => {
+      const { onQueryChange, onRunQuery } = renderBuilder(CoreApp.Explore, otherLogsDs);
+
+      expect(screen.getByTestId('compact-mode-bar')).toBeInTheDocument();
+      await waitFor(() => expect(onRunQuery).toHaveBeenCalledTimes(1));
+      const converted = onQueryChange.mock.calls[0][0];
+      expect(converted).toMatchObject({ database: 'otel_v2', table: 'app_logs', queryType: QueryType.Logs });
+      expect(converted.filters).toEqual([serviceFilter, severityFilter]);
+      expect(converted.meta.logMessageLike).toBe('timeout');
+    });
+
+    it('keeps it in the classic builder outside Explore, where it may be a saved query', async () => {
+      const { builderOptionsDispatch, onQueryChange, onRunQuery } = renderBuilder(CoreApp.PanelEditor, tracesDs);
+
+      expect(await screen.findByTestId('logs-component')).toHaveAttribute('data-table', 'otel_logs');
+      expect(screen.queryByTestId('compact-filter-bar')).not.toBeInTheDocument();
+      expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+      expect(onQueryChange).not.toHaveBeenCalled();
+      expect(onRunQuery).not.toHaveBeenCalled();
+    });
+
+    it('leaves a query that already belongs to the data source alone in Explore', async () => {
+      const { builderOptionsDispatch, onRunQuery } = renderBuilder(CoreApp.Explore, otherLogsDs, {
+        ...carriedOverLogsQuery,
+        table: 'app_logs',
+      });
+
+      expect(await screen.findByTestId('compact-mode-bar')).toBeInTheDocument();
+      expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+      expect(onRunQuery).not.toHaveBeenCalled();
+    });
+
+    it('keeps an authored time series query in the classic builder in Explore', async () => {
+      const { builderOptionsDispatch, onQueryChange, onRunQuery } = renderBuilder(CoreApp.Explore, otherLogsDs, {
+        queryType: QueryType.TimeSeries,
+        mode: BuilderMode.Trend,
+        database: 'metrics_db',
+        table: 'requests',
+        columns: [{ name: 'created_at', hint: ColumnHint.Time }, { name: 'requests_count' }],
+        filters: [serviceFilter],
+      });
+
+      expect(await screen.findByTestId('time-series-component')).toBeInTheDocument();
+      expect(screen.queryByTestId('compact-mode-bar')).not.toBeInTheDocument();
+      expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+      expect(onQueryChange).not.toHaveBeenCalled();
+      expect(onRunQuery).not.toHaveBeenCalled();
+    });
   });
 
   it('re-resolves compact logs defaults to the pre-v0.151.0 otel schema once table columns load', async () => {

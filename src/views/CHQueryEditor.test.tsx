@@ -8,6 +8,7 @@ import { EditorType } from 'types/sql';
 import { ColumnHint, FilterOperator, QueryType } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { selectors } from 'selectors';
+import { CoreApp } from '@grafana/data';
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
@@ -446,6 +447,66 @@ describe('Query Editor', () => {
     );
 
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+  });
+
+  // Every change the editor propagates must target the new table, never the carried-over one.
+  it('converts a query carried over from another single-table logs data source in Explore', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'app_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    datasource.fetchColumns = jest.fn(() =>
+      Promise.resolve([
+        { name: 'Body', type: 'String', picklistValues: [] },
+        { name: 'ServiceName', type: 'LowCardinality(String)', picklistValues: [] },
+      ])
+    );
+    const serviceFilter = {
+      filterType: 'custom',
+      key: 'ServiceName',
+      type: 'LowCardinality(String)',
+      operator: FilterOperator.Equals,
+      value: 'checkout',
+      condition: 'AND',
+    } as const;
+    const onChange = jest.fn();
+    const onRunQuery = jest.fn();
+
+    render(
+      <CHQueryEditor
+        app={CoreApp.Explore}
+        query={{
+          pluginVersion,
+          rawSql: 'SELECT Body FROM "otel_v2"."otel_logs"',
+          refId: 'A',
+          editorType: EditorType.Builder,
+          builderOptions: {
+            database: 'otel_v2',
+            table: 'otel_logs',
+            queryType: QueryType.Logs,
+            columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+            filters: [serviceFilter],
+          },
+        }}
+        onChange={onChange}
+        onRunQuery={onRunQuery}
+        datasource={datasource}
+      />
+    );
+
+    await waitFor(() => expect(onRunQuery).toHaveBeenCalledTimes(1));
+    expect(onChange).toHaveBeenCalled();
+    for (const [changedQuery] of onChange.mock.calls) {
+      expect(changedQuery.builderOptions.table).toBe('app_logs');
+      expect(changedQuery.builderOptions.filters).toContainEqual(serviceFilter);
+      expect(changedQuery.rawSql).toContain('"otel_v2"."app_logs"');
+      expect(changedQuery.rawSql).toContain("ServiceName = 'checkout'");
+    }
   });
 
   it('syncs compact builder state when query filters change externally', async () => {

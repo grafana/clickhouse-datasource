@@ -15,7 +15,11 @@ import { QueryBuilderOptions } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
 import useHasTraceTimestampTable from 'hooks/useHasTraceTimestampTable';
-import { buildCompactQueryDefaults, getCompactQueryType } from 'components/queryBuilder/compactQueryDefaults';
+import {
+  buildCompactQueryDefaults,
+  getCompactQueryType,
+  shouldConvertCarriedOverQuery,
+} from 'components/queryBuilder/compactQueryDefaults';
 import { isEqual } from 'lodash';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
@@ -128,7 +132,11 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const shouldSkipChanges = useRef<boolean>(true);
   if (isBuilderOptionsRunnable(builderOptions)) {
     if (singleTableMode && signalType) {
-      shouldSkipChanges.current = builderOptions.queryType !== getCompactQueryType(signalType);
+      // The compact editor converts a query carried over from another data source. Propagating
+      // it here would race that conversion and could put the stale query back.
+      shouldSkipChanges.current =
+        builderOptions.queryType !== getCompactQueryType(signalType) ||
+        shouldConvertCarriedOverQuery(builderOptions, props.datasource, signalType, app);
     } else {
       shouldSkipChanges.current = false;
     }

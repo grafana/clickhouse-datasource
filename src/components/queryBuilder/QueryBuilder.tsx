@@ -32,8 +32,10 @@ import { Components as allSelectors } from 'selectors';
 import allLabels from 'labels';
 import {
   buildCompactQueryDefaults,
+  convertCarriedOverQuery,
   isCompactQueryTypeMismatch,
   shouldBuildCompactQueryDefaults,
+  shouldConvertCarriedOverQuery,
 } from './compactQueryDefaults';
 import { useDefaultLogColumnsByName, useDefaultTimeColumn } from './views/logsQueryBuilderHooks';
 import { getColumnByHint } from 'data/sqlGenerator';
@@ -60,6 +62,7 @@ interface QueryBuilderProps {
 
 export const QueryBuilder = (props: QueryBuilderProps) => {
   const {
+    app,
     datasource,
     builderOptions,
     builderOptionsDispatch,
@@ -88,10 +91,16 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   }
 
   if (singleTableMode && signalType) {
+    // Switching data sources in Explore keeps the query when both use this plugin, so a query
+    // built for another data source lands here. Explore queries are not saved, so convert it
+    // for this data source instead of showing it in the classic builder.
+    const isCarriedOver = shouldConvertCarriedOverQuery(builderOptions, datasource, signalType, app);
+
     // An authored query whose type does not match the datasource signal falls through to
     // the classic builder, so switching a datasource to single-table mode never silently
     // replaces the saved options of pre-existing queries.
     const preserveAuthoredQuery =
+      !isCarriedOver &&
       isCompactQueryTypeMismatch(builderOptions, signalType) &&
       !shouldBuildCompactQueryDefaults(builderOptions, signalType);
 
@@ -103,6 +112,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           builderOptionsDispatch={builderOptionsDispatch}
           generatedSql={generatedSql}
           signalType={signalType}
+          isCarriedOver={isCarriedOver}
           minInterval={minInterval}
           onQueryChange={onQueryChange}
           onEditAsSql={onEditAsSql}
@@ -186,6 +196,8 @@ interface CompactQueryEditorProps {
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
   generatedSql: string;
   signalType: SignalType;
+  /** The query was carried over from another data source and is converted for this one. */
+  isCarriedOver: boolean;
   minInterval?: string;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
@@ -200,12 +212,16 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     builderOptionsDispatch,
     generatedSql,
     signalType,
+    isCarriedOver,
     minInterval,
     onQueryChange,
     onEditAsSql,
     onMinIntervalChange,
     onRunQuery,
   } = props;
+  // A carried-over query's table belongs to the other data source, so it must not stand in for
+  // an unset table in the defaults.
+  const fallbackTable = isCarriedOver ? '' : builderOptions.table;
   // Defaults are built in two passes: database and table never depend on the
   // table's columns, so a build without column names locates the table for the
   // columns fetch, and the fetched column names then feed the OTel logs schema
@@ -213,22 +229,58 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   // equals the base defaults as needing initialization lets that detection
   // correct the defaults once the columns arrive, without clobbering edits:
   // authored queries differ from the generated defaults and are never replaced.
-  const baseDefaults = buildCompactQueryDefaults(datasource, signalType, builderOptions.table);
+  const baseDefaults = buildCompactQueryDefaults(datasource, signalType, fallbackTable);
   const needsInitialization =
-    shouldBuildCompactQueryDefaults(builderOptions, signalType) || isEqual(builderOptions, baseDefaults);
+    isCarriedOver ||
+    shouldBuildCompactQueryDefaults(builderOptions, signalType) ||
+    isEqual(builderOptions, baseDefaults);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const lastInitializationKey = useRef<string>();
   const onQueryChangeRef = useRef(onQueryChange);
+  const onRunQueryRef = useRef(onRunQuery);
   const locationOptions = needsInitialization ? baseDefaults : builderOptions;
   const allColumns = useColumns(datasource, locationOptions.database, locationOptions.table);
   const tableColumnNames = useMemo(() => allColumns.map((column) => column.name), [allColumns]);
 
   useEffect(() => {
     onQueryChangeRef.current = onQueryChange;
-  }, [onQueryChange]);
+    onRunQueryRef.current = onRunQuery;
+  }, [onQueryChange, onRunQuery]);
+
+  // Converting a carried-over query checks its filters against this table's columns. They are
+  // fetched here rather than read from useColumns, which swallows a failed fetch and never
+  // settles. A failed fetch converts with no columns, so only fitting role filters are kept.
+  const { database: targetDatabase, table: targetTable } = baseDefaults;
+  useEffect(() => {
+    if (!isCarriedOver) {
+      return;
+    }
+
+    let cancelled = false;
+    const convert = (columns: readonly TableColumn[]) => {
+      if (cancelled) {
+        return;
+      }
+      const defaults = buildCompactQueryDefaults(datasource, signalType, '', columns);
+      const nextOptions = convertCarriedOverQuery(builderOptions, defaults, columns);
+      builderOptionsDispatch(setAllOptions(nextOptions));
+      onQueryChangeRef.current?.(nextOptions);
+      // Grafana already ran the carried-over query against this data source when the user
+      // switched, so the results below belong to the other data source's table. Run again.
+      onRunQueryRef.current?.();
+    };
+
+    const columnsRequest = targetTable
+      ? datasource.getColumnsCached(targetDatabase, targetTable)
+      : Promise.resolve<TableColumn[]>([]);
+    columnsRequest.then(convert, () => convert([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [builderOptions, builderOptionsDispatch, datasource, isCarriedOver, signalType, targetDatabase, targetTable]);
 
   useEffect(() => {
-    if (!needsInitialization) {
+    if (!needsInitialization || isCarriedOver) {
       return;
     }
 
@@ -243,7 +295,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
     lastInitializationKey.current = initializationKey;
 
-    const nextOptions = buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns);
+    const nextOptions = buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns);
     if (!isEqual(builderOptions, nextOptions)) {
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
@@ -252,6 +304,8 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     builderOptions,
     builderOptionsDispatch,
     datasource,
+    fallbackTable,
+    isCarriedOver,
     needsInitialization,
     signalType,
     tableColumnNames,
@@ -259,7 +313,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   ]);
 
   const activeOptions = needsInitialization
-    ? buildCompactQueryDefaults(datasource, signalType, builderOptions.table, allColumns)
+    ? buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns)
     : builderOptions;
   const filterColumns = useMemo(() => getCompactFilterColumns(allColumns, activeOptions), [allColumns, activeOptions]);
 
