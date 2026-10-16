@@ -225,6 +225,25 @@ Ad hoc filters support the following operators:
 
 By default, ad hoc filter keys are shown as `table.column`. To show only the column name (without the table prefix), enable the **Hide table name in ad hoc filters** option in the data source settings. This makes the filter drop-down cleaner when all queries target the same table.
 
+## Send ad hoc filters as a query setting
+
+By default, the plugin applies ad hoc filters by appending a `settings additional_table_filters=...` clause to the end of your SQL. If you enable **Send ad hoc filters as a query setting** in the data source settings, the plugin sends the same `additional_table_filters` value as a per-query setting instead, and the SQL is sent to ClickHouse exactly as written. With the HTTP protocol the setting is sent as a URL parameter; with the native protocol it is sent with the query's settings.
+
+Consider this option when:
+
+- You don't want the plugin to change your SQL. Trailing comments and trailing semicolons no longer interact with an appended clause.
+- You want `system.query_log` to record the panel SQL unchanged. The filters are still recorded, in the `Settings` column.
+- A proxy or gateway in front of ClickHouse inspects or rewrites SQL text and should see the query as written.
+
+Keep the following trade-offs in mind:
+
+- SQL copied from the Query Inspector doesn't include the filters. To reproduce a panel query outside Grafana, add the `additional_table_filters` setting yourself.
+- With the HTTP protocol, the filters count toward the request URL length, which ClickHouse and any proxy in between may limit.
+- If your query sets `additional_table_filters` in its own `SETTINGS` clause, that value takes precedence over the query setting, and the ad hoc filters aren't applied.
+- The target table is detected from your SQL exactly as it is without this option.
+
+The option doesn't change the [`$__adHocFilters` macro](#apply-ad-hoc-filters-manually-with-__adhocfilters). A query that uses the macro still gets the filters inline where you placed it.
+
 ## Map and JSON types (OpenTelemetry)
 
 Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is the default and turns merged labels into a filter. To use **JSON** syntax for the filter logic, add a dashboard variable of type **Constant** named `clickhouse_adhoc_use_json`. The variable’s value is ignored; it only needs to exist.

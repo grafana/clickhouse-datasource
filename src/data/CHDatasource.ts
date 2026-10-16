@@ -658,6 +658,10 @@ export class Datasource
     rawQuery = this.applyConditionalAll(rawQuery, templateSrvVariables);
     rawQuery = this.replace(rawQuery, applyMinIntervalToScopedVars(scoped, query.minInterval)) || '';
 
+    // Recomputed on every call so a value left on the query object can never
+    // carry stale filters to the backend.
+    let adHocFiltersSetting: string | undefined;
+
     if (!this.skipAdHocFilter) {
       if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters.length > 0) {
         throw new Error(
@@ -675,7 +679,13 @@ export class Datasource
 
       // Only apply automatic filters if the macro was not used
       if (!hasMacro) {
-        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
+        if (this.settings.jsonData.adHocFiltersAsQuerySetting) {
+          // The backend sends this as the additional_table_filters query
+          // setting, so the SQL itself stays exactly as written.
+          adHocFiltersSetting = this.adHocFilter.buildSetting(rawQuery, filters, useJSON) ?? undefined;
+        } else {
+          rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON);
+        }
       }
     }
     this.skipAdHocFilter = false;
@@ -683,6 +693,7 @@ export class Datasource
     return {
       ...query,
       rawSql: rawQuery,
+      adHocFiltersSetting,
     };
   }
 

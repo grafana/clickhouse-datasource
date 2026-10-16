@@ -21,6 +21,13 @@ export interface CHQueryBase extends DataQuery {
   minInterval?: string;
 
   /**
+   * `additional_table_filters` map value built from the dashboard's ad hoc
+   * filters when the datasource sends them as a query setting. Set by
+   * applyTemplateVariables, which recomputes it on every run.
+   */
+  adHocFiltersSetting?: string;
+
+  /**
    * REQUIRED by backend for auto selecting preferredVisualizationType.
    * Only used in explore view.
    * src: https://github.com/grafana/sqlds/blob/dda2dc0a54b128961fc9f7885baabf555f3ddfdc/query.go#L36

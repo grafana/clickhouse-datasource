@@ -267,6 +267,22 @@ describe('ConfigEditor', () => {
     });
   });
 
+  it('writes adHocFiltersAsQuerySetting when toggled', () => {
+    const props = mockConfigEditorProps({ dialTimeout: '10' });
+    render(<ConfigEditor {...props} />);
+    const toggle = screen.getByTestId(labels.adHocFiltersAsQuerySetting.testid);
+    expect(toggle).not.toBeChecked();
+
+    (props.onOptionsChange as jest.Mock).mockClear();
+    fireEvent.click(toggle);
+
+    expect(props.onOptionsChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ adHocFiltersAsQuerySetting: true }),
+      })
+    );
+  });
+
   it('persists the single-table logs trace correlation setting', () => {
     const props = mockConfigEditorProps({
       configMode: 'single-table',
