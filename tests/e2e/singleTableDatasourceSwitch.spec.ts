@@ -1,5 +1,5 @@
 import { expect, test } from '@grafana/plugin-e2e';
-import { Page } from '@playwright/test';
+import { Page, Request } from '@playwright/test';
 import { createTestDataSources, deleteTestDataSources } from './helpers/datasources';
 import {
   FIXTURE_FROM_ISO,
@@ -9,7 +9,7 @@ import {
   SINGLE_TRACES_DATASOURCE_UID,
   skipFixtureTestsOnCloud,
 } from './helpers/env';
-import { exploreUrl } from './helpers/explore';
+import { exploreUrl, ExploreUrlOptions } from './helpers/explore';
 import { QueryDataBody, rowCount } from './helpers/queryResponse';
 
 // When the user switches between two data sources of the same plugin in Explore, Grafana keeps
@@ -97,7 +97,7 @@ async function waitForQueryOn(page: Page, datasourceUid: string, table: string) 
       { timeout: 15_000 }
     )
     .catch(() => {
-      throw new Error(`No completed query against e2e_test.${table} on ${datasourceUid} after the switch`);
+      throw new Error(`No completed query against e2e_test.${table} on ${datasourceUid}`);
     });
   return { query, body };
 }
@@ -106,6 +106,55 @@ async function expectCompactEditor(page: Page) {
   await expect(page.locator('[data-testid="compact-filter-bar"]')).toBeVisible();
   // The classic builder's Query Type row is what showed up before this was fixed.
   await expect(page.getByText('Query Type', { exact: true })).toHaveCount(0);
+}
+
+// How long no query may run before the first query counts as finished.
+const QUIET_MS = 500;
+
+/**
+ * Opens Explore and waits until its first query has finished, including the follow-up queries the
+ * plugin runs after the response to build trace links. When that processing finishes, Grafana
+ * cancels the query still running in the pane, so switching data sources earlier can cancel the
+ * converted query.
+ */
+async function openExplore(page: Page, options: ExploreUrlOptions) {
+  const pending = new Set<Request>();
+  let lastActivity = Date.now();
+  const started = (request: Request) => {
+    if (request.url().includes('/api/ds/query')) {
+      pending.add(request);
+      lastActivity = Date.now();
+    }
+  };
+  const ended = (request: Request) => {
+    if (pending.delete(request)) {
+      lastActivity = Date.now();
+    }
+  };
+  // Playwright's request lifecycle events. cspell:ignore requestfinished requestfailed
+  page.on('request', started);
+  page.on('requestfinished', ended);
+  page.on('requestfailed', ended);
+  // Reports what is still running, so a timeout names the query that never settled.
+  const state = () => {
+    if (pending.size > 0) {
+      return [...pending]
+        .map((request) => String(request.postDataJSON()?.queries?.[0]?.rawSql).slice(0, 80))
+        .join(' | ');
+    }
+    return Date.now() - lastActivity >= QUIET_MS ? 'settled' : 'settling';
+  };
+  try {
+    const firstQuery = waitForQueryOn(page, String(options.datasourceUid), String(options.builderOptions?.table));
+    await page.goto(exploreUrl(options));
+    await firstQuery;
+    await expect.poll(state, { timeout: 15_000 }).toBe('settled');
+  } finally {
+    page.off('request', started);
+    page.off('requestfinished', ended);
+    page.off('requestfailed', ended);
+  }
+  await expectCompactEditor(page);
 }
 
 test.describe('Switching between single-table data sources in Explore', () => {
@@ -133,30 +182,27 @@ test.describe('Switching between single-table data sources in Explore', () => {
   });
 
   test('logs to traces keeps the ServiceName filter and drops the logs-only one', async ({ page, explorePage }) => {
-    await page.goto(
-      exploreUrl({
-        datasourceUid: OTEL_LOGS_DATASOURCE.uid,
-        from: FIXTURE_FROM_ISO,
-        to: FIXTURE_TO_ISO,
-        pluginVersion: BUILDER_PLUGIN_VERSION,
-        builderOptions: {
-          database: 'e2e_test',
-          table: 'trace_links_logs',
-          queryType: 'logs',
-          mode: 'list',
-          columns: [
-            { name: 'Timestamp', hint: 'time' },
-            { name: 'Body', hint: 'log_message' },
-            { name: 'SeverityText', hint: 'log_level' },
-          ],
-          filters: [timeRangeFilter('time'), equalsFilter('ServiceName', 'api'), equalsFilter('SeverityText', 'INFO')],
-          orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
-          limit: 1000,
-          meta: { otelEnabled: true, otelVersion: 'latest' },
-        },
-      })
-    );
-    await expectCompactEditor(page);
+    await openExplore(page, {
+      datasourceUid: OTEL_LOGS_DATASOURCE.uid,
+      from: FIXTURE_FROM_ISO,
+      to: FIXTURE_TO_ISO,
+      pluginVersion: BUILDER_PLUGIN_VERSION,
+      builderOptions: {
+        database: 'e2e_test',
+        table: 'trace_links_logs',
+        queryType: 'logs',
+        mode: 'list',
+        columns: [
+          { name: 'Timestamp', hint: 'time' },
+          { name: 'Body', hint: 'log_message' },
+          { name: 'SeverityText', hint: 'log_level' },
+        ],
+        filters: [timeRangeFilter('time'), equalsFilter('ServiceName', 'api'), equalsFilter('SeverityText', 'INFO')],
+        orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
+        limit: 1000,
+        meta: { otelEnabled: true, otelVersion: 'latest' },
+      },
+    });
 
     const converted = waitForQueryOn(page, SINGLE_TRACES_DATASOURCE_UID, 'trace_spans');
     await explorePage.datasource.set(SINGLE_TRACES_NAME);
@@ -170,34 +216,27 @@ test.describe('Switching between single-table data sources in Explore', () => {
   });
 
   test('traces to logs keeps the ServiceName filter and drops the traces-only one', async ({ page, explorePage }) => {
-    await page.goto(
-      exploreUrl({
-        datasourceUid: SINGLE_TRACES_DATASOURCE_UID,
-        from: FIXTURE_FROM_ISO,
-        to: FIXTURE_TO_ISO,
-        pluginVersion: BUILDER_PLUGIN_VERSION,
-        builderOptions: {
-          database: 'e2e_test',
-          table: 'trace_spans',
-          queryType: 'traces',
-          columns: [
-            { name: 'Timestamp', hint: 'time' },
-            { name: 'TraceId', hint: 'trace_id' },
-            { name: 'ServiceName', hint: 'trace_service_name' },
-            { name: 'SpanName', hint: 'trace_operation_name' },
-          ],
-          filters: [
-            timeRangeFilter('time'),
-            equalsFilter('ServiceName', 'api'),
-            equalsFilter('SpanName', 'HTTP GET /'),
-          ],
-          orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
-          limit: 1000,
-          meta: { traceDurationUnit: 'nanoseconds' },
-        },
-      })
-    );
-    await expectCompactEditor(page);
+    await openExplore(page, {
+      datasourceUid: SINGLE_TRACES_DATASOURCE_UID,
+      from: FIXTURE_FROM_ISO,
+      to: FIXTURE_TO_ISO,
+      pluginVersion: BUILDER_PLUGIN_VERSION,
+      builderOptions: {
+        database: 'e2e_test',
+        table: 'trace_spans',
+        queryType: 'traces',
+        columns: [
+          { name: 'Timestamp', hint: 'time' },
+          { name: 'TraceId', hint: 'trace_id' },
+          { name: 'ServiceName', hint: 'trace_service_name' },
+          { name: 'SpanName', hint: 'trace_operation_name' },
+        ],
+        filters: [timeRangeFilter('time'), equalsFilter('ServiceName', 'api'), equalsFilter('SpanName', 'HTTP GET /')],
+        orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
+        limit: 1000,
+        meta: { traceDurationUnit: 'nanoseconds' },
+      },
+    });
 
     const converted = waitForQueryOn(page, OTEL_LOGS_DATASOURCE.uid, 'trace_links_logs');
     await explorePage.datasource.set(OTEL_LOGS_DATASOURCE.name);
@@ -216,30 +255,27 @@ test.describe('Switching between single-table data sources in Explore', () => {
     page,
     explorePage,
   }) => {
-    await page.goto(
-      exploreUrl({
-        datasourceUid: SINGLE_LOGS_DATASOURCE_UID,
-        from: FIXTURE_FROM_ISO,
-        to: FIXTURE_TO_ISO,
-        pluginVersion: BUILDER_PLUGIN_VERSION,
-        builderOptions: {
-          database: 'e2e_test',
-          table: 'events',
-          queryType: 'logs',
-          mode: 'list',
-          columns: [
-            { name: 'timestamp', hint: 'time' },
-            { name: 'message', hint: 'log_message' },
-            { name: 'level', hint: 'log_level' },
-          ],
-          filters: [timeRangeFilter('time'), equalsFilter('service', 'worker')],
-          orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
-          limit: 1000,
-          meta: { otelEnabled: false, logMessageLike: 'timeout' },
-        },
-      })
-    );
-    await expectCompactEditor(page);
+    await openExplore(page, {
+      datasourceUid: SINGLE_LOGS_DATASOURCE_UID,
+      from: FIXTURE_FROM_ISO,
+      to: FIXTURE_TO_ISO,
+      pluginVersion: BUILDER_PLUGIN_VERSION,
+      builderOptions: {
+        database: 'e2e_test',
+        table: 'events',
+        queryType: 'logs',
+        mode: 'list',
+        columns: [
+          { name: 'timestamp', hint: 'time' },
+          { name: 'message', hint: 'log_message' },
+          { name: 'level', hint: 'log_level' },
+        ],
+        filters: [timeRangeFilter('time'), equalsFilter('service', 'worker')],
+        orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
+        limit: 1000,
+        meta: { otelEnabled: false, logMessageLike: 'timeout' },
+      },
+    });
 
     const converted = waitForQueryOn(page, OTEL_LOGS_DATASOURCE.uid, 'trace_links_logs');
     await explorePage.datasource.set(OTEL_LOGS_DATASOURCE.name);
