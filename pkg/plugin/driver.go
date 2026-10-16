@@ -344,13 +344,6 @@ func (h *Clickhouse) Connect(
 	ctx, cancel := context.WithTimeout(ctx, opts.DialTimeout)
 	defer cancel()
 
-	db := clickhouse.OpenDB(opts)
-
-	// Set connection pool settings
-	db.SetConnMaxLifetime(time.Duration(settings.ConnMaxLifetime) * time.Minute)
-	db.SetMaxIdleConns(settings.MaxIdleConns)
-	db.SetMaxOpenConns(settings.MaxOpenConns)
-
 	select {
 	case <-ctx.Done():
 		return nil, fmt.Errorf("the operation was cancelled before starting: %w", ctx.Err())
@@ -358,12 +351,23 @@ func (h *Clickhouse) Connect(
 		// proceed
 	}
 
+	db := clickhouse.OpenDB(opts)
+
+	// Set connection pool settings
+	db.SetConnMaxLifetime(time.Duration(settings.ConnMaxLifetime) * time.Minute)
+	db.SetMaxIdleConns(settings.MaxIdleConns)
+	db.SetMaxOpenConns(settings.MaxOpenConns)
+
 	// `sqlds` normally calls `db.PingContext()` to check if the connection is alive,
 	// however, as ClickHouse returns its own non-standard `Exception` type, we need
 	// to handle it here so that we can categorize and surface the error correctly.
 	if err := db.PingContext(ctx); err != nil {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
+		_ = db.Close()
+		if ctxErr := ctx.Err(); errors.Is(ctxErr, context.Canceled) {
+			if err == ctxErr {
+				return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctxErr)
+			}
+			return nil, fmt.Errorf("the operation was cancelled during execution: %w: %w", ctxErr, err)
 		}
 
 		return nil, wrapCategorizedConnectionError(err)
