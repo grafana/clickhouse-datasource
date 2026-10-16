@@ -1,4 +1,5 @@
-import { ColumnHint, TimeUnit } from 'types/queryBuilder';
+import { ColumnHint, TableKeys, TimeUnit } from 'types/queryBuilder';
+import { keyReferencesColumn } from 'data/tableKeys';
 
 export const defaultLogsTable = 'otel_logs';
 export const defaultTraceTable = 'otel_traces';
@@ -83,7 +84,7 @@ const otel130: OtelVersion = {
 };
 
 export const versions: readonly OtelVersion[] = [
-  // When selected, the log schema version is detected from the table's columns
+  // When selected, the log schema version is detected from the table's columns and keys
   // (see detectLogsVersion). The static map here is the fallback for paths that
   // can't inspect the table, and always tracks the newest schema.
   { ...otel130, name: 'auto (latest)', version: 'latest' },
@@ -93,17 +94,22 @@ export const versions: readonly OtelVersion[] = [
 
 export const getLatestVersion = (): OtelVersion => versions[0];
 
+const isKeyedOnTimestampOnly = ({ sortingKey, partitionKey }: TableKeys): boolean =>
+  [sortingKey, partitionKey].some((key) => keyReferencesColumn(key, 'Timestamp')) &&
+  ![sortingKey, partitionKey].some((key) => keyReferencesColumn(key, 'TimestampTime'));
+
 /**
- * Picks the log schema version that matches an actual table's columns.
+ * Picks the log schema version that matches an actual table's columns and keys.
  * The collector's migration is non-destructive, so both schema generations
  * coexist in the wild: tables created before clickhouseexporter v0.151.0 keep
  * their TimestampTime column, tables created after don't have it.
- * TimestampTime is the only column that distinguishes the two, so its
- * presence is the whole probe. Callers that pin an explicit version bypass
- * this entirely.
+ * TimestampTime is the only column that distinguishes the two. When the
+ * table's keys reference Timestamp but not TimestampTime (see #2103), the
+ * 1.3.0 map applies, so the time filter uses the column in the keys. Callers
+ * that pin an explicit version bypass this entirely.
  */
-export const detectLogsVersion = (columnNames: readonly string[]): OtelVersion =>
-  columnNames.includes('TimestampTime') ? otel129 : otel130;
+export const detectLogsVersion = (columnNames: readonly string[], keys?: TableKeys): OtelVersion =>
+  columnNames.includes('TimestampTime') && !(keys && isKeyedOnTimestampOnly(keys)) ? otel129 : otel130;
 export const getVersion = (version: string | undefined): OtelVersion | undefined => {
   if (!version) {
     return;

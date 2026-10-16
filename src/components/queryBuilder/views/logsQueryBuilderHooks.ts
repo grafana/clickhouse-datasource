@@ -3,6 +3,7 @@ import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/
 import { useEffect, useMemo, useRef } from 'react';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import otel from 'otel';
+import useTableKeys from 'hooks/useTableKeys';
 import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
 import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOptions';
 import { appendAdditionalLogColumns } from '../compactQueryDefaults';
@@ -94,7 +95,9 @@ export const useOtelColumns = (
   allColumns: readonly TableColumn[],
   otelEnabled: boolean,
   otelVersion: string,
-  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
+  database: string,
+  table: string
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
   const prevOtelVersion = useRef<string>(otelVersion);
@@ -107,20 +110,25 @@ export const useOtelColumns = (
     didSetColumns.current = false;
     prevOtelVersion.current = otelVersion;
   }
+  const detectsVersion = otelEnabled && !didSetColumns.current && otel.getVersion(otelVersion)?.version === 'latest';
+  const tableKeys = useTableKeys(datasource, database, detectsVersion ? table : '');
 
   useEffect(() => {
-    if (!otelEnabled || didSetColumns.current || allColumns.length === 0) {
+    if (!otelEnabled || didSetColumns.current || allColumns.length === 0 || tableKeys === undefined) {
       return;
     }
 
     let otelConfig = otel.getVersion(otelVersion);
     // The "latest" alias resolves against the actual table instead of a fixed
     // schema: pre-v0.151.0 collector tables keep their TimestampTime column,
-    // newer ones don't, and both exist in the wild (see #1900). allColumns is
-    // already fetched for the builder, so detection costs no extra round-trip.
+    // newer ones don't, and both exist in the wild (see #1900). The table keys
+    // refine that check (see detectLogsVersion).
     // Pinned versions (1.29.0, 1.30.0, ...) are honoured as-is.
     if (otelConfig?.version === 'latest') {
-      otelConfig = otel.detectLogsVersion(allColumns.map((c) => c.name));
+      otelConfig = otel.detectLogsVersion(
+        allColumns.map((c) => c.name),
+        tableKeys ?? undefined
+      );
     }
     const logColumnMap = otelConfig?.logColumnMap;
     if (!logColumnMap) {
@@ -153,7 +161,7 @@ export const useOtelColumns = (
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;
-  }, [datasource, allColumns, otelEnabled, otelVersion, builderOptionsDispatch]);
+  }, [datasource, allColumns, otelEnabled, otelVersion, builderOptionsDispatch, tableKeys]);
 };
 
 // Finds and selects a default log time column, updates when table changes
