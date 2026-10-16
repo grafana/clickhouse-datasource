@@ -1762,6 +1762,147 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchTableKeys', () => {
+    const rowsBySql = (rows: Record<string, Array<Record<string, string>>>) => (request: DataQueryRequest<CHQuery>) =>
+      of({ data: [arrayToDataFrame(rows[request.targets[0].rawSql] ?? [])] });
+    const keysSql = (database: string, table: string) =>
+      `SELECT engine, engine_full, sorting_key, partition_key FROM system.tables WHERE database = '${database}' AND name = '${table}'`;
+
+    it.each([
+      {
+        name: 'reads the keys of a MergeTree table',
+        database: 'otel',
+        table: 'otel_logs',
+        rows: {
+          [keysSql('otel', 'otel_logs')]: [
+            {
+              engine: 'MergeTree',
+              engine_full: 'MergeTree ORDER BY (toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp)',
+              sorting_key: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+              partition_key: 'toDate(Timestamp)',
+            },
+          ],
+        },
+        expected: {
+          sortingKey: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+          partitionKey: 'toDate(Timestamp)',
+        },
+      },
+      {
+        name: 'reads the keys of the local table behind a Distributed table',
+        database: 'otel',
+        table: 'otel_logs',
+        rows: {
+          [keysSql('otel', 'otel_logs')]: [
+            {
+              engine: 'Distributed',
+              engine_full: `Distributed('logs_cluster', 'otel', 'otel_logs_local', rand())`,
+              sorting_key: '',
+              partition_key: '',
+            },
+          ],
+          [keysSql('otel', 'otel_logs_local')]: [
+            {
+              engine: 'ReplicatedMergeTree',
+              engine_full: '',
+              sorting_key: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+              partition_key: 'toDate(Timestamp)',
+            },
+          ],
+        },
+        expected: {
+          sortingKey: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+          partitionKey: 'toDate(Timestamp)',
+        },
+      },
+      {
+        name: 'returns undefined when the table is not visible (missing or no grant)',
+        database: 'otel',
+        table: 'otel_logs',
+        rows: {},
+        expected: undefined,
+      },
+      {
+        name: 'returns undefined when the local table behind a Distributed table is not visible',
+        database: 'otel',
+        table: 'otel_logs',
+        rows: {
+          [keysSql('otel', 'otel_logs')]: [
+            {
+              engine: 'Distributed',
+              engine_full: `Distributed('logs_cluster', 'otel', 'otel_logs_local')`,
+              sorting_key: '',
+              partition_key: '',
+            },
+          ],
+        },
+        expected: undefined,
+      },
+      {
+        name: 'returns undefined when a Distributed table leaves the database to each shard',
+        database: 'otel',
+        table: 'otel_logs',
+        rows: {
+          [keysSql('otel', 'otel_logs')]: [
+            {
+              engine: 'Distributed',
+              engine_full: `Distributed('logs_cluster', '', 'otel_logs_local')`,
+              sorting_key: '',
+              partition_key: '',
+            },
+          ],
+        },
+        expected: undefined,
+      },
+    ])('$name', async ({ database, table, rows, expected }) => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(rowsBySql(rows));
+
+      await expect(ds.fetchTableKeys(database, table)).resolves.toEqual(expected);
+    });
+
+    it('caches the keys per table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(
+        rowsBySql({
+          [keysSql('otel', 'otel_logs')]: [
+            { engine: 'MergeTree', engine_full: '', sorting_key: 'Timestamp', partition_key: '' },
+          ],
+        })
+      );
+
+      await ds.fetchTableKeys('otel', 'otel_logs');
+      await ds.fetchTableKeys('otel', 'otel_logs');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares one lookup between concurrent calls', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(rowsBySql({}));
+
+      await Promise.all([ds.fetchTableKeys('otel', 'otel_logs'), ds.fetchTableKeys('otel', 'otel_logs')]);
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a lookup that found no table row', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keysRow = { engine: 'MergeTree', engine_full: '', sorting_key: 'Timestamp', partition_key: '' };
+      const spyOnQuery = jest
+        .spyOn(ds, 'query')
+        .mockImplementationOnce(rowsBySql({}))
+        .mockImplementationOnce(rowsBySql({ [keysSql('otel', 'otel_logs')]: [keysRow] }));
+
+      await expect(ds.fetchTableKeys('otel', 'otel_logs')).resolves.toBeUndefined();
+      await expect(ds.fetchTableKeys('otel', 'otel_logs')).resolves.toEqual({
+        sortingKey: 'Timestamp',
+        partitionKey: '',
+      });
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('getAliasTable', () => {
     it('returns the matching table alias', async () => {
       const ds = cloneDeep(mockDatasource);

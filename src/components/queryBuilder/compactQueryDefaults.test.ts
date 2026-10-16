@@ -30,6 +30,7 @@ import {
 } from 'types/queryBuilder';
 import { SignalType } from 'types/config';
 import otel from 'otel';
+import { generateSql } from 'data/sqlGenerator';
 
 const defaultOptions: QueryBuilderOptions = {
   database: '',
@@ -576,6 +577,32 @@ describe('buildCompactQueryDefaults', () => {
 
     expect(options.meta?.otelEnabled).toBe(true);
     expect(options.meta?.otelVersion).toBe('latest');
+  });
+
+  it('filters on Timestamp when the table keeps TimestampTime but its keys use only Timestamp (#2103)', () => {
+    const tableKeys = {
+      sortingKey: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+      partitionKey: 'toDate(Timestamp)',
+    };
+    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', preV151Columns, tableKeys);
+
+    expect(generateSql(options)).toEqual(
+      [
+        'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level", TraceId as "traceID",',
+        'ResourceAttributes, ScopeAttributes, LogAttributes FROM "otel"."otel_logs"',
+        'WHERE ( timestamp >= $__fromTime AND timestamp <= $__toTime )',
+        'ORDER BY timestamp DESC LIMIT 1000',
+      ].join(' ')
+    );
+  });
+
+  it('keeps the legacy TimestampTime query when the legacy collector keys use it', () => {
+    const tableKeys = { sortingKey: 'ServiceName, TimestampTime, Timestamp', partitionKey: 'toDate(TimestampTime)' };
+    const options = buildCompactQueryDefaults(createLogsDatasource('latest'), 'logs', '', preV151Columns, tableKeys);
+
+    expect(generateSql(options)).toContain(
+      'WHERE ( TimestampTime >= $__fromTime AND TimestampTime <= $__toTime ) ORDER BY (TimestampTime, timestamp) DESC LIMIT 1000'
+    );
   });
 });
 
