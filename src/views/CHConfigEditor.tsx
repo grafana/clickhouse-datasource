@@ -520,7 +520,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 jsonData: {
                   ...jsonData,
                   oauthPassThru: checked,
-                  allowClearTextJWTForwarding: checked ? jsonData.allowClearTextJWTForwarding : false,
+                  allowCleartextJWTForwarding: checked ? jsonData.allowCleartextJWTForwarding : false,
                 },
               });
             }}
@@ -548,22 +548,22 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
             />
           </Field>
         )}
-        {jsonData.oauthPassThru && instanceSettings.allowClearTextJWTForwarding && (
+        {jsonData.oauthPassThru && instanceSettings.allowCleartextJWTForwarding && (
           <Field
-            label={labels.allowClearTextJWTForwarding.label}
-            description={labels.allowClearTextJWTForwarding.tooltip}
+            label={labels.allowCleartextJWTForwarding.label}
+            description={labels.allowCleartextJWTForwarding.tooltip}
           >
             <Switch
-              id="allowClearTextJWTForwarding"
+              id="allowCleartextJWTForwarding"
               className="gf-form"
-              value={jsonData.allowClearTextJWTForwarding || false}
+              value={jsonData.allowCleartextJWTForwarding || false}
               onChange={(e) => {
                 const checked = e.currentTarget.checked;
                 onOptionsChange({
                   ...options,
                   jsonData: {
                     ...jsonData,
-                    allowClearTextJWTForwarding: checked,
+                    allowCleartextJWTForwarding: checked,
                   },
                 });
               }}

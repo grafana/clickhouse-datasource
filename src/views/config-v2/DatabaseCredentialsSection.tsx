@@ -177,7 +177,7 @@ export const DatabaseCredentialsSection = (props: Props) => {
               jsonData: {
                 ...jsonData,
                 oauthPassThru: checked,
-                allowClearTextJWTForwarding: checked ? jsonData.allowClearTextJWTForwarding : false,
+                allowCleartextJWTForwarding: checked ? jsonData.allowCleartextJWTForwarding : false,
               },
             });
           }}
@@ -201,19 +201,19 @@ export const DatabaseCredentialsSection = (props: Props) => {
             />
           </Box>
         )}
-        {jsonData.oauthPassThru && instanceSettings.allowClearTextJWTForwarding && (
+        {jsonData.oauthPassThru && instanceSettings.allowCleartextJWTForwarding && (
           <Box marginTop={1}>
             <Checkbox
-              label={labels.allowClearTextJWTForwarding.label}
-              description={labels.allowClearTextJWTForwarding.tooltip}
-              checked={jsonData.allowClearTextJWTForwarding || false}
+              label={labels.allowCleartextJWTForwarding.label}
+              description={labels.allowCleartextJWTForwarding.tooltip}
+              checked={jsonData.allowCleartextJWTForwarding || false}
               onChange={(e) => {
                 const checked = e.currentTarget.checked;
                 onOptionsChange({
                   ...options,
                   jsonData: {
                     ...jsonData,
-                    allowClearTextJWTForwarding: checked,
+                    allowCleartextJWTForwarding: checked,
                   },
                 });
               }}

@@ -48,11 +48,11 @@ test.describe('Config editor', () => {
       ).toBeVisible();
     });
 
-    test.describe('clear text JWT forwarding toggle', () => {
-      const toggleName = /Allow clear text JWT forwarding/;
-      const mockInstanceSettings = (page: Page, allowClearTextJWTForwarding: boolean) =>
+    test.describe('cleartext JWT forwarding toggle', () => {
+      const toggleName = /Allow cleartext JWT forwarding/;
+      const mockInstanceSettings = (page: Page, allowCleartextJWTForwarding: boolean) =>
         page.route('**/resources/instance-settings', (route) =>
-          route.fulfill({ json: { allowClearTextJWTForwarding } })
+          route.fulfill({ json: { allowCleartextJWTForwarding } })
         );
 
       test('is hidden until Forward OAuth Identity is on and the instance allows it', async ({

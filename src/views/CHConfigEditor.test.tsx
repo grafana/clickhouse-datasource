@@ -22,7 +22,7 @@ jest.mock('@grafana/runtime', () => {
 
 describe('ConfigEditor', () => {
   beforeEach(() => {
-    mockUseInstanceSettings.mockReturnValue({ allowClearTextJWTForwarding: false });
+    mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: false });
   });
 
   const labels = allLabels.components.Config.ConfigEditor;
@@ -149,12 +149,12 @@ describe('ConfigEditor', () => {
     expect(toggle.checked).toBe(true);
   });
 
-  describe('clear text JWT forwarding toggle', () => {
-    const toggleId = 'allowClearTextJWTForwarding';
-    const jwtProps = () => mockConfigEditorProps({ oauthPassThru: true, allowClearTextJWTForwarding: true });
+  describe('cleartext JWT forwarding toggle', () => {
+    const toggleId = 'allowCleartextJWTForwarding';
+    const jwtProps = () => mockConfigEditorProps({ oauthPassThru: true, allowCleartextJWTForwarding: true });
 
     it('is shown when oauthPassThru is on and the instance allows it', () => {
-      mockUseInstanceSettings.mockReturnValue({ allowClearTextJWTForwarding: true });
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
       const { rerender } = render(<ConfigEditor {...mockConfigEditorProps({})} />);
       expect(document.getElementById(toggleId)).not.toBeInTheDocument();
 
@@ -165,13 +165,24 @@ describe('ConfigEditor', () => {
     });
 
     it('is hidden when the instance does not allow it', () => {
-      mockUseInstanceSettings.mockReturnValue({ allowClearTextJWTForwarding: false });
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: false });
       render(<ConfigEditor {...jwtProps()} />);
       expect(document.getElementById(toggleId)).not.toBeInTheDocument();
     });
 
+    it('is set when toggled on', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      const props = mockConfigEditorProps({ oauthPassThru: true });
+      render(<ConfigEditor {...props} />);
+
+      fireEvent.click(document.getElementById(toggleId) as HTMLInputElement);
+
+      const lastArgs = (props.onOptionsChange as jest.Mock).mock.lastCall?.[0];
+      expect(lastArgs.jsonData.allowCleartextJWTForwarding).toBe(true);
+    });
+
     it('is cleared when Forward OAuth Identity is turned off', () => {
-      mockUseInstanceSettings.mockReturnValue({ allowClearTextJWTForwarding: true });
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
       const props = jwtProps();
       render(<ConfigEditor {...props} />);
 
@@ -179,7 +190,7 @@ describe('ConfigEditor', () => {
 
       const lastArgs = (props.onOptionsChange as jest.Mock).mock.lastCall?.[0];
       expect(lastArgs.jsonData.oauthPassThru).toBe(false);
-      expect(lastArgs.jsonData.allowClearTextJWTForwarding).toBe(false);
+      expect(lastArgs.jsonData.allowCleartextJWTForwarding).toBe(false);
     });
   });
 

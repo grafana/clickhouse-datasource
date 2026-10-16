@@ -16,8 +16,8 @@ func TestInstanceSettingsHandler(t *testing.T) {
 		return rw.Body.String()
 	}
 
-	assert.JSONEq(t, `{"allowClearTextJWTForwarding":false}`, get())
+	assert.JSONEq(t, `{"allowCleartextJWTForwarding":false}`, get())
 
-	t.Setenv(clearTextJWTForwardingEnv, "true")
-	assert.JSONEq(t, `{"allowClearTextJWTForwarding":true}`, get())
+	t.Setenv(cleartextJWTForwardingEnv, "true")
+	assert.JSONEq(t, `{"allowCleartextJWTForwarding":true}`, get())
 }

@@ -8,6 +8,6 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	abortIfClearTextJWTEnvSet()
+	abortIfCleartextJWTEnvSet()
 	os.Exit(m.Run())
 }

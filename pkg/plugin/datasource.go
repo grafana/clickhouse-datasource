@@ -25,6 +25,13 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	ds.CustomRoutes = map[string]func(http.ResponseWriter, *http.Request){
 		instanceSettingsRoute: instanceSettingsHandler,
 	}
+	// Warn once per data source instance rather than per connection, so the
+	// log does not fill up as per-user pools are created.
+	if dsSettings, err := LoadSettings(ctx, settings); err == nil && dsSettings.forwardsJWTInCleartext() {
+		backend.Logger.Warn("Forward OAuth Identity: user tokens are forwarded without TLS "+
+			"(cleartext JWT forwarding); the connection must be protected by a proxy that originates TLS",
+			"host", dsSettings.Host)
+	}
 	pluginSettings := clickhousePlugin.Settings(ctx, settings)
 	if pluginSettings.ForwardHeaders {
 		ds.EnableMultipleConnections = true
@@ -40,6 +47,6 @@ const instanceSettingsRoute = "/instance-settings"
 func instanceSettingsHandler(rw http.ResponseWriter, _ *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(rw).Encode(map[string]bool{
-		"allowClearTextJWTForwarding": instanceAllowsClearTextJWTForwarding(),
+		"allowCleartextJWTForwarding": instanceAllowsCleartextJWTForwarding(),
 	})
 }

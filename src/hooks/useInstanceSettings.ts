@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import { getBackendSrv } from '@grafana/runtime';
 
 export interface InstanceSettings {
-  allowClearTextJWTForwarding: boolean;
+  allowCleartextJWTForwarding: boolean;
 }
 
-const defaultInstanceSettings: InstanceSettings = { allowClearTextJWTForwarding: false };
+const defaultInstanceSettings: InstanceSettings = { allowCleartextJWTForwarding: false };
 
 /**
  * Reads the instance-wide Grafana settings the backend reports for this data
@@ -30,7 +30,7 @@ export const useInstanceSettings = (uid?: string): InstanceSettings => {
       )
       .then((res) => {
         if (!cancelled) {
-          setSettings({ allowClearTextJWTForwarding: res?.allowClearTextJWTForwarding === true });
+          setSettings({ allowCleartextJWTForwarding: res?.allowCleartextJWTForwarding === true });
         }
       })
       .catch(() => {

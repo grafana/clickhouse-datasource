@@ -7,7 +7,7 @@ import { ConfigEditor } from './CHConfigEditor';
 import { createTestProps } from './helpers';
 
 jest.mock('hooks/useInstanceSettings', () => ({
-  useInstanceSettings: () => ({ allowClearTextJWTForwarding: false }),
+  useInstanceSettings: () => ({ allowCleartextJWTForwarding: false }),
 }));
 
 jest.mock('./LeftSidebar', () => ({

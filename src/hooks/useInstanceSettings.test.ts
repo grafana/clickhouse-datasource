@@ -13,28 +13,28 @@ describe('useInstanceSettings', () => {
 
   it('is off and makes no call without a uid', () => {
     const { result } = renderHook(() => useInstanceSettings(undefined));
-    expect(result.current.allowClearTextJWTForwarding).toBe(false);
+    expect(result.current.allowCleartextJWTForwarding).toBe(false);
     expect(get).not.toHaveBeenCalled();
   });
 
   it('reflects the backend setting', async () => {
-    get.mockResolvedValue({ allowClearTextJWTForwarding: true });
+    get.mockResolvedValue({ allowCleartextJWTForwarding: true });
     const { result } = renderHook(() => useInstanceSettings('abc'));
-    await waitFor(() => expect(result.current.allowClearTextJWTForwarding).toBe(true));
+    await waitFor(() => expect(result.current.allowCleartextJWTForwarding).toBe(true));
     expect(get.mock.calls[0][0]).toBe('/api/datasources/uid/abc/resources/instance-settings');
   });
 
   it('stays off when the backend says off', async () => {
-    get.mockResolvedValue({ allowClearTextJWTForwarding: false });
+    get.mockResolvedValue({ allowCleartextJWTForwarding: false });
     const { result } = renderHook(() => useInstanceSettings('abc'));
     await waitFor(() => expect(get).toHaveBeenCalled());
-    expect(result.current.allowClearTextJWTForwarding).toBe(false);
+    expect(result.current.allowCleartextJWTForwarding).toBe(false);
   });
 
   it('stays off when the call fails', async () => {
     get.mockRejectedValue(new Error('boom'));
     const { result } = renderHook(() => useInstanceSettings('abc'));
     await waitFor(() => expect(get).toHaveBeenCalled());
-    expect(result.current.allowClearTextJWTForwarding).toBe(false);
+    expect(result.current.allowCleartextJWTForwarding).toBe(false);
   });
 });

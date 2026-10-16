@@ -53,17 +53,18 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	// AllowClearTextJWTForwarding lifts the requirement that Forward OAuth
+	// AllowCleartextJWTForwarding lifts the requirement that Forward OAuth
 	// Identity runs over a TLS connection established by the plugin itself.
 	// It exists for deployments where TLS termination and origination are
 	// delegated to a proxy alongside Grafana (an Istio/Envoy sidecar, for
-	// example): the plugin dials the sidecar in plaintext over loopback and
-	// the sidecar re-originates TLS to ClickHouse, so the plugin cannot see
-	// that the hop it forwards the token over is in fact encrypted. Enabling
-	// it without such a proxy sends user tokens in the clear. It does not
-	// affect the separate rejection of Forward OAuth Identity combined with
-	// Skip TLS Verify, which is about unverified TLS rather than no TLS.
-	AllowClearTextJWTForwarding bool            `json:"allowClearTextJWTForwarding,omitempty"`
+	// example): the plugin dials the sidecar in plaintext and the sidecar
+	// re-originates TLS to ClickHouse, so the plugin cannot see that the hop
+	// it forwards the token over is encrypted. The operator must ensure that
+	// plaintext hop stays local or otherwise protected; enabling it without
+	// such a proxy sends user tokens in the clear. It does not affect the
+	// separate rejection of Forward OAuth Identity combined with Skip TLS
+	// Verify, which is about unverified TLS rather than no TLS.
+	AllowCleartextJWTForwarding bool            `json:"allowCleartextJWTForwarding,omitempty"`
 	CustomSettings              []CustomSetting `json:"customSettings"`
 	ProxyOptions                *proxy.Options
 
@@ -111,6 +112,15 @@ func (settings *Settings) isValid() (err error) {
 		return backend.DownstreamError(ErrorMessageInvalidPort)
 	}
 	return nil
+}
+
+// forwardsJWTInCleartext reports whether user tokens will be forwarded
+// without TLS established by the plugin, which needs both the data source
+// flag and the instance setting.
+func (settings *Settings) forwardsJWTInCleartext() bool {
+	hasTLS := settings.Secure || settings.TlsClientAuth || settings.TlsAuthWithCACert
+	return settings.OAuthPassThru && !hasTLS &&
+		settings.AllowCleartextJWTForwarding && instanceAllowsCleartextJWTForwarding()
 }
 
 // parseBoolField sets *dst from jsonData[key], which provisioning may supply
@@ -232,7 +242,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		return settings, backend.DownstreamError(err)
 	}
 
-	if err = parseBoolField(jsonData, "allowClearTextJWTForwarding", &settings.AllowClearTextJWTForwarding); err != nil {
+	if err = parseBoolField(jsonData, "allowCleartextJWTForwarding", &settings.AllowCleartextJWTForwarding); err != nil {
 		return settings, backend.DownstreamError(err)
 	}
 

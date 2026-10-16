@@ -34,16 +34,16 @@ import (
 	"golang.org/x/net/proxy"
 )
 
-// clearTextJWTForwardingEnv is how Grafana hands the instance-level
+// cleartextJWTForwardingEnv is how Grafana hands the instance-level
 // [plugin.grafana-clickhouse-datasource] allow_cleartext_jwt_forwarding
 // setting to the plugin process.
-const clearTextJWTForwardingEnv = "GF_PLUGIN_ALLOW_CLEARTEXT_JWT_FORWARDING"
+const cleartextJWTForwardingEnv = "GF_PLUGIN_ALLOW_CLEARTEXT_JWT_FORWARDING"
 
-// instanceAllowsClearTextJWTForwarding reports whether the Grafana
+// instanceAllowsCleartextJWTForwarding reports whether the Grafana
 // administrator has allowed data sources to forward JWTs without TLS.
 // Missing or unparsable values mean false.
-func instanceAllowsClearTextJWTForwarding() bool {
-	v, ok := os.LookupEnv(clearTextJWTForwardingEnv)
+func instanceAllowsCleartextJWTForwarding() bool {
+	v, ok := os.LookupEnv(cleartextJWTForwardingEnv)
 	if !ok {
 		return false
 	}
@@ -235,6 +235,18 @@ func wrapCategorizedConnectionError(err error) error {
 	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
 }
 
+// jwtRequiresTLSMessage explains why JWT forwarding was refused without TLS.
+// It names the instance setting only when the data source already opted in,
+// so a data source that never asked for cleartext forwarding gets the base
+// error.
+func jwtRequiresTLSMessage(settings Settings) string {
+	msg := "JWT authentication requires a secure (TLS) connection"
+	if settings.AllowCleartextJWTForwarding {
+		msg += "; \"Allow cleartext JWT forwarding\" is enabled on the data source, but the Grafana administrator has not set allow_cleartext_jwt_forwarding = true in the [plugin.grafana-clickhouse-datasource] section"
+	}
+	return msg
+}
+
 func buildClickHouseOptions(ctx context.Context, settings Settings, message json.RawMessage) (*clickhouse.Options, error) {
 	var tlsConfig *tls.Config
 	var err error
@@ -281,16 +293,23 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	}
 
 	// Forwarding a user token over a plaintext connection exposes it on the
-	// wire, so require TLS by default. For deployments that delegate TLS
+	// wire, so require TLS by default. Deployments that delegate TLS
 	// termination and origination to a proxy alongside Grafana (an
-	// Istio/Envoy sidecar, for example), the plugin cannot see the encrypted
-	// hop, so the requirement can be waived. That takes both the per data
-	// source flag and the instance-wide Grafana setting, so provisioning the
-	// flag alone (as on Grafana Cloud, which never sets the instance setting)
-	// does not lift it.
-	if settings.OAuthPassThru && tlsConfig == nil &&
-		!(settings.AllowClearTextJWTForwarding && instanceAllowsClearTextJWTForwarding()) {
-		return nil, backend.DownstreamError(errors.New("JWT authentication requires a secure (TLS) connection; if Grafana reaches ClickHouse through a proxy that originates TLS for its outbound requests (for example an Istio/Envoy sidecar), the Grafana administrator must set allow_cleartext_jwt_forwarding = true in the [plugin.grafana-clickhouse-datasource] section and \"Allow clear text JWT forwarding\" must be enabled on the data source"))
+	// Istio/Envoy sidecar, for example) can waive the requirement: the plugin
+	// cannot see the encrypted hop. That takes both the per data source flag
+	// and the instance-wide Grafana setting, so provisioning the flag alone
+	// (as on Grafana Cloud, which never sets the instance setting) does not
+	// lift it. The operator must ensure the plaintext hop stays on the local
+	// host or otherwise protected network.
+	if settings.OAuthPassThru && tlsConfig == nil {
+		if !settings.AllowCleartextJWTForwarding || !instanceAllowsCleartextJWTForwarding() {
+			return nil, backend.DownstreamError(errors.New(jwtRequiresTLSMessage(settings)))
+		}
+		// The token would cross the hop after the secure SOCKS proxy in
+		// cleartext, and a mesh sidecar next to Grafana does not cover it.
+		if sdkproxy.New(settings.ProxyOptions).SecureSocksProxyEnabled() {
+			return nil, backend.DownstreamError(errors.New("cleartext JWT forwarding cannot be combined with the secure SOCKS proxy: the token would travel in cleartext beyond the proxy; enable Secure connection so the plugin establishes TLS"))
+		}
 	}
 
 	// Forwarding a real user's token over a connection whose server

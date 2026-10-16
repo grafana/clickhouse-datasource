@@ -418,42 +418,61 @@ func TestLoadSettingsOAuthPassThru(t *testing.T) {
 	})
 }
 
-func TestLoadSettingsAllowClearTextJWTForwarding(t *testing.T) {
+func TestLoadSettingsAllowCleartextJWTForwarding(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("should parse allowClearTextJWTForwarding as bool", func(t *testing.T) {
+	t.Run("should parse allowCleartextJWTForwarding as bool", func(t *testing.T) {
 		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 443, "allowClearTextJWTForwarding": true}`),
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowCleartextJWTForwarding": true}`),
 			DecryptedSecureJSONData: map[string]string{},
 		})
 		assert.NoError(t, err)
-		assert.True(t, settings.AllowClearTextJWTForwarding)
+		assert.True(t, settings.AllowCleartextJWTForwarding)
 	})
 
-	t.Run("should parse allowClearTextJWTForwarding as string", func(t *testing.T) {
+	t.Run("should parse allowCleartextJWTForwarding as string", func(t *testing.T) {
 		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 443, "allowClearTextJWTForwarding": "true"}`),
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowCleartextJWTForwarding": "true"}`),
 			DecryptedSecureJSONData: map[string]string{},
 		})
 		assert.NoError(t, err)
-		assert.True(t, settings.AllowClearTextJWTForwarding)
+		assert.True(t, settings.AllowCleartextJWTForwarding)
+	})
+
+	t.Run("should parse false and \"false\"", func(t *testing.T) {
+		for _, v := range []string{`false`, `"false"`} {
+			settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+				JSONData:                []byte(`{"host": "test", "port": 443, "allowCleartextJWTForwarding": ` + v + `}`),
+				DecryptedSecureJSONData: map[string]string{},
+			})
+			assert.NoError(t, err)
+			assert.False(t, settings.AllowCleartextJWTForwarding, v)
+		}
+	})
+
+	t.Run("should return an error on an invalid string", func(t *testing.T) {
+		_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowCleartextJWTForwarding": "yes"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.ErrorContains(t, err, "allowCleartextJWTForwarding")
 	})
 
 	t.Run("should return an error instead of panicking on a non-bool value", func(t *testing.T) {
 		_, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
-			JSONData:                []byte(`{"host": "test", "port": 443, "allowClearTextJWTForwarding": 1}`),
+			JSONData:                []byte(`{"host": "test", "port": 443, "allowCleartextJWTForwarding": 1}`),
 			DecryptedSecureJSONData: map[string]string{},
 		})
-		assert.ErrorContains(t, err, "allowClearTextJWTForwarding")
+		assert.ErrorContains(t, err, "allowCleartextJWTForwarding")
 	})
 
-	t.Run("should default allowClearTextJWTForwarding to false", func(t *testing.T) {
+	t.Run("should default allowCleartextJWTForwarding to false", func(t *testing.T) {
 		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
 			JSONData:                []byte(`{"host": "test", "port": 443}`),
 			DecryptedSecureJSONData: map[string]string{},
 		})
 		assert.NoError(t, err)
-		assert.False(t, settings.AllowClearTextJWTForwarding)
+		assert.False(t, settings.AllowCleartextJWTForwarding)
 	})
 }
 
@@ -595,7 +614,7 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"username": "baz", "defaultDatabase": "example",
 			"connMaxLifetime": 60, "dialTimeout": "20", "queryTimeout": "120", "maxIdleConns": 2, "maxOpenConns": 3,
 			"httpHeaders": [{ "name": "x-plain", "value": "value-1", "secure": false }],
-			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true, "allowClearTextJWTForwarding": true,
+			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true, "allowCleartextJWTForwarding": true,
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
 			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120

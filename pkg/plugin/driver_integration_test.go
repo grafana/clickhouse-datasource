@@ -50,7 +50,7 @@ func GetEnv(key, fallback string) string {
 }
 
 func TestMain(m *testing.M) {
-	abortIfClearTextJWTEnvSet()
+	abortIfCleartextJWTEnvSet()
 	useDocker := strings.ToLower(getEnv("CLICKHOUSE_USE_DOCKER", "true"))
 	if useDocker == "false" {
 		fmt.Printf("Using external ClickHouse for IT tests -  %s:%s\n",
