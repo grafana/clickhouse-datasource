@@ -64,7 +64,14 @@ import {
   TIME_FIELD_ALIAS,
 } from './logs';
 import { applyMinIntervalToScopedVars } from './queryInterval';
-import { escapeIdentifier, generateSql, getColumnByHint, isStringType, logAliasToColumnHints } from './sqlGenerator';
+import {
+  escapeIdentifier,
+  generateSql,
+  getColumnByHint,
+  getTableIdentifier,
+  isStringType,
+  logAliasToColumnHints,
+} from './sqlGenerator';
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
@@ -485,7 +492,15 @@ export class Datasource
       });
     }
 
+    const { database, table } = query.builderOptions;
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
+      // Table-qualified so the `time` bucket alias cannot shadow the raw time column.
+      if (f.hint === ColumnHint.Time || f.hint === ColumnHint.FilterTime) {
+        const rawTimeColumn = getColumnByHint(query.builderOptions, f.hint) ?? timeColumn;
+        const key = `${getTableIdentifier(database, table)}.${escapeIdentifier(rawTimeColumn.name)}`;
+        return { ...f, hint: undefined, key, type: rawTimeColumn.type || f.type } as Filter;
+      }
+
       // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
       // For this histogram query the "level" column isn't selected, so we must find the original column name
       // Clone so resolving the key does not write it back into the user's query filters.
