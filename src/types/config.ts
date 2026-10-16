@@ -47,6 +47,7 @@ export interface CHConfig extends DataSourceJsonData {
 
   httpHeaders?: CHHttpHeader[];
   forwardGrafanaHeaders?: boolean;
+  killQueryOnCancel?: boolean;
   oauthPassThru?: boolean;
   oauthPassThruAllowFallback?: boolean;
 
