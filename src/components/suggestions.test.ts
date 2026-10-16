@@ -268,4 +268,36 @@ describe('Suggestions', () => {
     expect(labels).toContain('${table}');
     expect(labels).toContain('${database}');
   });
+
+  it('offers Grafana variables when a variable is typed as a JOIN target', async () => {
+    const sql = 'SELECT * FROM otel_logs JOIN ${';
+    const cursorPosition = sql.length;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+
+    const schema: Schema = {
+      databases: async (): Promise<string[]> => ['default'],
+      tables: async (): Promise<string[]> => ['otel_logs', 'otel_traces'],
+      columns: async (): Promise<TableColumn[]> => [],
+      functions: async (): Promise<SqlFunction[]> => [],
+      defaultDatabase: 'default',
+    };
+
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+
+    const labels = (await getSuggestions(sql, schema, range, cursorPosition)).map((s) =>
+      typeof s.label === 'string' ? s.label : s.label.label
+    );
+    expect(labels).toContain('${table}');
+    expect(labels).toContain('${database}');
+  });
 });
