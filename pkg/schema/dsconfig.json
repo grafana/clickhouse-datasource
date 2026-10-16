@@ -585,6 +585,18 @@
       }
     },
     {
+      "id": "jsonData_logs_traceLinkDatasourceUid",
+      "key": "traceLinkDatasourceUid",
+      "section": "logs",
+      "label": "\"View trace\" data source",
+      "description": "UID of the Tempo data source that \"View trace\" links open. Traces queries and queries on the default trace table still open ClickHouse. Leave empty to keep the ClickHouse link.",
+      "valueType": "string",
+      "target": "jsonData",
+      "ui": {
+        "component": "input"
+      }
+    },
+    {
       "id": "jsonData_traces_defaultDatabase",
       "key": "defaultDatabase",
       "section": "traces",
@@ -1185,6 +1197,7 @@
         "jsonData_logs_contextColumns",
         "jsonData_logs_additionalColumns",
         "jsonData_logs_showLogLinks",
+        "jsonData_logs_traceLinkDatasourceUid",
         "jsonData_traces_defaultDatabase",
         "jsonData_traces_defaultTable",
         "jsonData_traces_otelEnabled",
