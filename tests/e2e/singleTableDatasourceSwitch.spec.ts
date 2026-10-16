@@ -56,37 +56,50 @@ const equalsFilter = (key: string, value: string) => ({
   condition: 'AND',
 });
 
+interface SentQuery {
+  rawSql?: string;
+  builderOptions?: { queryType?: string };
+}
+
 /**
- * Resolves with the first query of the next /api/ds/query request that targets the given data
- * source and table. Grafana first runs the carried-over query unchanged, so the table check skips
- * that request and waits for the converted one. Without the conversion no such request is made.
+ * Resolves with the query and frames of the next completed /api/ds/query response for the given
+ * data source and table. Grafana first runs the carried-over query unchanged, so the table check
+ * skips it. A new run in the Explore pane cancels a request that is still in flight, so only a
+ * completed response that carries frames counts, never a cancelled request. Without the conversion
+ * no such response arrives.
  */
-function waitForQueryOn(page: Page, datasourceUid: string, table: string) {
-  return page
-    .waitForRequest(
-      (request) => {
-        if (!request.url().includes('/api/ds/query') || request.method() !== 'POST') {
+async function waitForQueryOn(page: Page, datasourceUid: string, table: string) {
+  let query: SentQuery = {};
+  let body: QueryDataBody | null = null;
+  await page
+    .waitForResponse(
+      async (response) => {
+        const request = response.request();
+        if (!response.url().includes('/api/ds/query') || request.method() !== 'POST' || !response.ok()) {
           return false;
         }
-        const query = request.postDataJSON()?.queries?.[0];
-        return (
-          query?.refId === 'A' &&
-          query?.datasource?.uid === datasourceUid &&
-          String(query?.rawSql ?? '').includes(`"e2e_test"."${table}"`)
-        );
+        const sent = request.postDataJSON()?.queries?.[0];
+        if (
+          sent?.refId !== 'A' ||
+          sent?.datasource?.uid !== datasourceUid ||
+          !String(sent?.rawSql ?? '').includes(`"e2e_test"."${table}"`)
+        ) {
+          return false;
+        }
+        const received = (await response.json().catch(() => null)) as QueryDataBody | null;
+        if (!Array.isArray(received?.results?.A?.frames)) {
+          return false;
+        }
+        query = sent;
+        body = received;
+        return true;
       },
       { timeout: 15_000 }
     )
-    .then(
-      async (request) => {
-        const response = await request.response();
-        const body: QueryDataBody | null = (await response?.json().catch(() => null)) ?? null;
-        return { query: request.postDataJSON().queries[0], body };
-      },
-      () => {
-        throw new Error(`No query ran against e2e_test.${table} on ${datasourceUid} after the switch`);
-      }
-    );
+    .catch(() => {
+      throw new Error(`No completed query against e2e_test.${table} on ${datasourceUid} after the switch`);
+    });
+  return { query, body };
 }
 
 async function expectCompactEditor(page: Page) {
@@ -150,7 +163,7 @@ test.describe('Switching between single-table data sources in Explore', () => {
     const { query, body } = await converted;
 
     await expectCompactEditor(page);
-    expect(query.builderOptions.queryType).toBe('traces');
+    expect(query.builderOptions?.queryType).toBe('traces');
     expect(query.rawSql).toContain(`ServiceName = 'api'`);
     expect(query.rawSql).not.toContain('SeverityText');
     expect(rowCount(body)).toBeGreaterThan(0);
@@ -191,7 +204,7 @@ test.describe('Switching between single-table data sources in Explore', () => {
     const { query, body } = await converted;
 
     await expectCompactEditor(page);
-    expect(query.builderOptions.queryType).toBe('logs');
+    expect(query.builderOptions?.queryType).toBe('logs');
     expect(query.rawSql).toContain(`ServiceName = 'api'`);
     expect(query.rawSql).not.toContain('SpanName');
     // The fixture window holds three api log rows and one worker row: three rows means the
