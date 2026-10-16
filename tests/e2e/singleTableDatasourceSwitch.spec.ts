@@ -56,6 +56,24 @@ const equalsFilter = (key: string, value: string) => ({
   condition: 'AND',
 });
 
+// A logs query on e2e_test.events with a filter and a search, as the single-table logs data source
+// builds it.
+const EVENTS_LOGS_QUERY = {
+  database: 'e2e_test',
+  table: 'events',
+  queryType: 'logs',
+  mode: 'list',
+  columns: [
+    { name: 'timestamp', hint: 'time' },
+    { name: 'message', hint: 'log_message' },
+    { name: 'level', hint: 'log_level' },
+  ],
+  filters: [timeRangeFilter('time'), equalsFilter('service', 'worker')],
+  orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
+  limit: 1000,
+  meta: { otelEnabled: false, logMessageLike: 'timeout' },
+};
+
 interface SentQuery {
   rawSql?: string;
   builderOptions?: { queryType?: string };
@@ -260,21 +278,7 @@ test.describe('Switching between single-table data sources in Explore', () => {
       from: FIXTURE_FROM_ISO,
       to: FIXTURE_TO_ISO,
       pluginVersion: BUILDER_PLUGIN_VERSION,
-      builderOptions: {
-        database: 'e2e_test',
-        table: 'events',
-        queryType: 'logs',
-        mode: 'list',
-        columns: [
-          { name: 'timestamp', hint: 'time' },
-          { name: 'message', hint: 'log_message' },
-          { name: 'level', hint: 'log_level' },
-        ],
-        filters: [timeRangeFilter('time'), equalsFilter('service', 'worker')],
-        orderBy: [{ name: '', hint: 'time', dir: 'DESC' }],
-        limit: 1000,
-        meta: { otelEnabled: false, logMessageLike: 'timeout' },
-      },
+      builderOptions: EVENTS_LOGS_QUERY,
     });
 
     const converted = waitForQueryOn(page, OTEL_LOGS_DATASOURCE.uid, 'trace_links_logs');
@@ -288,5 +292,29 @@ test.describe('Switching between single-table data sources in Explore', () => {
     expect(query.rawSql).not.toMatch(/\bservice\s*=/);
     // One row in the window mentions a timeout ("downstream timeout").
     expect(rowCount(body)).toBe(1);
+  });
+
+  test('a link to a query on another table keeps its table and filters', async ({ page }) => {
+    // A panel opened in Explore, a history entry or a shared link can read a table other than the
+    // configured one. It belongs to this data source, so it is not converted.
+    const tables: string[] = [];
+    page.on('request', (request) => {
+      const sent = request.url().includes('/api/ds/query') ? request.postDataJSON()?.queries?.[0] : undefined;
+      if (sent?.refId === 'A') {
+        tables.push(String(sent.rawSql ?? '').match(/"e2e_test"\."(\w+)"/)?.[1] ?? '');
+      }
+    });
+
+    await openExplore(page, {
+      datasourceUid: OTEL_LOGS_DATASOURCE.uid,
+      from: FIXTURE_FROM_ISO,
+      to: FIXTURE_TO_ISO,
+      pluginVersion: BUILDER_PLUGIN_VERSION,
+      builderOptions: EVENTS_LOGS_QUERY,
+    });
+
+    await expect(page.getByPlaceholder('Search log body text...')).toHaveValue('timeout');
+    expect(tables).toContain('events');
+    expect(tables).not.toContain('trace_links_logs');
   });
 });
