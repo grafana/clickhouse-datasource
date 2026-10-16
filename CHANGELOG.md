@@ -9,6 +9,7 @@
 
 ### Fixes
 
+- Keep the query when changing the query type, database or table in the query builder. A database change replaces the table only when the new database doesn't have it, and a query type change fills in only what the new type is missing (its role columns, a time-range filter, the builder mode matching its aggregates). Previously each change reset the query to defaults, and a table or database change left the Limit input showing a value the query no longer used (#2162, #2200)
 - Escape ad-hoc filter values, including `IN`/`NOT IN` list elements, so a crafted value can't break out of the `additional_table_filters` clause. Previously a value with unbalanced parentheses bypassed the filter (no quote required), `NOT IN` was a silent no-op that returned every row, and values containing a backslash matched the wrong rows (#2095)
 - Bound the ad-hoc value-suggestion query to the dashboard time range (falling back to a recent window) on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
 - Quote ad-hoc filter keys that are not plain identifiers, so a crafted key is read as one (nonexistent) column name instead of being spliced into the `additional_table_filters` predicate. Plain and dotted column names are unchanged (#2095)
