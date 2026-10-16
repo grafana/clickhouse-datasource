@@ -237,13 +237,18 @@ When **Configuration mode** is set to **Single source** and **Signal type** is s
 
 The plugin ships built-in column maps for the OpenTelemetry ClickHouse exporter's default schemas. Pick the version that matches the exporter that wrote your data:
 
-- **`auto (latest)`**: detects the logs schema version from the table's columns when building a query: tables with a `TimestampTime` column use the `1.2.9` map, tables without it use the `1.3.0` map. Recommended, and the default. Pin a specific version below to override the detection.
+- **`auto (latest)`**: detects the logs schema version from the table when building a query. Tables without a `TimestampTime` column use the `1.3.0` map. Tables with a `TimestampTime` column use the `1.2.9` map, unless the table's sorting key or partition key references `Timestamp` and neither key references `TimestampTime`. Those tables use the `1.3.0` map, so the time filter uses the column in the keys. For a `Distributed` table, the plugin reads the keys of the local table that it points to. When the plugin can't read the keys, for example because the user can't see the local table in `system.tables`, detection uses the columns only. Recommended, and the default. Pin a specific version below to override the detection.
 - **`1.3.0`**: `opentelemetry-collector-contrib` clickhouseexporter `v0.151.0` and later. The `otel_logs` table partitions and orders directly on `Timestamp`. The `TimestampTime` column was removed in [PR #47720](https://github.com/open-telemetry/opentelemetry-collector-contrib/pull/47720), so the **Filter Time column** is left blank.
 - **`1.2.9`**: `opentelemetry-collector-contrib` clickhouseexporter `v0.150.x` and earlier. The `otel_logs` table includes a `TimestampTime DateTime` column used for partition-based filtering.
 
 The trace tables (`otel_traces`, `otel_traces_trace_id_ts`) and metric tables are unchanged across these versions; only the `otel_logs` schema changed. Detection therefore only applies to logs, and traces always use the selected version's map.
 
 If queries fail with an `Unknown identifier 'TimestampTime'` error after upgrading the exporter, leave the version on `auto (latest)` and rebuild the query, or pin the schema version to `1.3.0`.
+
+Detection runs when the query builder creates a query and when you turn on **Use OTel**. Saved queries keep the columns they were built with. To apply detection to a saved query:
+
+- In the query builder, turn **Use OTel** off and then on. This resets the selected columns to the OTel defaults.
+- The compact editor of a **Single source** data source has no **Use OTel** switch. Click **Open in SQL editor**, then click **Switch to compact view** and confirm with **Discard SQL and switch**. The compact editor then rebuilds the query from the generated defaults.
 
 ### Private data source connect
 

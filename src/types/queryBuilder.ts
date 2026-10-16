@@ -142,6 +142,12 @@ export interface TableColumn {
   aggregatable?: boolean;
 }
 
+/** Sorting and partition key expressions of a MergeTree table, as `system.tables` reports them. */
+export interface TableKeys {
+  sortingKey: string;
+  partitionKey: string;
+}
+
 export interface SqlFunction {
   name: string;
   isAggregate: boolean;
