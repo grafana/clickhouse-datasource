@@ -1,12 +1,15 @@
 import {
   CoreApp,
   DataFrame,
+  DataLink,
   DataQueryRequest,
   DataQueryResponse,
+  DataSourceInstanceSettings,
   FieldConfig,
   FieldType,
   TimeRange,
 } from '@grafana/data';
+import { getDataSourceSrv } from '@grafana/runtime';
 import {
   BuilderMode,
   ColumnHint,
@@ -28,6 +31,7 @@ import { pluginVersion } from 'utils/version';
 import { generateSql, JSON_SENTINEL_KEY } from './sqlGenerator';
 import { getDefaultLogsFilters } from 'components/queryBuilder/defaultQueryOptions';
 import otel from 'otel';
+import { getTable } from './ast';
 
 /**
  * Resolves the QueryBuilderOptions for a query regardless of editor type. Builder queries
@@ -694,7 +698,13 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     const canLinkToTraces = copiedTraceQuery || canBuildTraceLink(datasource, linkTables.traces);
     const canLinkToLogs = copiedLogsQuery || canBuildLogsLink(datasource, linkTables.logs);
 
-    if (datasource.settings.jsonData.traces?.showTraceLinks !== false && canLinkToTraces) {
+    const showTraceLinks = datasource.settings.jsonData.traces?.showTraceLinks !== false;
+    const traceLinkDatasource = showTraceLinks
+      ? getTraceLinkDatasource(datasource.settings.jsonData.logs?.traceLinkDatasourceUid)
+      : undefined;
+    if (traceLinkDatasource && !isClickHouseTracesQuery(datasource, originalQuery)) {
+      traceField.config.links.push(traceLinkToDatasource(traceLinkDatasource, openInNewWindow));
+    } else if (showTraceLinks && canLinkToTraces) {
       traceField.config.links!.push({
         title: 'View trace',
         targetBlank: openInNewWindow,
@@ -751,6 +761,41 @@ const getCarriedLinkTables = (query: CHQuery): LinkTables | undefined => {
     ? meta?.linkTables
     : undefined;
 };
+
+/**
+ * Returns the Tempo data source that "View trace" links open in place of ClickHouse, or undefined when
+ * the UID is empty or does not name a Tempo data source on this Grafana instance.
+ */
+export const getTraceLinkDatasource = (uid: string | undefined): DataSourceInstanceSettings | undefined => {
+  // eslint-disable-next-line @typescript-eslint/no-deprecated -- the @grafana/runtime/unstable replacement is async and ships from Grafana 13.1
+  const target = uid ? getDataSourceSrv().getInstanceSettings(uid) : undefined;
+  return target?.type === 'tempo' ? target : undefined;
+};
+
+const isClickHouseTracesQuery = (datasource: Datasource, query: CHQuery): boolean => {
+  const [queryType, table] =
+    query.editorType === EditorType.Builder
+      ? [query.builderOptions.queryType, query.builderOptions.table]
+      : [query.queryType, getTable(query.rawSql).split('.').pop()];
+  const tracesTable = datasource.getDefaultTraceTable();
+  return queryType === QueryType.Traces || (Boolean(tracesTable) && table === tracesTable);
+};
+
+const traceLinkToDatasource = (target: DataSourceInstanceSettings, targetBlank: boolean): DataLink => ({
+  title: 'View trace',
+  url: '',
+  targetBlank,
+  internal: {
+    datasourceUid: target.uid,
+    datasourceName: target.name,
+    query: {
+      refId: 'Trace ID',
+      datasource: { uid: target.uid, type: target.type },
+      queryType: 'traceql',
+      query: '${__value.raw}',
+    },
+  },
+});
 
 const canBuildTraceLink = (datasource: Datasource, linkTable?: LinkTable): boolean => {
   const traceColumns = datasource.getDefaultTraceColumns();

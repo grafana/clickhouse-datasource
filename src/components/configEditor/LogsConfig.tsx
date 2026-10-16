@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getDataSourceSrv } from '@grafana/runtime';
+import { DataSourcePicker, getDataSourceSrv } from '@grafana/runtime';
 import { ConfigSection, ConfigSubSection } from 'components/experimental/ConfigSection';
 import { Input, Field, InlineField, InlineFormLabel, TagsInput, Text } from '@grafana/ui';
 import { OtelVersionSelect } from 'components/queryBuilder/OtelVersionSelect';
@@ -12,7 +12,7 @@ import { LabeledInput } from './LabeledInput';
 import { CHLogsConfig, ConfigMode, defaultCHAdditionalSettingsConfig } from 'types/config';
 import { Datasource } from 'data/CHDatasource';
 import allLabels from 'labels';
-import { columnLabelToPlaceholder } from 'data/utils';
+import { columnLabelToPlaceholder, getTraceLinkDatasource } from 'data/utils';
 import { Switch } from 'components/queryBuilder/Switch';
 
 interface LogsConfigProps {
@@ -35,6 +35,7 @@ interface LogsConfigProps {
   onSelectContextColumnsChange: (v: boolean) => void;
   onContextColumnsChange: (v: string[]) => void;
   onShowLogLinksChange: (v: boolean) => void;
+  onTraceLinkDatasourceUidChange: (uid: string) => void;
   onAdditionalColumnsChange: (v: string[]) => void;
   onAttributeColumnsChange: (v: string[]) => void;
   onAttributeColumnExclusionsChange: (v: string[]) => void;
@@ -53,6 +54,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     onSelectContextColumnsChange,
     onContextColumnsChange,
     onShowLogLinksChange,
+    onTraceLinkDatasourceUidChange,
     onAdditionalColumnsChange,
     onAttributeColumnsChange,
     onAttributeColumnExclusionsChange,
@@ -69,6 +71,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
     selectContextColumns,
     contextColumns,
     showLogLinks,
+    traceLinkDatasourceUid,
     additionalColumns,
     attributeColumns,
     attributeColumnExclusions,
@@ -343,6 +346,26 @@ export const LogsConfig = (props: LogsConfigProps) => {
           onChange={onShowLogLinksChange}
           wide
         />
+        <Field
+          label={labels.traceIdCorrelation.traceLinkDatasource.label}
+          description={labels.traceIdCorrelation.traceLinkDatasource.description}
+          htmlFor="trace-link-datasource"
+        >
+          <DataSourcePicker
+            inputId="trace-link-datasource"
+            width={40}
+            pluginId="tempo"
+            noDefault
+            current={traceLinkDatasourceUid || null}
+            onChange={(ds) => onTraceLinkDatasourceUidChange(ds.uid)}
+            onClear={() => onTraceLinkDatasourceUidChange('')}
+          />
+        </Field>
+        {traceLinkDatasourceUid && !getTraceLinkDatasource(traceLinkDatasourceUid) && (
+          <Text variant="bodySmall" color="warning">
+            {`Data source "${traceLinkDatasourceUid}" ${labels.traceIdCorrelation.traceLinkDatasource.notFound}`}
+          </Text>
+        )}
       </ConfigSubSection>
       <br />
       <ConfigSubSection title={labels.contextColumns.title} description={labels.contextColumns.description}>
