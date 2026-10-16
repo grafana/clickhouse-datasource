@@ -4,8 +4,10 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { HttpProtocolSettingsSection } from './HttpProtocolSettingsSection';
 import { createTestProps } from './helpers';
 import { Protocol } from 'types/config';
+import allLabels from './labelsV2';
 
 describe('HttpProtocolSettingsSection', () => {
+  const labels = allLabels.components.Config.ConfigEditor;
   const onOptionsChangeMock = jest.fn();
   let consoleSpy: jest.SpyInstance;
 
@@ -67,5 +69,40 @@ describe('HttpProtocolSettingsSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
 
     expect(screen.getByTestId('angle-down')).toBeInTheDocument();
+  });
+
+  it('shows the stop canceled queries switch off by default under Optional HTTP settings', () => {
+    render(<HttpProtocolSettingsSection {...defaultProps} />);
+
+    expect(screen.queryByTestId(labels.killQueryOnCancel.testid)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
+
+    expect(screen.getByText(labels.killQueryOnCancel.label)).toBeInTheDocument();
+    expect(screen.getByTestId(labels.killQueryOnCancel.testid)).not.toBeChecked();
+  });
+
+  it('opens Optional HTTP settings with the switch on when killQueryOnCancel is stored', () => {
+    render(
+      <HttpProtocolSettingsSection
+        {...defaultProps}
+        options={{
+          ...defaultProps.options,
+          jsonData: { ...defaultProps.options.jsonData, killQueryOnCancel: true },
+        }}
+      />
+    );
+
+    expect(screen.getByTestId(labels.killQueryOnCancel.testid)).toBeChecked();
+  });
+
+  it('writes killQueryOnCancel when the switch is turned on', () => {
+    render(<HttpProtocolSettingsSection {...defaultProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /optional http settings/i }));
+
+    fireEvent.click(screen.getByTestId(labels.killQueryOnCancel.testid));
+
+    expect(onOptionsChangeMock).toHaveBeenCalledWith(
+      expect.objectContaining({ jsonData: expect.objectContaining({ killQueryOnCancel: true }) })
+    );
   });
 });
