@@ -344,7 +344,12 @@ func (h *Clickhouse) Connect(
 	ctx, cancel := context.WithTimeout(ctx, opts.DialTimeout)
 	defer cancel()
 
-	db := clickhouse.OpenDB(opts)
+	var db *sql.DB
+	if opts.Protocol == clickhouse.HTTP && settings.KillQueryOnCancel {
+		db = sql.OpenDB(&killOnCancelConnector{Connector: clickhouse.Connector(opts)})
+	} else {
+		db = clickhouse.OpenDB(opts)
+	}
 
 	// Set connection pool settings
 	db.SetConnMaxLifetime(time.Duration(settings.ConnMaxLifetime) * time.Minute)

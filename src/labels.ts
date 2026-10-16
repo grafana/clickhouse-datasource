@@ -24,6 +24,12 @@ export default {
           tooltip: 'Additional URL path for HTTP requests',
           placeholder: 'additional-path',
         },
+        killQueryOnCancel: {
+          label: 'Stop canceled queries on the server',
+          testid: 'data-testid kill-query-on-cancel-switch',
+          tooltip:
+            'Send KILL QUERY when Grafana cancels a running query, so that ClickHouse stops it. The user needs SELECT on system.processes, which lets it read the query text, user name, and client address of every running query on the server. Defaults to false.',
+        },
         protocol: {
           label: 'Protocol',
           tooltip: 'Native or HTTP for server protocol',
