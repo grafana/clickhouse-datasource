@@ -1,5 +1,6 @@
 import {
   arrayToDataFrame,
+  dateTime,
   CoreApp,
   DataFrame,
   DataQueryRequest,
@@ -1397,6 +1398,68 @@ describe('ClickHouseDatasource', () => {
   });
 
   describe('distinct value suggestions', () => {
+    it.each(['column', 'map'])('bounds %s suggestions to the selected historical range', async (kind) => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'event"time',
+      };
+      const frame = arrayToDataFrame([{ value: 'service-a' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+      const range: TimeRange = {
+        from: dateTime(1600000000123),
+        to: dateTime(1600000900456),
+        raw: { from: 'now-15m', to: 'now' },
+      };
+      const values =
+        kind === 'column'
+          ? await ds.fetchDistinctValues('ServiceName', 'otel', 'otel_logs', range)
+          : await ds.fetchDistinctMapValues('ResourceAttributes', 'service.name', 'otel', 'otel_logs', range);
+      expect(values).toEqual(['service-a']);
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(
+        ' AND "event""time" >= fromUnixTimestamp64Milli(1600000000123) AND "event""time" <= fromUnixTimestamp64Milli(1600000900456) LIMIT 1000'
+      );
+      expect(spy.mock.calls[0][0].targets[0].rawSql).not.toContain('now()');
+    });
+
+    it.each(['missing', 'invalid', 'reversed'])('uses a recent window for a %s range', async (kind) => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      const range =
+        kind === 'missing'
+          ? undefined
+          : {
+              from: dateTime(kind === 'invalid' ? NaN : 2000),
+              to: dateTime(1000),
+              raw: { from: 'now-15m', to: 'now' },
+            };
+      await ds.fetchDistinctValues('ServiceName', 'otel', 'otel_logs', range);
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(
+        ' AND "Timestamp" >= now() - INTERVAL 6 HOUR LIMIT 1000'
+      );
+    });
+
+    it('uses the configured trace timestamp for trace suggestions', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.traces = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_traces',
+        otelEnabled: false,
+        startTimeColumn: 'Timestamp',
+      };
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      await ds.fetchDistinctValues('ServiceName', 'otel', 'otel_traces');
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(' AND "Timestamp" >= now() - INTERVAL 6 HOUR');
+    });
+
     it('escapes identifiers for distinct column values', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([{ value: 1 }, { value: 2 }]);
