@@ -179,6 +179,22 @@
         "type": "query"
       },
       {
+        "description": "Table that View trace links on TraceId values open, the same table these panels read. Read by the ClickHouse data source.",
+        "hide": 2,
+        "name": "clickhouse_link_traces_table",
+        "query": "${database}.otel_traces",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
+        "description": "Table that View logs links on TraceId values open, the same table these panels read. Read by the ClickHouse data source.",
+        "hide": 2,
+        "name": "clickhouse_link_logs_table",
+        "query": "${database}.otel_logs",
+        "skipUrlSync": true,
+        "type": "constant"
+      },
+      {
         "current": {},
         "datasource": {
           "type": "grafana-clickhouse-datasource",

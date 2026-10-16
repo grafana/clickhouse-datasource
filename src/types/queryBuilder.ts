@@ -82,7 +82,23 @@ export interface QueryBuilderOptions {
     // Logs & Traces
     otelEnabled?: boolean;
     otelVersion?: string;
+    /**
+     * Tables resolved from the `clickhouse_link_*_table` dashboard variables, carried on
+     * data-link queries so links built from them in Explore, where the variables don't
+     * exist, keep pointing at the same tables.
+     */
+    linkTables?: LinkTables;
   };
+}
+
+export interface LinkTable {
+  database: string;
+  table: string;
+}
+
+export interface LinkTables {
+  traces?: LinkTable;
+  logs?: LinkTable;
 }
 
 export enum AggregateType {
