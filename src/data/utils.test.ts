@@ -20,7 +20,17 @@ import {
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, dateTime, Field, FieldType } from '@grafana/data';
+import {
+  CoreApp,
+  DataFrame,
+  DataQueryRequest,
+  DataQueryResponse,
+  DataSourceInstanceSettings,
+  dateTime,
+  Field,
+  FieldType,
+} from '@grafana/data';
+import { DataSourceSrv, setDataSourceSrv } from '@grafana/runtime';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import otel from 'otel';
@@ -1071,6 +1081,136 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
+  });
+
+  describe('"View trace" data source', () => {
+    const datasources: Record<string, Partial<DataSourceInstanceSettings>> = {
+      'tempo-uid': { uid: 'tempo-uid', type: 'tempo', name: 'Tempo' },
+      'jaeger-uid': { uid: 'jaeger-uid', type: 'jaeger', name: 'Jaeger' },
+      'clickhouse-uid': { uid: 'clickhouse-uid', type: 'grafana-clickhouse-datasource', name: 'Other ClickHouse' },
+    };
+
+    beforeEach(() => {
+      setDataSourceSrv({
+        getInstanceSettings: (uid: string) => datasources[uid],
+      } as unknown as DataSourceSrv);
+    });
+
+    const logsDatasource = (traceLinkDatasourceUid: string) => {
+      const datasource = newMockDatasource();
+      configureOtelLogs(datasource);
+      datasource.settings.jsonData.logs = { ...datasource.settings.jsonData.logs, traceLinkDatasourceUid };
+      return datasource;
+    };
+
+    const logsAndTracesDatasource = (traceLinkDatasourceUid: string) => {
+      const datasource = logsDatasource(traceLinkDatasourceUid);
+      configureOtelTraces(datasource);
+      jest.spyOn(datasource, 'fetchColumns').mockResolvedValue([]);
+      return datasource;
+    };
+
+    const sqlRequestResponse = (
+      rawSql: string,
+      queryType?: QueryType
+    ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
+      const [request, response] = buildTestRequestResponse({});
+      request.targets = [{ refId: 'A', editorType: EditorType.SQL, pluginVersion: '', rawSql, queryType }];
+      return [request, response];
+    };
+
+    const viewTrace = (out: DataQueryResponse) =>
+      (out.data[0] as DataFrame).fields[0].config.links?.find((link) => link.title === 'View trace');
+
+    it('opens a logs query trace ID in Tempo without a ClickHouse traces table', async () => {
+      const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+      const out = await transformQueryResponseWithTraceAndLogLinks(logsDatasource('tempo-uid'), request, response);
+
+      expect(viewTrace(out)).toEqual({
+        title: 'View trace',
+        url: '',
+        targetBlank: false,
+        internal: {
+          datasourceUid: 'tempo-uid',
+          datasourceName: 'Tempo',
+          query: {
+            refId: 'Trace ID',
+            datasource: { uid: 'tempo-uid', type: 'tempo' },
+            queryType: 'traceql',
+            query: '${__value.raw}',
+          },
+        },
+      });
+      const viewLogs = (out.data[0] as DataFrame).fields[0].config.links?.find((link) => link.title === 'View logs');
+      expect(viewLogs?.internal?.datasourceUid).toBe('clickhouse_ds');
+    });
+
+    it('opens Tempo in a new tab from a dashboard SQL editor panel', async () => {
+      const [request, response] = sqlRequestResponse('SELECT TraceId FROM otel.otel_logs');
+      request.app = CoreApp.Dashboard;
+      const out = await transformQueryResponseWithTraceAndLogLinks(
+        logsAndTracesDatasource('tempo-uid'),
+        request,
+        response
+      );
+
+      expect(viewTrace(out)?.targetBlank).toBe(true);
+      expect(viewTrace(out)?.internal?.datasourceUid).toBe('tempo-uid');
+    });
+
+    it.each<[string, () => [DataQueryRequest<CHQuery>, DataQueryResponse]]>([
+      ['a traces builder search', () => buildTestRequestResponse({ queryType: QueryType.Traces })],
+      [
+        'a traces builder trace ID lookup',
+        () => buildTestRequestResponse({ queryType: QueryType.Traces, meta: { isTraceIdMode: true, traceId: 'abc' } }),
+      ],
+      [
+        'a table builder query on the traces table',
+        () => buildTestRequestResponse({ queryType: QueryType.Table, database: 'otel', table: 'otel_traces' }),
+      ],
+      ['an SQL query with the traces query type', () => sqlRequestResponse('SELECT 1 AS traceID', QueryType.Traces)],
+      ['an SQL query on the traces table', () => sqlRequestResponse('SELECT TraceId FROM otel.otel_traces')],
+      [
+        'an SQL query on the traces table in a database variable',
+        () => sqlRequestResponse('SELECT TraceId FROM ${database}.otel_traces'),
+      ],
+    ])('keeps the ClickHouse link for %s', async (_label, build) => {
+      const [request, response] = build();
+      const out = await transformQueryResponseWithTraceAndLogLinks(
+        logsAndTracesDatasource('tempo-uid'),
+        request,
+        response
+      );
+
+      expect(viewTrace(out)?.internal?.datasourceUid).toBe('clickhouse_ds');
+    });
+
+    it.each([
+      ['is not found', 'deleted-uid'],
+      ['is a ClickHouse data source', 'clickhouse-uid'],
+      ['is not a Tempo data source', 'jaeger-uid'],
+    ])('falls back to the ClickHouse link when the data source %s', async (_label, uid) => {
+      const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+      const out = await transformQueryResponseWithTraceAndLogLinks(logsAndTracesDatasource(uid), request, response);
+
+      expect(viewTrace(out)?.internal?.datasourceUid).toBe('clickhouse_ds');
+    });
+
+    it('adds no "View trace" link when the data source is not found and no traces table is configured', async () => {
+      const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+      const out = await transformQueryResponseWithTraceAndLogLinks(logsDatasource('deleted-uid'), request, response);
+
+      expect(viewTrace(out)).toBeUndefined();
+    });
+
+    it('adds no "View trace" link when showTraceLinks is false', async () => {
+      const datasource = logsDatasource('tempo-uid');
+      datasource.settings.jsonData.traces = { showTraceLinks: false };
+      const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+      const out = await transformQueryResponseWithTraceAndLogLinks(datasource, request, response);
+
+      expect(viewTrace(out)).toBeUndefined();
+    });
   });
 });
 

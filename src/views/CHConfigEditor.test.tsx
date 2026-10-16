@@ -1,6 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { config } from '@grafana/runtime';
+import { config, DataSourceSrv, setDataSourceSrv } from '@grafana/runtime';
 import { ConfigEditor } from './CHConfigEditor';
 import { createValidationAPI } from './CHConfigEditorHooks';
 import { mockConfigEditorProps } from '__mocks__/ConfigEditor';
@@ -16,8 +16,17 @@ jest.mock('@grafana/runtime', () => {
   };
 });
 
+const tempo = { uid: 'tempo-uid', type: 'tempo', name: 'Tempo', meta: { info: { logos: { small: '' } } } };
+
 describe('ConfigEditor', () => {
   const labels = allLabels.components.Config.ConfigEditor;
+
+  beforeEach(() => {
+    setDataSourceSrv({
+      getList: () => [tempo],
+      getInstanceSettings: (ref: unknown) => (ref === tempo.uid || ref === tempo.name ? tempo : undefined),
+    } as unknown as DataSourceSrv);
+  });
 
   it('new editor', () => {
     render(<ConfigEditor {...mockConfigEditorProps()} />);
@@ -299,5 +308,38 @@ describe('ConfigEditor', () => {
         }),
       })
     );
+  });
+
+  describe('"View trace" data source picker', () => {
+    const traceLinkLabel = new RegExp(
+      `^${allLabels.components.Config.LogsConfig.traceIdCorrelation.traceLinkDatasource.label}`
+    );
+
+    it.each<[string, Partial<CHConfig>]>([
+      ['single-table logs mode', { configMode: 'single-table', signalType: 'logs' }],
+      ['classic mode', { configMode: 'classic', logs: { defaultTable: 'otel_logs' } }],
+    ])('saves the picked data source in %s', (_label, jsonData) => {
+      const props = mockConfigEditorProps(jsonData);
+      render(<ConfigEditor {...props} />);
+
+      (props.onOptionsChange as jest.Mock).mockClear();
+      fireEvent.keyDown(screen.getByLabelText(traceLinkLabel), { key: 'ArrowDown' });
+      fireEvent.click(screen.getByText('Tempo'));
+
+      expect(props.onOptionsChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jsonData: expect.objectContaining({
+            logs: expect.objectContaining({ traceLinkDatasourceUid: 'tempo-uid' }),
+          }),
+        })
+      );
+    });
+
+    it('is not rendered in single-table traces mode', () => {
+      render(<ConfigEditor {...mockConfigEditorProps({ configMode: 'single-table', signalType: 'traces' })} />);
+
+      expect(screen.getByText('Traces Table & Schema')).toBeInTheDocument();
+      expect(screen.queryByLabelText(traceLinkLabel)).not.toBeInTheDocument();
+    });
   });
 });
