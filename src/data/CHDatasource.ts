@@ -1289,7 +1289,7 @@ export class Datasource
    * column is the time column — those continue to use the bare LIMIT probe.
    */
   private getMapKeyProbeTimeColumn(db: string, table: string): string | undefined {
-    const logsDb = this.getDefaultLogsDatabase();
+    const logsDb = this.getDefaultLogsDatabase() || this.getDefaultDatabase();
     const logsTable = this.getDefaultLogsTable();
     if (logsDb === db && logsTable === table) {
       const cols = this.getDefaultLogsColumns();
@@ -1298,7 +1298,7 @@ export class Datasource
         return t;
       }
     }
-    const tracesDb = this.getDefaultTraceDatabase();
+    const tracesDb = this.getDefaultTraceDatabase() || this.getDefaultDatabase();
     const tracesTable = this.getDefaultTraceTable();
     if (tracesDb === db && tracesTable === table) {
       const cols = this.getDefaultTraceColumns();
