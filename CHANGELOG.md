@@ -9,6 +9,7 @@
 
 ### Fixes
 
+- Apply the dashboard variables to every panel they should filter: Operation, Status and Min Duration on the Traces Explorer's per-service panels, Level on the Logs Explorers' Level Distribution and Top Error Messages, Operation on the Service Dashboard's Top Errors, and User on Query Analysis's Query requests by user. Also fix the Traces Explorer's Min Duration filter, which failed with `ILLEGAL_AGGREGATION` on Trace Search Results (#2198)
 - Escape ad-hoc filter values, including `IN`/`NOT IN` list elements, so a crafted value can't break out of the `additional_table_filters` clause. Previously a value with unbalanced parentheses bypassed the filter (no quote required), `NOT IN` was a silent no-op that returned every row, and values containing a backslash matched the wrong rows (#2095)
 - Bound the ad-hoc value-suggestion query to the dashboard time range (falling back to a recent window) on the configured OTel logs/traces table, avoiding a full-column `DISTINCT` scan (#2095)
 - Quote ad-hoc filter keys that are not plain identifiers, so a crafted key is read as one (nonexistent) column name instead of being spliced into the `additional_table_filters` predicate. Plain and dotted column names are unchanged (#2095)
