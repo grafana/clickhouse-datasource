@@ -482,7 +482,8 @@ describe('QueryBuilder', () => {
     } as const;
     const severityFilter = { ...serviceFilter, key: 'SeverityText', value: 'ERROR' } as const;
 
-    // A logs query as another single-table data source built it, with a search and two filters.
+    // A logs query as another single-table data source built it in Explore, with a search and two
+    // filters. The editor recorded that data source as the owner.
     const carriedOverLogsQuery: QueryBuilderOptions = {
       database: 'otel_v2',
       table: 'otel_logs',
@@ -495,8 +496,12 @@ describe('QueryBuilder', () => {
       filters: [serviceFilter, severityFilter],
       orderBy: [{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC }],
       limit: 1000,
-      meta: { logMessageLike: 'timeout' },
+      meta: { logMessageLike: 'timeout', datasourceUid: 'single-table-otel-logs' },
     };
+    const { datasourceUid: discardedOwner, ...unrecordedMeta } = carriedOverLogsQuery.meta ?? {};
+    void discardedOwner;
+    // The same query without a recorded owner: a panel opened in Explore, a history entry or a link.
+    const unrecordedLogsQuery: QueryBuilderOptions = { ...carriedOverLogsQuery, meta: unrecordedMeta };
 
     const columnsOf = (types: Record<string, string>) =>
       Object.entries(types).map(([name, type]) => ({ name, type, picklistValues: [] }));
@@ -585,6 +590,7 @@ describe('QueryBuilder', () => {
       expect(converted.filters).toContainEqual(serviceFilter);
       expect(converted.filters).not.toContainEqual(severityFilter);
       expect(converted.meta.logMessageLike).toBeUndefined();
+      expect(converted.meta.datasourceUid).toBe('single-table-traces');
     });
 
     it('still converts and runs it once when the new table columns cannot be fetched', async () => {
@@ -609,6 +615,53 @@ describe('QueryBuilder', () => {
       expect(converted).toMatchObject({ database: 'otel_v2', table: 'app_logs', queryType: QueryType.Logs });
       expect(converted.filters).toEqual([serviceFilter, severityFilter]);
       expect(converted.meta.logMessageLike).toBe('timeout');
+      expect(converted.meta.datasourceUid).toBe('single-table-app-logs');
+    });
+
+    it('keeps a query that records no owner in Explore, such as a panel, a history entry or a link', async () => {
+      const datasource = {
+        ...otherLogsDs,
+        getColumnsCached: jest.fn(() => Promise.resolve([])),
+      } as unknown as Datasource;
+      const { builderOptionsDispatch, onQueryChange, onRunQuery } = renderBuilder(
+        CoreApp.Explore,
+        datasource,
+        unrecordedLogsQuery
+      );
+
+      expect(await screen.findByTestId('compact-mode-bar')).toBeInTheDocument();
+      expect(datasource.getColumnsCached).not.toHaveBeenCalled();
+      expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+      expect(onQueryChange).not.toHaveBeenCalled();
+      expect(onRunQuery).not.toHaveBeenCalled();
+    });
+
+    it('keeps a query recorded as this data source in Explore, even when it reads another table', async () => {
+      const { builderOptionsDispatch, onRunQuery } = renderBuilder(CoreApp.Explore, otherLogsDs, {
+        ...carriedOverLogsQuery,
+        meta: { ...carriedOverLogsQuery.meta, datasourceUid: 'single-table-app-logs' },
+      });
+
+      expect(await screen.findByTestId('compact-mode-bar')).toBeInTheDocument();
+      expect(builderOptionsDispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'set_all_options' }));
+      expect(onRunQuery).not.toHaveBeenCalled();
+    });
+
+    it('keeps the recorded owner when it builds the defaults for a new query', async () => {
+      const { onQueryChange } = renderBuilder(CoreApp.Explore, otherLogsDs, {
+        queryType: QueryType.Table,
+        mode: BuilderMode.List,
+        database: '',
+        table: '',
+        columns: [],
+        filters: [],
+        meta: { datasourceUid: 'single-table-app-logs' },
+      });
+
+      await waitFor(() => expect(onQueryChange).toHaveBeenCalled());
+      const defaults = onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0];
+      expect(defaults).toMatchObject({ table: 'app_logs', queryType: QueryType.Logs });
+      expect(defaults.meta.datasourceUid).toBe('single-table-app-logs');
     });
 
     it('keeps it in the classic builder outside Explore, where it may be a saved query', async () => {

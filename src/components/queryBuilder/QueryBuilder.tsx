@@ -34,8 +34,10 @@ import {
   buildCompactQueryDefaults,
   convertCarriedOverQuery,
   isCompactQueryTypeMismatch,
+  isSameQueryOptions,
   shouldBuildCompactQueryDefaults,
   shouldConvertCarriedOverQuery,
+  withDatasourceUid,
 } from './compactQueryDefaults';
 import { useDefaultLogColumnsByName, useDefaultTimeColumn } from './views/logsQueryBuilderHooks';
 import { getColumnByHint } from 'data/sqlGenerator';
@@ -44,7 +46,6 @@ import useColumns from 'hooks/useColumns';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
-import { isEqual } from 'lodash';
 import { MinIntervalEditor } from 'components/MinIntervalEditor';
 
 interface QueryBuilderProps {
@@ -233,7 +234,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const needsInitialization =
     isCarriedOver ||
     shouldBuildCompactQueryDefaults(builderOptions, signalType) ||
-    isEqual(builderOptions, baseDefaults);
+    isSameQueryOptions(builderOptions, baseDefaults);
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const lastInitializationKey = useRef<string>();
   const onQueryChangeRef = useRef(onQueryChange);
@@ -262,7 +263,8 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         return;
       }
       const defaults = buildCompactQueryDefaults(datasource, signalType, '', columns);
-      const nextOptions = convertCarriedOverQuery(builderOptions, defaults, columns);
+      // The converted query belongs to this data source now.
+      const nextOptions = withDatasourceUid(convertCarriedOverQuery(builderOptions, defaults, columns), datasource.uid);
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
       // Grafana already ran the carried-over query against this data source when the user
@@ -295,8 +297,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
     lastInitializationKey.current = initializationKey;
 
-    const nextOptions = buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns);
-    if (!isEqual(builderOptions, nextOptions)) {
+    const defaults = buildCompactQueryDefaults(datasource, signalType, fallbackTable, allColumns);
+    if (!isSameQueryOptions(builderOptions, defaults)) {
+      // Keep the recorded owner, so rebuilding the defaults does not drop it.
+      const owner = builderOptions.meta?.datasourceUid;
+      const nextOptions = owner ? withDatasourceUid(defaults, owner) : defaults;
       builderOptionsDispatch(setAllOptions(nextOptions));
       onQueryChangeRef.current?.(nextOptions);
     }

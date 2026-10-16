@@ -1,4 +1,5 @@
 import { CoreApp } from '@grafana/data';
+import { isEqual } from 'lodash';
 import { Datasource } from 'data/CHDatasource';
 import {
   BuilderMode,
@@ -86,11 +87,44 @@ export const getSingleTableLocation = (
   };
 };
 
+/** Records `datasourceUid` as the data source the query belongs to. */
+export const withDatasourceUid = (options: QueryBuilderOptions, datasourceUid: string): QueryBuilderOptions => ({
+  ...options,
+  meta: { ...options.meta, datasourceUid },
+});
+
 /**
- * True when a logs or traces builder query was built for another single-table data source: its
- * query type does not match the signal, or it reads a table other than the configured one.
+ * True when two sets of options match apart from the recorded owning data source. Explore records
+ * the owner on queries the editor builds, so comparing a query against freshly built defaults must
+ * not count it.
+ */
+export const isSameQueryOptions = (a: QueryBuilderOptions, b: QueryBuilderOptions): boolean => {
+  const withoutOwner = (options: QueryBuilderOptions): QueryBuilderOptions => {
+    if (options.meta?.datasourceUid === undefined) {
+      return options;
+    }
+    const { datasourceUid: discardedDatasourceUid, ...meta } = options.meta;
+    void discardedDatasourceUid;
+    // A meta that only held the owner compares like no meta at all.
+    if (Object.keys(meta).length === 0) {
+      const { meta: discardedMeta, ...rest } = options;
+      void discardedMeta;
+      return rest;
+    }
+    return { ...options, meta };
+  };
+  return isEqual(withoutOwner(a), withoutOwner(b));
+};
+
+/**
+ * True when a logs or traces builder query was carried over from another data source and does
+ * not fit this single-table data source: its query type does not match the signal, or it reads
+ * a table other than the configured one.
+ *
  * Grafana keeps the query as-is when the user switches between two data sources of the same
- * plugin type, so this is how a query carried over from another data source arrives.
+ * plugin type, so a carried-over query still records the other data source in
+ * `meta.datasourceUid`. A query without that record, or with this data source's, belongs here
+ * (a panel opened in Explore, a history entry, a shared link) and is kept.
  *
  * Table and time series queries are never treated as carried over, since a single-table data
  * source does not build them; they were authored and are kept. Neither are queries opened from
@@ -102,8 +136,15 @@ export const isQueryFromOtherSingleTableSource = (
   signalType: SignalType
 ): boolean => {
   const isCompactShaped = builderOptions.queryType === QueryType.Logs || builderOptions.queryType === QueryType.Traces;
+  const owner = builderOptions.meta?.datasourceUid;
   const { database, table } = getSingleTableLocation(datasource, signalType);
-  if (!isCompactShaped || builderOptions.meta?.minimized !== undefined || !table) {
+  if (
+    !isCompactShaped ||
+    builderOptions.meta?.minimized !== undefined ||
+    !table ||
+    !owner ||
+    owner === datasource.uid
+  ) {
     return false;
   }
 

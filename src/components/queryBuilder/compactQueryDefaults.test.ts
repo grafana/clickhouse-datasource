@@ -7,7 +7,9 @@ import {
   isCompactQueryTypeMismatch,
   isDefaultCompactQuery,
   isQueryFromOtherSingleTableSource,
+  isSameQueryOptions,
   shouldBuildCompactQueryDefaults,
+  withDatasourceUid,
 } from './compactQueryDefaults';
 import {
   getDefaultLogsFilters,
@@ -132,12 +134,13 @@ describe('shouldBuildCompactQueryDefaults', () => {
 describe('single-table location', () => {
   // A single-table data source for one signal, with only the fields the location lookup reads.
   const createSingleTableDatasource = (config: {
+    uid?: string;
     logs?: { database?: string; table?: string };
     traces?: { database?: string; table?: string };
     defaultDatabase?: string;
     defaultTable?: string;
   }): Datasource => {
-    const mockDs = {} as Datasource;
+    const mockDs = { uid: config.uid ?? 'this-ds' } as Datasource;
     mockDs.getDefaultLogsDatabase = jest.fn(() => config.logs?.database);
     mockDs.getDefaultLogsTable = jest.fn(() => config.logs?.table);
     mockDs.getDefaultTraceDatabase = jest.fn(() => config.traces?.database);
@@ -192,31 +195,52 @@ describe('single-table location', () => {
       },
       {
         name: 'is true for a logs query arriving at a traces data source',
-        builderOptions: authoredLogsOptions,
+        builderOptions: withDatasourceUid(authoredLogsOptions, 'other-ds'),
         datasource: tracesDs,
         signalType: 'traces',
         expected: true,
       },
       {
         name: 'is true for a traces query arriving at a logs data source',
-        builderOptions: compactTracesOptions,
+        builderOptions: withDatasourceUid(compactTracesOptions, 'other-ds'),
         datasource: logsDs,
         signalType: 'logs',
         expected: true,
       },
       {
         name: 'is true for a logs query that reads another logs table',
-        builderOptions: authoredLogsOptions,
+        builderOptions: withDatasourceUid(authoredLogsOptions, 'other-ds'),
         datasource: createSingleTableDatasource({ logs: { database: 'otel_v2', table: 'app_logs' } }),
         signalType: 'logs',
         expected: true,
       },
       {
         name: 'is true for a logs query that reads the same table name in another database',
-        builderOptions: authoredLogsOptions,
+        builderOptions: withDatasourceUid(authoredLogsOptions, 'other-ds'),
         datasource: createSingleTableDatasource({ logs: { database: 'otel_staging', table: 'otel_logs' } }),
         signalType: 'logs',
         expected: true,
+      },
+      {
+        name: 'is false for a query that records no data source, such as a panel opened in Explore, a history entry or a shared link',
+        builderOptions: authoredLogsOptions,
+        datasource: createSingleTableDatasource({ logs: { database: 'otel_v2', table: 'app_logs' } }),
+        signalType: 'logs',
+        expected: false,
+      },
+      {
+        name: 'is false for a query recorded as this data source, even when it reads another table',
+        builderOptions: withDatasourceUid(authoredLogsOptions, 'this-ds'),
+        datasource: createSingleTableDatasource({ logs: { database: 'otel_v2', table: 'app_logs' } }),
+        signalType: 'logs',
+        expected: false,
+      },
+      {
+        name: 'is false for a query from another data source that already fits this one',
+        builderOptions: withDatasourceUid(authoredLogsOptions, 'other-ds'),
+        datasource: logsDs,
+        signalType: 'logs',
+        expected: false,
       },
       {
         name: 'is false when the data source does not configure a table',
@@ -260,6 +284,21 @@ describe('single-table location', () => {
 
     it.each(cases)('$name', ({ builderOptions, datasource, signalType, expected }) => {
       expect(isQueryFromOtherSingleTableSource(builderOptions, datasource, signalType)).toBe(expected);
+    });
+  });
+
+  describe('recorded owner', () => {
+    it('records the data source and keeps the rest of the meta', () => {
+      const options = withDatasourceUid({ ...authoredLogsOptions, meta: { otelEnabled: true } }, 'this-ds');
+
+      expect(options.meta).toEqual({ otelEnabled: true, datasourceUid: 'this-ds' });
+    });
+
+    it('compares options without the recorded data source', () => {
+      expect(isSameQueryOptions(withDatasourceUid(compactTracesOptions, 'this-ds'), compactTracesOptions)).toBe(true);
+      expect(
+        isSameQueryOptions(withDatasourceUid(compactTracesOptions, 'this-ds'), { ...compactTracesOptions, limit: 5 })
+      ).toBe(false);
     });
   });
 });
