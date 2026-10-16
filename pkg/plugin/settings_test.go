@@ -449,6 +449,38 @@ func TestLoadSettingsOAuthPassThruAllowFallback(t *testing.T) {
 	})
 }
 
+func TestLoadSettingsKillQueryOnCancel(t *testing.T) {
+	tests := []struct {
+		description string
+		jsonData    string
+		want        bool
+		wantErr     bool
+	}{
+		{description: "absent key is off", jsonData: `{"host": "test", "port": 8123}`, want: false},
+		{description: "bool true", jsonData: `{"host": "test", "port": 8123, "killQueryOnCancel": true}`, want: true},
+		{description: "bool false", jsonData: `{"host": "test", "port": 8123, "killQueryOnCancel": false}`, want: false},
+		{description: "string true", jsonData: `{"host": "test", "port": 8123, "killQueryOnCancel": "true"}`, want: true},
+		{description: "string false", jsonData: `{"host": "test", "port": 8123, "killQueryOnCancel": "false"}`, want: false},
+		{description: "non-boolean string is rejected", jsonData: `{"host": "test", "port": 8123, "killQueryOnCancel": "yes please"}`, wantErr: true},
+		{description: "number is rejected", jsonData: `{"host": "test", "port": 8123, "killQueryOnCancel": 1}`, wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			got, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+				JSONData:                []byte(tc.jsonData),
+				DecryptedSecureJSONData: map[string]string{},
+			})
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.True(t, backend.IsDownstreamError(err))
+				return
+			}
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got.KillQueryOnCancel)
+		})
+	}
+}
+
 func TestLoadSettingsTimeouts(t *testing.T) {
 	ctx := context.Background()
 	tests := []struct {
@@ -556,7 +588,7 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"username": "baz", "defaultDatabase": "example",
 			"connMaxLifetime": 60, "dialTimeout": "20", "queryTimeout": "120", "maxIdleConns": 2, "maxOpenConns": 3,
 			"httpHeaders": [{ "name": "x-plain", "value": "value-1", "secure": false }],
-			"forwardGrafanaHeaders": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true,
+			"forwardGrafanaHeaders": true, "killQueryOnCancel": true, "oauthPassThru": true, "oauthPassThruAllowFallback": true,
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
 			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120
