@@ -5,6 +5,7 @@ import { Datasource } from 'data/CHDatasource';
 import useColumns from 'hooks/useColumns';
 import useDatabases from 'hooks/useDatabases';
 import useTables from 'hooks/useTables';
+import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import labels from 'labels';
 
@@ -13,7 +14,8 @@ import labels from 'labels';
  *  - 'database': database picker only
  *  - 'table': database + table
  *  - 'column': database + table + column (default)
- *  - 'mapKey': database + table + column + map key (when the column is a Map type)
+ *  - 'mapKey': database + table + column + map key (when the column is a Map
+ *    type, or a JSON path when enableJsonPaths is set and the column is JSON)
  */
 export type SchemaPickerLevel = 'database' | 'table' | 'column' | 'mapKey';
 
@@ -22,6 +24,7 @@ export interface SchemaPickerValue {
   database?: string;
   table?: string;
   column?: string;
+  /** Watched key: a Map key, or a dotted JSON path when the column is JSON. */
   mapKey?: string;
   /** Whether the selected column is a Map(...) type. Emitted on change so
    * consumers can reuse it instead of refetching the column metadata. */
@@ -36,10 +39,17 @@ export interface SchemaPickerProps {
   level?: SchemaPickerLevel;
   /** Override visible labels per level. */
   labels?: Partial<Record<SchemaPickerLevel, string>>;
+  /**
+   * At 'mapKey' depth, also offer the key picker for JSON columns, probing the
+   * table for JSON paths. Off by default so consumers whose generated SQL has
+   * no JSON path handling are unaffected.
+   */
+  enableJsonPaths?: boolean;
 }
 
 const LEVEL_ORDER: SchemaPickerLevel[] = ['database', 'table', 'column', 'mapKey'];
 const MAP_TYPE_PREFIX = 'Map(';
+const JSON_TYPE_PREFIX = 'JSON';
 const LABEL_WIDTH = 20;
 
 function levelIndex(level: SchemaPickerLevel): number {
@@ -50,26 +60,28 @@ function levelIndex(level: SchemaPickerLevel): number {
  * Reusable cascading schema picker: Database -> Table -> Column -> Map Key.
  *
  * Reuses the existing schema-fetch hooks (useDatabases, useTables, useColumns,
- * useUniqueMapKeys) so it stays consistent with the rest of the query builder.
+ * useUniqueMapKeys, useUniqueJSONPaths) so it stays consistent with the rest of
+ * the query builder.
  *
  * Usage: pick a depth via the `level` prop. Changing a parent value clears
  * every downstream selection in a single onChange emission.
  */
 export const SchemaPicker = (props: SchemaPickerProps) => {
-  const { datasource, value, onChange, level = 'column', labels: labelOverrides } = props;
+  const { datasource, value, onChange, level = 'column', labels: labelOverrides, enableJsonPaths = false } = props;
   const maxLevel = levelIndex(level);
 
   const databases = useDatabases(datasource);
   const tables = useTables(datasource, value.database || '');
   const columns = useColumns(datasource, value.database || '', value.table || '');
 
-  const columnIsMap = (name?: string): boolean => {
-    const col = columns.find((c) => c.name === name);
-    return col ? col.type.startsWith(MAP_TYPE_PREFIX) : false;
-  };
+  const columnType = (name?: string): string | undefined => columns.find((c) => c.name === name)?.type;
+  const columnIsMap = (name?: string): boolean => columnType(name)?.startsWith(MAP_TYPE_PREFIX) === true;
   const isMapColumn = columnIsMap(value.column);
+  const isJsonColumn = enableJsonPaths && columnType(value.column)?.startsWith(JSON_TYPE_PREFIX) === true;
   const mapColumnName = isMapColumn && value.column ? value.column : '';
+  const jsonColumnName = isJsonColumn && value.column ? value.column : '';
   const mapKeys = useUniqueMapKeys(datasource, mapColumnName, value.database || '', value.table || '');
+  const jsonPaths = useUniqueJSONPaths(datasource, jsonColumnName, value.database || '', value.table || '');
 
   // Build the option lists. The Select component drops the controlled value when
   // it isn't present in the options, so append the current value if the fetched
@@ -93,8 +105,9 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
     columnOptions.push({ label: value.column, value: value.column });
   }
 
-  const mapKeyOptions: Array<SelectableValue<string>> = mapKeys.map((k) => ({ label: k, value: k }));
-  if (value.mapKey && !mapKeys.includes(value.mapKey)) {
+  const availableKeys = isJsonColumn ? jsonPaths : mapKeys;
+  const mapKeyOptions: Array<SelectableValue<string>> = availableKeys.map((k) => ({ label: k, value: k }));
+  if (value.mapKey && !availableKeys.includes(value.mapKey)) {
     mapKeyOptions.push({ label: value.mapKey, value: value.mapKey });
   }
 
@@ -123,7 +136,8 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
 
   const showTable = maxLevel >= 1;
   const showColumn = maxLevel >= 2;
-  const showMapKey = maxLevel >= 3 && isMapColumn && Boolean(value.column);
+  const showMapKey = maxLevel >= 3 && (isMapColumn || isJsonColumn) && Boolean(value.column);
+  const mapKeyLabel = labelText('mapKey', isJsonColumn ? 'JSON Path' : 'Map Key');
 
   return (
     <>
@@ -189,7 +203,7 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
 
       {showMapKey && (
         <InlineFieldRow>
-          <InlineField label={labelText('mapKey', 'Map Key')} labelWidth={LABEL_WIDTH} grow>
+          <InlineField label={mapKeyLabel} labelWidth={LABEL_WIDTH} grow>
             <Select
               options={mapKeyOptions}
               value={value.mapKey || null}
@@ -198,7 +212,7 @@ export const SchemaPicker = (props: SchemaPickerProps) => {
               allowCustomValue
               isClearable
               placeholder={'<select key>'}
-              aria-label={labelText('mapKey', 'Map Key')}
+              aria-label={mapKeyLabel}
             />
           </InlineField>
         </InlineFieldRow>
