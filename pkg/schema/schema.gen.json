@@ -187,6 +187,10 @@
                 "timeColumn": {
                   "description": "Column for the log timestamp, used for high precision sorting",
                   "type": "string"
+                },
+                "traceLinkDatasourceUid": {
+                  "description": "UID of the Tempo data source that \"View trace\" links open. Traces queries and queries on the default trace table still open ClickHouse. Leave empty to keep the ClickHouse link.",
+                  "type": "string"
                 }
               }
             },
