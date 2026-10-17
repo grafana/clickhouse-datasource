@@ -4,6 +4,7 @@ import {
   DataFrame,
   DataQueryRequest,
   DataQueryResponse,
+  dateTime,
   Field,
   FieldType,
   LoadingState,
@@ -1467,6 +1468,122 @@ describe('ClickHouseDatasource', () => {
       expect(sql).toBe(
         'SELECT DISTINCT "labels""map"[\'user\\\'s key\'] FROM "db"."events" WHERE mapContains("labels""map", \'user\\\'s key\') LIMIT 1000'
       );
+    });
+  });
+
+  describe('fetchFilterValues', () => {
+    const timeRange: TimeRange = {
+      from: dateTime(1700000000000),
+      to: dateTime(1700003600000),
+      raw: { from: 'now-1h', to: 'now' },
+    };
+    const stubQuery = (ds: Datasource, values: unknown[], keyColumnFlag: unknown[] = [1]) => {
+      const spy = jest.spyOn(ds, 'query').mockImplementation((request: DataQueryRequest<CHQuery>) => {
+        const isLayoutLookup = request.targets[0]?.rawSql?.includes('system.columns');
+        return of({
+          data: [toDataFrame({ fields: [{ name: 'v', values: isLayoutLookup ? keyColumnFlag : values }] })],
+        });
+      });
+      return () => spy.mock.calls.map((call) => call[0].targets[0].rawSql ?? '');
+    };
+    const probe = async (
+      values: unknown[],
+      ...args: Parameters<Datasource['fetchFilterValues']>
+    ): Promise<{ result: string[]; sql: string; statements: string[] }> => {
+      const ds = cloneDeep(mockDatasource);
+      const statements = stubQuery(ds, values);
+      const result = await ds.fetchFilterValues(...args);
+      return { result, sql: statements().at(-1) ?? '', statements: statements() };
+    };
+
+    afterEach(() => {
+      Reflect.deleteProperty(templateSrvMock, 'timeRange');
+    });
+
+    it('reads distinct non-empty values from a bounded row sample', async () => {
+      const { sql } = await probe([], 'some"col', 'db"name', 'events');
+
+      expect(sql).toBe(
+        `SELECT DISTINCT toString("some""col") FROM (SELECT "some""col" FROM "db""name"."events" LIMIT 100000) WHERE "some""col" != '' AND isValidUTF8(toString("some""col")) AND length(toString("some""col")) <= 256 LIMIT 1000`
+      );
+    });
+
+    it('bounds the sample to the time range of a key column and matches the search outside it', async () => {
+      Object.assign(templateSrvMock, { timeRange });
+
+      const { sql, statements } = await probe([], 's', "d'b", 'events', { timeColumn: 'ts', search: 'ab' });
+
+      expect(statements[0]).toBe(
+        `SELECT is_in_partition_key OR is_in_sorting_key FROM system.columns WHERE database = 'd\\'b' AND table = 'events' AND name = 'ts'`
+      );
+      expect(sql).toContain(
+        `(SELECT "s" FROM "d'b"."events" WHERE "ts" >= $__fromTime AND "ts" <= $__toTime LIMIT 100000)`
+      );
+      expect(sql).toContain(` AND positionCaseInsensitiveUTF8(toString("s"), 'ab') > 0 LIMIT 1000`);
+    });
+
+    it('uses the sample alone when the time column is not in the partition or sorting key', async () => {
+      Object.assign(templateSrvMock, { timeRange });
+      const ds = cloneDeep(mockDatasource);
+      const statements = stubQuery(ds, [], [0]);
+
+      await ds.fetchFilterValues('s', 'db', 'events', { timeColumn: 'ts' });
+
+      expect(statements().at(-1)).toContain('(SELECT "s" FROM "db"."events" LIMIT 100000)');
+    });
+
+    it('looks up the table layout once per table and time column', async () => {
+      Object.assign(templateSrvMock, { timeRange });
+      const ds = cloneDeep(mockDatasource);
+      const statements = stubQuery(ds, []);
+
+      await ds.fetchFilterValues('s', 'db', 'events', { timeColumn: 'ts' });
+      await ds.fetchFilterValues('s', 'db', 'events', { timeColumn: 'ts', search: 'a' });
+      await ds.fetchFilterValues('s', 'db', 'other', { timeColumn: 'ts' });
+
+      expect(statements().filter((sql) => sql.includes('system.columns'))).toHaveLength(2);
+    });
+
+    it('looks up the layout in the current database when the database is empty', async () => {
+      Object.assign(templateSrvMock, { timeRange });
+
+      const { statements } = await probe([], 's', '', 'events', { timeColumn: 'ts' });
+
+      expect(statements[0]).toContain(`WHERE database = currentDatabase() AND table = 'events'`);
+    });
+
+    it('leaves out the time predicate when there is no template time range', async () => {
+      const { sql, statements } = await probe([], 's', 'db', 'events', { timeColumn: 'ts' });
+
+      expect(statements).toHaveLength(1);
+      expect(sql).not.toContain('$__fromTime');
+      expect(sql).toContain('(SELECT "s" FROM "db"."events" LIMIT 100000)');
+    });
+
+    it('reads from the bare table when the database is empty', async () => {
+      const { sql } = await probe([], 's', '', 'events');
+
+      expect(sql).toContain('FROM "events" LIMIT 100000');
+    });
+
+    it.each(['$__from', '${v}', '[[v]]', "O'B", 'c\\d', 'f('])(
+      'sends no probe for the search %j, which no suggestion can contain',
+      async (search) => {
+        const { result, statements } = await probe(['a'], 's', 'db', 'events', { search });
+
+        expect(result).toEqual([]);
+        expect(statements).toEqual([]);
+      }
+    );
+
+    it('drops values that do not render as plain literals and puts the exact match first', async () => {
+      const values = ['b', 'a', "O'Brien", 'f(x)', '$v', 'c\\d', '[[v]]', 'say "hi"', ' pad', 'ab'];
+
+      const { result } = await probe(values, 's', 'db', 'events', { search: 'a' });
+      const { result: exactFirst } = await probe(['ab', 'b'], 's', 'db', 'events', { search: 'b' });
+
+      expect(result).toEqual(['a', 'ab', 'b']);
+      expect(exactFirst).toEqual(['b', 'ab']);
     });
   });
 
