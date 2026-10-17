@@ -87,6 +87,69 @@ describe('detectLogsVersion', () => {
   it('falls back to the 1.30.0 schema for an empty column list', () => {
     expect(detectLogsVersion([]).version).toBe('1.30.0');
   });
+
+  describe('with the table sorting and partition keys', () => {
+    const withTimestampTime = ['Timestamp', 'TimestampTime', 'Body', 'SeverityText'];
+
+    it.each([
+      {
+        name: 'keeps TimestampTime when the legacy collector keys use it',
+        columns: withTimestampTime,
+        keys: { sortingKey: 'ServiceName, TimestampTime, Timestamp', partitionKey: 'toDate(TimestampTime)' },
+        expected: '1.29.0',
+      },
+      {
+        name: 'uses Timestamp when TimestampTime is kept but the keys only use Timestamp (#2103)',
+        columns: withTimestampTime,
+        keys: {
+          sortingKey: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+          partitionKey: 'toDate(Timestamp)',
+        },
+        expected: '1.30.0',
+      },
+      {
+        name: 'keeps TimestampTime when only the partition key uses it',
+        columns: withTimestampTime,
+        keys: { sortingKey: 'ServiceName, Timestamp', partitionKey: 'toDate(TimestampTime)' },
+        expected: '1.29.0',
+      },
+      {
+        name: 'keeps TimestampTime when the keys use neither column',
+        columns: withTimestampTime,
+        keys: { sortingKey: 'ServiceName', partitionKey: '' },
+        expected: '1.29.0',
+      },
+      {
+        name: 'keeps TimestampTime when the keys only use a column whose name contains Timestamp',
+        columns: withTimestampTime,
+        keys: {
+          sortingKey: 'toStartOfFiveMinutes(ObservedTimestamp), ServiceName',
+          partitionKey: 'toDate(ObservedTimestamp)',
+        },
+        expected: '1.29.0',
+      },
+      {
+        name: 'keeps TimestampTime when the keys are empty (Distributed or non-MergeTree table)',
+        columns: withTimestampTime,
+        keys: { sortingKey: '', partitionKey: '' },
+        expected: '1.29.0',
+      },
+      {
+        name: 'keeps TimestampTime when the keys are unknown',
+        columns: withTimestampTime,
+        keys: undefined,
+        expected: '1.29.0',
+      },
+      {
+        name: 'uses Timestamp when the table has no TimestampTime column',
+        columns: ['Timestamp', 'Body', 'SeverityText'],
+        keys: { sortingKey: 'ServiceName, TimestampTime, Timestamp', partitionKey: 'toDate(TimestampTime)' },
+        expected: '1.30.0',
+      },
+    ])('$name', ({ columns, keys, expected }) => {
+      expect(detectLogsVersion(columns, keys).version).toBe(expected);
+    });
+  });
 });
 
 describe('canary schema snapshot (tests/canary/expected-columns.json)', () => {
