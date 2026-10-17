@@ -3218,13 +3218,19 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns "Fields" for an unprefixed key (a folded top-level column)', () => {
-        // foldDiscoveredLogFieldsIntoLabels merges selected top-level columns into `labels` under
-        // their plain, unprefixed names. The backend only emits prefixed attribute keys, so an
-        // unprefixed key is always a folded column and groups under a "Fields" section.
-        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBe('Fields');
-        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBe('Fields');
-        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBe('Fields');
+      it('returns null for an unprefixed key (a folded top-level column)', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBeNull();
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBeNull();
+      });
+
+      // Grafana >=12.4 log details show plain fields (level, other columns) only in the null group, or with no labels.
+      it.each([
+        ['a folded column next to OTel attributes', ['ResourceAttributes.service.name', 'ServiceName']],
+        ["a table's own labels map", ['pod', 'region']],
+      ])('leaves a null label group for %s', (_, labelKeys) => {
+        const groups = labelKeys.map((key) => datasource.getLabelDisplayTypeFromFrame(key, undefined, null));
+        expect(groups).toContain(null);
       });
     });
 
