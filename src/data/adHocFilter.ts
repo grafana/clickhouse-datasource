@@ -44,18 +44,24 @@ export class AdHocFilter {
     this._mapColumns = merged;
   }
 
-  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  /**
+   * Render the filters as the body of an `additional_table_filters` entry. With
+   * `targetTable`, filters whose key names a different table are left out.
+   */
+  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false, targetTable?: string): string {
     if (!adHocFilters || adHocFilters.length === 0) {
       return '';
     }
 
-    const validFilters = adHocFilters.filter((filter: AdHocVariableFilter) => {
-      const valid = isValid(filter);
-      if (!valid) {
-        console.warn('Invalid adhoc filter will be ignored:', filter);
-      }
-      return valid;
-    });
+    const validFilters = adHocFilters
+      .filter((filter: AdHocVariableFilter) => {
+        const valid = isValid(filter);
+        if (!valid) {
+          console.warn('Invalid adhoc filter will be ignored:', filter);
+        }
+        return valid;
+      })
+      .filter((filter) => targetTable === undefined || appliesToTable(filter.key, targetTable, this._mapColumns));
 
     const filters = validFilters
       .map((f, i) => {
@@ -75,7 +81,12 @@ export class AdHocFilter {
     return this._mapColumns;
   }
 
-  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  /**
+   * Append the ad-hoc filters to `sql` as an `additional_table_filters`
+   * setting on the query's table. With `tableQualifiedKeys`, a filter applies
+   * only to the table its key names.
+   */
+  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false, tableQualifiedKeys = true): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
@@ -103,7 +114,7 @@ export class AdHocFilter {
       return sql;
     }
 
-    const filters = this.buildFilterString(adHocFilters, useJSON);
+    const filters = this.buildFilterString(adHocFilters, useJSON, tableQualifiedKeys ? targetTable : undefined);
 
     if (filters === '') {
       return sql;
@@ -169,6 +180,27 @@ function safeColumnRef(id: string): string {
     return id;
   }
   return quoted.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function appliesToTable(key: string, targetTable: string, mapColumns: ReadonlySet<string>): boolean {
+  const table = tablePrefix(key, mapColumns);
+  return table === undefined || table === targetTable.slice(targetTable.lastIndexOf('.') + 1);
+}
+
+function tablePrefix(key: string, mapColumns: ReadonlySet<string>): string | undefined {
+  if (key.startsWith('arrayElement(')) {
+    return undefined;
+  }
+  const bracketed = key.match(BRACKET_MAP_ACCESS);
+  if (bracketed) {
+    return bracketed[1];
+  }
+  const jsonKey = parseJSONAdhocKey(key);
+  if (jsonKey) {
+    return jsonKey.table;
+  }
+  const [first, ...rest] = key.split('.');
+  return rest.length > 0 && !mapColumns.has(first) ? first : undefined;
 }
 
 function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
