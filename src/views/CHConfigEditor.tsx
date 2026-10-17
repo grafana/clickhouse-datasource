@@ -148,6 +148,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
       | 'enableMapKeysDiscovery'
       | 'enableSecureSocksProxy'
       | 'forwardGrafanaHeaders'
+      | 'killQueryOnCancel'
       | 'enableRowLimit'
       | 'hideTableNameInAdhocFilters'
     >,
@@ -376,17 +377,26 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         </Field>
 
         {jsonData.protocol === Protocol.Http && (
-          <Field label={labels.path.label} description={labels.path.tooltip}>
-            <Input
-              value={jsonData.path || ''}
-              name="path"
-              width={80}
-              onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
-              label={labels.path.label}
-              aria-label={labels.path.label}
-              placeholder={labels.path.placeholder}
-            />
-          </Field>
+          <>
+            <Field label={labels.path.label} description={labels.path.tooltip}>
+              <Input
+                value={jsonData.path || ''}
+                name="path"
+                width={80}
+                onChange={onUpdateDatasourceJsonDataOption(props, 'path')}
+                label={labels.path.label}
+                aria-label={labels.path.label}
+                placeholder={labels.path.placeholder}
+              />
+            </Field>
+            <Field label={labels.killQueryOnCancel.label} description={labels.killQueryOnCancel.tooltip}>
+              <Switch
+                data-testid={labels.killQueryOnCancel.testid}
+                value={jsonData.killQueryOnCancel ?? false}
+                onChange={(e) => onSwitchToggle('killQueryOnCancel', e.currentTarget.checked)}
+              />
+            </Field>
+          </>
         )}
       </ConfigSection>
 

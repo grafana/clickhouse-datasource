@@ -147,11 +147,33 @@ If you are unsure which database to use, leave the field blank and select a data
 
 The following settings appear only when **Protocol** is set to **HTTP**:
 
-| Setting                          | Description                                                                                                                                                                                   |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **HTTP URL Path**                | Additional URL path appended to HTTP requests (for example, `/clickhouse`). Defaults to `/`.                                                                                                  |
-| **Custom HTTP headers**          | Static headers sent with every request. Each header has a name, value, and an optional **Secure** toggle that stores the value in encrypted storage.                                          |
-| **Forward Grafana HTTP headers** | When enabled, forwards Grafana request headers (such as authentication headers) to ClickHouse. Enables multi-connection mode so each unique set of forwarded headers gets its own connection. |
+| Setting                                 | Description                                                                                                                                                                                   |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HTTP URL Path**                       | Additional URL path appended to HTTP requests (for example, `/clickhouse`). Defaults to `/`.                                                                                                  |
+| **Custom HTTP headers**                 | Static headers sent with every request. Each header has a name, value, and an optional **Secure** toggle that stores the value in encrypted storage.                                          |
+| **Forward Grafana HTTP headers**        | When enabled, forwards Grafana request headers (such as authentication headers) to ClickHouse. Enables multi-connection mode so each unique set of forwarded headers gets its own connection. |
+| **Stop canceled queries on the server** | When enabled, the plugin sends `KILL QUERY` for each query that Grafana cancels. Defaults to off. Refer to [Stop canceled queries on the server](#stop-canceled-queries-on-the-server).       |
+
+#### Stop canceled queries on the server
+
+Grafana cancels a running query when you click **Cancel**, leave the page, or when a dashboard refresh starts the next query. With the **Native** protocol, the client tells ClickHouse to stop the query. With the **HTTP** protocol, the client only closes the connection. ClickHouse keeps running a query that has not sent results yet, until the query finishes or reaches `max_execution_time`.
+
+When you enable **Stop canceled queries on the server**, the plugin sends `KILL QUERY` to ClickHouse for each HTTP query that Grafana cancels. ClickHouse runs this `KILL QUERY` only if the data source user has the `SELECT` privilege on `system.processes`. Replace `grafana_user` with the data source user:
+
+```sql
+GRANT SELECT ON system.processes TO grafana_user;
+```
+
+This grant lets the user read every running query on the server, including the query text, user name, and client address of other users. It does not let the user stop the queries of other users. The option is off by default because of this exposure. Decide whether the grant is acceptable for your server before you enable the option.
+
+Without the grant, ClickHouse rejects the `KILL QUERY` with an `ACCESS_DENIED` error. The plugin logs a warning and sends no more `KILL QUERY` from that connection pool. Canceled queries then run until they finish or reach `max_execution_time`. After you add the grant, save the data source again. The plugin then opens a new connection pool and sends `KILL QUERY` again.
+
+The following limits apply:
+
+- Behind a load balancer that sends requests to more than one replica, the `KILL QUERY` can reach a replica that does not run the query. The query then keeps running.
+- The plugin waits up to 5 seconds for ClickHouse to accept the `KILL QUERY`. If ClickHouse does not answer in that time, the query keeps running.
+
+For a user with `readonly = 1` or `readonly = 2` over plain HTTP, the ClickHouse setting `cancel_http_readonly_queries_on_client_close` is an alternative that needs no grant. Set `cancel_http_readonly_queries_on_client_close = 1` in the settings profile of the user. ClickHouse then stops the query when the connection closes. This setting does not work over HTTPS ([ClickHouse issue #96737](https://github.com/ClickHouse/ClickHouse/issues/96737)), and has no effect when `readonly = 0`. Do not add it to **Custom Settings**. A user with `readonly = 1` cannot change it per query, so every query fails.
 
 ### TLS settings
 
@@ -358,6 +380,7 @@ datasources:
       # rowCapacityHint: <int>  # pre-allocate result frames to this many rows (0 = disabled, max 1000000)
       # enableMapKeysDiscovery: <bool>  # probe Map columns for filter-editor key suggestions (default true)
       # forwardGrafanaHeaders: <bool>
+      # killQueryOnCancel: <bool>  # HTTP protocol only, send KILL QUERY for canceled queries (default false)
       # oauthPassThru: <bool>  # forward the user's OAuth token as a JWT (ClickHouse Cloud only); requires secure: true
       # oauthPassThruAllowFallback: <bool>  # allow alerts/backend queries to fall back to username and password
       # path: <string>  # HTTP URL path (HTTP protocol only)

@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { DataSourcePluginOptionsEditorProps, onUpdateDatasourceJsonDataOption } from '@grafana/data';
-import { Field, Input, Button, useTheme2 } from '@grafana/ui';
+import {
+  DataSourcePluginOptionsEditorProps,
+  onUpdateDatasourceJsonDataOption,
+  onUpdateDatasourceJsonDataOptionChecked,
+} from '@grafana/data';
+import { Field, Input, Button, Switch, useTheme2 } from '@grafana/ui';
 import allLabels from './labelsV2';
 import { CHConfig, CHSecureConfig, Protocol } from 'types/config';
 import { css } from '@emotion/css';
@@ -18,13 +22,14 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
   const labels = allLabels.components.Config.ConfigEditor;
 
   const [optionalHttpIsOpen, setOptionalHttpIsOpen] = useState(
-    Boolean(jsonData.httpHeaders?.length || jsonData.forwardGrafanaHeaders)
+    Boolean(jsonData.httpHeaders?.length || jsonData.forwardGrafanaHeaders || jsonData.killQueryOnCancel)
   );
 
   const theme = useTheme2();
   const styles = {
     httpSettingsSection: css({ marginTop: theme.spacing(2) }),
     httpSettingsButton: css({ marginBottom: theme.spacing(2) }),
+    killQueryOnCancel: css({ marginLeft: '30px', marginTop: theme.spacing(2) }),
   };
 
   return jsonData.protocol === Protocol.Http ? (
@@ -48,14 +53,27 @@ export const HttpProtocolSettingsSection = (props: HttpProtocolSettingsSectionPr
         Optional HTTP settings
       </Button>
       {optionalHttpIsOpen && (
-        <HttpHeadersConfigV2
-          options={options}
-          onOptionsChange={onOptionsChange}
-          headers={jsonData.httpHeaders}
-          forwardGrafanaHeaders={jsonData.forwardGrafanaHeaders}
-          secureFields={secureJsonFields}
-          onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
-        />
+        <>
+          <HttpHeadersConfigV2
+            options={options}
+            onOptionsChange={onOptionsChange}
+            headers={jsonData.httpHeaders}
+            forwardGrafanaHeaders={jsonData.forwardGrafanaHeaders}
+            secureFields={secureJsonFields}
+            onHttpHeadersChange={(headers) => onHttpHeadersChange(headers, options, onOptionsChange)}
+          />
+          <Field
+            className={styles.killQueryOnCancel}
+            label={labels.killQueryOnCancel.label}
+            description={labels.killQueryOnCancel.tooltip}
+          >
+            <Switch
+              data-testid={labels.killQueryOnCancel.testid}
+              value={jsonData.killQueryOnCancel ?? false}
+              onChange={onUpdateDatasourceJsonDataOptionChecked(props, 'killQueryOnCancel')}
+            />
+          </Field>
+        </>
       )}
     </div>
   ) : null;

@@ -162,6 +162,7 @@ Work through the following checks in order. Most cases are resolved by one of th
 - "could not parse tlsAuth value"
 - "could not parse tlsAuthWithCACert value"
 - "could not parse forwardGrafanaHeaders value"
+- "could not parse killQueryOnCancel value"
 
 **Cause:** A configuration value could not be converted to the expected type (boolean or number).
 
