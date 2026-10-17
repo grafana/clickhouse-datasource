@@ -1,5 +1,7 @@
 import { Lexer } from 'ch-parser/lexer';
 import { getErrorTokenDescription } from 'ch-parser/types';
+import { analyzerValidate } from 'ch-parser/analyzer';
+import { offsetToLineCol } from 'ch-parser/helpers';
 
 export interface Error {
   startLine: number;
@@ -15,15 +17,12 @@ export interface Validation {
   error?: Error;
 }
 
-function offsetToLineCol(sql: string, offset: number): { line: number; col: number } {
-  const lines = sql.substring(0, offset).split('\n');
-  return {
-    line: lines.length,
-    col: lines[lines.length - 1].length + 1,
-  };
-}
-
 export function validate(sql: string): Validation {
+  const analyzerResult = analyzerValidate(sql);
+  if (analyzerResult !== null) {
+    return analyzerResult;
+  }
+
   const lexer = new Lexer(sql);
   while (true) {
     const token = lexer.nextToken();
