@@ -1,0 +1,11 @@
+# Layered over docker-compose.yml by scripts/e2e-matrix.js so several Grafana versions can run side by side.
+services:
+  grafana:
+    container_name: !reset null
+    ports: !override
+      - '${E2E_GRAFANA_PORT:-3000}:3000'
+  clickhouse-server:
+    container_name: !reset null
+    ports: !reset []
+  e2e-data-loader:
+    container_name: !reset null

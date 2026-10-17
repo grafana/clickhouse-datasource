@@ -10,6 +10,7 @@
     "go.sum",
     "mage_output_file.go",
     "test-results/**",
+    "e2e-results/**",
     "test_summary.json",
     "playwright-report/**"
   ],
@@ -99,6 +100,7 @@
     "regexes",
     "retarget",
     "retargets",
+    "rsort",
     "sdkconfig",
     "sdkproxy",
     "servicename",
