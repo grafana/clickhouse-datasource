@@ -91,9 +91,9 @@ Work through the following checks in order. Most cases are resolved by one of th
 
 #### Connection timeout
 
-**Error message:** "connection timeout" or "the operation was cancelled before starting: context deadline exceeded"
+**Error message:** "connection timeout", "the operation was cancelled before starting: context deadline exceeded", or a message that starts with `[timeout]`. For example: "[timeout] dial tcp 192.0.2.1:9000: i/o timeout"
 
-**Cause:** The connection to the ClickHouse server timed out before it could be established.
+**Cause:** The connection to the ClickHouse server timed out before it could be established. The text after `[timeout]` is the error from the connection attempt.
 
 **Solution:**
 
@@ -104,16 +104,14 @@ Work through the following checks in order. Most cases are resolved by one of th
 
 #### Operation cancelled during execution
 
-**Error message:** "the operation was cancelled during execution: context deadline exceeded"
+**Error message:** "the operation was cancelled during execution: context canceled", followed by the connection error. For example: "the operation was cancelled during execution: context canceled: dial tcp 192.0.2.1:9000: i/o timeout"
 
-**Cause:** The query or connection operation exceeded the configured timeout while running.
+**Cause:** The request was cancelled while the plugin was connecting to the ClickHouse server, for example because a dashboard was refreshed or closed. The text after `context canceled:` is the error from the connection attempt. This message usually appears in the Grafana server logs.
 
 **Solution:**
 
-1. Increase the **Query Timeout** value in the data source settings (default is 60 seconds).
-2. Optimize your query to reduce execution time.
-3. Check if the ClickHouse server is under heavy load.
-4. Consider adding appropriate indexes to your ClickHouse tables.
+1. If the message appears only now and then, no action is needed.
+2. If the connection error after `context canceled:` is a timeout, follow the steps in [Connection timeout](#connection-timeout).
 
 #### Plugin not found after installation (Grafana Cloud)
 
