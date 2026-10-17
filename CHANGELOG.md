@@ -15,6 +15,34 @@
 - Quote ad-hoc filter keys that are not plain identifiers, so a crafted key is read as one (nonexistent) column name instead of being spliced into the `additional_table_filters` predicate. Plain and dotted column names are unchanged (#2095)
 - Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
 
+## [4.23.0](https://github.com/grafana/clickhouse-datasource/compare/v4.22.1...v4.23.0) (2026-10-17)
+
+
+### 🎉 Features
+
+* **macros:** add $__fromGrafanaInterval to convert dashboard interval variables ([#2160](https://github.com/grafana/clickhouse-datasource/issues/2160)) ([a617629](https://github.com/grafana/clickhouse-datasource/commit/a6176298d279b8bb0204a5950cfb5b80b2a8001b))
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** scope ad-hoc filters to the table named in the key ([#2213](https://github.com/grafana/clickhouse-datasource/issues/2213)) ([fb47d3c](https://github.com/grafana/clickhouse-datasource/commit/fb47d3ca6163b9a8fc79292499c6d23a2714ecaf))
+* **annotations:** generate valid change-detection SQL for JSON attribute columns ([#2062](https://github.com/grafana/clickhouse-datasource/issues/2062)) ([26b6982](https://github.com/grafana/clickhouse-datasource/commit/26b698211e2c7c2be63a7f0bd3600b9d2ae1b5b7))
+* **deps:** resolve security vulnerabilities ([#2220](https://github.com/grafana/clickhouse-datasource/issues/2220)) ([ff48c3f](https://github.com/grafana/clickhouse-datasource/commit/ff48c3f064136f52881125b60fddcb4f4422442e))
+* **logs:** otel version switching, filter toggles, and log context fixes ([#2078](https://github.com/grafana/clickhouse-datasource/issues/2078)) ([277d41a](https://github.com/grafana/clickhouse-datasource/commit/277d41aef0d170ed11686155032e6391ed38d09e))
+* **macros:** accept $__timeFrom() and $__timeTo() and name the expected form in arity errors ([#2215](https://github.com/grafana/clickhouse-datasource/issues/2215)) ([bd6c2af](https://github.com/grafana/clickhouse-datasource/commit/bd6c2af35bb87dba963d84dd6a331d54192284d6))
+* **queryBuilder:** convert the query when switching between single-table data sources in Explore ([#2228](https://github.com/grafana/clickhouse-datasource/issues/2228)) ([01ae280](https://github.com/grafana/clickhouse-datasource/commit/01ae2803b689c08e9749c0f9b754c5357f9d8b39))
+
+
+### 📝 Documentation
+
+* add gcx CLI query note to ClickHouse data source ([#2204](https://github.com/grafana/clickhouse-datasource/issues/2204)) ([13c746d](https://github.com/grafana/clickhouse-datasource/commit/13c746d7f3968974065fbea7142698d9133b4e72))
+
+
+### 🤖 Continuous Integration
+
+* **e2e:** add quarantine split to nightly cloud E2E ([#2195](https://github.com/grafana/clickhouse-datasource/issues/2195)) ([52a1bbd](https://github.com/grafana/clickhouse-datasource/commit/52a1bbdf49260edf7ebebc8109eda68f1a164312))
+* let a bundled-image dispatch opt out of the per-merge frontend ([#2219](https://github.com/grafana/clickhouse-datasource/issues/2219)) ([d1bba23](https://github.com/grafana/clickhouse-datasource/commit/d1bba235118dc02333b8c31e4df844dfeb21f208))
+
 ## [4.22.1](https://github.com/grafana/clickhouse-datasource/compare/v4.22.0...v4.22.1) (2026-10-02)
 
 
