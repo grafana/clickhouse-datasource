@@ -8,6 +8,7 @@ import {
   ColumnHint,
   StringFilter,
   TableColumn,
+  TableKeys,
 } from 'types/queryBuilder';
 import { CoreApp } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
@@ -283,10 +284,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   const onRunQueryRef = useRef(onRunQuery);
   const locationOptions = needsInitialization ? baseDefaults : builderOptions;
   const allColumns = useColumns(datasource, locationOptions.database, locationOptions.table);
+  const detectsLogsSchema = signalType === 'logs' && detectsOtelLogsSchema(datasource);
   const tableKeys = useTableKeys(
     datasource,
     locationOptions.database,
-    needsInitialization && signalType === 'logs' && detectsOtelLogsSchema(datasource) ? locationOptions.table : ''
+    needsInitialization && detectsLogsSchema ? locationOptions.table : ''
   );
   // Columns stay hidden until the table keys settle, because a query built without the keys is not rebuilt.
   const schemaColumns = tableKeys === undefined ? NO_COLUMNS : allColumns;
@@ -300,6 +302,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
   // Converting a carried-over query checks its filters against this table's columns. They are
   // fetched here rather than read from useColumns, which swallows a failed fetch and never
   // settles. A failed fetch converts with no columns, so only fitting role filters are kept.
+  // The table keys load alongside them and share the lookup that useTableKeys starts.
   const { database: targetDatabase, table: targetTable } = baseDefaults;
   useEffect(() => {
     if (!isCarriedOver) {
@@ -307,11 +310,11 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     }
 
     let cancelled = false;
-    const convert = (columns: readonly TableColumn[]) => {
+    const convert = (columns: readonly TableColumn[], keys?: TableKeys) => {
       if (cancelled) {
         return;
       }
-      const defaults = buildCompactQueryDefaults(datasource, signalType, '', columns);
+      const defaults = buildCompactQueryDefaults(datasource, signalType, '', columns, keys);
       // The converted query belongs to this data source now.
       const nextOptions = withDatasourceUid(convertCarriedOverQuery(builderOptions, defaults, columns), datasource.uid);
       builderOptionsDispatch(setAllOptions(nextOptions));
@@ -322,13 +325,26 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
     };
 
     const columnsRequest = targetTable
-      ? datasource.getColumnsCached(targetDatabase, targetTable)
+      ? datasource.getColumnsCached(targetDatabase, targetTable).catch(() => [])
       : Promise.resolve<TableColumn[]>([]);
-    columnsRequest.then(convert, () => convert([]));
+    const keysRequest =
+      targetTable && detectsLogsSchema
+        ? datasource.fetchTableKeys(targetDatabase, targetTable).catch(() => undefined)
+        : Promise.resolve(undefined);
+    Promise.all([columnsRequest, keysRequest]).then(([columns, keys]) => convert(columns, keys));
     return () => {
       cancelled = true;
     };
-  }, [builderOptions, builderOptionsDispatch, datasource, isCarriedOver, signalType, targetDatabase, targetTable]);
+  }, [
+    builderOptions,
+    builderOptionsDispatch,
+    datasource,
+    detectsLogsSchema,
+    isCarriedOver,
+    signalType,
+    targetDatabase,
+    targetTable,
+  ]);
 
   useEffect(() => {
     if (!needsInitialization || isCarriedOver) {
