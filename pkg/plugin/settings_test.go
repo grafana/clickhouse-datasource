@@ -114,17 +114,17 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:               "test",
-					Port:               443,
-					Path:               "custom-path",
-					InsecureSkipVerify: true,
-					TlsClientAuth:      true,
-					TlsAuthWithCACert:  true,
-					ConnMaxLifetime:    5,
-					DialTimeout:        10,
-					MaxIdleConns:       25,
-					MaxOpenConns:       50,
-					QueryTimeout:       60,
+					Host:                  "test",
+					Port:                  443,
+					Path:                  "custom-path",
+					InsecureSkipVerify:    true,
+					TlsClientAuth:         true,
+					TlsAuthWithCACert:     true,
+					ConnMaxLifetime:       5,
+					DialTimeout:           10,
+					MaxIdleConns:          25,
+					MaxOpenConns:          50,
+					QueryTimeout:          60,
 					ProxyOptions:          nil,
 					EnableRowLimit:        true,
 					RowLimit:              1000000,
@@ -143,12 +143,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: 5,
-					DialTimeout:     10,
-					MaxIdleConns:    25,
-					MaxOpenConns:    50,
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       5,
+					DialTimeout:           10,
+					MaxIdleConns:          25,
+					MaxOpenConns:          50,
 					QueryTimeout:          60,
 					RowLimit:              1000000,
 					EnableRowLimit:        true,
@@ -234,12 +234,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: 5,
-					DialTimeout:     15,
-					MaxIdleConns:    25,
-					MaxOpenConns:    50,
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       5,
+					DialTimeout:           15,
+					MaxIdleConns:          25,
+					MaxOpenConns:          50,
 					QueryTimeout:          120,
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -257,12 +257,12 @@ func TestLoadSettings(t *testing.T) {
 					},
 				},
 				wantSettings: Settings{
-					Host:            "test",
-					Port:            443,
-					ConnMaxLifetime: 5,
-					DialTimeout:     25,
-					MaxIdleConns:    25,
-					MaxOpenConns:    50,
+					Host:                  "test",
+					Port:                  443,
+					ConnMaxLifetime:       5,
+					DialTimeout:           25,
+					MaxIdleConns:          25,
+					MaxOpenConns:          50,
 					QueryTimeout:          60,
 					EnableRowLimit:        false,
 					EnableSchemaCache:     true,
@@ -560,7 +560,8 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
 			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120,
-			"logs": { "attributeColumns": ["JsonBody"], "attributeColumnExclusions": ["JsonBody.client"] }
+			"logs": { "attributeColumns": ["JsonBody"], "attributeColumnExclusions": ["JsonBody.client"] },
+			"skipConnectionPings": true, "keepCookies": ["session"]
 		}`),
 		DecryptedSecureJSONData: map[string]string{
 			"password":                 "bar",
@@ -675,4 +676,74 @@ func TestLoadSettingsHttpHeadersWrongTypeDoesNotPanic(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, got.HttpHeaders)
 	})
+}
+
+func TestLoadSettingsSkipConnectionPings(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should parse skipConnectionPings as bool", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "skipConnectionPings": true}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.SkipConnectionPings)
+	})
+
+	t.Run("should parse skipConnectionPings as string", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "skipConnectionPings": "true"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.SkipConnectionPings)
+	})
+
+	t.Run("should default skipConnectionPings to false", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.SkipConnectionPings)
+	})
+}
+
+func TestLoadSettingsKeepCookiesConfigured(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("should detect a non-empty keepCookies list", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "keepCookies": ["session"]}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.True(t, settings.KeepCookiesConfigured)
+	})
+
+	t.Run("should not detect an empty keepCookies list", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443, "keepCookies": []}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.KeepCookiesConfigured)
+	})
+
+	t.Run("should default KeepCookiesConfigured to false when keepCookies is absent", func(t *testing.T) {
+		settings, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 443}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.False(t, settings.KeepCookiesConfigured)
+	})
+}
+
+func TestLoadSettingsSkipConnectionPingsInvalidType(t *testing.T) {
+	_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+		JSONData:                []byte(`{"host": "test", "port": 443, "skipConnectionPings": 1}`),
+		DecryptedSecureJSONData: map[string]string{},
+	})
+	assert.Error(t, err)
 }

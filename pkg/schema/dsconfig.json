@@ -975,6 +975,15 @@
       }
     },
     {
+      "id": "jsonData_skipConnectionPings",
+      "key": "skipConnectionPings",
+      "description": "Skip the bootstrap ping made without forwarded headers, for proxies that reject requests lacking them. Not exposed in the configuration editor; set it by provisioning.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "tags": ["backend-only"]
+    },
+    {
       "id": "jsonData_customSettings",
       "key": "customSettings",
       "label": "Custom Settings",
