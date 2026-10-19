@@ -257,6 +257,11 @@
             ],
             "x-dsconfig-depends-on": "jsonData_configMode == 'single-table'"
           },
+          "skipConnectionPings": {
+            "description": "Skip the bootstrap ping made without forwarded headers, for proxies that reject requests lacking them. Provisioning only.",
+            "type": "boolean",
+            "default": false
+          },
           "tlsAuth": {
             "description": "TLS Client Auth",
             "type": "boolean",

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"net/textproto"
 	"regexp"
 	"slices"
 	"strconv"
@@ -244,7 +245,10 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		customSettings["limit"] = settings.RowLimit
 	}
 
-	httpHeaders, err := extractForwardedHeadersFromMessage(message)
+	// Without forwardGrafanaHeaders or oauthPassThru, only the SDK whitelist
+	// (in practice just Cookie, see extractForwardedHeadersFromMessage) is forwarded.
+	restrictToSDKWhitelist := !settings.ForwardGrafanaHeaders && !settings.OAuthPassThru
+	httpHeaders, err := extractForwardedHeadersFromMessage(message, restrictToSDKWhitelist)
 	if err != nil {
 		return nil, err
 	}
@@ -361,12 +365,19 @@ func (h *Clickhouse) Connect(
 	// `sqlds` normally calls `db.PingContext()` to check if the connection is alive,
 	// however, as ClickHouse returns its own non-standard `Exception` type, we need
 	// to handle it here so that we can categorize and surface the error correctly.
-	if err := db.PingContext(ctx); err != nil {
-		if ctx.Err() != nil {
-			return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
-		}
+	//
+	// sqlds calls Connect(ctx, settings, nil) at bootstrap with no forwarded
+	// headers; skipConnectionPings skips only that ping, for proxies that
+	// reject requests lacking them. Per-query Connects always ping.
+	shouldPing := message != nil || !settings.SkipConnectionPings
+	if shouldPing {
+		if err := db.PingContext(ctx); err != nil {
+			if ctx.Err() != nil {
+				return nil, fmt.Errorf("the operation was cancelled during execution: %w", ctx.Err())
+			}
 
-		return nil, wrapCategorizedConnectionError(err)
+			return nil, wrapCategorizedConnectionError(err)
+		}
 	}
 
 	// Honor the (nil-resource-on-error) contract so callers can rely on
@@ -472,7 +483,11 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
+		// On HTTP, keepCookies also enables forwarding so Cookie reaches ClickHouse.
+		// Not unconditional: sqlds keys its never-evicted pool cache on the whole
+		// forwarded header set. Native drops headers, so it is excluded.
+		ForwardHeaders: settings.ForwardGrafanaHeaders || settings.OAuthPassThru ||
+			(settings.Protocol == "http" && settings.KeepCookiesConfigured),
 		RowLimit:        rowLimit,
 		RowCapacityHint: settings.RowCapacityHint,
 	}
@@ -786,7 +801,14 @@ func convertFieldToString(field *data.Field) (*data.Field, error) {
 	return newField, nil
 }
 
-func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]string, error) {
+// extractForwardedHeadersFromMessage decodes the grafana-http-headers blob
+// that sqlds writes into the query message's ConnectionArgs. When
+// restrictToSDKWhitelist is true, only Cookie, Authorization and X-Id-Token
+// pass, matching the Grafana HTTP client (as used by Prometheus).
+// Authorization and X-Id-Token only arrive with oauthPassThru, which selects
+// restrictToSDKWhitelist=false, so in practice only Cookie flows in
+// restricted mode.
+func extractForwardedHeadersFromMessage(message json.RawMessage, restrictToSDKWhitelist bool) (map[string]string, error) {
 	// An example of the message we're trying to parse:
 	// {
 	//   "grafana-http-headers": {
@@ -813,6 +835,15 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 		}
 
 		for k, v := range fwdHeaders {
+			if restrictToSDKWhitelist {
+				canonical := textproto.CanonicalMIMEHeaderKey(k)
+				if canonical != backend.CookiesHeaderName &&
+					canonical != backend.OAuthIdentityTokenHeaderName &&
+					canonical != backend.OAuthIdentityIDTokenHeaderName {
+					continue
+				}
+			}
+
 			anyHeadersArr, ok := v.([]interface{})
 			if !ok {
 				return nil, fmt.Errorf("couldn't parse header %s as an array", k)
