@@ -833,6 +833,11 @@ describe('QueryBuilder', () => {
 
   describe('compact otel logs schema detection with the table keys', () => {
     const filterTimeColumn = { name: 'TimestampTime', hint: ColumnHint.FilterTime };
+    const otelLogsColumns = [
+      { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+      { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+      { name: 'Body', type: 'String', picklistValues: [] },
+    ];
 
     const otelLogsDs = (fetchTableKeys: () => Promise<TableKeys | undefined>) =>
       ({
@@ -854,13 +859,8 @@ describe('QueryBuilder', () => {
         shouldSelectLogContextColumns: jest.fn(() => false),
         getLogContextColumnNames: jest.fn(() => []),
         fetchTableKeys: jest.fn(fetchTableKeys),
-        fetchColumns: jest.fn(() =>
-          Promise.resolve([
-            { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
-            { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
-            { name: 'Body', type: 'String', picklistValues: [] },
-          ])
-        ),
+        fetchColumns: jest.fn(() => Promise.resolve(otelLogsColumns)),
+        getColumnsCached: jest.fn(() => Promise.resolve(otelLogsColumns)),
       }) as unknown as Datasource;
 
     const newQuery: QueryBuilderOptions = {
@@ -872,11 +872,21 @@ describe('QueryBuilder', () => {
       filters: [],
     };
 
-    const renderQuery = (datasource: Datasource, builderOptions = newQuery): jest.Mock => {
+    const carriedOverQuery: QueryBuilderOptions = {
+      queryType: QueryType.Logs,
+      mode: BuilderMode.List,
+      database: 'otel_v2',
+      table: 'app_logs',
+      columns: [{ name: 'Timestamp', hint: ColumnHint.Time }],
+      filters: [],
+      meta: { datasourceUid: 'single-table-app-logs' },
+    };
+
+    const renderQuery = (datasource: Datasource, builderOptions = newQuery, app = CoreApp.PanelEditor): jest.Mock => {
       const onQueryChange = jest.fn();
       render(
         <QueryBuilder
-          app={CoreApp.PanelEditor}
+          app={app}
           builderOptions={builderOptions}
           builderOptionsDispatch={jest.fn()}
           datasource={datasource}
@@ -918,6 +928,35 @@ describe('QueryBuilder', () => {
       await waitFor(() => expect(onQueryChange).toHaveBeenCalledTimes(2));
       expect(onQueryChange).toHaveBeenLastCalledWith(
         expect.objectContaining({ columns: expect.arrayContaining([filterTimeColumn]) })
+      );
+    });
+
+    it('converts a query carried over in Explore with the table keys', async () => {
+      const datasource = otelLogsDs(() =>
+        Promise.resolve({
+          sortingKey: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+          partitionKey: 'toDate(Timestamp)',
+        })
+      );
+      const onQueryChange = renderQuery(datasource, carriedOverQuery, CoreApp.Explore);
+
+      await waitFor(() => expect(onQueryChange).toHaveBeenCalledTimes(1));
+      expect(datasource.fetchTableKeys).toHaveBeenCalledWith('otel_v2', 'otel_logs');
+      expect(onQueryChange).toHaveBeenCalledWith(
+        expect.objectContaining({ table: 'otel_logs', columns: expect.not.arrayContaining([filterTimeColumn]) })
+      );
+    });
+
+    it('converts a carried-over query from the columns when the table keys cannot be read', async () => {
+      const onQueryChange = renderQuery(
+        otelLogsDs(() => Promise.reject(new Error('system.tables is not readable'))),
+        carriedOverQuery,
+        CoreApp.Explore
+      );
+
+      await waitFor(() => expect(onQueryChange).toHaveBeenCalledTimes(1));
+      expect(onQueryChange).toHaveBeenCalledWith(
+        expect.objectContaining({ table: 'otel_logs', columns: expect.arrayContaining([filterTimeColumn]) })
       );
     });
 
