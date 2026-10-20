@@ -6,6 +6,10 @@ import { render, screen } from '@testing-library/react';
 import { ConfigEditor } from './CHConfigEditor';
 import { createTestProps } from './helpers';
 
+jest.mock('hooks/useInstanceSettings', () => ({
+  useInstanceSettings: () => ({ allowCleartextJWTForwarding: false }),
+}));
+
 jest.mock('./LeftSidebar', () => ({
   LeftSidebar: () => <div data-testid="left-sidebar" />,
 }));

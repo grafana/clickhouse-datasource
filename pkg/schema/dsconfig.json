@@ -162,6 +162,18 @@
       }
     },
     {
+      "id": "jsonData_allowCleartextJWTForwarding",
+      "key": "allowCleartextJWTForwarding",
+      "label": "Allow cleartext JWT forwarding",
+      "description": "Forward the token without a TLS connection established by the plugin, for deployments where a proxy next to Grafana terminates and originates TLS. Only applies when Forward OAuth Identity is enabled, and only takes effect when the Grafana administrator also sets allow_cleartext_jwt_forwarding = true in the [plugin.grafana-clickhouse-datasource] section.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
       "id": "jsonData_tlsSkipVerify",
       "key": "tlsSkipVerify",
       "label": "Skip TLS Verify",
@@ -1163,7 +1175,8 @@
         "jsonData_username",
         "secureJsonData_password",
         "jsonData_oauthPassThru",
-        "jsonData_oauthPassThruAllowFallback"
+        "jsonData_oauthPassThruAllowFallback",
+        "jsonData_allowCleartextJWTForwarding"
       ]
     },
     {

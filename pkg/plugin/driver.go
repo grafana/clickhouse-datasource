@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"os"
 	"regexp"
 	"slices"
 	"strconv"
@@ -32,6 +33,23 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/net/proxy"
 )
+
+// cleartextJWTForwardingEnv is how Grafana hands the instance-level
+// [plugin.grafana-clickhouse-datasource] allow_cleartext_jwt_forwarding
+// setting to the plugin process.
+const cleartextJWTForwardingEnv = "GF_PLUGIN_ALLOW_CLEARTEXT_JWT_FORWARDING"
+
+// instanceAllowsCleartextJWTForwarding reports whether the Grafana
+// administrator has allowed data sources to forward JWTs without TLS.
+// Missing or unparsable values mean false.
+func instanceAllowsCleartextJWTForwarding() bool {
+	v, ok := os.LookupEnv(cleartextJWTForwardingEnv)
+	if !ok {
+		return false
+	}
+	allowed, err := strconv.ParseBool(v)
+	return err == nil && allowed
+}
 
 type grafanaHeadersKeyType struct{}
 
@@ -180,7 +198,11 @@ func CheckMinServerVersion(conn *sql.DB, major, minor, patch uint64) (bool, erro
 // resolveJWTAuth builds the ClickHouse Auth and GetJWT callback when JWT
 // authentication is enabled. The Bearer token is removed from httpHeaders
 // (mutated in-place) and returned via the GetJWT callback instead.
-func resolveJWTAuth(settings Settings, httpHeaders map[string]string) (clickhouse.Auth, clickhouse.GetJWTFunc) {
+//
+// clickhouse-go only turns GetJWT into an Authorization header on TLS
+// connections. When tokenInHeader is set (HTTP without TLS), the token is
+// left in httpHeaders as a Bearer header so it is still sent.
+func resolveJWTAuth(settings Settings, httpHeaders map[string]string, tokenInHeader bool) (clickhouse.Auth, clickhouse.GetJWTFunc) {
 	auth := clickhouse.Auth{
 		Database: settings.DefaultDatabase,
 		Username: settings.Username,
@@ -192,8 +214,12 @@ func resolveJWTAuth(settings Settings, httpHeaders map[string]string) (clickhous
 		return auth, nil
 	}
 
-	delete(httpHeaders, backend.OAuthIdentityTokenHeaderName)
 	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if tokenInHeader {
+		httpHeaders[backend.OAuthIdentityTokenHeaderName] = "Bearer " + token
+	} else {
+		delete(httpHeaders, backend.OAuthIdentityTokenHeaderName)
+	}
 	return clickhouse.Auth{Database: settings.DefaultDatabase},
 		func(context.Context) (string, error) { return token, nil }
 }
@@ -207,6 +233,18 @@ func wrapCategorizedConnectionError(err error) error {
 		}
 	}
 	return backend.DownstreamError(fmt.Errorf("[%s] %w", category, err))
+}
+
+// jwtRequiresTLSMessage explains why JWT forwarding was refused without TLS.
+// It names the instance setting only when the data source already opted in,
+// so a data source that never asked for cleartext forwarding gets the base
+// error.
+func jwtRequiresTLSMessage(settings Settings) string {
+	msg := "JWT authentication requires a secure (TLS) connection"
+	if settings.AllowCleartextJWTForwarding {
+		msg += "; \"Allow cleartext JWT forwarding\" is enabled on the data source, but the Grafana administrator has not set allow_cleartext_jwt_forwarding = true in the [plugin.grafana-clickhouse-datasource] section"
+	}
+	return msg
 }
 
 func buildClickHouseOptions(ctx context.Context, settings Settings, message json.RawMessage) (*clickhouse.Options, error) {
@@ -254,8 +292,24 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		httpHeaders[k] = v
 	}
 
+	// Forwarding a user token over a plaintext connection exposes it on the
+	// wire, so require TLS by default. Deployments that delegate TLS
+	// termination and origination to a proxy alongside Grafana (an
+	// Istio/Envoy sidecar, for example) can waive the requirement: the plugin
+	// cannot see the encrypted hop. That takes both the per data source flag
+	// and the instance-wide Grafana setting, so provisioning the flag alone
+	// (as on Grafana Cloud, which never sets the instance setting) does not
+	// lift it. The operator must ensure the plaintext hop stays on the local
+	// host or otherwise protected network.
 	if settings.OAuthPassThru && tlsConfig == nil {
-		return nil, backend.DownstreamError(fmt.Errorf("JWT authentication requires a secure (TLS) connection"))
+		if !settings.AllowCleartextJWTForwarding || !instanceAllowsCleartextJWTForwarding() {
+			return nil, backend.DownstreamError(errors.New(jwtRequiresTLSMessage(settings)))
+		}
+		// The token would cross the hop after the secure SOCKS proxy in
+		// cleartext, and a mesh sidecar next to Grafana does not cover it.
+		if sdkproxy.New(settings.ProxyOptions).SecureSocksProxyEnabled() {
+			return nil, backend.DownstreamError(errors.New("cleartext JWT forwarding cannot be combined with the secure SOCKS proxy: the token would travel in cleartext beyond the proxy; enable Secure connection so the plugin establishes TLS"))
+		}
 	}
 
 	// Forwarding a real user's token over a connection whose server
@@ -286,7 +340,7 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 			"falling back to the configured username/password (service account)")
 	}
 
-	auth, getJWT := resolveJWTAuth(settings, httpHeaders)
+	auth, getJWT := resolveJWTAuth(settings, httpHeaders, protocol == clickhouse.HTTP && tlsConfig == nil)
 
 	opts := &clickhouse.Options{
 		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},

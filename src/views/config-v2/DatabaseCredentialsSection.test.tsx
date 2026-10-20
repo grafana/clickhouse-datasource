@@ -3,6 +3,10 @@ import { act, render, screen, fireEvent } from '@testing-library/react';
 
 import { DatabaseCredentialsSection } from './DatabaseCredentialsSection';
 import { createMockValidation, createTestProps } from './helpers';
+import { useInstanceSettings } from 'hooks/useInstanceSettings';
+
+jest.mock('hooks/useInstanceSettings');
+const mockUseInstanceSettings = useInstanceSettings as jest.Mock;
 
 describe('DatabaseCredentialsSection', () => {
   const onOptionsChangeMock = jest.fn();
@@ -25,6 +29,7 @@ describe('DatabaseCredentialsSection', () => {
     // Mock console.error to suppress React act() warnings
     consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest.clearAllMocks();
+    mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: false });
   });
 
   afterEach(() => {
@@ -163,6 +168,61 @@ describe('DatabaseCredentialsSection', () => {
 
     const toggle = screen.getByRole('checkbox', { name: /^forward oauth identity/i });
     expect(toggle).toBeChecked();
+  });
+
+  describe('allowCleartextJWTForwarding', () => {
+    const toggleName = /^allow cleartext jwt forwarding/i;
+    const jwtProps = () =>
+      createTestProps({
+        options: {
+          jsonData: { username: 'default', oauthPassThru: true },
+          secureJsonData: {},
+          secureJsonFields: {},
+        },
+        mocks: { onOptionsChange: onOptionsChangeMock },
+      });
+
+    it('is hidden without oauthPassThru even when the instance allows it', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      render(<DatabaseCredentialsSection {...defaultProps} />);
+      expect(screen.queryByRole('checkbox', { name: toggleName })).not.toBeInTheDocument();
+    });
+
+    it('is hidden when the instance does not allow it', () => {
+      render(<DatabaseCredentialsSection {...jwtProps()} />);
+      expect(screen.queryByRole('checkbox', { name: toggleName })).not.toBeInTheDocument();
+    });
+
+    it('is set when toggled on and the instance allows it', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      render(<DatabaseCredentialsSection {...jwtProps()} />);
+
+      const toggle = screen.getByRole('checkbox', { name: toggleName });
+      expect(toggle).not.toBeChecked();
+      fireEvent.click(toggle);
+
+      const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+      expect(lastArgs.jsonData?.allowCleartextJWTForwarding).toBe(true);
+    });
+
+    it('is cleared when Forward OAuth Identity is turned off', () => {
+      mockUseInstanceSettings.mockReturnValue({ allowCleartextJWTForwarding: true });
+      const props = createTestProps({
+        options: {
+          jsonData: { username: 'default', oauthPassThru: true, allowCleartextJWTForwarding: true },
+          secureJsonData: {},
+          secureJsonFields: {},
+        },
+        mocks: { onOptionsChange: onOptionsChangeMock },
+      });
+      render(<DatabaseCredentialsSection {...props} />);
+
+      fireEvent.click(screen.getByRole('checkbox', { name: /^forward oauth identity/i }));
+
+      const lastArgs = onOptionsChangeMock.mock.lastCall?.[0];
+      expect(lastArgs.jsonData?.oauthPassThru).toBe(false);
+      expect(lastArgs.jsonData?.allowCleartextJWTForwarding).toBe(false);
+    });
   });
 
   it('sets oauthPassThru when toggled on', () => {

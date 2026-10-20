@@ -42,12 +42,14 @@ import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from '../labels';
 import { createValidationAPI, onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
 import { AliasTableConfig } from '../components/configEditor/AliasTableConfig';
+import { useInstanceSettings } from 'hooks/useInstanceSettings';
 import * as trackingV1 from './trackingV1';
 
 export interface ConfigEditorProps extends DataSourcePluginOptionsEditorProps<CHConfig, CHSecureConfig> {}
 
 export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
   const { options, onOptionsChange } = props;
+  const instanceSettings = useInstanceSettings(options.uid);
   const { jsonData, secureJsonFields } = options;
 
   const validationEnabled = (config.featureToggles as Record<string, boolean | undefined> | undefined)?.[
@@ -518,6 +520,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 jsonData: {
                   ...jsonData,
                   oauthPassThru: checked,
+                  allowCleartextJWTForwarding: checked ? jsonData.allowCleartextJWTForwarding : false,
                 },
               });
             }}
@@ -539,6 +542,28 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                   jsonData: {
                     ...jsonData,
                     oauthPassThruAllowFallback: checked,
+                  },
+                });
+              }}
+            />
+          </Field>
+        )}
+        {jsonData.oauthPassThru && instanceSettings.allowCleartextJWTForwarding && (
+          <Field
+            label={labels.allowCleartextJWTForwarding.label}
+            description={labels.allowCleartextJWTForwarding.tooltip}
+          >
+            <Switch
+              id="allowCleartextJWTForwarding"
+              className="gf-form"
+              value={jsonData.allowCleartextJWTForwarding || false}
+              onChange={(e) => {
+                const checked = e.currentTarget.checked;
+                onOptionsChange({
+                  ...options,
+                  jsonData: {
+                    ...jsonData,
+                    allowCleartextJWTForwarding: checked,
                   },
                 });
               }}

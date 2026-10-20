@@ -46,6 +46,11 @@ export default {
           tooltip:
             'Run queries with no signed-in user (alert rules and other backend queries) using the configured username and password instead of failing them; per-user row policies and quotas will not apply.',
         },
+        allowCleartextJWTForwarding: {
+          label: 'Allow cleartext JWT forwarding',
+          tooltip:
+            'Forward the user token even when this data source connects without TLS. Use this only when TLS termination and origination are delegated to a proxy deployed alongside Grafana (for example an Istio/Envoy sidecar), and you must ensure the plaintext hop to that proxy is protected. Without such a proxy this sends user tokens in the clear. Experimental.',
+        },
         tlsSkipVerify: {
           label: 'Skip TLS Verify',
           tooltip: 'Skip TLS Verify',
