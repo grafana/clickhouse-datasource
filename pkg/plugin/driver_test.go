@@ -121,31 +121,31 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 		frame := &data.Frame{
 			Fields: []*data.Field{
 				data.NewField("JsonBody", nil, []json.RawMessage{json.RawMessage(
-					`{"forter":{"email":"a@b.com","score":"9"},"forterId":"keep","status":"200"}`)}),
+					`{"vendor":{"email":"a@b.com","score":"9"},"vendorId":"keep","status":"200"}`)}),
 			},
 		}
-		err := mergeOpenTelemetryLabels(frame, []string{"JsonBody"}, []string{"JsonBody.forter"})
+		err := mergeOpenTelemetryLabels(frame, []string{"JsonBody"}, []string{"JsonBody.vendor"})
 		assert.NoError(t, err)
 		assert.Equal(t, "labels", frame.Fields[0].Name)
 
 		labelValue, _ := frame.Fields[0].ConcreteAt(0)
 		var labelsMap map[string]interface{}
 		assert.NoError(t, json.Unmarshal(labelValue.(json.RawMessage), &labelsMap))
-		_, hasEmail := labelsMap["JsonBody.forter.email"]
-		_, hasScore := labelsMap["JsonBody.forter.score"]
+		_, hasEmail := labelsMap["JsonBody.vendor.email"]
+		_, hasScore := labelsMap["JsonBody.vendor.score"]
 		assert.False(t, hasEmail)
 		assert.False(t, hasScore)
-		assert.Equal(t, "keep", labelsMap["JsonBody.forterId"])
+		assert.Equal(t, "keep", labelsMap["JsonBody.vendorId"])
 		assert.Equal(t, "200", labelsMap["JsonBody.status"])
 	})
 }
 
 func TestIsExcludedPath(t *testing.T) {
-	excluded := []string{"JsonBody.forter", "JsonBody.reqHdr.cookie"}
-	assert.True(t, isExcludedPath("JsonBody.forter", excluded))
-	assert.True(t, isExcludedPath("JsonBody.forter.email", excluded))
+	excluded := []string{"JsonBody.vendor", "JsonBody.reqHdr.cookie"}
+	assert.True(t, isExcludedPath("JsonBody.vendor", excluded))
+	assert.True(t, isExcludedPath("JsonBody.vendor.email", excluded))
 	assert.True(t, isExcludedPath("JsonBody.reqHdr.cookie", excluded))
-	assert.False(t, isExcludedPath("JsonBody.forterId", excluded))
+	assert.False(t, isExcludedPath("JsonBody.vendorId", excluded))
 	assert.False(t, isExcludedPath("JsonBody.reqHdr.accEnc", excluded))
 	assert.False(t, isExcludedPath("JsonBody.status", excluded))
 	assert.False(t, isExcludedPath("JsonBody.status", nil))

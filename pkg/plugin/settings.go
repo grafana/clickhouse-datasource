@@ -84,8 +84,8 @@ type Settings struct {
 	LogsAttributeColumns []string `json:"-"`
 
 	// LogsAttributeColumnExclusions lists flattened label paths to drop, matched
-	// by subtree: an entry "JsonBody.content.rodan.forter" also removes
-	// "JsonBody.content.rodan.forter.email" and any future leaf under it. Applied
+	// by subtree: an entry "JsonBody.content.vendor" also removes
+	// "JsonBody.content.vendor.email" and any future leaf under it. Applied
 	// after flattening, so it covers the OTel columns too. Parsed from
 	// jsonData.logs.attributeColumnExclusions. Empty by default, so nothing is
 	// dropped unless a path is listed.

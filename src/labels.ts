@@ -363,7 +363,7 @@ export default {
           attributeColumnExclusions: {
             label: 'Excluded paths',
             tooltip:
-              'Flattened label paths to keep out of the Fields list, matched by subtree: an entry like JsonBody.content.forter also removes JsonBody.content.forter.email and any leaf under it. Applies to the attribute columns above and the OTel columns. Leave empty to exclude none.',
+              'Flattened label paths to keep out of the Fields list, matched by subtree: an entry like JsonBody.content.vendor also removes JsonBody.content.vendor.email and any leaf under it. Applies to the attribute columns above and the OTel columns. Leave empty to exclude none.',
             placeholder: 'Column.path prefix (enter key to add)',
             description:
               'Use this to keep sensitive paths (e.g. emails, cookies, client IPs) out of the flattened fields.',

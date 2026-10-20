@@ -213,7 +213,7 @@ The data source includes a dedicated configuration section for log queries. Thes
 | **Columns**              | Extra columns projected into new logs queries; each appears in the Fields list, the expanded log row, and the field filters, and can be shown as a displayed field.                                                                                         |
 | **Context columns**      | Comma-separated list of columns included alongside log messages for additional context.                                                                                                                                                                     |
 | **Attribute columns**    | JSON or `Map` columns whose keys are flattened into log labels, like the OTel `LogAttributes` column, so each nested path (for example `message.status`) becomes a filterable field. The named columns are also projected into new logs queries. |
-| **Excluded paths**       | Flattened label paths to keep out of the Fields list, matched by subtree: an entry like `JsonBody.content.forter` also removes `JsonBody.content.forter.email` and any leaf beneath it. Applies to the attribute columns above and to the OTel columns. |
+| **Excluded paths**       | Flattened label paths to keep out of the Fields list, matched by subtree: an entry like `JsonBody.content.vendor` also removes `JsonBody.content.vendor.email` and any leaf beneath it. Applies to the attribute columns above and to the OTel columns. |
 
 When **Configuration mode** is set to **Single source** and **Signal type** is set to **Logs**, these settings define the focused logs source.
 
