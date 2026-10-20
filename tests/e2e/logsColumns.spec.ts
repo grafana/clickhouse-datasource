@@ -1,5 +1,6 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Page, request as apiRequest } from '@playwright/test';
+import { Page } from '@playwright/test';
+import { createTestDataSources, deleteTestDataSources, TestDataSource } from './helpers/datasources';
 
 // E2E guard for the logs "Columns" datasource setting (HDX-5008).
 //
@@ -33,11 +34,6 @@ import { Page, request as apiRequest } from '@playwright/test';
 const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
 
 const isCloudRun = !!process.env.GRAFANA_URL;
-
-// Connection settings are inherited from this datasource so the spec works
-// wherever the standard e2e datasource points (docker-compose, custom stacks).
-const BASE_DATASOURCE_UID = process.env.DS_E2E_UID || 'clickhouse-e2e';
-const BASE_URL = process.env.GRAFANA_URL || `http://localhost:${process.env.PORT || 3000}`;
 
 // Window covering both fixtures (2024-03-15 ~10:00 UTC), matching the range the
 // sibling fixture specs use.
@@ -87,78 +83,34 @@ const CASES: LogsColumnsCase[] = [
   },
 ];
 
-async function newAdminApiContext() {
-  return apiRequest.newContext({
-    baseURL: BASE_URL,
-    httpCredentials: {
-      username: process.env.GRAFANA_ADMIN_USER || 'admin',
-      password: process.env.GRAFANA_ADMIN_PASSWORD || 'admin',
-    },
-  });
-}
-
-async function deleteTestDataSources() {
-  const ctx = await newAdminApiContext();
-  for (const c of CASES) {
-    // Returns 404 when absent; APIRequestContext does not throw on non-2xx.
-    await ctx.delete(`/api/datasources/uid/${c.uid}`);
+// One single-source logs datasource per case, configured with the extra column via
+// logs.additionalColumns.
+function caseDataSource(c: LogsColumnsCase): TestDataSource {
+  const logs: Record<string, unknown> = {
+    defaultDatabase: 'e2e_test',
+    defaultTable: c.table,
+    otelEnabled: c.otelEnabled,
+    additionalColumns: [c.additionalColumn],
+  };
+  if (c.otelVersion) {
+    logs.otelVersion = c.otelVersion;
   }
-  await ctx.dispose();
-}
-
-// Creates one single-source logs datasource per case, configured with the extra
-// column via logs.additionalColumns. Connection fields (host/port/protocol/TLS)
-// come from the base e2e datasource.
-async function createTestDataSources() {
-  const ctx = await newAdminApiContext();
-  const baseRes = await ctx.get(`/api/datasources/uid/${BASE_DATASOURCE_UID}`);
-  if (!baseRes.ok()) {
-    throw new Error(`Failed to read base datasource ${BASE_DATASOURCE_UID}: ${baseRes.status()}`);
+  if (c.timeColumn) {
+    logs.filterTimeColumn = c.timeColumn;
+    logs.timeColumn = c.timeColumn;
   }
-  const baseJsonData = (await baseRes.json())?.jsonData ?? {};
-
-  for (const c of CASES) {
-    const logs: Record<string, unknown> = {
-      defaultDatabase: 'e2e_test',
-      defaultTable: c.table,
-      otelEnabled: c.otelEnabled,
-      additionalColumns: [c.additionalColumn],
-    };
-    if (c.otelVersion) {
-      logs.otelVersion = c.otelVersion;
-    }
-    if (c.timeColumn) {
-      logs.filterTimeColumn = c.timeColumn;
-      logs.timeColumn = c.timeColumn;
-    }
-    if (c.levelColumn) {
-      logs.levelColumn = c.levelColumn;
-    }
-    if (c.messageColumn) {
-      logs.messageColumn = c.messageColumn;
-    }
-
-    const res = await ctx.post('/api/datasources', {
-      data: {
-        name: c.name,
-        uid: c.uid,
-        type: PLUGIN_TYPE,
-        access: 'proxy',
-        jsonData: {
-          ...baseJsonData,
-          database: 'e2e_test',
-          configMode: 'single-table',
-          signalType: 'logs',
-          logs,
-        },
-      },
-    });
-    // 409 = already created by a parallel worker; anything else is a real failure.
-    if (!res.ok() && res.status() !== 409) {
-      throw new Error(`Failed to create e2e datasource ${c.uid}: ${res.status()} ${await res.text()}`);
-    }
+  if (c.levelColumn) {
+    logs.levelColumn = c.levelColumn;
   }
-  await ctx.dispose();
+  if (c.messageColumn) {
+    logs.messageColumn = c.messageColumn;
+  }
+
+  return {
+    uid: c.uid,
+    name: c.name,
+    jsonData: { database: 'e2e_test', configMode: 'single-table', signalType: 'logs', logs },
+  };
 }
 
 function exploreUrl(datasourceUid: string): string {
@@ -306,15 +258,15 @@ test.describe('Logs Columns datasource setting (HDX-5008)', () => {
     }
     // Recreate from scratch so a leftover datasource from an aborted run cannot
     // poison this run.
-    await deleteTestDataSources();
-    await createTestDataSources();
+    await deleteTestDataSources(CASES);
+    await createTestDataSources(CASES.map(caseDataSource));
   });
 
   test.afterAll(async () => {
     if (isCloudRun) {
       return;
     }
-    await deleteTestDataSources();
+    await deleteTestDataSources(CASES);
   });
 
   test.beforeEach(() => {
