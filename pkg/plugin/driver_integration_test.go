@@ -1384,6 +1384,89 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 
 		assert.Equal(t, nil, err)
 	})
+
+	t.Run("should forward the Cookie header out of the box on http protocol when keepCookies is configured (parity with Prometheus keepCookies)", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "keepCookies": ["x_authorized_project_ids"]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		// Permissive handler during NewDatasource's ping. We only care
+		// about headers on the actual QueryData call below.
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{})
+		dsInstance, err := NewDatasource(ctx, settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+		cookieReq := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Headers: map[string]string{
+				// Cookie is one of the three unprefixed headers the SDK
+				// forwards; this is what Grafana's CookiesMiddleware emits
+				// after keepCookies filtering.
+				"Cookie": "x_authorized_project_ids=proj-a,proj-b",
+			},
+			Queries: []backend.DataQuery{{RefID: "A", JSON: []byte(`{"rawSql": "SELECT 1"}`)}},
+		}
+
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"Cookie": "x_authorized_project_ids=proj-a,proj-b"})
+		resp, err := ds.QueryData(ctx, cookieReq)
+		assert.Equal(t, nil, err)
+		require.NoError(t, resp.Responses["A"].Error)
+	})
+
+	t.Run("should not forward the Cookie header on http protocol when keepCookies is not configured", func(t *testing.T) {
+		// Without keepCookies the plugin does not opt this data source into
+		// sqlds header forwarding, so a client-set Cookie must not reach ClickHouse.
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http"}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{})
+		dsInstance, err := NewDatasource(ctx, settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+		cookieReq := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Headers: map[string]string{
+				"Cookie": "x_authorized_project_ids=proj-a,proj-b",
+			},
+			Queries: []backend.DataQuery{{RefID: "A", JSON: []byte(`{"rawSql": "SELECT 1"}`)}},
+		}
+
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"Cookie": ""})
+		resp, err := ds.QueryData(ctx, cookieReq)
+		assert.Equal(t, nil, err)
+		require.NoError(t, resp.Responses["A"].Error)
+	})
+
+	t.Run("should not forward arbitrary http_-prefixed headers when forwardGrafanaHeaders is off, even with a Cookie present", func(t *testing.T) {
+		// Confirms the parity fix does not broaden the existing
+		// arbitrary-header opt-in contract: X-Test must only be emitted when
+		// forwardGrafanaHeaders is true even on the HTTP protocol.
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "keepCookies": ["x_authorized_project_ids"]}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{})
+		dsInstance, err := NewDatasource(ctx, settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+		mixedReq := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Headers: map[string]string{
+				"Cookie":      "x_authorized_project_ids=proj-a",
+				"http_X-Test": "Hello World!",
+			},
+			Queries: []backend.DataQuery{{RefID: "A", JSON: []byte(`{"rawSql": "SELECT 1"}`)}},
+		}
+
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{
+			"Cookie": "x_authorized_project_ids=proj-a",
+			"X-Test": "",
+		})
+		resp, err := ds.QueryData(ctx, mixedReq)
+		assert.Equal(t, nil, err)
+		require.NoError(t, resp.Responses["A"].Error)
+	})
 }
 
 // TestQueryDataMacroExpansion exercises the macropro-driven macro pipeline end to

@@ -53,8 +53,15 @@ type Settings struct {
 	// Health checks and schema introspection always fall back regardless of
 	// this setting, since no user token is ever available for them.
 	OAuthPassThruAllowFallback bool `json:"oauthPassThruAllowFallback,omitempty"`
-	CustomSettings        []CustomSetting   `json:"customSettings"`
-	ProxyOptions          *proxy.Options
+	// SkipConnectionPings skips the nil-message bootstrap ping in Connect. Pings
+	// on per-query connections still run.
+	SkipConnectionPings bool            `json:"skipConnectionPings,omitempty"`
+	CustomSettings      []CustomSetting `json:"customSettings"`
+	ProxyOptions        *proxy.Options
+
+	// KeepCookiesConfigured is true when jsonData.keepCookies (Grafana's generic
+	// "Forward cookies" setting, not declared by this plugin) lists a cookie.
+	KeepCookiesConfigured bool `json:"-"`
 
 	RowLimit       int64 `json:"rowLimit,omitempty"`
 	EnableRowLimit bool  `json:"enableRowLimit,omitempty"`
@@ -249,6 +256,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 	}
 
+	if settings.SkipConnectionPings, err = boolSetting(jsonData, "skipConnectionPings"); err != nil {
+		return settings, err
+	}
+
+	// keepCookies is Grafana's own jsonData field for the "Forward cookies" HTTP
+	// setting; it is not declared by this plugin, so read it straight from the
+	// generic jsonData map rather than the Settings struct.
+	if keepCookies, ok := jsonData["keepCookies"].([]interface{}); ok && len(keepCookies) > 0 {
+		settings.KeepCookiesConfigured = true
+	}
+
 	if jsonData["enableRowLimit"] != nil {
 		if enableRowLimitString, ok := jsonData["enableRowLimit"].(string); ok {
 			settings.EnableRowLimit, err = strconv.ParseBool(enableRowLimitString)
@@ -380,6 +398,25 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 	}
 
 	return httpHeaders
+}
+
+// boolSetting reads a bool setting that Grafana may store as a JSON bool or a
+// string. A missing key is false.
+func boolSetting(jsonData map[string]interface{}, key string) (bool, error) {
+	switch v := jsonData[key].(type) {
+	case nil:
+		return false, nil
+	case bool:
+		return v, nil
+	case string:
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return false, backend.DownstreamError(fmt.Errorf("could not parse %s value: %w", key, err))
+		}
+		return b, nil
+	default:
+		return false, backend.DownstreamError(fmt.Errorf("could not parse %s value: unexpected type %T", key, v))
+	}
 }
 
 // intSetting reads a whole-number jsonData key, given as a JSON number or a
