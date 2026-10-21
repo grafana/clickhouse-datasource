@@ -339,6 +339,53 @@ describe('getQueryTypeChangeDefaults', () => {
     expect({ ...logs, ...back }.aggregates).toEqual(trend.aggregates);
   });
 
+  it('leaves the trace default filters and ordering behind on a picked table switched to Logs', () => {
+    // A datasource without a logs default: the picked otel_traces table stays.
+    const ds = newMockDatasource();
+    const traces: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'TraceId', hint: ColumnHint.TraceId },
+        { name: 'ParentSpanId', hint: ColumnHint.TraceParentSpanId },
+        { name: 'Duration', hint: ColumnHint.TraceDurationTime },
+        { name: 'Timestamp', hint: ColumnHint.Time },
+      ],
+      filters: [...getDefaultTraceFilters(), { ...userFilter, key: 'SpanKind', value: 'Server' }],
+      orderBy: getDefaultTraceOrderBy(),
+      limit: 1000,
+      meta: {},
+    };
+
+    const next = getQueryTypeChangeDefaults(ds, traces, QueryType.Logs);
+    const sql = generateSql({ ...traces, ...next, queryType: QueryType.Logs });
+
+    expect(next).not.toHaveProperty('table');
+    expect(sql).toContain('"otel"."otel_traces"');
+    expect(sql).not.toContain('ParentSpanId');
+    expect(sql).not.toContain('Duration');
+    // A filter set on a column, and the time range, stay.
+    expect(sql).toContain("SpanKind = 'Server'");
+    expect(next.filters?.[0]).toMatchObject({ operator: FilterOperator.WithInGrafanaTimeRange });
+    // The role columns stay, unseen, for the way back to Traces.
+    expect(next.columns).toEqual(
+      expect.arrayContaining([{ name: 'ParentSpanId', hint: ColumnHint.TraceParentSpanId }])
+    );
+  });
+
+  it('leaves the log level filter behind when a logs query goes to Traces', () => {
+    const logs = tableQuery({
+      queryType: QueryType.Logs,
+      filters: getDefaultLogsFilters(),
+      orderBy: getDefaultLogsOrderBy(),
+    });
+
+    const next = getQueryTypeChangeDefaults(newMockDatasource(), logs, QueryType.Traces);
+
+    expect(next.filters?.some((f) => f.hint === ColumnHint.LogLevel)).toBe(false);
+  });
+
   it('returns nothing for a query with nothing configured yet', () => {
     const empty = { database: 'db', table: 't', queryType: QueryType.Table, columns: [], meta: {} };
 

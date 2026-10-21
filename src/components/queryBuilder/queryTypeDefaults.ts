@@ -58,6 +58,30 @@ const isAggregating = (options: QueryBuilderOptions): boolean =>
     options.mode === BuilderMode.Aggregate &&
     Boolean(options.aggregates?.length || options.groupBy?.length));
 
+// Roles only one signal has: a filter or ordering addressed to one by hint is that signal's, typically
+// its default (root spans only, Duration > 0), so it doesn't follow the query to the other signal.
+// Trace ID is a logs role too.
+const logsOnlyHints = new Set([ColumnHint.LogLevel, ColumnHint.LogMessage, ColumnHint.LogAttributes]);
+const tracesOnlyHints = new Set([
+  ColumnHint.TraceSpanId,
+  ColumnHint.TraceParentSpanId,
+  ColumnHint.TraceServiceName,
+  ColumnHint.TraceOperationName,
+  ColumnHint.TraceDurationTime,
+  ColumnHint.TraceTags,
+  ColumnHint.TraceServiceTags,
+  ColumnHint.TraceStatusCode,
+  ColumnHint.TraceKind,
+  ColumnHint.TraceStatusMessage,
+  ColumnHint.TraceInstrumentationLibraryName,
+  ColumnHint.TraceInstrumentationLibraryVersion,
+  ColumnHint.TraceState,
+]);
+const isOtherSignalHint = (hint: ColumnHint | undefined, queryType: QueryType): boolean =>
+  hint !== undefined &&
+  ((queryType === QueryType.Logs && tracesOnlyHints.has(hint)) ||
+    (queryType === QueryType.Traces && logsOnlyHints.has(hint)));
+
 const isTimeRangeFilter = (f: Filter) => f.operator === FilterOperator.WithInGrafanaTimeRange;
 
 /**
@@ -81,6 +105,7 @@ const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] =>
  * already has:
  * - for logs and traces, the type's default database and table unless the user picked them, and the
  *   configured role columns and OTel setting only when the query is on that configured table;
+ * - for logs and traces, no filters or ordering addressed to a role only the other signal has;
  * - a time-range filter when it has none, and default filters and ordering when it has none at all;
  * - the builder mode matching whether it aggregates, so aggregates are never applied unseen;
  * - unset trace settings.
@@ -104,8 +129,8 @@ export const getQueryTypeChangeDefaults = (
   const next: Partial<QueryBuilderOptions> = {};
   const nextMeta: NonNullable<QueryBuilderOptions['meta']> = {};
   let columns: SelectedColumn[] = [...(options.columns || [])];
-  let filters = options.filters || [];
-  let orderBy = options.orderBy || [];
+  let filters = (options.filters || []).filter((f) => !isOtherSignalHint(f.hint, queryType));
+  let orderBy = (options.orderBy || []).filter((o) => !isOtherSignalHint(o.hint, queryType));
 
   if (queryType === QueryType.Logs || queryType === QueryType.Traces) {
     const isLogs = queryType === QueryType.Logs;
