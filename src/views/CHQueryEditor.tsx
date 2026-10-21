@@ -112,6 +112,12 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const propBuilderOptions =
     query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
   const lastPropBuilderOptions = useRef<QueryBuilderOptions | undefined>(propBuilderOptions);
+  // Builder options this editor sent with onChange that Grafana has not handed back yet. A change in
+  // several steps, such as a query type change followed by the new type's defaults, sends each step;
+  // where Grafana hands them back later (a dashboard panel editor), the copy of an earlier step lands
+  // after the later ones and must not be taken for an outside change, or the editor reverts to it,
+  // sends it again, and the two steps chase each other without end.
+  const sentBuilderOptions = useRef<QueryBuilderOptions[]>([]);
   useEffect(() => {
     if (!propBuilderOptions) {
       lastPropBuilderOptions.current = undefined;
@@ -126,6 +132,11 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     }
 
     lastPropBuilderOptions.current = propBuilderOptions;
+    const sent = sentBuilderOptions.current.findIndex((o) => isSameQueryOptions(o, propBuilderOptions));
+    if (sent >= 0) {
+      sentBuilderOptions.current.splice(0, sent + 1);
+      return;
+    }
     if (!isSameQueryOptions(propBuilderOptions, builderOptions)) {
       builderOptionsDispatch(setAllOptions(propBuilderOptions));
     }
@@ -209,6 +220,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       return;
     }
 
+    sentBuilderOptions.current = [...sentBuilderOptions.current.slice(-49), builderOptions];
     onChange({
       ...query,
       pluginVersion,
@@ -224,6 +236,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 
   const onQueryChange = useCallback(
     (newOptions: QueryBuilderOptions) => {
+      sentBuilderOptions.current = [...sentBuilderOptions.current.slice(-49), newOptions];
       onChange({
         ...query,
         pluginVersion,

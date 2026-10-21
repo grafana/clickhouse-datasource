@@ -404,6 +404,65 @@ describe('Query Editor', () => {
     );
   });
 
+  it('settles on a type change when the panel editor hands each change back', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: 'latest',
+    };
+    datasource.settings.jsonData.traces = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_traces',
+      otelEnabled: true,
+      otelVersion: 'latest',
+    };
+    datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+    datasource.getColumnsCached = jest.fn(() => Promise.resolve([]));
+    const traces: CHQuery = {
+      pluginVersion,
+      rawSql: '',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns: [{ name: 'TraceId', hint: ColumnHint.TraceId }],
+        filters: [],
+        orderBy: [],
+        limit: 1000,
+        meta: {},
+      },
+    };
+    let changes = 0;
+    const Panel = () => {
+      const [query, setQuery] = React.useState<CHQuery>(traces);
+      // Takes each change in its own state, as the panel editor does: the editor sees it on its next
+      // render, by when a change made in the same pass may already be in its state.
+      const onChange = (next: CHQuery) => {
+        changes++;
+        // Stop handing changes back past any sane count, so a loop fails the test instead of hanging it.
+        if (changes < 50) {
+          setQuery(next);
+        }
+      };
+      return <CHQueryEditor query={query} onChange={onChange} onRunQuery={jest.fn()} datasource={datasource} />;
+    };
+    render(<Panel />);
+    await act(async () => new Promise((r) => setTimeout(r, 50)));
+    changes = 0;
+
+    fireEvent.click(screen.getByLabelText('Logs'));
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+    const settled = changes;
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+
+    expect(changes).toBe(settled);
+    expect(changes).toBeLessThan(10);
+  });
+
   it('does not resync compact builder state for fresh equal builder options', async () => {
     const datasource = newMockDatasource();
     datasource.settings.jsonData.configMode = 'single-table';
