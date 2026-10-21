@@ -53,6 +53,7 @@
     "fromtime",
     "godoc",
     "gtime",
+    "golangci",
     "goproxy",
     "Grafana",
     "grafanalabs",
