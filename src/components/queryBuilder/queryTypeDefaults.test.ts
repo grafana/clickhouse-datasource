@@ -3,6 +3,7 @@ import {
   AggregateType,
   BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -18,6 +19,7 @@ import {
   getDefaultTraceOrderBy,
 } from './defaultQueryOptions';
 import { buildDefaultLogsColumns } from './views/logsQueryBuilderHooks';
+import { getDefaultTimeSeriesFilters, getDefaultTimeSeriesOrderBy } from './views/timeSeriesQueryBuilderHooks';
 import { generateSql } from 'data/sqlGenerator';
 import { isBuilderOptionsRunnable } from 'data/utils';
 
@@ -388,6 +390,49 @@ describe('getQueryTypeChangeDefaults', () => {
 
     expect(back.filters).toEqual(getDefaultTraceFilters());
     expect(back.orderBy).toEqual(getDefaultTraceOrderBy());
+  });
+
+  it('leaves the trace defaults behind on a Time series round trip through Traces', () => {
+    const ds = newMockDatasource();
+    const series = tableQuery({
+      table: 'otel_traces',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*' }],
+      filters: getDefaultTimeSeriesFilters(),
+      orderBy: getDefaultTimeSeriesOrderBy(),
+    });
+
+    const traces = {
+      ...series,
+      ...getQueryTypeChangeDefaults(ds, series, QueryType.Traces),
+      queryType: QueryType.Traces,
+    };
+    expect(traces.filters?.some((f) => f.hint === ColumnHint.TraceParentSpanId)).toBe(true);
+    const back = getQueryTypeChangeDefaults(ds, traces, QueryType.TimeSeries);
+
+    expect(back.filters).toEqual(getDefaultTimeSeriesFilters());
+    expect(back.orderBy).toEqual(getDefaultTimeSeriesOrderBy());
+  });
+
+  it('keeps a trace filter the user edited when leaving Traces', () => {
+    const edited: Filter[] = getDefaultTraceFilters().map((f) =>
+      f.hint === ColumnHint.TraceServiceName ? ({ ...f, operator: FilterOperator.Equals, value: 'api' } as Filter) : f
+    );
+    const traces = tableQuery({ queryType: QueryType.Traces, filters: edited });
+
+    const next = getQueryTypeChangeDefaults(newMockDatasource(), traces, QueryType.Logs);
+
+    expect(next.filters?.map((f) => f.hint)).toEqual([ColumnHint.Time, ColumnHint.TraceServiceName]);
+  });
+
+  it('keeps a default ordering whose direction the user flipped', () => {
+    // OrderByEditor clears `default` on an edit.
+    const flipped = getDefaultLogsOrderBy().map((o) => ({ ...o, dir: OrderByDirection.ASC, default: undefined }));
+    const logs = tableQuery({ queryType: QueryType.Logs, orderBy: flipped });
+
+    expect(getQueryTypeChangeDefaults(newMockDatasource(), logs, QueryType.TimeSeries).orderBy).toEqual(flipped);
+    expect(getQueryTypeChangeDefaults(newMockDatasource(), logs, QueryType.Traces).orderBy).toEqual(flipped);
   });
 
   it('keeps ordering and filters of its own over the type defaults', () => {

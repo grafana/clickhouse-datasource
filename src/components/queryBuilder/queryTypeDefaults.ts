@@ -59,9 +59,7 @@ const isAggregating = (options: QueryBuilderOptions): boolean =>
     options.mode === BuilderMode.Aggregate &&
     Boolean(options.aggregates?.length || options.groupBy?.length));
 
-// Roles only one signal has: a filter or ordering addressed to one by hint is that signal's, typically
-// its default (root spans only, Duration > 0), so it doesn't follow the query to the other signal.
-// Trace ID is a logs role too.
+// Roles only one signal has (Trace ID is a logs role too).
 const logsOnlyHints = new Set([ColumnHint.LogLevel, ColumnHint.LogMessage, ColumnHint.LogAttributes]);
 const tracesOnlyHints = new Set([
   ColumnHint.TraceSpanId,
@@ -78,10 +76,45 @@ const tracesOnlyHints = new Set([
   ColumnHint.TraceInstrumentationLibraryVersion,
   ColumnHint.TraceState,
 ]);
-const isOtherSignalHint = (hint: ColumnHint | undefined, queryType: QueryType): boolean =>
-  hint !== undefined &&
-  ((queryType === QueryType.Logs && tracesOnlyHints.has(hint)) ||
-    (queryType === QueryType.Traces && logsOnlyHints.has(hint)));
+/** The signal whose roles alone include `hint`, if any. */
+const signalOfHint = (hint: ColumnHint | undefined): QueryType | undefined =>
+  hint === undefined
+    ? undefined
+    : tracesOnlyHints.has(hint)
+      ? QueryType.Traces
+      : logsOnlyHints.has(hint)
+        ? QueryType.Logs
+        : undefined;
+
+const isSameFilter = (a: Filter, b: Filter) =>
+  a.hint === b.hint &&
+  a.operator === b.operator &&
+  (a as { value?: unknown }).value === (b as { value?: unknown }).value;
+
+/**
+ * Whether a filter is one of a signal's defaults left as it was (root spans only, Duration > 0, any
+ * level), on a query leaving that signal for another type. Those were never the user's and would
+ * keep narrowing the query through the signal's unseen role columns, so they don't follow it. One
+ * the user edited stays.
+ */
+const isLeftSignalDefault = (filter: Filter, queryType: QueryType): boolean => {
+  const signal = signalOfHint(filter.hint);
+  if (!signal || signal === queryType) {
+    return false;
+  }
+  const defaults = signal === QueryType.Traces ? getDefaultTraceFilters() : getDefaultLogsFilters();
+  return defaults.some((d) => isSameFilter(d, filter));
+};
+
+/** The same for a default ordering, which carries `default` until the user edits it. */
+const isLeftSignalDefaultOrderBy = (orderBy: OrderBy, queryType: QueryType): boolean => {
+  const signal = signalOfHint(orderBy.hint);
+  return Boolean(orderBy.default) && signal !== undefined && signal !== queryType;
+};
+
+/** The type's default ordering, unless the query has ordering of its own (not from another type's defaults). */
+const withDefaultOrderBy = (orderBy: OrderBy[], defaults: OrderBy[]): OrderBy[] =>
+  orderBy.every((o) => o.default) ? defaults : orderBy;
 
 const isTimeRangeFilter = (f: Filter) => f.operator === FilterOperator.WithInGrafanaTimeRange;
 
@@ -89,15 +122,11 @@ const isTimeRangeFilter = (f: Filter) => f.operator === FilterOperator.WithInGra
  * Adds the type's time-range filter when the query has none. Only for filters joined with AND:
  * filters render without outer parentheses, so `time AND a OR b` would still read `b` across all time.
  */
-/** The type's default ordering, unless the query has ordering of its own (not from another type's defaults). */
-const withDefaultOrderBy = (orderBy: OrderBy[], defaults: OrderBy[]): OrderBy[] =>
-  orderBy.every((o) => o.default) ? defaults : orderBy;
-
 const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] => {
   if (!filters.length) {
     return defaults;
   }
-  // Only a time range left, as after leaving the other signal's defaults behind: add the type's others.
+  // Only a time range left, as after leaving a signal's defaults behind: add the type's others.
   if (filters.every(isTimeRangeFilter)) {
     return [...filters, ...defaults.filter((f) => !isTimeRangeFilter(f))];
   }
@@ -114,7 +143,7 @@ const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] =>
  * already has:
  * - for logs and traces, the type's default database and table unless the user picked them, and the
  *   configured role columns and OTel setting only when the query is on that configured table;
- * - for logs and traces, no filters or ordering addressed to a role only the other signal has;
+ * - none of the defaults of a signal it leaves, unless the user edited them (see `isLeftSignalDefault`);
  * - a time-range filter when it has none, and the type's default filters when it has nothing else;
  * - the type's default ordering, unless it has ordering of its own;
  * - the builder mode matching whether it aggregates, so aggregates are never applied unseen;
@@ -139,8 +168,8 @@ export const getQueryTypeChangeDefaults = (
   const next: Partial<QueryBuilderOptions> = {};
   const nextMeta: NonNullable<QueryBuilderOptions['meta']> = {};
   let columns: SelectedColumn[] = [...(options.columns || [])];
-  let filters = (options.filters || []).filter((f) => !isOtherSignalHint(f.hint, queryType));
-  let orderBy = (options.orderBy || []).filter((o) => !isOtherSignalHint(o.hint, queryType));
+  let filters = (options.filters || []).filter((f) => !isLeftSignalDefault(f, queryType));
+  let orderBy = (options.orderBy || []).filter((o) => !isLeftSignalDefaultOrderBy(o, queryType));
 
   if (queryType === QueryType.Logs || queryType === QueryType.Traces) {
     const isLogs = queryType === QueryType.Logs;

@@ -32,6 +32,8 @@ interface TraceQueryBuilderProps {
   datasource: Datasource;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
+  /** The `sourceKey` of the last database or table picked in the dropdowns (see `useFitQueryToTable`). */
+  pickedSource?: string;
 }
 
 interface TraceQueryBuilderState {
@@ -66,7 +68,13 @@ interface TraceQueryBuilderState {
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
-  useFitQueryToTable(allColumns, builderOptions.database, builderOptions.table, builderOptionsDispatch);
+  useFitQueryToTable(
+    allColumns,
+    builderOptions.database,
+    builderOptions.table,
+    props.pickedSource,
+    builderOptionsDispatch
+  );
   const isNewQuery = useIsNewQuery(builderOptions);
   const [showConfigWarning, setConfigWarningOpen] = useState(
     datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0

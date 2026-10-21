@@ -1,4 +1,12 @@
-import { ColumnHint, Filter, FilterOperator, OrderByDirection, QueryType } from 'types/queryBuilder';
+import {
+  AggregateType,
+  BuilderMode,
+  ColumnHint,
+  Filter,
+  FilterOperator,
+  OrderByDirection,
+  QueryType,
+} from 'types/queryBuilder';
 import {
   mergeColumns,
   setAllOptions,
@@ -190,6 +198,56 @@ describe('reducer', () => {
       }));
 
       expect(reducer(state, fitToTable('db', 'new_logs', sameSchema))).toBe(state);
+    });
+
+    it('keeps aggregate ordering, aliases and typed expressions on a same-schema table', async () => {
+      const state = buildInitialState({
+        queryType: QueryType.Table,
+        mode: BuilderMode.Aggregate,
+        database: 'db',
+        table: 'requests_copy',
+        columns: [],
+        aggregates: [
+          { aggregateType: AggregateType.Count, column: '*' },
+          { aggregateType: AggregateType.Sum, column: 'bytes', alias: 'total_bytes' },
+        ],
+        groupBy: ['service', 'toStartOfHour(ts)'],
+        orderBy: [
+          { name: 'count(*)', dir: OrderByDirection.DESC },
+          { name: 'total_bytes', dir: OrderByDirection.DESC },
+          { name: 'toStartOfHour(ts)', dir: OrderByDirection.ASC },
+        ],
+      });
+      const sameSchema = ['ts', 'service', 'bytes'].map((name) => ({ name, type: 'String', picklistValues: [] }));
+
+      expect(reducer(state, fitToTable('db', 'requests_copy', sameSchema))).toBe(state);
+    });
+
+    it('drops plain column references the new table lacks from an aggregate query', async () => {
+      const state = buildInitialState({
+        queryType: QueryType.Table,
+        mode: BuilderMode.Aggregate,
+        database: 'db',
+        table: 'other',
+        aggregates: [
+          { aggregateType: AggregateType.Sum, column: 'bytes', alias: 'total_bytes' },
+          { aggregateType: AggregateType.Count, column: '*' },
+        ],
+        groupBy: ['service', 'region'],
+        orderBy: [
+          { name: 'total_bytes', dir: OrderByDirection.DESC },
+          { name: 'region', dir: OrderByDirection.ASC },
+          { name: 'count(*)', dir: OrderByDirection.DESC },
+        ],
+      });
+      const columns = ['service', 'region'].map((name) => ({ name, type: 'String', picklistValues: [] }));
+
+      const next = reducer(state, fitToTable('db', 'other', columns));
+
+      // bytes is gone, and with it its aggregate and the ordering by that aggregate's alias.
+      expect(next.aggregates).toEqual([{ aggregateType: AggregateType.Count, column: '*' }]);
+      expect(next.groupBy).toEqual(['service', 'region']);
+      expect(next.orderBy?.map((o) => o.name)).toEqual(['region', 'count(*)']);
     });
 
     it('ignores columns of a table the query has since left', async () => {

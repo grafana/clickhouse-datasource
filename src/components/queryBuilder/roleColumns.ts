@@ -61,22 +61,26 @@ export const guessMissingRoles = (
   });
 
 /**
- * Whether `name` refers to one of the table's columns: the column itself, a Map key
- * (`attributes['k']`), or a JSON path or Nested field (`attributes.k`, `events.name`).
+ * Whether `name` can stay on a table with these columns: one of its columns, a Map key
+ * (`attributes['k']`) or JSON path or Nested field (`attributes.k`, `events.name`) of one, or an
+ * expression. Only a plain column reference the table lacks is dropped; an expression, such as an
+ * aggregate in ORDER BY or a typed `toStartOfHour(ts)`, names no column the table can be checked for.
  */
-const isTableColumn = (name: string, tableColumns: ReadonlySet<string>): boolean =>
-  !name ||
-  name === '*' ||
-  tableColumns.has(name) ||
-  tableColumns.has(name.split('[')[0]) ||
-  tableColumns.has(name.split('.')[0]);
+const isTableColumn = (name: string, tableColumns: ReadonlySet<string>): boolean => {
+  if (!name || name === '*' || tableColumns.has(name)) {
+    return true;
+  }
+  const base = name.split(/[[.]/)[0];
+  return !/^\w+$/.test(base) || tableColumns.has(base);
+};
 
 /**
  * Fits a query to a table it was just moved to. Everything that references a column the table
  * doesn't have is dropped (selected columns, filters, ordering, aggregates and grouping), then the
  * empty roles are guessed from the table's column names, as a new query's builder would. A table
- * with the same schema keeps the query whole. Custom SQL columns and anything addressed by role
- * hint are kept, since they don't name a column of the table.
+ * with the same schema keeps the query whole. Custom SQL columns, expressions, anything addressed
+ * by role hint, and ordering by the alias of a kept aggregate or column are kept, since they don't
+ * name a column of the table.
  */
 export const fitQueryToTable = (
   options: QueryBuilderOptions,
@@ -87,9 +91,12 @@ export const fitQueryToTable = (
 
   let columns: SelectedColumn[] = (options.columns || []).filter((c) => c.custom || keep(c.name));
   const filters: Filter[] = (options.filters || []).filter((f) => f.hint !== undefined || keep(f.key));
-  const orderBy: OrderBy[] = (options.orderBy || []).filter((o) => o.hint !== undefined || keep(o.name));
   const aggregates: AggregateColumn[] = (options.aggregates || []).filter((a) => keep(a.column));
   const groupBy: string[] = (options.groupBy || []).filter((g) => keep(g));
+  const aliases = new Set([...aggregates, ...columns].flatMap((c) => (c.alias ? [c.alias] : [])));
+  const orderBy: OrderBy[] = (options.orderBy || []).filter(
+    (o) => o.hint !== undefined || aliases.has(o.name) || keep(o.name)
+  );
 
   for (const role of guessMissingRoles({ ...options, columns }, options.queryType, allColumns)) {
     columns = addRoleColumn(columns, role);

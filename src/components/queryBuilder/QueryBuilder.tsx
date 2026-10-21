@@ -47,6 +47,7 @@ import { useDefaultLogColumnsByName, useDefaultTimeColumn } from './views/logsQu
 import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
+import { sourceKey } from 'hooks/useFitQueryToTable';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
@@ -81,8 +82,16 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   const signalType = datasource.getSignalType();
   const singleTableMode = datasource.isSingleTableMode();
 
-  const onDatabaseChange = (database: string) => builderOptionsDispatch(setDatabase(database));
-  const onTableChange = (table: string) => builderOptionsDispatch(setTable(table));
+  // The source last picked in the dropdowns: the views fit the query to it once its columns load.
+  const [pickedSource, setPickedSource] = useState<string>();
+  const onDatabaseChange = (database: string) => {
+    setPickedSource(sourceKey(database, builderOptions.table));
+    builderOptionsDispatch(setDatabase(database));
+  };
+  const onTableChange = (table: string) => {
+    setPickedSource(sourceKey(builderOptions.database, table));
+    builderOptionsDispatch(setTable(table));
+  };
   const onQueryTypeChange = (queryType: QueryType) => {
     if (queryType === builderOptions.queryType) {
       return;
@@ -174,6 +183,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
       {builderOptions.queryType === QueryType.Logs && (
@@ -181,6 +191,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
       {builderOptions.queryType === QueryType.TimeSeries && (
@@ -188,6 +199,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
       {builderOptions.queryType === QueryType.Traces && (
@@ -195,6 +207,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
 

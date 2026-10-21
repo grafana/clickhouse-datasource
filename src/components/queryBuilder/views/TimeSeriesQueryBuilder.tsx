@@ -33,6 +33,8 @@ interface TimeSeriesQueryBuilderProps {
   datasource: Datasource;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
+  /** The `sourceKey` of the last database or table picked in the dropdowns (see `useFitQueryToTable`). */
+  pickedSource?: string;
 }
 
 interface TimeSeriesQueryBuilderState {
@@ -50,7 +52,13 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const isNewQuery = useIsNewQuery(builderOptions);
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
-  useFitQueryToTable(allColumns, builderOptions.database, builderOptions.table, builderOptionsDispatch);
+  useFitQueryToTable(
+    allColumns,
+    builderOptions.database,
+    builderOptions.table,
+    props.pickedSource,
+    builderOptionsDispatch
+  );
   const labels = allLabels.components.TimeSeriesQueryBuilder;
   const builderState: TimeSeriesQueryBuilderState = useMemo(
     () => ({
