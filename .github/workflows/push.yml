@@ -56,6 +56,8 @@ jobs:
       id-token: write
       attestations: write
       pull-requests: read
+    with:
+      golangci-lint-version: '2.15.0'
     secrets: inherit
 
   publish-dev:
