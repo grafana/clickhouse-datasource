@@ -415,6 +415,24 @@ describe('getQueryTypeChangeDefaults', () => {
     expect(back.orderBy).toEqual(getDefaultTimeSeriesOrderBy());
   });
 
+  it('leaves the role columns but the time behind going to Time series, which would chart them', () => {
+    const traces = tableQuery({
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'Timestamp', hint: ColumnHint.Time },
+        { name: 'TraceId', hint: ColumnHint.TraceId },
+        { name: 'Duration', hint: ColumnHint.TraceDurationTime },
+        { name: 'bytes' },
+      ],
+    });
+
+    const next = getQueryTypeChangeDefaults(newMockDatasource(), traces, QueryType.TimeSeries);
+
+    expect(next.columns).toEqual([{ name: 'Timestamp', hint: ColumnHint.Time }, { name: 'bytes' }]);
+    // Table lists them as columns, so it keeps them.
+    expect(getQueryTypeChangeDefaults(newMockDatasource(), traces, QueryType.Table).columns).toEqual(traces.columns);
+  });
+
   it('keeps a trace filter the user edited when leaving Traces', () => {
     const edited: Filter[] = getDefaultTraceFilters().map((f) =>
       f.hint === ColumnHint.TraceServiceName ? ({ ...f, operator: FilterOperator.Equals, value: 'api' } as Filter) : f

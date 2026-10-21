@@ -146,6 +146,7 @@ const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] =>
  * - none of the defaults of a signal it leaves, unless the user edited them (see `isLeftSignalDefault`);
  * - a time-range filter when it has none, and the type's default filters when it has nothing else;
  * - the type's default ordering, unless it has ordering of its own;
+ * - for time series, no logs or traces role columns but the time, which it would draw as series;
  * - the builder mode matching whether it aggregates, so aggregates are never applied unseen;
  * - unset trace settings.
  *
@@ -228,6 +229,11 @@ export const getQueryTypeChangeDefaults = (
     nextMeta.traceLinksColumnPrefix = meta.traceLinksColumnPrefix ?? datasource.getDefaultTraceLinksColumnPrefix();
     nextMeta.traceTimestampTableSuffix = meta.traceTimestampTableSuffix ?? datasource.getTraceTimestampTableSuffix();
   } else if (queryType === QueryType.TimeSeries) {
+    // Logs and traces role columns other than the time are drawn as series here, unlike in those
+    // types where they sit behind their own fields; the way back guesses or configures them again.
+    columns = columns.filter(
+      (c) => c.hint === undefined || c.hint === ColumnHint.Time || c.hint === ColumnHint.FilterTime
+    );
     filters = withTimeRangeFilter(filters, getDefaultTimeSeriesFilters());
     orderBy = withDefaultOrderBy(orderBy, getDefaultTimeSeriesOrderBy());
     Object.assign(
