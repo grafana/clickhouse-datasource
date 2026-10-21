@@ -6,7 +6,7 @@
 ### 🐛 Bug Fixes
 
 * **annotations:** keep text and tags selectable on region annotations ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87)), closes [#2174](https://github.com/grafana/clickhouse-datasource/issues/2174)
-* **annotations:** region annotations making text and tags unselectable in the column mapping ([#2175](https://github.com/grafana/clickhouse-datasource/issues/2175)) ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87))
+* **annotations:** region annotations making text and tags non selectable in the column mapping ([#2175](https://github.com/grafana/clickhouse-datasource/issues/2175)) ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87))
 * **suggestions:** suggest the paths inside JSON columns in the SQL editor ([#2206](https://github.com/grafana/clickhouse-datasource/issues/2206)) ([5b79e79](https://github.com/grafana/clickhouse-datasource/commit/5b79e7984dd38d8b4d3c71311339c2a74e4d4916))
 
 
