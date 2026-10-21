@@ -374,6 +374,34 @@ describe('getQueryTypeChangeDefaults', () => {
     );
   });
 
+  it('restores the trace defaults on the way back from Logs', () => {
+    const ds = newMockDatasource();
+    const traces = tableQuery({
+      table: 'otel_traces',
+      queryType: QueryType.Traces,
+      filters: getDefaultTraceFilters(),
+      orderBy: getDefaultTraceOrderBy(),
+    });
+
+    const logs = { ...traces, ...getQueryTypeChangeDefaults(ds, traces, QueryType.Logs), queryType: QueryType.Logs };
+    const back = getQueryTypeChangeDefaults(ds, logs, QueryType.Traces);
+
+    expect(back.filters).toEqual(getDefaultTraceFilters());
+    expect(back.orderBy).toEqual(getDefaultTraceOrderBy());
+  });
+
+  it('keeps ordering and filters of its own over the type defaults', () => {
+    const ordered = tableQuery({ orderBy: [{ name: 'Body', dir: OrderByDirection.ASC }] });
+
+    const next = getQueryTypeChangeDefaults(newMockDatasource(), ordered, QueryType.Traces);
+
+    expect(next.orderBy).toEqual([{ name: 'Body', dir: OrderByDirection.ASC }]);
+    expect(next.filters).toEqual([
+      expect.objectContaining({ operator: FilterOperator.WithInGrafanaTimeRange }),
+      userFilter,
+    ]);
+  });
+
   it('leaves the log level filter behind when a logs query goes to Traces', () => {
     const logs = tableQuery({
       queryType: QueryType.Logs,

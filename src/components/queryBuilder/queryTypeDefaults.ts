@@ -5,6 +5,7 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  OrderBy,
   QueryBuilderOptions,
   QueryType,
   SelectedColumn,
@@ -88,9 +89,17 @@ const isTimeRangeFilter = (f: Filter) => f.operator === FilterOperator.WithInGra
  * Adds the type's time-range filter when the query has none. Only for filters joined with AND:
  * filters render without outer parentheses, so `time AND a OR b` would still read `b` across all time.
  */
+/** The type's default ordering, unless the query has ordering of its own (not from another type's defaults). */
+const withDefaultOrderBy = (orderBy: OrderBy[], defaults: OrderBy[]): OrderBy[] =>
+  orderBy.every((o) => o.default) ? defaults : orderBy;
+
 const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] => {
   if (!filters.length) {
     return defaults;
+  }
+  // Only a time range left, as after leaving the other signal's defaults behind: add the type's others.
+  if (filters.every(isTimeRangeFilter)) {
+    return [...filters, ...defaults.filter((f) => !isTimeRangeFilter(f))];
   }
   const timeFilter = defaults.find(isTimeRangeFilter);
   if (!timeFilter || filters.some(isTimeRangeFilter) || filters.slice(1).some((f) => f.condition === 'OR')) {
@@ -106,7 +115,8 @@ const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] =>
  * - for logs and traces, the type's default database and table unless the user picked them, and the
  *   configured role columns and OTel setting only when the query is on that configured table;
  * - for logs and traces, no filters or ordering addressed to a role only the other signal has;
- * - a time-range filter when it has none, and default filters and ordering when it has none at all;
+ * - a time-range filter when it has none, and the type's default filters when it has nothing else;
+ * - the type's default ordering, unless it has ordering of its own;
  * - the builder mode matching whether it aggregates, so aggregates are never applied unseen;
  * - unset trace settings.
  *
@@ -177,11 +187,11 @@ export const getQueryTypeChangeDefaults = (
 
   if (queryType === QueryType.Logs) {
     filters = withTimeRangeFilter(filters, getDefaultLogsFilters());
-    orderBy = orderBy.length ? orderBy : getDefaultLogsOrderBy();
+    orderBy = withDefaultOrderBy(orderBy, getDefaultLogsOrderBy());
   } else if (queryType === QueryType.Traces) {
     if (!meta.isTraceIdMode) {
       filters = withTimeRangeFilter(filters, getDefaultTraceFilters());
-      orderBy = orderBy.length ? orderBy : getDefaultTraceOrderBy();
+      orderBy = withDefaultOrderBy(orderBy, getDefaultTraceOrderBy());
     }
     nextMeta.traceDurationUnit = meta.traceDurationUnit ?? datasource.getDefaultTraceDurationUnit();
     nextMeta.flattenNested = meta.flattenNested ?? datasource.getDefaultTraceFlattenNested();
@@ -190,7 +200,7 @@ export const getQueryTypeChangeDefaults = (
     nextMeta.traceTimestampTableSuffix = meta.traceTimestampTableSuffix ?? datasource.getTraceTimestampTableSuffix();
   } else if (queryType === QueryType.TimeSeries) {
     filters = withTimeRangeFilter(filters, getDefaultTimeSeriesFilters());
-    orderBy = orderBy.length ? orderBy : getDefaultTimeSeriesOrderBy();
+    orderBy = withDefaultOrderBy(orderBy, getDefaultTimeSeriesOrderBy());
     Object.assign(
       next,
       isAggregating(options)
