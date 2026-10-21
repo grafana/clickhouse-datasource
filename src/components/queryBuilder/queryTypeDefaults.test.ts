@@ -444,6 +444,70 @@ describe('getQueryTypeChangeDefaults', () => {
     expect(next.filters?.map((f) => f.hint)).toEqual([ColumnHint.Time, ColumnHint.TraceServiceName]);
   });
 
+  it('keeps edited role filters and ordering applying in Time series, on the column itself', () => {
+    const ds = newMockDatasource();
+    const levelError: Filter = {
+      type: 'string',
+      operator: FilterOperator.Equals,
+      filterType: 'custom',
+      key: '',
+      hint: ColumnHint.LogLevel,
+      condition: 'AND',
+      value: 'error',
+    };
+    const logs = tableQuery({
+      queryType: QueryType.Logs,
+      columns: [
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'SeverityText', type: 'LowCardinality(String)', hint: ColumnHint.LogLevel },
+        { name: 'Body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      filters: [getDefaultLogsFilters()[0], levelError],
+      orderBy: getDefaultLogsOrderBy(),
+    });
+
+    const next = getQueryTypeChangeDefaults(ds, logs, QueryType.TimeSeries);
+    const sql = generateSql({ ...logs, ...next, queryType: QueryType.TimeSeries });
+
+    expect(next.filters).toContainEqual({
+      ...levelError,
+      hint: undefined,
+      key: 'SeverityText',
+      type: 'LowCardinality(String)',
+    } as Filter);
+    expect(sql).toContain("SeverityText = 'error'");
+    expect(sql).not.toContain('Body');
+  });
+
+  it('keeps an edited Service Name filter and a flipped Duration ordering from Traces in Time series', () => {
+    const ds = newMockDatasource();
+    const filters: Filter[] = getDefaultTraceFilters().map((f) =>
+      f.hint === ColumnHint.TraceServiceName ? ({ ...f, operator: FilterOperator.Equals, value: 'api' } as Filter) : f
+    );
+    const orderBy = getDefaultTraceOrderBy().map((o) =>
+      o.hint === ColumnHint.TraceDurationTime ? { ...o, dir: OrderByDirection.ASC, default: undefined } : o
+    );
+    const traces = tableQuery({
+      queryType: QueryType.Traces,
+      columns: [
+        { name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'ServiceName', type: 'LowCardinality(String)', hint: ColumnHint.TraceServiceName },
+        { name: 'Duration', type: 'Int64', hint: ColumnHint.TraceDurationTime },
+      ],
+      filters,
+      orderBy,
+    });
+
+    const next = getQueryTypeChangeDefaults(ds, traces, QueryType.TimeSeries);
+    const sql = generateSql({ ...traces, ...next, queryType: QueryType.TimeSeries });
+
+    expect(sql).toContain("ServiceName = 'api'");
+    expect(sql).toMatch(/ORDER BY .*Duration ASC/);
+    // The untouched trace defaults are still left behind.
+    expect(sql).not.toContain('ParentSpanId');
+    expect(sql).not.toContain('Duration > 0');
+  });
+
   it('keeps a default ordering whose direction the user flipped', () => {
     // OrderByEditor clears `default` on an edit.
     const flipped = getDefaultLogsOrderBy().map((o) => ({ ...o, dir: OrderByDirection.ASC, default: undefined }));

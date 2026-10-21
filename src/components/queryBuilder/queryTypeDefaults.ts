@@ -119,6 +119,38 @@ const withDefaultOrderBy = (orderBy: OrderBy[], defaults: OrderBy[]): OrderBy[] 
 const isTimeRangeFilter = (f: Filter) => f.operator === FilterOperator.WithInGrafanaTimeRange;
 
 /**
+ * Points the filters and ordering addressed to the role of a column about to be dropped at the column
+ * itself, so they keep applying without it: the SQL generator skips a filter whose role has no column.
+ */
+const pointAtColumns = (
+  filters: Filter[],
+  orderBy: OrderBy[],
+  dropped: SelectedColumn[]
+): { filters: Filter[]; orderBy: OrderBy[] } => {
+  const byHint = new Map(dropped.flatMap((c) => (c.hint ? [[c.hint, c] as const] : [])));
+  return {
+    filters: filters.map((f) => {
+      const column = f.hint && byHint.get(f.hint);
+      if (!column) {
+        return f;
+      }
+      const { hint: discardedHint, ...rest } = f;
+      void discardedHint;
+      return { ...rest, key: column.name, type: column.type || f.type } as Filter;
+    }),
+    orderBy: orderBy.map((o) => {
+      const column = o.hint && byHint.get(o.hint);
+      if (!column) {
+        return o;
+      }
+      const { hint: discardedHint, ...rest } = o;
+      void discardedHint;
+      return { ...rest, name: column.name };
+    }),
+  };
+};
+
+/**
  * Adds the type's time-range filter when the query has none. Only for filters joined with AND:
  * filters render without outer parentheses, so `time AND a OR b` would still read `b` across all time.
  */
@@ -231,9 +263,14 @@ export const getQueryTypeChangeDefaults = (
   } else if (queryType === QueryType.TimeSeries) {
     // Logs and traces role columns other than the time are drawn as series here, unlike in those
     // types where they sit behind their own fields; the way back guesses or configures them again.
-    columns = columns.filter(
-      (c) => c.hint === undefined || c.hint === ColumnHint.Time || c.hint === ColumnHint.FilterTime
-    );
+    const isKept = (c: SelectedColumn) =>
+      c.hint === undefined || c.hint === ColumnHint.Time || c.hint === ColumnHint.FilterTime;
+    ({ filters, orderBy } = pointAtColumns(
+      filters,
+      orderBy,
+      columns.filter((c) => !isKept(c))
+    ));
+    columns = columns.filter(isKept);
     filters = withTimeRangeFilter(filters, getDefaultTimeSeriesFilters());
     orderBy = withDefaultOrderBy(orderBy, getDefaultTimeSeriesOrderBy());
     Object.assign(
