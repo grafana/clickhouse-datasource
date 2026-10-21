@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { InlineField, InlineFormLabel, Input } from '@grafana/ui';
 import labels from 'labels';
 import { selectors } from 'selectors';
@@ -10,6 +10,11 @@ interface LimitEditorProps {
 
 export const LimitEditor = (props: LimitEditorProps) => {
   const [limit, setLimit] = useState<number>(props.limit || 0);
+  // The query can change from outside the input (a table or type change, query history, Grafana
+  // replacing the query), so follow it rather than keep the value it mounted with.
+  useEffect(() => {
+    setLimit(props.limit || 0);
+  }, [props.limit]);
   const { label, tooltip } = labels.components.LimitEditor;
 
   return (

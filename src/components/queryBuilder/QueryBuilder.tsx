@@ -28,7 +28,8 @@ import {
   setQueryType,
   setTable,
 } from 'hooks/useBuilderOptionsState';
-import { getQueryTypeChangeDefaults, guessMissingRoles, needsRoleGuess } from './queryTypeDefaults';
+import { getQueryTypeChangeDefaults } from './queryTypeDefaults';
+import { guessMissingRoles, needsRoleGuess } from './roleColumns';
 import TraceIdInput from './TraceIdInput';
 import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
@@ -83,6 +84,9 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   const onDatabaseChange = (database: string) => builderOptionsDispatch(setDatabase(database));
   const onTableChange = (table: string) => builderOptionsDispatch(setTable(table));
   const onQueryTypeChange = (queryType: QueryType) => {
+    if (queryType === builderOptions.queryType) {
+      return;
+    }
     const defaults = getQueryTypeChangeDefaults(datasource, builderOptions, queryType);
     builderOptionsDispatch(setQueryType(queryType));
     builderOptionsDispatch(setOptions(defaults));
@@ -94,9 +98,11 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
       datasource
         .getColumnsCached(next.database, next.table)
         .then((columns) =>
-          builderOptionsDispatch(fillMissingRoles(queryType, guessMissingRoles(next, queryType, columns)))
+          builderOptionsDispatch(
+            fillMissingRoles(queryType, next.database, next.table, guessMissingRoles(next, queryType, columns))
+          )
         )
-        .catch(() => {});
+        .catch((ex: unknown) => console.error(ex));
     }
   };
 

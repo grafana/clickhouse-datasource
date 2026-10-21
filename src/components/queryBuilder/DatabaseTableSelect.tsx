@@ -84,9 +84,10 @@ export const TableSelect = (props: TableSelectProps) => {
     if (databaseChanged) {
       databaseChanged.current = false;
     }
-    // Auto select first/default table
+    // Auto select the default table, when this database has it, or else the first one
     if (!table || missing) {
-      onTableChange(datasource.getDefaultTable() || tables[0]);
+      const defaultTable = datasource.getDefaultTable();
+      onTableChange(defaultTable && tables.includes(defaultTable) ? defaultTable : tables[0]);
     }
   }, [database, table, tables, datasource, onTableChange, databaseChanged]);
 
@@ -122,7 +123,10 @@ export const DatabaseTableSelect = (props: DatabaseTableSelectProps) => {
   const { datasource, database, onDatabaseChange, table, onTableChange } = props;
   const databaseChanged = useRef<boolean>(false);
   const onSelectDatabase = (value: string) => {
-    databaseChanged.current = true;
+    // Re-selecting the current database changes nothing, so TableSelect would never clear the flag.
+    if (value !== database) {
+      databaseChanged.current = true;
+    }
     onDatabaseChange(value);
   };
 

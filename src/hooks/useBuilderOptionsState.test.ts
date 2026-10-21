@@ -1,4 +1,4 @@
-import { ColumnHint, FilterOperator, OrderByDirection, QueryType } from 'types/queryBuilder';
+import { ColumnHint, Filter, FilterOperator, OrderByDirection, QueryType } from 'types/queryBuilder';
 import {
   mergeColumns,
   setAllOptions,
@@ -12,6 +12,7 @@ import {
   setTable,
   testFuncs,
   fillMissingRoles,
+  fitToTable,
 } from './useBuilderOptionsState';
 const { reducer, buildInitialState } = testFuncs;
 
@@ -89,9 +90,11 @@ describe('reducer', () => {
 
     expect(nextState).toEqual({ ...prevState, database: 'next_db' });
   });
-  it('fills only roles still empty, and only for the same query type', async () => {
+  it('fills only roles still empty, and only for the same query type and table', async () => {
     const state = buildInitialState({
       queryType: QueryType.Logs,
+      database: 'db',
+      table: 'logs',
       columns: [{ name: 'msg' }, { name: 't', hint: ColumnHint.Time }],
     });
     const roles = [
@@ -99,11 +102,103 @@ describe('reducer', () => {
       { name: 'msg', hint: ColumnHint.LogMessage },
     ];
 
-    expect(reducer(state, fillMissingRoles(QueryType.Logs, roles)).columns).toEqual([
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, 'db', 'logs', roles)).columns).toEqual([
       { name: 't', hint: ColumnHint.Time },
       { name: 'msg', hint: ColumnHint.LogMessage },
     ]);
-    expect(reducer(state, fillMissingRoles(QueryType.Traces, roles))).toBe(state);
+    expect(reducer(state, fillMissingRoles(QueryType.Traces, 'db', 'logs', roles))).toBe(state);
+    // Guessed from a table the query has since left.
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, 'db', 'old_logs', roles))).toBe(state);
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, 'old_db', 'logs', roles))).toBe(state);
+  });
+  describe('fitToTable', () => {
+    const logsQuery = () =>
+      buildInitialState({
+        queryType: QueryType.Logs,
+        database: 'db',
+        table: 'new_logs',
+        columns: [
+          { name: 'ts', hint: ColumnHint.Time },
+          { name: 'body', hint: ColumnHint.LogMessage },
+          { name: 'sev', hint: ColumnHint.LogLevel },
+          { name: 'host' },
+          { name: "attrs['pod']" },
+          { name: 'toUpper(host)', custom: true },
+        ],
+        filters: [
+          {
+            key: '',
+            hint: ColumnHint.Time,
+            type: 'datetime',
+            filterType: 'custom',
+            condition: 'AND',
+            operator: FilterOperator.WithInGrafanaTimeRange,
+          },
+          {
+            key: 'host',
+            type: 'String',
+            filterType: 'custom',
+            condition: 'AND',
+            operator: FilterOperator.Equals,
+            value: 'a',
+          },
+          {
+            key: 'region',
+            type: 'String',
+            filterType: 'custom',
+            condition: 'AND',
+            operator: FilterOperator.Equals,
+            value: 'b',
+          },
+        ] as Filter[],
+        orderBy: [
+          { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC },
+          { name: 'region', dir: OrderByDirection.ASC },
+        ],
+        limit: 500,
+      });
+
+    it('drops what the new table lacks and re-guesses the emptied roles', async () => {
+      const state = logsQuery();
+      const tableColumns = [
+        { name: 'timestamp', type: 'DateTime64(9)', picklistValues: [] },
+        { name: 'message', type: 'String', picklistValues: [] },
+        { name: 'host', type: 'String', picklistValues: [] },
+        { name: 'attrs', type: 'Map(String, String)', picklistValues: [] },
+      ];
+
+      const next = reducer(state, fitToTable('db', 'new_logs', tableColumns));
+
+      expect(next.columns).toEqual([
+        { name: 'host' },
+        { name: "attrs['pod']" },
+        { name: 'toUpper(host)', custom: true },
+        { name: 'timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'message', type: 'String', hint: ColumnHint.LogMessage },
+      ]);
+      expect(next.filters!.map((f) => f.key || f.hint)).toEqual([ColumnHint.Time, 'host']);
+      expect(next.orderBy).toEqual([{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC }]);
+      expect(next.limit).toBe(500);
+    });
+
+    it('keeps a query whose columns all exist in the new table', async () => {
+      const state = logsQuery();
+      const sameSchema = ['ts', 'body', 'sev', 'host', 'region', 'attrs'].map((name) => ({
+        name,
+        type: name === 'ts' ? 'DateTime' : 'String',
+        picklistValues: [],
+      }));
+
+      expect(reducer(state, fitToTable('db', 'new_logs', sameSchema))).toBe(state);
+    });
+
+    it('ignores columns of a table the query has since left', async () => {
+      const state = logsQuery();
+      const other = [{ name: 'x', type: 'String', picklistValues: [] }];
+
+      expect(reducer(state, fitToTable('db', 'other', other))).toBe(state);
+      expect(reducer(state, fitToTable('db', 'new_logs', []))).toBe(state);
+    });
   });
   it('applies SetTable keeping the rest of the query', async () => {
     const prevState = authoredState();

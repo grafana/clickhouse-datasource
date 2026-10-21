@@ -4,11 +4,22 @@ import {
   BuilderMode,
   ColumnHint,
   FilterOperator,
+  OrderByDirection,
   QueryBuilderOptions,
   QueryType,
   TableColumn,
 } from 'types/queryBuilder';
-import { getQueryTypeChangeDefaults, guessMissingRoles } from './queryTypeDefaults';
+import { getQueryTypeChangeDefaults } from './queryTypeDefaults';
+import { guessMissingRoles } from './roleColumns';
+import {
+  getDefaultLogsFilters,
+  getDefaultLogsOrderBy,
+  getDefaultTraceFilters,
+  getDefaultTraceOrderBy,
+} from './defaultQueryOptions';
+import { buildDefaultLogsColumns } from './views/logsQueryBuilderHooks';
+import { generateSql } from 'data/sqlGenerator';
+import { isBuilderOptionsRunnable } from 'data/utils';
 
 const userFilter = {
   type: 'string',
@@ -190,14 +201,77 @@ describe('getQueryTypeChangeDefaults', () => {
       return ds;
     };
 
-    it('moves a query on a default table to the target type default', () => {
-      const next = getQueryTypeChangeDefaults(
-        traceDatasource(),
-        tableQuery({ database: 'foo', table: 'bar' }),
-        QueryType.Traces
-      );
+    it('moves a query on a default table to the target type default, keeping only its limit', () => {
+      const options = tableQuery({
+        database: 'foo',
+        table: 'bar',
+        columns: [{ name: 'user_id' }, { name: 'action' }],
+        orderBy: [{ name: 'user_id', dir: OrderByDirection.ASC }],
+        aggregates: [{ aggregateType: AggregateType.Count, column: 'user_id' }],
+        groupBy: ['action'],
+        limit: 250,
+      });
 
-      expect(next).toMatchObject({ database: 'otel', table: 'otel_traces' });
+      const next = getQueryTypeChangeDefaults(traceDatasource(), options, QueryType.Traces);
+
+      // Nothing of foo.bar's columns is carried over to otel_traces.
+      expect(next).toEqual({
+        database: 'otel',
+        table: 'otel_traces',
+        columns: [],
+        filters: [],
+        orderBy: [],
+        aggregates: [],
+        groupBy: [],
+      });
+      // So the Traces builder mounts it as a new query and applies its full defaults.
+      expect(isBuilderOptionsRunnable({ ...options, ...next })).toBe(false);
+      expect({ ...options, ...next }.limit).toBe(250);
+    });
+
+    it('moves an OTel Traces query to Logs without any trace column left in the SQL', () => {
+      const ds = newMockDatasource();
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: true,
+        otelVersion: 'latest',
+      };
+      ds.settings.jsonData.traces = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_traces',
+        otelEnabled: true,
+        otelVersion: 'latest',
+      };
+      // A new Traces query, as the Traces builder sets it up.
+      const traces: QueryBuilderOptions = {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns: Array.from(ds.getDefaultTraceColumns(), ([hint, name]) => ({ name, hint })),
+        filters: getDefaultTraceFilters(),
+        orderBy: getDefaultTraceOrderBy(),
+        limit: 1000,
+        meta: { otelEnabled: true, otelVersion: 'latest' },
+      };
+
+      const moved = { ...traces, ...getQueryTypeChangeDefaults(ds, traces, QueryType.Logs), queryType: QueryType.Logs };
+      expect(moved).toMatchObject({ database: 'otel', table: 'otel_logs' });
+      expect(isBuilderOptionsRunnable(moved)).toBe(false);
+
+      // The Logs builder then applies its new-query defaults (useLogDefaultsOnMount, useDefaultFilters).
+      const sql = generateSql({
+        ...moved,
+        columns: buildDefaultLogsColumns(ds),
+        filters: getDefaultLogsFilters(),
+        orderBy: getDefaultLogsOrderBy(),
+        meta: { ...moved.meta, otelEnabled: true, otelVersion: 'latest' },
+      });
+
+      expect(sql).toContain('"otel"."otel_logs"');
+      for (const traceColumn of ['ParentSpanId', 'Duration', 'SpanName', 'SpanId']) {
+        expect(sql).not.toContain(traceColumn);
+      }
     });
 
     it('keeps a table that is not a default', () => {
@@ -226,6 +300,43 @@ describe('getQueryTypeChangeDefaults', () => {
     const next = getQueryTypeChangeDefaults(ds, tableQuery({ meta: { otelEnabled: false } }), QueryType.Traces);
 
     expect(next.meta).toMatchObject({ otelEnabled: false, otelVersion: 'latest' });
+  });
+
+  it('adds the log context and extra default columns on the configured logs table', () => {
+    const ds = logsDatasource();
+    ds.settings.jsonData.logs = {
+      ...ds.settings.jsonData.logs,
+      selectContextColumns: true,
+      contextColumns: ['Host', 'LogAttributes', "LogAttributes['pod']"],
+    };
+
+    const next = getQueryTypeChangeDefaults(ds, tableQuery({ columns: [{ name: 'Host' }] }), QueryType.Logs);
+
+    // Host is already selected; the Map key is covered by its Map column, so it is not added twice.
+    expect(next.columns).toEqual([
+      { name: 'Host' },
+      { name: 'Timestamp', hint: ColumnHint.Time },
+      { name: 'Body', hint: ColumnHint.LogMessage },
+      { name: 'LogAttributes' },
+    ]);
+  });
+
+  it('keeps Trend aggregates through a round trip by Logs', () => {
+    const ds = newMockDatasource();
+    const trend = tableQuery({
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*' }],
+      groupBy: ['ServiceName'],
+    });
+
+    const logs = { ...trend, ...getQueryTypeChangeDefaults(ds, trend, QueryType.Logs), queryType: QueryType.Logs };
+    const back = getQueryTypeChangeDefaults(ds, logs, QueryType.TimeSeries);
+
+    expect(back.mode).toBe(BuilderMode.Trend);
+    expect(back).not.toHaveProperty('aggregates');
+    expect(back).not.toHaveProperty('groupBy');
+    expect({ ...logs, ...back }.aggregates).toEqual(trend.aggregates);
   });
 
   it('returns nothing for a query with nothing configured yet', () => {

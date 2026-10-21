@@ -11,6 +11,7 @@ import { GroupByEditor } from '../GroupByEditor';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
+import useFitQueryToTable from 'hooks/useFitQueryToTable';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 
 interface TableQueryBuilderProps {
@@ -32,6 +33,7 @@ interface TableQueryBuilderState {
 export const TableQueryBuilder = (props: TableQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
+  useFitQueryToTable(allColumns, builderOptions.database, builderOptions.table, builderOptionsDispatch);
   const labels = allLabels.components.TableQueryBuilder;
   const builderState: TableQueryBuilderState = useMemo(
     () => ({

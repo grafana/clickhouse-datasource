@@ -24,6 +24,7 @@ import { columnFilterDateTime } from 'data/columnFilters';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
+import useFitQueryToTable from 'hooks/useFitQueryToTable';
 import { BuilderOptionsReducerAction, setOptions } from 'hooks/useBuilderOptionsState';
 import { useDefaultFilters, useDefaultTimeColumn } from './timeSeriesQueryBuilderHooks';
 import useIsNewQuery from 'hooks/useIsNewQuery';
@@ -49,6 +50,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const isNewQuery = useIsNewQuery(builderOptions);
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
+  useFitQueryToTable(allColumns, builderOptions.database, builderOptions.table, builderOptionsDispatch);
   const labels = allLabels.components.TimeSeriesQueryBuilder;
   const builderState: TimeSeriesQueryBuilderState = useMemo(
     () => ({

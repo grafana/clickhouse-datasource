@@ -1,5 +1,6 @@
 import { Reducer, useReducer } from 'react';
-import { QueryBuilderOptions, QueryType, SelectedColumn } from 'types/queryBuilder';
+import { addRoleColumn, fitQueryToTable } from 'components/queryBuilder/roleColumns';
+import { QueryBuilderOptions, QueryType, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { defaultCHBuilderQuery } from 'types/sql';
 
 enum BuilderOptionsActionType {
@@ -14,6 +15,7 @@ enum BuilderOptionsActionType {
   MergeColumns = 'merge_columns',
   SetBuilderMinimized = 'set_builder_minimized',
   FillMissingRoles = 'fill_missing_roles',
+  FitToTable = 'fit_to_table',
 }
 
 type QueryBuilderOptionsReducerAction = {
@@ -53,9 +55,20 @@ export const mergeColumns = (columns: SelectedColumn[]): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.MergeColumns, { columns });
 export const setBuilderMinimized = (minimized: boolean): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.SetBuilderMinimized, { minimized });
-/** Adds role columns whose role is still empty, if the query is still of `queryType`. */
-export const fillMissingRoles = (queryType: QueryType, columns: SelectedColumn[]): GenericReducerAction =>
-  createGenericAction(BuilderOptionsActionType.FillMissingRoles, { queryType, columns });
+/**
+ * Adds role columns whose role is still empty, if the query is still of `queryType` on the
+ * `database` and `table` the roles were guessed from.
+ */
+export const fillMissingRoles = (
+  queryType: QueryType,
+  database: string,
+  table: string,
+  columns: SelectedColumn[]
+): GenericReducerAction =>
+  createGenericAction(BuilderOptionsActionType.FillMissingRoles, { queryType, database, table, columns });
+/** Fits the query to the columns of `database`.`table`, if it is still on that table (see `fitQueryToTable`). */
+export const fitToTable = (database: string, table: string, columns: readonly TableColumn[]): GenericReducerAction =>
+  createGenericAction(BuilderOptionsActionType.FitToTable, { database, table, columns });
 
 const reducer = (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
   const actionFn = actions.get(action.type);
@@ -91,8 +104,8 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
   [
     BuilderOptionsActionType.SetQueryType,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
-      // Keep everything: options the new type doesn't use are ignored, and come back if the
-      // type is switched back.
+      // Keep the rest of the query; QueryBuilder adjusts it for the new type (see
+      // getQueryTypeChangeDefaults), so a round trip doesn't always restore it.
       return mergeBuilderOptionsState(state, { queryType: action.payload.queryType });
     },
   ],
@@ -100,7 +113,7 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     BuilderOptionsActionType.SetDatabase,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
       // Keep the table and the rest of the query; TableSelect picks another table when this
-      // one doesn't exist in the new database.
+      // one doesn't exist in the new database, and fitToTable drops what the table lacks.
       return mergeBuilderOptionsState(state, action.payload);
     },
   ],
@@ -108,6 +121,7 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     BuilderOptionsActionType.SetTable,
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
       // Keep the rest of the query, so switching between tables with the same schema keeps it whole.
+      // Once the new table's columns load, fitToTable drops what it lacks.
       return mergeBuilderOptionsState(state, action.payload);
     },
   ],
@@ -170,19 +184,48 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
   [
     BuilderOptionsActionType.FillMissingRoles,
     (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
-      // Applied after an async column lookup: skip it if the query changed type meanwhile, and never
-      // replace a role that got filled in the meantime.
-      const { queryType, columns: roles } = action.payload as { queryType: QueryType; columns: SelectedColumn[] };
-      if (state.queryType !== queryType) {
+      // Applied after an async column lookup: skip it if the query changed type or table meanwhile,
+      // since the roles were guessed from the old one, and never replace a role filled meanwhile.
+      const {
+        queryType,
+        database,
+        table,
+        columns: roles,
+      } = action.payload as {
+        queryType: QueryType;
+        database: string;
+        table: string;
+        columns: SelectedColumn[];
+      };
+      if (state.queryType !== queryType || state.database !== database || state.table !== table) {
         return state;
       }
       let columns = state.columns || [];
       for (const role of roles) {
         if (!columns.some((c) => c.hint === role.hint)) {
-          columns = [...columns.filter((c) => !(c.hint === undefined && c.name === role.name)), role];
+          columns = addRoleColumn(columns, role);
         }
       }
       return columns === state.columns ? state : mergeBuilderOptionsState(state, { columns });
+    },
+  ],
+  [
+    BuilderOptionsActionType.FitToTable,
+    (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
+      // Applied once a table's columns load: skip it if the query moved on to another table meanwhile.
+      const { database, table, columns } = action.payload as {
+        database: string;
+        table: string;
+        columns: readonly TableColumn[];
+      };
+      if (state.database !== database || state.table !== table || columns.length === 0) {
+        return state;
+      }
+      const fitted = fitQueryToTable(state, columns);
+      const unchanged = (Object.keys(fitted) as Array<keyof typeof fitted>).every(
+        (k) => JSON.stringify(fitted[k]) === JSON.stringify(state[k] ?? [])
+      );
+      return unchanged ? state : mergeBuilderOptionsState(state, fitted);
     },
   ],
   [

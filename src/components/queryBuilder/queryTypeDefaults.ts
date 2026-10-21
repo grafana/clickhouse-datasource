@@ -8,7 +8,6 @@ import {
   QueryBuilderOptions,
   QueryType,
   SelectedColumn,
-  TableColumn,
 } from 'types/queryBuilder';
 import {
   getDefaultLogsFilters,
@@ -17,12 +16,8 @@ import {
   getDefaultTraceOrderBy,
 } from './defaultQueryOptions';
 import { getDefaultTimeSeriesFilters, getDefaultTimeSeriesOrderBy } from './views/timeSeriesQueryBuilderHooks';
-import {
-  findColumnByNameHeuristic,
-  isDateTimeColumn,
-  isNumericColumn,
-  isStringLikeColumn,
-} from './views/columnNameHeuristics';
+import { buildDefaultLogsColumns } from './views/logsQueryBuilderHooks';
+import { addRoleColumn, hasRole } from './roleColumns';
 
 /**
  * Where a logs or traces query switched from another type should point. A query on one of the data
@@ -54,52 +49,14 @@ const resolveSignalSource = (
   return { database, table, kept, usesConfiguredColumns };
 };
 
-const roleTypes: Partial<Record<QueryType, Array<[ColumnHint, (c: TableColumn) => boolean]>>> = {
-  [QueryType.Logs]: [
-    [ColumnHint.Time, isDateTimeColumn],
-    [ColumnHint.LogMessage, isStringLikeColumn],
-    [ColumnHint.LogLevel, isStringLikeColumn],
-  ],
-  [QueryType.Traces]: [
-    [ColumnHint.TraceId, isStringLikeColumn],
-    [ColumnHint.TraceSpanId, isStringLikeColumn],
-    [ColumnHint.TraceParentSpanId, isStringLikeColumn],
-    [ColumnHint.TraceServiceName, isStringLikeColumn],
-    [ColumnHint.TraceOperationName, isStringLikeColumn],
-    [ColumnHint.Time, isDateTimeColumn],
-    [ColumnHint.TraceDurationTime, isNumericColumn],
-  ],
-};
-
-const hasRole = (columns: readonly SelectedColumn[] | undefined, hint: ColumnHint) =>
-  (columns || []).some((c) => c.hint === hint);
-
-/** Adds `role` to `columns`; a plain column of the same name takes the role instead of being selected twice. */
-export const addRoleColumn = (columns: SelectedColumn[], role: SelectedColumn): SelectedColumn[] => [
-  ...columns.filter((c) => !(c.hint === undefined && c.name === role.name)),
-  role,
-];
-
-/** Whether a query of `queryType` lacks role columns that the column-name heuristics could fill. */
-export const needsRoleGuess = (options: QueryBuilderOptions, queryType: QueryType): boolean =>
-  (roleTypes[queryType] || []).some(([hint]) => !hasRole(options.columns, hint));
-
-/** The missing role columns of a `queryType` query found by name among the table's columns. */
-export const guessMissingRoles = (
-  options: QueryBuilderOptions,
-  queryType: QueryType,
-  allColumns: readonly TableColumn[]
-): SelectedColumn[] =>
-  (roleTypes[queryType] || []).flatMap(([hint, typeFilter]) => {
-    const match = !hasRole(options.columns, hint) && findColumnByNameHeuristic(allColumns, hint, typeFilter);
-    return match ? [{ name: match.name, type: match.type, hint }] : [];
-  });
-
 // Table's Aggregate mode and Time series' Trend mode are the modes that apply aggregates and grouping.
+// Trend counts whatever the current type: Logs and Traces keep it unseen, so a Time series query
+// passing through them still has its aggregates on the way back.
 const isAggregating = (options: QueryBuilderOptions): boolean =>
-  options.queryType === QueryType.TimeSeries
-    ? options.mode === BuilderMode.Trend
-    : options.mode === BuilderMode.Aggregate && Boolean(options.aggregates?.length || options.groupBy?.length);
+  options.mode === BuilderMode.Trend ||
+  (options.queryType !== QueryType.TimeSeries &&
+    options.mode === BuilderMode.Aggregate &&
+    Boolean(options.aggregates?.length || options.groupBy?.length));
 
 const isTimeRangeFilter = (f: Filter) => f.operator === FilterOperator.WithInGrafanaTimeRange;
 
@@ -128,8 +85,11 @@ const withTimeRangeFilter = (filters: Filter[], defaults: Filter[]): Filter[] =>
  * - the builder mode matching whether it aggregates, so aggregates are never applied unseen;
  * - unset trace settings.
  *
- * Roles still missing are left to `guessMissingRoles`, which needs the table's columns. A query with
- * nothing configured yet gets nothing here: the type's builder applies its full new-query defaults.
+ * A query moved to the type's default table keeps only its limit: its columns, filters and ordering
+ * belong to the old table, so it is cleared and the type's builder applies its full new-query
+ * defaults, as it does for a query with nothing configured yet (which gets nothing here).
+ *
+ * Roles still missing are left to `guessMissingRoles`, which needs the table's columns.
  */
 export const getQueryTypeChangeDefaults = (
   datasource: Datasource,
@@ -151,14 +111,30 @@ export const getQueryTypeChangeDefaults = (
     const isLogs = queryType === QueryType.Logs;
     const source = resolveSignalSource(datasource, options, queryType);
     if (!source.kept) {
-      Object.assign(next, { database: source.database, table: source.table });
+      return {
+        database: source.database,
+        table: source.table,
+        columns: [],
+        filters: [],
+        orderBy: [],
+        aggregates: [],
+        groupBy: [],
+      };
     }
 
     if (source.usesConfiguredColumns) {
-      const configured = isLogs ? datasource.getDefaultLogsColumns() : datasource.getDefaultTraceColumns();
-      for (const [hint, name] of configured) {
-        if (!hasRole(columns, hint)) {
-          columns = addRoleColumn(columns, { name, hint });
+      // On the configured table, add what a new query there starts with: the configured roles and,
+      // for logs, the context and extra default columns ("Show context" needs the former).
+      const defaults: SelectedColumn[] = isLogs
+        ? buildDefaultLogsColumns(datasource)
+        : Array.from(datasource.getDefaultTraceColumns(), ([hint, name]) => ({ name, hint }));
+      for (const column of defaults) {
+        if (column.hint !== undefined) {
+          if (!hasRole(columns, column.hint)) {
+            columns = addRoleColumn(columns, column);
+          }
+        } else if (!columns.some((c) => c.name === column.name)) {
+          columns.push(column);
         }
       }
     }
