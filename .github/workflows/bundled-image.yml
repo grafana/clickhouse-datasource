@@ -89,6 +89,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      golangci-lint-version: '2.15.0'
       ref: ${{ inputs.ref }}
       grafana-image: ${{ inputs.grafana-image }}
       push-image: ${{ inputs.push-image }}
