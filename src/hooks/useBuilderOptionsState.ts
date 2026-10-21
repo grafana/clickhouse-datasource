@@ -70,6 +70,9 @@ export const fillMissingRoles = (
 export const fitToTable = (database: string, table: string, columns: readonly TableColumn[]): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.FitToTable, { database, table, columns });
 
+// A query with no limit gets the default one when its type, database or table changes (#2163).
+const keptLimit = (state: QueryBuilderOptions) => state.limit || defaultCHBuilderQuery.builderOptions.limit;
+
 const reducer = (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
   const actionFn = actions.get(action.type);
   if (!actionFn) {
@@ -106,7 +109,7 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
       // Keep the rest of the query; QueryBuilder adjusts it for the new type (see
       // getQueryTypeChangeDefaults), so a round trip doesn't always restore it.
-      return mergeBuilderOptionsState(state, { queryType: action.payload.queryType });
+      return mergeBuilderOptionsState(state, { queryType: action.payload.queryType, limit: keptLimit(state) });
     },
   ],
   [
@@ -114,7 +117,7 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
       // Keep the table and the rest of the query; TableSelect picks another table when this
       // one doesn't exist in the new database, and fitToTable drops what the table lacks.
-      return mergeBuilderOptionsState(state, action.payload);
+      return mergeBuilderOptionsState(state, { ...action.payload, limit: keptLimit(state) });
     },
   ],
   [
@@ -122,7 +125,7 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
     (state: QueryBuilderOptions, action: BuilderOptionsReducerAction): QueryBuilderOptions => {
       // Keep the rest of the query, so switching between tables with the same schema keeps it whole.
       // Once the new table's columns load, fitToTable drops what it lacks.
-      return mergeBuilderOptionsState(state, action.payload);
+      return mergeBuilderOptionsState(state, { ...action.payload, limit: keptLimit(state) });
     },
   ],
   [

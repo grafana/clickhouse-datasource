@@ -22,6 +22,7 @@ import {
   fillMissingRoles,
   fitToTable,
 } from './useBuilderOptionsState';
+import { defaultCHBuilderQuery } from 'types/sql';
 const { reducer, buildInitialState } = testFuncs;
 
 describe('reducer', () => {
@@ -264,6 +265,13 @@ describe('reducer', () => {
     const nextState = reducer(prevState, setTable('next_table'));
 
     expect(nextState).toEqual({ ...prevState, table: 'next_table' });
+  });
+  it('falls back to the default limit when the query has none', async () => {
+    const prevState = { ...buildInitialState({ table: 'prev_table' }), limit: undefined };
+
+    for (const action of [setTable('next_table'), setDatabase('next_db'), setQueryType(QueryType.Logs)]) {
+      expect(reducer(prevState, action).limit).toEqual(defaultCHBuilderQuery.builderOptions.limit);
+    }
   });
   it('applies SetOtelEnabled action', async () => {
     const prevState = buildInitialState({
