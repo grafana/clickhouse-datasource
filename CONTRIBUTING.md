@@ -117,6 +117,21 @@ likely to hit:
 - `SchemaArtifactInSync` — a `.gen.json` file has drifted. Run `go generate ./pkg/schema/...` and commit the result.
 - `JSONDataMatchesStruct` / `JSONDataTypesMatchStruct` — the schema and `ClickHouseSettingsJSON` disagree on keys or types. Update whichever side is behind.
 - `SecureValuesMatchLoadSettings` — the schema's `secureJsonData` fields and `SecureKeys` disagree.
+#### Test quarantine
+
+When a test defect is identified — a test that fails or flakes due to environment, timing, or selector issues rather than a real product bug — demote it with the `@quarantine` tag:
+
+```ts
+test('the flaky test', { tag: '@quarantine' }, async ({ page }) => {
+  // ...
+});
+```
+
+Quarantined tests are excluded from the Cloud gating run (`npm run e2e:cloud` and the in-Argo bench gate) and run separately in a non-gating quarantine suite. This keeps the release gate green while the defect is tracked.
+
+Re-promote a test by removing `{ tag: '@quarantine' }` once the underlying issue is fixed.
+
+See the [test-signal taxonomy](https://github.com/grafana/data-sources/blob/main/docs/testing/test-signal-taxonomy.md) for the full quarantine policy.
 
 ## Create a pull request
 
@@ -124,13 +139,21 @@ Run `npm run lint` and `npm run prettier:check` to check for any style errors. A
 
 Once you are ready to make a pull request, please read and follow [Create a pull request](https://github.com/grafana/grafana/blob/master/contribute/create-pull-request.md).
 
-## Build a release for the ClickHouse data source plugin
+Give the pull request a [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) title, for example `fix(logs): apply the search to the logs volume query`. The subject after the colon starts with a lowercase letter, and a check enforces both rules. Maintainers squash-merge pull requests with the title as the commit subject, and release-please builds the changelog from these subjects.
 
-You need to have commit rights to the GitHub repository to publish a release.
+## Release the ClickHouse data source plugin
 
-1. Update the version number in the `package.json` file.
-2. Update the `CHANGELOG.md` by copy and pasting the relevant PRs
-   from [GitHub's Release drafter interface](https://github.com/grafana/clickhouse-datasource/releases/new) or by
-   running `npm run generate-release-notes`.
-3. PR the changes.
-4. Once merged, follow the Drone release process that you can find [here](https://github.com/grafana/integrations-team/wiki/Plugin-Release-Process#drone-release-proces
+[release-please](https://github.com/googleapis/release-please) creates releases. Don't change the version in `package.json` or edit `CHANGELOG.md` by hand.
+
+1. After each merge to `main`, release-please opens or updates a release pull request titled `chore(main): release X.Y.Z`. It bumps the version and adds a `CHANGELOG.md` section built from the commit subjects since the last release.
+2. To publish the release, merge the release pull request. The merge creates the `vX.Y.Z` tag and the GitHub release, and publishes that version to the Grafana plugin catalog.
+
+The commit type sets the version bump:
+
+- `feat` bumps the minor version.
+- A breaking change, marked with `!` after the type or with a `BREAKING CHANGE:` footer, bumps the major version.
+- Every other type except `chore` bumps the patch version. `chore` commits don't appear in the changelog and don't start a release.
+
+Routine dependency updates use `chore(deps)`, so they don't start a release. Security updates use `fix(deps)`, so they start a release. To release a routine update on its own, add a `Release-As: X.Y.Z` footer to the commit message.
+
+To publish outside this flow, for example an emergency fix for on-premises users or a docs-only update, run the **Plugins - Publish plugin** workflow (`.github/workflows/publish.yml`) manually.

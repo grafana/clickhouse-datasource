@@ -91,6 +91,23 @@ Always ensure that your plugin version is up-to-date so you have access to all c
 Plugins are automatically updated in Grafana Cloud.
 {{< /admonition >}}
 
+{{< docs/shared source="grafana" lookup="datasources/query-with-gcx.md" version="latest" >}}
+
+For example, to query your ClickHouse data source, use `gcx datasources clickhouse`:
+
+```sh
+# Run a SQL query
+gcx datasources clickhouse query -d <DATASOURCE_UID> 'SELECT count() FROM otel_logs'
+
+# List tables in a database
+gcx datasources clickhouse list-tables -d <DATASOURCE_UID> --database otel
+
+# Show a table's column schema
+gcx datasources clickhouse describe-table otel_logs -d <DATASOURCE_UID> --database otel
+```
+
+Replace _`<DATASOURCE_UID>`_ with the UID of your ClickHouse data source. The `query` command accepts SQL with server-side macros such as `$__timeFilter`; `list-tables` and `describe-table` let you explore schema, and `--database` targets a specific database.
+
 ## Related resources
 
 - [ClickHouse documentation](https://clickhouse.com/docs)

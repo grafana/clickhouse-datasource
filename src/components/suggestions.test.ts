@@ -105,8 +105,8 @@ describe('Suggestions', () => {
       databases: async (): Promise<string[]> => ['default', 'system'],
       tables: async (db?: string): Promise<string[]> => ['numbers', 'query_log'],
       columns: async (db: string, table: string): Promise<TableColumn[]> => [
-        { label: 'query', type: 'String' } as TableColumn,
-        { label: 'EventDate', type: 'DateTime' } as TableColumn,
+        { label: 'query', name: 'query', type: 'String' } as TableColumn,
+        { label: 'EventDate', name: 'EventDate', type: 'DateTime' } as TableColumn,
       ],
       functions: async (): Promise<SqlFunction[]> => [
         { name: 'toDateTime', origin: 'System' } as SqlFunction,
@@ -267,5 +267,67 @@ describe('Suggestions', () => {
     );
     expect(labels).toContain('${table}');
     expect(labels).toContain('${database}');
+  });
+});
+
+describe('Suggestions for JSON path columns (#2193)', () => {
+  const column = (name: string, type: string): TableColumn => ({ name, label: name, type, picklistValues: [] });
+  const schema: Schema = {
+    databases: async () => ['e2e_test'],
+    tables: async () => ['json_events'],
+    columns: async () => [
+      column('timestamp', 'DateTime'),
+      column('attributes', 'JSON'),
+      column('attributes.http.status_code', 'String'),
+      column('attributes.level', 'String'),
+      column('attributes.weird key', 'Int64'),
+    ],
+    functions: async () => [],
+    defaultDatabase: 'e2e_test',
+  };
+
+  const fieldSuggestions = async (sql: string) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const cursorPosition = sql.length;
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+    const suggestions = await getSuggestions(sql, schema, range, cursorPosition);
+    return suggestions.filter((s) => s.kind === 3).map((s) => [s.label, s.filterText, s.insertText]);
+  };
+
+  it('lists only the paths under the typed column after `column.`', async () => {
+    expect(await fieldSuggestions('SELECT * FROM e2e_test.json_events WHERE attributes.')).toEqual([
+      ['attributes.http.status_code', 'http.status_code', 'http.status_code'],
+      ['attributes.level', 'level', 'level'],
+      ['attributes.weird key', 'weird key', '`weird key`'],
+    ]);
+  });
+
+  it('filters and inserts the rest of the path after a partly typed segment', async () => {
+    expect(await fieldSuggestions('SELECT * FROM e2e_test.json_events WHERE attributes.ht')).toEqual([
+      ['attributes.http.status_code', 'http.status_code', 'http.status_code'],
+    ]);
+  });
+
+  it('starts the insert text after the last dot of a nested prefix', async () => {
+    expect(await fieldSuggestions('SELECT * FROM e2e_test.json_events WHERE attributes.http.')).toEqual([
+      ['attributes.http.status_code', 'status_code', 'status_code'],
+    ]);
+  });
+
+  it('inserts the whole name when no segment is typed', async () => {
+    const suggestions = await fieldSuggestions('SELECT * FROM e2e_test.json_events WHERE ');
+
+    expect(suggestions).toContainEqual(['attributes.level', 'attributes.level', 'attributes.level']);
+    expect(suggestions).toContainEqual(['attributes.weird key', 'attributes.weird key', 'attributes.`weird key`']);
   });
 });

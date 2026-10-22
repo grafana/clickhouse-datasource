@@ -16,8 +16,8 @@ import (
 // makeCtx is a test helper that builds a macropro.QueryContext from time range and interval.
 func makeCtx(from, to time.Time, interval time.Duration) macropro.QueryContext[struct{}] {
 	return macropro.QueryContext[struct{}]{
-		TimeRange: macropro.TimeRange{From: from, To: to},
-		Interval:  interval,
+		TimeRange:  macropro.TimeRange{From: from, To: to},
+		Interval:   interval,
 		IntervalMS: interval.Milliseconds(),
 	}
 }
@@ -192,6 +192,36 @@ func TestMacroIntervalSeconds(t *testing.T) {
 	assert.Equal(t, "20", got)
 }
 
+func TestMacroFromGrafanaInterval(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	tests := map[string]string{
+		"250ms": "250 millisecond",
+		"1s":    "1 second",
+		"5m":    "5 minute",
+		"'5m'":  "5 minute",
+		"2h":    "2 hour",
+		"3d":    "3 day",
+		"1w":    "1 week",
+		"6M":    "6 month",
+		"1y":    "1 year",
+	}
+	for input, expected := range tests {
+		t.Run(input, func(t *testing.T) {
+			got, err := FromGrafanaInterval(ctx, []string{input})
+			require.NoError(t, err)
+			assert.Equal(t, expected, got)
+		})
+	}
+
+	for _, input := range []string{"", "0m", "1", "minute", "-1h", "1.5h"} {
+		t.Run("rejects_"+input, func(t *testing.T) {
+			_, err := FromGrafanaInterval(ctx, []string{input})
+			require.Error(t, err)
+		})
+	}
+}
+
 func TestMacroTimeFrom(t *testing.T) {
 	from, _ := time.Parse("2006-01-02T15:04:05.000Z", "2014-11-12T11:45:26.371Z")
 	to, _ := time.Parse("2006-01-02T15:04:05.000Z", "2015-11-12T11:45:26.371Z")
@@ -201,8 +231,18 @@ func TestMacroTimeFrom(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "ts >= toDateTime(1415792726)", got)
 
-	_, err = TimeFrom(ctx, []string{})
+	got, err = TimeFrom(ctx, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, "toDateTime(1415792726)", got)
+
+	got, err = TimeFrom(ctx, []string{""})
+	assert.Nil(t, err)
+	assert.Equal(t, "toDateTime(1415792726)", got)
+
+	_, err = TimeFrom(ctx, []string{"a", "b"})
 	assert.Error(t, err)
+	assert.True(t, stdErrors.Is(err, sqlutil.ErrorBadArgumentCount))
+	assert.Contains(t, err.Error(), "$__timeFrom accepts at most 1 argument, received 2")
 }
 
 func TestMacroTimeTo(t *testing.T) {
@@ -214,8 +254,13 @@ func TestMacroTimeTo(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, "ts <= toDateTime(1447328726)", got)
 
-	_, err = TimeTo(ctx, []string{})
+	got, err = TimeTo(ctx, nil)
+	assert.Nil(t, err)
+	assert.Equal(t, "toDateTime(1447328726)", got)
+
+	_, err = TimeTo(ctx, []string{"a", "b"})
 	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "$__timeTo accepts at most 1 argument, received 2")
 }
 
 func TestMacroTimeGroup(t *testing.T) {
@@ -252,8 +297,10 @@ func TestMacroErrorsAreDownstream(t *testing.T) {
 		{"DateTimeFilter wrong arity", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }},
 		{"TimeInterval wrong arity", func() error { _, err := TimeInterval(ctx, nil); return err }},
 		{"TimeIntervalMs wrong arity", func() error { _, err := TimeIntervalMs(ctx, nil); return err }},
-		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, nil); return err }},
-		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, nil); return err }},
+		{"FromGrafanaInterval wrong arity", func() error { _, err := FromGrafanaInterval(ctx, nil); return err }},
+		{"FromGrafanaInterval bad value", func() error { _, err := FromGrafanaInterval(ctx, []string{"1.5h"}); return err }},
+		{"TimeFrom wrong arity", func() error { _, err := TimeFrom(ctx, []string{"a", "b"}); return err }},
+		{"TimeTo wrong arity", func() error { _, err := TimeTo(ctx, []string{"a", "b"}); return err }},
 		{"TimeGroup wrong arity", func() error { _, err := TimeGroup(ctx, []string{"ts"}); return err }},
 		{"TimeGroup bad duration", func() error { _, err := TimeGroup(ctx, []string{"ts", "nope"}); return err }},
 	}
@@ -290,6 +337,8 @@ func TestInterpolate(t *testing.T) {
 	}
 
 	tests := []test{
+		{input: "select toStartOfInterval(time, INTERVAL $__fromGrafanaInterval(5m))", output: "select toStartOfInterval(time, INTERVAL 5 minute)", name: "Grafana dashboard interval"},
+		{input: "select toStartOfInterval(time, INTERVAL $__fromGrafanaInterval('5m'))", output: "select toStartOfInterval(time, INTERVAL 5 minute)", name: "quoted Grafana dashboard interval"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter"},
 		{input: "select * from foo where $__timeFilter(cast(sth as timestamp) )", output: "select * from foo where cast(sth as timestamp) >= toDateTime(1415792726) AND cast(sth as timestamp) <= toDateTime(1447328726)", name: "clickhouse timeFilter with empty spaces"},
 		{input: "select * from foo where $__timeFilter_ms(cast(sth as timestamp))", output: "select * from foo where cast(sth as timestamp) >= fromUnixTimestamp64Milli(1415792726123) AND cast(sth as timestamp) <= fromUnixTimestamp64Milli(1447328726456)", name: "clickhouse timeFilter_ms"},
@@ -466,6 +515,71 @@ func TestInterpolateBacktickAndDollarQuotedRegions(t *testing.T) {
 			interpolatedQuery, err := Interpolate(tc.input, query)
 			require.Nil(t, err)
 			assert.Equal(t, tc.output, interpolatedQuery)
+		})
+	}
+}
+
+// Arity errors surface in the panel, so each one names the form the user needs.
+func TestMacroArityErrorsNameTheExpectedForm(t *testing.T) {
+	ctx := makeCtx(time.Time{}, time.Time{}, 0)
+
+	cases := []struct {
+		name string
+		call func() error
+		want string
+	}{
+		{"timeFilter", func() error { _, err := TimeFilter(ctx, nil); return err }, "usage: $__timeFilter(timeColumn)"},
+		{"timeFilter_ms", func() error { _, err := TimeFilterMs(ctx, nil); return err }, "usage: $__timeFilter_ms(timeColumn)"},
+		{"dateFilter", func() error { _, err := DateFilter(ctx, nil); return err }, "usage: $__dateFilter(dateColumn)"},
+		{"dateTimeFilter", func() error { _, err := DateTimeFilter(ctx, []string{"d"}); return err }, "usage: $__dateTimeFilter(dateColumn, timeColumn)"},
+		{"timeInterval", func() error { _, err := TimeInterval(ctx, []string{"ts", "'1d'"}); return err }, "usage: $__timeInterval(timeColumn), the bucket size comes from the dashboard interval"},
+		{"timeInterval_ms", func() error { _, err := TimeIntervalMs(ctx, nil); return err }, "usage: $__timeInterval_ms(timeColumn), the bucket size comes from the dashboard interval"},
+		{"fromGrafanaInterval", func() error { _, err := FromGrafanaInterval(ctx, nil); return err }, "usage: $__fromGrafanaInterval(interval)"},
+		{"timeGroup", func() error { _, err := TimeGroup(ctx, nil); return err }, "usage: $__timeGroup(timeColumn, interval)"},
+		{"timeFrom", func() error { _, err := TimeFrom(ctx, []string{"a", "b"}); return err }, "usage: $__timeFrom() or $__timeFrom(timeColumn)"},
+		{"timeTo", func() error { _, err := TimeTo(ctx, []string{"a", "b"}); return err }, "usage: $__timeTo() or $__timeTo(timeColumn)"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.call()
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tc.want)
+		})
+	}
+}
+
+func TestInterpolateTimeBoundaryValueForm(t *testing.T) {
+	from, _ := time.Parse(time.RFC3339, "2014-11-12T11:45:26Z")
+	to, _ := time.Parse(time.RFC3339, "2015-11-12T11:45:26Z")
+	q := &sqlutil.Query{TimeRange: backend.TimeRange{From: from, To: to}}
+
+	got, err := Interpolate("SELECT * FROM t WHERE ts >= $__timeFrom() AND ts <= $__timeTo AND $__timeFrom(ts)", q)
+	require.NoError(t, err)
+	assert.Equal(t, "SELECT * FROM t WHERE ts >= toDateTime(1415792726) AND ts <= toDateTime(1447328726) AND ts >= toDateTime(1415792726)", got)
+}
+
+func TestMacroInterval(t *testing.T) {
+	from := time.Unix(1415792726, 0)
+	to := time.Unix(1447328726, 0)
+	tests := []struct {
+		name     string
+		interval time.Duration
+		want     string
+	}{
+		{"whole minutes", 5 * time.Minute, "5m"},
+		{"whole hours stay in hours", 24 * time.Hour, "24h"},
+		{"whole days render in hours", 7 * 24 * time.Hour, "168h"},
+		{"minutes that are not whole hours stay exact", 90 * time.Minute, "90m"},
+		{"hours that are not whole days stay exact", 36 * time.Hour, "36h"},
+		{"seconds that are not whole minutes stay exact", 90 * time.Second, "90s"},
+		{"milliseconds that are not whole seconds stay exact", 1500 * time.Millisecond, "1500ms"},
+		{"zero", 0, "0s"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := ClickHouseMacros["interval"](makeCtx(from, to, tt.interval), nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }

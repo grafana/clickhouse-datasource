@@ -11,7 +11,10 @@
 
 CREATE DATABASE IF NOT EXISTS e2e_test;
 
-CREATE TABLE IF NOT EXISTS e2e_test.map_events
+DROP TABLE IF EXISTS e2e_test.map_events;
+-- Dropped and recreated on every load so re-running the e2e-data-loader
+-- (e.g. docker compose up against an existing stack) cannot duplicate rows.
+CREATE TABLE e2e_test.map_events
 (
     timestamp   DateTime,
     service     LowCardinality(String),
