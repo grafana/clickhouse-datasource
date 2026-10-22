@@ -50,6 +50,7 @@ import {
   SelectedColumn,
   SqlFunction,
   TableColumn,
+  TableKeys,
   TimeUnit,
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
@@ -82,6 +83,7 @@ import {
 } from './utils';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
+import { parseDistributedTarget } from './tableKeys';
 
 interface ResolvedColumn {
   columnName: string;
@@ -1584,6 +1586,51 @@ export class Datasource
     }
 
     return this.fetchColumnsFromTable(database, table);
+  }
+
+  private readonly _tableKeysCache = new Map<string, Promise<TableKeys | undefined>>();
+
+  /**
+   * Reads a table's sorting and partition keys from `system.tables`, following a Distributed table to its local
+   * table. Concurrent calls share one lookup, and a lookup that finds no table row resolves to undefined and is not cached.
+   */
+  async fetchTableKeys(database: string, table: string): Promise<TableKeys | undefined> {
+    const key = this.columnCacheKey(database, table);
+    const request = this._tableKeysCache.get(key) ?? this.queryTableKeys(database, table, true);
+    this._tableKeysCache.set(key, request);
+    const keys = await request;
+    if (!keys && this._tableKeysCache.get(key) === request) {
+      this._tableKeysCache.delete(key);
+    }
+    return keys;
+  }
+
+  private async queryTableKeys(
+    database: string,
+    table: string,
+    followDistributed: boolean
+  ): Promise<TableKeys | undefined> {
+    const frame = await this.runQuery({
+      rawSql: `SELECT engine, engine_full, sorting_key, partition_key FROM system.tables WHERE database = '${escapeCHStringLiteral(database)}' AND name = '${escapeCHStringLiteral(table)}'`,
+    });
+    if (!frame.fields?.length) {
+      return undefined;
+    }
+
+    const [row] = new DataFrameView<{
+      engine: string;
+      engine_full: string;
+      sorting_key: string;
+      partition_key: string;
+    }>(frame).toArray();
+    if (!row) {
+      return undefined;
+    }
+    if (row.engine === 'Distributed') {
+      const target = followDistributed ? parseDistributedTarget(row.engine_full) : undefined;
+      return target ? this.queryTableKeys(target.database, target.table, false) : undefined;
+    }
+    return { sortingKey: row.sorting_key, partitionKey: row.partition_key };
   }
 
   private readonly _columnCache = new Map<string, TableColumn[]>();
