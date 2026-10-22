@@ -493,7 +493,15 @@ export class Datasource
       });
     }
 
+    const { database, table } = query.builderOptions;
     const filters = (query.builderOptions.filters?.slice() || []).map((f) => {
+      // Table-qualified so the `time` bucket alias cannot shadow the raw time column.
+      if (f.hint === ColumnHint.Time || f.hint === ColumnHint.FilterTime) {
+        const rawTimeColumn = getColumnByHint(query.builderOptions, f.hint) ?? timeColumn;
+        const key = `${getTableIdentifier(database, table)}.${escapeIdentifier(rawTimeColumn.name)}`;
+        return { ...f, hint: undefined, key, type: rawTimeColumn.type || f.type } as Filter;
+      }
+
       // In order for a hinted filter to work, the hinted column must be SELECTed OR provide "key"
       // For this histogram query the "level" column isn't selected, so we must find the original column name
       // Clone so resolving the key does not write it back into the user's query filters.
@@ -2554,14 +2562,9 @@ export class Datasource
    * (e.g. "ResourceAttributes.service.name"). This method tells Grafana
    * how to bucket those keys into named, collapsible sections.
    *
-   * Unprefixed keys are the top-level scalar columns that
-   * `foldDiscoveredLogFieldsIntoLabels` merged into `labels` (the field
-   * options feature). They are bucketed under a plain "Fields" section so
-   * they sit next to the grouped attributes in the log-row details flyout,
-   * with the same filter-for / filter-out buttons. Filtering is unaffected:
-   * `modifyQuery` resolves a bare key to the real column (and splits the
-   * `<map>.` prefix back for the attribute keys), so grouping and filter
-   * routing stay aligned.
+   * Unprefixed keys (folded Columns or a table's own `labels` map) return
+   * null. On a row with labels, Grafana renders plain fields such as the
+   * level only in the null group.
    *
    * Strings are plain English; the plugin codebase does not currently
    * use `@grafana/i18n`, so a future i18n pass would localize these
@@ -2577,14 +2580,7 @@ export class Datasource
     if (labelKey.startsWith('LogAttributes.')) {
       return 'Log attributes';
     }
-    // Group unprefixed keys under a "Fields" section next to the attribute groups. The backend only
-    // writes prefixed attribute keys (ResourceAttributes.* / ScopeAttributes.* / LogAttributes.*),
-    // so an unprefixed key is normally a scalar column that foldDiscoveredLogFieldsIntoLabels merged
-    // into `labels`. A table that already exposes its own `labels` map would also land here; grouping
-    // those under "Fields" is intentional and harmless (the section renders much the same). Keeping
-    // it ungated also groups columns selected ad hoc in the query editor, not only ones configured on
-    // the datasource.
-    return 'Fields';
+    return null;
   }
 
   async testDatasource(): Promise<{ status: string; message: string }> {

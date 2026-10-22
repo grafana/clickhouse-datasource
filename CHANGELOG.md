@@ -1,5 +1,17 @@
 # Changelog
 
+## [4.23.2](https://github.com/grafana/clickhouse-datasource/compare/v4.23.1...v4.23.2) (2026-10-21)
+
+
+### 🐛 Bug Fixes
+
+* **query-builder:** keep Limit when changing table or database ([#2163](https://github.com/grafana/clickhouse-datasource/issues/2163)) ([32e4f1a](https://github.com/grafana/clickhouse-datasource/commit/32e4f1a44c3c958de6aaff16b77afba3a99bdecd))
+
+
+### 🤖 Continuous Integration
+
+* update golangci-lint to 2.15.0 ([cc56d77](https://github.com/grafana/clickhouse-datasource/commit/cc56d776a1a30f392e8f4fb9a1a3818d124f329f))
+
 ## [4.23.1](https://github.com/grafana/clickhouse-datasource/compare/v4.23.0...v4.23.1) (2026-10-21)
 
 
