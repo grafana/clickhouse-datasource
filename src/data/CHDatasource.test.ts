@@ -4,6 +4,7 @@ import {
   DataFrame,
   DataQueryRequest,
   DataQueryResponse,
+  dateTime,
   Field,
   FieldType,
   LoadingState,
@@ -20,6 +21,7 @@ import { lastValueFrom, of, Subject, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -2359,6 +2361,111 @@ describe('ClickHouseDatasource', () => {
         });
         expect(result).toBeDefined();
         expect(result?.rawSql).not.toContain('LIKE');
+      });
+
+      const withinTimeRange = (hint: ColumnHint): Filter => ({
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: '',
+        hint,
+        condition: 'AND',
+      });
+
+      it.each([
+        {
+          name: 'a FilterTime filter falling back to the Time column',
+          columns: [{ name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."created_at"',
+        },
+        {
+          name: 'a Time filter falling back to the FilterTime column',
+          columns: [{ name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime }],
+          filterHint: ColumnHint.Time,
+          filteredColumn: '"default"."logs"."created_date"',
+        },
+        {
+          name: 'a FilterTime filter with both time columns',
+          columns: [
+            { name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime },
+            { name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          ],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."created_date"',
+        },
+        {
+          name: 'a Time filter with both time columns',
+          columns: [
+            { name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime },
+            { name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          ],
+          filterHint: ColumnHint.Time,
+          filteredColumn: '"default"."logs"."created_at"',
+        },
+        {
+          name: 'a time column that shares the bucket alias name',
+          columns: [{ name: 'time', type: 'DateTime64(3)', hint: ColumnHint.Time }],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."time"',
+        },
+      ])(
+        'should filter the time range on the raw column, not the bucket, for $name',
+        ({ columns, filterHint, filteredColumn }) => {
+          const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...query,
+            builderOptions: { ...query.builderOptions, columns, filters: [withinTimeRange(filterHint)] },
+          });
+
+          expect(result?.rawSql).toContain(
+            `WHERE ( ${filteredColumn} >= $__fromTime AND ${filteredColumn} <= $__toTime ) GROUP BY time`
+          );
+          expect(result?.rawSql).not.toContain('time >= $__fromTime');
+        }
+      );
+
+      it('should take the time range filter type from the time column, as the logs query does', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+            filters: [{ ...withinTimeRange(ColumnHint.Time), type: '' } as Filter],
+          },
+        });
+
+        expect(result?.rawSql).toContain(
+          'WHERE ( "default"."logs"."created_at" >= $__fromTime AND "default"."logs"."created_at" <= $__toTime ) GROUP BY time'
+        );
+      });
+
+      it('should filter the time range on the raw column when the min interval bucket is longer than the range', () => {
+        const actualLogs = jest.requireActual<typeof logs>('./logs');
+        const from = dateTime('2024-03-15T10:02:30Z');
+        const to = dateTime('2024-03-15T10:17:30Z');
+        let rawSql: string | undefined;
+        jest.mocked(logs.getIntervalInfo).withImplementation(actualLogs.getIntervalInfo, () =>
+          jest.mocked(logs.getTimeFieldRoundingClause).withImplementation(actualLogs.getTimeFieldRoundingClause, () => {
+            rawSql = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
+              ...request,
+              range: { from, to, raw: { from, to } },
+              scopedVars: { __interval_ms: { text: '1000', value: 1000 } },
+              targets: [
+                {
+                  ...query,
+                  minInterval: '1h',
+                  builderOptions: { ...query.builderOptions, filters: [withinTimeRange(ColumnHint.FilterTime)] },
+                },
+              ],
+            })?.targets[0]?.rawSql;
+          })
+        );
+
+        expect(rawSql).toContain('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 HOUR) as "time"');
+        expect(rawSql).toContain(
+          'WHERE ( "default"."logs"."created_at" >= $__fromTime AND "default"."logs"."created_at" <= $__toTime ) GROUP BY time'
+        );
+        expect(rawSql).not.toContain('time >= $__fromTime');
       });
     });
 

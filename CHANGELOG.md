@@ -1,5 +1,36 @@
 # Changelog
 
+## [4.23.2](https://github.com/grafana/clickhouse-datasource/compare/v4.23.1...v4.23.2) (2026-10-21)
+
+
+### 🐛 Bug Fixes
+
+* **query-builder:** keep Limit when changing table or database ([#2163](https://github.com/grafana/clickhouse-datasource/issues/2163)) ([32e4f1a](https://github.com/grafana/clickhouse-datasource/commit/32e4f1a44c3c958de6aaff16b77afba3a99bdecd))
+
+
+### 🤖 Continuous Integration
+
+* update golangci-lint to 2.15.0 ([cc56d77](https://github.com/grafana/clickhouse-datasource/commit/cc56d776a1a30f392e8f4fb9a1a3818d124f329f))
+
+## [4.23.1](https://github.com/grafana/clickhouse-datasource/compare/v4.23.0...v4.23.1) (2026-10-21)
+
+
+### 🐛 Bug Fixes
+
+* **annotations:** keep text and tags selectable on region annotations ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87)), closes [#2174](https://github.com/grafana/clickhouse-datasource/issues/2174)
+* **annotations:** region annotations making text and tags unselectable in the column mapping ([#2175](https://github.com/grafana/clickhouse-datasource/issues/2175)) ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87))
+* **suggestions:** suggest the paths inside JSON columns in the SQL editor ([#2206](https://github.com/grafana/clickhouse-datasource/issues/2206)) ([5b79e79](https://github.com/grafana/clickhouse-datasource/commit/5b79e7984dd38d8b4d3c71311339c2a74e4d4916))
+
+
+### ♻️ Code Refactoring
+
+* **macros:** keep the $__interval format independent of the macropro version ([#2214](https://github.com/grafana/clickhouse-datasource/issues/2214)) ([c7086a9](https://github.com/grafana/clickhouse-datasource/commit/c7086a9140c2298f0eea9c62dcd00a548059c8f6))
+
+
+### ✅ Tests
+
+* **e2e:** group specs into thematic directories and adopt the shared helpers ([#2123](https://github.com/grafana/clickhouse-datasource/issues/2123)) ([c233eb4](https://github.com/grafana/clickhouse-datasource/commit/c233eb4a20806427d658c7b38a24bd1f2d2bfd14))
+
 ## [4.23.0](https://github.com/grafana/clickhouse-datasource/compare/v4.22.1...v4.23.0) (2026-10-19)
 
 
