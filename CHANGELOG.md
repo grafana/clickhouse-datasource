@@ -1,5 +1,16 @@
 # Changelog
 
+## [4.23.3](https://github.com/grafana/clickhouse-datasource/compare/v4.23.2...v4.23.3) (2026-10-22)
+
+
+### 🐛 Bug Fixes
+
+* **driver:** close the connection pool and keep the cause when connect fails ([#2234](https://github.com/grafana/clickhouse-datasource/issues/2234)) ([9ad3679](https://github.com/grafana/clickhouse-datasource/commit/9ad367949bc5c0c3850dcd338ca5f9e54d7aa62e))
+* **http:** name the FORMAT clause or HTML page behind "block decode" errors ([#2242](https://github.com/grafana/clickhouse-datasource/issues/2242)) ([1ac0318](https://github.com/grafana/clickhouse-datasource/commit/1ac0318eb0ad337ef92aba129f1983e8eddfc36f))
+* **logs:** count the same rows in the builder logs volume as in the logs query ([#2236](https://github.com/grafana/clickhouse-datasource/issues/2236)) ([bb8280a](https://github.com/grafana/clickhouse-datasource/commit/bb8280a0071115865075d9e36e561f4adbef7b41))
+* **logs:** show level and other fields in log details for Columns and labels maps ([#2232](https://github.com/grafana/clickhouse-datasource/issues/2232)) ([07bce6d](https://github.com/grafana/clickhouse-datasource/commit/07bce6d0edf9281770be693810dd52409b3655a0))
+* **query-builder:** keep the query when changing type, database or table ([#2200](https://github.com/grafana/clickhouse-datasource/issues/2200)) ([6f89eb3](https://github.com/grafana/clickhouse-datasource/commit/6f89eb367a593ed4a02f9739b7445b2082e7341d))
+
 ## [4.23.2](https://github.com/grafana/clickhouse-datasource/compare/v4.23.1...v4.23.2) (2026-10-21)
 
 
