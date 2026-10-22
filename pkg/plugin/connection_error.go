@@ -107,6 +107,11 @@ func CategorizeConnectionError(err error) ConnectionErrorCategory {
 		}
 	}
 
+	var formatErr *responseFormatError
+	if errors.As(err, &formatErr) {
+		return ConnectionErrorCategoryConfig
+	}
+
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return ConnectionErrorCategoryTimeout
 	}

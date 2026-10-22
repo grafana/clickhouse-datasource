@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"maps"
 	"net"
+	"net/http"
 	"regexp"
 	"slices"
 	"strconv"
@@ -199,6 +200,10 @@ func resolveJWTAuth(settings Settings, httpHeaders map[string]string) (clickhous
 }
 
 func wrapCategorizedConnectionError(err error) error {
+	var formatErr *responseFormatError
+	if errors.As(err, &formatErr) {
+		err = formatErr
+	}
 	category := CategorizeConnectionError(err)
 	backend.Logger.Error("failed to create ClickHouse client", "error_category", string(category))
 	if category == ConnectionErrorCategoryAuth {
@@ -307,6 +312,12 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 		TLS:         tlsConfig,
 	}
 
+	if protocol == clickhouse.HTTP {
+		opts.TransportFunc = func(t *http.Transport) (http.RoundTripper, error) {
+			return nativeResponseCheck{next: t}, nil
+		}
+	}
+
 	// dialCtx is used to create a connection to PDC, if it is enabled above
 	dialCtx, err := getPDCDialContext(settings, tlsConfig, protocol)
 	if err != nil {
@@ -397,8 +408,12 @@ func (h *Clickhouse) Macros() sqlds.Macros {
 	return sqlds.Macros{}
 }
 
-// MutateQueryError marks ClickHouse errors as downstream errors
+// MutateQueryError marks ClickHouse errors and HTTP responses that are not in the Native format as downstream errors
 func (h *Clickhouse) MutateQueryError(err error) backend.ErrorWithSource {
+	var formatErr *responseFormatError
+	if errors.As(err, &formatErr) {
+		return backend.NewErrorWithSource(fmt.Errorf("%w: %w", sqlds.ErrorQuery, formatErr), backend.ErrorSourceDownstream)
+	}
 	// Check if any error in the error chain (including multi-errors) is a clickhouse.Exception
 	if containsClickHouseException(err) {
 		return backend.NewErrorWithSource(err, backend.ErrorSourceDownstream)
