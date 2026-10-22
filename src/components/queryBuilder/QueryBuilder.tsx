@@ -9,7 +9,7 @@ import {
   StringFilter,
   TableColumn,
 } from 'types/queryBuilder';
-import { CoreApp } from '@grafana/data';
+import { CoreApp, TimeRange } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
 import { TimeSeriesQueryBuilder } from './views/TimeSeriesQueryBuilder';
 import { TableQueryBuilder } from './views/TableQueryBuilder';
@@ -49,6 +49,7 @@ import { CompactAdvanced } from './CompactAdvanced';
 import { MinIntervalEditor } from 'components/MinIntervalEditor';
 
 interface QueryBuilderProps {
+  timeRange?: TimeRange;
   app: CoreApp | undefined;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
@@ -108,6 +109,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     if (!preserveAuthoredQuery) {
       return (
         <CompactQueryEditor
+          timeRange={props.timeRange}
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
@@ -192,6 +194,7 @@ export const getCompactFilterColumns = (
 };
 
 interface CompactQueryEditorProps {
+  timeRange?: TimeRange;
   datasource: Datasource;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
@@ -380,6 +383,7 @@ const CompactQueryEditor = (props: CompactQueryEditorProps) => {
         onSearchChange={(logMessageLike) => mergeActiveOptions({ meta: { logMessageLike } }, true)}
       />
       <CompactFilterBar
+        timeRange={props.timeRange}
         datasource={datasource}
         database={activeOptions.database}
         table={activeOptions.table}

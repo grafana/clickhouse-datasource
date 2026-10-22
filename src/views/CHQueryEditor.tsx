@@ -280,6 +280,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 
   return (
     <QueryBuilder
+      timeRange={props.range}
       datasource={props.datasource}
       builderOptions={builderOptions}
       builderOptionsDispatch={builderOptionsDispatch}
