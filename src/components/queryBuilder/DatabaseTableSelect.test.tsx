@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { DatabaseSelect, TableSelect, DatabaseTableSelect } from './DatabaseTableSelect';
 import { Datasource } from '../../data/CHDatasource';
@@ -121,6 +121,65 @@ describe('TableSelect', () => {
   });
 });
 
+describe('TableSelect after a database change', () => {
+  const setup = (tablesByDb: Record<string, string[]>, changedInDropdown: boolean) => {
+    const mockDs = {} as Datasource;
+    mockDs.fetchTables = jest.fn((db?: string) => Promise.resolve(tablesByDb[db!] ?? []));
+    mockDs.getDefaultTable = jest.fn(() => '');
+    const onTableChange = jest.fn();
+    const databaseChanged = { current: false };
+    const select = (database: string) => (
+      <TableSelect
+        datasource={mockDs}
+        database={database}
+        table="logs"
+        onTableChange={onTableChange}
+        databaseChanged={databaseChanged}
+      />
+    );
+    const result = render(select('db_a'));
+    const changeDatabase = (database: string) => {
+      databaseChanged.current = changedInDropdown;
+      result.rerender(select(database));
+    };
+    return { mockDs, onTableChange, changeDatabase };
+  };
+
+  it('keeps the table when the new database has it', async () => {
+    const { mockDs, onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['logs', 'other'] }, true);
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(mockDs.fetchTables).toHaveBeenCalledWith('db_b'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onTableChange).not.toHaveBeenCalled();
+  });
+
+  it('picks another table when the new database lacks it', async () => {
+    const { onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['spans'] }, true);
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(onTableChange).toHaveBeenCalledWith('spans'));
+  });
+
+  it('skips a default table the new database lacks', async () => {
+    const { mockDs, onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['spans'] }, true);
+    (mockDs.getDefaultTable as jest.Mock).mockReturnValue('events');
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(onTableChange).toHaveBeenCalledWith('spans'));
+    expect(onTableChange).not.toHaveBeenCalledWith('events');
+  });
+
+  it('keeps the table of a query restored with another database', async () => {
+    const { mockDs, onTableChange, changeDatabase } = setup({ db_a: ['logs'], db_b: ['spans'] }, false);
+    changeDatabase('db_b');
+
+    await waitFor(() => expect(mockDs.fetchTables).toHaveBeenCalledWith('db_b'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onTableChange).not.toHaveBeenCalled();
+  });
+});
+
 describe('DatabaseTableSelect', () => {
   it('should render the combined components', async () => {
     const mockDs = {} as Datasource;
@@ -140,5 +199,67 @@ describe('DatabaseTableSelect', () => {
     );
     expect(result.container.firstChild).not.toBeNull();
     expect(result.container.firstChild?.childNodes).toHaveLength(2); // 2 InlineFields (database + table)
+  });
+});
+
+describe('DatabaseTableSelect database changes', () => {
+  // Holds the query's database and table the way the builder does, so the dropdown drives TableSelect.
+  const Harness = ({ datasource, onTableChange }: { datasource: Datasource; onTableChange: (t: string) => void }) => {
+    const [database, setDatabase] = useState('db_a');
+    const [table, setTable] = useState('logs');
+    return (
+      <DatabaseTableSelect
+        datasource={datasource}
+        database={database}
+        onDatabaseChange={setDatabase}
+        table={table}
+        onTableChange={(t) => {
+          onTableChange(t);
+          setTable(t);
+        }}
+      />
+    );
+  };
+
+  const setup = () => {
+    const mockDs = {} as Datasource;
+    mockDs.getDefaultDatabase = jest.fn(() => 'db_a');
+    mockDs.getDefaultTable = jest.fn(() => '');
+    mockDs.fetchDatabases = jest.fn(() => Promise.resolve(['db_a', 'db_b']));
+    mockDs.fetchTables = jest.fn((db?: string) => Promise.resolve(db === 'db_b' ? ['spans'] : ['logs']));
+    const onTableChange = jest.fn();
+    const result = render(<Harness datasource={mockDs} onTableChange={onTableChange} />);
+    const [databaseSelect, tableSelect] = result.getAllByRole('combobox');
+    return { mockDs, onTableChange, result, databaseSelect, tableSelect };
+  };
+
+  it('replaces the table when a database picked in the dropdown lacks it', async () => {
+    const { mockDs, onTableChange, result, databaseSelect } = setup();
+    await waitFor(() => expect(result.getByText('db_a')).toBeInTheDocument());
+
+    fireEvent.keyDown(databaseSelect, { key: 'ArrowDown' }); // opens on db_a, the current one
+    fireEvent.keyDown(databaseSelect, { key: 'ArrowDown' }); // db_b
+    fireEvent.keyDown(databaseSelect, { key: 'Enter' });
+
+    await waitFor(() => expect(mockDs.fetchTables).toHaveBeenCalledWith('db_b'));
+    await waitFor(() => expect(onTableChange).toHaveBeenCalledWith('spans'));
+  });
+
+  it('keeps a typed table after re-selecting the current database', async () => {
+    const { mockDs, onTableChange, result, databaseSelect, tableSelect } = setup();
+    await waitFor(() => expect(result.getByText('db_a')).toBeInTheDocument());
+    await waitFor(() => expect(mockDs.fetchTables).toHaveBeenCalledWith('db_a'));
+
+    fireEvent.keyDown(databaseSelect, { key: 'ArrowDown' }); // opens on db_a, the current one
+    fireEvent.keyDown(databaseSelect, { key: 'Enter' });
+
+    // A table name typed by hand, not in the list.
+    fireEvent.change(tableSelect, { target: { value: 'typed_table' } });
+    await waitFor(() => expect(result.getByText(/typed_table/)).toBeInTheDocument());
+    fireEvent.keyDown(tableSelect, { key: 'Enter' });
+
+    await waitFor(() => expect(onTableChange).toHaveBeenCalledWith('typed_table'));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(onTableChange).toHaveBeenLastCalledWith('typed_table');
   });
 });

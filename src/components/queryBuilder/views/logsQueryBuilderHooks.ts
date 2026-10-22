@@ -8,6 +8,40 @@ import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOpt
 import { appendAdditionalLogColumns } from '../compactQueryDefaults';
 
 /**
+ * The columns a new logs query on the configured logs table starts with: the configured role columns,
+ * the log context columns when "Auto-Select Columns" is on, and the extra default columns. Pass the
+ * table's columns when they are loaded, so the extra columns carry their types.
+ */
+export const buildDefaultLogsColumns = (
+  datasource: Datasource,
+  allColumns: readonly TableColumn[] = []
+): SelectedColumn[] => {
+  const columns: SelectedColumn[] = [];
+  const includedColumns = new Set<string>();
+  for (let [hint, colName] of datasource.getDefaultLogsColumns()) {
+    columns.push({ name: colName, hint });
+    includedColumns.add(colName);
+  }
+
+  if (datasource.shouldSelectLogContextColumns()) {
+    for (let columnName of datasource.getLogContextColumnNames()) {
+      // Excludes columns already added, and maps that contain the selected key (such as "ResourceAttributes['x']")
+      if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
+        continue;
+      }
+
+      columns.push({ name: columnName });
+      includedColumns.add(columnName);
+    }
+  }
+
+  // Extra fields configured via the Columns setting. Pass the fetched schema (when it is loaded)
+  // so each column carries its type; the fold uses that to skip collection- and date-typed columns.
+  appendAdditionalLogColumns(datasource, allColumns, columns, includedColumns);
+  return columns;
+};
+
+/**
  * Loads the default configuration for new queries. (Only runs on new queries)
  */
 export const useLogDefaultsOnMount = (
@@ -26,38 +60,12 @@ export const useLogDefaultsOnMount = (
     const defaultDb = datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase();
     const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable();
     const otelVersion = datasource.getLogsOtelVersion();
-    const defaultColumns = datasource.getDefaultLogsColumns();
-
-    const nextColumns: SelectedColumn[] = [];
-    const includedColumns = new Set<string>();
-    for (let [hint, colName] of defaultColumns) {
-      nextColumns.push({ name: colName, hint });
-      includedColumns.add(colName);
-    }
-
-    if (datasource.shouldSelectLogContextColumns()) {
-      const contextColumnNames = datasource.getLogContextColumnNames();
-
-      for (let columnName of contextColumnNames) {
-        // Excludes columns already added, and maps that contain the selected key (such as "ResourceAttributes['x']")
-        if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
-          continue;
-        }
-
-        nextColumns.push({ name: columnName });
-        includedColumns.add(columnName);
-      }
-    }
-
-    // Extra fields configured via the Columns setting. Pass the fetched schema (when it is loaded)
-    // so each column carries its type; the fold uses that to skip collection- and date-typed columns.
-    appendAdditionalLogColumns(datasource, allColumns, nextColumns, includedColumns);
 
     builderOptionsDispatch(
       setOptions({
         database: defaultDb,
         table: defaultTable || builderOptions.table,
-        columns: nextColumns,
+        columns: buildDefaultLogsColumns(datasource, allColumns),
         meta: {
           otelEnabled: Boolean(otelVersion),
           otelVersion,
@@ -252,24 +260,19 @@ export const useDefaultLogColumnsByName = (
   }, [allColumns, table, messageColumn, logLevelColumn, otelEnabled, builderOptionsDispatch]);
 };
 
-// Apply default filters/orderBy on table change
+// Apply default filters to a new query once it has a table; a table change keeps the query's filters
 export const useDefaultFilters = (
   table: string,
   isNewQuery: boolean,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
-  const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
 
   useEffect(() => {
     if (!table || appliedDefaultFilters.current) {
       return;
     }
 
-    lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({

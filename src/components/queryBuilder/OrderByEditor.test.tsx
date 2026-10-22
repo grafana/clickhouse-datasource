@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OrderByEditor, getOrderByOptions } from './OrderByEditor';
 import { AggregateType, BuilderMode, OrderByDirection, QueryType, TableColumn } from 'types/queryBuilder';
@@ -84,6 +84,25 @@ describe('OrderByEditor', () => {
     expect(onOrderByChange).toBeCalledTimes(1);
     expect(onOrderByChange).toBeCalledWith([{ name: 'foo', dir: OrderByDirection.ASC }]);
   });
+  it('clears the default flag when the user flips a default ordering', () => {
+    // So a type change keeps the user's choice instead of replacing it with the type's defaults.
+    const onOrderByChange = jest.fn();
+    const result = render(
+      <OrderByEditor
+        orderByOptions={[testOptions[0]]}
+        orderBy={[{ name: 'foo', dir: OrderByDirection.DESC, default: true }]}
+        onOrderByChange={onOrderByChange}
+      />
+    );
+
+    const direction = result.getAllByRole('combobox')[1];
+    fireEvent.keyDown(direction, { key: 'ArrowDown' }); // opens on DESC
+    fireEvent.keyDown(direction, { key: 'ArrowUp' }); // ASC
+    fireEvent.keyDown(direction, { key: 'Enter' });
+
+    expect(onOrderByChange).toHaveBeenCalledWith([{ name: 'foo', dir: OrderByDirection.ASC, default: undefined }]);
+  });
+
   it('should remove items when remove button clicked', async () => {
     const onOrderByChange = jest.fn();
     const result = render(
