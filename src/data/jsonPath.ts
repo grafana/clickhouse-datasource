@@ -67,20 +67,19 @@ export function mintJSONAdhocKey(baseText: string, path: string): string {
 // Optional `table.` prefix, the JSON column, then one or more backtick-quoted
 // path segments. The segment body allows escaped chars so a `\`` can't end the
 // match early.
-const JSON_ADHOC_KEY = /^(?:[^.`]+\.)?([^.`]+)((?:\.`(?:[^`\\]|\\.)*`)+)$/;
+const JSON_ADHOC_KEY = /^(?:([^.`]+)\.)?([^.`]+)((?:\.`(?:[^`\\]|\\.)*`)+)$/;
 
 /**
- * Parse a key minted by `mintJSONAdhocKey` back into `{ column, path }` (any
- * `table.` prefix is dropped). Returns `undefined` for keys not in the backtick
- * JSON form (Map bracket, bare column, legacy dotted), so callers can fall
- * through to the existing handling.
+ * Parse a key minted by `mintJSONAdhocKey` back into `{ table, column, path }`.
+ * Returns `undefined` for keys not in the backtick JSON form (Map bracket, bare
+ * column, legacy dotted), so callers can fall through to the existing handling.
  */
-export function parseJSONAdhocKey(s: string): { column: string; path: string } | undefined {
+export function parseJSONAdhocKey(s: string): { table?: string; column: string; path: string } | undefined {
   const m = s.match(JSON_ADHOC_KEY);
   if (!m) {
     return undefined;
   }
-  const column = m[1];
-  const segments = [...m[2].matchAll(/`((?:[^`\\]|\\.)*)`/g)].map((seg) => unescapeJSONPathSegment(seg[1]));
-  return { column, path: segments.join('.') };
+  const [, table, column, pathSegments] = m;
+  const segments = [...pathSegments.matchAll(/`((?:[^`\\]|\\.)*)`/g)].map((seg) => unescapeJSONPathSegment(seg[1]));
+  return { table, column, path: segments.join('.') };
 }

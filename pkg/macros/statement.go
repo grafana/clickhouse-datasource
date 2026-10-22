@@ -93,7 +93,7 @@ func expandStatementMacros(rawSQL string, q *sqlutil.Query) (string, error) {
 		return rawSQL, nil
 	}
 	if match.argsStart < 0 {
-		return rawSQL, badArgsErr(stmtPrefix+match.name, 3, 0)
+		return rawSQL, badArgsErr(stmtPrefix+match.name, 3, 0, stmtPrefix+match.name+"(timeColumn, labelColumn, valueColumn) FROM table")
 	}
 
 	args, err := splitStatementArgs(work[match.argsStart:match.argsEnd])
@@ -101,7 +101,7 @@ func expandStatementMacros(rawSQL string, q *sqlutil.Query) (string, error) {
 		return rawSQL, backend.DownstreamError(fmt.Errorf("%s%s: %w", stmtPrefix, match.name, err))
 	}
 	if len(args) != 3 {
-		return rawSQL, badArgsErr(stmtPrefix+match.name, 3, len(args))
+		return rawSQL, badArgsErr(stmtPrefix+match.name, 3, len(args), stmtPrefix+match.name+"(timeColumn, labelColumn, valueColumn) FROM table")
 	}
 
 	expanded, err := statementBuilders[match.name](q, args, work[match.argsEnd+1:])
