@@ -107,10 +107,20 @@ func CategorizeConnectionError(err error) ConnectionErrorCategory {
 		}
 	}
 
+	var formatErr *responseFormatError
+	if errors.As(err, &formatErr) {
+		return ConnectionErrorCategoryConfig
+	}
+
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return ConnectionErrorCategoryTimeout
 	}
 	if errors.Is(err, clickhouse.ErrAcquireConnTimeout) {
+		return ConnectionErrorCategoryTimeout
+	}
+	// A socket deadline gives os.ErrDeadlineExceeded, which does not match context.DeadlineExceeded.
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
 		return ConnectionErrorCategoryTimeout
 	}
 	if errors.Is(err, clickhouse.ErrAcquireConnNoAddress) {
