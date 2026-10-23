@@ -58,21 +58,50 @@ export const CompactFilterBar = (props: CompactFilterBarProps) => {
   } = props;
   const styles = useStyles2(getStyles);
   const [showPopover, setShowPopover] = useState(false);
+  const [editingFilterIndex, setEditingFilterIndex] = useState<number | undefined>();
 
   const onRemoveFilter = (index: number) => {
     onFiltersChange(filters.filter((_, filterIndex) => filterIndex !== index));
+    if (editingFilterIndex === index) {
+      setEditingFilterIndex(undefined);
+      setShowPopover(false);
+    }
   };
 
   const onAddFilter = (filter: Filter) => {
-    onFiltersChange([...filters, filter]);
+    if (editingFilterIndex === undefined) {
+      onFiltersChange([...filters, filter]);
+    } else {
+      onFiltersChange(filters.map((existing, index) => (index === editingFilterIndex ? filter : existing)));
+    }
+    setEditingFilterIndex(undefined);
+  };
+
+  const onEditFilter = (index: number) => {
+    setEditingFilterIndex(index);
+    setShowPopover(true);
   };
 
   return (
     <div data-testid="compact-filter-bar">
       <div className={styles.row}>
         <div className={styles.filters}>
-          <FilterTagBar filters={filters} selectedColumns={selectedColumns} onRemoveFilter={onRemoveFilter} />
-          <Button icon="plus" variant="secondary" size="sm" fill="text" onClick={() => setShowPopover(!showPopover)}>
+          <FilterTagBar
+            filters={filters}
+            selectedColumns={selectedColumns}
+            onRemoveFilter={onRemoveFilter}
+            onEditFilter={onEditFilter}
+          />
+          <Button
+            icon="plus"
+            variant="secondary"
+            size="sm"
+            fill="text"
+            onClick={() => {
+              setEditingFilterIndex(undefined);
+              setShowPopover(!showPopover);
+            }}
+          >
             Add filter
           </Button>
           {onToggleAdvanced && (
@@ -97,7 +126,9 @@ export const CompactFilterBar = (props: CompactFilterBarProps) => {
           database={database}
           table={table}
           allColumns={allColumns}
+          selectedColumns={selectedColumns}
           onAddFilter={onAddFilter}
+          filter={editingFilterIndex === undefined ? undefined : filters[editingFilterIndex]}
           onClose={() => setShowPopover(false)}
         />
       )}

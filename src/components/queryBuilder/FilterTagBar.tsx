@@ -8,6 +8,7 @@ interface FilterTagBarProps {
   filters: Filter[];
   selectedColumns?: readonly SelectedColumn[];
   onRemoveFilter: (index: number) => void;
+  onEditFilter: (index: number) => void;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -122,7 +123,7 @@ const getOperatorDisplay = (operator: FilterOperator): string => {
 };
 
 export const FilterTagBar = (props: FilterTagBarProps) => {
-  const { filters, selectedColumns, onRemoveFilter } = props;
+  const { filters, selectedColumns, onRemoveFilter, onEditFilter } = props;
   const styles = useStyles2(getStyles);
 
   const activeFilters = filters.filter(
@@ -156,13 +157,21 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
 
         return (
           <Tooltip key={index} content={`${name} ${operator} ${value}`.trim()} placement="top">
-            <span className={styles.tag}>
+            <span className={styles.tag} onClick={() => onEditFilter(index)} role="button" tabIndex={0}>
               <span className={styles.tagContent}>
                 <span className={styles.tagKey}>{name}</span>
                 <span className={styles.tagOperator}> {operator} </span>
                 {value && <span className={styles.tagValue}>{value}</span>}
               </span>
-              <span className={styles.removeBtn} onClick={() => onRemoveFilter(index)} role="button" tabIndex={0}>
+              <span
+                className={styles.removeBtn}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onRemoveFilter(index);
+                }}
+                role="button"
+                tabIndex={0}
+              >
                 <Icon name="times" size="sm" />
               </span>
             </span>
