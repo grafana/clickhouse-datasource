@@ -91,9 +91,9 @@ Work through the following checks in order. Most cases are resolved by one of th
 
 #### Connection timeout
 
-**Error message:** "connection timeout" or "the operation was cancelled before starting: context deadline exceeded"
+**Error message:** "connection timeout", "the operation was cancelled before starting: context deadline exceeded", or a message that starts with `[timeout]`. For example: "[timeout] dial tcp 192.0.2.1:9000: i/o timeout"
 
-**Cause:** The connection to the ClickHouse server timed out before it could be established.
+**Cause:** The connection to the ClickHouse server timed out before it could be established. The text after `[timeout]` is the error from the connection attempt.
 
 **Solution:**
 
@@ -104,16 +104,14 @@ Work through the following checks in order. Most cases are resolved by one of th
 
 #### Operation cancelled during execution
 
-**Error message:** "the operation was cancelled during execution: context deadline exceeded"
+**Error message:** "the operation was cancelled during execution: context canceled", followed by the connection error. For example: "the operation was cancelled during execution: context canceled: dial tcp 192.0.2.1:9000: i/o timeout"
 
-**Cause:** The query or connection operation exceeded the configured timeout while running.
+**Cause:** The request was cancelled while the plugin was connecting to the ClickHouse server, for example because a dashboard was refreshed or closed. The text after `context canceled:` is the error from the connection attempt. This message usually appears in the Grafana server logs.
 
 **Solution:**
 
-1. Increase the **Query Timeout** value in the data source settings (default is 60 seconds).
-2. Optimize your query to reduce execution time.
-3. Check if the ClickHouse server is under heavy load.
-4. Consider adding appropriate indexes to your ClickHouse tables.
+1. If the message appears only now and then, no action is needed.
+2. If the connection error after `context canceled:` is a timeout, follow the steps in [Connection timeout](#connection-timeout).
 
 #### Plugin not found after installation (Grafana Cloud)
 
@@ -311,7 +309,7 @@ For more details on configuring permissions, refer to [ClickHouse user and permi
 
 ## Query builder issues
 
-These issues affect the visual query builder's schema drop-downs and autocomplete rather than query execution itself.
+These issues affect the query builder's schema drop-downs and the SQL editor's autocomplete rather than query execution itself.
 
 #### Empty database, table, or column drop-downs
 
@@ -337,6 +335,19 @@ These issues affect the visual query builder's schema drop-downs and autocomplet
 1. Use simpler filter values that you type manually rather than relying on autocomplete.
 2. Create a materialized view or dictionary with pre-aggregated distinct values for frequently filtered columns.
 3. Add a `clickhouse_adhoc_query` variable with a targeted `SELECT` query instead of relying on schema-driven suggestions.
+
+#### JSON path suggestions are missing in the SQL editor
+
+**Symptoms:** After you type a `JSON` column name and a dot in the SQL editor, the suggestions list shows macros and functions but no paths from the column.
+
+**Cause:** The plugin discovers paths with `distinctJSONPathsAndTypes` over a sample of at most 100,000 rows (from the most recent 6 hours for the configured logs or traces table). The lookup returns nothing when the **Suggest Map keys and JSON paths** setting is disabled, when the ClickHouse user has no `SELECT` permission on the column, when the ClickHouse server is older than 24.9, or when the sample contains no rows. The editor does not show the failure. The ClickHouse error is in the response body of the failed `/api/ds/query` request in the browser's Network tab.
+
+**Solution:**
+
+1. Open the browser developer tools (**F12** > **Network**), type the column name and a dot again, and read the response of the `/api/ds/query` request whose body contains `distinctJSONPathsAndTypes`.
+2. Enable **Suggest Map keys and JSON paths** in the data source settings.
+3. Verify the ClickHouse user has `SELECT` permission on the `JSON` column.
+4. Type the path manually. The editor accepts any path, suggested or not.
 
 ## Query errors
 
@@ -381,10 +392,10 @@ These errors occur when a query is sent to ClickHouse but fails during parsing o
    - `$__dateTimeFilter(dateColumn, timeColumn)` - requires 2 arguments
    - `$__timeInterval(column)` - requires 1 argument (the time column)
    - `$__timeInterval_ms(column)` - requires 1 argument (the time column)
-   - `$__timeFrom(column)` - requires 1 argument (the time column)
-   - `$__timeTo(column)` - requires 1 argument (the time column)
+   - `$__timeFrom(column)` - at most 1 argument (the time column). `$__timeFrom()` returns the range start, like `$__fromTime`
+   - `$__timeTo(column)` - at most 1 argument (the time column). `$__timeTo()` returns the range end, like `$__toTime`
    - `$__timeGroup(column, interval)` - requires 2 arguments (the time column and an interval such as `5m`)
-2. Ensure arguments are separated by commas if multiple are required.
+2. Ensure arguments are separated by commas if multiple are required. The error message names the expected form.
 
 #### SQL parse error
 

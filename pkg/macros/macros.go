@@ -30,8 +30,8 @@ var grafanaIntervalUnits = map[string]string{
 // bug. macropro's MacroFunc signature forbids a backend.ErrorWithSource
 // return type, so we wrap via backend.DownstreamError and let errors.As
 // unwrap it at the sqlds boundary.
-func badArgsErr(macro string, want, got int) error {
-	return backend.DownstreamError(fmt.Errorf("%w: %s expected %d argument(s), received %d", sqlutil.ErrorBadArgumentCount, macro, want, got))
+func badArgsErr(macro string, want, got int, usage string) error {
+	return backend.DownstreamError(fmt.Errorf("%w: %s expected %d argument(s), received %d, usage: %s", sqlutil.ErrorBadArgumentCount, macro, want, got, usage))
 }
 
 // timeToDate converts a time.Time to a ClickHouse Date literal.
@@ -87,7 +87,7 @@ func ToTimeFilterMs(ctx macropro.QueryContext[struct{}], args []string) (string,
 // $__timeFilter(col) → col >= toDateTime(<from>) AND col <= toDateTime(<to>)
 func TimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", badArgsErr("$__timeFilter", 1, len(args))
+		return "", badArgsErr("$__timeFilter", 1, len(args), "$__timeFilter(timeColumn)")
 	}
 	col := args[0]
 	return fmt.Sprintf("%s >= %s AND %s <= %s", col, timeToDateTime(ctx.TimeRange.From), col, timeToDateTime(ctx.TimeRange.To)), nil
@@ -97,7 +97,7 @@ func TimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string, err
 // $__timeFilter_ms(col) → col >= fromUnixTimestamp64Milli(<from>) AND col <= fromUnixTimestamp64Milli(<to>)
 func TimeFilterMs(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", badArgsErr("$__timeFilter_ms", 1, len(args))
+		return "", badArgsErr("$__timeFilter_ms", 1, len(args), "$__timeFilter_ms(timeColumn)")
 	}
 	col := args[0]
 	return fmt.Sprintf("%s >= %s AND %s <= %s", col, timeToDateTime64(ctx.TimeRange.From), col, timeToDateTime64(ctx.TimeRange.To)), nil
@@ -107,7 +107,7 @@ func TimeFilterMs(ctx macropro.QueryContext[struct{}], args []string) (string, e
 // $__dateFilter(col) → col >= toDate('YYYY-MM-DD') AND col <= toDate('YYYY-MM-DD')
 func DateFilter(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", badArgsErr("$__dateFilter", 1, len(args))
+		return "", badArgsErr("$__dateFilter", 1, len(args), "$__dateFilter(dateColumn)")
 	}
 	col := args[0]
 	return fmt.Sprintf("%s >= %s AND %s <= %s", col, timeToDate(ctx.TimeRange.From), col, timeToDate(ctx.TimeRange.To)), nil
@@ -117,7 +117,7 @@ func DateFilter(ctx macropro.QueryContext[struct{}], args []string) (string, err
 // $__dateTimeFilter(dateCol, timeCol) → (dateCol >= toDate(...) AND ...) AND (timeCol >= toDateTime(...) AND ...)
 func DateTimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 2 {
-		return "", badArgsErr("$__dateTimeFilter", 2, len(args))
+		return "", badArgsErr("$__dateTimeFilter", 2, len(args), "$__dateTimeFilter(dateColumn, timeColumn)")
 	}
 	dateCol, timeCol := args[0], args[1]
 	dateFilter := fmt.Sprintf("(%s >= %s AND %s <= %s)", dateCol, timeToDate(ctx.TimeRange.From), dateCol, timeToDate(ctx.TimeRange.To))
@@ -129,7 +129,7 @@ func DateTimeFilter(ctx macropro.QueryContext[struct{}], args []string) (string,
 // $__timeInterval(col) → toStartOfInterval(toDateTime(col), INTERVAL N second)
 func TimeInterval(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", badArgsErr("$__timeInterval", 1, len(args))
+		return "", badArgsErr("$__timeInterval", 1, len(args), "$__timeInterval(timeColumn), the bucket size comes from the dashboard interval")
 	}
 	seconds := math.Max(ctx.Interval.Seconds(), 1)
 	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", args[0], int(seconds)), nil
@@ -139,7 +139,7 @@ func TimeInterval(ctx macropro.QueryContext[struct{}], args []string) (string, e
 // $__timeInterval_ms(col) → toStartOfInterval(toDateTime64(col, 3), INTERVAL N millisecond)
 func TimeIntervalMs(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", badArgsErr("$__timeInterval_ms", 1, len(args))
+		return "", badArgsErr("$__timeInterval_ms", 1, len(args), "$__timeInterval_ms(timeColumn), the bucket size comes from the dashboard interval")
 	}
 	ms := math.Max(float64(ctx.IntervalMS), 1)
 	return fmt.Sprintf("toStartOfInterval(toDateTime64(%s, 3), INTERVAL %d millisecond)", args[0], int(ms)), nil
@@ -158,7 +158,7 @@ func IntervalSeconds(ctx macropro.QueryContext[struct{}], args []string) (string
 // $__fromGrafanaInterval('5m') → 5 minute
 func FromGrafanaInterval(_ macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 1 {
-		return "", badArgsErr("$__fromGrafanaInterval", 1, len(args))
+		return "", badArgsErr("$__fromGrafanaInterval", 1, len(args), "$__fromGrafanaInterval(interval)")
 	}
 
 	interval := strings.Trim(strings.TrimSpace(args[0]), "'\"")
@@ -185,25 +185,47 @@ func FromGrafanaInterval(_ macropro.QueryContext[struct{}], args []string) (stri
 	return fmt.Sprintf("%d %s", value, unit), nil
 }
 
-// TimeFrom overrides the dialect-neutral $__timeFrom default with a
-// ClickHouse-native filter expression. sqlutil's default renders an
-// RFC 3339 string literal that only works via implicit String→DateTime
-// coercion; ClickHouse's DateTime functions are explicit and cheaper.
-// $__timeFrom(col) → col >= toDateTime(<from_unix>)
-func TimeFrom(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
-	if len(args) != 1 {
-		return "", badArgsErr("$__timeFrom", 1, len(args))
+// Interval renders $__interval as the largest of hours, minutes, seconds or
+// milliseconds that divides the interval exactly, so a per-query min interval
+// such as 90m never renders finer than the floor it sets.
+func Interval(ctx macropro.QueryContext[struct{}], _ []string) (string, error) {
+	d := ctx.Interval
+	if d == 0 {
+		return "0s", nil
 	}
-	return fmt.Sprintf("%s >= %s", args[0], timeToDateTime(ctx.TimeRange.From)), nil
+	switch {
+	case d%time.Hour == 0:
+		return fmt.Sprintf("%dh", int64(d/time.Hour)), nil
+	case d%time.Minute == 0:
+		return fmt.Sprintf("%dm", int64(d/time.Minute)), nil
+	case d%time.Second == 0:
+		return fmt.Sprintf("%ds", int64(d/time.Second)), nil
+	default:
+		return fmt.Sprintf("%dms", int64(d/time.Millisecond)), nil
+	}
 }
 
-// TimeTo is the ClickHouse-native counterpart to TimeFrom.
-// $__timeTo(col) → col <= toDateTime(<to_unix>)
+// TimeFrom is the ClickHouse-native $__timeFrom, dual mode like the macropro default.
+// $__timeFrom() → toDateTime(<from_unix>), $__timeFrom(col) → col >= toDateTime(<from_unix>)
+func TimeFrom(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
+	return timeBoundary("$__timeFrom", ">=", ctx.TimeRange.From, args)
+}
+
+// TimeTo is the ClickHouse-native $__timeTo, dual mode like the macropro default.
+// $__timeTo() → toDateTime(<to_unix>), $__timeTo(col) → col <= toDateTime(<to_unix>)
 func TimeTo(ctx macropro.QueryContext[struct{}], args []string) (string, error) {
-	if len(args) != 1 {
-		return "", badArgsErr("$__timeTo", 1, len(args))
+	return timeBoundary("$__timeTo", "<=", ctx.TimeRange.To, args)
+}
+
+func timeBoundary(name, op string, t time.Time, args []string) (string, error) {
+	switch {
+	case len(args) == 0 || (len(args) == 1 && args[0] == ""):
+		return timeToDateTime(t), nil
+	case len(args) == 1:
+		return fmt.Sprintf("%s %s %s", args[0], op, timeToDateTime(t)), nil
 	}
-	return fmt.Sprintf("%s <= %s", args[0], timeToDateTime(ctx.TimeRange.To)), nil
+	return "", backend.DownstreamError(fmt.Errorf("%w: %s accepts at most 1 argument, received %d, usage: %s() or %s(timeColumn)",
+		sqlutil.ErrorBadArgumentCount, name, len(args), name, name))
 }
 
 // TimeGroup overrides sqlutil's SQL-Server-style datepart() output — which
@@ -212,7 +234,7 @@ func TimeTo(ctx macropro.QueryContext[struct{}], args []string) (string, error) 
 // $__timeGroup(col, 5m) → toStartOfInterval(toDateTime(col), INTERVAL 300 second)
 func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error) {
 	if len(args) != 2 {
-		return "", badArgsErr("$__timeGroup", 2, len(args))
+		return "", badArgsErr("$__timeGroup", 2, len(args), "$__timeGroup(timeColumn, interval)")
 	}
 	col := strings.TrimSpace(args[0])
 	periodStr := strings.Trim(strings.TrimSpace(args[1]), "'\"")
@@ -237,8 +259,9 @@ func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error)
 // Where the dialect-neutral default produces output that does not parse as
 // valid ClickHouse SQL — timeFilter, timeFrom, timeTo, timeGroup — the
 // override below emits ClickHouse-native functions (toDateTime,
-// toStartOfInterval). The remaining defaults (interval, interval_ms, table,
-// column) are format-neutral and reused as-is.
+// toStartOfInterval). interval is overridden so that its rendering does not
+// change with the macropro version. The remaining defaults (interval_ms,
+// table, column) are reused as-is.
 var ClickHouseMacros = macropro.MergeMacros(
 	macropro.DefaultMacros[struct{}](),
 	macropro.MacroMap[struct{}]{
@@ -247,6 +270,7 @@ var ClickHouseMacros = macropro.MergeMacros(
 		"timeFrom":   TimeFrom,
 		"timeTo":     TimeTo,
 		"timeGroup":  TimeGroup,
+		"interval":   Interval,
 
 		// ClickHouse-specific extensions (no SDK-default equivalent).
 		"fromTime":            FromTimeFilter,
