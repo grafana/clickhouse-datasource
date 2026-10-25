@@ -1032,3 +1032,32 @@ func TestQueryLocation(t *testing.T) {
 		})
 	}
 }
+
+func TestMutateResponseConvertsJSONFieldsToStrings(t *testing.T) {
+	raw := json.RawMessage(`{"a":[1,2]}`)
+	frame := &data.Frame{
+		Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+		Fields: []*data.Field{
+			data.NewField("time", nil, []time.Time{time.Unix(0, 0), time.Unix(1, 0)}),
+			// The JSON-family converters (Map, Array, Tuple, JSON, ...) emit
+			// FieldTypeJSON values.
+			data.NewField("attrs", nil, []json.RawMessage{json.RawMessage(`{"k":"v"}`), json.RawMessage(`[1,2]`)}),
+			data.NewField("nullable", nil, []*json.RawMessage{&raw, nil}),
+		},
+	}
+
+	frames, err := (&Clickhouse{}).MutateResponse(context.Background(), data.Frames{frame})
+	require.NoError(t, err)
+
+	attrs := frames[0].Fields[1]
+	require.Equal(t, data.FieldTypeNullableString, attrs.Type())
+	require.NotNil(t, attrs.At(0).(*string))
+	assert.Equal(t, `{"k":"v"}`, *attrs.At(0).(*string))
+	assert.Equal(t, `[1,2]`, *attrs.At(1).(*string))
+
+	nullable := frames[0].Fields[2]
+	require.Equal(t, data.FieldTypeNullableString, nullable.Type())
+	require.NotNil(t, nullable.At(0).(*string))
+	assert.Equal(t, `{"a":[1,2]}`, *nullable.At(0).(*string))
+	assert.Nil(t, nullable.At(1).(*string))
+}

@@ -781,12 +781,13 @@ func shouldConvertFields(visType data.VisType) bool {
 	return visType != data.VisTypeTrace && visType != data.VisTypeTable && visType != data.VisTypeLogs
 }
 
-// convertNullableJSONFields converts all FieldTypeNullableJSON fields in the given frame to string.
+// convertNullableJSONFields converts all JSON fields (FieldTypeJSON and
+// FieldTypeNullableJSON) in the given frame to nullable strings.
 func convertNullableJSONFields(frame *data.Frame) error {
 	var convertedFields []*data.Field
 
 	for _, field := range frame.Fields {
-		if field.Type() == data.FieldTypeJSON {
+		if field.Type().JSON() {
 			newField, err := convertFieldToString(field)
 			if err != nil {
 				return err
@@ -808,17 +809,25 @@ func convertFieldToString(field *data.Field) (*data.Field, error) {
 	newField.SetConfig(field.Config)
 
 	for i := 0; i < field.Len(); i++ {
-		val, _ := field.At(i).(*json.RawMessage)
+		// The JSON-family converters emit FieldTypeJSON, whose values are
+		// json.RawMessage, while FieldTypeNullableJSON holds *json.RawMessage.
+		// Asserting only the pointer form turned every FieldTypeJSON value
+		// into null.
+		var val json.RawMessage
+		switch v := field.At(i).(type) {
+		case json.RawMessage:
+			val = v
+		case *json.RawMessage:
+			if v != nil {
+				val = *v
+			}
+		}
 		if val == nil {
 			newField.Set(i, nil)
-		} else {
-			bytes, err := val.MarshalJSON()
-			if err != nil {
-				return nil, err
-			}
-			sVal := string(bytes)
-			newField.Set(i, &sVal)
+			continue
 		}
+		sVal := string(val)
+		newField.Set(i, &sVal)
 	}
 
 	return newField, nil
