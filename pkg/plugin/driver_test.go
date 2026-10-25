@@ -1061,3 +1061,8 @@ func TestMutateResponseConvertsJSONFieldsToStrings(t *testing.T) {
 	assert.Equal(t, `{"a":[1,2]}`, *nullable.At(0).(*string))
 	assert.Nil(t, nullable.At(1).(*string))
 }
+
+func TestExtractForwardedHeadersRejectsNonStringValues(t *testing.T) {
+	_, err := extractForwardedHeadersFromMessage(json.RawMessage(`{"grafana-http-headers": {"X-Test": [1]}}`))
+	assert.Error(t, err)
+}

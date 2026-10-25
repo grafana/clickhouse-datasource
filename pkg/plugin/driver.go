@@ -867,7 +867,11 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 
 			strHeadersArr := make([]string, len(anyHeadersArr))
 			for ind, val := range anyHeadersArr {
-				strHeadersArr[ind] = val.(string)
+				strVal, ok := val.(string)
+				if !ok {
+					return nil, fmt.Errorf("couldn't parse header %s: expected string values, got %T", k, val)
+				}
+				strHeadersArr[ind] = strVal
 			}
 
 			httpHeaders[k] = strings.Join(strHeadersArr, ",")
