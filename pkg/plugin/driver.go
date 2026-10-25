@@ -679,8 +679,27 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		return ctx, req
 	}
 
-	loc, _ := time.LoadLocation(dataQuery.Meta.TimeZone)
+	loc := queryLocation(dataQuery.Meta.TimeZone)
+	if loc == nil {
+		return ctx, req
+	}
 	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
+}
+
+// queryLocation resolves the dashboard time zone sent by the frontend. Grafana
+// names UTC "utc" in lower case, which time.LoadLocation only accepts as "UTC",
+// so it is matched case-insensitively instead of silently falling back to the
+// server time zone. An unknown zone returns nil and is logged.
+func queryLocation(timeZone string) *time.Location {
+	if strings.EqualFold(timeZone, "utc") {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(timeZone)
+	if err != nil {
+		backend.Logger.Warn("Unknown query time zone, using the server time zone", "timezone", timeZone, "error", err)
+		return nil
+	}
+	return loc
 }
 
 // MutateResponse converts fields of type FieldTypeNullableJSON to string,
