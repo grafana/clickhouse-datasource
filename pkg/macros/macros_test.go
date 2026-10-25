@@ -279,6 +279,21 @@ func TestMacroTimeGroup(t *testing.T) {
 
 	_, err = TimeGroup(ctx, []string{"ts", "not-a-duration"})
 	assert.Error(t, err)
+
+	// $__interval interpolates to day and week units on long time ranges.
+	got, err = TimeGroup(ctx, []string{"ts", "1d"})
+	assert.Nil(t, err)
+	assert.Equal(t, "toStartOfInterval(toDateTime(ts), INTERVAL 86400 second)", got)
+
+	got, err = TimeGroup(ctx, []string{"ts", "'2w'"})
+	assert.Nil(t, err)
+	assert.Equal(t, "toStartOfInterval(toDateTime(ts), INTERVAL 1209600 second)", got)
+
+	_, err = TimeGroup(ctx, []string{"ts", "0d"})
+	assert.Error(t, err)
+
+	_, err = TimeGroup(ctx, []string{"ts", "99999999999999w"})
+	assert.Error(t, err)
 }
 
 // TestMacroErrorsAreDownstream ensures bad-argument and bad-duration errors
