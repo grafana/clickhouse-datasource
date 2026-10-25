@@ -8,6 +8,20 @@ import (
 	"github.com/grafana/sqlds/v5"
 )
 
+// Datasource wraps the sqlds datasource so request headers can be adjusted
+// before sqlds reads them. sqlds copies the forwarded headers out of the
+// request before it calls any driver hook (MutateQueryData included), so a
+// header added from a hook never reaches ClickHouse.
+type Datasource struct {
+	*sqlds.SQLDatasource
+}
+
+// QueryData adds X-Grafana-User to the request headers, then delegates to sqlds.
+func (ds *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	injectGrafanaUserHeader(ctx, req)
+	return ds.SQLDatasource.QueryData(ctx, req)
+}
+
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 	clickhousePlugin := Clickhouse{}
 	ds := sqlds.NewDatasource(&clickhousePlugin)
@@ -25,5 +39,9 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		ds.EnableMultipleConnections = true
 	}
 
-	return ds.NewDatasource(ctx, settings)
+	instance, err := ds.NewDatasource(ctx, settings)
+	if err != nil {
+		return nil, err
+	}
+	return &Datasource{SQLDatasource: instance.(*sqlds.SQLDatasource)}, nil
 }

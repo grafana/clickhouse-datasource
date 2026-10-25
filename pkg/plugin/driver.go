@@ -513,8 +513,6 @@ func (h *Clickhouse) MutateQueryData(
 		ctx = context.WithValue(ctx, grafanaHeadersKey, gh)
 	}
 
-	injectGrafanaUserHeader(ctx, req)
-
 	return ctx, req
 }
 
@@ -524,6 +522,10 @@ func (h *Clickhouse) MutateQueryData(
 // path (core HTTP datasources); plugin-initiated connections never see it,
 // so downstream ClickHouse loses the user attribution that operators expect
 // when the toggle is on. See #1451.
+//
+// It runs from Datasource.QueryData rather than MutateQueryData: sqlds takes
+// its copy of the forwarded headers before calling MutateQueryData, so a
+// header set there was never sent.
 func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest) {
 	if req == nil || req.PluginContext.DataSourceInstanceSettings == nil {
 		return

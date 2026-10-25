@@ -578,9 +578,7 @@ func TestMutateQuery_MinIntervalDoesNotBreakTimezone(t *testing.T) {
 	assert.NotEqual(t, t.Context(), ctx, "timezone should still have been applied to the context")
 }
 
-func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
-	h := &Clickhouse{}
-
+func TestInjectGrafanaUserHeader(t *testing.T) {
 	newRequest := func(forward bool) *backend.QueryDataRequest {
 		jsonBytes, _ := json.Marshal(map[string]any{
 			"host":                  "localhost",
@@ -601,7 +599,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req := newRequest(true)
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Equal(t, "alice", req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -610,7 +608,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req := newRequest(false)
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -620,7 +618,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req.SetHTTPHeader("X-Grafana-User", "from-proxy")
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Equal(t, "from-proxy", req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -628,7 +626,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	t.Run("no user in context is a no-op", func(t *testing.T) {
 		req := newRequest(true)
 
-		h.MutateQueryData(t.Context(), req)
+		injectGrafanaUserHeader(t.Context(), req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -638,7 +636,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
 		// Should not panic and should not set the header.
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -647,7 +645,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req := newRequest(true)
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: ""})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
