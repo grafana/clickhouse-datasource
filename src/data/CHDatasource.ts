@@ -1028,7 +1028,9 @@ export class Datasource
 
   private format(value: any) {
     if (Array.isArray(value)) {
-      return `'${value.join("','")}'`;
+      // Each value becomes its own string literal, so a quote or backslash in
+      // a value must be escaped or it ends the literal early.
+      return value.map((v) => `'${escapeCHStringLiteral(String(v))}'`).join(',');
     }
     return value;
   }
