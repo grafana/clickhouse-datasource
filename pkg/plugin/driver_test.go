@@ -1011,3 +1011,24 @@ func TestBuildClickHouseOptionsRowLimitPushDown(t *testing.T) {
 		assert.False(t, ok, "the limit setting must not be pushed to the server when enableRowLimit is off")
 	})
 }
+
+func TestQueryLocation(t *testing.T) {
+	lisbon, err := time.LoadLocation("Europe/Lisbon")
+	assert.NoError(t, err)
+
+	tests := []struct {
+		timeZone string
+		want     *time.Location
+	}{
+		// Grafana sends "utc" in lower case when the dashboard time zone is UTC.
+		{timeZone: "utc", want: time.UTC},
+		{timeZone: "UTC", want: time.UTC},
+		{timeZone: "Europe/Lisbon", want: lisbon},
+		{timeZone: "Not/AZone", want: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.timeZone, func(t *testing.T) {
+			assert.Equal(t, tc.want, queryLocation(tc.timeZone))
+		})
+	}
+}
