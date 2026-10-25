@@ -194,6 +194,17 @@ describe('ClickHouseDatasource', () => {
 
       expect(spyOnReplace).toHaveBeenCalledWith('select $__interval', scoped, expect.any(Function));
     });
+    it('quotes and escapes each value of a multi-value variable', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $v', editorType: EditorType.SQL } as CHQuery;
+
+      createInstance({}).applyTemplateVariables(query, {});
+
+      const format = spyOnReplace.mock.calls[0][2] as unknown as (value: unknown) => string;
+      expect(format(['a', 'b'])).toBe(`'a','b'`);
+      expect(format([`it's`, 'C:\\temp', 3])).toBe(`'it\\'s','C:\\\\temp','3'`);
+      expect(format('single')).toBe('single');
+    });
     it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];
