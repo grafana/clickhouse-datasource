@@ -762,6 +762,28 @@ describe('ClickHouseDatasource', () => {
       expect(values).toEqual([{ text: 'foo' }]);
     });
 
+    it('keeps applying ad-hoc filters to panel queries while a tag value lookup is pending', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      // The schema probe never answers, so getTagValues stays suspended.
+      jest.spyOn(ds, 'query').mockImplementation(() => new Subject<DataQueryResponse>());
+      const applySpy = jest.spyOn(ds.adHocFilter, 'apply').mockImplementation((sql) => `${sql} filtered`);
+
+      void ds.getTagValues({ key: 'foo.bar' });
+
+      const filters = [{ key: 'foo.bar', operator: '=', value: 'x' }];
+      const result = ds.applyTemplateVariables(
+        { rawSql: 'SELECT * FROM foo', editorType: EditorType.SQL, refId: 'A' } as CHQuery,
+        {},
+        filters
+      );
+
+      expect(applySpy).toHaveBeenCalledWith('SELECT * FROM foo', filters, false, true);
+      expect(result.rawSql).toBe('SELECT * FROM foo filtered');
+    });
+
     it('should Fetch Tag Values from Query', async () => {
       const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'select name from bar');
       const ds = cloneDeep(mockDatasource);

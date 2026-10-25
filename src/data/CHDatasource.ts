@@ -236,7 +236,6 @@ export class Datasource
 {
   settings: DataSourceInstanceSettings<CHConfig>;
   adHocFilter: AdHocFilter;
-  skipAdHocFilter = false; // don't apply adhoc filters to the query
   adHocFiltersStatus = AdHocFilterStatus.none; // ad hoc filters only work with CH 22.7+
   adHocCHVerReq = { major: 22, minor: 7 };
 
@@ -674,28 +673,31 @@ export class Datasource
     rawQuery = this.applyConditionalAll(rawQuery, templateSrvVariables);
     rawQuery = this.replace(rawQuery, applyMinIntervalToScopedVars(scoped, query.minInterval)) || '';
 
-    if (!this.skipAdHocFilter) {
-      if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters.length > 0) {
-        throw new Error(
-          `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
-        );
-      }
-
-      const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
-      const tableQualifiedKeys = !this.settings.jsonData.hideTableNameInAdhocFilters;
-
-      // Check if query contains $__adHocFilters macro
-      const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
-
-      // Apply $__adHocFilters macro before automatic filter application
-      rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON);
-
-      // Only apply automatic filters if the macro was not used
-      if (!hasMacro) {
-        rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON, tableQualifiedKeys);
-      }
+    // Ad-hoc filters come only from the request's own `filters`. The plugin's
+    // internal queries (schema lookups, tag keys and values, version checks)
+    // go through runQuery, which never sets them, so they are never filtered.
+    // A shared "skip" flag on the instance used to decide this instead, and a
+    // panel query that ran while a tag lookup was awaiting consumed the flag
+    // and silently dropped the dashboard's filters.
+    if (this.adHocFiltersStatus === AdHocFilterStatus.disabled && filters.length > 0) {
+      throw new Error(
+        `Unable to apply ad hoc filters. Upgrade ClickHouse to >=${this.adHocCHVerReq.major}.${this.adHocCHVerReq.minor} or remove ad hoc filters for the dashboard.`
+      );
     }
-    this.skipAdHocFilter = false;
+
+    const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
+    const tableQualifiedKeys = !this.settings.jsonData.hideTableNameInAdhocFilters;
+
+    // Check if query contains $__adHocFilters macro
+    const hasMacro = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/.test(rawQuery);
+
+    // Apply $__adHocFilters macro before automatic filter application
+    rawQuery = this.applyAdHocFiltersMacro(rawQuery, filters, useJSON);
+
+    // Only apply automatic filters if the macro was not used
+    if (!hasMacro) {
+      rawQuery = this.adHocFilter.apply(rawQuery, filters, useJSON, tableQualifiedKeys);
+    }
 
     return {
       ...query,
@@ -1928,7 +1930,6 @@ export class Datasource
 
   async getTagValues({ key, timeRange }: any): Promise<MetricFindValue[]> {
     const { type } = this.getTagSource();
-    this.skipAdHocFilter = true;
     if (type === TagType.query) {
       return this.fetchTagValuesFromQuery(key);
     }
@@ -2081,7 +2082,6 @@ export class Datasource
     // Mark fetched up front so concurrent value lookups don't double-probe.
     this.attributeSchemaFetched.add(table);
     try {
-      this.skipAdHocFilter = true;
       const rawSql = `SELECT name, type FROM system.columns WHERE database = '${escapeCHStringLiteral(db)}' AND table = '${escapeCHStringLiteral(table)}'`;
       const frame = await this.runQuery({ rawSql });
       const view = new DataFrameView<{ 0: string; 1: string }>(frame);
@@ -2190,7 +2190,6 @@ export class Datasource
       // like `a$&b`) are inserted literally rather than interpreted by
       // String.replace as `$&`/`$1`/`$'` replacement patterns.
       const queryWithColumn = tagSource.source.replace(/\$__adhoc_column/g, () => columnExpr);
-      this.skipAdHocFilter = true;
       const frame = await this.runQuery({ rawSql: queryWithColumn });
 
       if (frame.fields?.length === 0) {
@@ -2212,7 +2211,6 @@ export class Datasource
 
   private async fetchTags(): Promise<Tags> {
     const tagSource = this.getTagSource();
-    this.skipAdHocFilter = true;
 
     if (tagSource.source === undefined) {
       const rawSql = 'SELECT name, type, table FROM system.columns';
@@ -2299,7 +2297,6 @@ export class Datasource
   // Returns true if ClickHouse's version is greater than or equal to 22.7
   // 22.7 added 'settings additional_table_filters' which is used for ad hoc filters
   private async canUseAdhocFilters(): Promise<AdHocFilterStatus> {
-    this.skipAdHocFilter = true;
     const data = await this.fetchData(`SELECT version()`);
     const versionValue = data[0];
     if (typeof versionValue !== 'string') {
