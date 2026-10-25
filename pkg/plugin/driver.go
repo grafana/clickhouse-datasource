@@ -52,7 +52,7 @@ type Clickhouse struct{}
 func getTLSConfig(settings Settings) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: settings.InsecureSkipVerify,
-		ServerName:         settings.Host,
+		ServerName:         stripIPv6Brackets(settings.Host),
 	}
 	if settings.TlsClientAuth || settings.TlsAuthWithCACert {
 		if settings.TlsAuthWithCACert && len(settings.TlsCACert) > 0 {
@@ -71,6 +71,22 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 		}
 	}
 	return tlsConfig, nil
+}
+
+// clickhouseAddr joins host and port into a dial address. An IPv6 literal
+// needs brackets ("[::1]:9000"); plain "host:port" formatting produced
+// "::1:9000", which does not parse. A host the user already bracketed is
+// kept as is.
+func clickhouseAddr(host string, port int64) string {
+	return net.JoinHostPort(stripIPv6Brackets(host), strconv.FormatInt(port, 10))
+}
+
+// stripIPv6Brackets removes the brackets from a bracketed IPv6 literal.
+func stripIPv6Brackets(host string) string {
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		return host[1 : len(host)-1]
+	}
+	return host
 }
 
 // getPDCDialContext returns a dialer function for creating a connection to PDC if a secure SOCKS proxy is enabled.
@@ -294,7 +310,7 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	auth, getJWT := resolveJWTAuth(settings, httpHeaders)
 
 	opts := &clickhouse.Options{
-		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
+		Addr: []string{clickhouseAddr(settings.Host, settings.Port)},
 		Auth: auth,
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),

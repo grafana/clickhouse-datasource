@@ -1060,6 +1060,30 @@ func TestMutateResponseConvertsJSONFieldsToStrings(t *testing.T) {
 	assert.Nil(t, nullable.At(1).(*string))
 }
 
+func TestClickhouseAddr(t *testing.T) {
+	tests := []struct {
+		host string
+		want string
+	}{
+		{host: "localhost", want: "localhost:9000"},
+		{host: "10.0.0.1", want: "10.0.0.1:9000"},
+		{host: "::1", want: "[::1]:9000"},
+		{host: "[::1]", want: "[::1]:9000"},
+		{host: "2001:db8::10", want: "[2001:db8::10]:9000"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.host, func(t *testing.T) {
+			assert.Equal(t, tc.want, clickhouseAddr(tc.host, 9000))
+		})
+	}
+}
+
+func TestGetTLSConfigServerNameForIPv6(t *testing.T) {
+	cfg, err := getTLSConfig(Settings{Host: "[::1]"})
+	require.NoError(t, err)
+	assert.Equal(t, "::1", cfg.ServerName)
+}
+
 func TestExtractForwardedHeadersRejectsNonStringValues(t *testing.T) {
 	_, err := extractForwardedHeadersFromMessage(json.RawMessage(`{"grafana-http-headers": {"X-Test": [1]}}`))
 	assert.Error(t, err)
