@@ -554,6 +554,11 @@ func buildIncreaseColumns(_ *sqlutil.Query, args []string, tail string) (string,
 // subquery and lttb consumes its aliased output columns, because lttb is
 // itself an aggregate and ClickHouse rejects nested aggregation such as
 // lttb(...)(ts, avg(value)) with ILLEGAL_AGGREGATION.
+//
+// An ORDER BY or LIMIT without a GROUP BY also goes through the subquery. In
+// the single-level form they landed on the aggregate query itself, where an
+// ORDER BY on a raw column fails with NOT_AN_AGGREGATE and a LIMIT trimmed the
+// downsampled points instead of the input rows.
 func buildLTTB(q *sqlutil.Query, args []string, tail string) (string, error) {
 	buckets, err := lttbBuckets(args[0], q)
 	if err != nil {
@@ -575,7 +580,7 @@ func buildLTTB(q *sqlutil.Query, args []string, tail string) (string, error) {
 
 	lttbX, lttbY := args[1], args[2]
 	from := tc.from
-	if tc.groupBy != "" {
+	if tc.groupBy != "" || tc.orderBy != "" || tc.limit != "" {
 		// GROUP BY output order is unspecified and lttb buckets by input
 		// order, so the aggregated rows are sorted by x unless the user
 		// ordered them explicitly.
@@ -587,9 +592,8 @@ func buildLTTB(q *sqlutil.Query, args []string, tail string) (string, error) {
 			fmt.Sprintf("SELECT %s, %s", lttbSelectColumn(xExpr, xAlias), lttbSelectColumn(yExpr, yAlias)),
 			tc.from,
 			where,
-			tc.groupBy,
 		}
-		for _, clause := range []string{tc.having, orderBy, tc.limit, tc.settings} {
+		for _, clause := range []string{tc.groupBy, tc.having, orderBy, tc.limit, tc.settings} {
 			if clause != "" {
 				aggregated = append(aggregated, clause)
 			}
@@ -603,7 +607,7 @@ func buildLTTB(q *sqlutil.Query, args []string, tail string) (string, error) {
 		from,
 		where,
 	}
-	for _, clause := range []string{tc.having, tc.orderBy, tc.limit, tc.settings} {
+	for _, clause := range []string{tc.having, tc.settings} {
 		if clause != "" {
 			inner = append(inner, clause)
 		}
