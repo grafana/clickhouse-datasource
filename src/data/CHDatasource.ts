@@ -66,11 +66,13 @@ import {
 import { applyMinIntervalToScopedVars } from './queryInterval';
 import {
   escapeIdentifier,
+  escapeLikePattern,
   generateSql,
   getColumnByHint,
   getTableIdentifier,
   isStringType,
   logAliasToColumnHints,
+  toFilterLiteral,
 } from './sqlGenerator';
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
@@ -191,7 +193,20 @@ function resolveFilterColumn(
   };
 }
 
-/** Build a filter object from resolved column info. */
+/**
+ * Whether a stored filter value equals a value taken from query results. The
+ * stored value is the raw value, or its literal form when buildFilter had to
+ * quote it.
+ */
+function filterValueMatches(stored: unknown, value: string): boolean {
+  const s = String(stored);
+  return s === value || s === toFilterLiteral(value);
+}
+
+/**
+ * Build a filter object from resolved column info. The value comes from query
+ * results, so it is stored as a literal (see toFilterLiteral).
+ */
 function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'], value: string): Filter {
   return {
     condition: 'AND',
@@ -204,7 +219,7 @@ function buildFilter(resolved: ResolvedColumn, operator: StringFilter['operator'
     type: resolved.hasMapKey ? (resolved.columnType.startsWith('JSON') ? 'JSON' : 'Map(String, String)') : 'string',
     filterType: 'custom',
     operator,
-    value,
+    value: toFilterLiteral(value),
   };
 }
 
@@ -865,7 +880,7 @@ export class Datasource
           !(
             (filterMatchesColumn(f, resolved) &&
               'value' in f &&
-              f.value === actionValue &&
+              filterValueMatches(f.value, actionValue) &&
               (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.NotEquals)) ||
             (filterMatchesColumn(f, resolved) &&
               (f.operator === FilterOperator.IsAnything || f.operator === FilterOperator.Equals))
@@ -874,13 +889,14 @@ export class Datasource
 
       nextFilters.push(buildFilter(resolved, FilterOperator.NotEquals, actionValue));
     } else if (action.type === 'ADD_STRING_FILTER') {
+      // The selected text is matched literally: its % and _ are not wildcards.
       nextFilters.push({
         condition: 'AND',
         key: resolved.columnName,
         filterType: 'custom',
         type: 'string',
         operator: FilterOperator.ILike,
-        value: actionValue,
+        value: escapeLikePattern(actionValue),
       });
     } else if (action.type === 'ADD_STRING_FILTER_OUT') {
       nextFilters.push({
@@ -889,7 +905,7 @@ export class Datasource
         filterType: 'custom',
         type: 'string',
         operator: FilterOperator.NotILike,
-        value: actionValue,
+        value: escapeLikePattern(actionValue),
       });
     }
 
@@ -922,7 +938,7 @@ export class Datasource
         filterMatchesColumn(f, resolved) &&
         f.operator === FilterOperator.Equals &&
         'value' in f &&
-        String(f.value) === value
+        filterValueMatches(f.value, value)
     );
   }
 
@@ -948,7 +964,10 @@ export class Datasource
     // Check if the exact filter already exists (toggle off)
     const exactMatchIndex = nextFilters.findIndex(
       (f) =>
-        filterMatchesColumn(f, resolved) && f.operator === targetOperator && 'value' in f && String(f.value) === value
+        filterMatchesColumn(f, resolved) &&
+        f.operator === targetOperator &&
+        'value' in f &&
+        filterValueMatches(f.value, value)
     );
 
     if (exactMatchIndex !== -1) {
@@ -978,7 +997,7 @@ export class Datasource
               filterMatchesColumn(f, resolved) &&
               f.operator === oppositeOperator &&
               'value' in f &&
-              String(f.value) === value
+              filterValueMatches(f.value, value)
             )
         );
       }
@@ -2474,7 +2493,7 @@ export class Datasource
             filterType: 'custom',
             key: mapName,
             mapKey: keyName,
-            value: String(c.value),
+            value: toFilterLiteral(String(c.value)),
             type: mapColumnType,
             condition: 'AND',
           };
@@ -2485,7 +2504,8 @@ export class Datasource
         operator: FilterOperator.Equals,
         filterType: 'custom',
         key: c.name,
-        value: c.value,
+        // The value comes from the log row, so it must not be read as an expression.
+        value: typeof c.value === 'string' ? toFilterLiteral(c.value) : c.value,
         type: 'string',
         condition: 'AND',
       };

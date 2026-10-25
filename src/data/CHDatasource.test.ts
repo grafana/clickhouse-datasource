@@ -3002,6 +3002,54 @@ describe('ClickHouseDatasource', () => {
       });
     });
 
+    describe('values taken from query results', () => {
+      it('quotes a value that would otherwise be read as an expression', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'path', value: `GET /api (v2) can't` },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({ value: `'GET /api (v2) can\\'t'` });
+        expect(result.rawSql).toContain(`( path = 'GET /api (v2) can\\'t' )`);
+      });
+
+      it('keeps plain values as they are', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'level', value: 'info' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({ value: 'info' });
+      });
+
+      it('replaces a quoted Equals filter when filtering out the same value', () => {
+        const added = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'path', value: `a'b` },
+        } as any) as CHBuilderQuery;
+
+        const result = datasource.modifyQuery(added, {
+          type: 'ADD_FILTER_OUT',
+          options: { key: 'path', value: `a'b` },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          operator: FilterOperator.NotEquals,
+          value: `'a\\'b'`,
+        });
+      });
+
+      it('matches the selected text of a string filter literally', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_STRING_FILTER',
+          options: { key: 'body', value: `50%_it's` },
+        } as any) as CHBuilderQuery;
+
+        expect(result.rawSql).toContain(`ILIKE '%50\\\\%\\\\_it\\'s%'`);
+      });
+    });
+
     describe('ADD_FILTER', () => {
       it('adds an Equals filter for the given field', () => {
         const result = datasource.modifyQuery(query, {
