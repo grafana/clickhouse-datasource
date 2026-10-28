@@ -578,9 +578,7 @@ func TestMutateQuery_MinIntervalDoesNotBreakTimezone(t *testing.T) {
 	assert.NotEqual(t, t.Context(), ctx, "timezone should still have been applied to the context")
 }
 
-func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
-	h := &Clickhouse{}
-
+func TestInjectGrafanaUserHeader(t *testing.T) {
 	newRequest := func(forward bool) *backend.QueryDataRequest {
 		jsonBytes, _ := json.Marshal(map[string]any{
 			"host":                  "localhost",
@@ -601,7 +599,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req := newRequest(true)
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Equal(t, "alice", req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -610,7 +608,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req := newRequest(false)
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -620,7 +618,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req.SetHTTPHeader("X-Grafana-User", "from-proxy")
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Equal(t, "from-proxy", req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -628,7 +626,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 	t.Run("no user in context is a no-op", func(t *testing.T) {
 		req := newRequest(true)
 
-		h.MutateQueryData(t.Context(), req)
+		injectGrafanaUserHeader(t.Context(), req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -638,7 +636,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: "alice"})
 
 		// Should not panic and should not set the header.
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -647,7 +645,7 @@ func TestMutateQueryData_XGrafanaUserForwarding(t *testing.T) {
 		req := newRequest(true)
 		ctx := backend.WithUser(t.Context(), &backend.User{Login: ""})
 
-		h.MutateQueryData(ctx, req)
+		injectGrafanaUserHeader(ctx, req)
 
 		assert.Empty(t, req.GetHTTPHeader("X-Grafana-User"))
 	})
@@ -1010,4 +1008,83 @@ func TestBuildClickHouseOptionsRowLimitPushDown(t *testing.T) {
 		_, ok := opts.Settings["limit"]
 		assert.False(t, ok, "the limit setting must not be pushed to the server when enableRowLimit is off")
 	})
+}
+
+func TestQueryLocation(t *testing.T) {
+	lisbon, err := time.LoadLocation("Europe/Lisbon")
+	assert.NoError(t, err)
+
+	tests := []struct {
+		timeZone string
+		want     *time.Location
+	}{
+		// Grafana sends "utc" in lower case when the dashboard time zone is UTC.
+		{timeZone: "utc", want: time.UTC},
+		{timeZone: "UTC", want: time.UTC},
+		{timeZone: "Europe/Lisbon", want: lisbon},
+		{timeZone: "Not/AZone", want: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.timeZone, func(t *testing.T) {
+			assert.Equal(t, tc.want, queryLocation(tc.timeZone))
+		})
+	}
+}
+
+func TestMutateResponseConvertsJSONFieldsToStrings(t *testing.T) {
+	raw := json.RawMessage(`{"a":[1,2]}`)
+	frame := &data.Frame{
+		Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+		Fields: []*data.Field{
+			data.NewField("time", nil, []time.Time{time.Unix(0, 0), time.Unix(1, 0)}),
+			// The JSON-family converters (Map, Array, Tuple, JSON, ...) emit
+			// FieldTypeJSON values.
+			data.NewField("attrs", nil, []json.RawMessage{json.RawMessage(`{"k":"v"}`), json.RawMessage(`[1,2]`)}),
+			data.NewField("nullable", nil, []*json.RawMessage{&raw, nil}),
+		},
+	}
+
+	frames, err := (&Clickhouse{}).MutateResponse(context.Background(), data.Frames{frame})
+	require.NoError(t, err)
+
+	attrs := frames[0].Fields[1]
+	require.Equal(t, data.FieldTypeNullableString, attrs.Type())
+	require.NotNil(t, attrs.At(0).(*string))
+	assert.Equal(t, `{"k":"v"}`, *attrs.At(0).(*string))
+	assert.Equal(t, `[1,2]`, *attrs.At(1).(*string))
+
+	nullable := frames[0].Fields[2]
+	require.Equal(t, data.FieldTypeNullableString, nullable.Type())
+	require.NotNil(t, nullable.At(0).(*string))
+	assert.Equal(t, `{"a":[1,2]}`, *nullable.At(0).(*string))
+	assert.Nil(t, nullable.At(1).(*string))
+}
+
+func TestClickhouseAddr(t *testing.T) {
+	tests := []struct {
+		host string
+		want string
+	}{
+		{host: "localhost", want: "localhost:9000"},
+		{host: "10.0.0.1", want: "10.0.0.1:9000"},
+		{host: "::1", want: "[::1]:9000"},
+		{host: "[::1]", want: "[::1]:9000"},
+		{host: "2001:db8::10", want: "[2001:db8::10]:9000"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.host, func(t *testing.T) {
+			assert.Equal(t, tc.want, clickhouseAddr(tc.host, 9000))
+		})
+	}
+}
+
+func TestGetTLSConfigServerNameForIPv6(t *testing.T) {
+	cfg, err := getTLSConfig(Settings{Host: "[::1]"})
+	require.NoError(t, err)
+	assert.Equal(t, "::1", cfg.ServerName)
+}
+
+func TestExtractForwardedHeadersRejectsNonStringValues(t *testing.T) {
+	_, err := extractForwardedHeadersFromMessage(json.RawMessage(`{"grafana-http-headers": {"X-Test": [1]}}`))
+	assert.Error(t, err)
 }

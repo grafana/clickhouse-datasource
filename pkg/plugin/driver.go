@@ -52,7 +52,7 @@ type Clickhouse struct{}
 func getTLSConfig(settings Settings) (*tls.Config, error) {
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: settings.InsecureSkipVerify,
-		ServerName:         settings.Host,
+		ServerName:         stripIPv6Brackets(settings.Host),
 	}
 	if settings.TlsClientAuth || settings.TlsAuthWithCACert {
 		if settings.TlsAuthWithCACert && len(settings.TlsCACert) > 0 {
@@ -71,6 +71,22 @@ func getTLSConfig(settings Settings) (*tls.Config, error) {
 		}
 	}
 	return tlsConfig, nil
+}
+
+// clickhouseAddr joins host and port into a dial address. An IPv6 literal
+// needs brackets ("[::1]:9000"); plain "host:port" formatting produced
+// "::1:9000", which does not parse. A host the user already bracketed is
+// kept as is.
+func clickhouseAddr(host string, port int64) string {
+	return net.JoinHostPort(stripIPv6Brackets(host), strconv.FormatInt(port, 10))
+}
+
+// stripIPv6Brackets removes the brackets from a bracketed IPv6 literal.
+func stripIPv6Brackets(host string) string {
+	if strings.HasPrefix(host, "[") && strings.HasSuffix(host, "]") {
+		return host[1 : len(host)-1]
+	}
+	return host
 }
 
 // getPDCDialContext returns a dialer function for creating a connection to PDC if a secure SOCKS proxy is enabled.
@@ -294,7 +310,7 @@ func buildClickHouseOptions(ctx context.Context, settings Settings, message json
 	auth, getJWT := resolveJWTAuth(settings, httpHeaders)
 
 	opts := &clickhouse.Options{
-		Addr: []string{fmt.Sprintf("%s:%d", settings.Host, settings.Port)},
+		Addr: []string{clickhouseAddr(settings.Host, settings.Port)},
 		Auth: auth,
 		ClientInfo: clickhouse.ClientInfo{
 			Products: getClientInfoProducts(ctx),
@@ -513,8 +529,6 @@ func (h *Clickhouse) MutateQueryData(
 		ctx = context.WithValue(ctx, grafanaHeadersKey, gh)
 	}
 
-	injectGrafanaUserHeader(ctx, req)
-
 	return ctx, req
 }
 
@@ -524,6 +538,10 @@ func (h *Clickhouse) MutateQueryData(
 // path (core HTTP datasources); plugin-initiated connections never see it,
 // so downstream ClickHouse loses the user attribution that operators expect
 // when the toggle is on. See #1451.
+//
+// It runs from Datasource.QueryData rather than MutateQueryData: sqlds takes
+// its copy of the forwarded headers before calling MutateQueryData, so a
+// header set there was never sent.
 func injectGrafanaUserHeader(ctx context.Context, req *backend.QueryDataRequest) {
 	if req == nil || req.PluginContext.DataSourceInstanceSettings == nil {
 		return
@@ -679,8 +697,27 @@ func (h *Clickhouse) MutateQuery(ctx context.Context, req backend.DataQuery) (co
 		return ctx, req
 	}
 
-	loc, _ := time.LoadLocation(dataQuery.Meta.TimeZone)
+	loc := queryLocation(dataQuery.Meta.TimeZone)
+	if loc == nil {
+		return ctx, req
+	}
 	return clickhouse.Context(ctx, clickhouse.WithUserLocation(loc)), req
+}
+
+// queryLocation resolves the dashboard time zone sent by the frontend. Grafana
+// names UTC "utc" in lower case, which time.LoadLocation only accepts as "UTC",
+// so it is matched case-insensitively instead of silently falling back to the
+// server time zone. An unknown zone returns nil and is logged.
+func queryLocation(timeZone string) *time.Location {
+	if strings.EqualFold(timeZone, "utc") {
+		return time.UTC
+	}
+	loc, err := time.LoadLocation(timeZone)
+	if err != nil {
+		backend.Logger.Warn("Unknown query time zone, using the server time zone", "timezone", timeZone, "error", err)
+		return nil
+	}
+	return loc
 }
 
 // MutateResponse converts fields of type FieldTypeNullableJSON to string,
@@ -762,12 +799,13 @@ func shouldConvertFields(visType data.VisType) bool {
 	return visType != data.VisTypeTrace && visType != data.VisTypeTable && visType != data.VisTypeLogs
 }
 
-// convertNullableJSONFields converts all FieldTypeNullableJSON fields in the given frame to string.
+// convertNullableJSONFields converts all JSON fields (FieldTypeJSON and
+// FieldTypeNullableJSON) in the given frame to nullable strings.
 func convertNullableJSONFields(frame *data.Frame) error {
 	var convertedFields []*data.Field
 
 	for _, field := range frame.Fields {
-		if field.Type() == data.FieldTypeJSON {
+		if field.Type().JSON() {
 			newField, err := convertFieldToString(field)
 			if err != nil {
 				return err
@@ -789,17 +827,25 @@ func convertFieldToString(field *data.Field) (*data.Field, error) {
 	newField.SetConfig(field.Config)
 
 	for i := 0; i < field.Len(); i++ {
-		val, _ := field.At(i).(*json.RawMessage)
+		// The JSON-family converters emit FieldTypeJSON, whose values are
+		// json.RawMessage, while FieldTypeNullableJSON holds *json.RawMessage.
+		// Asserting only the pointer form turned every FieldTypeJSON value
+		// into null.
+		var val json.RawMessage
+		switch v := field.At(i).(type) {
+		case json.RawMessage:
+			val = v
+		case *json.RawMessage:
+			if v != nil {
+				val = *v
+			}
+		}
 		if val == nil {
 			newField.Set(i, nil)
-		} else {
-			bytes, err := val.MarshalJSON()
-			if err != nil {
-				return nil, err
-			}
-			sVal := string(bytes)
-			newField.Set(i, &sVal)
+			continue
 		}
+		sVal := string(val)
+		newField.Set(i, &sVal)
 	}
 
 	return newField, nil
@@ -839,7 +885,11 @@ func extractForwardedHeadersFromMessage(message json.RawMessage) (map[string]str
 
 			strHeadersArr := make([]string, len(anyHeadersArr))
 			for ind, val := range anyHeadersArr {
-				strHeadersArr[ind] = val.(string)
+				strVal, ok := val.(string)
+				if !ok {
+					return nil, fmt.Errorf("couldn't parse header %s: expected string values, got %T", k, val)
+				}
+				strHeadersArr[ind] = strVal
 			}
 
 			httpHeaders[k] = strings.Join(strHeadersArr, ",")

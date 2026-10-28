@@ -254,6 +254,22 @@ func TestExpandStatementMacrosLTTB(t *testing.T) {
 				"WHERE $__timeFilter(EventTime) GROUP BY EventTime ORDER BY EventTime)) ORDER BY EventTime",
 		},
 		{
+			name:  "ORDER BY and LIMIT without GROUP BY apply to the input rows",
+			input: "$__lttb(100, EventTime, Latency) FROM latencies ORDER BY EventTime DESC LIMIT 5000",
+			want: "SELECT point.1 AS EventTime, point.2 AS Latency FROM " +
+				"(SELECT arrayJoin(lttb(100)(EventTime, Latency)) AS point FROM " +
+				"(SELECT EventTime, Latency FROM latencies WHERE $__timeFilter(EventTime) " +
+				"ORDER BY EventTime DESC LIMIT 5000)) ORDER BY EventTime",
+		},
+		{
+			name:  "LIMIT alone is sorted by x before downsampling",
+			input: "$__lttb(100, EventTime, Latency / 2) FROM latencies LIMIT 10 SETTINGS max_threads = 1",
+			want: "SELECT point.1 AS EventTime, point.2 AS y FROM " +
+				"(SELECT arrayJoin(lttb(100)(EventTime, y)) AS point FROM " +
+				"(SELECT EventTime, Latency / 2 AS y FROM latencies WHERE $__timeFilter(EventTime) " +
+				"ORDER BY EventTime LIMIT 10 SETTINGS max_threads = 1)) ORDER BY EventTime",
+		},
+		{
 			name:  "non-identifier expressions fall back to x and y aliases",
 			input: "$__lttb(100, toUnixTimestamp(EventTime), Latency / 2) FROM latencies",
 			want: "SELECT point.1 AS x, point.2 AS y FROM " +
