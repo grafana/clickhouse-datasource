@@ -14,6 +14,7 @@ import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import { Alert, Button, InlineField, InlineFieldRow, InlineFormLabel, Input, Stack } from '@grafana/ui';
 import useColumns from 'hooks/useColumns';
+import useFitQueryToTable from 'hooks/useFitQueryToTable';
 import {
   BuilderOptionsReducerAction,
   mergeColumns,
@@ -36,6 +37,8 @@ interface LogsQueryBuilderProps {
   datasource: Datasource;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
+  /** The `sourceKey` of the last database or table picked in the dropdowns (see `useFitQueryToTable`). */
+  pickedSource?: string;
 }
 
 interface LogsQueryBuilderState {
@@ -55,6 +58,13 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const labels = allLabels.components.LogsQueryBuilder;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
+  useFitQueryToTable(
+    allColumns,
+    builderOptions.database,
+    builderOptions.table,
+    props.pickedSource,
+    builderOptionsDispatch
+  );
   const isNewQuery = useIsNewQuery(builderOptions);
   const builderState: LogsQueryBuilderState = useMemo(
     () => ({

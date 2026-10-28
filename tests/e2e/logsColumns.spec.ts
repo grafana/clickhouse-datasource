@@ -1,5 +1,7 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
-import { Page, request as apiRequest } from '@playwright/test';
+import { Page } from '@playwright/test';
+import { createTestDataSources, deleteTestDataSources, TestDataSource } from './helpers/datasources';
+import { DATASOURCE_UID } from './helpers/env';
 
 // E2E guard for the logs "Columns" datasource setting (HDX-5008).
 //
@@ -34,11 +36,6 @@ const PLUGIN_TYPE = 'grafana-clickhouse-datasource';
 
 const isCloudRun = !!process.env.GRAFANA_URL;
 
-// Connection settings are inherited from this datasource so the spec works
-// wherever the standard e2e datasource points (docker-compose, custom stacks).
-const BASE_DATASOURCE_UID = process.env.DS_E2E_UID || 'clickhouse-e2e';
-const BASE_URL = process.env.GRAFANA_URL || `http://localhost:${process.env.PORT || 3000}`;
-
 // Window covering both fixtures (2024-03-15 ~10:00 UTC), matching the range the
 // sibling fixture specs use.
 const FIXTURE_FROM_ISO = '2024-03-15T09:45:00.000Z';
@@ -62,6 +59,8 @@ interface LogsColumnsCase {
   // in the expanded row (the compact editor shows no column list), never as a
   // log-line value, so it is safe to locate by exact text.
   additionalColumn: string;
+  // Level of the newest fixture row, which Explore lists first.
+  newestRowLevel: string;
 }
 
 const CASES: LogsColumnsCase[] = [
@@ -75,6 +74,7 @@ const CASES: LogsColumnsCase[] = [
     levelColumn: 'level',
     messageColumn: 'message',
     additionalColumn: 'service',
+    newestRowLevel: 'error',
   },
   {
     title: 'OTel logs table (e2e_test.otel_logs_v151)',
@@ -84,90 +84,48 @@ const CASES: LogsColumnsCase[] = [
     otelEnabled: true,
     otelVersion: 'latest',
     additionalColumn: 'ServiceName',
+    newestRowLevel: 'INFO',
   },
 ];
 
-async function newAdminApiContext() {
-  return apiRequest.newContext({
-    baseURL: BASE_URL,
-    httpCredentials: {
-      username: process.env.GRAFANA_ADMIN_USER || 'admin',
-      password: process.env.GRAFANA_ADMIN_PASSWORD || 'admin',
-    },
-  });
+// One single-source logs datasource per case, configured with the extra column via
+// logs.additionalColumns.
+function caseDataSource(c: LogsColumnsCase): TestDataSource {
+  const logs: Record<string, unknown> = {
+    defaultDatabase: 'e2e_test',
+    defaultTable: c.table,
+    otelEnabled: c.otelEnabled,
+    additionalColumns: [c.additionalColumn],
+  };
+  if (c.otelVersion) {
+    logs.otelVersion = c.otelVersion;
+  }
+  if (c.timeColumn) {
+    logs.filterTimeColumn = c.timeColumn;
+    logs.timeColumn = c.timeColumn;
+  }
+  if (c.levelColumn) {
+    logs.levelColumn = c.levelColumn;
+  }
+  if (c.messageColumn) {
+    logs.messageColumn = c.messageColumn;
+  }
+
+  return {
+    uid: c.uid,
+    name: c.name,
+    jsonData: { database: 'e2e_test', configMode: 'single-table', signalType: 'logs', logs },
+  };
 }
 
-async function deleteTestDataSources() {
-  const ctx = await newAdminApiContext();
-  for (const c of CASES) {
-    // Returns 404 when absent; APIRequestContext does not throw on non-2xx.
-    await ctx.delete(`/api/datasources/uid/${c.uid}`);
-  }
-  await ctx.dispose();
-}
-
-// Creates one single-source logs datasource per case, configured with the extra
-// column via logs.additionalColumns. Connection fields (host/port/protocol/TLS)
-// come from the base e2e datasource.
-async function createTestDataSources() {
-  const ctx = await newAdminApiContext();
-  const baseRes = await ctx.get(`/api/datasources/uid/${BASE_DATASOURCE_UID}`);
-  if (!baseRes.ok()) {
-    throw new Error(`Failed to read base datasource ${BASE_DATASOURCE_UID}: ${baseRes.status()}`);
-  }
-  const baseJsonData = (await baseRes.json())?.jsonData ?? {};
-
-  for (const c of CASES) {
-    const logs: Record<string, unknown> = {
-      defaultDatabase: 'e2e_test',
-      defaultTable: c.table,
-      otelEnabled: c.otelEnabled,
-      additionalColumns: [c.additionalColumn],
-    };
-    if (c.otelVersion) {
-      logs.otelVersion = c.otelVersion;
-    }
-    if (c.timeColumn) {
-      logs.filterTimeColumn = c.timeColumn;
-      logs.timeColumn = c.timeColumn;
-    }
-    if (c.levelColumn) {
-      logs.levelColumn = c.levelColumn;
-    }
-    if (c.messageColumn) {
-      logs.messageColumn = c.messageColumn;
-    }
-
-    const res = await ctx.post('/api/datasources', {
-      data: {
-        name: c.name,
-        uid: c.uid,
-        type: PLUGIN_TYPE,
-        access: 'proxy',
-        jsonData: {
-          ...baseJsonData,
-          database: 'e2e_test',
-          configMode: 'single-table',
-          signalType: 'logs',
-          logs,
-        },
-      },
-    });
-    // 409 = already created by a parallel worker; anything else is a real failure.
-    if (!res.ok() && res.status() !== 409) {
-      throw new Error(`Failed to create e2e datasource ${c.uid}: ${res.status()} ${await res.text()}`);
-    }
-  }
-  await ctx.dispose();
-}
-
-function exploreUrl(datasourceUid: string): string {
+function exploreUrl(datasourceUid: string, logsSql = ''): string {
   const query = {
     refId: 'A',
     datasource: { type: PLUGIN_TYPE, uid: datasourceUid },
     editorType: 'sql',
     pluginVersion: '',
-    rawSql: '',
+    rawSql: logsSql,
+    ...(logsSql ? { queryType: 'logs', format: 2 } : {}),
   };
   const panes = JSON.stringify({
     explore: {
@@ -277,6 +235,15 @@ function filterForButtonForField(page: Page, fieldName: string) {
     .first();
 }
 
+// The value beside a field name in the expanded row, for both the <tr> and <div> panel DOMs.
+function detailsFieldValue(page: Page, fieldName: string, value: string) {
+  return page
+    .getByText(fieldName, { exact: true })
+    .locator('xpath=following-sibling::*[1]')
+    .getByText(value, { exact: true })
+    .first();
+}
+
 async function waitForNextQueryRequestBody(page: Page): Promise<any> {
   const requestPromise = page.waitForRequest((r) => r.url().includes('/api/ds/query') && r.method() === 'POST');
   const responsePromise = page.waitForResponse(
@@ -306,15 +273,15 @@ test.describe('Logs Columns datasource setting (HDX-5008)', () => {
     }
     // Recreate from scratch so a leftover datasource from an aborted run cannot
     // poison this run.
-    await deleteTestDataSources();
-    await createTestDataSources();
+    await deleteTestDataSources(CASES);
+    await createTestDataSources(CASES.map(caseDataSource));
   });
 
   test.afterAll(async () => {
     if (isCloudRun) {
       return;
     }
-    await deleteTestDataSources();
+    await deleteTestDataSources(CASES);
   });
 
   test.beforeEach(() => {
@@ -339,6 +306,7 @@ test.describe('Logs Columns datasource setting (HDX-5008)', () => {
       // a browsable/filterable detail field.
       await openFirstLogRowDetails(page);
       await expect(page.getByText(c.additionalColumn, { exact: true }).first()).toBeVisible();
+      await expect(detailsFieldValue(page, 'level', c.newestRowLevel)).toBeVisible();
 
       // Filter-for on the folded field must regenerate the builder query with a
       // WHERE on the real column name. The fold folds under the real name (not
@@ -353,4 +321,30 @@ test.describe('Logs Columns datasource setting (HDX-5008)', () => {
       expect(String(q?.rawSql ?? '')).toMatch(new RegExp(`${c.additionalColumn}\\s*=\\s*'`));
     });
   }
+});
+
+test.describe('Log details for a labels map', () => {
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Depends on the local e2e_test.events fixture (tests/e2e/fixtures/seed.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
+  test('shows the level and plain columns next to a Map aliased AS labels', async ({ page, explorePage }) => {
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.goto(
+      exploreUrl(
+        DATASOURCE_UID,
+        "SELECT timestamp, message, level, service, map('region', 'eu') AS labels FROM e2e_test.events ORDER BY timestamp DESC"
+      )
+    );
+    await responsePromise;
+    expect(rowCount(getBody())).toBeGreaterThan(0);
+
+    await openFirstLogRowDetails(page);
+    await expect(detailsFieldValue(page, 'region', 'eu')).toBeVisible();
+    await expect(detailsFieldValue(page, 'level', 'error')).toBeVisible();
+    await expect(detailsFieldValue(page, 'service', 'db')).toBeVisible();
+  });
 });

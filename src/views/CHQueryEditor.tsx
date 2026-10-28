@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { QueryEditorProps } from '@grafana/data';
+import { CoreApp, QueryEditorProps } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import { EditorTypeSwitcher } from 'components/queryBuilder/EditorTypeSwitcher';
 import { styles } from 'styles';
@@ -15,8 +15,12 @@ import { QueryBuilderOptions } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { migrateCHQuery } from 'data/migration';
 import useHasTraceTimestampTable from 'hooks/useHasTraceTimestampTable';
-import { buildCompactQueryDefaults, getCompactQueryType } from 'components/queryBuilder/compactQueryDefaults';
-import { isEqual } from 'lodash';
+import {
+  buildCompactQueryDefaults,
+  getCompactQueryType,
+  isSameQueryOptions,
+  shouldConvertCarriedOverQuery,
+} from 'components/queryBuilder/compactQueryDefaults';
 
 export type CHQueryEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
@@ -108,27 +112,47 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   const propBuilderOptions =
     query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
   const lastPropBuilderOptions = useRef<QueryBuilderOptions | undefined>(propBuilderOptions);
+  // Builder options this editor sent with onChange that Grafana has not handed back yet. A change in
+  // several steps, such as a query type change followed by the new type's defaults, sends each step;
+  // where Grafana hands them back later (a dashboard panel editor), the copy of an earlier step lands
+  // after the later ones and must not be taken for an outside change, or the editor reverts to it,
+  // sends it again, and the two steps chase each other without end.
+  const sentBuilderOptions = useRef<QueryBuilderOptions[]>([]);
   useEffect(() => {
     if (!propBuilderOptions) {
       lastPropBuilderOptions.current = undefined;
       return;
     }
 
-    if (isEqual(propBuilderOptions, lastPropBuilderOptions.current)) {
+    // The recorded owning data source is not an edit: comparing it would let a copy of the query
+    // that has not caught up with the recorded owner yet overwrite the editor state, which then
+    // records the owner again, back and forth without end.
+    if (lastPropBuilderOptions.current && isSameQueryOptions(propBuilderOptions, lastPropBuilderOptions.current)) {
       return;
     }
 
     lastPropBuilderOptions.current = propBuilderOptions;
-    if (!isEqual(propBuilderOptions, builderOptions)) {
+    const sent = sentBuilderOptions.current.findIndex((o) => isSameQueryOptions(o, propBuilderOptions));
+    if (sent >= 0) {
+      sentBuilderOptions.current.splice(0, sent + 1);
+      return;
+    }
+    if (!isSameQueryOptions(propBuilderOptions, builderOptions)) {
       builderOptionsDispatch(setAllOptions(propBuilderOptions));
     }
   }, [builderOptions, builderOptionsDispatch, propBuilderOptions]);
+
+  const isCarriedOver = Boolean(
+    singleTableMode && signalType && shouldConvertCarriedOverQuery(builderOptions, props.datasource, signalType, app)
+  );
 
   // Prevent trying to run empty query on load, or stale query after datasource/signal switches.
   const shouldSkipChanges = useRef<boolean>(true);
   if (isBuilderOptionsRunnable(builderOptions)) {
     if (singleTableMode && signalType) {
-      shouldSkipChanges.current = builderOptions.queryType !== getCompactQueryType(signalType);
+      // The compact editor converts a query carried over from another data source. Propagating
+      // it here would race that conversion and could put the stale query back.
+      shouldSkipChanges.current = builderOptions.queryType !== getCompactQueryType(signalType) || isCarriedOver;
     } else {
       shouldSkipChanges.current = false;
     }
@@ -175,11 +199,28 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
     builderOptionsDispatch,
   ]);
 
+  // In Explore, record the data source the query belongs to. Switching data sources keeps the
+  // query, so the compact editor reads a different UID as a query carried over from another data
+  // source, and a missing or matching one as a query opened here from a panel, the history or a
+  // shared link. Nothing is recorded outside Explore, so saved queries do not change.
+  const datasourceUid = props.datasource.uid;
+  const recordOwner =
+    app === CoreApp.Explore &&
+    query.editorType !== EditorType.SQL &&
+    !isCarriedOver &&
+    builderOptions.meta?.datasourceUid !== datasourceUid;
+  useEffect(() => {
+    if (recordOwner) {
+      builderOptionsDispatch(setOptions({ meta: { datasourceUid } }));
+    }
+  }, [builderOptionsDispatch, datasourceUid, recordOwner]);
+
   useEffect(() => {
     if (shouldSkipChanges.current || query.editorType === EditorType.SQL) {
       return;
     }
 
+    sentBuilderOptions.current = [...sentBuilderOptions.current.slice(-49), builderOptions];
     onChange({
       ...query,
       pluginVersion,
@@ -195,6 +236,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
 
   const onQueryChange = useCallback(
     (newOptions: QueryBuilderOptions) => {
+      sentBuilderOptions.current = [...sentBuilderOptions.current.slice(-49), newOptions];
       onChange({
         ...query,
         pluginVersion,

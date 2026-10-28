@@ -1,4 +1,12 @@
-import { ColumnHint, QueryType } from 'types/queryBuilder';
+import {
+  AggregateType,
+  BuilderMode,
+  ColumnHint,
+  Filter,
+  FilterOperator,
+  OrderByDirection,
+  QueryType,
+} from 'types/queryBuilder';
 import {
   mergeColumns,
   setAllOptions,
@@ -11,7 +19,10 @@ import {
   setQueryType,
   setTable,
   testFuncs,
+  fillMissingRoles,
+  fitToTable,
 } from './useBuilderOptionsState';
+import { defaultCHBuilderQuery } from 'types/sql';
 const { reducer, buildInitialState } = testFuncs;
 
 describe('reducer', () => {
@@ -52,50 +63,215 @@ describe('reducer', () => {
     const nextState = reducer(prevState, action);
     expect(nextState.queryType).toEqual(QueryType.TimeSeries);
   });
-  it('applies SetQueryType to reset settings but preserve db/table', async () => {
-    const prevState = buildInitialState({
+  const authoredState = () =>
+    buildInitialState({
       database: 'prev_db',
       table: 'prev_table',
       queryType: QueryType.Table,
-      groupBy: ['will', 'be', 'reset'],
+      columns: [{ name: 'a' }],
+      groupBy: ['a'],
+      filters: [
+        {
+          type: 'string',
+          operator: FilterOperator.Equals,
+          filterType: 'custom',
+          key: 'a',
+          condition: 'AND',
+          value: 'x',
+        },
+      ],
+      orderBy: [{ name: 'a', dir: OrderByDirection.DESC }],
+      limit: 50,
+      meta: { otelEnabled: true },
     });
-    const action = setQueryType(QueryType.Logs);
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.database).toEqual('prev_db');
-    expect(nextState.table).toEqual('prev_table');
-    expect(nextState.queryType).toEqual(QueryType.Logs);
-    expect(nextState.groupBy).toBeFalsy();
+  it('applies SetQueryType keeping the rest of the query', async () => {
+    const prevState = authoredState();
+
+    const nextState = reducer(prevState, setQueryType(QueryType.Logs));
+
+    expect(nextState).toEqual({ ...prevState, queryType: QueryType.Logs });
   });
-  it('applies SetDatabase to reset settings but preserve query type', async () => {
-    const prevState = buildInitialState({
-      database: 'prev_db',
-      table: 'prev_table',
-      queryType: QueryType.Logs,
-      groupBy: ['will', 'be', 'reset'],
-    });
-    const action = setDatabase('next_db');
+  it('applies SetDatabase keeping the table and the rest of the query', async () => {
+    const prevState = authoredState();
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.database).toEqual('next_db');
-    expect(nextState.table).toEqual('');
-    expect(nextState.queryType).toEqual(QueryType.Logs);
-    expect(nextState.groupBy).toBeFalsy();
+    const nextState = reducer(prevState, setDatabase('next_db'));
+
+    expect(nextState).toEqual({ ...prevState, database: 'next_db' });
   });
-  it('applies SetTable to reset settings but preserve db/queryType', async () => {
-    const prevState = buildInitialState({
-      database: 'prev_db',
-      table: 'prev_table',
+  it('fills only roles still empty, and only for the same query type and table', async () => {
+    const state = buildInitialState({
       queryType: QueryType.Logs,
-      groupBy: ['will', 'be', 'reset'],
+      database: 'db',
+      table: 'logs',
+      columns: [{ name: 'msg' }, { name: 't', hint: ColumnHint.Time }],
     });
-    const action = setTable('next_table');
+    const roles = [
+      { name: 'ts', hint: ColumnHint.Time },
+      { name: 'msg', hint: ColumnHint.LogMessage },
+    ];
 
-    const nextState = reducer(prevState, action);
-    expect(nextState.database).toEqual('prev_db');
-    expect(nextState.table).toEqual('next_table');
-    expect(nextState.queryType).toEqual(QueryType.Logs);
-    expect(nextState.groupBy).toBeFalsy();
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, 'db', 'logs', roles)).columns).toEqual([
+      { name: 't', hint: ColumnHint.Time },
+      { name: 'msg', hint: ColumnHint.LogMessage },
+    ]);
+    expect(reducer(state, fillMissingRoles(QueryType.Traces, 'db', 'logs', roles))).toBe(state);
+    // Guessed from a table the query has since left.
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, 'db', 'old_logs', roles))).toBe(state);
+    expect(reducer(state, fillMissingRoles(QueryType.Logs, 'old_db', 'logs', roles))).toBe(state);
+  });
+  describe('fitToTable', () => {
+    const logsQuery = () =>
+      buildInitialState({
+        queryType: QueryType.Logs,
+        database: 'db',
+        table: 'new_logs',
+        columns: [
+          { name: 'ts', hint: ColumnHint.Time },
+          { name: 'body', hint: ColumnHint.LogMessage },
+          { name: 'sev', hint: ColumnHint.LogLevel },
+          { name: 'host' },
+          { name: "attrs['pod']" },
+          { name: 'toUpper(host)', custom: true },
+        ],
+        filters: [
+          {
+            key: '',
+            hint: ColumnHint.Time,
+            type: 'datetime',
+            filterType: 'custom',
+            condition: 'AND',
+            operator: FilterOperator.WithInGrafanaTimeRange,
+          },
+          {
+            key: 'host',
+            type: 'String',
+            filterType: 'custom',
+            condition: 'AND',
+            operator: FilterOperator.Equals,
+            value: 'a',
+          },
+          {
+            key: 'region',
+            type: 'String',
+            filterType: 'custom',
+            condition: 'AND',
+            operator: FilterOperator.Equals,
+            value: 'b',
+          },
+        ] as Filter[],
+        orderBy: [
+          { name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC },
+          { name: 'region', dir: OrderByDirection.ASC },
+        ],
+        limit: 500,
+      });
+
+    it('drops what the new table lacks and re-guesses the emptied roles', async () => {
+      const state = logsQuery();
+      const tableColumns = [
+        { name: 'timestamp', type: 'DateTime64(9)', picklistValues: [] },
+        { name: 'message', type: 'String', picklistValues: [] },
+        { name: 'host', type: 'String', picklistValues: [] },
+        { name: 'attrs', type: 'Map(String, String)', picklistValues: [] },
+      ];
+
+      const next = reducer(state, fitToTable('db', 'new_logs', tableColumns));
+
+      expect(next.columns).toEqual([
+        { name: 'host' },
+        { name: "attrs['pod']" },
+        { name: 'toUpper(host)', custom: true },
+        { name: 'timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time },
+        { name: 'message', type: 'String', hint: ColumnHint.LogMessage },
+      ]);
+      expect(next.filters!.map((f) => f.key || f.hint)).toEqual([ColumnHint.Time, 'host']);
+      expect(next.orderBy).toEqual([{ name: '', hint: ColumnHint.Time, dir: OrderByDirection.DESC }]);
+      expect(next.limit).toBe(500);
+    });
+
+    it('keeps a query whose columns all exist in the new table', async () => {
+      const state = logsQuery();
+      const sameSchema = ['ts', 'body', 'sev', 'host', 'region', 'attrs'].map((name) => ({
+        name,
+        type: name === 'ts' ? 'DateTime' : 'String',
+        picklistValues: [],
+      }));
+
+      expect(reducer(state, fitToTable('db', 'new_logs', sameSchema))).toBe(state);
+    });
+
+    it('keeps aggregate ordering, aliases and typed expressions on a same-schema table', async () => {
+      const state = buildInitialState({
+        queryType: QueryType.Table,
+        mode: BuilderMode.Aggregate,
+        database: 'db',
+        table: 'requests_copy',
+        columns: [],
+        aggregates: [
+          { aggregateType: AggregateType.Count, column: '*' },
+          { aggregateType: AggregateType.Sum, column: 'bytes', alias: 'total_bytes' },
+        ],
+        groupBy: ['service', 'toStartOfHour(ts)'],
+        orderBy: [
+          { name: 'count(*)', dir: OrderByDirection.DESC },
+          { name: 'total_bytes', dir: OrderByDirection.DESC },
+          { name: 'toStartOfHour(ts)', dir: OrderByDirection.ASC },
+        ],
+      });
+      const sameSchema = ['ts', 'service', 'bytes'].map((name) => ({ name, type: 'String', picklistValues: [] }));
+
+      expect(reducer(state, fitToTable('db', 'requests_copy', sameSchema))).toBe(state);
+    });
+
+    it('drops plain column references the new table lacks from an aggregate query', async () => {
+      const state = buildInitialState({
+        queryType: QueryType.Table,
+        mode: BuilderMode.Aggregate,
+        database: 'db',
+        table: 'other',
+        aggregates: [
+          { aggregateType: AggregateType.Sum, column: 'bytes', alias: 'total_bytes' },
+          { aggregateType: AggregateType.Count, column: '*' },
+        ],
+        groupBy: ['service', 'region'],
+        orderBy: [
+          { name: 'total_bytes', dir: OrderByDirection.DESC },
+          { name: 'region', dir: OrderByDirection.ASC },
+          { name: 'count(*)', dir: OrderByDirection.DESC },
+        ],
+      });
+      const columns = ['service', 'region'].map((name) => ({ name, type: 'String', picklistValues: [] }));
+
+      const next = reducer(state, fitToTable('db', 'other', columns));
+
+      // bytes is gone, and with it its aggregate and the ordering by that aggregate's alias.
+      expect(next.aggregates).toEqual([{ aggregateType: AggregateType.Count, column: '*' }]);
+      expect(next.groupBy).toEqual(['service', 'region']);
+      expect(next.orderBy?.map((o) => o.name)).toEqual(['region', 'count(*)']);
+    });
+
+    it('ignores columns of a table the query has since left', async () => {
+      const state = logsQuery();
+      const other = [{ name: 'x', type: 'String', picklistValues: [] }];
+
+      expect(reducer(state, fitToTable('db', 'other', other))).toBe(state);
+      expect(reducer(state, fitToTable('db', 'new_logs', []))).toBe(state);
+    });
+  });
+  it('applies SetTable keeping the rest of the query', async () => {
+    const prevState = authoredState();
+
+    const nextState = reducer(prevState, setTable('next_table'));
+
+    expect(nextState).toEqual({ ...prevState, table: 'next_table' });
+  });
+  it('falls back to the default limit when the query has none', async () => {
+    const prevState = { ...buildInitialState({ table: 'prev_table' }), limit: undefined };
+
+    for (const action of [setTable('next_table'), setDatabase('next_db'), setQueryType(QueryType.Logs)]) {
+      expect(reducer(prevState, action).limit).toEqual(defaultCHBuilderQuery.builderOptions.limit);
+    }
   });
   it('applies SetOtelEnabled action', async () => {
     const prevState = buildInitialState({
