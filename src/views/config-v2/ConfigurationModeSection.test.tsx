@@ -1,6 +1,8 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
+import { DataSourceSrv, setDataSourceSrv } from '@grafana/runtime';
+import allLabels from 'labels';
 import { ConfigurationModeSection } from './ConfigurationModeSection';
 import { createTestProps } from './helpers';
 
@@ -17,11 +19,20 @@ jest.mock('@grafana/runtime', () => {
   };
 });
 
+const tempo = { uid: 'tempo-uid', type: 'tempo', name: 'Tempo', meta: { info: { logos: { small: '' } } } };
+const traceLinkLabel = new RegExp(
+  `^${allLabels.components.Config.LogsConfig.traceIdCorrelation.traceLinkDatasource.label}`
+);
+
 describe('ConfigurationModeSection', () => {
   const onOptionsChangeMock = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
+    setDataSourceSrv({
+      getList: () => [tempo],
+      getInstanceSettings: (ref: unknown) => (ref === tempo.uid || ref === tempo.name ? tempo : undefined),
+    } as unknown as DataSourceSrv);
   });
 
   it('defaults to logs when switching to single source mode', () => {
@@ -99,6 +110,35 @@ describe('ConfigurationModeSection', () => {
         }),
       })
     );
+  });
+
+  it('saves the "View trace" data source picked for a single source logs table', () => {
+    const props = createTestProps({
+      options: { jsonData: { configMode: 'single-table', signalType: 'logs' } },
+      mocks: { onOptionsChange: onOptionsChangeMock },
+    });
+
+    render(<ConfigurationModeSection {...props} />);
+    fireEvent.keyDown(screen.getByLabelText(traceLinkLabel), { key: 'ArrowDown' });
+    fireEvent.click(screen.getByText('Tempo'));
+
+    expect(onOptionsChangeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jsonData: expect.objectContaining({ logs: { traceLinkDatasourceUid: 'tempo-uid' } }),
+      })
+    );
+  });
+
+  it('does not render the "View trace" data source picker for a single source traces table', () => {
+    const props = createTestProps({
+      options: { jsonData: { configMode: 'single-table', signalType: 'traces' } },
+      mocks: { onOptionsChange: onOptionsChangeMock },
+    });
+
+    render(<ConfigurationModeSection {...props} />);
+
+    expect(screen.getByText('Traces Table & Schema')).toBeInTheDocument();
+    expect(screen.queryByLabelText(traceLinkLabel)).not.toBeInTheDocument();
   });
 
   it('does not render the focused source configuration in classic mode', () => {

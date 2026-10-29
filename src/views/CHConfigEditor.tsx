@@ -613,6 +613,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onSelectContextColumnsChange={(c) => onLogsConfigChange('selectContextColumns', c)}
                 onContextColumnsChange={(c) => onLogsConfigChange('contextColumns', c)}
                 onShowLogLinksChange={(v) => onLogsConfigChange('showLogLinks', v)}
+                onTraceLinkDatasourceUidChange={(uid) => onLogsConfigChange('traceLinkDatasourceUid', uid)}
                 onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
               />
             </>
@@ -792,6 +793,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               onShowLogLinksChange={(v) => {
                 onLogsConfigChange('showLogLinks', v);
               }}
+              onTraceLinkDatasourceUidChange={(uid) => onLogsConfigChange('traceLinkDatasourceUid', uid)}
               onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
             />
 
