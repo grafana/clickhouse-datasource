@@ -418,6 +418,11 @@ func (h *Clickhouse) MutateQueryError(err error) backend.ErrorWithSource {
 	if containsClickHouseException(err) {
 		return backend.NewErrorWithSource(err, backend.ErrorSourceDownstream)
 	}
+
+	if isNetworkErr, source := IsNetworkError(err); isNetworkErr {
+		return backend.NewErrorWithSource(err, source)
+	}
+
 	return backend.NewErrorWithSource(err, backend.DefaultErrorSource)
 }
 
