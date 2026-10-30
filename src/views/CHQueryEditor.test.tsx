@@ -508,6 +508,62 @@ describe('Query Editor', () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
   });
 
+  it('propagates edits when a single-table data source falls back to the classic builder', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    datasource.fetchDatabases = jest.fn(() => Promise.resolve(['otel_v2']));
+    datasource.fetchTables = jest.fn(() => Promise.resolve(['otel_logs']));
+    datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+    const onChange = jest.fn();
+
+    render(
+      <CHQueryEditor
+        query={{
+          pluginVersion,
+          rawSql: 'SELECT "Body" FROM "otel_v2"."otel_logs" LIMIT 100',
+          refId: 'A',
+          editorType: EditorType.Builder,
+          builderOptions: {
+            database: 'otel_v2',
+            table: 'otel_logs',
+            queryType: QueryType.Table,
+            columns: [{ name: 'Body' }],
+            filters: [],
+            limit: 100,
+          },
+        }}
+        onChange={onChange}
+        onRunQuery={jest.fn()}
+        datasource={datasource}
+      />
+    );
+
+    const limitInput = await screen.findByTestId(selectors.components.QueryBuilder.LimitEditor.input);
+    onChange.mockClear();
+
+    fireEvent.change(limitInput, { target: { value: '250', valueAsNumber: 250 } });
+    fireEvent.blur(limitInput);
+
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          builderOptions: expect.objectContaining({
+            queryType: QueryType.Table,
+            limit: 250,
+          }),
+          rawSql: expect.stringContaining('LIMIT 250'),
+        })
+      )
+    );
+  });
+
   // Every change the editor propagates must target the new table, never the carried-over one.
   it('converts a query carried over from another single-table logs data source in Explore', async () => {
     const datasource = newMockDatasource();
