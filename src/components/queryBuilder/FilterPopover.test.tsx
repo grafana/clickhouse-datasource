@@ -1,4 +1,5 @@
 import React from 'react';
+import { dateTime, TimeRange } from '@grafana/data';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Datasource } from 'data/CHDatasource';
@@ -21,11 +22,17 @@ const allColumns: TableColumn[] = [
   { name: 'ResourceAttributes', type: 'Map(String, String)', picklistValues: [] },
 ];
 
-const renderPopover = (overrides?: { onAddFilter?: jest.Mock; onClose?: jest.Mock; columns?: TableColumn[] }) => {
+const renderPopover = (overrides?: {
+  onAddFilter?: jest.Mock;
+  onClose?: jest.Mock;
+  columns?: TableColumn[];
+  timeRange?: TimeRange;
+}) => {
   const datasource = createMockDatasource();
   render(
     <FilterPopover
       datasource={datasource}
+      timeRange={overrides?.timeRange}
       database="default"
       table="otel_logs"
       allColumns={overrides?.columns || allColumns}
@@ -45,6 +52,20 @@ const selectColumn = async (columnName: string) => {
 };
 
 describe('FilterPopover', () => {
+  it('passes the editor time range to value autocomplete', async () => {
+    const timeRange: TimeRange = {
+      from: dateTime(1600000000000),
+      to: dateTime(1600000900000),
+      raw: { from: 'now-15m', to: 'now' },
+    };
+    const datasource = renderPopover({ timeRange });
+    await selectColumn('Body');
+    await userEvent.click(screen.getAllByRole('combobox')[2]);
+    await waitFor(() =>
+      expect(datasource.fetchDistinctValues).toHaveBeenCalledWith('Body', 'default', 'otel_logs', timeRange)
+    );
+  });
+
   it('infers number filter kind from ClickHouse numeric types', () => {
     expect(getFilterValueKind('UInt64')).toBe('number');
     expect(getFilterValueKind('Nullable(Float64)')).toBe('number');
