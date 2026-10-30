@@ -17,7 +17,6 @@ import { migrateCHQuery } from 'data/migration';
 import useHasTraceTimestampTable from 'hooks/useHasTraceTimestampTable';
 import {
   buildCompactQueryDefaults,
-  getCompactQueryType,
   isSameQueryOptions,
   shouldConvertCarriedOverQuery,
 } from 'components/queryBuilder/compactQueryDefaults';
@@ -149,13 +148,9 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
   // Prevent trying to run empty query on load, or stale query after datasource/signal switches.
   const shouldSkipChanges = useRef<boolean>(true);
   if (isBuilderOptionsRunnable(builderOptions)) {
-    if (singleTableMode && signalType) {
-      // The compact editor converts a query carried over from another data source. Propagating
-      // it here would race that conversion and could put the stale query back.
-      shouldSkipChanges.current = builderOptions.queryType !== getCompactQueryType(signalType) || isCarriedOver;
-    } else {
-      shouldSkipChanges.current = false;
-    }
+    // The compact editor converts a query carried over from another data source. Propagating
+    // it here would race that conversion and could put the stale query back.
+    shouldSkipChanges.current = isCarriedOver;
   }
 
   // Resolve hasTraceTimestampTable for any trace ID query — not only OTel ones.
