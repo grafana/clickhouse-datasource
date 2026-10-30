@@ -111,9 +111,16 @@ describe('parseSelect', () => {
     expect(multi?.withAliases?.get('b')?.from?.table).toBe('t_b');
   });
 
-  it('flags a top-level UNION', () => {
-    expect(parseSelect('SELECT a FROM t1 UNION ALL SELECT a FROM t2')?.hasUnion).toBe(true);
-    expect(parseSelect('SELECT a FROM t1')?.hasUnion).toBeFalsy();
+  it('flags a top-level set operation (UNION / INTERSECT / EXCEPT)', () => {
+    expect(parseSelect('SELECT a FROM t1 UNION ALL SELECT a FROM t2')?.hasSetOperation).toBe(true);
+    expect(parseSelect('SELECT a FROM t1 INTERSECT SELECT a FROM t2')?.hasSetOperation).toBe(true);
+    expect(parseSelect('SELECT a FROM t1 EXCEPT SELECT a FROM t2')?.hasSetOperation).toBe(true);
+    expect(parseSelect('SELECT a FROM t1')?.hasSetOperation).toBeFalsy();
+  });
+
+  it('resolves unqualified FORMAT and PREWHERE as table names', () => {
+    expect(parseSelect('SELECT * FROM format')?.from?.table).toBe('format');
+    expect(parseSelect('SELECT * FROM prewhere')?.from?.table).toBe('prewhere');
   });
 
   it('keeps the outer table across an ARRAY JOIN', () => {
