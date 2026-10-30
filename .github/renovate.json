@@ -1,6 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["github>grafana/grafana-renovate-config//presets/data-sources/base"],
+  "extends": [
+    "github>grafana/grafana-renovate-config//presets/data-sources/base",
+    "github>grafana/grafana-renovate-config//presets/data-sources/renovate-gate"
+  ],
   "packageRules": [
     {
       "description": "Use chore(deps) for all updates so release-please keeps dependency bumps out of the changelog",
