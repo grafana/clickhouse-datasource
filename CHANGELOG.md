@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.23.4](https://github.com/grafana/clickhouse-datasource/compare/v4.23.3...v4.23.4) (2026-10-29)
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** declare multiValueFilterOperators support in plugin.json ([ca4855e](https://github.com/grafana/clickhouse-datasource/commit/ca4855ed18f00c63a8b132d5ef42d4cc058f999e))
+* **adhoc:** enable multiValueFilterOperators support in plugin.json ([#2218](https://github.com/grafana/clickhouse-datasource/issues/2218)) ([ca4855e](https://github.com/grafana/clickhouse-datasource/commit/ca4855ed18f00c63a8b132d5ef42d4cc058f999e))
+
 ## [4.23.3](https://github.com/grafana/clickhouse-datasource/compare/v4.23.2...v4.23.3) (2026-10-28)
 
 
