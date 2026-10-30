@@ -241,6 +241,8 @@ export const AdditionalSettingsSection = (props: Props) => {
               onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
               onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
               onAdditionalColumnsChange={(c) => onUpdateLogsConfig('additionalColumns', c)}
+              onAttributeColumnsChange={(c) => onUpdateLogsConfig('attributeColumns', c)}
+              onAttributeColumnExclusionsChange={(c) => onUpdateLogsConfig('attributeColumnExclusions', c)}
             />
 
             <Divider />
