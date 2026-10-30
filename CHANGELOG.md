@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.23.5](https://github.com/grafana/clickhouse-datasource/compare/v4.23.4...v4.23.5) (2026-10-30)
+
+
+### 🐛 Bug Fixes
+
+* gRPC deadlock that freezes the plugin connection under load ([#2265](https://github.com/grafana/clickhouse-datasource/issues/2265)) ([7bea76e](https://github.com/grafana/clickhouse-datasource/commit/7bea76e5e04daab3d6af29fcb3ac4c6cfe854eb0))
+
 ## [4.23.4](https://github.com/grafana/clickhouse-datasource/compare/v4.23.3...v4.23.4) (2026-10-29)
 
 
