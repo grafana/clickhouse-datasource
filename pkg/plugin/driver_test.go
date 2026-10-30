@@ -463,6 +463,55 @@ func TestContainsClickHouseException(t *testing.T) {
 	})
 }
 
+func TestMutateQueryError(t *testing.T) {
+	h := &Clickhouse{}
+
+	tests := []struct {
+		name       string
+		err        error
+		wantSource backend.ErrorSource
+	}{
+		{
+			name:       "clickhouse exception is downstream",
+			err:        &clickhouse.Exception{Code: 60, Message: "Unknown table"},
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "wrapped clickhouse exception is downstream",
+			err:        fmt.Errorf("query failed: %w", &clickhouse.Exception{Code: 62, Message: "Syntax error"}),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "connection refused is downstream",
+			err:        errors.New("dial tcp: connect: connection refused"),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "no such host is downstream",
+			err:        errors.New("dial tcp: lookup invalid.example.com: no such host"),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "network is unreachable is downstream",
+			err:        errors.New("dial tcp: connect: network is unreachable"),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "unknown error uses default source",
+			err:        errors.New("something went very wrong"),
+			wantSource: backend.DefaultErrorSource,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := h.MutateQueryError(tt.err)
+			assert.Equal(t, tt.wantSource, got.ErrorSource())
+			assert.Equal(t, tt.err, got.Unwrap())
+		})
+	}
+}
+
 func TestMutateQueryData(t *testing.T) {
 	h := &Clickhouse{}
 
