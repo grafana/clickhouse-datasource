@@ -4,10 +4,11 @@ import '@testing-library/jest-dom';
 import { CHQueryEditor } from './CHQueryEditor';
 import * as ui from '@grafana/ui';
 import { mockDatasource, newMockDatasource } from '__mocks__/datasource';
-import { EditorType } from 'types/sql';
+import { CHQuery, EditorType } from 'types/sql';
 import { ColumnHint, FilterOperator, QueryType } from 'types/queryBuilder';
 import { pluginVersion } from 'utils/version';
 import { selectors } from 'selectors';
+import { CoreApp } from '@grafana/data';
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
@@ -403,6 +404,65 @@ describe('Query Editor', () => {
     );
   });
 
+  it('settles on a type change when the panel editor hands each change back', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_logs',
+      otelEnabled: true,
+      otelVersion: 'latest',
+    };
+    datasource.settings.jsonData.traces = {
+      defaultDatabase: 'otel',
+      defaultTable: 'otel_traces',
+      otelEnabled: true,
+      otelVersion: 'latest',
+    };
+    datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+    datasource.getColumnsCached = jest.fn(() => Promise.resolve([]));
+    const traces: CHQuery = {
+      pluginVersion,
+      rawSql: '',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'otel',
+        table: 'otel_traces',
+        queryType: QueryType.Traces,
+        columns: [{ name: 'TraceId', hint: ColumnHint.TraceId }],
+        filters: [],
+        orderBy: [],
+        limit: 1000,
+        meta: {},
+      },
+    };
+    let changes = 0;
+    const Panel = () => {
+      const [query, setQuery] = React.useState<CHQuery>(traces);
+      // Takes each change in its own state, as the panel editor does: the editor sees it on its next
+      // render, by when a change made in the same pass may already be in its state.
+      const onChange = (next: CHQuery) => {
+        changes++;
+        // Stop handing changes back past any sane count, so a loop fails the test instead of hanging it.
+        if (changes < 50) {
+          setQuery(next);
+        }
+      };
+      return <CHQueryEditor query={query} onChange={onChange} onRunQuery={jest.fn()} datasource={datasource} />;
+    };
+    render(<Panel />);
+    await act(async () => new Promise((r) => setTimeout(r, 50)));
+    changes = 0;
+
+    fireEvent.click(screen.getByLabelText('Logs'));
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+    const settled = changes;
+    await act(async () => new Promise((r) => setTimeout(r, 300)));
+
+    expect(changes).toBe(settled);
+    expect(changes).toBeLessThan(10);
+  });
+
   it('does not resync compact builder state for fresh equal builder options', async () => {
     const datasource = newMockDatasource();
     datasource.settings.jsonData.configMode = 'single-table';
@@ -446,6 +506,219 @@ describe('Query Editor', () => {
     );
 
     await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+  });
+
+  // Every change the editor propagates must target the new table, never the carried-over one.
+  it('converts a query carried over from another single-table logs data source in Explore', async () => {
+    const datasource = newMockDatasource();
+    datasource.settings.jsonData.configMode = 'single-table';
+    datasource.settings.jsonData.signalType = 'logs';
+    datasource.settings.jsonData.logs = {
+      defaultDatabase: 'otel_v2',
+      defaultTable: 'app_logs',
+      otelEnabled: true,
+      otelVersion: '1.29.0',
+    };
+    datasource.fetchColumns = jest.fn(() =>
+      Promise.resolve([
+        { name: 'Body', type: 'String', picklistValues: [] },
+        { name: 'ServiceName', type: 'LowCardinality(String)', picklistValues: [] },
+      ])
+    );
+    const serviceFilter = {
+      filterType: 'custom',
+      key: 'ServiceName',
+      type: 'LowCardinality(String)',
+      operator: FilterOperator.Equals,
+      value: 'checkout',
+      condition: 'AND',
+    } as const;
+    const onChange = jest.fn();
+    const onRunQuery = jest.fn();
+
+    render(
+      <CHQueryEditor
+        app={CoreApp.Explore}
+        query={{
+          pluginVersion,
+          rawSql: 'SELECT Body FROM "otel_v2"."otel_logs"',
+          refId: 'A',
+          editorType: EditorType.Builder,
+          builderOptions: {
+            database: 'otel_v2',
+            table: 'otel_logs',
+            queryType: QueryType.Logs,
+            columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+            filters: [serviceFilter],
+            meta: { datasourceUid: 'other-logs-ds' },
+          },
+        }}
+        onChange={onChange}
+        onRunQuery={onRunQuery}
+        datasource={datasource}
+      />
+    );
+
+    await waitFor(() => expect(onRunQuery).toHaveBeenCalledTimes(1));
+    expect(onChange).toHaveBeenCalled();
+    for (const [changedQuery] of onChange.mock.calls) {
+      expect(changedQuery.builderOptions.table).toBe('app_logs');
+      expect(changedQuery.builderOptions.filters).toContainEqual(serviceFilter);
+      expect(changedQuery.builderOptions.meta.datasourceUid).toBe(datasource.uid);
+      expect(changedQuery.rawSql).toContain('"otel_v2"."app_logs"');
+      expect(changedQuery.rawSql).toContain("ServiceName = 'checkout'");
+    }
+  });
+
+  describe('recorded owner', () => {
+    const ownLogsQuery = {
+      pluginVersion,
+      rawSql: 'SELECT Body FROM "otel_v2"."otel_logs"',
+      refId: 'A',
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'otel_v2',
+        table: 'otel_logs',
+        queryType: QueryType.Logs,
+        columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+        filters: [],
+      },
+    };
+    const singleTableLogsDatasource = () => {
+      const datasource = newMockDatasource();
+      datasource.settings.jsonData.configMode = 'single-table';
+      datasource.settings.jsonData.signalType = 'logs';
+      datasource.settings.jsonData.logs = {
+        defaultDatabase: 'otel_v2',
+        defaultTable: 'otel_logs',
+        otelEnabled: true,
+        otelVersion: '1.29.0',
+      };
+      datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+      return datasource;
+    };
+
+    const classicDatasource = () => {
+      const datasource = newMockDatasource();
+      datasource.fetchDatabases = jest.fn(() => Promise.resolve(['otel_v2']));
+      datasource.fetchTables = jest.fn(() => Promise.resolve(['otel_logs']));
+      datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+      return datasource;
+    };
+
+    it.each([
+      ['a single-table', singleTableLogsDatasource],
+      ['a classic', classicDatasource],
+    ])('records %s data source on a query Explore opens without a record, without running it', async (_, build) => {
+      const datasource = build();
+      const onChange = jest.fn();
+      const onRunQuery = jest.fn();
+
+      render(
+        <CHQueryEditor
+          app={CoreApp.Explore}
+          query={ownLogsQuery}
+          onChange={onChange}
+          onRunQuery={onRunQuery}
+          datasource={datasource}
+        />
+      );
+
+      await waitFor(() =>
+        expect(onChange).toHaveBeenCalledWith(
+          expect.objectContaining({
+            builderOptions: expect.objectContaining({
+              meta: expect.objectContaining({ datasourceUid: datasource.uid }),
+            }),
+          })
+        )
+      );
+      expect(onRunQuery).not.toHaveBeenCalled();
+    });
+
+    // Explore feeds each change back as the new query. Recording the owner must settle instead of
+    // trading the recorded and unrecorded options back and forth with that copy.
+    it.each(['logs', 'traces'] as const)(
+      'settles after switching a %s query from SQL to the compact view in Explore',
+      async (signalType) => {
+        const datasource = newMockDatasource();
+        datasource.settings.jsonData.configMode = 'single-table';
+        datasource.settings.jsonData.signalType = signalType;
+        datasource.settings.jsonData[signalType] = {
+          defaultDatabase: 'otel_v2',
+          defaultTable: `otel_${signalType}`,
+          otelEnabled: true,
+          otelVersion: 'latest',
+        };
+        datasource.fetchColumns = jest.fn(() => Promise.resolve([]));
+        const onChange = jest.fn();
+        const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+        const ExploreRow = () => {
+          const [query, setQuery] = React.useState<CHQuery>({
+            pluginVersion,
+            refId: 'A',
+            editorType: EditorType.SQL,
+            rawSql: '',
+          });
+          return (
+            <CHQueryEditor
+              app={CoreApp.Explore}
+              query={query}
+              onChange={(next) => {
+                onChange(next);
+                // Stop feeding changes back after a while, so a loop fails the count below
+                // instead of rendering forever.
+                if (onChange.mock.calls.length <= 30) {
+                  setQuery(next);
+                }
+              }}
+              onRunQuery={jest.fn()}
+              datasource={datasource}
+            />
+          );
+        };
+
+        render(<ExploreRow />);
+        fireEvent.click(screen.getByRole('button', { name: 'Switch to compact view' }));
+
+        await waitFor(() =>
+          expect(onChange).toHaveBeenLastCalledWith(
+            expect.objectContaining({
+              builderOptions: expect.objectContaining({
+                meta: expect.objectContaining({ datasourceUid: datasource.uid }),
+              }),
+            })
+          )
+        );
+        await act(() => new Promise((resolve) => setTimeout(resolve, 200)));
+        expect(onChange.mock.calls.length).toBeLessThan(10);
+        expect(errorSpy).not.toHaveBeenCalledWith(
+          expect.stringContaining('Maximum update depth exceeded'),
+          expect.anything()
+        );
+        errorSpy.mockRestore();
+      }
+    );
+
+    it('records nothing outside Explore, so saved queries do not change', async () => {
+      const datasource = singleTableLogsDatasource();
+      const onChange = jest.fn();
+
+      render(
+        <CHQueryEditor
+          app={CoreApp.PanelEditor}
+          query={ownLogsQuery}
+          onChange={onChange}
+          onRunQuery={jest.fn()}
+          datasource={datasource}
+        />
+      );
+
+      await waitFor(() => expect(screen.getByTestId('compact-mode-bar')).toBeInTheDocument());
+      for (const [changedQuery] of onChange.mock.calls) {
+        expect(changedQuery.builderOptions.meta?.datasourceUid).toBeUndefined();
+      }
+    });
   });
 
   it('syncs compact builder state when query filters change externally', async () => {

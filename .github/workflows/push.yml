@@ -35,6 +35,7 @@ jobs:
       contents: read
       id-token: write
     with:
+      golangci-lint-version: '2.15.0'
       # Ensure PR builds produce unique plugin versions.
       plugin-version-suffix: ${{ github.event.pull_request.head.sha }}
 
@@ -55,6 +56,8 @@ jobs:
       id-token: write
       attestations: write
       pull-requests: read
+    with:
+      golangci-lint-version: '2.15.0'
     secrets: inherit
 
   publish-dev:
@@ -74,8 +77,8 @@ jobs:
       id-token: write
       pull-requests: read
     with:
-      go-version: '1.26.5'
-      golangci-lint-version: '2.10.1'
+      go-version: '1.27.3'
+      golangci-lint-version: '2.15.0'
       # The backend ships to dev0 per merge through the bundled pipeline
       # (bundled-image.yml), so this job publishes the frontend to the dev catalog
       # and does not also trigger the backend rollout.

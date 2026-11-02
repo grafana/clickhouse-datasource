@@ -1,14 +1,136 @@
 # Changelog
 
-## Unreleased
+## [4.23.4](https://github.com/grafana/clickhouse-datasource/compare/v4.23.3...v4.23.4) (2026-10-29)
 
-### Features
 
-- Add Forward OAuth Identity authentication: forward the signed-in Grafana user's OAuth token to ClickHouse Cloud as a JWT so queries are attributed to the real user instead of a shared service account. Requires a verified TLS connection. Alert and other backend queries have no signed-in user and are blocked by default; enable **Allow service account fallback** to let them run with the configured username/password (#1987)
+### 🐛 Bug Fixes
 
-### Fixes
+* **adhoc:** declare multiValueFilterOperators support in plugin.json ([ca4855e](https://github.com/grafana/clickhouse-datasource/commit/ca4855ed18f00c63a8b132d5ef42d4cc058f999e))
+* **adhoc:** enable multiValueFilterOperators support in plugin.json ([#2218](https://github.com/grafana/clickhouse-datasource/issues/2218)) ([ca4855e](https://github.com/grafana/clickhouse-datasource/commit/ca4855ed18f00c63a8b132d5ef42d4cc058f999e))
 
-- Apply the log message search to the logs volume and logs sample queries, so the volume histogram matches the filtered log list (#2092)
+## [4.23.3](https://github.com/grafana/clickhouse-datasource/compare/v4.23.2...v4.23.3) (2026-10-28)
+
+
+### 🐛 Bug Fixes
+
+* **driver:** close the connection pool and keep the cause when connect fails ([#2234](https://github.com/grafana/clickhouse-datasource/issues/2234)) ([9ad3679](https://github.com/grafana/clickhouse-datasource/commit/9ad367949bc5c0c3850dcd338ca5f9e54d7aa62e))
+* **http:** name the FORMAT clause or HTML page behind "block decode" errors ([#2242](https://github.com/grafana/clickhouse-datasource/issues/2242)) ([1ac0318](https://github.com/grafana/clickhouse-datasource/commit/1ac0318eb0ad337ef92aba129f1983e8eddfc36f))
+* **logs:** count the same rows in the builder logs volume as in the logs query ([#2236](https://github.com/grafana/clickhouse-datasource/issues/2236)) ([bb8280a](https://github.com/grafana/clickhouse-datasource/commit/bb8280a0071115865075d9e36e561f4adbef7b41))
+* **logs:** show level and other fields in log details for Columns and labels maps ([#2232](https://github.com/grafana/clickhouse-datasource/issues/2232)) ([07bce6d](https://github.com/grafana/clickhouse-datasource/commit/07bce6d0edf9281770be693810dd52409b3655a0))
+* **query-builder:** keep the query when changing type, database or table ([#2200](https://github.com/grafana/clickhouse-datasource/issues/2200)) ([6f89eb3](https://github.com/grafana/clickhouse-datasource/commit/6f89eb367a593ed4a02f9739b7445b2082e7341d))
+
+
+### ✅ Tests
+
+* **e2e:** bump @grafana/plugin-e2e to 3.12.0 ([#2261](https://github.com/grafana/clickhouse-datasource/issues/2261)) ([3c20297](https://github.com/grafana/clickhouse-datasource/commit/3c202971c0e1618d5a2d80a27ef536f342751191))
+
+## [4.23.2](https://github.com/grafana/clickhouse-datasource/compare/v4.23.1...v4.23.2) (2026-10-21)
+
+
+### 🐛 Bug Fixes
+
+* **query-builder:** keep Limit when changing table or database ([#2163](https://github.com/grafana/clickhouse-datasource/issues/2163)) ([32e4f1a](https://github.com/grafana/clickhouse-datasource/commit/32e4f1a44c3c958de6aaff16b77afba3a99bdecd))
+
+
+### 🤖 Continuous Integration
+
+* update golangci-lint to 2.15.0 ([cc56d77](https://github.com/grafana/clickhouse-datasource/commit/cc56d776a1a30f392e8f4fb9a1a3818d124f329f))
+
+## [4.23.1](https://github.com/grafana/clickhouse-datasource/compare/v4.23.0...v4.23.1) (2026-10-21)
+
+
+### 🐛 Bug Fixes
+
+* **annotations:** keep text and tags selectable on region annotations ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87)), closes [#2174](https://github.com/grafana/clickhouse-datasource/issues/2174)
+* **annotations:** region annotations making text and tags unselectable in the column mapping ([#2175](https://github.com/grafana/clickhouse-datasource/issues/2175)) ([1e391dd](https://github.com/grafana/clickhouse-datasource/commit/1e391ddcaf695fdc6748f92cdda23f3116463a87))
+* **suggestions:** suggest the paths inside JSON columns in the SQL editor ([#2206](https://github.com/grafana/clickhouse-datasource/issues/2206)) ([5b79e79](https://github.com/grafana/clickhouse-datasource/commit/5b79e7984dd38d8b4d3c71311339c2a74e4d4916))
+
+
+### ♻️ Code Refactoring
+
+* **macros:** keep the $__interval format independent of the macropro version ([#2214](https://github.com/grafana/clickhouse-datasource/issues/2214)) ([c7086a9](https://github.com/grafana/clickhouse-datasource/commit/c7086a9140c2298f0eea9c62dcd00a548059c8f6))
+
+
+### ✅ Tests
+
+* **e2e:** group specs into thematic directories and adopt the shared helpers ([#2123](https://github.com/grafana/clickhouse-datasource/issues/2123)) ([c233eb4](https://github.com/grafana/clickhouse-datasource/commit/c233eb4a20806427d658c7b38a24bd1f2d2bfd14))
+
+## [4.23.0](https://github.com/grafana/clickhouse-datasource/compare/v4.22.1...v4.23.0) (2026-10-19)
+
+
+### 🎉 Features
+
+* **macros:** add $__fromGrafanaInterval to convert dashboard interval variables ([#2160](https://github.com/grafana/clickhouse-datasource/issues/2160)) ([a617629](https://github.com/grafana/clickhouse-datasource/commit/a6176298d279b8bb0204a5950cfb5b80b2a8001b))
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** scope ad-hoc filters to the table named in the key ([#2213](https://github.com/grafana/clickhouse-datasource/issues/2213)) ([fb47d3c](https://github.com/grafana/clickhouse-datasource/commit/fb47d3ca6163b9a8fc79292499c6d23a2714ecaf))
+* **annotations:** generate valid change-detection SQL for JSON attribute columns ([#2062](https://github.com/grafana/clickhouse-datasource/issues/2062)) ([26b6982](https://github.com/grafana/clickhouse-datasource/commit/26b698211e2c7c2be63a7f0bd3600b9d2ae1b5b7))
+* **deps:** resolve security vulnerabilities ([#2220](https://github.com/grafana/clickhouse-datasource/issues/2220)) ([ff48c3f](https://github.com/grafana/clickhouse-datasource/commit/ff48c3f064136f52881125b60fddcb4f4422442e))
+* **logs:** otel version switching, filter toggles, and log context fixes ([#2078](https://github.com/grafana/clickhouse-datasource/issues/2078)) ([277d41a](https://github.com/grafana/clickhouse-datasource/commit/277d41aef0d170ed11686155032e6391ed38d09e))
+* **macros:** accept $__timeFrom() and $__timeTo() and name the expected form in arity errors ([#2215](https://github.com/grafana/clickhouse-datasource/issues/2215)) ([bd6c2af](https://github.com/grafana/clickhouse-datasource/commit/bd6c2af35bb87dba963d84dd6a331d54192284d6))
+* **queryBuilder:** convert the query when switching between single-table data sources in Explore ([#2228](https://github.com/grafana/clickhouse-datasource/issues/2228)) ([01ae280](https://github.com/grafana/clickhouse-datasource/commit/01ae2803b689c08e9749c0f9b754c5357f9d8b39))
+
+
+### 📝 Documentation
+
+* add gcx CLI query note to ClickHouse data source ([#2204](https://github.com/grafana/clickhouse-datasource/issues/2204)) ([13c746d](https://github.com/grafana/clickhouse-datasource/commit/13c746d7f3968974065fbea7142698d9133b4e72))
+* describe the release-please release process in CONTRIBUTING.md ([#2238](https://github.com/grafana/clickhouse-datasource/issues/2238)) ([5efce5a](https://github.com/grafana/clickhouse-datasource/commit/5efce5acf3865a972da2223073721e71df4cf2e4))
+
+
+### 🤖 Continuous Integration
+
+* **e2e:** add quarantine split to nightly cloud E2E ([#2195](https://github.com/grafana/clickhouse-datasource/issues/2195)) ([52a1bbd](https://github.com/grafana/clickhouse-datasource/commit/52a1bbdf49260edf7ebebc8109eda68f1a164312))
+* let a bundled-image dispatch opt out of the per-merge frontend ([#2219](https://github.com/grafana/clickhouse-datasource/issues/2219)) ([d1bba23](https://github.com/grafana/clickhouse-datasource/commit/d1bba235118dc02333b8c31e4df844dfeb21f208))
+
+## [4.22.1](https://github.com/grafana/clickhouse-datasource/compare/v4.22.0...v4.22.1) (2026-10-02)
+
+
+### 🐛 Bug Fixes
+
+* always apply the Grafana row limit to query results ([#2150](https://github.com/grafana/clickhouse-datasource/issues/2150)) ([0637465](https://github.com/grafana/clickhouse-datasource/commit/06374654e7eef755cadbe667eeaab0a1adb36d44))
+
+## [4.22.0](https://github.com/grafana/clickhouse-datasource/compare/v4.21.3...v4.22.0) (2026-09-30)
+
+
+### 🎉 Features
+
+* **adhoc:** support JSON-typed columns and escape filter values ([#2095](https://github.com/grafana/clickhouse-datasource/issues/2095)) ([90ce33e](https://github.com/grafana/clickhouse-datasource/commit/90ce33e9625228ded153af04039b64659ad7f61c))
+* **dashboards:** add database selector variable to OTel dashboards ([#2080](https://github.com/grafana/clickhouse-datasource/issues/2080)) ([9c3bdb7](https://github.com/grafana/clickhouse-datasource/commit/9c3bdb7683bfa66009b15dc11d1edd0697682803))
+* **dashboards:** add interval variable to control panel min interval ([#2082](https://github.com/grafana/clickhouse-datasource/issues/2082)) ([bb04001](https://github.com/grafana/clickhouse-datasource/commit/bb04001219e32222a68a7b2de3b8dc9b035e8975))
+* **dashboards:** let Query Analysis read any query_log source ([#2145](https://github.com/grafana/clickhouse-datasource/issues/2145)) ([51dd076](https://github.com/grafana/clickhouse-datasource/commit/51dd07614ce20d85d54ce92fb5229fa8ed548042))
+* **dashboards:** make OTel dashboards importable via datasource input ([#2081](https://github.com/grafana/clickhouse-datasource/issues/2081)) ([9a20ba8](https://github.com/grafana/clickhouse-datasource/commit/9a20ba8c588e629777d706ab2b9b3b8ed5fe278d))
+* **explore:** show log volume for SQL editor queries ([37bc128](https://github.com/grafana/clickhouse-datasource/commit/37bc128036ed5df0e6f1b1c0096d5f7ecb70a118)), closes [#2112](https://github.com/grafana/clickhouse-datasource/issues/2112)
+* **logs:** browse and filter by any log table column ([#2108](https://github.com/grafana/clickhouse-datasource/issues/2108)) ([c88708c](https://github.com/grafana/clickhouse-datasource/commit/c88708cd5f4c85ec4fe0375463f094ae6d9317c5))
+* **query:** add a per-query min interval override ([#2149](https://github.com/grafana/clickhouse-datasource/issues/2149)) ([3fe9c39](https://github.com/grafana/clickhouse-datasource/commit/3fe9c396160cba30a88942f908a11b3352614b86))
+* **traces:** accept human-friendly units in the Duration filter ([#2135](https://github.com/grafana/clickhouse-datasource/issues/2135)) ([6351016](https://github.com/grafana/clickhouse-datasource/commit/63510165e2d87ef578000ff1ce55011b519e5741))
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** resolve ad-hoc filter table with the ClickHouse parser ([#1936](https://github.com/grafana/clickhouse-datasource/issues/1936)) ([7335492](https://github.com/grafana/clickhouse-datasource/commit/733549218aa5b76e41c3bf92f5cc1ef5803f0f67))
+* **adhoc:** support Grafana's built-in multi-value ad hoc operators ([#2181](https://github.com/grafana/clickhouse-datasource/issues/2181)) ([9dc2e67](https://github.com/grafana/clickhouse-datasource/commit/9dc2e67fecad625dfca773d34de3e3fd6218879c))
+* **autocomplete:** stop offering NULL when the typed prefix rules it out ([#2156](https://github.com/grafana/clickhouse-datasource/issues/2156)) ([061fca2](https://github.com/grafana/clickhouse-datasource/commit/061fca27f509ff5de3ba232c7b29acd668388e3d))
+* **dashboards:** quote template variables in bundled dashboards ([#2083](https://github.com/grafana/clickhouse-datasource/issues/2083)) ([ec147cf](https://github.com/grafana/clickhouse-datasource/commit/ec147cf421fe17e59b8c6571bba840f0afe2ceea))
+* **settings:** apply connection pool settings from the data source config ([#2180](https://github.com/grafana/clickhouse-datasource/issues/2180)) ([4429dc8](https://github.com/grafana/clickhouse-datasource/commit/4429dc8e0097976aa4cfb494afa74380b28af6dc))
+* warn when time series queries include Map/Array/JSON columns ([#2136](https://github.com/grafana/clickhouse-datasource/issues/2136)) ([717f5be](https://github.com/grafana/clickhouse-datasource/commit/717f5be782820388743d3fd57af365d12cb323d4))
+
+
+### ✅ Tests
+
+* bind the proxy on an ephemeral port and inherit the Cloud expect timeout ([#2168](https://github.com/grafana/clickhouse-datasource/issues/2168)) ([1bc1f7e](https://github.com/grafana/clickhouse-datasource/commit/1bc1f7e3162f3f10763f4a108012fe154c426501))
+* **e2e:** add shared E2E helpers ([#2122](https://github.com/grafana/clickhouse-datasource/issues/2122)) ([10b0944](https://github.com/grafana/clickhouse-datasource/commit/10b094480b8c0f0eac5293cfa5837897b6150b5b))
+* **e2e:** let the config editor wait inherit the Cloud expect timeout ([#2176](https://github.com/grafana/clickhouse-datasource/issues/2176)) ([fb4346c](https://github.com/grafana/clickhouse-datasource/commit/fb4346c9d0d41ff7576d7724dcfe91fc3a882d0b))
+* **e2e:** remount the SQL editor in document so the dedupe test can fail ([#2157](https://github.com/grafana/clickhouse-datasource/issues/2157)) ([c2d9a7e](https://github.com/grafana/clickhouse-datasource/commit/c2d9a7e7596801ff1259ff55f71948b49a6ad48f))
+* **e2e:** run a query through the backend on Cloud runs ([#2194](https://github.com/grafana/clickhouse-datasource/issues/2194)) ([60f8cf7](https://github.com/grafana/clickhouse-datasource/commit/60f8cf78f6adbe8f0cd6dddc78b269e8ac9ecf0e))
+* **settings:** fail when a Settings field has no parsing branch ([#2184](https://github.com/grafana/clickhouse-datasource/issues/2184)) ([ae1ef82](https://github.com/grafana/clickhouse-datasource/commit/ae1ef821927a4ca4d9636bd445fc50cb4f94785c))
+* **suggestions:** guard the internal-function filter against origin-only matching ([#2154](https://github.com/grafana/clickhouse-datasource/issues/2154)) ([2ec7da0](https://github.com/grafana/clickhouse-datasource/commit/2ec7da055f15a383e6dc0f305a06b75eef8535f5))
+
+
+### 🤖 Continuous Integration
+
+* **otel:** add scheduled canary for collector schema drift ([#2018](https://github.com/grafana/clickhouse-datasource/issues/2018)) ([bebeb48](https://github.com/grafana/clickhouse-datasource/commit/bebeb48712475fcb81a3a576e64bb1c8a4c33c39))
 
 ## [4.21.3](https://github.com/grafana/clickhouse-datasource/compare/v4.21.2...v4.21.3) (2026-09-15)
 

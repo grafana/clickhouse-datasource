@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
+	"github.com/grafana/grafana-plugin-sdk-go/backend"
 )
 
 type ConnectionErrorCategory string
@@ -107,10 +108,20 @@ func CategorizeConnectionError(err error) ConnectionErrorCategory {
 		}
 	}
 
+	var formatErr *responseFormatError
+	if errors.As(err, &formatErr) {
+		return ConnectionErrorCategoryConfig
+	}
+
 	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
 		return ConnectionErrorCategoryTimeout
 	}
 	if errors.Is(err, clickhouse.ErrAcquireConnTimeout) {
+		return ConnectionErrorCategoryTimeout
+	}
+	// A socket deadline gives os.ErrDeadlineExceeded, which does not match context.DeadlineExceeded.
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
 		return ConnectionErrorCategoryTimeout
 	}
 	if errors.Is(err, clickhouse.ErrAcquireConnNoAddress) {
@@ -179,10 +190,7 @@ func CategorizeConnectionError(err error) ConnectionErrorCategory {
 	if strings.Contains(errStr, "timeout") || strings.Contains(errStr, "deadline exceeded") {
 		return ConnectionErrorCategoryTimeout
 	}
-	if strings.Contains(errStr, "connection refused") ||
-		strings.Contains(errStr, "no such host") ||
-		strings.Contains(errStr, "network is unreachable") ||
-		strings.Contains(errStr, "connection reset by peer") {
+	if isNetworkErr, _ := IsNetworkError(err); isNetworkErr {
 		return ConnectionErrorCategoryNetwork
 	}
 	if strings.Contains(errStr, "DB::Exception") {
@@ -190,4 +198,21 @@ func CategorizeConnectionError(err error) ConnectionErrorCategory {
 	}
 
 	return ConnectionErrorCategoryUnknown
+}
+
+func IsNetworkError(err error) (bool, backend.ErrorSource) {
+	if err == nil {
+		return false, backend.ErrorSourcePlugin
+	}
+
+	errStr := err.Error()
+	switch {
+	case strings.Contains(errStr, "connection refused"),
+		strings.Contains(errStr, "no such host"),
+		strings.Contains(errStr, "connection reset by peer"),
+		strings.Contains(errStr, "network is unreachable"):
+		return true, backend.ErrorSourceDownstream
+	}
+
+	return false, backend.ErrorSourcePlugin
 }

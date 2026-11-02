@@ -27,6 +27,7 @@ jobs:
     with:
       # This is the nightly Cloud E2E run, so label it with the DER run_stage vocabulary.
       run-stage: nightly
+      bench-execute-cmd: npm run e2e:cloud
       # datasource-version is omitted here: the nightly tests whatever version is deployed
       # on the shared instance, so it defaults to the commit SHA. The in-Argo promotion
       # gate (generateBenchSuites) passes the real released version.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 	"time"
@@ -35,11 +36,11 @@ type Settings struct {
 
 	DefaultDatabase string `json:"defaultDatabase,omitempty"`
 
-	ConnMaxLifetime string `json:"connMaxLifetime,omitempty"`
-	DialTimeout     string `json:"dialTimeout,omitempty"`
-	QueryTimeout    string `json:"queryTimeout,omitempty"`
-	MaxIdleConns    string `json:"maxIdleConns,omitempty"`
-	MaxOpenConns    string `json:"maxOpenConns,omitempty"`
+	ConnMaxLifetime int `json:"connMaxLifetime"`
+	DialTimeout     int `json:"dialTimeout"`
+	QueryTimeout    int `json:"queryTimeout"`
+	MaxIdleConns    int `json:"maxIdleConns"`
+	MaxOpenConns    int `json:"maxOpenConns"`
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
@@ -64,7 +65,7 @@ type Settings struct {
 	// results. It is applied to every query, so leave it at 0 (the default,
 	// disabled) unless queries from this datasource reliably return a similar,
 	// large number of rows. A value larger than the typical result wastes
-	// memory.
+	// memory. Values above maxRowCapacityHint are clamped.
 	RowCapacityHint int64 `json:"rowCapacityHint,omitempty"`
 
 	// EnableSchemaCache gates the in-process cache that memoizes
@@ -83,6 +84,13 @@ type CustomSetting struct {
 }
 
 const secureHeaderKeyPrefix = "secureHttpHeaders."
+
+// maxRowCapacityHint bounds the rowCapacityHint datasource option. The hint
+// sets the capacity of every column's backing slice before any row is
+// scanned, so an arbitrarily large value would allocate that much memory per
+// column up front. 1,000,000 matches Grafana's default dataproxy.row_limit,
+// past which results are truncated anyway.
+const maxRowCapacityHint = 1_000_000
 
 func (settings *Settings) isValid() (err error) {
 	if settings.Host == "" {
@@ -175,32 +183,24 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	}
 
 	// Deprecated: Replaced with DialTimeout for v4. Deserializes "timeout" field for old v3 configs.
-	if jsonData["timeout"] != nil {
-		if val, ok := jsonData["timeout"].(string); !ok {
-			if val, ok := jsonData["timeout"].(float64); ok {
-				settings.DialTimeout = fmt.Sprintf("%d", int64(val))
-			}
-		} else {
-			settings.DialTimeout = val
-		}
+	legacyTimeout, err := intSetting(jsonData, "timeout", 10)
+	if err != nil {
+		return settings, err
 	}
-	if jsonData["dialTimeout"] != nil {
-		if val, ok := jsonData["dialTimeout"].(string); !ok {
-			if val, ok := jsonData["dialTimeout"].(float64); ok {
-				settings.DialTimeout = fmt.Sprintf("%d", int64(val))
-			}
-		} else {
-			settings.DialTimeout = val
-		}
+	if settings.DialTimeout, err = intSetting(jsonData, "dialTimeout", legacyTimeout); err != nil {
+		return settings, err
 	}
-
-	if jsonData["queryTimeout"] != nil {
-		if val, ok := jsonData["queryTimeout"].(string); ok {
-			settings.QueryTimeout = val
-		}
-		if val, ok := jsonData["queryTimeout"].(float64); ok {
-			settings.QueryTimeout = fmt.Sprintf("%d", int64(val))
-		}
+	if settings.QueryTimeout, err = intSetting(jsonData, "queryTimeout", 60); err != nil {
+		return settings, err
+	}
+	if settings.ConnMaxLifetime, err = intSetting(jsonData, "connMaxLifetime", 5); err != nil {
+		return settings, err
+	}
+	if settings.MaxIdleConns, err = intSetting(jsonData, "maxIdleConns", 25); err != nil {
+		return settings, err
+	}
+	if settings.MaxOpenConns, err = intSetting(jsonData, "maxOpenConns", 50); err != nil {
+		return settings, err
 	}
 	if jsonData["customSettings"] != nil {
 		customSettingsRaw := jsonData["customSettings"].([]interface{})
@@ -307,22 +307,8 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	if settings.RowCapacityHint < 0 {
 		settings.RowCapacityHint = 0
 	}
-
-	// Set default values
-	if strings.TrimSpace(settings.DialTimeout) == "" {
-		settings.DialTimeout = "10"
-	}
-	if strings.TrimSpace(settings.QueryTimeout) == "" {
-		settings.QueryTimeout = "60"
-	}
-	if strings.TrimSpace(settings.ConnMaxLifetime) == "" {
-		settings.ConnMaxLifetime = "5"
-	}
-	if strings.TrimSpace(settings.MaxIdleConns) == "" {
-		settings.MaxIdleConns = "25"
-	}
-	if strings.TrimSpace(settings.MaxOpenConns) == "" {
-		settings.MaxOpenConns = "50"
+	if settings.RowCapacityHint > maxRowCapacityHint {
+		settings.RowCapacityHint = maxRowCapacityHint
 	}
 
 	// Load secure settings
@@ -350,12 +336,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	proxyOpts, err := config.ProxyOptionsFromContext(ctx)
 
 	if err == nil && proxyOpts != nil {
-		// the sdk expects the timeout to not be a string
-		timeout, err := strconv.ParseFloat(settings.DialTimeout, 64)
-		if err == nil {
-			proxyOpts.Timeouts.Timeout = time.Duration(timeout) * time.Second
-		}
-
+		proxyOpts.Timeouts.Timeout = time.Duration(settings.DialTimeout) * time.Second
 		settings.ProxyOptions = proxyOpts
 	}
 
@@ -399,4 +380,33 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 	}
 
 	return httpHeaders
+}
+
+// intSetting reads a whole-number jsonData key, given as a JSON number or a
+// numeric string, and returns def when the key is absent or empty.
+func intSetting(jsonData map[string]interface{}, key string, def int) (int, error) {
+	switch v := jsonData[key].(type) {
+	case nil:
+		return def, nil
+	case float64:
+		if v != math.Trunc(v) {
+			return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: %v is not a whole number", key, v))
+		}
+		if v > math.MaxInt32 || v < math.MinInt32 {
+			return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: %v is out of range", key, v))
+		}
+		return int(v), nil
+	case string:
+		v = strings.TrimSpace(v)
+		if v == "" {
+			return def, nil
+		}
+		parsed, err := strconv.ParseInt(v, 10, 32)
+		if err != nil {
+			return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: %w", key, err))
+		}
+		return int(parsed), nil
+	default:
+		return 0, backend.DownstreamError(fmt.Errorf("could not parse %s value: unexpected type %T", key, v))
+	}
 }

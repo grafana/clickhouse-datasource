@@ -1,5 +1,6 @@
 import { AdHocVariableFilter } from '@grafana/data';
 import { getTable } from './ast';
+import { buildJSONPathAccess, parseJSONAdhocKey, quoteColumnIfUnsafe } from './jsonPath';
 
 // OTel-standard Map columns. Retained as a fallback so behavior does not
 // regress when schema info has not been populated (e.g. in tests that
@@ -11,10 +12,15 @@ export class AdHocFilter {
   private _mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS;
 
   setTargetTableFromQuery(query: string) {
-    this._targetTable = getTable(query);
-    if (this._targetTable === '') {
+    // Reset first so that if getTable() throws (its pgsql AST can't parse some
+    // valid ClickHouse SQL, e.g. backtick identifiers) we don't retain a stale
+    // table from a previous query — apply() then re-derives from the panel SQL.
+    this._targetTable = '';
+    const table = getTable(query);
+    if (table === '') {
       throw new Error('Failed to get table from adhoc query.');
     }
+    this._targetTable = table;
   }
 
   /**
@@ -38,23 +44,29 @@ export class AdHocFilter {
     this._mapColumns = merged;
   }
 
-  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  /**
+   * Render the filters as the body of an `additional_table_filters` entry. With
+   * `targetTable`, filters whose key names a different table are left out.
+   */
+  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false, targetTable?: string): string {
     if (!adHocFilters || adHocFilters.length === 0) {
       return '';
     }
 
-    const validFilters = adHocFilters.filter((filter: AdHocVariableFilter) => {
-      const valid = isValid(filter);
-      if (!valid) {
-        console.warn('Invalid adhoc filter will be ignored:', filter);
-      }
-      return valid;
-    });
+    const validFilters = adHocFilters
+      .filter((filter: AdHocVariableFilter) => {
+        const valid = isValid(filter);
+        if (!valid) {
+          console.warn('Invalid adhoc filter will be ignored:', filter);
+        }
+        return valid;
+      })
+      .filter((filter) => targetTable === undefined || appliesToTable(filter.key, targetTable, this._mapColumns));
 
     const filters = validFilters
       .map((f, i) => {
         const key = escapeKey(f.key, useJSON, this._mapColumns);
-        const value = escapeValueBasedOnOperator(f.value, f.operator);
+        const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
         const condition = i !== validFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
@@ -69,7 +81,12 @@ export class AdHocFilter {
     return this._mapColumns;
   }
 
-  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false): string {
+  /**
+   * Append the ad-hoc filters to `sql` as an `additional_table_filters`
+   * setting on the query's table. With `tableQualifiedKeys`, a filter applies
+   * only to the table its key names.
+   */
+  apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false, tableQualifiedKeys = true): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
       return sql;
     }
@@ -97,7 +114,7 @@ export class AdHocFilter {
       return sql;
     }
 
-    const filters = this.buildFilterString(adHocFilters, useJSON);
+    const filters = this.buildFilterString(adHocFilters, useJSON, tableQualifiedKeys ? targetTable : undefined);
 
     if (filters === '') {
       return sql;
@@ -122,13 +139,13 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Two-layer escape for Map keys embedded as `MapCol[\'<key>\']` inside the
-// outer single-quoted string passed to `additional_table_filters`. A raw
-// `'` in the key has to survive (a) the inner bracket-access string literal
-// and (b) the outer filter string — so each `'` produces `\\\'` and each
-// `\` produces `\\\\` at SQL source level.
-function escapeMapKeyForOuterFilter(key: string): string {
-  return key.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
+// Two-layer escape for a string embedded as a nested SQL literal inside the
+// outer single-quoted `additional_table_filters` string — a Map key in
+// `MapCol[\'<key>\']` or a filter value in `= \'<value>\'`. A raw `'` has to
+// survive (a) the inner string literal and (b) the outer filter string — so
+// each `'` produces `\\\'` and each `\` produces `\\\\` at SQL source level.
+function escapeForOuterFilterLiteral(value: string): string {
+  return value.replace(/\\/g, '\\\\\\\\').replace(/'/g, "\\\\\\'");
 }
 
 // Self-describing Map access minted by getTagKeys: `MapCol['key']` or
@@ -142,6 +159,50 @@ function unescapeCHStringLiteral(s: string): string {
   return s.replace(/\\(.)/g, '$1');
 }
 
+// `buildJSONPathAccess` output embedded inside the single-quoted
+// `additional_table_filters` string needs one further layer of string escaping
+// (`'` → `\'`, `\` → `\\`) over the whole expression.
+function buildJSONAccessForOuterFilter(col: string, path: string): string {
+  const expr = buildJSONPathAccess(col, path);
+  return expr.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+// A column identifier emitted straight into the `additional_table_filters`
+// expression. Ad-hoc filter keys are URL-settable, and this identifier used to
+// be emitted verbatim, so a crafted key such as `ServiceName = 'x' OR 1=1 --`
+// spliced raw SQL into the filter predicate and bypassed the filter. Plain and
+// dotted identifiers pass through unchanged; anything else is backtick-quoted
+// (identifier layer first, then the outer single-quoted filter string) so the
+// query fails closed with UNKNOWN_IDENTIFIER rather than running the injection.
+function safeColumnRef(id: string): string {
+  const quoted = quoteColumnIfUnsafe(id);
+  if (quoted === id) {
+    return id;
+  }
+  return quoted.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function appliesToTable(key: string, targetTable: string, mapColumns: ReadonlySet<string>): boolean {
+  const table = tablePrefix(key, mapColumns);
+  return table === undefined || table === targetTable.slice(targetTable.lastIndexOf('.') + 1);
+}
+
+function tablePrefix(key: string, mapColumns: ReadonlySet<string>): string | undefined {
+  if (key.startsWith('arrayElement(')) {
+    return undefined;
+  }
+  const bracketed = key.match(BRACKET_MAP_ACCESS);
+  if (bracketed) {
+    return bracketed[1];
+  }
+  const jsonKey = parseJSONAdhocKey(key);
+  if (jsonKey) {
+    return jsonKey.table;
+  }
+  const [first, ...rest] = key.split('.');
+  return rest.length > 0 && !mapColumns.has(first) ? first : undefined;
+}
+
 function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
@@ -149,7 +210,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const match = s.match(/arrayElement\((.*?),\s*['"](.*?)['"]\)/);
     if (match) {
       const [_, array, key] = match;
-      return `${array}[\\'${escapeMapKeyForOuterFilter(key)}\\']`;
+      return `${safeColumnRef(array)}[\\'${escapeForOuterFilterLiteral(key)}\\']`;
     }
   }
 
@@ -162,9 +223,17 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const [, , mapCol, literalKey] = bracketed;
     const mapKey = unescapeCHStringLiteral(literalKey);
     if (isJSON) {
-      return `${mapCol}.${mapKey}`;
+      return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+    return `${safeColumnRef(mapCol)}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
+  }
+
+  // Stateless JSON path form minted by getTagKeys (`col.`seg``): the backtick
+  // form is itself the signal, so it renders with no column cache (mirrors the
+  // Map bracket form above).
+  const jsonKey = parseJSONAdhocKey(s);
+  if (jsonKey) {
+    return buildJSONAccessForOuterFilter(jsonKey.column, jsonKey.path);
   }
 
   const parts = s.split('.');
@@ -177,9 +246,9 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const mapCol = parts[1];
     const mapKey = parts.slice(2).join('.');
     if (isJSON) {
-      return `${mapCol}.${mapKey}`;
+      return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+    return `${safeColumnRef(mapCol)}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Non-prefixed Map access: `MapCol.key1.key2` (hideTableName=true or
@@ -189,26 +258,72 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
     const mapCol = parts[0];
     const mapKey = parts.slice(1).join('.');
     if (isJSON) {
-      return s;
+      return buildJSONAccessForOuterFilter(mapCol, mapKey);
     }
-    return `${mapCol}[\\'${escapeMapKeyForOuterFilter(mapKey)}\\']`;
+    return `${safeColumnRef(mapCol)}[\\'${escapeForOuterFilterLiteral(mapKey)}\\']`;
   }
 
   // Default: bare column, or `table.col` reference where col isn't a Map.
   // Strip the leading table prefix if present.
-  return s.includes('.') ? s.split('.').slice(1).join('.') : s;
+  return safeColumnRef(s.includes('.') ? s.split('.').slice(1).join('.') : s);
 }
 
-function escapeValueBasedOnOperator(s: string, operator: string): string {
-  if (operator === 'IN') {
-    // Allow list of values without parentheses
-    if (s.length > 2 && s[0] !== '(' && s[s.length - 1] !== ')') {
-      s = `(${s})`;
+function escapeValueBasedOnOperator(s: string, operator: string, values?: string[]): string {
+  if (operator === 'IN' || operator === 'NOT IN' || operator === '=|' || operator === '!=|') {
+    // Build the list from the structured `values` array when Grafana provides it
+    // (multi-select), otherwise best-effort split of the legacy joined string.
+    // Every element is escaped and re-quoted, so no element can break out of the
+    // filter clause — ClickHouse coerces quoted numerics, so numeric IN still
+    // works. Empty list → `(NULL)` so `IN`/`NOT IN` stay valid SQL.
+    const items = values && values.length > 0 ? values : parseInListItems(s);
+    if (items.length === 0) {
+      return '(NULL)';
     }
-    return s.replace(/'/g, "\\'");
-  } else {
-    return `\\'${s}\\'`;
+    return `(${items.map((item) => `\\'${escapeForOuterFilterLiteral(item)}\\'`).join(', ')})`;
   }
+  // The value becomes a SQL string literal nested inside the single-quoted
+  // additional_table_filters string — the same two-layer embedding as a Map
+  // key inside `col['...']` — so reuse that escaping. Without it a value
+  // containing `'` breaks out of the filter (e.g. `x' OR '1'='1`).
+  return `\\'${escapeForOuterFilterLiteral(s)}\\'`;
+}
+
+// Split a legacy comma-separated IN value into individual items when the
+// structured `values` array isn't provided. Strips an optional surrounding pair
+// of parentheses and per-item surrounding single quotes/whitespace. Best-effort
+// (a value containing a comma won't split correctly), but every resulting item
+// is re-escaped and re-quoted by the caller, so it cannot break out of the SQL.
+function parseInListItems(raw: string): string[] {
+  let s = raw.trim();
+  if (s.startsWith('(') && s.endsWith(')')) {
+    s = s.slice(1, -1);
+  }
+  // Split on commas that are NOT inside a single-quoted element, so a value
+  // containing a comma (e.g. `'gzip, deflate'`) stays a single item instead of
+  // being torn in half. Best-effort: the joined form isn't a strict grammar.
+  const items: string[] = [];
+  let cur = '';
+  let inQuote = false;
+  for (const ch of s) {
+    if (ch === "'") {
+      inQuote = !inQuote;
+      cur += ch;
+    } else if (ch === ',' && !inQuote) {
+      items.push(cur);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  items.push(cur);
+  return items
+    .map((item) =>
+      item
+        .trim()
+        .replace(/^'([\s\S]*)'$/, '$1')
+        .replace(/''/g, "'")
+    )
+    .filter((item) => item.length > 0);
 }
 
 function convertOperatorToClickHouseOperator(operator: string): string {
@@ -221,6 +336,17 @@ function convertOperatorToClickHouseOperator(operator: string): string {
   }
   if (operator === '!~') {
     return 'NOT REGEXP';
+  }
+  // Grafana's multi-value ad-hoc operators ("Equals any of multiple values" /
+  // "Not equal any of multiple values") send the literal symbols =| / !=|
+  // with a `values` array — same shape as this plugin's own IN / NOT IN, so
+  // map them onto the ClickHouse operator escapeValueBasedOnOperator already
+  // builds a parenthesized list for (see grafana/scenes AdHocFiltersCombobox).
+  if (operator === '=|') {
+    return 'IN';
+  }
+  if (operator === '!=|') {
+    return 'NOT IN';
   }
   return operator;
 }

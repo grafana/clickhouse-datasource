@@ -82,7 +82,7 @@ export default {
           label: 'Enable row limit',
           testid: 'data-testid enable-row-limit-switch',
           tooltip:
-            'Enable using the Grafana row limit setting to limit the number of rows returned from Clickhouse. Ensure the appropriate permissions are set for your user. Only supported for Grafana >= 11.0.0. Defaults to false.',
+            'The plugin always limits query results to the Grafana row limit setting. Enable to also apply the limit on the ClickHouse server, so excess rows are not sent over the network. Ensure the appropriate permissions are set for your user. Defaults to false.',
         },
         hideTableNameInAdhocFilters: {
           label: 'Hide table name in ad hoc filters',
@@ -176,19 +176,21 @@ export default {
           tooltip:
             'Expected number of rows per query response. Pre-allocates data frames before scanning to avoid repeated ' +
             'reallocation on large results. Applied to every query, so leave at 0 (disabled) unless queries reliably ' +
-            'return a similar, large number of rows. A value larger than the typical result wastes memory.',
+            'return a similar, large number of rows. A value larger than the typical result wastes memory. ' +
+            'Values above 1000000 are clamped.',
         },
         validateSql: {
           label: 'Validate SQL',
           tooltip: 'Validate SQL in the editor.',
         },
         enableMapKeysDiscovery: {
-          label: 'Suggest Map keys in filter editor',
+          label: 'Suggest Map keys and JSON paths',
           testid: 'data-testid enable-map-keys-discovery-switch',
           tooltip:
-            'When enabled, the filter editor probes Map(...) columns for distinct keys to populate the key-suggestion dropdown. ' +
-            'On large tables with high-cardinality maps this probe can scan billions of rows. ' +
-            'Disable to suppress the probe — operators can still type Map keys manually. Defaults to enabled.',
+            'When enabled, the filter editor probes Map(...) and JSON columns for distinct keys and paths, ' +
+            'and the SQL editor suggests the paths inside JSON columns. ' +
+            'On large tables with high-cardinality maps or JSON these probes can read many rows. ' +
+            'Disable to suppress the probes. You can still type Map keys and JSON paths manually. Defaults to enabled.',
         },
       },
       TracesConfig: {
@@ -422,6 +424,15 @@ export default {
       tooltip:
         'Enables Open Telemetry schema versioning. The auto option matches the logs schema version to the table columns. Pick a specific version to override.',
     },
+    MinIntervalEditor: {
+      label: 'Min interval',
+      placeholder: 'e.g. 1m',
+      tooltip:
+        "Lower bound for this query's interval. Raises the interval Grafana derives from the time range, so " +
+        '$__timeInterval, $__interval and friends bucket no finer than this. One number plus one unit — ms, s, m, ' +
+        'h, d or w (e.g. 10s, 5m, 1d). Leave empty to use the interval Grafana picks.',
+      error: 'Invalid duration. Use one number plus a unit of ms, s, m, h, d or w — for example 10s, 5m or 1d.',
+    },
     LimitEditor: {
       label: 'Limit',
       tooltip: 'Limits the number of rows returned by the query',
@@ -448,6 +459,10 @@ export default {
       addLabel: 'Filter',
       mapKeyPlaceholder: 'map key',
       jsonPathPlaceholder: 'json path',
+      durationFilter: {
+        tooltip:
+          'Accepts a unit suffix: ns, us (or µs), ms, s (integer or decimal, e.g. "1.2s"). A bare number is treated as nanoseconds. Values are converted to the column\u2019s configured Duration Unit before being compared.',
+      },
     },
     GroupByEditor: {
       label: 'Group By',

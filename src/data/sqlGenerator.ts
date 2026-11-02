@@ -14,6 +14,7 @@ import {
   TimeUnit,
 } from 'types/queryBuilder';
 import otel from 'otel';
+import { buildJSONPathAccess } from './jsonPath';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
@@ -697,7 +698,7 @@ const getColumnIdentifier = (col: SelectedColumn): string => {
     colName.includes(')') ||
     colName.includes('"') ||
     colName.includes('"') ||
-    colName.includes(' as ')
+    /\sas\s/i.test(colName)
   ) {
     colName = col.name;
   } else if (colName.includes(' ') || colName.includes(':')) {
@@ -730,7 +731,14 @@ export const escapeIdentifier = (id: string): string => {
  */
 export const JSON_SENTINEL_KEY = '__ch_json__';
 
-const escapeValue = (value: string): string => {
+const escapeValue = (value: string | number | boolean): string => {
+  // Filter values are typed as strings, but JSON-typed attribute columns can
+  // carry numeric/boolean values at runtime. Render those unquoted instead of
+  // throwing on the string methods below.
+  if (typeof value !== 'string') {
+    return String(value);
+  }
+
   if (value.includes('$') || value.includes('(') || value.includes(')') || value.includes("'") || value.includes('"')) {
     return value;
   }
@@ -895,15 +903,11 @@ const getFilters = (options: QueryBuilderOptions): string => {
       const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
       type = valueType;
     } else if (filter.mapKey && type.startsWith('JSON')) {
-      const escapedJSONPaths = filter.mapKey
-        .split('.')
-        .map((p) => `\`${p}\``)
-        .join('.');
       // JSON path extraction returns Dynamic, which ClickHouse's `IN` / `NOT IN` reject
-      // with ILLEGAL_TYPE_OF_ARGUMENT. Cast to Nullable(String) so every filter operator
-      // works — `IS NULL` still detects missing keys (a plain ::String cast would swallow
-      // that signal), and `=` / `!=` / `LIKE` are unaffected.
-      column = `${column}.${escapedJSONPaths}::Nullable(String)`;
+      // with ILLEGAL_TYPE_OF_ARGUMENT. buildJSONPathAccess casts to Nullable(String) so
+      // every filter operator works — `IS NULL` still detects missing keys (a plain
+      // ::String cast would swallow that signal), and `=` / `!=` / `LIKE` are unaffected.
+      column = buildJSONPathAccess(column, filter.mapKey);
       // Update type so filter value generation routes through the string-aware branches.
       type = 'String';
     }
@@ -1011,7 +1015,7 @@ const isNumberType = (type: string): boolean => numberTypes.some((t) => type?.to
 const isDateType = (type: string): boolean =>
   type?.toLowerCase().startsWith('date') || type?.toLowerCase().startsWith('nullable(date');
 // const isDateTimeType = (type: string): boolean => type?.toLowerCase().startsWith('datetime') || type?.toLowerCase().startsWith('nullable(datetime');
-const isStringType = (type: string): boolean => {
+export const isStringType = (type: string): boolean => {
   type = stripTypeModifiers(type.toLowerCase());
   return (
     (type === 'string' || type.startsWith('fixedstring')) &&
