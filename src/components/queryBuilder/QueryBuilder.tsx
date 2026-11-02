@@ -20,12 +20,16 @@ import { styles } from 'styles';
 import { TraceQueryBuilder } from './views/TraceQueryBuilder';
 import {
   BuilderOptionsReducerAction,
+  fillMissingRoles,
   setAllOptions,
   setBuilderMinimized,
   setDatabase,
+  setOptions,
   setQueryType,
   setTable,
 } from 'hooks/useBuilderOptionsState';
+import { getQueryTypeChangeDefaults } from './queryTypeDefaults';
+import { guessMissingRoles, needsRoleGuess } from './roleColumns';
 import TraceIdInput from './TraceIdInput';
 import { Alert, Button, InlineFieldRow, Stack } from '@grafana/ui';
 import { Components as allSelectors } from 'selectors';
@@ -43,6 +47,7 @@ import { useDefaultLogColumnsByName, useDefaultTimeColumn } from './views/logsQu
 import { getColumnByHint } from 'data/sqlGenerator';
 import { SignalType } from 'types/config';
 import useColumns from 'hooks/useColumns';
+import { sourceKey } from 'hooks/useFitQueryToTable';
 import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
@@ -77,9 +82,38 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   const signalType = datasource.getSignalType();
   const singleTableMode = datasource.isSingleTableMode();
 
-  const onDatabaseChange = (database: string) => builderOptionsDispatch(setDatabase(database));
-  const onTableChange = (table: string) => builderOptionsDispatch(setTable(table));
-  const onQueryTypeChange = (queryType: QueryType) => builderOptionsDispatch(setQueryType(queryType));
+  // The source last picked in the dropdowns: the views fit the query to it once its columns load.
+  const [pickedSource, setPickedSource] = useState<string>();
+  const onDatabaseChange = (database: string) => {
+    setPickedSource(sourceKey(database, builderOptions.table));
+    builderOptionsDispatch(setDatabase(database));
+  };
+  const onTableChange = (table: string) => {
+    setPickedSource(sourceKey(builderOptions.database, table));
+    builderOptionsDispatch(setTable(table));
+  };
+  const onQueryTypeChange = (queryType: QueryType) => {
+    if (queryType === builderOptions.queryType) {
+      return;
+    }
+    const defaults = getQueryTypeChangeDefaults(datasource, builderOptions, queryType);
+    builderOptionsDispatch(setQueryType(queryType));
+    builderOptionsDispatch(setOptions(defaults));
+
+    // Roles still empty are guessed from the table's column names, once those are fetched. A query
+    // moving to the default table has its configured roles, and a new one gets the builder defaults.
+    const next = { ...builderOptions, ...defaults, queryType };
+    if (Object.keys(defaults).length && !defaults.table && needsRoleGuess(next, queryType) && next.table) {
+      datasource
+        .getColumnsCached(next.database, next.table)
+        .then((columns) =>
+          builderOptionsDispatch(
+            fillMissingRoles(queryType, next.database, next.table, guessMissingRoles(next, queryType, columns))
+          )
+        )
+        .catch((ex: unknown) => console.error(ex));
+    }
+  };
 
   if (builderOptions.meta?.minimized) {
     return (
@@ -149,6 +183,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
       {builderOptions.queryType === QueryType.Logs && (
@@ -156,6 +191,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
       {builderOptions.queryType === QueryType.TimeSeries && (
@@ -163,6 +199,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
       {builderOptions.queryType === QueryType.Traces && (
@@ -170,6 +207,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
           datasource={datasource}
           builderOptions={builderOptions}
           builderOptionsDispatch={builderOptionsDispatch}
+          pickedSource={pickedSource}
         />
       )}
 

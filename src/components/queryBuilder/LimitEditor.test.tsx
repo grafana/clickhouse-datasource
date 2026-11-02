@@ -22,4 +22,14 @@ describe('LimitEditor', () => {
     expect(onLimitChange).toBeCalledTimes(1);
     expect(onLimitChange).toBeCalledWith(5);
   });
+
+  it('follows a limit changed from outside the input', () => {
+    // For example a query picked from query history, which reaches the builder through setAllOptions.
+    const result = render(<LimitEditor limit={10} onLimitChange={() => {}} />);
+    const limitInput = result.getByTestId(selectors.components.QueryBuilder.LimitEditor.input);
+
+    result.rerender(<LimitEditor limit={250} onLimitChange={() => {}} />);
+
+    expect(limitInput).toHaveValue(250);
+  });
 });

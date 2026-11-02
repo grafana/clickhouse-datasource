@@ -9,6 +9,7 @@
   "tracing": true,
   "alerting": true,
   "annotations": true,
+  "multiValueFilterOperators": true,
   "executable": "gpx_clickhouse",
   "includes": [
     {
