@@ -217,6 +217,25 @@ When **Configuration mode** is set to **Single source** and **Signal type** is s
 
 In **Single source** mode, the **Columns** field is a picker of the selected table's columns with an **Add all columns** shortcut; other configuration modes accept a typed list. The columns work with both OTel and non-OTel log tables; when **Use OTel** is enabled, they are added on top of the OTel default columns.
 
+#### Open trace IDs in Tempo
+
+By default, the **View trace** link on a `traceID` or `trace_id` field opens the trace in this ClickHouse data source. Outside traces query builder results, the link needs a configured traces table. If your traces are in Tempo, select the Tempo data source in **"View trace" data source** under **Trace ID correlation**.
+
+With a Tempo data source selected, **View trace** opens the trace ID in Tempo from Explore and from dashboard table and logs panels. A ClickHouse traces table isn't required.
+
+These queries keep the ClickHouse link:
+
+- Traces query builder queries
+- SQL queries with the **Traces** query type
+- Query builder and SQL queries that read from the **Default trace table**
+
+Additional behavior:
+
+- In **All databases** mode, **Show "View trace" links** under **Traces configuration** turns off this link too.
+- In Grafana 12.3 and later, the expanded log row also shows the Tempo trace in a **Trace** section.
+- Data source UIDs are specific to each Grafana instance. When you copy provisioning files between instances, set the Tempo UID for each instance.
+- If Grafana can't find a Tempo data source with the saved UID when a query runs, the link uses the ClickHouse traces table instead. This happens when the data source was deleted, when the user has no access to it, or when the UID belongs to another type of data source. With no traces table configured, no **View trace** link appears. The configuration page shows a warning when it can't find a Tempo data source with the saved UID.
+
 ### Traces configuration
 
 The data source includes a dedicated configuration section for trace queries. These settings control the default column mappings used by the [traces query builder](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#traces-query-builder):
@@ -340,6 +359,7 @@ datasources:
       #   defaultDatabase: <string>
       #   defaultTable: <string>
       #   otelEnabled: <bool>
+      #   traceLinkDatasourceUid: <string>  # UID of a Tempo data source that "View trace" links open
       # traces:
       #   defaultDatabase: <string>
       #   defaultTable: <string>

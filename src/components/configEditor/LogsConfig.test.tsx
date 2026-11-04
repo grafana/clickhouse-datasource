@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, render, fireEvent, waitFor, within } from '@testing-library/react';
-import { getDataSourceSrv } from '@grafana/runtime';
+import { DataSourceSrv, getDataSourceSrv, setDataSourceSrv } from '@grafana/runtime';
 import { LogsConfig } from './LogsConfig';
 import allLabels from 'labels';
 import { columnLabelToPlaceholder } from 'data/utils';
@@ -31,8 +31,20 @@ jest.mock('@grafana/runtime', () => ({
 
 const mockGetDataSourceSrv = getDataSourceSrv as unknown as jest.Mock;
 
+const logo = { info: { logos: { small: '' } } };
+const tracingDatasources = [
+  { uid: 'tempo-uid', type: 'tempo', name: 'Tempo', meta: logo },
+  { uid: 'jaeger-uid', type: 'jaeger', name: 'Jaeger', meta: logo },
+];
+const getTracingDatasource = (ref: unknown) => tracingDatasources.find((ds) => ds.uid === ref || ds.name === ref);
+
 describe('LogsConfig', () => {
   beforeEach(() => {
+    setDataSourceSrv({
+      getList: ({ pluginId }: { pluginId?: string }) =>
+        tracingDatasources.filter((ds) => !pluginId || ds.type === pluginId),
+      getInstanceSettings: getTracingDatasource,
+    } as unknown as DataSourceSrv);
     // Reset to the deterministic single-table schema before each test; the guard/fallback tests
     // override this with their own resolved value (or a rejection) as needed.
     mockGetDataSourceSrv.mockReset();
@@ -54,6 +66,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -76,6 +89,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -105,6 +119,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -162,12 +177,13 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
     expect(result.container.firstChild).not.toBeNull();
 
-    const select = result.getByRole('combobox');
+    const select = result.getAllByRole('combobox')[0];
     expect(select).toBeInTheDocument();
     fireEvent.keyDown(select, { key: 'ArrowDown' });
     fireEvent.keyDown(select, { key: 'Enter' });
@@ -191,6 +207,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -222,6 +239,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -253,6 +271,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -284,6 +303,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={() => {}}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -315,6 +335,7 @@ describe('LogsConfig', () => {
         onSelectContextColumnsChange={() => {}}
         onContextColumnsChange={() => {}}
         onShowLogLinksChange={onShowLogLinksChange}
+        onTraceLinkDatasourceUidChange={() => {}}
         onAdditionalColumnsChange={() => {}}
       />
     );
@@ -325,6 +346,57 @@ describe('LogsConfig', () => {
     fireEvent.click(input);
     expect(onShowLogLinksChange).toHaveBeenCalledTimes(1);
     expect(onShowLogLinksChange).toHaveBeenCalledWith(false);
+  });
+
+  describe('"View trace" data source', () => {
+    const traceLinkLabels = allLabels.components.Config.LogsConfig.traceIdCorrelation.traceLinkDatasource;
+    const handlers = {
+      onDefaultDatabaseChange: () => {},
+      onDefaultTableChange: () => {},
+      onOtelEnabledChange: () => {},
+      onOtelVersionChange: () => {},
+      onFilterTimeColumnChange: () => {},
+      onTimeColumnChange: () => {},
+      onLevelColumnChange: () => {},
+      onMessageColumnChange: () => {},
+      onSelectContextColumnsChange: () => {},
+      onContextColumnsChange: () => {},
+      onShowLogLinksChange: () => {},
+      onTraceLinkDatasourceUidChange: () => {},
+      onAdditionalColumnsChange: () => {},
+    };
+
+    beforeEach(() => {
+      mockGetDataSourceSrv.mockReturnValue({ ...defaultDataSourceSrv, getInstanceSettings: getTracingDatasource });
+    });
+
+    it('offers only Tempo data sources and reports the picked UID', () => {
+      const onTraceLinkDatasourceUidChange = jest.fn();
+      const result = render(
+        <LogsConfig {...handlers} logsConfig={{}} onTraceLinkDatasourceUidChange={onTraceLinkDatasourceUidChange} />
+      );
+
+      fireEvent.keyDown(result.getByLabelText(new RegExp(`^${traceLinkLabels.label}`)), { key: 'ArrowDown' });
+      expect(result.queryByText('Jaeger')).not.toBeInTheDocument();
+      fireEvent.click(result.getByText('Tempo'));
+
+      expect(onTraceLinkDatasourceUidChange).toHaveBeenCalledWith('tempo-uid');
+    });
+
+    it.each([
+      ['does not resolve', 'deleted-uid'],
+      ['is not a Tempo data source', 'jaeger-uid'],
+    ])('warns when the saved UID %s', (_label, uid) => {
+      const result = render(<LogsConfig {...handlers} logsConfig={{ traceLinkDatasourceUid: uid }} />);
+
+      expect(result.getByText(`Data source "${uid}" ${traceLinkLabels.notFound}`)).toBeInTheDocument();
+    });
+
+    it('does not warn when the saved UID resolves', () => {
+      const result = render(<LogsConfig {...handlers} logsConfig={{ traceLinkDatasourceUid: 'tempo-uid' }} />);
+
+      expect(result.queryByText(new RegExp(traceLinkLabels.notFound))).not.toBeInTheDocument();
+    });
   });
 
   describe('schema-backed controls (single-table mode)', () => {
@@ -341,6 +413,7 @@ describe('LogsConfig', () => {
       onSelectContextColumnsChange: () => {},
       onContextColumnsChange: () => {},
       onShowLogLinksChange: () => {},
+      onTraceLinkDatasourceUidChange: () => {},
       onAdditionalColumnsChange: () => {},
     };
 
@@ -373,20 +446,20 @@ describe('LogsConfig', () => {
       for (const placeholder of rolePlaceholders) {
         expect(result.queryByPlaceholderText(placeholder)).not.toBeInTheDocument();
       }
-      // 4 role ColumnSelects, present before the debounced fetch resolves (OtelVersionSelect's Select
-      // is disabled when otelEnabled is false, so it exposes no combobox role). The Columns field is
-      // still the tags input at this point.
-      expect(result.getAllByRole('combobox')).toHaveLength(4);
+      // 4 role ColumnSelects plus the "View trace" data source picker, present before the debounced
+      // fetch resolves (OtelVersionSelect's Select is disabled when otelEnabled is false, so it exposes
+      // no combobox role). The Columns field is still the tags input at this point.
+      expect(result.getAllByRole('combobox')).toHaveLength(5);
 
       // Once the debounced (400ms) schema read returns, the Columns field swaps from the tags input to
-      // the ColumnsEditor multiselect: a 5th combobox appears and only the Context Columns tags input
+      // the ColumnsEditor multiselect: a 6th combobox appears and only the Context Columns tags input
       // remains (both tags inputs share the placeholder, so it drops from 2 to 1).
       await result.findByTestId(
         selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper,
         {},
         { timeout: 2000 }
       );
-      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(5), { timeout: 2000 });
+      await waitFor(() => expect(result.getAllByRole('combobox')).toHaveLength(6), { timeout: 2000 });
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(1);
     });
 
@@ -410,12 +483,12 @@ describe('LogsConfig', () => {
         expect(result.getByPlaceholderText(placeholder)).toBeInTheDocument();
       }
       // Columns stays a TagsInput (no ColumnsEditor multiselect), so it and Context Columns share the
-      // placeholder: 2 tags inputs. No schema-backed combobox renders in the fallback layout.
+      // placeholder: 2 tags inputs. Only the "View trace" data source picker renders a combobox.
       expect(
         result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
       ).not.toBeInTheDocument();
       expect(result.getAllByPlaceholderText(tagsPlaceholder)).toHaveLength(2);
-      expect(result.queryAllByRole('combobox')).toHaveLength(0);
+      expect(result.queryAllByRole('combobox')).toHaveLength(1);
       jest.useRealTimers();
     });
 
