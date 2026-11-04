@@ -1,5 +1,7 @@
 # Changelog
 
+- Surface JSON and `Map` column paths as log fields: a new **Attribute columns** logs setting flattens the named columns' keys into labels the same way the OTel `LogAttributes` column is flattened, so each nested path (e.g. `message.status`) becomes a filterable field in Explore instead of one opaque value, and the columns are projected into new logs queries. An **Excluded paths** setting drops paths from the flattened output, matched by subtree, to keep sensitive or high-cardinality keys (e.g. emails, client IPs) out of the Fields list. Both default to empty, so existing data sources are unaffected (#2182)
+
 ## [4.23.4](https://github.com/grafana/clickhouse-datasource/compare/v4.23.3...v4.23.4) (2026-10-29)
 
 
