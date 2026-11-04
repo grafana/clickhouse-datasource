@@ -62,9 +62,15 @@ export const CompactFilterBar = (props: CompactFilterBarProps) => {
 
   const onRemoveFilter = (index: number) => {
     onFiltersChange(filters.filter((_, filterIndex) => filterIndex !== index));
+    if (editingFilterIndex === undefined) {
+      return;
+    }
     if (editingFilterIndex === index) {
       setEditingFilterIndex(undefined);
       setShowPopover(false);
+    } else if (index < editingFilterIndex) {
+      // Keep editing the same chip after an earlier one is removed.
+      setEditingFilterIndex(editingFilterIndex - 1);
     }
   };
 

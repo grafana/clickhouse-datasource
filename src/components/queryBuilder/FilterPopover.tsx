@@ -3,7 +3,7 @@ import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Button, Combobox, ComboboxOption, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
-import { Filter, FilterOperator, NumberFilter, SelectedColumn, StringFilter, TableColumn } from 'types/queryBuilder';
+import { Filter, FilterOperator, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { getFilterOperatorOptions } from './filterOperatorOptions';
 import * as utils from './utils';
 
@@ -198,18 +198,50 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       ...(isKeyedColumn && selectedMapKey ? { mapKey: selectedMapKey } : {}),
     };
 
-    const filter: StringFilter | NumberFilter =
-      filterKind === 'number'
-        ? ({
-            ...commonFilter,
-            value: noValueNeeded ? 0 : numericValue,
-          } as NumberFilter)
-        : ({
-            ...commonFilter,
-            value: noValueNeeded ? '' : value,
-          } as StringFilter);
+    const isMultiOperator = operator === FilterOperator.In || operator === FilterOperator.NotIn;
+    const builtValue = isMultiOperator
+      ? value
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : noValueNeeded
+        ? filterKind === 'number'
+          ? 0
+          : ''
+        : filterKind === 'number'
+          ? numericValue
+          : value;
 
-    onAddFilter(filter as Filter);
+    const builtFilter = {
+      ...commonFilter,
+      value: builtValue,
+    } as Filter;
+
+    if (!filter) {
+      onAddFilter(builtFilter);
+      onClose();
+      return;
+    }
+
+    // Only overwrite what the user changed so fields the popover does not manage
+    // (condition, hint, multi-value arrays, etc.) survive an edit.
+    const originalValue = 'value' in filter ? filter.value : undefined;
+    const columnUnchanged = selectedColumn === (filter.key || hintedColumn);
+    const valueUnchanged =
+      originalValue !== undefined &&
+      String(originalValue) === value &&
+      Array.isArray(originalValue) === isMultiOperator;
+
+    const updatedFilter = {
+      ...filter,
+      ...builtFilter,
+      // The popover has no condition control and a changed column must not inherit the old hint.
+      condition: filter.condition,
+      ...(columnUnchanged ? { key: filter.key, hint: filter.hint } : { hint: undefined }),
+      ...(valueUnchanged ? { value: originalValue } : {}),
+    } as Filter;
+
+    onAddFilter(updatedFilter);
     onClose();
   };
 

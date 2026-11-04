@@ -1,7 +1,7 @@
 import React from 'react';
 import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
-import { Icon, Tooltip, useStyles2 } from '@grafana/ui';
+import { IconButton, Tooltip, useStyles2 } from '@grafana/ui';
 import { Filter, FilterOperator, SelectedColumn } from 'types/queryBuilder';
 
 interface FilterTagBarProps {
@@ -156,26 +156,41 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
         const value = getFilterDisplayValue(filter);
 
         return (
-          <Tooltip key={index} content={`${name} ${operator} ${value}`.trim()} placement="top">
-            <span className={styles.tag} onClick={() => onEditFilter(index)} role="button" tabIndex={0}>
+          <span
+            key={index}
+            className={styles.tag}
+            role="button"
+            tabIndex={0}
+            aria-label={`Edit filter ${name} ${operator} ${value}`.trim()}
+            onClick={() => onEditFilter(index)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onEditFilter(index);
+              }
+            }}
+          >
+            {/* Tooltip clones its child and spreads its own handlers over it, which would drop the
+                chip's onKeyDown, so it wraps the content instead of the chip. */}
+            <Tooltip content={`${name} ${operator} ${value}`.trim()} placement="top">
               <span className={styles.tagContent}>
                 <span className={styles.tagKey}>{name}</span>
                 <span className={styles.tagOperator}> {operator} </span>
                 {value && <span className={styles.tagValue}>{value}</span>}
               </span>
-              <span
-                className={styles.removeBtn}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onRemoveFilter(index);
-                }}
-                role="button"
-                tabIndex={0}
-              >
-                <Icon name="times" size="sm" />
-              </span>
-            </span>
-          </Tooltip>
+            </Tooltip>
+            <IconButton
+              className={styles.removeBtn}
+              name="times"
+              size="sm"
+              aria-label={`Remove filter ${name} ${operator} ${value}`.trim()}
+              onKeyDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemoveFilter(index);
+              }}
+            />
+          </span>
         );
       })}
     </div>

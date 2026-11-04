@@ -2,7 +2,8 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Datasource } from 'data/CHDatasource';
-import { Filter, FilterOperator, TableColumn } from 'types/queryBuilder';
+import { generateSql } from 'data/sqlGenerator';
+import { ColumnHint, Filter, FilterOperator, QueryType, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { FilterPopover, getFilterValueKind, getOperatorOptions, toFilterValueOption } from './FilterPopover';
 import { newMockDatasource } from '__mocks__/datasource';
 
@@ -25,6 +26,7 @@ const renderPopover = (overrides?: {
   onAddFilter?: jest.Mock;
   onClose?: jest.Mock;
   columns?: TableColumn[];
+  selectedColumns?: readonly SelectedColumn[];
   filter?: Filter;
 }) => {
   const datasource = createMockDatasource();
@@ -34,6 +36,7 @@ const renderPopover = (overrides?: {
       database="default"
       table="otel_logs"
       allColumns={overrides?.columns || allColumns}
+      selectedColumns={overrides?.selectedColumns}
       onAddFilter={overrides?.onAddFilter || jest.fn()}
       filter={overrides?.filter}
       onClose={overrides?.onClose || jest.fn()}
@@ -127,6 +130,67 @@ describe('FilterPopover', () => {
       value: 'worker',
     });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('keeps an IN filter as an array and keeps its condition when updating without changes', async () => {
+    const onAddFilter = jest.fn();
+    const existingFilter: Filter = {
+      filterType: 'custom',
+      key: 'Body',
+      type: 'String',
+      operator: FilterOperator.In,
+      condition: 'OR',
+      value: ['payments', 'checkout'],
+    };
+    renderPopover({ onAddFilter, filter: existingFilter });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    expect(onAddFilter).toHaveBeenCalledWith(existingFilter);
+    const updatedFilter = onAddFilter.mock.calls[0][0] as Filter;
+
+    expect(() =>
+      generateSql({
+        database: 'default',
+        table: 'otel_logs',
+        queryType: QueryType.Table,
+        columns: [{ name: 'Body', type: 'String' }],
+        limit: 1000,
+        filters: [updatedFilter],
+        orderBy: [],
+      })
+    ).not.toThrow();
+  });
+
+  it('keeps the hint and condition when editing a hinted filter', async () => {
+    const onAddFilter = jest.fn();
+    const existingFilter: Filter = {
+      filterType: 'custom',
+      key: '',
+      hint: ColumnHint.LogAttributes,
+      type: 'JSON',
+      operator: FilterOperator.Like,
+      condition: 'OR',
+      mapKey: 'event.name',
+      value: 'worker',
+    };
+    renderPopover({
+      onAddFilter,
+      filter: existingFilter,
+      selectedColumns: [{ name: 'LogAttributes', type: 'JSON', hint: ColumnHint.LogAttributes }],
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    expect(onAddFilter).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: '',
+        hint: ColumnHint.LogAttributes,
+        condition: 'OR',
+        mapKey: 'event.name',
+        value: 'worker',
+      })
+    );
   });
 
   it('shows a path input and probes JSON paths when a JSON column is selected', async () => {
