@@ -426,7 +426,8 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
   }
 
   if (filterParts) {
-    queryParts.push(filterParts);
+    // Message search constrains the whole column-filter expression, including OR branches.
+    queryParts.push(hasLogMessageFilter ? `(${filterParts})` : filterParts);
   }
 
   if (hasLogMessageFilter) {
