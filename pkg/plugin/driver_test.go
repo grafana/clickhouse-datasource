@@ -443,6 +443,11 @@ func TestMutateQueryError(t *testing.T) {
 			wantSource: backend.ErrorSourceDownstream,
 		},
 		{
+			name:       "no server hello is downstream",
+			err:        errors.New("failed to query server hello"),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
 			name:       "unknown error uses default source",
 			err:        errors.New("something went very wrong"),
 			wantSource: backend.DefaultErrorSource,
