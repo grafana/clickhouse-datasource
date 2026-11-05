@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Datasource } from 'data/CHDatasource';
-import { Filter, FilterOperator, TableColumn } from 'types/queryBuilder';
+import { Filter, FilterOperator, TableColumn, TimeUnit } from 'types/queryBuilder';
 import { CompactFilterBar } from './CompactFilterBar';
+import { FilterValueEditor } from './FilterEditor';
 
 const allColumns: TableColumn[] = [{ name: 'ServiceName', type: 'String', picklistValues: [] }];
 
@@ -25,7 +26,7 @@ const createFilter = (value: string): Filter => ({
   value,
 });
 
-const renderCompactFilterBar = (initialFilters: Filter[]) => {
+const renderCompactFilterBar = (initialFilters: Filter[], columns: TableColumn[] = allColumns) => {
   const onFiltersChange = jest.fn();
   const datasource = createMockDatasource();
 
@@ -37,7 +38,7 @@ const renderCompactFilterBar = (initialFilters: Filter[]) => {
         database="default"
         table="otel_logs"
         filters={filters}
-        allColumns={allColumns}
+        allColumns={columns}
         onFiltersChange={(nextFilters) => {
           setFilters(nextFilters);
           onFiltersChange(nextFilters);
@@ -90,5 +91,41 @@ describe('CompactFilterBar', () => {
     expect(updatedFilters).toHaveLength(2);
     expect(updatedFilters[0]).toMatchObject({ key: 'ServiceName', value: 'checkout' });
     expect(updatedFilters[1]).toMatchObject({ key: 'ServiceName', value: 'inventory' });
+  });
+
+  it('clears a stale duration rawInput so the full editor shows the edited value', async () => {
+    const durationFilter: Filter = {
+      filterType: 'custom',
+      key: 'Duration',
+      type: 'UInt64',
+      operator: FilterOperator.GreaterThan,
+      condition: 'AND',
+      value: 1_000_000_000,
+      rawInput: '1s',
+    };
+    const { onFiltersChange } = renderCompactFilterBar([durationFilter], [
+      { name: 'Duration', type: 'UInt64', picklistValues: [] },
+    ]);
+
+    await userEvent.click(screen.getByRole('button', { name: /Edit filter Duration/ }));
+
+    const valueInput = screen.getByPlaceholderText('Type or select...');
+    fireEvent.change(valueInput, { target: { value: '2000000000' } });
+    fireEvent.keyDown(valueInput, { key: 'Enter' });
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    const [updatedFilter] = onFiltersChange.mock.lastCall?.[0] as Filter[];
+    expect(updatedFilter).toMatchObject({ value: 2_000_000_000 });
+
+    // Reopening the classic editor must show the new value instead of the stale '1s'.
+    render(
+      <FilterValueEditor
+        allColumns={[]}
+        filter={updatedFilter}
+        onFilterChange={jest.fn()}
+        durationFilterContext={{ columnKey: 'Duration', unit: TimeUnit.Nanoseconds }}
+      />
+    );
+    expect(screen.getByTestId('query-builder-filters-duration-value-input')).toHaveValue('2000000000ns');
   });
 });

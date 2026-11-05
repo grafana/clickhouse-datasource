@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Datasource } from 'data/CHDatasource';
 import { generateSql } from 'data/sqlGenerator';
@@ -45,12 +45,22 @@ const renderPopover = (overrides?: {
   return datasource;
 };
 
-// Typing highlights the first (exact) match, so a plain Enter selects it. The
-// options list uses virtual scrolling and does not render in jsdom, so
-// clicking an option is not possible here.
+// Setting the input value in one go (rather than typing) keeps the combobox's
+// selected item from being re-prefixed to the typed text. Options render in a
+// virtualized list that jsdom does not produce, so clicking an option is not
+// possible; the first match is confirmed with the keyboard instead.
 const selectColumn = async (columnName: string) => {
-  await userEvent.type(screen.getAllByRole('combobox')[0], columnName);
-  await userEvent.keyboard('{Enter}');
+  const input = screen.getAllByRole('combobox')[0] as HTMLInputElement;
+  await userEvent.click(input);
+  fireEvent.change(input, { target: { value: columnName } });
+
+  // The highlighted row keeps the index of the previously selected column, which
+  // no longer addresses the same row once the typed text has filtered the list.
+  // Step back to the first match before confirming it.
+  for (let attempt = 0; attempt < 5 && !input.getAttribute('aria-activedescendant')?.endsWith('-item-0'); attempt++) {
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+  }
+  fireEvent.keyDown(input, { key: 'Enter' });
 };
 
 describe('FilterPopover', () => {
@@ -191,6 +201,109 @@ describe('FilterPopover', () => {
         value: 'worker',
       })
     );
+  });
+
+  it('drops the map key when the filter is moved to a scalar column', async () => {
+    const onAddFilter = jest.fn();
+    renderPopover({
+      onAddFilter,
+      filter: {
+        filterType: 'custom',
+        key: 'LogAttributes',
+        type: 'JSON',
+        operator: FilterOperator.Like,
+        condition: 'AND',
+        mapKey: 'service.name',
+        value: 'worker',
+      },
+    });
+
+    await selectColumn('Body');
+    expect(screen.queryByText('JSON path')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    const updatedFilter = onAddFilter.mock.calls[0][0] as Filter;
+    expect(updatedFilter).toMatchObject({ key: 'Body', type: 'String' });
+    // The chip renders the map key as a suffix, so keeping it would read Body.service.name.
+    expect((updatedFilter as { mapKey?: string }).mapKey).toBeUndefined();
+  });
+
+  it('keeps the map key when the column is not changed', async () => {
+    const onAddFilter = jest.fn();
+    renderPopover({
+      onAddFilter,
+      filter: {
+        filterType: 'custom',
+        key: 'LogAttributes',
+        type: 'JSON',
+        operator: FilterOperator.Like,
+        condition: 'AND',
+        mapKey: 'service.name',
+        value: 'worker',
+      },
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+    expect(onAddFilter).toHaveBeenCalledWith(expect.objectContaining({ key: 'LogAttributes', mapKey: 'service.name' }));
+  });
+
+  describe('duration rawInput', () => {
+    const durationColumns: TableColumn[] = [{ name: 'Duration', type: 'UInt64', picklistValues: [] }];
+    const durationFilter: Filter = {
+      filterType: 'custom',
+      key: 'Duration',
+      type: 'UInt64',
+      operator: FilterOperator.GreaterThan,
+      condition: 'AND',
+      value: 1_000_000_000,
+      rawInput: '1s',
+    };
+
+    const setValue = (nextValue: string) => {
+      const valueInput = screen.getByPlaceholderText('Type or select...');
+      fireEvent.change(valueInput, { target: { value: nextValue } });
+      fireEvent.keyDown(valueInput, { key: 'Enter' });
+    };
+
+    it('keeps rawInput when the value is updated without changes', async () => {
+      const onAddFilter = jest.fn();
+      renderPopover({ onAddFilter, columns: durationColumns, filter: durationFilter });
+
+      await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+      expect(onAddFilter).toHaveBeenCalledWith(durationFilter);
+    });
+
+    it('clears rawInput when the value changes', async () => {
+      const onAddFilter = jest.fn();
+      renderPopover({ onAddFilter, columns: durationColumns, filter: durationFilter });
+
+      setValue('2000000000');
+      await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+      const updatedFilter = onAddFilter.mock.calls[0][0] as Filter;
+      expect(updatedFilter).toMatchObject({ key: 'Duration', value: 2_000_000_000 });
+      // A stale '1s' would make the duration editor show 1s while SQL uses 2s.
+      expect((updatedFilter as { rawInput?: string }).rawInput).toBeUndefined();
+    });
+
+    it('clears rawInput when the column changes even if the value is re-entered', async () => {
+      const onAddFilter = jest.fn();
+      renderPopover({
+        onAddFilter,
+        columns: [...durationColumns, { name: 'Count', type: 'UInt64', picklistValues: [] }],
+        filter: durationFilter,
+      });
+
+      await selectColumn('Count');
+      setValue('1000000000');
+      await userEvent.click(screen.getByRole('button', { name: 'Update' }));
+
+      const updatedFilter = onAddFilter.mock.calls[0][0] as Filter;
+      expect(updatedFilter).toMatchObject({ key: 'Count', value: 1_000_000_000 });
+      expect((updatedFilter as { rawInput?: string }).rawInput).toBeUndefined();
+    });
   });
 
   it('shows a path input and probes JSON paths when a JSON column is selected', async () => {

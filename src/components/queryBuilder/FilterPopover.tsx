@@ -226,11 +226,16 @@ export const FilterPopover = (props: FilterPopoverProps) => {
     // Only overwrite what the user changed so fields the popover does not manage
     // (condition, hint, multi-value arrays, etc.) survive an edit.
     const originalValue = 'value' in filter ? filter.value : undefined;
+    const originalRawInput = 'rawInput' in filter ? filter.rawInput : undefined;
     const columnUnchanged = selectedColumn === (filter.key || hintedColumn);
     const valueUnchanged =
       originalValue !== undefined &&
       String(originalValue) === value &&
       Array.isArray(originalValue) === isMultiOperator;
+    const keepsOriginalValueAndColumn = columnUnchanged && valueUnchanged;
+    // `rawInput` is the duration editor's text for a specific value and column, so a
+    // stale one would show the old duration and restore the old value on blur.
+    const rawInputIsStale = originalRawInput !== undefined && !keepsOriginalValueAndColumn;
 
     const updatedFilter = {
       ...filter,
@@ -239,6 +244,10 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       condition: filter.condition,
       ...(columnUnchanged ? { key: filter.key, hint: filter.hint } : { hint: undefined }),
       ...(valueUnchanged ? { value: originalValue } : {}),
+      // A key from a Map/JSON column is rendered as a suffix of the chip label, so a
+      // filter moved to a scalar column must not keep it.
+      ...(!columnUnchanged && !isKeyedColumn && 'mapKey' in filter ? { mapKey: undefined } : {}),
+      ...(rawInputIsStale ? { rawInput: undefined } : {}),
     } as Filter;
 
     onAddFilter(updatedFilter);
