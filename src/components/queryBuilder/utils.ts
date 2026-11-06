@@ -295,7 +295,8 @@ function getStringFilter(filters: Filter[], i: number, e: ExprString): number {
     filters[i] = { ...filters[i], key: e.value } as Filter;
     return i;
   }
-  filters[i] = { ...filters[i], value: e.value, type: 'string' } as Filter;
+  const value = [FilterOperator.In, FilterOperator.NotIn].includes(filters[i].operator) ? [e.value] : e.value;
+  filters[i] = { ...filters[i], value, type: 'string' } as Filter;
   i++;
   return i;
 }
