@@ -1,0 +1,75 @@
+# Weekly canary for opentelemetry-collector-contrib clickhouseexporter schema
+# drift (#1901): boots the real collector (:latest) against a fresh ClickHouse,
+# lets it create its own schema, pushes a small OTLP payload, and diffs the
+# created tables against tests/canary/expected-columns.json. On drift it files
+# (or comments on) a tracking issue with the diff.
+#
+# Complementary to the per-PR e2e fixture (tests/e2e/fixtures/otel_logs_v0151.sql),
+# which locks in the SQL the plugin emits, and to the unit tests in src/otel.test.ts,
+# which keep the snapshot and the plugin's column maps consistent on every PR.
+name: OTel schema canary
+
+on:
+  schedule:
+    - cron: '0 7 * * 1' # Weekly on Monday at 07:00 UTC
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions: {}
+
+jobs:
+  canary:
+    name: Compare collector schema against snapshot
+    # PRs only run the canary when explicitly opted in with the schema-canary label
+    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'schema-canary')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Run schema canary
+        id: canary
+        run: |
+          set -o pipefail +e
+          ./tests/canary/run.sh | tee canary-output.md
+          code=$?
+          echo "code=${code}" >> "$GITHUB_OUTPUT"
+          exit "${code}"
+
+      # Exit code 1 is genuine drift; exit code 2 is an infrastructure failure
+      # (image pull, container startup, ingest timeout) and files no issue.
+      - name: Add the drift report to the job summary
+        if: ${{ failure() && steps.canary.outputs.code == '1' }}
+        run: cat canary-output.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: File or update the tracking issue
+        if: ${{ failure() && steps.canary.outputs.code == '1' && github.event_name != 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          {
+            cat canary-output.md
+            echo
+            echo "Canary run: ${RUN_URL}"
+            echo
+            echo 'To resolve: if the plugin is affected, add or update the schema maps in `src/otel.ts`,'
+            echo 'then regenerate the snapshot with `./tests/canary/run.sh --update` and commit'
+            echo '`tests/canary/expected-columns.json`. See #1901 for background.'
+          } > issue-body.md
+          existing="$(gh issue list --state open --search 'OTel collector schema drift in:title' --json number --jq '.[0].number // empty')"
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body-file issue-body.md
+          else
+            gh issue create --title 'OTel collector schema drift detected by the canary workflow' --body-file issue-body.md
+          fi

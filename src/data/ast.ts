@@ -1,4 +1,5 @@
-import { parseFirst, Statement, SelectFromStatement, astMapper, toSql, ExprRef } from 'pgsql-ast-parser';
+import { parseFirst, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
+import { FromQueryNode, parseSelect, SelectQueryNode } from 'ch-parser/parser';
 
 interface ReplacePart {
   startIndex: number;
@@ -123,26 +124,73 @@ export function sqlToStatement(rawSql: string): Statement {
   return mapper.statement(ast)!;
 }
 
+function unquoteIdentifier(name: string): string {
+  return name.replace(/^["`]|["`]$/g, '');
+}
+
+// The physical table a FROM node points at, or undefined for a subquery or a
+// table function. A Grafana-variable target is returned verbatim (e.g.
+// `${table}`), since that is the identifier the emitted query carries.
+function qualifiedTableName(node: FromQueryNode): string | undefined {
+  if (!node.table || node.isTableFunction) {
+    return undefined;
+  }
+  const table = unquoteIdentifier(node.table);
+  return node.database ? `${unquoteIdentifier(node.database)}.${table}` : table;
+}
+
+// Resolves the table the outer FROM reads from at this select level. When the
+// FROM is a subquery it descends into that subquery, and only that subquery, so
+// a scalar subquery in the SELECT list or a sibling CTE body is never mistaken
+// for the target. A FROM that references a CTE resolves to the CTE's underlying
+// table. A table-function FROM, or a top-level UNION, resolves to undefined.
+function firstPhysicalTable(node: SelectQueryNode): string | undefined {
+  // A top-level UNION combines several tables; single-table targeting is not
+  // meaningful, so resolve to no table. Per-branch keying is a follow-up.
+  if (node.hasUnion) {
+    return undefined;
+  }
+  const from = node.from;
+  if (!from) {
+    return undefined;
+  }
+  // An unqualified FROM target that names a CTE defined at this level resolves
+  // to the CTE body's table, not the alias (which ClickHouse would ignore).
+  if (from.table && !from.database && !from.isTableFunction) {
+    const cteBody = node.withAliases?.get(from.table);
+    if (cteBody) {
+      return firstPhysicalTable(cteBody);
+    }
+  }
+  const name = qualifiedTableName(from);
+  if (name) {
+    return name;
+  }
+  if (from.subquery) {
+    return firstPhysicalTable(from.subquery);
+  }
+  return undefined;
+}
+
+/**
+ * Returns the physical table an ad-hoc filter should target for `sql`, or ''
+ * when none can be found.
+ *
+ * Parses with the in-repo ClickHouse parser (shared with SQL autocomplete via
+ * `parseSelect`), not `pgsql-ast-parser`. The Postgres grammar throws on valid
+ * ClickHouse syntax (SAMPLE, INTERVAL, lambdas, backtick-quoted names), and on
+ * a throw the old implementation returned '', so the ad-hoc filter was silently
+ * dropped (grafana/clickhouse-datasource#958). The ClickHouse parser tokenizes
+ * that syntax instead of failing, and resolves through a subquery FROM, CTE
+ * references, keyword-named tables, and Grafana variables while rejecting table
+ * functions and top-level UNIONs and honoring statement boundaries.
+ */
 export function getTable(sql: string): string {
-  const stm = sqlToStatement(sql);
-  if (stm.type !== 'select' || !stm.from?.length || stm.from?.length <= 0) {
+  const root = parseSelect(sql);
+  if (!root) {
     return '';
   }
-  switch (stm.from![0].type) {
-    case 'table': {
-      const table = stm.from![0];
-      const tableName = `${table.name.schema ? `${table.name.schema}.` : ''}${table.name.name}`;
-      // clickhouse table names are case-sensitive and pgsql parser removes casing,
-      // so we need to get the casing from the raw sql
-      const s = new RegExp(`\\b${tableName}\\b`, 'gi').exec(sql);
-      return s ? s[0] : tableName;
-    }
-    case 'statement': {
-      const table = stm.from![0];
-      return getTable(toSql.statement(table.statement));
-    }
-  }
-  return '';
+  return firstPhysicalTable(root) ?? '';
 }
 
 export function getFields(sql: string): string[] {

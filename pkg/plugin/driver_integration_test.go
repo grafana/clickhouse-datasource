@@ -16,6 +16,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -26,6 +27,7 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/shopspring/decimal"
@@ -169,6 +171,14 @@ func TestConnect(t *testing.T) {
 		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
 	})
+	t.Run("should apply connection pool settings from jsonData", func(t *testing.T) {
+		secure := map[string]string{}
+		secure["password"] = password
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "maxOpenConns": 5, "maxIdleConns": "2", "connMaxLifetime": 60 }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
+		db, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
+		assert.Equal(t, nil, err)
+		assert.Equal(t, 5, db.Stats().MaxOpenConnections)
+	})
 }
 
 func TestHTTPConnect(t *testing.T) {
@@ -191,6 +201,48 @@ func TestHTTPConnect(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
+	})
+}
+
+func TestHTTPQueryResponseFormat(t *testing.T) {
+	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl := getEnv("CLICKHOUSE_SSL", "false")
+	clickhouse := Clickhouse{}
+	ctx := sdkconfig.WithGrafanaConfig(context.Background(), sdkconfig.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+	settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: map[string]string{"password": password}}
+	db, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	for _, query := range []string{"SELECT 1", "SELECT 1 FORMAT native", "SELECT 1 FORMAT Null"} {
+		t.Run(query, func(t *testing.T) {
+			rows, err := db.QueryContext(ctx, query)
+			require.NoError(t, err)
+			for rows.Next() {
+			}
+			require.NoError(t, rows.Err())
+			require.NoError(t, rows.Close())
+		})
+	}
+
+	t.Run("SELECT 1 FORMAT JSON", func(t *testing.T) {
+		_, err := db.QueryContext(ctx, "SELECT 1 FORMAT JSON")
+		require.Error(t, err)
+		got := clickhouse.MutateQueryError(err)
+		assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource())
+		assert.Contains(t, got.Error(), "the JSON format")
+
+		var one uint8
+		require.NoError(t, db.QueryRowContext(ctx, "SELECT 1").Scan(&one))
+		assert.Equal(t, uint8(1), one)
 	})
 }
 
@@ -1248,38 +1300,26 @@ func TestConvertNullableIPv6(t *testing.T) {
 func TestHTTPConnectWithHeaders(t *testing.T) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxyHost := "localhost"
-	proxyPort := getEnv("CLICKHOUSE_PROXY_PORT", "8122")
 	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
 	host := getEnv("CLICKHOUSE_HOST", "localhost")
 
+	// Bind synchronously so the port is already accepting connections before any
+	// request is sent to it, rather than racing a background ListenAndServe against
+	// the rest of the test. An ephemeral port (":0") also avoids collisions with a
+	// leftover listener from a prior run, since nothing else can be bound to it yet.
+	listener, err := net.Listen("tcp", net.JoinHostPort(proxyHost, "0"))
+	require.NoError(t, err)
+	proxyPort := strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+
+	server := &http.Server{Handler: proxy}
 	go func() {
-		err := http.ListenAndServe(fmt.Sprintf("%s:%s", proxyHost, proxyPort), proxy)
-		assert.Equal(t, nil, err)
+		if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			assert.NoError(t, err)
+		}
 	}()
-
-	// Wait for proxy server to be ready
-	proxyAddr := net.JoinHostPort(proxyHost, proxyPort)
-
-	waitCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	d := &net.Dialer{}
-	tick := time.NewTicker(100 * time.Millisecond)
-	defer tick.Stop()
-
-	for {
-		conn, err := d.DialContext(waitCtx, "tcp", proxyAddr)
-		if err == nil {
-			_ = conn.Close()
-			break
-		}
-
-		select {
-		case <-waitCtx.Done():
-			t.Fatalf("proxy server failed to start within 5s: %v", err)
-		case <-tick.C:
-		}
-	}
+	t.Cleanup(func() {
+		_ = server.Shutdown(context.Background())
+	})
 
 	username := getEnv("CLICKHOUSE_USERNAME", "default")
 	password := getEnv("CLICKHOUSE_PASSWORD", "")
@@ -1416,9 +1456,8 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 	}
 	dsInstance, err := NewDatasource(ctx, settings)
 	require.NoError(t, err)
-	// NewDatasource returns a *clickhouseInstance that embeds *sqlds.SQLDatasource
-	// (promoting QueryData), or the bare *sqlds.SQLDatasource on the defensive
-	// fallback path. Assert on the QueryDataHandler interface so either works.
+	// NewDatasource returns a *sqlds.SQLDatasource (promoting QueryData).
+	// Assert on the QueryDataHandler interface.
 	ds, ok := dsInstance.(backend.QueryDataHandler)
 	require.True(t, ok)
 
@@ -1518,3 +1557,61 @@ func TestQueryDataMacroExpansion(t *testing.T) {
 		assert.Equal(t, backend.ErrorSourceDownstream, resp.Responses["A"].ErrorSource)
 	})
 }
+
+// TestQueryDataRowLimit exercises the full NewDatasource -> QueryData path and
+// asserts that Grafana's dataproxy.row_limit bounds the rows buffered into the
+// response frame. Regression test for unbounded result sets: before the cap,
+// one oversized query could hold the whole result in plugin memory.
+func TestQueryDataRowLimit(t *testing.T) {
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	port := getEnv("CLICKHOUSE_PORT", "9000")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+
+	ctx := backend.WithGrafanaConfig(context.Background(), backend.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "100",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+
+	settings := backend.DataSourceInstanceSettings{
+		JSONData:                []byte(fmt.Sprintf(`{"server": "%s", "port": %s, "username": "%s"}`, host, port, username)),
+		DecryptedSecureJSONData: map[string]string{"password": password},
+	}
+
+	dsInstance, err := NewDatasource(ctx, settings)
+	require.NoError(t, err)
+	ds, ok := dsInstance.(backend.QueryDataHandler)
+	require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+	req := &backend.QueryDataRequest{
+		PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+		Queries: []backend.DataQuery{
+			{
+				RefID: "A",
+				JSON:  []byte(`{"rawSql": "SELECT number FROM system.numbers LIMIT 1000", "format": 1}`),
+			},
+		},
+	}
+
+	resp, err := ds.QueryData(ctx, req)
+	require.NoError(t, err)
+	require.Contains(t, resp.Responses, "A")
+	res := resp.Responses["A"]
+	require.NoError(t, res.Error)
+	require.Len(t, res.Frames, 1)
+
+	rows, err := res.Frames[0].RowLen()
+	require.NoError(t, err)
+	assert.Equal(t, 100, rows)
+
+	truncated := false
+	for _, notice := range res.Frames[0].Meta.Notices {
+		if strings.Contains(notice.Text, "limited") {
+			truncated = true
+		}
+	}
+	assert.True(t, truncated, "the response must carry a truncation notice")
+}
+

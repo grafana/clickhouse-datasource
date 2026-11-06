@@ -1,7 +1,12 @@
 import {
   arrayToDataFrame,
   CoreApp,
+  DataFrame,
   DataQueryRequest,
+  DataQueryResponse,
+  dateTime,
+  Field,
+  FieldType,
   LoadingState,
   SupplementaryQueryType,
   TimeRange,
@@ -12,10 +17,11 @@ import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { lastValueFrom, of, throwError } from 'rxjs';
+import { lastValueFrom, of, Subject, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -28,12 +34,16 @@ import { Datasource } from './CHDatasource';
 import * as logs from './logs';
 
 jest.mock('./logs', () => ({
-  getTimeFieldRoundingClause: jest.fn(),
+  // Default to a plausible clause: the generator dereferences it, so a bare jest.fn()
+  // returning undefined would make every volume query throw rather than build.
+  getTimeFieldRoundingClause: jest.fn(() => 'toStartOfInterval("created_at", INTERVAL 1 DAY)'),
   getIntervalInfo: jest.fn(),
+  getTimeFieldRoundingInterval: jest.requireActual('./logs').getTimeFieldRoundingInterval,
   queryLogsVolume: jest.fn(),
   TIME_FIELD_ALIAS: jest.requireActual('./logs').TIME_FIELD_ALIAS,
   DEFAULT_LOGS_ALIAS: jest.requireActual('./logs').DEFAULT_LOGS_ALIAS,
   LOG_LEVEL_TO_IN_CLAUSE: jest.requireActual('./logs').LOG_LEVEL_TO_IN_CLAUSE,
+  buildLogLevelAggregateExpressions: jest.requireActual('./logs').buildLogLevelAggregateExpressions,
 }));
 
 interface InstanceConfig {
@@ -153,6 +163,37 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnReplace).toHaveBeenCalled();
       expect(val).toEqual({ rawSql, editorType: EditorType.SQL });
     });
+    it('raises $__interval to the per-query min interval', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $__interval', editorType: EditorType.SQL, minInterval: '5m' } as CHQuery;
+      const scoped = {
+        __interval: { text: '30s', value: '30s' },
+        __interval_ms: { text: '30000', value: 30000 },
+      };
+
+      createInstance({}).applyTemplateVariables(query, scoped);
+
+      expect(spyOnReplace).toHaveBeenCalledWith(
+        'select $__interval',
+        {
+          __interval: { text: '5m', value: '5m' },
+          __interval_ms: { text: '300000', value: 300000 },
+        },
+        expect.any(Function)
+      );
+    });
+    it('leaves $__interval alone without a per-query min interval', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $__interval', editorType: EditorType.SQL } as CHQuery;
+      const scoped = {
+        __interval: { text: '30s', value: '30s' },
+        __interval_ms: { text: '30000', value: 30000 },
+      };
+
+      createInstance({}).applyTemplateVariables(query, scoped);
+
+      expect(spyOnReplace).toHaveBeenCalledWith('select $__interval', scoped, expect.any(Function));
+    });
     it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];
@@ -218,7 +259,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -270,7 +311,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -395,6 +436,52 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
       expect(result.rawSql).toEqual(
         "SELECT * FROM complex_table settings additional_table_filters={'table1': ' key = \\'val\\' ', 'table2': ' key = \\'val\\' ', 'table3': ' key = \\'val\\' '}"
+      );
+    });
+
+    it('applies every filter to the $__adHocFilters tables whatever table the key names', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters('web_by_useragent')",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, [
+        { key: 'web.client_asn', operator: '>', value: '0' },
+      ]);
+
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'web_by_useragent': ' client_asn > \\'0\\' '}"
+      );
+    });
+
+    it('leaves a query on another table unfiltered when keys carry the table name', async () => {
+      const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
+
+      expect(result.rawSql).toEqual('SELECT * FROM web_by_useragent');
+    });
+
+    it('applies a table-qualified key to another table when the table name is hidden from keys', async () => {
+      const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
+
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}"
       );
     });
 
@@ -1024,6 +1111,194 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('JSON type ad-hoc filters (#2094)', () => {
+    it('expands JSON-typed columns into self-describing backtick path keys', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'level', type: 'String', table: 'events' },
+        { name: 'ResourceAttributes', type: 'JSON', table: 'events' },
+      ]);
+      // fetchUniqueJSONPathsForAdhoc → distinct JSON paths for ResourceAttributes.
+      const pathsFrame = arrayToDataFrame([{ path: 'k8s.pod' }, { path: 'level' }]);
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('JSONAllPaths("ResourceAttributes")')) {
+          return of({ data: [pathsFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      // Each level backtick-quoted: the key is self-describing, so escapeKey
+      // renders cast JSON access with no JSON-column cache.
+      expect(keys).toEqual([
+        { text: 'events.level' },
+        { text: 'events.ResourceAttributes.`k8s`.`pod`' },
+        { text: 'events.ResourceAttributes.`level`' },
+      ]);
+    });
+
+    it('reads a companion <col>Keys array column instead of JSONAllPaths when present', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      ds.settings.jsonData.defaultTable = 'events';
+      const columnsFrame = arrayToDataFrame([
+        { name: 'ResourceAttributes', type: 'JSON', table: 'events' },
+        { name: 'ResourceAttributesKeys', type: 'Array(String)', table: 'events' },
+      ]);
+      const pathsFrame = arrayToDataFrame([{ path: 'service.name' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('arrayJoin("ResourceAttributesKeys")')) {
+          return of({ data: [pathsFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const keys = await ds.getTagKeys();
+      expect(keys).toContainEqual({ text: 'events.ResourceAttributes.`service`.`name`' });
+      // Discovery read the companion array column, not JSONAllPaths.
+      const probedSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql as string)
+        .find((s) => s.includes('arrayJoin('));
+      expect(probedSql).toContain('arrayJoin("ResourceAttributesKeys")');
+      expect(probedSql).not.toContain('JSONAllPaths');
+    });
+
+    it('fetches values for a minted JSON key with the cast, no prior getTagKeys call', async () => {
+      // Stateless round-trip: on a fresh dashboard load (caches empty) the
+      // value SELECT must still cast the JSON sub-path — an uncast Dynamic path
+      // reads back all-null over the native protocol.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'events' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'api' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const values = await ds.getTagValues({ key: 'events.ResourceAttributes.`k8s`.`pod`' });
+      expect(values).toEqual([{ text: 'api' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: 'select distinct ResourceAttributes.`k8s`.`pod`::Nullable(String) from db.events limit 1000',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('casts a LEGACY dotted JSON key on a cold cache (pins ensureAttributeColumnCache)', async () => {
+      // A minted backtick key self-describes and casts with no cache, so it
+      // can't catch a broken warm-up. A legacy dotted key (`col.path`, from an
+      // already-saved dashboard) resolves JSON-ness only via the column cache,
+      // which getTagKeys hasn't populated on a fresh load — ensureAttributeColumnCache
+      // must warm it, else the sub-path is emitted uncast (Dynamic → all-null).
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'db.events');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'db';
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'events' }]);
+      const valuesFrame = arrayToDataFrame([{ val: 'api' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const values = await ds.getTagValues({ key: 'events.ResourceAttributes.k8s.pod' });
+      expect(values).toEqual([{ text: 'api' }]);
+      expect(spyOnQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          targets: expect.arrayContaining([
+            expect.objectContaining({
+              rawSql: 'select distinct ResourceAttributes.`k8s`.`pod`::Nullable(String) from db.events limit 1000',
+            }),
+          ]),
+        })
+      );
+    });
+
+    it('bounds the value SELECT to a time window for the configured logs table', async () => {
+      // The distinct-value scan behind the filter-value dropdown is bounded to a
+      // 6h window when the target is the configured OTel logs/traces table (same
+      // partition-pruning heuristic as the key-discovery probe). Without it,
+      // `select distinct <expr>` scans the whole column — worse for JSON paths.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'otel.otel_logs');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'otel';
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'otel_logs' }]);
+      const valuesFrame = arrayToDataFrame([{ v: 'pod-a' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      await ds.getTagValues({ key: 'otel_logs.ResourceAttributes.`k8s`.`pod`' });
+      const valueSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql ?? '')
+        .find((s: string) => s.includes('select distinct'));
+      // Pin clause ordering: the WHERE must sit before LIMIT (a WHERE placed
+      // after LIMIT is a live syntax error but would still satisfy `toContain`).
+      expect(valueSql).toContain('where "Timestamp" >= now() - INTERVAL 6 HOUR limit 1000');
+      expect(valueSql).toContain('ResourceAttributes.`k8s`.`pod`::Nullable(String)');
+    });
+
+    it('bounds the value SELECT to the dashboard time range when supplied', async () => {
+      // The dropdown should reflect values within the dashboard's own range, not
+      // a fixed recent window. When a timeRange is passed it wins over the 6h fallback.
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation(() => 'otel.otel_logs');
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = 'otel';
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
+      };
+      const columnsFrame = arrayToDataFrame([{ name: 'ResourceAttributes', type: 'JSON', table: 'otel_logs' }]);
+      const valuesFrame = arrayToDataFrame([{ v: 'pod-a' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        if (sql.includes('::Nullable(String)')) {
+          return of({ data: [valuesFrame] });
+        }
+        return of({ data: [columnsFrame] });
+      });
+
+      const timeRange = { from: { valueOf: () => 1_600_000_000_000 }, to: { valueOf: () => 1_600_086_400_000 } };
+      await ds.getTagValues({ key: 'otel_logs.ResourceAttributes.`k8s`.`pod`', timeRange } as any);
+      const valueSql = spyOnQuery.mock.calls
+        .map((c) => (c[0] as any).targets[0].rawSql ?? '')
+        .find((s: string) => s.includes('select distinct'));
+      expect(valueSql).toContain(
+        'where "Timestamp" >= fromUnixTimestamp(1600000000) and "Timestamp" <= fromUnixTimestamp(1600086400) limit 1000'
+      );
+      expect(valueSql).not.toContain('INTERVAL 6 HOUR');
+    });
+  });
+
   describe('fetchUniqueMapKeys probe (#1843)', () => {
     it('bounds the probe to a row-sampled subquery for free-form tables (no time column known)', async () => {
       // Without a known time column the probe can't prune by partition, so it
@@ -1223,77 +1498,93 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe.skip('fetchPathsForJSONColumns', () => {
-    it('sends a correct query when database and table names are provided', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      const expected = {
-        rawSql:
-          'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name" SETTINGS max_execution_time=10',
+  describe('fetchPathsForJSONColumns', () => {
+    const pathsSql = (source: string) =>
+      `SELECT tupleElement(pt, 1) AS path, if(length(tupleElement(pt, 2)) = 1, tupleElement(pt, 2)[1], 'Dynamic') AS type FROM (SELECT arrayJoin(distinctJSONPathsAndTypes("jsonCol")) AS pt FROM ${source}) LIMIT 5000`;
+    const configureOtelLogs = (ds: Datasource) => {
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
       };
+    };
+
+    const cases: Array<{
+      name: string;
+      database: string;
+      table: string;
+      configure?: (ds: Datasource) => void;
+      source: string;
+    }> = [
+      {
+        name: 'reads a row sample of the qualified table',
+        database: 'db_name',
+        table: 'table_name',
+        source: '(SELECT "jsonCol" FROM "db_name"."table_name" LIMIT 100000)',
+      },
+      {
+        name: 'reads a row sample of the unqualified table when no database is given',
+        database: '',
+        table: 'table.name',
+        source: '(SELECT "jsonCol" FROM "table.name" LIMIT 100000)',
+      },
+      {
+        name: 'reads a row sample from the recent time window of the configured logs table',
+        database: 'otel',
+        table: 'otel_logs',
+        configure: configureOtelLogs,
+        source: '(SELECT "jsonCol" FROM "otel"."otel_logs" WHERE "Timestamp" >= now() - INTERVAL 6 HOUR LIMIT 100000)',
+      },
+    ];
+
+    it.each(cases)('$name', async ({ database, table, configure, source }) => {
+      const ds = cloneDeep(mockDatasource);
+      configure?.(ds);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchPathsForJSONColumns(database, table, 'jsonCol');
 
       expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+        expect.objectContaining({
+          targets: expect.arrayContaining([expect.objectContaining({ rawSql: pathsSql(source) })]),
+        })
       );
     });
 
-    it('sends a correct query when only table name is provided', async () => {
+    it('maps each path to a typed column', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
+        { path: 'a.b.c', type: 'Int64' },
+        { path: 'a.b.d', type: 'String' },
+        { path: 'a.b.e', type: 'Dynamic' },
+        { path: 'a..f', type: 'String' },
       ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('', 'table_name', 'jsonCol');
-      const expected = {
-        rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name" SETTINGS max_execution_time=10',
-      };
-
-      expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
-      );
-    });
-
-    it('sends a correct query when table name contains a dot', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('', 'table.name', 'jsonCol');
-      const expected = {
-        rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name" SETTINGS max_execution_time=10',
-      };
-
-      expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
-      );
-    });
-
-    it('returns correct json columns', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
 
       const jsonColumns = await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      expect(jsonColumns).toMatchObject([
+
+      expect(jsonColumns).toEqual([
         { name: 'jsonCol.a.b.c', label: 'jsonCol.a.b.c', type: 'Int64', picklistValues: [] },
         { name: 'jsonCol.a.b.d', label: 'jsonCol.a.b.d', type: 'String', picklistValues: [] },
-        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Bool', picklistValues: [] },
+        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Dynamic', picklistValues: [] },
       ]);
+    });
+
+    it('returns no columns for an empty table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      expect(await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol')).toEqual([]);
+    });
+
+    it('short-circuits to empty when discovery is disabled, without issuing a query', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol')).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
     });
   });
 
@@ -1333,6 +1624,127 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
       );
+    });
+
+    it('reads only the schema, never the JSON path probe', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ name: 'payload', type: 'JSON' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const columns = await ds.fetchColumnsFromTable('db_name', 'table_name');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+      expect(columns).toEqual([{ name: 'payload', type: 'JSON', label: 'payload', picklistValues: [] }]);
+    });
+  });
+
+  describe('fetchJSONPathColumns', () => {
+    const schema: TableColumn[] = [
+      { name: 'ts', type: 'DateTime', label: 'ts', picklistValues: [] },
+      { name: 'payload', type: 'JSON', label: 'payload', picklistValues: [] },
+      { name: 'extra', type: 'Nullable(JSON)', label: 'extra', picklistValues: [] },
+    ];
+    const probedColumn = (sql: string) => sql.match(/distinctJSONPathsAndTypes\("(\w+)"\)/)?.[1];
+
+    it('returns the paths of each JSON column, in schema order', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const column = probedColumn(request.targets[0].rawSql ?? '');
+        return of({ data: [arrayToDataFrame([{ path: `${column}_path`, type: 'String' }])] });
+      });
+
+      const paths = await ds.fetchJSONPathColumns('db_name', 'table_name', schema);
+
+      expect(paths.map((c) => c.name)).toEqual(['payload.payload_path', 'extra.extra_path']);
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('issues no query for a table without JSON columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', [schema[0]])).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
+    });
+
+    it('issues no query when key and path discovery is disabled', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', schema)).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns no paths for a column whose probe fails', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const error = { message: 'Code: 497. DB::Exception: Not enough privileges. (ACCESS_DENIED)' };
+      jest
+        .spyOn(ds, 'query')
+        .mockImplementation(() => of({ data: [], state: LoadingState.Error, error, errors: [error] }));
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', schema)).toEqual([]);
+    });
+
+    it('probes one column at a time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const first = new Subject<DataQueryResponse>();
+      const spyOnQuery = jest
+        .spyOn(ds, 'query')
+        .mockImplementation((request) =>
+          probedColumn(request.targets[0].rawSql ?? '') === 'payload' ? first : of({ data: [arrayToDataFrame([])] })
+        );
+
+      const pending = ds.fetchJSONPathColumns('db_name', 'table_name', schema);
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+
+      first.next({ data: [arrayToDataFrame([{ path: 'p', type: 'String' }])] });
+      first.complete();
+
+      expect((await pending).map((c) => c.name)).toEqual(['payload.p']);
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getEditorColumnsCached', () => {
+    const schemaFrame = () => arrayToDataFrame([{ name: 'payload', type: 'JSON' }]);
+    const pathsFrame = () => arrayToDataFrame([{ path: 'http.status', type: 'Int64' }]);
+    const mockQueries = (ds: Datasource) =>
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        return of({ data: [sql.includes('distinctJSONPathsAndTypes') ? pathsFrame() : schemaFrame()] });
+      });
+
+    it('returns the schema columns followed by the JSON paths', async () => {
+      const ds = cloneDeep(mockDatasource);
+      mockQueries(ds);
+
+      const columns = await ds.getEditorColumnsCached('db_name', 'table_name');
+
+      expect(columns.map((c) => c.name)).toEqual(['payload', 'payload.http.status']);
+    });
+
+    it('shares one fetch between concurrent and later requests for the same table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = mockQueries(ds);
+
+      await Promise.all([
+        ds.getEditorColumnsCached('db_name', 'table_name'),
+        ds.getEditorColumnsCached('db_name', 'table_name'),
+      ]);
+      await ds.getEditorColumnsCached('db_name', 'table_name');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('fetches each table once', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = mockQueries(ds);
+
+      await ds.getEditorColumnsCached('db_name', 'table_name');
+      await ds.getEditorColumnsCached('db_name', 'other_table');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -1383,16 +1795,42 @@ describe('ClickHouseDatasource', () => {
   });
 
   describe('filterQuery', () => {
-    it('returns true when hide is not set', () => {
-      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
+    it('returns true for a non-hidden query with SQL', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: 'SELECT 1' } as CHQuery)).toBe(true);
     });
 
-    it('returns true when hide is false', () => {
-      expect(mockDatasource.filterQuery({ refId: '1', hide: false } as CHQuery)).toBe(true);
+    it('returns true when hide is false and SQL is present', () => {
+      expect(mockDatasource.filterQuery({ refId: '1', hide: false, rawSql: 'SELECT 1' } as CHQuery)).toBe(true);
     });
 
     it('returns false when hide is true', () => {
-      expect(mockDatasource.filterQuery({ refId: '1', hide: true } as CHQuery)).toBe(false);
+      expect(mockDatasource.filterQuery({ refId: '1', hide: true, rawSql: 'SELECT 1' } as CHQuery)).toBe(false);
+    });
+
+    it('skips only an empty-rawSql logs builder query (its transient pre-schema state)', () => {
+      // A logs builder query has an empty rawSql until its columns resolve (e.g. a non-OTel table
+      // in the compact editor before the schema fetch returns). Running it would 400 at the backend.
+      const emptyLogsBuilder = {
+        refId: '1',
+        rawSql: '',
+        editorType: EditorType.Builder,
+        builderOptions: { queryType: QueryType.Logs },
+      } as CHQuery;
+      const blankLogsBuilder = {
+        refId: '1',
+        rawSql: '   ',
+        editorType: EditorType.Builder,
+        builderOptions: { queryType: QueryType.Logs },
+      } as CHQuery;
+      expect(mockDatasource.filterQuery(emptyLogsBuilder)).toBe(false);
+      expect(mockDatasource.filterQuery(blankLogsBuilder)).toBe(false);
+    });
+
+    it('runs an empty-rawSql query that is not a logs builder query, so its error still surfaces', () => {
+      // The guard is narrowed to the transient logs-builder case only. An empty SQL-editor query (or
+      // any other type) runs as before, so a broken query errors visibly instead of failing silently.
+      expect(mockDatasource.filterQuery({ refId: '1', rawSql: '', editorType: EditorType.SQL } as CHQuery)).toBe(true);
+      expect(mockDatasource.filterQuery({ refId: '1' } as CHQuery)).toBe(true);
     });
   });
 
@@ -1460,6 +1898,72 @@ describe('ClickHouseDatasource', () => {
       expect(response.errors?.[0]?.message).toBe('connection refused');
       consoleSpy.mockRestore();
     });
+
+    // End-to-end guard for the discovered-fields fold: query() runs foldDiscoveredLogFieldsIntoLabels
+    // on the backend response, so a logs Builder query whose datasource configures a column via the
+    // Columns setting must come back with that column folded into `labels` and dropped as a standalone
+    // frame field. This mirrors the pure-fold assertion in utils.test.ts, but through the real query()
+    // pipeline.
+    it('folds a configured column into labels through the query() pipeline', async () => {
+      const instance = cloneDeep(mockDatasource);
+      // The fold is gated on the datasource's configured Columns setting (additionalColumns).
+      instance.settings.jsonData.logs = { ...instance.settings.jsonData.logs, additionalColumns: ['ServiceName'] };
+
+      const logsQuery: CHBuilderQuery = {
+        refId: 'A',
+        editorType: EditorType.Builder,
+        rawSql: '',
+        pluginVersion: '',
+        builderOptions: {
+          database: 'otel',
+          table: 'otel_logs',
+          queryType: QueryType.Logs,
+          columns: [
+            { name: 'Timestamp', hint: ColumnHint.Time },
+            { name: 'Body', hint: ColumnHint.LogMessage },
+            { name: 'ServiceName', type: 'String' }, // configured via the Columns setting -> folds into labels
+          ],
+        },
+      };
+
+      // Backend frame carries the role fields, the scalar ServiceName field, and an existing labels
+      // field (JSON string, the backend-serialized shape). The trace/log-link transform is a no-op
+      // here since there is no traceID field, so the fold is the only thing that mutates the frame.
+      const backendFrame: DataFrame = {
+        refId: 'A',
+        length: 1,
+        fields: [
+          { name: 'Timestamp', type: FieldType.time, config: {}, values: [1] } as Field,
+          { name: 'Body', type: FieldType.string, config: {}, values: ['hello'] } as Field,
+          { name: 'ServiceName', type: FieldType.string, config: {}, values: ['cart'] } as Field,
+          {
+            name: 'labels',
+            type: FieldType.other,
+            config: {},
+            values: ['{"LogAttributes.http.method":"GET"}'],
+          } as Field,
+        ],
+      };
+
+      jest
+        .spyOn(DataSourceWithBackend.prototype, 'query')
+        .mockImplementation((_request) => of({ data: [backendFrame] }));
+
+      const response: DataQueryResponse = await lastValueFrom(
+        instance.query({
+          targets: [logsQuery] as CHQuery[],
+          timezone: 'UTC',
+        } as DataQueryRequest<CHQuery>)
+      );
+
+      const frame = response.data[0] as DataFrame;
+      // ServiceName removed as a standalone field; role fields + labels kept.
+      expect(frame.fields.map((f) => f.name)).toEqual(['Timestamp', 'Body', 'labels']);
+      // ServiceName folded into labels next to the existing attribute key, written back as a JSON
+      // string in the same shape it arrived in.
+      const labels = frame.fields.find((f) => f.name === 'labels')!.values[0];
+      expect(JSON.parse(labels)).toEqual({ 'LogAttributes.http.method': 'GET', ServiceName: 'cart' });
+    });
   });
 
   describe('SupplementaryQueriesSupport', () => {
@@ -1501,14 +2005,35 @@ describe('ClickHouseDatasource', () => {
       datasource = cloneDeep(mockDatasource);
     });
 
+    /** A SQL editor logs target carrying the given raw SQL. */
+    const sqlLogsTarget = (rawSql: string): CHQuery =>
+      ({
+        pluginVersion: '',
+        refId: 'A',
+        editorType: EditorType.SQL,
+        queryType: QueryType.Logs,
+        rawSql,
+      }) as CHQuery;
+
+    const mockDefaultLogColumns = () =>
+      jest.spyOn(datasource, 'getDefaultLogsColumns').mockReturnValue(
+        new Map<ColumnHint, string>([
+          [ColumnHint.Time, 'created_at'],
+          [ColumnHint.LogLevel, 'level'],
+        ])
+      );
+
     describe('getSupportedSupplementaryQueryTypes', () => {
-      it('should return LogsVolume and LogsSample for empty dsRequest', async () => {
+      it('should offer nothing when no target is a logs query', async () => {
+        // There is nothing to draw for a non-logs pane, and advertising a type without emitting
+        // a target would replace Grafana's fallback with an empty state.
         const dsRequest = { targets: [{ editorType: EditorType.Builder }] } as DataQueryRequest<CHQuery>;
         const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
-        expect(result).toEqual([SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample]);
+        expect(result).toEqual([]);
       });
 
       it('should return LogsVolume and LogsSample when all targets use Builder editor', async () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
@@ -1522,19 +2047,159 @@ describe('ClickHouseDatasource', () => {
         expect(result).toEqual([SupplementaryQueryType.LogsVolume, SupplementaryQueryType.LogsSample]);
       });
 
-      it('should return empty array when any target uses SQL editor', async () => {
+      it('should return empty array when a SQL editor target cannot be aggregated', async () => {
+        // No default log columns configured, so there is no column to bucket on.
+        jest.spyOn(datasource, 'getDefaultLogsColumns').mockReturnValue(new Map<ColumnHint, string>());
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [sqlLogsTarget('SELECT Timestamp, Body FROM otel_logs LIMIT 100')],
+        };
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([]);
+      });
+
+      it('should return LogsVolume (but not LogsSample) for an aggregatable SQL editor target', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [sqlLogsTarget('SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 100')],
+        };
+        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
+        expect(result).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should decline for the whole request when one SQL target is not aggregatable', async () => {
+        mockDefaultLogColumns();
+        // All or nothing: Grafana renders one stacked histogram for the pane, so emitting
+        // volume for a subset of targets would show a silent under-count.
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, editorType: EditorType.Builder },
+            sqlLogsTarget('SELECT created_at FROM logs SETTINGS max_threads = 4'),
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should ignore hidden targets when deciding', async () => {
+        mockDefaultLogColumns();
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, editorType: EditorType.Builder },
+            { ...sqlLogsTarget('SELECT anything FROM nowhere SETTINGS x = 1'), hide: true },
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([
+          SupplementaryQueryType.LogsVolume,
+          SupplementaryQueryType.LogsSample,
+        ]);
+      });
+
+      it('should offer LogsVolume for a hand-typed SQL query that declares no query type', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              pluginVersion: '',
+              refId: 'A',
+              editorType: EditorType.SQL,
+              format: 1,
+              rawSql: 'SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 10',
+            } as CHQuery,
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([SupplementaryQueryType.LogsVolume]);
+      });
+
+      it('should offer nothing for a SQL query that neither declares logs nor aggregates', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            {
+              pluginVersion: '',
+              refId: 'A',
+              editorType: EditorType.SQL,
+              format: 1,
+              rawSql: 'SELECT count() FROM logs',
+            } as CHQuery,
+          ],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should offer nothing for a single SQL target that explicitly declares Table', async () => {
+        mockDefaultLogColumns();
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [{ ...sqlLogsTarget('SELECT created_at, level FROM logs LIMIT 10'), queryType: QueryType.Table }],
+        };
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toEqual([]);
+      });
+
+      it('should not let an explicit Table target inflate a sibling logs histogram', async () => {
+        mockDefaultLogColumns();
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1d' });
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [
+            { ...query, refId: 'A', editorType: EditorType.Builder },
+            {
+              ...sqlLogsTarget('SELECT created_at, level FROM logs ORDER BY created_at DESC LIMIT 10'),
+              refId: 'B',
+              queryType: QueryType.Table,
+              format: 1,
+            },
+          ],
+        };
+
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsVolume);
+        const emitted = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, dsRequest);
+        expect(emitted?.targets.map((t) => t.refId)).toEqual(['log-volume-A']);
+      });
+
+      it('should return [] rather than propagate when a target throws', async () => {
+        jest.spyOn(datasource, 'getSupplementaryLogsVolumeQuery').mockImplementation(() => {
+          throw new Error('boom');
+        });
+        const consoleSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const dsRequest: DataQueryRequest<CHQuery> = {
+          ...request,
+          targets: [{ ...query, editorType: EditorType.Builder }],
+        };
+
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).not.toContain(
+          SupplementaryQueryType.LogsVolume
+        );
+        expect(consoleSpy).toHaveBeenCalled();
+        consoleSpy.mockRestore();
+      });
+
+      it('should offer LogsSample for a builder Table query on the default logs table', async () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
         const dsRequest: DataQueryRequest<CHQuery> = {
           ...request,
           targets: [
             {
               ...query,
-              editorType: EditorType.SQL,
-              queryType: query.builderOptions.queryType,
+              editorType: EditorType.Builder,
+              builderOptions: { ...query.builderOptions, queryType: QueryType.Table },
             },
           ],
         };
-        const result = datasource.getSupportedSupplementaryQueryTypes(dsRequest);
-        expect(result).toEqual([]);
+        expect(datasource.getSupportedSupplementaryQueryTypes(dsRequest)).toContain(SupplementaryQueryType.LogsSample);
+      });
+
+      it('should return both types when called without a request', async () => {
+        expect(datasource.getSupportedSupplementaryQueryTypes()).toEqual([
+          SupplementaryQueryType.LogsVolume,
+          SupplementaryQueryType.LogsSample,
+        ]);
       });
     });
 
@@ -1622,15 +2287,17 @@ describe('ClickHouseDatasource', () => {
           .spyOn(logs, 'getTimeFieldRoundingClause')
           .mockReturnValue('toStartOfInterval("created_at", INTERVAL 1 DAY)');
         const result = datasource.getSupplementaryLogsVolumeQuery(request, query);
+        // Levels match exactly, `unknown` is their complement, and ifNull keeps a Nullable
+        // column in the partition, so the stacked total equals count().
         expect(result?.rawSql).toEqual(
           `SELECT toStartOfInterval("created_at", INTERVAL 1 DAY) as "time", ` +
-            `sum(multiSearchAny(toString("level"), ['critical','fatal','crit','alert','emerg','CRITICAL','FATAL','CRIT','ALERT','EMERG','Critical','Fatal','Crit','Alert','Emerg'])) as critical, ` +
-            `sum(multiSearchAny(toString("level"), ['error','err','eror','ERROR','ERR','EROR','Error','Err','Eror'])) as error, ` +
-            `sum(multiSearchAny(toString("level"), ['warn','warning','WARN','WARNING','Warn','Warning'])) as warn, ` +
-            `sum(multiSearchAny(toString("level"), ['info','information','informational','INFO','INFORMATION','INFORMATIONAL','Info','Information','Informational'])) as info, ` +
-            `sum(multiSearchAny(toString("level"), ['debug','dbug','DEBUG','DBUG','Debug','Dbug'])) as debug, ` +
-            `sum(multiSearchAny(toString("level"), ['trace','TRACE','Trace'])) as trace, ` +
-            `sum(multiSearchAny(toString("level"), ['unknown','UNKNOWN','Unknown'])) as unknown ` +
+            `sum(ifNull(toString("level"), '') IN ('critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency')) as critical, ` +
+            `sum(ifNull(toString("level"), '') IN ('error','err','eror','ERROR','ERR','EROR','Error','Err','Eror')) as error, ` +
+            `sum(ifNull(toString("level"), '') IN ('warn','warning','WARN','WARNING','Warn','Warning')) as warn, ` +
+            `sum(ifNull(toString("level"), '') IN ('info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice')) as info, ` +
+            `sum(ifNull(toString("level"), '') IN ('debug','dbug','DEBUG','DBUG','Debug','Dbug')) as debug, ` +
+            `sum(ifNull(toString("level"), '') IN ('trace','TRACE','Trace')) as trace, ` +
+            `sum(ifNull(toString("level"), '') NOT IN ('critical','fatal','crit','alert','emerg','emergency','CRITICAL','FATAL','CRIT','ALERT','EMERG','EMERGENCY','Critical','Fatal','Crit','Alert','Emerg','Emergency','error','err','eror','ERROR','ERR','EROR','Error','Err','Eror','warn','warning','WARN','WARNING','Warn','Warning','info','information','informational','notice','INFO','INFORMATION','INFORMATIONAL','NOTICE','Info','Information','Informational','Notice','debug','dbug','DEBUG','DBUG','Debug','Dbug','trace','TRACE','Trace')) as unknown ` +
             `FROM "default"."logs" ` +
             `GROUP BY time ` +
             `ORDER BY time ASC`
@@ -1694,6 +2361,206 @@ describe('ClickHouseDatasource', () => {
         });
         expect(result).toBeDefined();
         expect(result?.rawSql).not.toContain('LIKE');
+      });
+
+      const withinTimeRange = (hint: ColumnHint): Filter => ({
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: '',
+        hint,
+        condition: 'AND',
+      });
+
+      it.each([
+        {
+          name: 'a FilterTime filter falling back to the Time column',
+          columns: [{ name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."created_at"',
+        },
+        {
+          name: 'a Time filter falling back to the FilterTime column',
+          columns: [{ name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime }],
+          filterHint: ColumnHint.Time,
+          filteredColumn: '"default"."logs"."created_date"',
+        },
+        {
+          name: 'a FilterTime filter with both time columns',
+          columns: [
+            { name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime },
+            { name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          ],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."created_date"',
+        },
+        {
+          name: 'a Time filter with both time columns',
+          columns: [
+            { name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime },
+            { name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          ],
+          filterHint: ColumnHint.Time,
+          filteredColumn: '"default"."logs"."created_at"',
+        },
+        {
+          name: 'a time column that shares the bucket alias name',
+          columns: [{ name: 'time', type: 'DateTime64(3)', hint: ColumnHint.Time }],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."time"',
+        },
+      ])(
+        'should filter the time range on the raw column, not the bucket, for $name',
+        ({ columns, filterHint, filteredColumn }) => {
+          const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...query,
+            builderOptions: { ...query.builderOptions, columns, filters: [withinTimeRange(filterHint)] },
+          });
+
+          expect(result?.rawSql).toContain(
+            `WHERE ( ${filteredColumn} >= $__fromTime AND ${filteredColumn} <= $__toTime ) GROUP BY time`
+          );
+          expect(result?.rawSql).not.toContain('time >= $__fromTime');
+        }
+      );
+
+      it('should take the time range filter type from the time column, as the logs query does', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+            filters: [{ ...withinTimeRange(ColumnHint.Time), type: '' } as Filter],
+          },
+        });
+
+        expect(result?.rawSql).toContain(
+          'WHERE ( "default"."logs"."created_at" >= $__fromTime AND "default"."logs"."created_at" <= $__toTime ) GROUP BY time'
+        );
+      });
+
+      it('should filter the time range on the raw column when the min interval bucket is longer than the range', () => {
+        const actualLogs = jest.requireActual<typeof logs>('./logs');
+        const from = dateTime('2024-03-15T10:02:30Z');
+        const to = dateTime('2024-03-15T10:17:30Z');
+        let rawSql: string | undefined;
+        jest.mocked(logs.getIntervalInfo).withImplementation(actualLogs.getIntervalInfo, () =>
+          jest.mocked(logs.getTimeFieldRoundingClause).withImplementation(actualLogs.getTimeFieldRoundingClause, () => {
+            rawSql = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
+              ...request,
+              range: { from, to, raw: { from, to } },
+              scopedVars: { __interval_ms: { text: '1000', value: 1000 } },
+              targets: [
+                {
+                  ...query,
+                  minInterval: '1h',
+                  builderOptions: { ...query.builderOptions, filters: [withinTimeRange(ColumnHint.FilterTime)] },
+                },
+              ],
+            })?.targets[0]?.rawSql;
+          })
+        );
+
+        expect(rawSql).toContain('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 HOUR) as "time"');
+        expect(rawSql).toContain(
+          'WHERE ( "default"."logs"."created_at" >= $__fromTime AND "default"."logs"."created_at" <= $__toTime ) GROUP BY time'
+        );
+        expect(rawSql).not.toContain('time >= $__fromTime');
+      });
+    });
+
+    describe('getSupplementaryLogsVolumeQuery for SQL editor queries', () => {
+      beforeEach(() => {
+        mockDefaultLogColumns();
+      });
+
+      it('should wrap the user SQL as a derived table and drop the trailing ORDER BY and LIMIT', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(
+          request,
+          sqlLogsTarget("SELECT created_at, level FROM logs WHERE level = 'ERROR' ORDER BY created_at DESC LIMIT 100")
+        );
+
+        expect(result).toBeDefined();
+        expect(result?.editorType).toBe(EditorType.SQL);
+        // format 0 is what shapes the response into the stacked series Explore draws.
+        expect(result?.format).toBe(0);
+        expect(result?.queryType).toBe(QueryType.TimeSeries);
+        expect(result?.refId).toBe('');
+        // The row limit and ordering are what cap Grafana's own histogram, so they must go.
+        expect(result?.rawSql).not.toContain('LIMIT');
+        expect(result?.rawSql).not.toContain('ORDER BY created_at');
+        // The user's filter rides along verbatim inside the subquery.
+        expect(result?.rawSql).toContain("WHERE level = 'ERROR'");
+        expect(result?.rawSql).toContain('FROM (');
+        expect(result?.rawSql).toContain('GROUP BY "time"');
+      });
+
+      it('should bucket on the projected alias rather than the physical column', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(
+          request,
+          sqlLogsTarget('SELECT created_at AS ts, level AS lvl FROM logs LIMIT 10')
+        );
+
+        expect(result?.rawSql).toContain(
+          'WHERE toDateTime(src."ts") >= $__fromTime AND toDateTime(src."ts") <= $__toTime'
+        );
+        expect(result?.rawSql).toContain('toString(src."lvl")');
+      });
+
+      it('should fall back to a single count series when the level column is not projected', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(
+          request,
+          sqlLogsTarget('SELECT created_at, message FROM logs LIMIT 10')
+        );
+
+        expect(result?.rawSql).toContain('count(*) AS "logs"');
+        expect(result?.rawSql).not.toContain('toString(');
+      });
+
+      it('should return undefined for a hidden target', () => {
+        expect(
+          datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...sqlLogsTarget('SELECT created_at FROM logs'),
+            hide: true,
+          })
+        ).toBeUndefined();
+      });
+
+      it('should build a volume query whatever query type the target declares', () => {
+        // The SQL editor defaults queryType to Table, so a hand-written logs query usually does
+        // not declare itself as logs. Whether to offer a histogram is the gate's decision.
+        expect(
+          datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...sqlLogsTarget('SELECT created_at, level FROM logs'),
+            queryType: QueryType.Table,
+          })
+        ).toBeDefined();
+      });
+
+      it('should return undefined when the SQL cannot be safely aggregated', () => {
+        // A subquery LIMIT must not be mistaken for a trailing one, but SETTINGS, LIMIT BY and
+        // WITH FILL all change which rows exist and so must decline outright.
+        [
+          'SELECT created_at FROM logs SETTINGS max_threads = 4',
+          'SELECT created_at FROM logs ORDER BY created_at LIMIT 2 BY level',
+          'SELECT created_at FROM logs ORDER BY created_at WITH FILL STEP 1',
+          'SELECT created_at FROM a UNION ALL SELECT created_at FROM b',
+          'SELECT message, created_at FROM logs',
+          'SELECT created_at - INTERVAL 5 HOUR AS created_at FROM logs',
+        ].forEach((rawSql) => {
+          expect(datasource.getSupplementaryLogsVolumeQuery(request, sqlLogsTarget(rawSql))).toBeUndefined();
+        });
+      });
+    });
+
+    describe('hidden targets', () => {
+      it('should not build a volume query for a hidden builder target', () => {
+        expect(datasource.getSupplementaryLogsVolumeQuery(request, { ...query, hide: true })).toBeUndefined();
+      });
+
+      it('should not build a sample query for a hidden builder target', () => {
+        jest.spyOn(datasource, 'getDefaultLogsTable').mockReturnValue('logs');
+        expect(datasource.getSupplementaryLogsSampleQuery({ ...query, hide: true })).toBeUndefined();
       });
     });
 
@@ -1872,7 +2739,7 @@ describe('ClickHouseDatasource', () => {
         const supplementaryQuery = { rawSql: 'SELECT * FROM logs', refId: '', format: 2 } as CHSqlQuery;
         jest.spyOn(Datasource.prototype, 'getSupplementaryLogsSampleQuery').mockReturnValue(supplementaryQuery);
         const result = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsSample, {
-          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          targets: [{ refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } }],
         } as any);
         expect(result).toMatchObject({
           hideFromInspector: true,
@@ -1893,6 +2760,42 @@ describe('ClickHouseDatasource', () => {
         ).toBeUndefined();
       });
 
+      it('applies the min interval of each target to its own volume query', async () => {
+        // The histogram buckets from scopedVars.__interval_ms, which is shared by the whole
+        // request, so a per-query floor only reaches it if it is folded in per target.
+        const seen: Array<number | undefined> = [];
+        jest.spyOn(Datasource.prototype, 'getSupplementaryLogsVolumeQuery').mockImplementation((volumeRequest: any) => {
+          seen.push(volumeRequest.scopedVars.__interval_ms?.value);
+          return { rawSql: 'supplementaryQuery', refId: '' } as CHSqlQuery;
+        });
+        jest.spyOn(logs, 'getIntervalInfo').mockReturnValue({ interval: '1m', intervalMs: 60000 });
+
+        datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
+          scopedVars: { __interval: {} },
+          targets: [
+            { refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } },
+            {
+              refId: 'B',
+              minInterval: '1h',
+              editorType: EditorType.Builder,
+              builderOptions: { queryType: QueryType.Logs },
+            },
+            {
+              refId: 'C',
+              minInterval: '1s',
+              editorType: EditorType.Builder,
+              builderOptions: { queryType: QueryType.Logs },
+            },
+          ],
+          range: ['from', 'to'],
+        } as any);
+
+        // getSupportedSupplementaryQueryTypes probes each target first, so only the last three
+        // calls are the real volume queries. A: no floor, B: raised to 1h, C: floor below the
+        // derived interval, so unchanged.
+        expect(seen.slice(-3)).toEqual([60000, 60 * 60 * 1000, 60000]);
+      });
+
       it('should return a modified request with log-volume targets', async () => {
         const range = ['from', 'to'];
         const supplementaryQuery = {
@@ -1905,7 +2808,7 @@ describe('ClickHouseDatasource', () => {
           scopedVars: {
             __interval: {},
           },
-          targets: [{ refId: 'A', editorType: EditorType.Builder }],
+          targets: [{ refId: 'A', editorType: EditorType.Builder, builderOptions: { queryType: QueryType.Logs } }],
           range,
         } as any);
         expect(result).toMatchObject({
@@ -2559,23 +3462,19 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns null for the Body core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('Body', undefined, null)).toBeNull();
-      });
-
-      it('returns null for the TraceId core column', () => {
-        expect(datasource.getLabelDisplayTypeFromFrame('TraceId', undefined, null)).toBeNull();
-      });
-
-      it('returns null for the bare "ResourceAttributes" without a dot', () => {
-        // The backend's flatten always emits at least one nested key, so the
-        // bare column name never reaches Grafana's label list. Guard against
-        // mis-grouping if a custom schema ever surfaces it.
-        expect(datasource.getLabelDisplayTypeFromFrame('ResourceAttributes', undefined, null)).toBeNull();
-      });
-
-      it('returns null for an arbitrary user-defined column', () => {
+      it('returns null for an unprefixed key (a folded top-level column)', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBeNull();
         expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBeNull();
+      });
+
+      // Grafana >=12.4 log details show plain fields (level, other columns) only in the null group, or with no labels.
+      it.each([
+        ['a folded column next to OTel attributes', ['ResourceAttributes.service.name', 'ServiceName']],
+        ["a table's own labels map", ['pod', 'region']],
+      ])('leaves a null label group for %s', (_, labelKeys) => {
+        const groups = labelKeys.map((key) => datasource.getLabelDisplayTypeFromFrame(key, undefined, null));
+        expect(groups).toContain(null);
       });
     });
 
@@ -2730,6 +3629,82 @@ describe('ClickHouseDatasource', () => {
       await expect(ds.getLogRowContext(makeRow(), contextOptions, cloneDeep(baseQuery))).rejects.toThrow(
         /Syntax error/
       );
+    });
+
+    describe('context columns on attribute map columns', () => {
+      // Row whose LogAttributes field carries object values, as returned for
+      // both Map- and JSON-typed attribute columns.
+      const makeAttributesRow = (attributes: Record<string, unknown>) => {
+        const frame = toDataFrame({
+          fields: [
+            { name: 'timestamp', values: [1700000000000] },
+            { name: 'LogAttributes', type: FieldType.other, values: [attributes] },
+          ],
+        });
+        return { ...makeRow(), dataFrame: frame };
+      };
+
+      const setup = (contextColumn: string, attributesColumnType: string | undefined) => {
+        const ds = cloneDeep(mockDatasource);
+        ds.settings.jsonData.logs = { contextColumns: [contextColumn] };
+        const querySpy = jest.spyOn(ds, 'query').mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+
+        const query = cloneDeep(baseQuery);
+        query.builderOptions.columns = [
+          ...(query.builderOptions.columns ?? []),
+          { name: 'LogAttributes', type: attributesColumnType },
+        ];
+
+        return { ds, querySpy, query };
+      };
+
+      const sentQuery = (querySpy: jest.SpyInstance): CHBuilderQuery => {
+        const request = querySpy.mock.calls[0][0] as DataQueryRequest<CHQuery>;
+        return request.targets[0] as CHBuilderQuery;
+      };
+
+      it('builds a JSON accessor filter when the attributes column is JSON-typed', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['host.name']", 'JSON');
+
+        await ds.getLogRowContext(makeAttributesRow({ 'host.name': 'web-01' }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.builderOptions.filters).toContainEqual(
+          expect.objectContaining({ key: 'LogAttributes', mapKey: 'host.name', type: 'JSON', value: 'web-01' })
+        );
+        expect(sent.rawSql).toContain("LogAttributes.`host`.`name`::Nullable(String) = 'web-01'");
+        expect(sent.rawSql).not.toContain("LogAttributes['host.name']");
+      });
+
+      it('does not throw when a JSON-typed attribute value is numeric', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['bytes']", 'JSON');
+
+        await ds.getLogRowContext(makeAttributesRow({ bytes: 42 }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.rawSql).toContain("LogAttributes.`bytes`::Nullable(String) = '42'");
+      });
+
+      it('keeps the raw subscript filter for Map-typed attribute columns', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['host']", 'Map(String, String)');
+
+        await ds.getLogRowContext(makeAttributesRow({ host: 'web' }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.builderOptions.filters).toContainEqual(
+          expect.objectContaining({ key: "LogAttributes['host']", value: 'web', type: 'string' })
+        );
+        expect(sent.rawSql).toContain("LogAttributes['host'] = 'web'");
+      });
+
+      it('does not throw on a numeric value when the attributes column type is unknown', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['bytes']", undefined);
+
+        await ds.getLogRowContext(makeAttributesRow({ bytes: 42 }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.rawSql).toContain("LogAttributes['bytes'] = 42");
+      });
     });
   });
 
@@ -3075,6 +4050,31 @@ describe('ClickHouseDatasource', () => {
       expect(datasource.queryHasFilter(queryWithLevel, { key: 'level', value: 'info' })).toBe(true);
     });
 
+    it('returns true for an editor-created filter that stores the real column type', () => {
+      // The compact FilterPopover and the classic FilterEditor store the real
+      // ClickHouse column type, not the 'string' sentinel the log-view toggles
+      // use, so the same column's filters must still be found.
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'SeverityText', value: 'Error' })).toBe(true);
+    });
+
     it('returns true for OTel map key match', () => {
       const queryWithMap: CHBuilderQuery = {
         ...query,
@@ -3394,6 +4394,66 @@ describe('ClickHouseDatasource', () => {
       expect(result.builderOptions.filters![0]).toMatchObject({
         operator: FilterOperator.NotEquals,
         value: 'error',
+      });
+    });
+
+    it('FILTER_FOR toggles off an editor-created filter that stores the real column type', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+
+    it('FILTER_FOR replaces an editor-created Equals filter with a different value (no AND-ing)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Info' },
+      }) as CHBuilderQuery;
+
+      // Must NOT produce `SeverityText = 'Error' AND SeverityText = 'Info'` (zero rows).
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'SeverityText',
+        operator: FilterOperator.Equals,
+        value: 'Info',
       });
     });
 

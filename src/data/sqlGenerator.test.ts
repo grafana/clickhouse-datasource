@@ -91,6 +91,32 @@ describe('SQL Generator', () => {
     expect(jsonSql).toContain('LogAttributes.`method`');
   });
 
+  // Log-context filters are declared with sentinel type 'string', but JSON-typed
+  // attribute columns can carry numeric values at runtime. See getLogRowContext.
+  it('renders a numeric value on a string-typed filter without throwing', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'otel_logs',
+      queryType: QueryType.Table,
+      columns: [{ name: 'Body', type: 'String' }],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          key: "LogAttributes['bytes']",
+          type: 'string',
+          condition: 'AND',
+          operator: FilterOperator.Equals,
+          value: 42,
+        },
+      ],
+      orderBy: [],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toContain("LogAttributes['bytes'] = 42");
+  });
+
   it('generates aggregate table query', () => {
     const opts: QueryBuilderOptions = {
       database: 'default',
@@ -169,6 +195,21 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('returns an empty query when a logs query has no selected columns', () => {
+    // Cold-load transient in the compact editor: a non-OTel table has no columns until the
+    // schema fetch resolves and the default-column hooks run. Emitting `SELECT  FROM table`
+    // would be rejected by ClickHouse with a syntax error, so the generator emits nothing.
+    const opts: QueryBuilderOptions = {
+      database: 'system',
+      table: 'query_log',
+      queryType: QueryType.Logs,
+      columns: [],
+      limit: 1000,
+    };
+
+    expect(generateSql(opts)).toEqual('');
   });
 
   // Regression test for #1882: opentelemetry-collector-contrib clickhouseexporter v0.151.0
@@ -1039,6 +1080,12 @@ describe('getColumnIdentifier', () => {
     { input: { name: 'my:name' }, expected: `"my:name"` },
     { input: { name: 'namespace:field:value' }, expected: `"namespace:field:value"` },
     { input: { name: 'verification:id', alias: 'vid' }, expected: `"verification:id" as "vid"` },
+    // The ` as ` alias sentinel is case-insensitive so users can hand-write map/array
+    // extractions with either lowercase or uppercase AS (e.g. Attributes['http.route'] AS http_route)
+    // in the Columns selector. See https://github.com/grafana/clickhouse-datasource/issues/2126.
+    { input: { name: `Attributes['http.route'] AS http_route` }, expected: `Attributes['http.route'] AS http_route` },
+    { input: { name: `Attributes['http.route'] as http_route` }, expected: `Attributes['http.route'] as http_route` },
+    { input: { name: `Attributes['http.route']\tAS\thttp_route` }, expected: `Attributes['http.route']\tAS\thttp_route` },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {
@@ -1093,6 +1140,18 @@ describe('escapeValue', () => {
   ];
 
   it.each(cases)('returns escaped value (case %#)', (c) => {
+    expect(_testExports.escapeValue(c.input)).toEqual(c.expected);
+  });
+
+  const nonStringCases: Array<{ input: number | boolean; expected: string }> = [
+    { input: 42, expected: '42' },
+    { input: 4.2, expected: '4.2' },
+    { input: 0, expected: '0' },
+    { input: true, expected: 'true' },
+    { input: false, expected: 'false' },
+  ];
+
+  it.each(nonStringCases)('renders non-string primitive unquoted (case %#)', (c) => {
     expect(_testExports.escapeValue(c.input)).toEqual(c.expected);
   });
 });

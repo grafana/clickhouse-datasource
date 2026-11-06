@@ -16,27 +16,33 @@ menuTitle: OpenTelemetry dashboards
 title: ClickHouse OpenTelemetry dashboards
 weight: 60
 version: 0.1
-last_reviewed: 2026-05-07
+review_date: 2026-08-12
 ---
 
 # ClickHouse OpenTelemetry dashboards
 
-The plugin ships three pre-built dashboards for OpenTelemetry data stored in ClickHouse. Together they cover top-down log exploration, service topology and trace search, and a single-service deep dive that ties RED metrics, errors, logs, and trace detail into one view.
+The plugin ships four pre-built dashboards for OpenTelemetry data stored in ClickHouse. Three cover top-down log exploration, service topology and trace search, and a single-service deep dive that ties RED metrics, errors, logs, and trace detail into one view; a fourth is a variant of the logs explorer for tables that store OTel attributes as the native JSON type.
 
-The three dashboards link to each other via dashboard data links: clicking a service or operation in one dashboard preserves the time range and datasource and lands you on the matching view in another.
+The core three dashboards link to each other via dashboard data links: clicking a service or operation in one dashboard preserves the time range, datasource and selected database, and lands you on the matching view in another.
 
 ## Required schema
 
 The dashboards expect the standard table layout produced by the [ClickHouse exporter for the OpenTelemetry Collector](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter):
 
-- A logs table named `otel_logs` in the data source's default database.
-- A traces table named `otel_traces` in the data source's default database.
+- A logs table named `otel_logs`.
+- A traces table named `otel_traces`.
 
-Both tables are referenced by their bare names in raw SQL, so the data source's **Default database** setting needs to point at the database that holds them. If you renamed the OTel exporter tables, the dashboards do not pick the new names up automatically; either restore the standard names or duplicate the dashboards and edit the SQL.
+All four dashboards expose a **Database** template variable and qualify every table reference as `${database}.otel_logs` / `${database}.otel_traces`, so you pick the database that holds the OTel tables from the dashboard itself instead of relying on the data source's **Default database** setting.
+
+The three Map-schema dashboards (Logs Explorer, Traces Explorer, and the single-service deep dive) link to each other and forward the selected database between them, so their **Database** variable lists only databases that hold **both** `otel_logs` and `otel_traces`. Splitting logs and traces across separate databases is not supported by these three: the selector would list nothing rather than offer a database whose panels cannot all resolve.
+
+The JSON-schema Logs Explorer lists databases whose `otel_logs.ResourceAttributes` column uses the native `JSON` type. Its panels only need `otel_logs`; the `otel_traces` table is required solely by the optional deployment annotation, which is **disabled by default**, so a logs-only database works there.
+
+Both selectors read `system.tables` / `system.columns`, so the data source user needs read access to them. If you renamed the OTel exporter tables, the dashboards do not pick the new names up automatically; either restore the standard names or duplicate the dashboards and edit the SQL.
 
 The dashboards rely on the columns the exporter ships with: `Timestamp`, `Body`, `SeverityText`, `ServiceName`, `TraceId`, `SpanId`, `ResourceAttributes` for logs; `TraceId`, `ServiceName`, `SpanName`, `Timestamp`, `Duration`, `StatusCode`, `SpanKind`, `ParentSpanId`, `SpanAttributes`, `ResourceAttributes` for traces.
 
-`StatusCode` is matched against the OTel spec value `'Error'`, which is what the current ClickHouse exporter writes.
+`StatusCode` is matched against both `'Error'` and `'STATUS_CODE_ERROR'`, the error values the current ClickHouse exporter writes.
 
 ## OpenTelemetry Logs Explorer
 
@@ -48,9 +54,13 @@ Below the overview, a per-service row repeats once per service in the **Service*
 
 Both per-service panels have an **Open in Explore** link in the panel header that pre-fills a matching query for that row's service in Explore. The Log Volume link drops you into a time-series query; the Log Samples link drops you into the logs visualization with the same column projection as the dashboard panel. Because the per-service row repeats once per selected service, each panel-header link is scoped to its row's `$service` value.
 
-Filter variables: **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `hasToken(Body, ...)`).
+Filter variables: **Database** (selects the database that holds the OTel tables; needs read access to `system.tables`), **Service** (multi, defaults to top 10 by volume), **Level** (multi), **Search** (textbox; passes through to `positionCaseInsensitive(Body, ...)`, a case-insensitive substring match).
 
 Annotations: deployment markers derived from `service.version` changes in `otel_traces` over 30-second buckets.
+
+## OpenTelemetry Logs Explorer (JSON schema)
+
+A variant of the OpenTelemetry Logs Explorer for deployments where the `otel_logs` attribute columns (`ResourceAttributes`, `LogAttributes`, `ScopeAttributes`) use ClickHouse's native `JSON` type instead of `Map(String, String)` — the ClickStack schema. The panels are identical except that the Log Samples panel reads attributes with JSON path access (for example `ResourceAttributes.service.namespace::String`) instead of Map key access. Because the two access styles are not interchangeable within a single query, this ships as a separate dashboard rather than a mode of the Map dashboard. The deployment annotation reads `otel_traces`, which is left as `Map`.
 
 ## OpenTelemetry Traces Explorer
 
@@ -64,7 +74,7 @@ Below trace search, a per-service row repeats once per service: a 1-in-500 sampl
 
 Each per-service panel has an **Open in Explore** link in its panel header that pre-fills a matching query in Explore.
 
-Filter variables: **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName applied to every trace panel).
+Filter variables: **Database** (selects the database that holds the OTel tables), **Service** (multi), **Operation** (multi), **Status** (multi), **Min Duration (ms)** (textbox; leave blank for no minimum, passes through `$__conditionalAll`), **Search** (textbox; free-text match on SpanName applied to every trace panel).
 
 ## OpenTelemetry Service Dashboard
 
@@ -80,7 +90,7 @@ Single-service deep dive, broken out by SpanKind. Top to bottom:
 
 Click any operation in any Slowest Operations or Top Errors table to open the matching trace search in OpenTelemetry Traces Explorer.
 
-Filter variables: **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
+Filter variables: **Database** (selects the database that holds the OTel tables), **Service** (single-select), **Operation** (multi), **Search** (textbox; free-text match on SpanName for trace panels and on Body for the Logs panel).
 
 Each non-row panel has an **Open in Explore** link in its header that pre-fills the panel's underlying query in Explore. Useful when you want to refine the SQL, change visualization, or read log details with more horizontal space.
 

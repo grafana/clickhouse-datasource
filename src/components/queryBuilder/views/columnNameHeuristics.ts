@@ -65,3 +65,20 @@ export const isNumericColumn = (column: TableColumn): boolean => {
   const type = (column.type || '').toLowerCase();
   return type.includes('uint') || type.includes('int') || type.includes('float') || type.includes('decimal');
 };
+
+/** Type predicate (by type string): ClickHouse Date / DateTime / DateTime64 columns. */
+export const isDateTimeColumnType = (type?: string): boolean => (type || '').toLowerCase().includes('date');
+
+/** Type predicate: ClickHouse collection / compound column types (Map, Array, Tuple, Nested, Object, JSON). */
+export const isCollectionColumnType = (type?: string): boolean => {
+  const s = (type || '').trim();
+  return (
+    s.startsWith('Map(') ||
+    s.startsWith('Array(') ||
+    s.startsWith('Tuple(') ||
+    s.startsWith('Nested') ||
+    s.startsWith('Object(') ||
+    s === 'JSON' ||
+    s.startsWith('JSON(')
+  );
+};

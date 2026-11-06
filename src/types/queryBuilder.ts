@@ -82,6 +82,13 @@ export interface QueryBuilderOptions {
     // Logs & Traces
     otelEnabled?: boolean;
     otelVersion?: string;
+
+    /**
+     * UID of the data source the query belongs to, recorded by the editor in Explore. Switching
+     * data sources keeps the query, so a different UID here marks a query carried over from
+     * another data source rather than one opened from a panel, the history or a shared link.
+     */
+    datasourceUid?: string;
   };
 }
 
@@ -322,6 +329,13 @@ export interface NumberFilter extends CommonFilterProps {
     | FilterOperator.GreaterThan
     | FilterOperator.GreaterThanOrEqual;
   value: number;
+  /**
+   * Original textual input, preserved for UI round-trip when the filter is
+   * rendered with a human-friendly duration editor (see DurationFilterInput).
+   * SQL generation ignores this field and uses `value` (already in the
+   * column's stored unit).
+   */
+  rawInput?: string;
 }
 
 export interface DateFilterWithValue extends CommonFilterProps {

@@ -5,6 +5,8 @@ apiVersion: 1
 deleteDatasources:
   - name: ClickHouse
     orgId: 1
+  - name: ClickHouse Logs Defaults
+    orgId: 1
   - name: ClickHouse Single Logs
     orgId: 1
   - name: ClickHouse Single Traces
@@ -88,6 +90,29 @@ datasources:
         traceEventsColumnPrefix: 'Events'
         traceLinksColumnPrefix: 'Links'
         traceTimestampTableSuffix: '_trace_id_ts'
+        otelEnabled: false
+    secureJsonData:
+      # password: ""
+  - name: ClickHouse Logs Defaults
+    uid: clickhouse-e2e-logs-defaults
+    type: grafana-clickhouse-datasource
+    access: proxy
+    url: clickhouse-server
+    orgId: 1
+    jsonData:
+      host: clickhouse-server
+      database: 'e2e_test'
+      username: 'default'
+      port: 9000
+      protocol: native
+      # Logs defaults without single-table mode, so the SQL editor's aggregated log volume has
+      # the timestamp and level columns it reads (tests/e2e/sqlLogsVolume.spec.ts).
+      logs:
+        defaultDatabase: 'e2e_test'
+        defaultTable: 'events'
+        timeColumn: 'timestamp'
+        levelColumn: 'level'
+        messageColumn: 'message'
         otelEnabled: false
     secureJsonData:
       # password: ""

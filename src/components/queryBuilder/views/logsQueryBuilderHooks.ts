@@ -5,6 +5,41 @@ import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'ty
 import otel from 'otel';
 import { findColumnByNameHeuristic, isDateTimeColumn, isStringLikeColumn } from './columnNameHeuristics';
 import { getDefaultLogsFilters, getDefaultLogsOrderBy } from '../defaultQueryOptions';
+import { appendAdditionalLogColumns } from '../compactQueryDefaults';
+
+/**
+ * The columns a new logs query on the configured logs table starts with: the configured role columns,
+ * the log context columns when "Auto-Select Columns" is on, and the extra default columns. Pass the
+ * table's columns when they are loaded, so the extra columns carry their types.
+ */
+export const buildDefaultLogsColumns = (
+  datasource: Datasource,
+  allColumns: readonly TableColumn[] = []
+): SelectedColumn[] => {
+  const columns: SelectedColumn[] = [];
+  const includedColumns = new Set<string>();
+  for (let [hint, colName] of datasource.getDefaultLogsColumns()) {
+    columns.push({ name: colName, hint });
+    includedColumns.add(colName);
+  }
+
+  if (datasource.shouldSelectLogContextColumns()) {
+    for (let columnName of datasource.getLogContextColumnNames()) {
+      // Excludes columns already added, and maps that contain the selected key (such as "ResourceAttributes['x']")
+      if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
+        continue;
+      }
+
+      columns.push({ name: columnName });
+      includedColumns.add(columnName);
+    }
+  }
+
+  // Extra fields configured via the Columns setting. Pass the fetched schema (when it is loaded)
+  // so each column carries its type; the fold uses that to skip collection- and date-typed columns.
+  appendAdditionalLogColumns(datasource, allColumns, columns, includedColumns);
+  return columns;
+};
 
 /**
  * Loads the default configuration for new queries. (Only runs on new queries)
@@ -13,7 +48,8 @@ export const useLogDefaultsOnMount = (
   datasource: Datasource,
   isNewQuery: boolean,
   builderOptions: QueryBuilderOptions,
-  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>,
+  allColumns: readonly TableColumn[] = []
 ) => {
   const didSetDefaults = useRef<boolean>(false);
   useEffect(() => {
@@ -24,34 +60,12 @@ export const useLogDefaultsOnMount = (
     const defaultDb = datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase();
     const defaultTable = datasource.getDefaultLogsTable() || datasource.getDefaultTable();
     const otelVersion = datasource.getLogsOtelVersion();
-    const defaultColumns = datasource.getDefaultLogsColumns();
-
-    const nextColumns: SelectedColumn[] = [];
-    const includedColumns = new Set<string>();
-    for (let [hint, colName] of defaultColumns) {
-      nextColumns.push({ name: colName, hint });
-      includedColumns.add(colName);
-    }
-
-    if (datasource.shouldSelectLogContextColumns()) {
-      const contextColumnNames = datasource.getLogContextColumnNames();
-
-      for (let columnName of contextColumnNames) {
-        // Excludes columns already added, and maps that contain the selected key (such as "ResourceAttributes['x']")
-        if (includedColumns.has(columnName) || includedColumns.has(columnName.split('[')[0])) {
-          continue;
-        }
-
-        nextColumns.push({ name: columnName });
-        includedColumns.add(columnName);
-      }
-    }
 
     builderOptionsDispatch(
       setOptions({
         database: defaultDb,
         table: defaultTable || builderOptions.table,
-        columns: nextColumns,
+        columns: buildDefaultLogsColumns(datasource, allColumns),
         meta: {
           otelEnabled: Boolean(otelVersion),
           otelVersion,
@@ -60,6 +74,7 @@ export const useLogDefaultsOnMount = (
     );
     didSetDefaults.current = true;
   }, [
+    allColumns,
     builderOptions.columns,
     builderOptions.orderBy,
     builderOptions.table,
@@ -71,7 +86,8 @@ export const useLogDefaultsOnMount = (
 
 /**
  * Sets OTEL Logs columns automatically when OTEL is enabled.
- * Does not run if OTEL is already enabled, only when it's changed.
+ * Does not run if OTEL is already enabled, only when the toggle or the
+ * selected schema version changes.
  */
 export const useOtelColumns = (
   datasource: Datasource,
@@ -81,8 +97,15 @@ export const useOtelColumns = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const didSetColumns = useRef<boolean>(otelEnabled);
+  const prevOtelVersion = useRef<string>(otelVersion);
   if (!otelEnabled) {
     didSetColumns.current = false;
+    prevOtelVersion.current = otelVersion;
+  } else if (otelVersion !== prevOtelVersion.current) {
+    // Version changed while OTel is on: reset the flag so the Effect re-applies
+    // the new version's column map ('latest' re-runs auto-detection).
+    didSetColumns.current = false;
+    prevOtelVersion.current = otelVersion;
   }
 
   useEffect(() => {
@@ -124,6 +147,9 @@ export const useOtelColumns = (
         includedColumns.add(columnName);
       }
     }
+
+    // Extra fields configured in Default columns (all detected scalars, or an explicit list).
+    appendAdditionalLogColumns(datasource, allColumns, columns, includedColumns);
 
     builderOptionsDispatch(setOptions({ columns }));
     didSetColumns.current = true;
@@ -234,24 +260,19 @@ export const useDefaultLogColumnsByName = (
   }, [allColumns, table, messageColumn, logLevelColumn, otelEnabled, builderOptionsDispatch]);
 };
 
-// Apply default filters/orderBy on table change
+// Apply default filters to a new query once it has a table; a table change keeps the query's filters
 export const useDefaultFilters = (
   table: string,
   isNewQuery: boolean,
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   const appliedDefaultFilters = useRef<boolean>(!isNewQuery);
-  const lastTable = useRef<string>(table || '');
-  if (table !== lastTable.current) {
-    appliedDefaultFilters.current = false;
-  }
 
   useEffect(() => {
     if (!table || appliedDefaultFilters.current) {
       return;
     }
 
-    lastTable.current = table;
     appliedDefaultFilters.current = true;
     builderOptionsDispatch(
       setOptions({

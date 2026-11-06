@@ -12,6 +12,7 @@ import { DurationUnitSelect } from 'components/queryBuilder/DurationUnitSelect';
 import { Datasource } from 'data/CHDatasource';
 import { useBuilderOptionChanges } from 'hooks/useBuilderOptionChanges';
 import useColumns from 'hooks/useColumns';
+import useFitQueryToTable from 'hooks/useFitQueryToTable';
 import { BuilderOptionsReducerAction, setOptions, setOtelEnabled, setOtelVersion } from 'hooks/useBuilderOptionsState';
 import useIsNewQuery from 'hooks/useIsNewQuery';
 import { OtelVersionSelect } from '../OtelVersionSelect';
@@ -31,6 +32,8 @@ interface TraceQueryBuilderProps {
   datasource: Datasource;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
+  /** The `sourceKey` of the last database or table picked in the dropdowns (see `useFitQueryToTable`). */
+  pickedSource?: string;
 }
 
 interface TraceQueryBuilderState {
@@ -65,6 +68,13 @@ interface TraceQueryBuilderState {
 export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
   const { datasource, builderOptions, builderOptionsDispatch } = props;
   const allColumns = useColumns(datasource, builderOptions.database, builderOptions.table);
+  useFitQueryToTable(
+    allColumns,
+    builderOptions.database,
+    builderOptions.table,
+    props.pickedSource,
+    builderOptionsDispatch
+  );
   const isNewQuery = useIsNewQuery(builderOptions);
   const [showConfigWarning, setConfigWarningOpen] = useState(
     datasource.getDefaultTraceColumns().size === 0 && builderOptions.columns?.length === 0
@@ -446,6 +456,14 @@ export const TraceQueryBuilder = (props: TraceQueryBuilderProps) => {
           datasource={datasource}
           database={builderOptions.database}
           table={builderOptions.table}
+          durationFilterContext={
+            builderState.durationTimeColumn && builderState.durationUnit
+              ? {
+                  columnKey: builderState.durationTimeColumn.alias || builderState.durationTimeColumn.name,
+                  unit: builderState.durationUnit,
+                }
+              : undefined
+          }
         />
       </Collapse>
       {builderState.isTraceIdMode && (

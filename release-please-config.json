@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "release-type": "node",
+  "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "bootstrap-sha": "973c4a508220c378ef8a477f3133bba935ca2345",
+  "changelog-sections": [
+    { "type": "feat", "section": "🎉 Features" },
+    { "type": "fix", "section": "🐛 Bug Fixes" },
+    { "type": "perf", "section": "⚡ Performance Improvements" },
+    { "type": "refactor", "section": "♻️ Code Refactoring" },
+    { "type": "docs", "section": "📝 Documentation" },
+    { "type": "test", "section": "✅ Tests" },
+    { "type": "build", "section": "🏗️ Builds" },
+    { "type": "ci", "section": "🤖 Continuous Integration" },
+    { "type": "revert", "section": "⏪ Reverts" },
+    { "type": "chore", "section": "🔧 Chores", "hidden": true }
+  ],
+  "packages": {
+    ".": {
+      "package-name": "grafana-clickhouse-datasource"
+    }
+  }
+}

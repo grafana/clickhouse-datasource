@@ -1,0 +1,29 @@
+# Minimal collector config for the schema canary (#1901): accept OTLP over
+# HTTP and let the clickhouseexporter create its own schema, exactly as a
+# user following the exporter docs would get it.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+exporters:
+  clickhouse:
+    endpoint: tcp://clickhouse:9000?dial_timeout=10s
+    database: default
+    create_schema: true
+    logs_table_name: otel_logs
+    traces_table_name: otel_traces
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 1s
+
+service:
+  pipelines:
+    logs:
+      receivers: [otlp]
+      exporters: [clickhouse]
+    traces:
+      receivers: [otlp]
+      exporters: [clickhouse]

@@ -1,0 +1,212 @@
+{
+  "otel_logs": [
+    {
+      "name": "Timestamp",
+      "type": "DateTime64(9)"
+    },
+    {
+      "name": "TraceId",
+      "type": "String"
+    },
+    {
+      "name": "SpanId",
+      "type": "String"
+    },
+    {
+      "name": "TraceFlags",
+      "type": "UInt8"
+    },
+    {
+      "name": "SeverityText",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "SeverityNumber",
+      "type": "UInt8"
+    },
+    {
+      "name": "ServiceName",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "Body",
+      "type": "String"
+    },
+    {
+      "name": "ResourceSchemaUrl",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ResourceAttributes",
+      "type": "Map(LowCardinality(String), String)"
+    },
+    {
+      "name": "ScopeSchemaUrl",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ScopeName",
+      "type": "String"
+    },
+    {
+      "name": "ScopeVersion",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ScopeAttributes",
+      "type": "Map(LowCardinality(String), String)"
+    },
+    {
+      "name": "LogAttributes",
+      "type": "Map(LowCardinality(String), String)"
+    },
+    {
+      "name": "EventName",
+      "type": "String"
+    },
+    {
+      "name": "__otel_materialized_k8s.cluster.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_k8s.container.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_k8s.deployment.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_k8s.namespace.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_k8s.node.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_k8s.pod.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_k8s.pod.uid",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    },
+    {
+      "name": "__otel_materialized_deployment.environment.name",
+      "type": "LowCardinality(String)",
+      "defaultKind": "MATERIALIZED"
+    }
+  ],
+  "otel_traces": [
+    {
+      "name": "Timestamp",
+      "type": "DateTime64(9)"
+    },
+    {
+      "name": "TraceId",
+      "type": "String"
+    },
+    {
+      "name": "SpanId",
+      "type": "String"
+    },
+    {
+      "name": "ParentSpanId",
+      "type": "String"
+    },
+    {
+      "name": "TraceState",
+      "type": "String"
+    },
+    {
+      "name": "SpanName",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "SpanKind",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ServiceName",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ResourceAttributes",
+      "type": "Map(LowCardinality(String), String)"
+    },
+    {
+      "name": "ScopeName",
+      "type": "String"
+    },
+    {
+      "name": "ScopeVersion",
+      "type": "String"
+    },
+    {
+      "name": "SpanAttributes",
+      "type": "Map(LowCardinality(String), String)"
+    },
+    {
+      "name": "Duration",
+      "type": "UInt64"
+    },
+    {
+      "name": "StatusCode",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "StatusMessage",
+      "type": "String"
+    },
+    {
+      "name": "Events.Timestamp",
+      "type": "Array(DateTime64(9))"
+    },
+    {
+      "name": "Events.Name",
+      "type": "Array(LowCardinality(String))"
+    },
+    {
+      "name": "Events.Attributes",
+      "type": "Array(Map(LowCardinality(String), String))"
+    },
+    {
+      "name": "Links.TraceId",
+      "type": "Array(String)"
+    },
+    {
+      "name": "Links.SpanId",
+      "type": "Array(String)"
+    },
+    {
+      "name": "Links.TraceState",
+      "type": "Array(String)"
+    },
+    {
+      "name": "Links.Attributes",
+      "type": "Array(Map(LowCardinality(String), String))"
+    }
+  ],
+  "otel_traces_trace_id_ts": [
+    {
+      "name": "TraceId",
+      "type": "String"
+    },
+    {
+      "name": "Start",
+      "type": "DateTime"
+    },
+    {
+      "name": "End",
+      "type": "DateTime"
+    }
+  ]
+}
