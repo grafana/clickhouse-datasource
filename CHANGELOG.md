@@ -1,5 +1,12 @@
 # Changelog
 
+## [4.23.5](https://github.com/grafana/clickhouse-datasource/compare/v4.23.4...v4.23.5) (2026-11-06)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** update `golang.org/x/net` to v0.62.0 and `golang.org/x/crypto`
+
 ## [4.23.4](https://github.com/grafana/clickhouse-datasource/compare/v4.23.3...v4.23.4) (2026-10-29)
 
 
