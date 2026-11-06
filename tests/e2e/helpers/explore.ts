@@ -8,6 +8,11 @@ export interface ExploreUrlOptions {
   to?: string;
   rawSql?: string;
   builderOptions?: Record<string, unknown>;
+  /**
+   * The query's plugin version. Empty (the default) marks it as a v3 query, which the editor
+   * migrates to a SQL query. Pass a 4.x version to open builderOptions in the Query Builder.
+   */
+  pluginVersion?: string;
 }
 
 /**
@@ -19,13 +24,21 @@ export interface ExploreUrlOptions {
  * switchToBuilderMode after page.goto.
  */
 export function exploreUrl(opts: ExploreUrlOptions = {}): string {
-  const { datasourceUid = DATASOURCE_UID, queryType, from = 'now-1h', to = 'now', rawSql = '', builderOptions } = opts;
+  const {
+    datasourceUid = DATASOURCE_UID,
+    queryType,
+    from = 'now-1h',
+    to = 'now',
+    rawSql = '',
+    builderOptions,
+    pluginVersion = '',
+  } = opts;
 
   const query: Record<string, unknown> = {
     refId: 'A',
     datasource: { type: PLUGIN_TYPE, uid: datasourceUid },
     editorType: builderOptions === undefined ? 'sql' : 'builder',
-    pluginVersion: '',
+    pluginVersion,
     rawSql,
   };
   if (queryType !== undefined) {

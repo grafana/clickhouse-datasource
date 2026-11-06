@@ -82,6 +82,13 @@ export interface QueryBuilderOptions {
     // Logs & Traces
     otelEnabled?: boolean;
     otelVersion?: string;
+
+    /**
+     * UID of the data source the query belongs to, recorded by the editor in Explore. Switching
+     * data sources keeps the query, so a different UID here marks a query carried over from
+     * another data source rather than one opened from a panel, the history or a shared link.
+     */
+    datasourceUid?: string;
   };
 }
 

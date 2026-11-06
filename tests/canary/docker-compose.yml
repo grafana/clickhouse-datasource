@@ -7,7 +7,7 @@
 # schema against a current ClickHouse is the whole point of the canary.
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:latest@sha256:bdb5c911a23d92fd364e246ab20b5a0a485f00112f3663fa626b083fb46c146b
     ports:
       - 8123:8123
     ulimits:
@@ -24,7 +24,7 @@ services:
       start_period: 5s
 
   collector:
-    image: otel/opentelemetry-collector-contrib:latest
+    image: otel/opentelemetry-collector-contrib:latest@sha256:1175b03003053962012f5a231f5567f66a3e8fdb960c7835c0e48f7aa1555806
     command: ['--config=/etc/otelcol/config.yaml']
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro

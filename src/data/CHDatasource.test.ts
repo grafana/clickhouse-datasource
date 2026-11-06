@@ -4,6 +4,7 @@ import {
   DataFrame,
   DataQueryRequest,
   DataQueryResponse,
+  dateTime,
   Field,
   FieldType,
   LoadingState,
@@ -16,10 +17,11 @@ import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { lastValueFrom, of, throwError } from 'rxjs';
+import { lastValueFrom, of, Subject, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
+  Filter,
   FilterOperator,
   OrderByDirection,
   QueryBuilderOptions,
@@ -257,7 +259,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, false, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -309,7 +311,7 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
 
       // Verify that apply was called with the resolved SQL
-      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true);
+      expect(applyFilterSpy).toHaveBeenCalledWith(resolvedSql, adHocFilters, true, true);
 
       // Verify that the final query contains the ad-hoc filters
       expect(result.rawSql).toEqual(sqlWithAdHocFilters);
@@ -434,6 +436,52 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnGetVars).toHaveBeenCalled();
       expect(result.rawSql).toEqual(
         "SELECT * FROM complex_table settings additional_table_filters={'table1': ' key = \\'val\\' ', 'table2': ' key = \\'val\\' ', 'table3': ' key = \\'val\\' '}"
+      );
+    });
+
+    it('applies every filter to the $__adHocFilters tables whatever table the key names', async () => {
+      const query = {
+        rawSql: "SELECT * FROM complex_table settings $__adHocFilters('web_by_useragent')",
+        editorType: EditorType.SQL,
+      } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const result = createInstance({}).applyTemplateVariables(query, {}, [
+        { key: 'web.client_asn', operator: '>', value: '0' },
+      ]);
+
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM complex_table settings additional_table_filters={'web_by_useragent': ' client_asn > \\'0\\' '}"
+      );
+    });
+
+    it('leaves a query on another table unfiltered when keys carry the table name', async () => {
+      const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = false;
+      const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
+
+      expect(result.rawSql).toEqual('SELECT * FROM web_by_useragent');
+    });
+
+    it('applies a table-qualified key to another table when the table name is hidden from keys', async () => {
+      const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
+
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
+
+      expect(result.rawSql).toEqual(
+        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}"
       );
     });
 
@@ -1450,77 +1498,93 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
-  describe.skip('fetchPathsForJSONColumns', () => {
-    it('sends a correct query when database and table names are provided', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      const expected = {
-        rawSql:
-          'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "db_name"."table_name" SETTINGS max_execution_time=10',
+  describe('fetchPathsForJSONColumns', () => {
+    const pathsSql = (source: string) =>
+      `SELECT tupleElement(pt, 1) AS path, if(length(tupleElement(pt, 2)) = 1, tupleElement(pt, 2)[1], 'Dynamic') AS type FROM (SELECT arrayJoin(distinctJSONPathsAndTypes("jsonCol")) AS pt FROM ${source}) LIMIT 5000`;
+    const configureOtelLogs = (ds: Datasource) => {
+      ds.settings.jsonData.logs = {
+        defaultDatabase: 'otel',
+        defaultTable: 'otel_logs',
+        otelEnabled: false,
+        timeColumn: 'Timestamp',
       };
+    };
+
+    const cases: Array<{
+      name: string;
+      database: string;
+      table: string;
+      configure?: (ds: Datasource) => void;
+      source: string;
+    }> = [
+      {
+        name: 'reads a row sample of the qualified table',
+        database: 'db_name',
+        table: 'table_name',
+        source: '(SELECT "jsonCol" FROM "db_name"."table_name" LIMIT 100000)',
+      },
+      {
+        name: 'reads a row sample of the unqualified table when no database is given',
+        database: '',
+        table: 'table.name',
+        source: '(SELECT "jsonCol" FROM "table.name" LIMIT 100000)',
+      },
+      {
+        name: 'reads a row sample from the recent time window of the configured logs table',
+        database: 'otel',
+        table: 'otel_logs',
+        configure: configureOtelLogs,
+        source: '(SELECT "jsonCol" FROM "otel"."otel_logs" WHERE "Timestamp" >= now() - INTERVAL 6 HOUR LIMIT 100000)',
+      },
+    ];
+
+    it.each(cases)('$name', async ({ database, table, configure, source }) => {
+      const ds = cloneDeep(mockDatasource);
+      configure?.(ds);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchPathsForJSONColumns(database, table, 'jsonCol');
 
       expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
+        expect.objectContaining({
+          targets: expect.arrayContaining([expect.objectContaining({ rawSql: pathsSql(source) })]),
+        })
       );
     });
 
-    it('sends a correct query when only table name is provided', async () => {
+    it('maps each path to a typed column', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
+        { path: 'a.b.c', type: 'Int64' },
+        { path: 'a.b.d', type: 'String' },
+        { path: 'a.b.e', type: 'Dynamic' },
+        { path: 'a..f', type: 'String' },
       ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('', 'table_name', 'jsonCol');
-      const expected = {
-        rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table_name" SETTINGS max_execution_time=10',
-      };
-
-      expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
-      );
-    });
-
-    it('sends a correct query when table name contains a dot', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
-      await ds.fetchPathsForJSONColumns('', 'table.name', 'jsonCol');
-      const expected = {
-        rawSql: 'SELECT arrayJoin(distinctJSONPathsAndTypes(jsonCol)) FROM "table.name" SETTINGS max_execution_time=10',
-      };
-
-      expect(spyOnQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
-      );
-    });
-
-    it('returns correct json columns', async () => {
-      const ds = cloneDeep(mockDatasource);
-      const frame = arrayToDataFrame([
-        JSON.stringify({ keys: 'a.b.c', values: ['Int64'] }),
-        JSON.stringify({ keys: 'a.b.d', values: ['String'] }),
-        JSON.stringify({ keys: 'a.b.e', values: ['Bool'] }),
-      ]);
-      jest.spyOn(ds, 'query').mockImplementation((_request) => of({ data: [frame] }));
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
 
       const jsonColumns = await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol');
-      expect(jsonColumns).toMatchObject([
+
+      expect(jsonColumns).toEqual([
         { name: 'jsonCol.a.b.c', label: 'jsonCol.a.b.c', type: 'Int64', picklistValues: [] },
         { name: 'jsonCol.a.b.d', label: 'jsonCol.a.b.d', type: 'String', picklistValues: [] },
-        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Bool', picklistValues: [] },
+        { name: 'jsonCol.a.b.e', label: 'jsonCol.a.b.e', type: 'Dynamic', picklistValues: [] },
       ]);
+    });
+
+    it('returns no columns for an empty table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      expect(await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol')).toEqual([]);
+    });
+
+    it('short-circuits to empty when discovery is disabled, without issuing a query', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchPathsForJSONColumns('db_name', 'table_name', 'jsonCol')).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
     });
   });
 
@@ -1560,6 +1624,127 @@ describe('ClickHouseDatasource', () => {
       expect(spyOnQuery).toHaveBeenCalledWith(
         expect.objectContaining({ targets: expect.arrayContaining([expect.objectContaining(expected)]) })
       );
+    });
+
+    it('reads only the schema, never the JSON path probe', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([{ name: 'payload', type: 'JSON' }]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const columns = await ds.fetchColumnsFromTable('db_name', 'table_name');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+      expect(columns).toEqual([{ name: 'payload', type: 'JSON', label: 'payload', picklistValues: [] }]);
+    });
+  });
+
+  describe('fetchJSONPathColumns', () => {
+    const schema: TableColumn[] = [
+      { name: 'ts', type: 'DateTime', label: 'ts', picklistValues: [] },
+      { name: 'payload', type: 'JSON', label: 'payload', picklistValues: [] },
+      { name: 'extra', type: 'Nullable(JSON)', label: 'extra', picklistValues: [] },
+    ];
+    const probedColumn = (sql: string) => sql.match(/distinctJSONPathsAndTypes\("(\w+)"\)/)?.[1];
+
+    it('returns the paths of each JSON column, in schema order', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const column = probedColumn(request.targets[0].rawSql ?? '');
+        return of({ data: [arrayToDataFrame([{ path: `${column}_path`, type: 'String' }])] });
+      });
+
+      const paths = await ds.fetchJSONPathColumns('db_name', 'table_name', schema);
+
+      expect(paths.map((c) => c.name)).toEqual(['payload.payload_path', 'extra.extra_path']);
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('issues no query for a table without JSON columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', [schema[0]])).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
+    });
+
+    it('issues no query when key and path discovery is disabled', async () => {
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.enableMapKeysDiscovery = false;
+      const spyOnQuery = jest.spyOn(ds, 'query');
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', schema)).toEqual([]);
+      expect(spyOnQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns no paths for a column whose probe fails', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const error = { message: 'Code: 497. DB::Exception: Not enough privileges. (ACCESS_DENIED)' };
+      jest
+        .spyOn(ds, 'query')
+        .mockImplementation(() => of({ data: [], state: LoadingState.Error, error, errors: [error] }));
+
+      expect(await ds.fetchJSONPathColumns('db_name', 'table_name', schema)).toEqual([]);
+    });
+
+    it('probes one column at a time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const first = new Subject<DataQueryResponse>();
+      const spyOnQuery = jest
+        .spyOn(ds, 'query')
+        .mockImplementation((request) =>
+          probedColumn(request.targets[0].rawSql ?? '') === 'payload' ? first : of({ data: [arrayToDataFrame([])] })
+        );
+
+      const pending = ds.fetchJSONPathColumns('db_name', 'table_name', schema);
+      expect(spyOnQuery).toHaveBeenCalledTimes(1);
+
+      first.next({ data: [arrayToDataFrame([{ path: 'p', type: 'String' }])] });
+      first.complete();
+
+      expect((await pending).map((c) => c.name)).toEqual(['payload.p']);
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('getEditorColumnsCached', () => {
+    const schemaFrame = () => arrayToDataFrame([{ name: 'payload', type: 'JSON' }]);
+    const pathsFrame = () => arrayToDataFrame([{ path: 'http.status', type: 'Int64' }]);
+    const mockQueries = (ds: Datasource) =>
+      jest.spyOn(ds, 'query').mockImplementation((request) => {
+        const sql = request.targets[0].rawSql ?? '';
+        return of({ data: [sql.includes('distinctJSONPathsAndTypes') ? pathsFrame() : schemaFrame()] });
+      });
+
+    it('returns the schema columns followed by the JSON paths', async () => {
+      const ds = cloneDeep(mockDatasource);
+      mockQueries(ds);
+
+      const columns = await ds.getEditorColumnsCached('db_name', 'table_name');
+
+      expect(columns.map((c) => c.name)).toEqual(['payload', 'payload.http.status']);
+    });
+
+    it('shares one fetch between concurrent and later requests for the same table', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = mockQueries(ds);
+
+      await Promise.all([
+        ds.getEditorColumnsCached('db_name', 'table_name'),
+        ds.getEditorColumnsCached('db_name', 'table_name'),
+      ]);
+      await ds.getEditorColumnsCached('db_name', 'table_name');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(2);
+    });
+
+    it('fetches each table once', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spyOnQuery = mockQueries(ds);
+
+      await ds.getEditorColumnsCached('db_name', 'table_name');
+      await ds.getEditorColumnsCached('db_name', 'other_table');
+
+      expect(spyOnQuery).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -2176,6 +2361,111 @@ describe('ClickHouseDatasource', () => {
         });
         expect(result).toBeDefined();
         expect(result?.rawSql).not.toContain('LIKE');
+      });
+
+      const withinTimeRange = (hint: ColumnHint): Filter => ({
+        type: 'datetime',
+        operator: FilterOperator.WithInGrafanaTimeRange,
+        filterType: 'custom',
+        key: '',
+        hint,
+        condition: 'AND',
+      });
+
+      it.each([
+        {
+          name: 'a FilterTime filter falling back to the Time column',
+          columns: [{ name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."created_at"',
+        },
+        {
+          name: 'a Time filter falling back to the FilterTime column',
+          columns: [{ name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime }],
+          filterHint: ColumnHint.Time,
+          filteredColumn: '"default"."logs"."created_date"',
+        },
+        {
+          name: 'a FilterTime filter with both time columns',
+          columns: [
+            { name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime },
+            { name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          ],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."created_date"',
+        },
+        {
+          name: 'a Time filter with both time columns',
+          columns: [
+            { name: 'created_date', type: 'DateTime', hint: ColumnHint.FilterTime },
+            { name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time },
+          ],
+          filterHint: ColumnHint.Time,
+          filteredColumn: '"default"."logs"."created_at"',
+        },
+        {
+          name: 'a time column that shares the bucket alias name',
+          columns: [{ name: 'time', type: 'DateTime64(3)', hint: ColumnHint.Time }],
+          filterHint: ColumnHint.FilterTime,
+          filteredColumn: '"default"."logs"."time"',
+        },
+      ])(
+        'should filter the time range on the raw column, not the bucket, for $name',
+        ({ columns, filterHint, filteredColumn }) => {
+          const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+            ...query,
+            builderOptions: { ...query.builderOptions, columns, filters: [withinTimeRange(filterHint)] },
+          });
+
+          expect(result?.rawSql).toContain(
+            `WHERE ( ${filteredColumn} >= $__fromTime AND ${filteredColumn} <= $__toTime ) GROUP BY time`
+          );
+          expect(result?.rawSql).not.toContain('time >= $__fromTime');
+        }
+      );
+
+      it('should take the time range filter type from the time column, as the logs query does', () => {
+        const result = datasource.getSupplementaryLogsVolumeQuery(request, {
+          ...query,
+          builderOptions: {
+            ...query.builderOptions,
+            columns: [{ name: 'created_at', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+            filters: [{ ...withinTimeRange(ColumnHint.Time), type: '' } as Filter],
+          },
+        });
+
+        expect(result?.rawSql).toContain(
+          'WHERE ( "default"."logs"."created_at" >= $__fromTime AND "default"."logs"."created_at" <= $__toTime ) GROUP BY time'
+        );
+      });
+
+      it('should filter the time range on the raw column when the min interval bucket is longer than the range', () => {
+        const actualLogs = jest.requireActual<typeof logs>('./logs');
+        const from = dateTime('2024-03-15T10:02:30Z');
+        const to = dateTime('2024-03-15T10:17:30Z');
+        let rawSql: string | undefined;
+        jest.mocked(logs.getIntervalInfo).withImplementation(actualLogs.getIntervalInfo, () =>
+          jest.mocked(logs.getTimeFieldRoundingClause).withImplementation(actualLogs.getTimeFieldRoundingClause, () => {
+            rawSql = datasource.getSupplementaryRequest(SupplementaryQueryType.LogsVolume, {
+              ...request,
+              range: { from, to, raw: { from, to } },
+              scopedVars: { __interval_ms: { text: '1000', value: 1000 } },
+              targets: [
+                {
+                  ...query,
+                  minInterval: '1h',
+                  builderOptions: { ...query.builderOptions, filters: [withinTimeRange(ColumnHint.FilterTime)] },
+                },
+              ],
+            })?.targets[0]?.rawSql;
+          })
+        );
+
+        expect(rawSql).toContain('toStartOfInterval(toDateTime("created_at"), INTERVAL 1 HOUR) as "time"');
+        expect(rawSql).toContain(
+          'WHERE ( "default"."logs"."created_at" >= $__fromTime AND "default"."logs"."created_at" <= $__toTime ) GROUP BY time'
+        );
+        expect(rawSql).not.toContain('time >= $__fromTime');
       });
     });
 
@@ -3172,13 +3462,19 @@ describe('ClickHouseDatasource', () => {
         );
       });
 
-      it('returns "Fields" for an unprefixed key (a folded top-level column)', () => {
-        // foldDiscoveredLogFieldsIntoLabels merges selected top-level columns into `labels` under
-        // their plain, unprefixed names. The backend only emits prefixed attribute keys, so an
-        // unprefixed key is always a folded column and groups under a "Fields" section.
-        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBe('Fields');
-        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBe('Fields');
-        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBe('Fields');
+      it('returns null for an unprefixed key (a folded top-level column)', () => {
+        expect(datasource.getLabelDisplayTypeFromFrame('ServiceName', undefined, null)).toBeNull();
+        expect(datasource.getLabelDisplayTypeFromFrame('service_name', undefined, null)).toBeNull();
+        expect(datasource.getLabelDisplayTypeFromFrame('SpanId', undefined, null)).toBeNull();
+      });
+
+      // Grafana >=12.4 log details show plain fields (level, other columns) only in the null group, or with no labels.
+      it.each([
+        ['a folded column next to OTel attributes', ['ResourceAttributes.service.name', 'ServiceName']],
+        ["a table's own labels map", ['pod', 'region']],
+      ])('leaves a null label group for %s', (_, labelKeys) => {
+        const groups = labelKeys.map((key) => datasource.getLabelDisplayTypeFromFrame(key, undefined, null));
+        expect(groups).toContain(null);
       });
     });
 
@@ -3333,6 +3629,82 @@ describe('ClickHouseDatasource', () => {
       await expect(ds.getLogRowContext(makeRow(), contextOptions, cloneDeep(baseQuery))).rejects.toThrow(
         /Syntax error/
       );
+    });
+
+    describe('context columns on attribute map columns', () => {
+      // Row whose LogAttributes field carries object values, as returned for
+      // both Map- and JSON-typed attribute columns.
+      const makeAttributesRow = (attributes: Record<string, unknown>) => {
+        const frame = toDataFrame({
+          fields: [
+            { name: 'timestamp', values: [1700000000000] },
+            { name: 'LogAttributes', type: FieldType.other, values: [attributes] },
+          ],
+        });
+        return { ...makeRow(), dataFrame: frame };
+      };
+
+      const setup = (contextColumn: string, attributesColumnType: string | undefined) => {
+        const ds = cloneDeep(mockDatasource);
+        ds.settings.jsonData.logs = { contextColumns: [contextColumn] };
+        const querySpy = jest.spyOn(ds, 'query').mockImplementation((_req) => of({ data: [toDataFrame([])] }));
+
+        const query = cloneDeep(baseQuery);
+        query.builderOptions.columns = [
+          ...(query.builderOptions.columns ?? []),
+          { name: 'LogAttributes', type: attributesColumnType },
+        ];
+
+        return { ds, querySpy, query };
+      };
+
+      const sentQuery = (querySpy: jest.SpyInstance): CHBuilderQuery => {
+        const request = querySpy.mock.calls[0][0] as DataQueryRequest<CHQuery>;
+        return request.targets[0] as CHBuilderQuery;
+      };
+
+      it('builds a JSON accessor filter when the attributes column is JSON-typed', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['host.name']", 'JSON');
+
+        await ds.getLogRowContext(makeAttributesRow({ 'host.name': 'web-01' }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.builderOptions.filters).toContainEqual(
+          expect.objectContaining({ key: 'LogAttributes', mapKey: 'host.name', type: 'JSON', value: 'web-01' })
+        );
+        expect(sent.rawSql).toContain("LogAttributes.`host`.`name`::Nullable(String) = 'web-01'");
+        expect(sent.rawSql).not.toContain("LogAttributes['host.name']");
+      });
+
+      it('does not throw when a JSON-typed attribute value is numeric', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['bytes']", 'JSON');
+
+        await ds.getLogRowContext(makeAttributesRow({ bytes: 42 }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.rawSql).toContain("LogAttributes.`bytes`::Nullable(String) = '42'");
+      });
+
+      it('keeps the raw subscript filter for Map-typed attribute columns', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['host']", 'Map(String, String)');
+
+        await ds.getLogRowContext(makeAttributesRow({ host: 'web' }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.builderOptions.filters).toContainEqual(
+          expect.objectContaining({ key: "LogAttributes['host']", value: 'web', type: 'string' })
+        );
+        expect(sent.rawSql).toContain("LogAttributes['host'] = 'web'");
+      });
+
+      it('does not throw on a numeric value when the attributes column type is unknown', async () => {
+        const { ds, querySpy, query } = setup("LogAttributes['bytes']", undefined);
+
+        await ds.getLogRowContext(makeAttributesRow({ bytes: 42 }), contextOptions, query);
+
+        const sent = sentQuery(querySpy);
+        expect(sent.rawSql).toContain("LogAttributes['bytes'] = 42");
+      });
     });
   });
 
@@ -3678,6 +4050,31 @@ describe('ClickHouseDatasource', () => {
       expect(datasource.queryHasFilter(queryWithLevel, { key: 'level', value: 'info' })).toBe(true);
     });
 
+    it('returns true for an editor-created filter that stores the real column type', () => {
+      // The compact FilterPopover and the classic FilterEditor store the real
+      // ClickHouse column type, not the 'string' sentinel the log-view toggles
+      // use, so the same column's filters must still be found.
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      expect(datasource.queryHasFilter(queryWithFilter, { key: 'SeverityText', value: 'Error' })).toBe(true);
+    });
+
     it('returns true for OTel map key match', () => {
       const queryWithMap: CHBuilderQuery = {
         ...query,
@@ -3997,6 +4394,66 @@ describe('ClickHouseDatasource', () => {
       expect(result.builderOptions.filters![0]).toMatchObject({
         operator: FilterOperator.NotEquals,
         value: 'error',
+      });
+    });
+
+    it('FILTER_FOR toggles off an editor-created filter that stores the real column type', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Error' },
+      }) as CHBuilderQuery;
+
+      expect(result.builderOptions.filters).toHaveLength(0);
+    });
+
+    it('FILTER_FOR replaces an editor-created Equals filter with a different value (no AND-ing)', () => {
+      const queryWithFilter: CHBuilderQuery = {
+        ...query,
+        builderOptions: {
+          ...query.builderOptions,
+          columns: [{ name: 'SeverityText', type: 'LowCardinality(String)' }],
+          filters: [
+            {
+              condition: 'AND',
+              key: 'SeverityText',
+              type: 'LowCardinality(String)',
+              filterType: 'custom',
+              operator: FilterOperator.Equals,
+              value: 'Error',
+            },
+          ],
+        },
+      };
+
+      const result = datasource.toggleQueryFilter(queryWithFilter, {
+        type: 'FILTER_FOR',
+        options: { key: 'SeverityText', value: 'Info' },
+      }) as CHBuilderQuery;
+
+      // Must NOT produce `SeverityText = 'Error' AND SeverityText = 'Info'` (zero rows).
+      expect(result.builderOptions.filters).toHaveLength(1);
+      expect(result.builderOptions.filters![0]).toMatchObject({
+        key: 'SeverityText',
+        operator: FilterOperator.Equals,
+        value: 'Info',
       });
     });
 

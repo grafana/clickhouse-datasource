@@ -572,7 +572,7 @@ describe('AdHocManager', () => {
   it('should apply ad hoc filter with . in column name', () => {
     const ahm = new AdHocFilter();
     const val = ahm.apply('SELECT stuff FROM foo', [
-      { key: 'TABLE.key.key2', operator: '=', value: 'val' },
+      { key: 'foo.key.key2', operator: '=', value: 'val' },
     ] as AdHocVariableFilter[]);
     expect(val).toEqual(`SELECT stuff FROM foo\nsettings additional_table_filters={'foo' : ' key.key2 = \\'val\\' '}`);
   });
@@ -746,6 +746,106 @@ describe('AdHocManager', () => {
       ] as AdHocVariableFilter[]);
       expect(val).toContain("ResourceAttributes.`a\\'b`::Nullable(String)");
       expect(val).not.toContain("`a'b`");
+    });
+  });
+  describe('table-qualified keys apply only to the named table (#2207)', () => {
+    const asnFilter = { key: 'web.client_asn', operator: '>', value: '0' } as AdHocVariableFilter;
+
+    it('leaves a query on another table unfiltered', () => {
+      const sql = 'SELECT country, sum(hits) FROM logs.web_by_useragent GROUP BY country';
+      expect(new AdHocFilter().apply(sql, [asnFilter])).toEqual(sql);
+    });
+
+    it('filters a database-qualified query on the named table', () => {
+      const val = new AdHocFilter().apply('SELECT * FROM logs.web', [asnFilter]);
+      expect(val).toEqual(
+        `SELECT * FROM logs.web\nsettings additional_table_filters={'logs.web' : ' client_asn > \\'0\\' '}`
+      );
+    });
+
+    it('keeps keys without a table prefix for every table', () => {
+      const val = new AdHocFilter().apply('SELECT * FROM logs.web_by_useragent', [
+        asnFilter,
+        { key: 'host', operator: '=', value: 'example.com' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toEqual(
+        `SELECT * FROM logs.web_by_useragent\nsettings additional_table_filters={'logs.web_by_useragent' : ' host = \\'example.com\\' '}`
+      );
+    });
+
+    it('matches the table name case-sensitively', () => {
+      const sql = 'SELECT * FROM Web';
+      expect(new AdHocFilter().apply(sql, [asnFilter])).toEqual(sql);
+    });
+
+    it('scopes a table-prefixed legacy Map key', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(new Set(['labels']));
+      const filter = { key: 'web.labels.region', operator: '=', value: 'eu' } as AdHocVariableFilter;
+      expect(ahm.apply('SELECT * FROM web_by_useragent', [filter])).toEqual('SELECT * FROM web_by_useragent');
+      expect(ahm.apply('SELECT * FROM web', [filter])).toContain("labels[\\'region\\'] = \\'eu\\'");
+    });
+
+    it('scopes a table-prefixed bracketed Map key', () => {
+      const filter = { key: "web.labels['region']", operator: '=', value: 'eu' } as AdHocVariableFilter;
+      expect(new AdHocFilter().apply('SELECT * FROM web_by_useragent', [filter])).toEqual(
+        'SELECT * FROM web_by_useragent'
+      );
+      expect(new AdHocFilter().apply('SELECT * FROM web', [filter])).toContain("labels[\\'region\\'] = \\'eu\\'");
+    });
+
+    it('scopes a table-prefixed minted JSON key', () => {
+      const filter = { key: 'web.ResourceAttributes.`k8s`', operator: '=', value: 'api' } as AdHocVariableFilter;
+      expect(new AdHocFilter().apply('SELECT * FROM web_by_useragent', [filter])).toEqual(
+        'SELECT * FROM web_by_useragent'
+      );
+      expect(new AdHocFilter().apply('SELECT * FROM web', [filter])).toContain(
+        "ResourceAttributes.`k8s`::Nullable(String) = \\'api\\'"
+      );
+    });
+
+    it('does not read a leading Map column as a table name', () => {
+      const val = new AdHocFilter().apply('SELECT * FROM web_by_useragent', [
+        { key: 'LogAttributes.level', operator: '=', value: 'error' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("LogAttributes[\\'level\\'] = \\'error\\'");
+    });
+
+    it('scopes against an explicit tag-source target', () => {
+      const other = new AdHocFilter();
+      other.setTargetTableFromQuery('SELECT * FROM logs.web_by_useragent');
+      expect(other.apply('SELECT * FROM logs.web_by_useragent', [asnFilter])).toEqual(
+        'SELECT * FROM logs.web_by_useragent'
+      );
+
+      const named = new AdHocFilter();
+      named.setTargetTableFromQuery('SELECT * FROM logs.web');
+      expect(named.apply('SELECT * FROM logs.web', [asnFilter])).toContain(
+        "additional_table_filters={'logs.web' : ' client_asn > \\'0\\' '}"
+      );
+    });
+
+    it('drops a scoped-out key in last position without leaving a dangling AND', () => {
+      const val = new AdHocFilter().apply('SELECT * FROM logs.web_by_useragent', [
+        { key: 'host', operator: '=', value: 'example.com' },
+        asnFilter,
+      ] as AdHocVariableFilter[]);
+      expect(val).toEqual(
+        `SELECT * FROM logs.web_by_useragent\nsettings additional_table_filters={'logs.web_by_useragent' : ' host = \\'example.com\\' '}`
+      );
+    });
+
+    it('applies every key when keys carry no table name', () => {
+      const val = new AdHocFilter().apply('SELECT * FROM web_by_useragent', [asnFilter], false, false);
+      expect(val).toContain("additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}");
+    });
+
+    it('buildFilterString scopes to the given target table', () => {
+      const ahm = new AdHocFilter();
+      const filters = [asnFilter, { key: 'host', operator: '=', value: 'x' }] as AdHocVariableFilter[];
+      expect(ahm.buildFilterString(filters, false, 'web_by_useragent')).toEqual(" host = \\'x\\' ");
+      expect(ahm.buildFilterString(filters, false, 'logs.web')).toEqual(" client_asn > \\'0\\' AND host = \\'x\\' ");
+      expect(ahm.buildFilterString(filters)).toEqual(" client_asn > \\'0\\' AND host = \\'x\\' ");
     });
   });
 });

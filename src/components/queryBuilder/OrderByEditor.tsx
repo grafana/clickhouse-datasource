@@ -31,7 +31,7 @@ const OrderByItem = (props: OrderByItemProps) => {
         className={styles.Common.inlineSelect}
         width={36}
         options={columnOptions}
-        onChange={(e) => updateOrderByItem(index, { ...orderByItem, name: e.value! })}
+        onChange={(e) => updateOrderByItem(index, { ...orderByItem, name: e.value!, default: undefined })}
         allowCustomValue
         menuPlacement={'bottom'}
       />
@@ -40,7 +40,7 @@ const OrderByItem = (props: OrderByItemProps) => {
         className={styles.Common.inlineSelect}
         width={12}
         options={sortOptions}
-        onChange={(e) => updateOrderByItem(index, { ...orderByItem, dir: e.value! })}
+        onChange={(e) => updateOrderByItem(index, { ...orderByItem, dir: e.value!, default: undefined })}
         menuPlacement={'bottom'}
       />
       <Button

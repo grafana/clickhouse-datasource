@@ -1,6 +1,6 @@
 {
   "name": "clickhouse-datasource",
-  "version": "4.22.1",
+  "version": "4.23.4",
   "description": "Clickhouse Datasource",
   "engines": {
     "node": ">=24",
@@ -30,7 +30,7 @@
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
     "@grafana/eslint-config": "8.2.0",
-    "@grafana/plugin-e2e": "3.11.0",
+    "@grafana/plugin-e2e": "3.12.0",
     "@grafana/sign-plugin": "3.3.3",
     "@grafana/tsconfig": "2.2.0",
     "@playwright/test": "1.61.1",
@@ -81,6 +81,8 @@
     "webpack-virtual-modules": "0.6.2"
   },
   "overrides": {
+    "basic-ftp": "6.2.1",
+    "moment": "2.31.0",
     "picomatch": "4.0.5",
     "react-router": "6.30.4"
   },

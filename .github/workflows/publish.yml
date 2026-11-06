@@ -42,6 +42,7 @@ jobs:
       attestations: write
       pull-requests: read
     with:
+      golangci-lint-version: '2.15.0'
       # On a release event these dispatch inputs are empty and the shared
       # workflow's docs job reads github.event.release instead. On dispatch, the
       # environment choice maps to publishing scopes (Cloud vs On Prem/universal),
