@@ -445,6 +445,9 @@ func containsClickHouseException(err error) bool {
 	if strings.Contains(errStr, "DB::Exception") {
 		return true
 	}
+	if strings.Contains(errStr, "failed to query server hello") {
+		return true
+	}
 
 	// Catch legacy ClickHouse HTTP error format.
 	// This is more general than the above and we attempt the DB::Exception catch first
