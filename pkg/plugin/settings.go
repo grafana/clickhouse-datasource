@@ -111,10 +111,18 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 
 	// Deprecated: Replaced with Host for v4. Deserializes "server" field for old v3 configs.
 	if jsonData["server"] != nil {
-		settings.Host = strings.TrimSpace(jsonData["server"].(string))
+		server, err := stringSetting(jsonData, "server")
+		if err != nil {
+			return settings, err
+		}
+		settings.Host = strings.TrimSpace(server)
 	}
 	if jsonData["host"] != nil {
-		settings.Host = strings.TrimSpace(jsonData["host"].(string))
+		host, err := stringSetting(jsonData, "host")
+		if err != nil {
+			return settings, err
+		}
+		settings.Host = strings.TrimSpace(host)
 	}
 
 	if jsonData["port"] != nil {
@@ -123,63 +131,37 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			if err != nil {
 				return settings, backend.DownstreamError(fmt.Errorf("could not parse port value: %w", err))
 			}
+		} else if port, ok := jsonData["port"].(float64); ok {
+			settings.Port = int64(port)
 		} else {
-			settings.Port = int64(jsonData["port"].(float64))
+			return settings, backend.DownstreamError(fmt.Errorf("could not parse port value: unexpected type %T", jsonData["port"]))
 		}
 	}
-	if jsonData["protocol"] != nil {
-		settings.Protocol = jsonData["protocol"].(string)
+	if settings.Protocol, err = stringSetting(jsonData, "protocol"); err != nil {
+		return settings, err
 	}
-	if jsonData["secure"] != nil {
-		if secure, ok := jsonData["secure"].(string); ok {
-			settings.Secure, err = strconv.ParseBool(secure)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse secure value: %w", err))
-			}
-		} else {
-			settings.Secure = jsonData["secure"].(bool)
-		}
+	if settings.Secure, err = boolSetting(jsonData, "secure"); err != nil {
+		return settings, err
 	}
-	if jsonData["path"] != nil {
-		settings.Path = jsonData["path"].(string)
+	if settings.Path, err = stringSetting(jsonData, "path"); err != nil {
+		return settings, err
 	}
 
-	if jsonData["tlsSkipVerify"] != nil {
-		if tlsSkipVerify, ok := jsonData["tlsSkipVerify"].(string); ok {
-			settings.InsecureSkipVerify, err = strconv.ParseBool(tlsSkipVerify)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsSkipVerify value: %w", err))
-			}
-		} else {
-			settings.InsecureSkipVerify = jsonData["tlsSkipVerify"].(bool)
-		}
+	if settings.InsecureSkipVerify, err = boolSetting(jsonData, "tlsSkipVerify"); err != nil {
+		return settings, err
 	}
-	if jsonData["tlsAuth"] != nil {
-		if tlsAuth, ok := jsonData["tlsAuth"].(string); ok {
-			settings.TlsClientAuth, err = strconv.ParseBool(tlsAuth)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsAuth value: %w", err))
-			}
-		} else {
-			settings.TlsClientAuth = jsonData["tlsAuth"].(bool)
-		}
+	if settings.TlsClientAuth, err = boolSetting(jsonData, "tlsAuth"); err != nil {
+		return settings, err
 	}
-	if jsonData["tlsAuthWithCACert"] != nil {
-		if tlsAuthWithCACert, ok := jsonData["tlsAuthWithCACert"].(string); ok {
-			settings.TlsAuthWithCACert, err = strconv.ParseBool(tlsAuthWithCACert)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse tlsAuthWithCACert value: %w", err))
-			}
-		} else {
-			settings.TlsAuthWithCACert = jsonData["tlsAuthWithCACert"].(bool)
-		}
+	if settings.TlsAuthWithCACert, err = boolSetting(jsonData, "tlsAuthWithCACert"); err != nil {
+		return settings, err
 	}
 
-	if jsonData["username"] != nil {
-		settings.Username = jsonData["username"].(string)
+	if settings.Username, err = stringSetting(jsonData, "username"); err != nil {
+		return settings, err
 	}
-	if jsonData["defaultDatabase"] != nil {
-		settings.DefaultDatabase = jsonData["defaultDatabase"].(string)
+	if settings.DefaultDatabase, err = stringSetting(jsonData, "defaultDatabase"); err != nil {
+		return settings, err
 	}
 
 	// Deprecated: Replaced with DialTimeout for v4. Deserializes "timeout" field for old v3 configs.
@@ -193,6 +175,17 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	if settings.QueryTimeout, err = intSetting(jsonData, "queryTimeout", 60); err != nil {
 		return settings, err
 	}
+	// A dial timeout of zero or less would expire the connect context before
+	// the first dial, failing every query with a confusing "cancelled before
+	// starting" error, so fall back to the default instead.
+	if settings.DialTimeout <= 0 {
+		settings.DialTimeout = 10
+	}
+	// Zero means "no timeout" for queries, but a negative value would cancel
+	// every query immediately.
+	if settings.QueryTimeout < 0 {
+		settings.QueryTimeout = 60
+	}
 	if settings.ConnMaxLifetime, err = intSetting(jsonData, "connMaxLifetime", 5); err != nil {
 		return settings, err
 	}
@@ -202,51 +195,19 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 	if settings.MaxOpenConns, err = intSetting(jsonData, "maxOpenConns", 50); err != nil {
 		return settings, err
 	}
-	if jsonData["customSettings"] != nil {
-		customSettingsRaw := jsonData["customSettings"].([]interface{})
-		customSettings := make([]CustomSetting, len(customSettingsRaw))
-
-		for i, raw := range customSettingsRaw {
-			rawMap := raw.(map[string]interface{})
-			customSettings[i] = CustomSetting{
-				Setting: rawMap["setting"].(string),
-				Value:   rawMap["value"].(string),
-			}
-		}
-
-		settings.CustomSettings = customSettings
+	if settings.CustomSettings, err = customSettingsSetting(jsonData); err != nil {
+		return settings, err
 	}
-	if jsonData["forwardGrafanaHeaders"] != nil {
-		if forwardGrafanaHeaders, ok := jsonData["forwardGrafanaHeaders"].(string); ok {
-			settings.ForwardGrafanaHeaders, err = strconv.ParseBool(forwardGrafanaHeaders)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse forwardGrafanaHeaders value: %w", err))
-			}
-		} else {
-			settings.ForwardGrafanaHeaders = jsonData["forwardGrafanaHeaders"].(bool)
-		}
+	if settings.ForwardGrafanaHeaders, err = boolSetting(jsonData, "forwardGrafanaHeaders"); err != nil {
+		return settings, err
 	}
 
-	if jsonData["oauthPassThru"] != nil {
-		if oauthPassThru, ok := jsonData["oauthPassThru"].(string); ok {
-			settings.OAuthPassThru, err = strconv.ParseBool(oauthPassThru)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThru value: %w", err))
-			}
-		} else {
-			settings.OAuthPassThru = jsonData["oauthPassThru"].(bool)
-		}
+	if settings.OAuthPassThru, err = boolSetting(jsonData, "oauthPassThru"); err != nil {
+		return settings, err
 	}
 
-	if jsonData["oauthPassThruAllowFallback"] != nil {
-		if allowFallback, ok := jsonData["oauthPassThruAllowFallback"].(string); ok {
-			settings.OAuthPassThruAllowFallback, err = strconv.ParseBool(allowFallback)
-			if err != nil {
-				return settings, backend.DownstreamError(fmt.Errorf("could not parse oauthPassThruAllowFallback value: %w", err))
-			}
-		} else {
-			settings.OAuthPassThruAllowFallback = jsonData["oauthPassThruAllowFallback"].(bool)
-		}
+	if settings.OAuthPassThruAllowFallback, err = boolSetting(jsonData, "oauthPassThruAllowFallback"); err != nil {
+		return settings, err
 	}
 
 	if jsonData["enableRowLimit"] != nil {
@@ -255,8 +216,10 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 			if err != nil {
 				backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "error", err)
 			}
+		} else if enableRowLimit, ok := jsonData["enableRowLimit"].(bool); ok {
+			settings.EnableRowLimit = enableRowLimit
 		} else {
-			settings.EnableRowLimit = jsonData["enableRowLimit"].(bool)
+			backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "type", fmt.Sprintf("%T", jsonData["enableRowLimit"]))
 		}
 	}
 
@@ -358,8 +321,7 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]string) map[string]string {
 	httpHeaders := make(map[string]string)
 
-	if jsonData["httpHeaders"] != nil {
-		httpHeadersRaw := jsonData["httpHeaders"].([]interface{})
+	if httpHeadersRaw, ok := jsonData["httpHeaders"].([]interface{}); ok {
 
 		for _, rawHeader := range httpHeadersRaw {
 			header, _ := rawHeader.(map[string]interface{})
@@ -380,6 +342,76 @@ func loadHttpHeaders(jsonData map[string]interface{}, secureJsonData map[string]
 	}
 
 	return httpHeaders
+}
+
+// stringSetting reads a string jsonData key and returns "" when the key is
+// absent. Any other JSON type is a downstream error rather than a panic, so a
+// hand-written provisioning file cannot crash the plugin.
+func stringSetting(jsonData map[string]interface{}, key string) (string, error) {
+	switch v := jsonData[key].(type) {
+	case nil:
+		return "", nil
+	case string:
+		return v, nil
+	default:
+		return "", backend.DownstreamError(fmt.Errorf("could not parse %s value: expected a string, got %T", key, v))
+	}
+}
+
+// boolSetting reads a jsonData key given as a JSON boolean or a boolean
+// string, and returns false when the key is absent.
+func boolSetting(jsonData map[string]interface{}, key string) (bool, error) {
+	switch v := jsonData[key].(type) {
+	case nil:
+		return false, nil
+	case bool:
+		return v, nil
+	case string:
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			return false, backend.DownstreamError(fmt.Errorf("could not parse %s value: %w", key, err))
+		}
+		return parsed, nil
+	default:
+		return false, backend.DownstreamError(fmt.Errorf("could not parse %s value: unexpected type %T", key, v))
+	}
+}
+
+// customSettingsSetting reads the customSettings list. Provisioning YAML
+// commonly writes numeric or boolean values unquoted (value: 4), so scalar
+// values are accepted and rendered as the string ClickHouse expects.
+func customSettingsSetting(jsonData map[string]interface{}) ([]CustomSetting, error) {
+	if jsonData["customSettings"] == nil {
+		return nil, nil
+	}
+	raw, ok := jsonData["customSettings"].([]interface{})
+	if !ok {
+		return nil, backend.DownstreamError(fmt.Errorf("could not parse customSettings value: expected a list, got %T", jsonData["customSettings"]))
+	}
+	customSettings := make([]CustomSetting, 0, len(raw))
+	for i, item := range raw {
+		itemMap, ok := item.(map[string]interface{})
+		if !ok {
+			return nil, backend.DownstreamError(fmt.Errorf("could not parse customSettings[%d]: expected an object, got %T", i, item))
+		}
+		name, ok := itemMap["setting"].(string)
+		if !ok || strings.TrimSpace(name) == "" {
+			return nil, backend.DownstreamError(fmt.Errorf("could not parse customSettings[%d]: setting must be a non-empty string", i))
+		}
+		var value string
+		switch v := itemMap["value"].(type) {
+		case string:
+			value = v
+		case float64:
+			value = strconv.FormatFloat(v, 'f', -1, 64)
+		case bool:
+			value = strconv.FormatBool(v)
+		default:
+			return nil, backend.DownstreamError(fmt.Errorf("could not parse customSettings[%d] (%s): value must be a string, number or boolean, got %T", i, name, v))
+		}
+		customSettings = append(customSettings, CustomSetting{Setting: name, Value: value})
+	}
+	return customSettings, nil
 }
 
 // intSetting reads a whole-number jsonData key, given as a JSON number or a

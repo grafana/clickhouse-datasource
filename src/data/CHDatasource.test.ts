@@ -194,6 +194,17 @@ describe('ClickHouseDatasource', () => {
 
       expect(spyOnReplace).toHaveBeenCalledWith('select $__interval', scoped, expect.any(Function));
     });
+    it('quotes and escapes each value of a multi-value variable', async () => {
+      const spyOnReplace = jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      const query = { rawSql: 'select $v', editorType: EditorType.SQL } as CHQuery;
+
+      createInstance({}).applyTemplateVariables(query, {});
+
+      const format = spyOnReplace.mock.calls[0][2] as unknown as (value: unknown) => string;
+      expect(format(['a', 'b'])).toBe(`'a','b'`);
+      expect(format([`it's`, 'C:\\temp', 3])).toBe(`'it\\'s','C:\\\\temp','3'`);
+      expect(format('single')).toBe('single');
+    });
     it('should handle $__conditionalAll and not replace', async () => {
       const query = { rawSql: '$__conditionalAll(foo, $fieldVal)', editorType: EditorType.SQL } as CHQuery;
       const vars = [{ current: { value: `'val1', 'val2'` }, name: 'fieldVal' }] as TypedVariableModel[];
@@ -749,6 +760,28 @@ describe('ClickHouseDatasource', () => {
       );
 
       expect(values).toEqual([{ text: 'foo' }]);
+    });
+
+    it('keeps applying ad-hoc filters to panel queries while a tag value lookup is pending', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+      const ds = cloneDeep(mockDatasource);
+      ds.settings.jsonData.defaultDatabase = undefined;
+      // The schema probe never answers, so getTagValues stays suspended.
+      jest.spyOn(ds, 'query').mockImplementation(() => new Subject<DataQueryResponse>());
+      const applySpy = jest.spyOn(ds.adHocFilter, 'apply').mockImplementation((sql) => `${sql} filtered`);
+
+      void ds.getTagValues({ key: 'foo.bar' });
+
+      const filters = [{ key: 'foo.bar', operator: '=', value: 'x' }];
+      const result = ds.applyTemplateVariables(
+        { rawSql: 'SELECT * FROM foo', editorType: EditorType.SQL, refId: 'A' } as CHQuery,
+        {},
+        filters
+      );
+
+      expect(applySpy).toHaveBeenCalledWith('SELECT * FROM foo', filters, false, true);
+      expect(result.rawSql).toBe('SELECT * FROM foo filtered');
     });
 
     it('should Fetch Tag Values from Query', async () => {
@@ -2966,6 +2999,54 @@ describe('ClickHouseDatasource', () => {
         // Resolved via the real name (LogAttributes) to JSON, so dot access, not the Map default.
         expect(filter.type).toBe('JSON');
         expect(result.rawSql).toContain('::Nullable(String)');
+      });
+    });
+
+    describe('values taken from query results', () => {
+      it('quotes a value that would otherwise be read as an expression', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'path', value: `GET /api (v2) can't` },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({ value: `'GET /api (v2) can\\'t'` });
+        expect(result.rawSql).toContain(`( path = 'GET /api (v2) can\\'t' )`);
+      });
+
+      it('keeps plain values as they are', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'level', value: 'info' },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters![0]).toMatchObject({ value: 'info' });
+      });
+
+      it('replaces a quoted Equals filter when filtering out the same value', () => {
+        const added = datasource.modifyQuery(query, {
+          type: 'ADD_FILTER',
+          options: { key: 'path', value: `a'b` },
+        } as any) as CHBuilderQuery;
+
+        const result = datasource.modifyQuery(added, {
+          type: 'ADD_FILTER_OUT',
+          options: { key: 'path', value: `a'b` },
+        } as any) as CHBuilderQuery;
+
+        expect(result.builderOptions.filters).toHaveLength(1);
+        expect(result.builderOptions.filters![0]).toMatchObject({
+          operator: FilterOperator.NotEquals,
+          value: `'a\\'b'`,
+        });
+      });
+
+      it('matches the selected text of a string filter literally', () => {
+        const result = datasource.modifyQuery(query, {
+          type: 'ADD_STRING_FILTER',
+          options: { key: 'body', value: `50%_it's` },
+        } as any) as CHBuilderQuery;
+
+        expect(result.rawSql).toContain(`ILIKE '%50\\\\%\\\\_it\\'s%'`);
       });
     });
 

@@ -580,3 +580,96 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 		}
 	}
 }
+
+func TestLoadSettingsNonPositiveTimeouts(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		description string
+		jsonData    string
+		wantDial    int
+		wantQuery   int
+	}{
+		{description: "zero dialTimeout uses the default", jsonData: `{"host": "test", "port": 9000, "dialTimeout": 0}`, wantDial: 10, wantQuery: 60},
+		{description: "negative dialTimeout uses the default", jsonData: `{"host": "test", "port": 9000, "dialTimeout": "-5"}`, wantDial: 10, wantQuery: 60},
+		{description: "zero queryTimeout is kept as no timeout", jsonData: `{"host": "test", "port": 9000, "queryTimeout": 0}`, wantDial: 10, wantQuery: 0},
+		{description: "negative queryTimeout uses the default", jsonData: `{"host": "test", "port": 9000, "queryTimeout": -1}`, wantDial: 10, wantQuery: 60},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			got, err := LoadSettings(ctx, backend.DataSourceInstanceSettings{
+				JSONData:                []byte(tc.jsonData),
+				DecryptedSecureJSONData: map[string]string{},
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantDial, got.DialTimeout)
+			assert.Equal(t, tc.wantQuery, got.QueryTimeout)
+		})
+	}
+}
+
+func TestLoadSettingsCustomSettingsScalarValues(t *testing.T) {
+	got, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+		JSONData: []byte(`{"host": "test", "port": 9000, "customSettings": [
+			{"setting": "max_threads", "value": 4},
+			{"setting": "max_memory_usage", "value": 10000000000},
+			{"setting": "use_query_cache", "value": true},
+			{"setting": "max_execution_time", "value": "30"}
+		]}`),
+		DecryptedSecureJSONData: map[string]string{},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, []CustomSetting{
+		{Setting: "max_threads", Value: "4"},
+		{Setting: "max_memory_usage", Value: "10000000000"},
+		{Setting: "use_query_cache", Value: "true"},
+		{Setting: "max_execution_time", Value: "30"},
+	}, got.CustomSettings)
+}
+
+// TestLoadSettingsWrongTypesDoNotPanic checks that a jsonData value of an
+// unexpected JSON type, as a hand-written provisioning file can produce, is a
+// downstream error instead of a panic.
+func TestLoadSettingsWrongTypesDoNotPanic(t *testing.T) {
+	tests := []struct {
+		description string
+		jsonData    string
+	}{
+		{description: "numeric host", jsonData: `{"host": 1, "port": 9000}`},
+		{description: "numeric legacy server", jsonData: `{"server": 1, "port": 9000}`},
+		{description: "boolean port", jsonData: `{"host": "test", "port": true}`},
+		{description: "numeric protocol", jsonData: `{"host": "test", "port": 9000, "protocol": 1}`},
+		{description: "numeric path", jsonData: `{"host": "test", "port": 9000, "path": 1}`},
+		{description: "numeric username", jsonData: `{"host": "test", "port": 9000, "username": 123}`},
+		{description: "numeric defaultDatabase", jsonData: `{"host": "test", "port": 9000, "defaultDatabase": 1}`},
+		{description: "numeric secure", jsonData: `{"host": "test", "port": 9000, "secure": 1}`},
+		{description: "numeric tlsSkipVerify", jsonData: `{"host": "test", "port": 9000, "tlsSkipVerify": 1}`},
+		{description: "numeric oauthPassThru", jsonData: `{"host": "test", "port": 9000, "oauthPassThru": 1}`},
+		{description: "customSettings is not a list", jsonData: `{"host": "test", "port": 9000, "customSettings": "max_threads=4"}`},
+		{description: "customSettings item is not an object", jsonData: `{"host": "test", "port": 9000, "customSettings": ["max_threads"]}`},
+		{description: "customSettings item has no setting", jsonData: `{"host": "test", "port": 9000, "customSettings": [{"value": "4"}]}`},
+		{description: "customSettings value is an object", jsonData: `{"host": "test", "port": 9000, "customSettings": [{"setting": "max_threads", "value": {}}]}`},
+	}
+	for _, tc := range tests {
+		t.Run(tc.description, func(t *testing.T) {
+			assert.NotPanics(t, func() {
+				_, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+					JSONData:                []byte(tc.jsonData),
+					DecryptedSecureJSONData: map[string]string{},
+				})
+				assert.Error(t, err)
+				assert.True(t, backend.IsDownstreamError(err))
+			})
+		})
+	}
+}
+
+func TestLoadSettingsHttpHeadersWrongTypeDoesNotPanic(t *testing.T) {
+	assert.NotPanics(t, func() {
+		got, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+			JSONData:                []byte(`{"host": "test", "port": 8123, "protocol": "http", "httpHeaders": "X-Foo: bar"}`),
+			DecryptedSecureJSONData: map[string]string{},
+		})
+		assert.NoError(t, err)
+		assert.Empty(t, got.HttpHeaders)
+	})
+}
