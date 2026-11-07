@@ -30,6 +30,7 @@ import {
   parseMetricLabelId,
   quoteString,
   resolveMetricTables,
+  usesGroupBy,
   usesSeriesAggregation,
 } from './metrics';
 
@@ -331,7 +332,13 @@ describe('generateMetricsQuery', () => {
     );
     expect(sql).toContain("argMax(CAST(BucketCounts, 'Array(Float64)'), TimeUnix) AS __last_b");
     expect(sql).toContain('lagInFrame(__last_b) OVER w AS __prev_b');
-    expect(sql).toContain('any(__point_bounds) AS __bounds');
+    // Buckets merge by upper bound, so series with different bounds add up correctly.
+    expect(sql).toContain(
+      'sumMap(arrayPushBack(__point_bounds, inf), arrayResize(arrayMap((x, i) -> x + (if(__is_delta OR'
+    );
+    expect(sql).toContain('arrayMap(x -> 1., arrayPushBack(__point_bounds, inf))) AS __merged');
+    expect(sql).toContain('tupleElement(__merged, 2) AS __counts');
+    expect(sql).toContain('arrayPopBack(tupleElement(__merged, 1)) AS __bounds');
     expect(sql).toContain('GROUP BY __time, __label_0, __series, __run');
     expect(sql).toContain('arrayFirstIndex(c -> c >= 0.5 * __total, __cum) AS __i0');
     expect(sql).toContain('arrayFirstIndex(c -> c >= 0.99 * __total, __cum) AS __i1');
@@ -339,6 +346,35 @@ describe('generateMetricsQuery', () => {
     expect(sql).toContain(`${histogramQuantileExpression(0.99, '__i1')} AS "p99"`);
     expect(sql).toContain('__label_0 AS "ServiceName"');
     expect(sql.endsWith('ORDER BY time ASC')).toBe(true);
+  });
+
+  it('builds histogram heatmaps with one row per bucket bound', () => {
+    const sql = generateSql(
+      options(metric({ type: MetricType.Histogram, fn: MetricFunction.Heatmap, groupBy: [service] }), {
+        table: 'otel_metrics_histogram',
+      })
+    );
+    // The group by does not apply: a heatmap shows one histogram of all series.
+    expect(sql).not.toContain('__label_0');
+    expect(sql).toContain("if(__i <= length(__bounds), toString(__bounds[__i]), '+Inf') AS le");
+    expect(sql).toContain('__count AS "http.server.request.duration"');
+    expect(sql).toContain('ARRAY JOIN __counts AS __count, arrayEnumerate(__counts) AS __i');
+    expect(sql.endsWith('ORDER BY time ASC, __i ASC')).toBe(true);
+  });
+
+  it('offers heatmaps for histograms only', () => {
+    expect(getMetricFunctions(MetricType.Histogram)).toContain(MetricFunction.Heatmap);
+    expect(getMetricFunctions(MetricType.ExponentialHistogram)).not.toContain(MetricFunction.Heatmap);
+    expect(usesSeriesAggregation(MetricType.Histogram, MetricFunction.Heatmap)).toBe(false);
+    expect(usesGroupBy(MetricFunction.Heatmap)).toBe(false);
+    expect(usesGroupBy(MetricFunction.Quantile)).toBe(true);
+    expect(
+      generateSql(
+        options(metric({ type: MetricType.ExponentialHistogram, fn: MetricFunction.Heatmap }), {
+          table: 'otel_metrics_exp_histogram',
+        })
+      )
+    ).toBe('');
   });
 
   it('reads summary quantiles per series', () => {

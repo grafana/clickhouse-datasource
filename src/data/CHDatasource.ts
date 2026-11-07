@@ -101,6 +101,7 @@ import {
   mapGrafanaFormatToQueryType,
   transformQueryResponseWithTraceAndLogLinks,
 } from './utils';
+import { transformMetricHeatmapFrames } from './metricsHeatmap';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -1857,6 +1858,7 @@ export class Datasource
         concatMap(async (res: DataQueryResponse) => {
           let transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
           transformed = foldDiscoveredLogFieldsIntoLabels(this, request, transformed);
+          transformed = transformMetricHeatmapFrames(request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }

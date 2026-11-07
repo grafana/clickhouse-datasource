@@ -295,6 +295,7 @@ export const getMetricFunctions = (type: MetricType, isMonotonic?: boolean): Met
         MetricFunction.Increase,
         MetricFunction.SumRate,
         MetricFunction.AvgValue,
+        MetricFunction.Heatmap,
       ];
     case MetricType.ExponentialHistogram:
       return [MetricFunction.Rate, MetricFunction.Increase, MetricFunction.SumRate, MetricFunction.AvgValue];
@@ -328,6 +329,10 @@ export const metricFunctionLabels: Record<MetricFunction, { label: string; descr
     label: 'Quantile',
     description: 'Quantiles of the observed values, for example p95 latency',
   },
+  [MetricFunction.Heatmap]: {
+    label: 'Heatmap',
+    description: 'Observations per bucket and interval, for the Heatmap panel',
+  },
 };
 
 /**
@@ -335,7 +340,12 @@ export const metricFunctionLabels: Record<MetricFunction, { label: string; descr
  * series instead, and the average value divides the summed sums by the summed counts.
  */
 export const usesSeriesAggregation = (type: MetricType, fn: MetricFunction): boolean =>
-  fn !== MetricFunction.AvgValue && !(fn === MetricFunction.Quantile && type === MetricType.Histogram);
+  fn !== MetricFunction.AvgValue &&
+  fn !== MetricFunction.Heatmap &&
+  !(fn === MetricFunction.Quantile && type === MetricType.Histogram);
+
+/** Whether series are grouped by labels. A heatmap shows one histogram: the buckets of all series. */
+export const usesGroupBy = (fn: MetricFunction): boolean => fn !== MetricFunction.Heatmap;
 
 /** The cross-series aggregation picked by default for a function. */
 export const getDefaultSeriesAggregation = (type: MetricType, fn: MetricFunction): MetricSeriesAggregation => {
@@ -589,8 +599,16 @@ const generateCounterQuery = (
   );
 };
 
-const generateHistogramQuantileQuery = (options: QueryBuilderOptions, metric: MetricQuery): string => {
-  const ctx = buildContext(options, metric, readFromBeforeRangeCondition);
+/**
+ * Bucket increases of a histogram per time bucket and group: `__counts` (one entry per bucket, the
+ * last one unbounded) and `__bounds` (the explicit bounds). Buckets of all series in a group add up,
+ * which is how histograms aggregate correctly.
+ *
+ * Buckets are matched by their upper bound, not their position, because series of one metric can
+ * use different bounds (an SDK's defaults next to a collector's own). The merged histogram has the
+ * bounds of all series; a bucket of a coarser series counts towards its own upper bound.
+ */
+const histogramBucketsQuery = (ctx: QueryContext, metric: MetricQuery): string => {
   const buckets = "CAST(BucketCounts, 'Array(Float64)')";
   const minus = (a: string, b: string) => `arrayMap((x, i) -> greatest(x - ${b}[i], 0.), ${a}, arrayEnumerate(${a}))`;
 
@@ -619,16 +637,30 @@ const generateHistogramQuantileQuery = (options: QueryBuilderOptions, metric: Me
     `if(__is_delta OR __prev_count IS NULL, arrayMap(x -> 0., __first_b), ` +
     `if(__first_count >= __prev_count AND length(__prev_b) = length(__first_b), ${minus('__first_b', '__prev_b')}, __first_b))`;
 
-  // Buckets of all series in a group add up, which is how histograms aggregate correctly.
-  const perGroup = `SELECT ${join([
+  const increases = `arrayMap((x, i) -> x + (${sincePrevious})[i], ${inRun}, arrayEnumerate(${inRun}))`;
+  // One count per bound and +Inf; arrayResize guards against a point whose counts and bounds
+  // disagree in length. The array of ones keeps buckets whose sum is 0, which sumMap would drop.
+  const bounds = 'arrayPushBack(__point_bounds, inf)';
+  const merged = `SELECT ${join([
     '__time',
     ...labelRefs(ctx),
-    `sumForEach(arrayMap((x, i) -> x + (${sincePrevious})[i], ${inRun}, arrayEnumerate(${inRun}))) AS __counts`,
-    'any(__point_bounds) AS __bounds',
+    `sumMap(${bounds}, arrayResize(${increases}, length(${bounds})), arrayMap(x -> 1., ${bounds})) AS __merged`,
   ])} FROM (${withPrevious}) WHERE __time >= ${timeBucketExpression(metric, '$__fromTime')} GROUP BY ${join([
     '__time',
     ...labelRefs(ctx),
   ])}`;
+
+  return `SELECT ${join([
+    '__time',
+    ...labelRefs(ctx),
+    'tupleElement(__merged, 2) AS __counts',
+    'arrayPopBack(tupleElement(__merged, 1)) AS __bounds',
+  ])} FROM (${merged})`;
+};
+
+const generateHistogramQuantileQuery = (options: QueryBuilderOptions, metric: MetricQuery): string => {
+  const ctx = buildContext(options, metric, readFromBeforeRangeCondition);
+  const perGroup = histogramBucketsQuery(ctx, metric);
 
   // Cumulative counts and the index of the bucket holding each quantile, named so the
   // interpolation below stays readable in the SQL editor.
@@ -650,6 +682,24 @@ const generateHistogramQuantileQuery = (options: QueryBuilderOptions, metric: Me
       (q, index) => `${histogramQuantileExpression(q, `__i${index}`)} AS ${escapeIdentifier(ctx.valueAliases[index])}`
     ),
   ])} FROM (${withIndexes}) ORDER BY time ASC`;
+};
+
+/** The label naming each bucket of a heatmap by its upper bound, as in Prometheus. */
+export const heatmapBucketLabel = 'le';
+
+/**
+ * A histogram heatmap: one row per time bucket and histogram bucket, with the bucket's upper bound
+ * (`+Inf` for the last one) as the `le` label and the observations in it as the value. The time
+ * series format turns it into one field per bucket, which `toHeatmapFrames` names by bound for
+ * the Heatmap panel.
+ */
+const generateHistogramHeatmapQuery = (options: QueryBuilderOptions, metric: MetricQuery): string => {
+  const ctx = buildContext(options, { ...metric, groupBy: [] }, readFromBeforeRangeCondition);
+  return `SELECT ${join([
+    '__time AS time',
+    `if(__i <= length(__bounds), toString(__bounds[__i]), '+Inf') AS ${heatmapBucketLabel}`,
+    `__count AS ${escapeIdentifier(ctx.valueAliases[0])}`,
+  ])} FROM (${histogramBucketsQuery(ctx, metric)}) ARRAY JOIN __counts AS __count, arrayEnumerate(__counts) AS __i ORDER BY time ASC, __i ASC`;
 };
 
 /**
@@ -716,6 +766,8 @@ export const generateMetricsQuery = (options: QueryBuilderOptions): string => {
 
   // Histograms, exponential histograms and summaries.
   switch (metric.fn) {
+    case MetricFunction.Heatmap:
+      return metric.type === MetricType.Histogram ? generateHistogramHeatmapQuery(options, metric) : '';
     case MetricFunction.Quantile:
       if (metric.type === MetricType.Histogram) {
         return generateHistogramQuantileQuery(options, metric);

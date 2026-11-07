@@ -47,14 +47,14 @@ Every query computes a value **per series per time bucket** first, then **aggreg
 per group. A series is `cityHash64(ResourceAttributes, ScopeName, ScopeAttributes, Attributes)`.
 This avoids the classic pitfall of summing every raw gauge sample in a bucket.
 
-| Type                     | Functions (default first)                         | Cross-series default |
-| ------------------------ | ------------------------------------------------- | -------------------- |
-| Gauge                    | avg, min, max, last                               | avg                  |
-| Sum, monotonic (counter) | rate, increase                                    | sum                  |
-| Sum, non-monotonic       | last, avg, min, max                               | sum                  |
-| Histogram                | quantile, rate, increase, sum rate, average value | merged buckets       |
-| Exponential histogram    | rate, increase, sum rate, average value           | sum                  |
-| Summary                  | quantile, rate, increase, sum rate, average value | avg                  |
+| Type                     | Functions (default first)                                  | Cross-series default |
+| ------------------------ | ---------------------------------------------------------- | -------------------- |
+| Gauge                    | avg, min, max, last                                        | avg                  |
+| Sum, monotonic (counter) | rate, increase                                             | sum                  |
+| Sum, non-monotonic       | last, avg, min, max                                        | sum                  |
+| Histogram                | quantile, rate, increase, sum rate, average value, heatmap | merged buckets       |
+| Exponential histogram    | rate, increase, sum rate, average value                    | sum                  |
+| Summary                  | quantile, rate, increase, sum rate, average value          | avg                  |
 
 - **Counters** use `lagInFrame` over each series to turn cumulative values into increases. A drop of
   the value (or of `Count` for histograms and summaries) is a counter reset, after which the new
@@ -62,8 +62,14 @@ This avoids the classic pitfall of summing every raw gauge sample in a bucket.
   increase. Rows are read from `max(interval, 10m)` before the range so the first bucket has a
   previous point.
 - **Histogram quantiles** compute per-series bucket increases, add the buckets of all series in a
-  group (`sumForEach`), and interpolate inside the bucket holding the quantile, like
-  `histogram_quantile`. Several quantiles produce one column each (`p50`, `p95`, `p99`).
+  group by upper bound (`sumMap`), and interpolate inside the bucket holding the quantile, like
+  `histogram_quantile`. Several quantiles produce one column each (`p50`, `p95`, `p99`). Matching
+  by bound, not position, matters because one metric can come with different bounds: in the test
+  data, `http.server.request.duration` from applications has 10 bounds and the Collector's own has 14. A bucket of the coarser series counts towards its own upper bound in the merged histogram.
+- **Histogram heatmaps** return the same merged bucket increases with one row per time bucket
+  and histogram bucket with the upper bound as the `le` label. The frontend turns the wide frame
+  into a `heatmap-rows` frame (fields named by bound, ordered by bound), which the Heatmap panel
+  draws as is. The group by doesn't apply, since a heatmap shows one histogram.
 - **Summary quantiles** read the reported quantile values; the picker lists the quantiles the
   metric actually reports.
 - **Average value** is `sum(Δ Sum) / sum(Δ Count)`, the correct mean across series.
@@ -93,12 +99,14 @@ generator, filter chips and "Open in SQL editor" behave as for logs and traces. 
 
 ### Verification of every function
 
-Every metric type x function x cross-series aggregation the editor offers (219 combinations, on
+Every metric type x function x cross-series aggregation the editor offers (222 combinations, on
 real host and Prometheus data plus generated data with restarts, delta temporality, up-down
 counters and varying gauges) was compared with an independent Python reference that reads the
 raw points and applies the definitions, at 1 s, 60 s and 300 s intervals: all match. The check
 found one bug, fixed since: summary quantiles reported as NaN (no observations) now count as
-missing instead of turning averages into NaN.
+missing instead of turning averages into NaN. A later run added the heatmaps and a quantile
+across series with different bucket bounds, which found that buckets were merged by position;
+they now merge by bound.
 
 ### Many instances
 
@@ -151,7 +159,7 @@ toStartOfHour(TimeUnix), ...`) and daily partitions: a metric reads only its own
 
 - Verify the generated SQL against a live ClickHouse with exporter data in CI (integration test).
 - Exponential histogram quantiles (needs scale alignment across series).
-- Heatmap output for histograms (bucket counts per interval).
+- Heatmaps for exponential histograms (same scale alignment as their quantiles).
 - Exemplars: link from points to traces via `Exemplars.TraceId`.
 - Ad hoc filters for metrics dashboards (map `key` to the three attribute maps).
 - Pre-aggregated rollup tables (for example per-minute materialized views) for ranges of weeks or

@@ -392,6 +392,7 @@ export enum MetricType {
  * - sum_rate: per-second increase of the Sum of a histogram or summary.
  * - avg_value: Sum / Count of a histogram or summary, for example the mean latency.
  * - quantile: quantiles from histogram buckets or summary quantile values.
+ * - heatmap: observations per histogram bucket and interval, for the Heatmap panel.
  */
 export enum MetricFunction {
   Avg = 'avg',
@@ -403,6 +404,7 @@ export enum MetricFunction {
   SumRate = 'sum_rate',
   AvgValue = 'avg_value',
   Quantile = 'quantile',
+  Heatmap = 'heatmap',
 }
 
 /** How the per-series values are combined into one value per group. */

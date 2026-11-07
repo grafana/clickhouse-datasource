@@ -32,6 +32,7 @@ import {
   metricFunctionLabels,
   metricTypeLabels,
   parseMetricLabelId,
+  usesGroupBy,
   usesSeriesAggregation,
 } from 'data/metrics';
 import { BuilderOptionsReducerAction, setAllOptions } from 'hooks/useBuilderOptionsState';
@@ -472,38 +473,40 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
               )}
             </div>
 
-            <div className={styles.section}>
-              {usesSeriesAggregation(metric.type, metric.fn) && (
-                <InlineField label="Aggregate" labelWidth={14}>
-                  <div data-testid={editorSelectors.aggregationPicker}>
-                    <RadioButtonGroup
-                      options={aggregationOptions}
-                      value={metric.aggregation}
-                      onChange={(aggregation) => updateMetric({ aggregation })}
+            {usesGroupBy(metric.fn) && (
+              <div className={styles.section}>
+                {usesSeriesAggregation(metric.type, metric.fn) && (
+                  <InlineField label="Aggregate" labelWidth={14}>
+                    <div data-testid={editorSelectors.aggregationPicker}>
+                      <RadioButtonGroup
+                        options={aggregationOptions}
+                        value={metric.aggregation}
+                        onChange={(aggregation) => updateMetric({ aggregation })}
+                      />
+                    </div>
+                  </InlineField>
+                )}
+                <InlineField
+                  label={usesSeriesAggregation(metric.type, metric.fn) ? 'by' : 'Group by'}
+                  labelWidth={usesSeriesAggregation(metric.type, metric.fn) ? undefined : 14}
+                  tooltip="One series per combination of these labels. Leave empty for a single series."
+                  grow
+                >
+                  <div data-testid={editorSelectors.groupByPicker}>
+                    <MultiCombobox
+                      aria-label="Group by"
+                      options={labelOptions}
+                      value={metric.groupBy.map(getMetricLabelId)}
+                      onChange={onGroupByChange}
+                      loading={labelKeys.loading}
+                      placeholder="Labels"
+                      width="auto"
+                      minWidth={30}
                     />
                   </div>
                 </InlineField>
-              )}
-              <InlineField
-                label={usesSeriesAggregation(metric.type, metric.fn) ? 'by' : 'Group by'}
-                labelWidth={usesSeriesAggregation(metric.type, metric.fn) ? undefined : 14}
-                tooltip="One series per combination of these labels. Leave empty for a single series."
-                grow
-              >
-                <div data-testid={editorSelectors.groupByPicker}>
-                  <MultiCombobox
-                    aria-label="Group by"
-                    options={labelOptions}
-                    value={metric.groupBy.map(getMetricLabelId)}
-                    onChange={onGroupByChange}
-                    loading={labelKeys.loading}
-                    placeholder="Labels"
-                    width="auto"
-                    minWidth={30}
-                  />
-                </div>
-              </InlineField>
-            </div>
+              </div>
+            )}
 
             <div className={styles.section}>
               <InlineField label="Filters" labelWidth={14}>

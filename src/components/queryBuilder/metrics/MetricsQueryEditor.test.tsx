@@ -159,6 +159,27 @@ describe('MetricsQueryEditor', () => {
     expect(screen.getByTestId(editorSelectors.groupByPicker)).toBeInTheDocument();
   });
 
+  it('hides aggregation and group by for a heatmap', async () => {
+    const options: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_metrics_histogram',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: 'http.server.duration',
+        type: MetricType.Histogram,
+        fn: MetricFunction.Heatmap,
+        aggregation: MetricSeriesAggregation.Sum,
+        groupBy: [],
+      },
+    };
+    const { datasource } = renderEditor(options);
+    await waitFor(() => expect(datasource.fetchMetricLabelKeys).toHaveBeenCalled());
+    expect(screen.queryByTestId(editorSelectors.quantilesPicker)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(editorSelectors.aggregationPicker)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(editorSelectors.groupByPicker)).not.toBeInTheDocument();
+    expect(screen.getByTestId(editorSelectors.addFilterButton)).toBeInTheDocument();
+  });
+
   it('opens the label filter editor', async () => {
     const options: QueryBuilderOptions = {
       database: 'otel',
