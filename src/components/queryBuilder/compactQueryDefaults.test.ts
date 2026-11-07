@@ -3,9 +3,11 @@ import {
   appendAdditionalLogColumns,
   buildCompactQueryDefaults,
   convertCarriedOverQuery,
+  getCompactQueryType,
   getSingleTableLocation,
   isCompactQueryTypeMismatch,
   isDefaultCompactQuery,
+  isMetricsEditorQuery,
   isQueryFromOtherSingleTableSource,
   isSameQueryOptions,
   shouldBuildCompactQueryDefaults,
@@ -22,6 +24,9 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  MetricFunction,
+  MetricSeriesAggregation,
+  MetricType,
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
@@ -607,5 +612,42 @@ describe('appendAdditionalLogColumns', () => {
       // method is already present; the map key dedupes against its base ResourceAttributes column
       expect(columns.map((c) => c.name)).toEqual(['method', 'ResourceAttributes']);
     });
+  });
+});
+
+describe('metrics signal', () => {
+  const metricsDatasource = {
+    getDefaultMetricsDatabase: () => 'otel',
+  } as unknown as Datasource;
+
+  it('builds an empty time series metrics query', () => {
+    const defaults = buildCompactQueryDefaults(metricsDatasource, 'metrics');
+    expect(defaults).toEqual({
+      database: 'otel',
+      table: '',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: '',
+        type: MetricType.Gauge,
+        fn: MetricFunction.Avg,
+        aggregation: MetricSeriesAggregation.Avg,
+        groupBy: [],
+      },
+      filters: [],
+    });
+    expect(getSingleTableLocation(metricsDatasource, 'metrics')).toEqual({ database: 'otel', table: '' });
+    expect(getCompactQueryType('metrics')).toBe(QueryType.TimeSeries);
+  });
+
+  it('shows new and metrics queries in the metrics editor and keeps authored classic queries', () => {
+    expect(isMetricsEditorQuery(defaultOptions)).toBe(true);
+    expect(isMetricsEditorQuery(buildCompactQueryDefaults(metricsDatasource, 'metrics'))).toBe(true);
+    expect(isMetricsEditorQuery(authoredTimeSeriesOptions)).toBe(false);
+  });
+
+  it('never treats metrics queries as carried over logs or traces queries', () => {
+    const query = { ...buildCompactQueryDefaults(metricsDatasource, 'metrics'), meta: { datasourceUid: 'other' } };
+    const datasource = { ...metricsDatasource, uid: 'this' } as unknown as Datasource;
+    expect(isQueryFromOtherSingleTableSource(query, datasource, 'metrics')).toBe(false);
   });
 });

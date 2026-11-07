@@ -8,6 +8,10 @@ interface FilterTagBarProps {
   filters: Filter[];
   selectedColumns?: readonly SelectedColumn[];
   onRemoveFilter: (index: number) => void;
+  /** Shows the "Filters:" label in front of the chips. Off where the surrounding field is labelled already. */
+  showLabel?: boolean;
+  /** Overrides how a filter's column is named in its chip. */
+  getDisplayName?: (filter: Filter) => string;
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
@@ -122,7 +126,7 @@ const getOperatorDisplay = (operator: FilterOperator): string => {
 };
 
 export const FilterTagBar = (props: FilterTagBarProps) => {
-  const { filters, selectedColumns, onRemoveFilter } = props;
+  const { filters, selectedColumns, onRemoveFilter, showLabel = true, getDisplayName } = props;
   const styles = useStyles2(getStyles);
 
   const activeFilters = filters.filter(
@@ -138,7 +142,7 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
 
   return (
     <div className={styles.bar} data-testid="filter-tag-bar">
-      <span className={styles.label}>Filters:</span>
+      {showLabel && <span className={styles.label}>Filters:</span>}
       {filters.map((filter, index) => {
         if (filter.operator === FilterOperator.IsAnything && !filter.key) {
           return null;
@@ -150,7 +154,7 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
           return null;
         }
 
-        const name = getFilterDisplayName(filter, selectedColumns);
+        const name = getDisplayName?.(filter) ?? getFilterDisplayName(filter, selectedColumns);
         const operator = getOperatorDisplay(filter.operator);
         const value = getFilterDisplayValue(filter);
 

@@ -9,7 +9,7 @@ import {
   StringFilter,
   TableColumn,
 } from 'types/queryBuilder';
-import { CoreApp } from '@grafana/data';
+import { CoreApp, TimeRange } from '@grafana/data';
 import { LogsQueryBuilder } from './views/LogsQueryBuilder';
 import { TimeSeriesQueryBuilder } from './views/TimeSeriesQueryBuilder';
 import { TableQueryBuilder } from './views/TableQueryBuilder';
@@ -38,6 +38,7 @@ import {
   buildCompactQueryDefaults,
   convertCarriedOverQuery,
   isCompactQueryTypeMismatch,
+  isMetricsEditorQuery,
   isSameQueryOptions,
   shouldBuildCompactQueryDefaults,
   shouldConvertCarriedOverQuery,
@@ -52,6 +53,7 @@ import { CompactModeBar, getDefaultCompactMode } from './CompactModeBar';
 import { CompactFilterBar } from './CompactFilterBar';
 import { CompactAdvanced } from './CompactAdvanced';
 import { MinIntervalEditor } from 'components/MinIntervalEditor';
+import { MetricsQueryEditor } from './metrics/MetricsQueryEditor';
 
 interface QueryBuilderProps {
   app: CoreApp | undefined;
@@ -60,6 +62,7 @@ interface QueryBuilderProps {
   datasource: Datasource;
   generatedSql: string;
   minInterval?: string;
+  range?: TimeRange;
   onQueryChange?: (builderOptions: QueryBuilderOptions) => void;
   onEditAsSql?: (builderOptions: QueryBuilderOptions) => void;
   onMinIntervalChange?: (minInterval: string) => void;
@@ -74,6 +77,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     builderOptionsDispatch,
     generatedSql,
     minInterval,
+    range,
     onQueryChange,
     onEditAsSql,
     onMinIntervalChange,
@@ -125,7 +129,30 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
     );
   }
 
-  if (singleTableMode && signalType) {
+  // Metrics use their own editor: a metric picker over all metric tables instead of one table's
+  // columns. Classic queries authored before the switch to the metrics signal stay in the classic
+  // builder, like logs and traces queries do. A metrics query always opens in the metrics editor,
+  // also on a data source in classic mode (carried over in Explore, or after a mode change), since
+  // the classic builder cannot edit what its SQL does.
+  const isMetricsSource = singleTableMode && signalType === 'metrics';
+  if (builderOptions.metric || (isMetricsSource && isMetricsEditorQuery(builderOptions))) {
+    return (
+      <MetricsQueryEditor
+        datasource={datasource}
+        builderOptions={builderOptions}
+        builderOptionsDispatch={builderOptionsDispatch}
+        generatedSql={generatedSql}
+        range={range}
+        minInterval={minInterval}
+        onQueryChange={onQueryChange}
+        onEditAsSql={onEditAsSql}
+        onMinIntervalChange={onMinIntervalChange}
+        onRunQuery={onRunQuery}
+      />
+    );
+  }
+
+  if (singleTableMode && signalType && signalType !== 'metrics') {
     // Switching data sources in Explore keeps the query when both use this plugin, so a query
     // built for another data source lands here. Explore queries are not saved, so convert it
     // for this data source instead of showing it in the classic builder.

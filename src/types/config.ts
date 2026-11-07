@@ -1,8 +1,8 @@
 import { DataSourceJsonData, KeyValue } from '@grafana/data';
-import otel, { defaultLogsTable, defaultTraceTable } from 'otel';
+import otel, { defaultLogsTable, defaultMetricsTables, defaultTraceTable } from 'otel';
 import { TimeUnit } from './queryBuilder';
 
-export type SignalType = 'logs' | 'traces';
+export type SignalType = 'logs' | 'traces' | 'metrics';
 
 /**
  * Configuration mode controls the datasource UI layout:
@@ -42,6 +42,7 @@ export interface CHConfig extends DataSourceJsonData {
 
   logs?: CHLogsConfig;
   traces?: CHTracesConfig;
+  metrics?: CHMetricsConfig;
 
   aliasTables?: AliasTableEntry[];
 
@@ -169,6 +170,21 @@ export interface CHTracesConfig {
   traceTimestampTableSuffix?: string;
 }
 
+/**
+ * Settings for OTel metrics, stored the way the opentelemetry-collector-contrib ClickHouse
+ * exporter writes them: one table per data point type. The table names mirror the exporter's
+ * `metrics_tables` option, so a non-default exporter setup is configured by copying its names.
+ */
+export interface CHMetricsConfig {
+  defaultDatabase?: string;
+
+  gaugeTable?: string;
+  sumTable?: string;
+  histogramTable?: string;
+  exponentialHistogramTable?: string;
+  summaryTable?: string;
+}
+
 export interface AliasTableEntry {
   targetDatabase: string;
   targetTable: string;
@@ -192,5 +208,8 @@ export const defaultCHAdditionalSettingsConfig: Partial<CHConfig> = {
     defaultTable: defaultTraceTable,
     otelVersion: otel.getLatestVersion().version,
     durationUnit: TimeUnit.Nanoseconds,
+  },
+  metrics: {
+    ...defaultMetricsTables,
   },
 };

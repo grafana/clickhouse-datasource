@@ -61,6 +61,35 @@ Filter operators are tailored to the selected field type. Numeric fields offer c
 
 The compact editor also includes a generated SQL preview. Use **Copy** to copy the generated query, or **Open in SQL editor** to switch to the SQL editor for manual customization.
 
+### Metrics query mode
+
+When a data source is configured in **Single source** mode for **Metrics**, the query builder works like a metrics browser for the OpenTelemetry ClickHouse exporter tables. You never pick a table: the metric decides which table is read.
+
+1. **Metric**: search all metrics with data in the dashboard time range. Each entry shows its type (gauge, counter, up-down counter, histogram, exponential histogram, summary), unit, and description.
+1. **Function**: what to compute for each series and time interval. The options depend on the metric type, and the most common one is preselected:
+
+   | Metric type             | Functions                                                    | Default  |
+   | ----------------------- | ------------------------------------------------------------ | -------- |
+   | Gauge                   | Average, Min, Max, Last                                      | Average  |
+   | Counter (monotonic sum) | Rate (per second), Increase (per interval)                   | Rate     |
+   | Up-down counter         | Last, Average, Min, Max                                      | Last     |
+   | Histogram               | Quantile, Rate, Increase, Sum rate, Average value            | Quantile |
+   | Exponential histogram   | Rate, Increase, Sum rate, Average value                      | Rate     |
+   | Summary                 | Quantile (reported quantiles), Rate, Increase, Sum rate, Average value | Quantile |
+
+   Rates and increases handle counter resets and both cumulative and delta temporality. Histogram quantiles merge the bucket counts of all series in a group and interpolate within the bucket, like PromQL's `histogram_quantile`. Select several quantiles to get one value per quantile, for example `p50`, `p95`, and `p99`.
+
+1. **Aggregate … by**: how the series of each group are combined (`sum`, `avg`, `min`, `max`, `count`), and which labels form the groups. Labels are listed from the metric's data point attributes, resource attributes (such as `service.name` or `k8s.pod.name`), and scope attributes, plus the `ServiceName` and `ScopeName` columns. Leave the labels empty for a single series.
+1. **Filters**: narrow the series by label, with value suggestions for the selected metric. Dashboard variables are offered as values too; see [Metrics variables](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#metrics-variables).
+
+Like PromQL, values are computed per series first (a series is one combination of resource, scope, and data point attributes) and then aggregated per group, so a gauge reported every 10 seconds is not counted several times when summed across pods. Rates divide each increase by the time it actually covers, so they stay correct at any zoom level.
+
+When you pick a metric, the editor detects how often it's exported and never uses time buckets shorter than twice that interval (shown below the legend), so every instance has a point in each bucket and sums across instances don't jump. The generated SQL shows this as `greatest($__interval_s, <seconds>)`.
+
+OpenTelemetry requires every instance to have a unique identity, usually `service.instance.id`. When several instances send a metric with identical resource attributes, their points mix in one series and rates and averages become wrong. The editor detects this and shows a warning with the number of affected series. Fix it at the source, for example with the Collector's `k8sattributes` or `resourcedetection` processor.
+
+Use **Open in SQL editor** to start from the generated SQL.
+
 ## Build queries
 
 You can build queries using the **SQL editor** (raw SQL) or the **Query builder**. Queries can include macros for dynamic parts such as time range filters.

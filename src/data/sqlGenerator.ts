@@ -15,13 +15,16 @@ import {
 } from 'types/queryBuilder';
 import otel from 'otel';
 import { buildJSONPathAccess } from './jsonPath';
+import { generateMetricsQuery } from './metrics';
 
 /**
  * Generates a SQL string for the given QueryBuilderOptions
  */
 export const generateSql = (options: QueryBuilderOptions): string => {
   const hasTraceIdFilter = options.meta?.isTraceIdMode && options.meta?.traceId;
-  if (options.queryType === QueryType.Traces && hasTraceIdFilter) {
+  if (options.queryType === QueryType.TimeSeries && options.metric) {
+    return generateMetricsQuery(options);
+  } else if (options.queryType === QueryType.Traces && hasTraceIdFilter) {
     return generateTraceIdQuery(options);
   } else if (options.queryType === QueryType.Traces) {
     return generateTraceSearchQuery(options);
@@ -716,6 +719,12 @@ export const getTableIdentifier = (database: string, table: string): string => {
   return `${escapeIdentifier(database)}${sep}${escapeIdentifier(table)}`;
 };
 
+/**
+ * Escapes a string for a single-quoted ClickHouse string literal: backslash and single quote are
+ * the only characters that need escaping.
+ */
+export const escapeCHStringLiteral = (s: string): string => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
 export const escapeIdentifier = (id: string): string => {
   return id ? `"${id.replace(/"/g, '""')}"` : '';
 };
@@ -865,7 +874,7 @@ const getLimit = (limit?: number | undefined): string => {
 /**
  * Returns the filters in the WHERE clause, excluding the "WHERE" keyword
  */
-const getFilters = (options: QueryBuilderOptions): string => {
+export const getFilters = (options: QueryBuilderOptions): string => {
   const filters = options.filters || [];
   const builtFilters: string[] = [];
 
