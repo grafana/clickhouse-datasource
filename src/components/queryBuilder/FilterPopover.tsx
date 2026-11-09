@@ -3,7 +3,7 @@ import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
 import { Button, Combobox, ComboboxOption, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
-import { Filter, FilterOperator, NumberFilter, StringFilter, TableColumn } from 'types/queryBuilder';
+import { Filter, FilterOperator, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import { getFilterOperatorOptions } from './filterOperatorOptions';
 import * as utils from './utils';
 
@@ -12,7 +12,9 @@ interface FilterPopoverProps {
   database: string;
   table: string;
   allColumns: readonly TableColumn[];
+  selectedColumns?: readonly SelectedColumn[];
   onAddFilter: (filter: Filter) => void;
+  filter?: Filter;
   onClose: () => void;
 }
 
@@ -105,14 +107,24 @@ const getStyles = (theme: GrafanaTheme2) => ({
 });
 
 export const FilterPopover = (props: FilterPopoverProps) => {
-  const { datasource, database, table, allColumns, onAddFilter, onClose } = props;
+  const { datasource, database, table, allColumns, selectedColumns, onAddFilter, filter, onClose } = props;
   const styles = useStyles2(getStyles);
 
-  const [selectedColumn, setSelectedColumn] = useState('');
-  const [selectedMapKey, setSelectedMapKey] = useState('');
-  const [operator, setOperator] = useState<FilterOperator>(FilterOperator.Equals);
-  const [value, setValue] = useState('');
+  const hintedColumn = filter?.hint ? selectedColumns?.find((column) => column.hint === filter.hint)?.name : undefined;
+  const filterValue = filter && 'value' in filter ? filter.value : undefined;
+  const [selectedColumn, setSelectedColumn] = useState(filter?.key || hintedColumn || '');
+  const filterMapKey = filter && 'mapKey' in filter ? filter.mapKey : undefined;
+  const [selectedMapKey, setSelectedMapKey] = useState(filterMapKey || '');
+  const [operator, setOperator] = useState<FilterOperator>(filter?.operator || FilterOperator.Equals);
+  const [value, setValue] = useState(filterValue !== undefined ? String(filterValue) : '');
   const [mapKeys, setMapKeys] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedColumn(filter?.key || hintedColumn || '');
+    setSelectedMapKey(filterMapKey || '');
+    setOperator(filter?.operator || FilterOperator.Equals);
+    setValue(filterValue !== undefined ? String(filterValue) : '');
+  }, [filter, filter?.key, filter?.operator, filterMapKey, filterValue, hintedColumn]);
 
   const selectedColDef = allColumns.find((column) => column.name === selectedColumn);
   const isMapColumn = selectedColDef?.type?.startsWith('Map(') || false;
@@ -186,18 +198,59 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       ...(isKeyedColumn && selectedMapKey ? { mapKey: selectedMapKey } : {}),
     };
 
-    const filter: StringFilter | NumberFilter =
-      filterKind === 'number'
-        ? ({
-            ...commonFilter,
-            value: noValueNeeded ? 0 : numericValue,
-          } as NumberFilter)
-        : ({
-            ...commonFilter,
-            value: noValueNeeded ? '' : value,
-          } as StringFilter);
+    const isMultiOperator = operator === FilterOperator.In || operator === FilterOperator.NotIn;
+    const builtValue = isMultiOperator
+      ? value
+          .split(',')
+          .map((item) => item.trim())
+          .filter(Boolean)
+      : noValueNeeded
+        ? filterKind === 'number'
+          ? 0
+          : ''
+        : filterKind === 'number'
+          ? numericValue
+          : value;
 
-    onAddFilter(filter as Filter);
+    const builtFilter = {
+      ...commonFilter,
+      value: builtValue,
+    } as Filter;
+
+    if (!filter) {
+      onAddFilter(builtFilter);
+      onClose();
+      return;
+    }
+
+    // Only overwrite what the user changed so fields the popover does not manage
+    // (condition, hint, multi-value arrays, etc.) survive an edit.
+    const originalValue = 'value' in filter ? filter.value : undefined;
+    const originalRawInput = 'rawInput' in filter ? filter.rawInput : undefined;
+    const columnUnchanged = selectedColumn === (filter.key || hintedColumn);
+    const valueUnchanged =
+      originalValue !== undefined &&
+      String(originalValue) === value &&
+      Array.isArray(originalValue) === isMultiOperator;
+    const keepsOriginalValueAndColumn = columnUnchanged && valueUnchanged;
+    // `rawInput` is the duration editor's text for a specific value and column, so a
+    // stale one would show the old duration and restore the old value on blur.
+    const rawInputIsStale = originalRawInput !== undefined && !keepsOriginalValueAndColumn;
+
+    const updatedFilter = {
+      ...filter,
+      ...builtFilter,
+      // The popover has no condition control and a changed column must not inherit the old hint.
+      condition: filter.condition,
+      ...(columnUnchanged ? { key: filter.key, hint: filter.hint } : { hint: undefined }),
+      ...(valueUnchanged ? { value: originalValue } : {}),
+      // A key from a Map/JSON column is rendered as a suffix of the chip label, so a
+      // filter moved to a scalar column must not keep it.
+      ...(!columnUnchanged && !isKeyedColumn && 'mapKey' in filter ? { mapKey: undefined } : {}),
+      ...(rawInputIsStale ? { rawInput: undefined } : {}),
+    } as Filter;
+
+    onAddFilter(updatedFilter);
     onClose();
   };
 
@@ -276,7 +329,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
           onClick={handleAdd}
           disabled={!selectedColumn || isNumberValueInvalid || (isKeyedColumn && !selectedMapKey)}
         >
-          Add
+          {filter ? 'Update' : 'Add'}
         </Button>
         <Button size="sm" variant="secondary" onClick={onClose}>
           Cancel
