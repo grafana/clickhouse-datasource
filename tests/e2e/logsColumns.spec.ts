@@ -1,6 +1,7 @@
 import { expect, test, ExplorePage } from '@grafana/plugin-e2e';
 import { Page } from '@playwright/test';
 import { createTestDataSources, deleteTestDataSources, TestDataSource } from './helpers/datasources';
+import { DATASOURCE_UID } from './helpers/env';
 
 // E2E guard for the logs "Columns" datasource setting (HDX-5008).
 //
@@ -58,6 +59,8 @@ interface LogsColumnsCase {
   // in the expanded row (the compact editor shows no column list), never as a
   // log-line value, so it is safe to locate by exact text.
   additionalColumn: string;
+  // Level of the newest fixture row, which Explore lists first.
+  newestRowLevel: string;
 }
 
 const CASES: LogsColumnsCase[] = [
@@ -71,6 +74,7 @@ const CASES: LogsColumnsCase[] = [
     levelColumn: 'level',
     messageColumn: 'message',
     additionalColumn: 'service',
+    newestRowLevel: 'error',
   },
   {
     title: 'OTel logs table (e2e_test.otel_logs_v151)',
@@ -80,6 +84,7 @@ const CASES: LogsColumnsCase[] = [
     otelEnabled: true,
     otelVersion: 'latest',
     additionalColumn: 'ServiceName',
+    newestRowLevel: 'INFO',
   },
 ];
 
@@ -113,13 +118,14 @@ function caseDataSource(c: LogsColumnsCase): TestDataSource {
   };
 }
 
-function exploreUrl(datasourceUid: string): string {
+function exploreUrl(datasourceUid: string, logsSql = ''): string {
   const query = {
     refId: 'A',
     datasource: { type: PLUGIN_TYPE, uid: datasourceUid },
     editorType: 'sql',
     pluginVersion: '',
-    rawSql: '',
+    rawSql: logsSql,
+    ...(logsSql ? { queryType: 'logs', format: 2 } : {}),
   };
   const panes = JSON.stringify({
     explore: {
@@ -229,6 +235,15 @@ function filterForButtonForField(page: Page, fieldName: string) {
     .first();
 }
 
+// The value beside a field name in the expanded row, for both the <tr> and <div> panel DOMs.
+function detailsFieldValue(page: Page, fieldName: string, value: string) {
+  return page
+    .getByText(fieldName, { exact: true })
+    .locator('xpath=following-sibling::*[1]')
+    .getByText(value, { exact: true })
+    .first();
+}
+
 async function waitForNextQueryRequestBody(page: Page): Promise<any> {
   const requestPromise = page.waitForRequest((r) => r.url().includes('/api/ds/query') && r.method() === 'POST');
   const responsePromise = page.waitForResponse(
@@ -291,6 +306,7 @@ test.describe('Logs Columns datasource setting (HDX-5008)', () => {
       // a browsable/filterable detail field.
       await openFirstLogRowDetails(page);
       await expect(page.getByText(c.additionalColumn, { exact: true }).first()).toBeVisible();
+      await expect(detailsFieldValue(page, 'level', c.newestRowLevel)).toBeVisible();
 
       // Filter-for on the folded field must regenerate the builder query with a
       // WHERE on the real column name. The fold folds under the real name (not
@@ -305,4 +321,30 @@ test.describe('Logs Columns datasource setting (HDX-5008)', () => {
       expect(String(q?.rawSql ?? '')).toMatch(new RegExp(`${c.additionalColumn}\\s*=\\s*'`));
     });
   }
+});
+
+test.describe('Log details for a labels map', () => {
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Depends on the local e2e_test.events fixture (tests/e2e/fixtures/seed.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
+  test('shows the level and plain columns next to a Map aliased AS labels', async ({ page, explorePage }) => {
+    const { responsePromise, getBody } = await waitForQueryDataResponseWithBody(explorePage);
+    await page.goto(
+      exploreUrl(
+        DATASOURCE_UID,
+        "SELECT timestamp, message, level, service, map('region', 'eu') AS labels FROM e2e_test.events ORDER BY timestamp DESC"
+      )
+    );
+    await responsePromise;
+    expect(rowCount(getBody())).toBeGreaterThan(0);
+
+    await openFirstLogRowDetails(page);
+    await expect(detailsFieldValue(page, 'region', 'eu')).toBeVisible();
+    await expect(detailsFieldValue(page, 'level', 'error')).toBeVisible();
+    await expect(detailsFieldValue(page, 'service', 'db')).toBeVisible();
+  });
 });

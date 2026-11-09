@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getCompactFilterColumns, QueryBuilder } from './QueryBuilder';
 import { getDefaultCompactMode } from './CompactModeBar';
 import { Datasource } from 'data/CHDatasource';
@@ -13,7 +13,7 @@ import {
   QueryType,
   TimeUnit,
 } from 'types/queryBuilder';
-import { setColumnByHint, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { setColumnByHint, setTable, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
 import { defaultCHBuilderQuery } from 'types/sql';
 import { CoreApp } from '@grafana/data';
 import { selectors } from 'selectors';
@@ -67,6 +67,73 @@ describe('QueryBuilder', () => {
     return Promise.resolve([]);
   });
   mockDs.getColumnsCached = jest.fn(() => Promise.resolve([]));
+
+  describe('query type change', () => {
+    const tableQuery: QueryBuilderOptions = {
+      database: 'db',
+      table: 'events',
+      queryType: QueryType.Table,
+      mode: BuilderMode.List,
+      columns: [{ name: 'message' }],
+      filters: [],
+      orderBy: [],
+      limit: 100,
+      meta: {},
+    };
+    const eventsColumns = [
+      { name: 'timestamp', type: 'DateTime', picklistValues: [] },
+      { name: 'message', type: 'String', picklistValues: [] },
+      { name: 'level', type: 'String', picklistValues: [] },
+    ];
+
+    const Harness = () => {
+      const [builderOptions, builderOptionsDispatch] = useBuilderOptionsState(tableQuery);
+      return (
+        <>
+          <QueryBuilder
+            app={CoreApp.PanelEditor}
+            builderOptions={builderOptions}
+            builderOptionsDispatch={builderOptionsDispatch}
+            datasource={mockDs}
+            generatedSql=""
+          />
+          <button onClick={() => builderOptionsDispatch(setTable('other'))}>switch table</button>
+          <pre data-testid="state">{JSON.stringify(builderOptions)}</pre>
+        </>
+      );
+    };
+    const state = (): QueryBuilderOptions => JSON.parse(screen.getByTestId('state').textContent || '{}');
+
+    it('keeps the query and fills its missing roles from the table columns', async () => {
+      (mockDs.getColumnsCached as jest.Mock).mockImplementationOnce(() => Promise.resolve(eventsColumns));
+      render(<Harness />);
+
+      fireEvent.click(screen.getByLabelText('Logs'));
+
+      expect(mockDs.getColumnsCached).toHaveBeenCalledWith('db', 'events');
+      await waitFor(() =>
+        expect(state().columns).toEqual([
+          { name: 'timestamp', type: 'DateTime', hint: ColumnHint.Time },
+          { name: 'message', type: 'String', hint: ColumnHint.LogMessage },
+          { name: 'level', type: 'String', hint: ColumnHint.LogLevel },
+        ])
+      );
+      expect(state()).toMatchObject({ queryType: QueryType.Logs, database: 'db', table: 'events', limit: 100 });
+    });
+
+    it('drops roles guessed from a table the query left while they loaded', async () => {
+      let resolve: (columns: typeof eventsColumns) => void = () => {};
+      (mockDs.getColumnsCached as jest.Mock).mockImplementationOnce(() => new Promise((r) => (resolve = r)));
+      render(<Harness />);
+
+      fireEvent.click(screen.getByLabelText('Logs'));
+      fireEvent.click(screen.getByText('switch table'));
+      await act(async () => resolve(eventsColumns));
+
+      expect(state().table).toBe('other');
+      expect(state().columns?.some((c) => c.hint !== undefined)).toBe(false);
+    });
+  });
 
   it('omits compact time columns from filter column options', () => {
     const filterColumns = getCompactFilterColumns(

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"testing"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
@@ -55,6 +56,11 @@ func TestCategorizeConnectionError(t *testing.T) {
 		{
 			name:     "deadline exceeded in error string",
 			err:      errors.New("operation timed out: deadline exceeded"),
+			expected: ConnectionErrorCategoryTimeout,
+		},
+		{
+			name:     "net.OpError dial socket deadline",
+			err:      &net.OpError{Op: "dial", Net: "tcp", Err: os.ErrDeadlineExceeded},
 			expected: ConnectionErrorCategoryTimeout,
 		},
 		{

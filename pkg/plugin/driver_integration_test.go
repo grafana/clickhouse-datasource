@@ -27,6 +27,7 @@ import (
 	"github.com/elazarl/goproxy"
 	"github.com/grafana/clickhouse-datasource/pkg/converters"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
+	sdkconfig "github.com/grafana/grafana-plugin-sdk-go/config"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/grafana/grafana-plugin-sdk-go/data/sqlutil"
 	"github.com/shopspring/decimal"
@@ -200,6 +201,48 @@ func TestHTTPConnect(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: secure}
 		_, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
 		assert.Equal(t, nil, err)
+	})
+}
+
+func TestHTTPQueryResponseFormat(t *testing.T) {
+	port := getEnv("CLICKHOUSE_HTTP_PORT", "8123")
+	host := getEnv("CLICKHOUSE_HOST", "localhost")
+	username := getEnv("CLICKHOUSE_USERNAME", "default")
+	password := getEnv("CLICKHOUSE_PASSWORD", "")
+	ssl := getEnv("CLICKHOUSE_SSL", "false")
+	clickhouse := Clickhouse{}
+	ctx := sdkconfig.WithGrafanaConfig(context.Background(), sdkconfig.NewGrafanaCfg(map[string]string{
+		"GF_SQL_ROW_LIMIT":                         "1000000",
+		"GF_SQL_MAX_OPEN_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_IDLE_CONNS_DEFAULT":            "10",
+		"GF_SQL_MAX_CONN_LIFETIME_SECONDS_DEFAULT": "60",
+	}))
+	settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{ "server": "%s", "port": %s, "username": "%s", "secure": %s, "protocol": "http" }`, host, port, username, ssl)), DecryptedSecureJSONData: map[string]string{"password": password}}
+	db, err := clickhouse.Connect(ctx, settings, json.RawMessage{})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Close() })
+
+	for _, query := range []string{"SELECT 1", "SELECT 1 FORMAT native", "SELECT 1 FORMAT Null"} {
+		t.Run(query, func(t *testing.T) {
+			rows, err := db.QueryContext(ctx, query)
+			require.NoError(t, err)
+			for rows.Next() {
+			}
+			require.NoError(t, rows.Err())
+			require.NoError(t, rows.Close())
+		})
+	}
+
+	t.Run("SELECT 1 FORMAT JSON", func(t *testing.T) {
+		_, err := db.QueryContext(ctx, "SELECT 1 FORMAT JSON")
+		require.Error(t, err)
+		got := clickhouse.MutateQueryError(err)
+		assert.Equal(t, backend.ErrorSourceDownstream, got.ErrorSource())
+		assert.Contains(t, got.Error(), "the JSON format")
+
+		var one uint8
+		require.NoError(t, db.QueryRowContext(ctx, "SELECT 1").Scan(&one))
+		assert.Equal(t, uint8(1), one)
 	})
 }
 
