@@ -323,7 +323,7 @@ test.describe('Config editor', () => {
       createDataSourceConfigPage,
       page,
     }) => {
-      const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await fillConnectionDetails(page, isV2);
       await setMaxOpenConnections(page, isV2, '1.5');
@@ -332,7 +332,7 @@ test.describe('Config editor', () => {
     });
 
     test('a whole Max Open Connections value passes the health check', async ({ createDataSourceConfigPage, page }) => {
-      const configPage = await createDataSourceConfigPage({ type: PLUGIN_UID });
+      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await fillConnectionDetails(page, isV2);
       await setMaxOpenConnections(page, isV2, '1');
