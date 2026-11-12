@@ -40,15 +40,23 @@ async function fillConnectionDetails(page: Page, isV2: boolean) {
   await page.getByPlaceholder(isV2 ? 'Enter server port' : '9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
   await page.getByPlaceholder(isV2 ? 'Enter username' : 'default').fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
   await page.getByPlaceholder(isV2 ? 'Enter password' : 'password').fill(process.env.DS_INSTANCE_PASSWORD ?? '');
+  if (process.env.DS_PDC_NETWORK_NAME) {
+    await configurePDC(page, process.env.DS_PDC_NETWORK_NAME);
+  }
 }
 
-async function setMaxOpenConnections(page: Page, isV2: boolean, value: string) {
+async function expandAdditionalSettings(page: Page, isV2: boolean) {
   const toggle = isV2
     ? page.locator('#additional').getByRole('button', { name: /Additional settings/ })
     : page.getByRole('button', { name: 'Expand section Additional settings' });
   await toggle.click();
-  await page.getByLabel('Max Open Connections').fill(value);
 }
+
+const POOL_SETTINGS = [
+  { label: 'Max Open Connections', key: 'maxOpenConns' },
+  { label: 'Max Idle Connections', key: 'maxIdleConns' },
+  { label: 'Connection Max Lifetime (minutes)', key: 'connMaxLifetime' },
+];
 
 test.describe('Config editor', () => {
   test.describe('rendering', () => {
@@ -198,17 +206,7 @@ test.describe('Config editor', () => {
 
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
-      await page.getByPlaceholder(isV2 ? 'Enter server address' : 'Server address').fill(resolveClickhouseUrl());
-      await page.getByPlaceholder(isV2 ? 'Enter server port' : '9000').fill(process.env.DS_INSTANCE_PORT ?? '9000');
-      await page
-        .getByPlaceholder(isV2 ? 'Enter username' : 'default')
-        .fill(process.env.DS_INSTANCE_USERNAME ?? 'default');
-      await page.getByPlaceholder(isV2 ? 'Enter password' : 'password').fill(process.env.DS_INSTANCE_PASSWORD ?? '');
-
-      if (process.env.DS_PDC_NETWORK_NAME) {
-        await configurePDC(page, process.env.DS_PDC_NETWORK_NAME);
-      }
-
+      await fillConnectionDetails(page, isV2);
       await configPage.saveAndTest();
       await expect(configPage).toHaveAlert('success', { hasNotText: 'Datasource updated' });
     });
@@ -319,23 +317,29 @@ test.describe('Config editor', () => {
       'Ad-hoc save & test connectivity is not reliable on the shared Cloud instance; covered by local/PR CI.'
     );
 
-    test('a decimal Max Open Connections value fails the health check naming the key', async ({
-      createDataSourceConfigPage,
-      page,
-    }) => {
-      const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
-      const isV2 = await isV2Editor(page);
-      await fillConnectionDetails(page, isV2);
-      await setMaxOpenConnections(page, isV2, '1.5');
-      await expect(configPage.saveAndTest()).not.toBeOK();
-      await expect(configPage).toHaveAlert('error', { hasText: 'could not parse maxOpenConns value' });
-    });
+    for (const { label, key } of POOL_SETTINGS) {
+      test(`a decimal ${label} value fails the health check naming ${key}`, async ({
+        createDataSourceConfigPage,
+        page,
+      }) => {
+        const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
+        const isV2 = await isV2Editor(page);
+        await fillConnectionDetails(page, isV2);
+        await expandAdditionalSettings(page, isV2);
+        await page.getByLabel(label).fill('1.5');
+        await expect(configPage.saveAndTest()).not.toBeOK();
+        await expect(configPage).toHaveAlert('error', { hasText: `could not parse ${key} value` });
+      });
+    }
 
-    test('a whole Max Open Connections value passes the health check', async ({ createDataSourceConfigPage, page }) => {
+    test('whole pool setting values pass the health check', async ({ createDataSourceConfigPage, page }) => {
       const configPage = await createDataSourceConfigPage({ type: PLUGIN_TYPE });
       const isV2 = await isV2Editor(page);
       await fillConnectionDetails(page, isV2);
-      await setMaxOpenConnections(page, isV2, '1');
+      await expandAdditionalSettings(page, isV2);
+      for (const { label } of POOL_SETTINGS) {
+        await page.getByLabel(label).fill('1');
+      }
       await configPage.saveAndTest();
       await expect(configPage).toHaveAlert('success', { hasNotText: 'Datasource updated' });
     });
