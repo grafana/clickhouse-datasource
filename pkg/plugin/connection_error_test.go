@@ -183,6 +183,11 @@ func TestCategorizeConnectionError(t *testing.T) {
 			expected: ConnectionErrorCategoryNetwork,
 		},
 		{
+			name:     "handshake EOF",
+			err:      errors.New("handshake: failed to read packet from 00.000.00.000:9440 (conn_id=0000, auth_db=usage): read: EOF"),
+			expected: ConnectionErrorCategoryNetwork,
+		},
+		{
 			name:     "HTTP 502",
 			err:      errors.New("clickhouse [HTTP 502]: Bad Gateway"),
 			expected: ConnectionErrorCategoryNetwork,
