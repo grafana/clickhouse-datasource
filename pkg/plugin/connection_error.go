@@ -210,7 +210,11 @@ func IsNetworkError(err error) (bool, backend.ErrorSource) {
 	case strings.Contains(errStr, "connection refused"),
 		strings.Contains(errStr, "no such host"),
 		strings.Contains(errStr, "connection reset by peer"),
-		strings.Contains(errStr, "network is unreachable"):
+		strings.Contains(errStr, "network is unreachable"),
+		// The server closed the connection during the native protocol handshake
+		// (e.g. wrong secure/port setting, firewall or allowlist, server restart
+		// or connection limits). A bare EOF is intentionally not matched.
+		strings.Contains(errStr, "handshake: failed to read packet") && strings.HasSuffix(errStr, "EOF"):
 		return true, backend.ErrorSourceDownstream
 	}
 
