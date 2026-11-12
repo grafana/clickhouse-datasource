@@ -448,6 +448,16 @@ func TestMutateQueryError(t *testing.T) {
 			wantSource: backend.ErrorSourceDownstream,
 		},
 		{
+			name:       "handshake EOF is downstream",
+			err:        fmt.Errorf("%w: handshake: failed to read packet from 00.000.00.000:9440 (conn_id=0000, auth_db=usage): read: EOF", sqlds.ErrorQuery),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "bare EOF uses default source",
+			err:        errors.New("read: EOF"),
+			wantSource: backend.DefaultErrorSource,
+		},
+		{
 			name:       "unknown error uses default source",
 			err:        errors.New("something went very wrong"),
 			wantSource: backend.DefaultErrorSource,
