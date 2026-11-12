@@ -210,17 +210,8 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		return settings, err
 	}
 
-	if jsonData["enableRowLimit"] != nil {
-		if enableRowLimitString, ok := jsonData["enableRowLimit"].(string); ok {
-			settings.EnableRowLimit, err = strconv.ParseBool(enableRowLimitString)
-			if err != nil {
-				backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "error", err)
-			}
-		} else if enableRowLimit, ok := jsonData["enableRowLimit"].(bool); ok {
-			settings.EnableRowLimit = enableRowLimit
-		} else {
-			backend.Logger.Warn("Failed to parse enableRowLimit value, defaulting to false", "type", fmt.Sprintf("%T", jsonData["enableRowLimit"]))
-		}
+	if settings.EnableRowLimit, err = boolSetting(jsonData, "enableRowLimit"); err != nil {
+		return settings, err
 	}
 
 	// Default schema cache on; surface both as booleans and strings to stay

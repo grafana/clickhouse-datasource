@@ -644,6 +644,8 @@ func TestLoadSettingsWrongTypesDoNotPanic(t *testing.T) {
 		{description: "numeric secure", jsonData: `{"host": "test", "port": 9000, "secure": 1}`},
 		{description: "numeric tlsSkipVerify", jsonData: `{"host": "test", "port": 9000, "tlsSkipVerify": 1}`},
 		{description: "numeric oauthPassThru", jsonData: `{"host": "test", "port": 9000, "oauthPassThru": 1}`},
+		{description: "numeric enableRowLimit", jsonData: `{"host": "test", "port": 9000, "enableRowLimit": 1}`},
+		{description: "non-boolean enableRowLimit string", jsonData: `{"host": "test", "port": 9000, "enableRowLimit": "yes"}`},
 		{description: "customSettings is not a list", jsonData: `{"host": "test", "port": 9000, "customSettings": "max_threads=4"}`},
 		{description: "customSettings item is not an object", jsonData: `{"host": "test", "port": 9000, "customSettings": ["max_threads"]}`},
 		{description: "customSettings item has no setting", jsonData: `{"host": "test", "port": 9000, "customSettings": [{"value": "4"}]}`},
