@@ -8,6 +8,7 @@ import {
   QueryType,
   SelectedColumn,
   TableColumn,
+  TableKeys,
 } from 'types/queryBuilder';
 import { SignalType } from 'types/config';
 import { isBuilderOptionsRunnable } from 'data/utils';
@@ -253,25 +254,31 @@ export const shouldBuildCompactQueryDefaults = (
   return isCompactQueryTypeMismatch(builderOptions, signalType) && !isBuilderOptionsRunnable(builderOptions);
 };
 
+/** True when the compact logs defaults detect the OTel schema from the table's columns and keys. */
+export const detectsOtelLogsSchema = (datasource: Datasource): boolean =>
+  otel.getVersion(datasource.getLogsOtelVersion())?.version === 'latest';
+
 export function buildCompactQueryDefaults(
   datasource: Datasource,
   signalType: SignalType,
   fallbackTable = '',
-  allColumns: readonly TableColumn[] = []
+  allColumns: readonly TableColumn[] = [],
+  tableKeys?: TableKeys
 ): QueryBuilderOptions {
   return signalType === 'logs'
-    ? buildCompactLogsDefaults(datasource, fallbackTable, allColumns)
+    ? buildCompactLogsDefaults(datasource, fallbackTable, allColumns, tableKeys)
     : buildCompactTracesDefaults(datasource, fallbackTable);
 }
 
 const buildCompactLogsDefaults = (
   datasource: Datasource,
   fallbackTable: string,
-  allColumns: readonly TableColumn[]
+  allColumns: readonly TableColumn[],
+  tableKeys: TableKeys | undefined
 ): QueryBuilderOptions => {
   const location = getSingleTableLocation(datasource, 'logs');
   const otelVersion = datasource.getLogsOtelVersion();
-  const columns = getLogsDefaultColumns(datasource, allColumns);
+  const columns = getLogsDefaultColumns(datasource, allColumns, tableKeys);
 
   return {
     database: location.database,
@@ -321,21 +328,26 @@ const buildCompactTracesDefaults = (datasource: Datasource, fallbackTable: strin
 // map from the datasource remains the fallback.
 const getLogsDefaultColumnMap = (
   datasource: Datasource,
-  tableColumnNames: readonly string[]
+  tableColumnNames: readonly string[],
+  tableKeys: TableKeys | undefined
 ): Map<ColumnHint, string> => {
-  const otelConfig = otel.getVersion(datasource.getLogsOtelVersion());
-  if (otelConfig?.version === 'latest' && tableColumnNames.length > 0) {
-    return otel.detectLogsVersion(tableColumnNames).logColumnMap;
+  if (detectsOtelLogsSchema(datasource) && tableColumnNames.length > 0) {
+    return otel.detectLogsVersion(tableColumnNames, tableKeys).logColumnMap;
   }
 
   return datasource.getDefaultLogsColumns();
 };
 
-const getLogsDefaultColumns = (datasource: Datasource, allColumns: readonly TableColumn[]): SelectedColumn[] => {
+const getLogsDefaultColumns = (
+  datasource: Datasource,
+  allColumns: readonly TableColumn[],
+  tableKeys: TableKeys | undefined
+): SelectedColumn[] => {
   const nextColumns = getDefaultColumns(
     getLogsDefaultColumnMap(
       datasource,
-      allColumns.map((column) => column.name)
+      allColumns.map((column) => column.name),
+      tableKeys
     )
   );
   const includedColumns = new Set(nextColumns.map((c) => c.name));
