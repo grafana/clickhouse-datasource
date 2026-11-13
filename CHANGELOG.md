@@ -1,5 +1,41 @@
 # Changelog
 
+## [4.23.5](https://github.com/grafana/clickhouse-datasource/compare/v4.23.4...v4.23.5) (2026-11-10)
+
+
+### 🐛 Bug Fixes
+
+* **deps:** update backend dependencies ([#2252](https://github.com/grafana/clickhouse-datasource/issues/2252)) ([c34f59d](https://github.com/grafana/clickhouse-datasource/commit/c34f59db1929aacacdc9e9dd44605a428360b203))
+* **deps:** update golang.org/x/crypto to fix GO-2026-5932 ([#2274](https://github.com/grafana/clickhouse-datasource/issues/2274)) ([2cbde29](https://github.com/grafana/clickhouse-datasource/commit/2cbde2993673a3548878e82f003fd6330bb7cee6))
+* **error type:** 'failed to query server hello' as downstream error ([#2269](https://github.com/grafana/clickhouse-datasource/issues/2269)) ([753c0e9](https://github.com/grafana/clickhouse-datasource/commit/753c0e93d3ee1509737a92621c72ac92dea78de0))
+* gRPC deadlock that freezes the plugin connection under load ([#2265](https://github.com/grafana/clickhouse-datasource/issues/2265)) ([7bea76e](https://github.com/grafana/clickhouse-datasource/commit/7bea76e5e04daab3d6af29fcb3ac4c6cfe854eb0))
+* **security/medium/:** update dependency glob to v14 [security] ([2b137ed](https://github.com/grafana/clickhouse-datasource/commit/2b137eda59a15fba46834409114d89d9a74251c1))
+* **security/medium/:** update dependency glob to v14 [security] - abandoned ([#2268](https://github.com/grafana/clickhouse-datasource/issues/2268)) ([2b137ed](https://github.com/grafana/clickhouse-datasource/commit/2b137eda59a15fba46834409114d89d9a74251c1))
+
+## [4.23.4](https://github.com/grafana/clickhouse-datasource/compare/v4.23.3...v4.23.4) (2026-10-29)
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** declare multiValueFilterOperators support in plugin.json ([ca4855e](https://github.com/grafana/clickhouse-datasource/commit/ca4855ed18f00c63a8b132d5ef42d4cc058f999e))
+* **adhoc:** enable multiValueFilterOperators support in plugin.json ([#2218](https://github.com/grafana/clickhouse-datasource/issues/2218)) ([ca4855e](https://github.com/grafana/clickhouse-datasource/commit/ca4855ed18f00c63a8b132d5ef42d4cc058f999e))
+
+## [4.23.3](https://github.com/grafana/clickhouse-datasource/compare/v4.23.2...v4.23.3) (2026-10-28)
+
+
+### 🐛 Bug Fixes
+
+* **driver:** close the connection pool and keep the cause when connect fails ([#2234](https://github.com/grafana/clickhouse-datasource/issues/2234)) ([9ad3679](https://github.com/grafana/clickhouse-datasource/commit/9ad367949bc5c0c3850dcd338ca5f9e54d7aa62e))
+* **http:** name the FORMAT clause or HTML page behind "block decode" errors ([#2242](https://github.com/grafana/clickhouse-datasource/issues/2242)) ([1ac0318](https://github.com/grafana/clickhouse-datasource/commit/1ac0318eb0ad337ef92aba129f1983e8eddfc36f))
+* **logs:** count the same rows in the builder logs volume as in the logs query ([#2236](https://github.com/grafana/clickhouse-datasource/issues/2236)) ([bb8280a](https://github.com/grafana/clickhouse-datasource/commit/bb8280a0071115865075d9e36e561f4adbef7b41))
+* **logs:** show level and other fields in log details for Columns and labels maps ([#2232](https://github.com/grafana/clickhouse-datasource/issues/2232)) ([07bce6d](https://github.com/grafana/clickhouse-datasource/commit/07bce6d0edf9281770be693810dd52409b3655a0))
+* **query-builder:** keep the query when changing type, database or table ([#2200](https://github.com/grafana/clickhouse-datasource/issues/2200)) ([6f89eb3](https://github.com/grafana/clickhouse-datasource/commit/6f89eb367a593ed4a02f9739b7445b2082e7341d))
+
+
+### ✅ Tests
+
+* **e2e:** bump @grafana/plugin-e2e to 3.12.0 ([#2261](https://github.com/grafana/clickhouse-datasource/issues/2261)) ([3c20297](https://github.com/grafana/clickhouse-datasource/commit/3c202971c0e1618d5a2d80a27ef536f342751191))
+
 ## [4.23.2](https://github.com/grafana/clickhouse-datasource/compare/v4.23.1...v4.23.2) (2026-10-21)
 
 

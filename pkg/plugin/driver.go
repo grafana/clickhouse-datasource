@@ -418,6 +418,11 @@ func (h *Clickhouse) MutateQueryError(err error) backend.ErrorWithSource {
 	if containsClickHouseException(err) {
 		return backend.NewErrorWithSource(err, backend.ErrorSourceDownstream)
 	}
+
+	if isNetworkErr, source := IsNetworkError(err); isNetworkErr {
+		return backend.NewErrorWithSource(err, source)
+	}
+
 	return backend.NewErrorWithSource(err, backend.DefaultErrorSource)
 }
 
@@ -438,6 +443,9 @@ func containsClickHouseException(err error) bool {
 
 	// Look for common ClickHouse error patterns in response bodies
 	if strings.Contains(errStr, "DB::Exception") {
+		return true
+	}
+	if strings.Contains(errStr, "failed to query server hello") {
 		return true
 	}
 
