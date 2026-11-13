@@ -227,6 +227,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         datasource={datasource}
         database={builderOptions.database}
         table={builderOptions.table}
+        selectedColumns={builderOptions.columns}
       />
       <LogMessageLikeInput logMessageLike={builderState.logMessageLike} onChange={onOptionChange('logMessageLike')} />
     </div>

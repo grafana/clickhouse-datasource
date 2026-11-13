@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { SelectableValue } from '@grafana/data';
 import {
   Button,
@@ -11,11 +11,21 @@ import {
   RadioButtonGroup,
   Stack,
 } from '@grafana/ui';
-import { Filter, FilterOperator, TableColumn, NullFilter, TimeUnit, ColumnHint, NumberFilter } from 'types/queryBuilder';
+import {
+  Filter,
+  FilterOperator,
+  TableColumn,
+  NullFilter,
+  TimeUnit,
+  ColumnHint,
+  NumberFilter,
+  SelectedColumn,
+} from 'types/queryBuilder';
 import * as utils from 'components/queryBuilder/utils';
 import labels from 'labels';
 import { styles } from 'styles';
 import { Datasource } from 'data/CHDatasource';
+import { getHintedFilterColumn, getTimeFilterColumn, isStringType } from 'data/sqlGenerator';
 import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
 import { getFilterOperatorsByType } from './filterOperatorOptions';
@@ -98,6 +108,112 @@ const FilterValueSingleStringItem = (props: { value: string; onChange: (value: s
   );
 };
 
+type ValueOptionsLoader = (search: string) => Promise<Array<ComboboxOption<string>>>;
+
+const FilterValueSuggestItem = (props: {
+  value: string;
+  loadOptions: ValueOptionsLoader;
+  onChange: (value: string) => void;
+}) => {
+  const { value, loadOptions, onChange } = props;
+  // The value prop can lag a pick by one event, and committing the picked text again loops Combobox on Grafana 11.6.
+  const latestValue = useRef(value);
+  latestValue.current = value;
+  const change = (next: string) => {
+    latestValue.current = next;
+    onChange(next);
+  };
+  // Grafana 11.6 highlights the first row when the menu reopens, so Tab would replace the saved value with it.
+  const loadOptionsSavedFirst = useCallback(
+    async (search: string) => {
+      const options = await loadOptions(search);
+      const saved = latestValue.current;
+      return search || !saved
+        ? options
+        : [{ label: saved, value: saved }, ...options.filter((option) => option.value !== saved)];
+    },
+    [loadOptions]
+  );
+  // Combobox drops typed text on click-outside, and its onBlur prop never fires before Grafana 13.1.
+  const commitTypedText = (target: EventTarget) => {
+    if (target instanceof HTMLInputElement && target.value && target.value !== latestValue.current) {
+      change(target.value);
+    }
+  };
+  // Downshift clears the value on Escape with the menu closed, and drops typed text on Enter with no row highlighted.
+  const onKeyDownCapture = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!(event.target instanceof HTMLInputElement)) {
+      return;
+    }
+    if (event.key === 'Escape' && event.target.getAttribute('aria-expanded') !== 'true') {
+      Object.assign(event.nativeEvent, { preventDownshiftDefault: true });
+    }
+    if (event.key === 'Enter' && !event.target.getAttribute('aria-activedescendant')) {
+      commitTypedText(event.target);
+    }
+  };
+  return (
+    <div
+      data-testid="query-builder-filters-single-string-value-container"
+      onBlur={(event) => commitTypedText(event.target)}
+      onKeyDownCapture={onKeyDownCapture}
+    >
+      <Combobox
+        value={value || null}
+        options={loadOptionsSavedFirst}
+        createCustomValue
+        isClearable
+        width={70}
+        onChange={(option) => change(option?.value ?? '')}
+      />
+    </div>
+  );
+};
+
+const FilterValueSuggestMultiItem = (props: {
+  value: string[];
+  loadOptions: ValueOptionsLoader;
+  onChange: (value: string[]) => void;
+}) => {
+  const { loadOptions, onChange } = props;
+  // MultiCombobox keeps its search text after a pick and, before Grafana 13.1, crashes on duplicate values.
+  const hasTypedText = useRef(false);
+  const unique = [...new Set(props.value)];
+  const display = unique.length === 1 && unique[0] === '' ? [] : unique;
+  const change = (next: string[]) => {
+    hasTypedText.current = false;
+    onChange(next);
+  };
+  const commitTypedText = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (!hasTypedText.current || !(event.target instanceof HTMLInputElement)) {
+      return;
+    }
+    const typed = event.target.value
+      .split(',')
+      .map((v) => v.trim())
+      .filter((v) => v !== '');
+    if (typed.length > 0) {
+      change([...new Set([...display, ...typed])]);
+    }
+  };
+  return (
+    <div
+      data-testid="query-builder-filters-multi-string-value-container"
+      onInput={() => (hasTypedText.current = true)}
+      onBlur={commitTypedText}
+    >
+      <MultiCombobox
+        value={display}
+        options={loadOptions}
+        createCustomValue
+        placeholder="comma separated values"
+        width={70}
+        onChange={(options) => change(options.map((option) => option.value))}
+      />
+    </div>
+  );
+};
+
 const FilterValueMultiStringItem = (props: { value: string[]; onChange: (value: string[]) => void }) => {
   const [value, setValue] = useState(props.value || []);
   return (
@@ -118,8 +234,9 @@ export const FilterValueEditor = (props: {
   filter: Filter;
   onFilterChange: (filter: Filter) => void;
   durationFilterContext?: DurationFilterContext;
+  loadValueOptions?: ValueOptionsLoader;
 }) => {
-  const { filter, onFilterChange, allColumns: fieldsList, durationFilterContext } = props;
+  const { filter, onFilterChange, allColumns: fieldsList, durationFilterContext, loadValueOptions } = props;
   const getOptions = () => {
     const matchedFilter = fieldsList.find((f) => f.name === filter.key);
     return matchedFilter?.picklistValues || [];
@@ -195,6 +312,19 @@ export const FilterValueEditor = (props: {
         </div>
       );
     }
+    if (
+      loadValueOptions &&
+      (filter.operator === FilterOperator.Equals || filter.operator === FilterOperator.NotEquals)
+    ) {
+      return (
+        <FilterValueSuggestItem
+          // A switch from IN to = keeps the array value, which Combobox would read as an option object.
+          value={String(filter.value ?? '')}
+          loadOptions={loadValueOptions}
+          onChange={onStringFilterValueChange}
+        />
+      );
+    }
 
     return (
       <FilterValueSingleStringItem
@@ -219,6 +349,15 @@ export const FilterValueEditor = (props: {
         </div>
       );
     }
+    if (loadValueOptions) {
+      return (
+        <FilterValueSuggestMultiItem
+          value={filter.value}
+          loadOptions={loadValueOptions}
+          onChange={onMultiFilterValueChange}
+        />
+      );
+    }
     return <FilterValueMultiStringItem value={filter.value} onChange={onMultiFilterValueChange} />;
   } else {
     return <></>;
@@ -235,8 +374,22 @@ export const FilterEditor = (props: {
   database: string;
   table: string;
   durationFilterContext?: DurationFilterContext;
+  selectedColumns?: SelectedColumn[];
+  timeColumn?: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter, durationFilterContext } = props;
+  const { datasource, database, table, timeColumn } = props;
+  const hintedColumn = getHintedFilterColumn({ columns: props.selectedColumns }, filter);
+  const valueColumn = hintedColumn?.name || filter.key;
+  const loadValueOptions = useCallback(
+    (search: string): Promise<Array<ComboboxOption<string>>> =>
+      datasource
+        .fetchFilterValues(valueColumn, database, table, { search, timeColumn })
+        .then((values) => values.map((value) => ({ label: value, value })))
+        .catch(() => []),
+    [datasource, database, table, valueColumn, timeColumn]
+  );
+  const suggestsValues = Boolean(valueColumn && table) && isStringType(hintedColumn?.type || filter.type);
   const isMapType = filter.type.startsWith('Map');
   const isJSONType = filter.type.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
@@ -382,7 +535,15 @@ export const FilterEditor = (props: {
         options={toComboboxOptions(getFilterOperatorsByType(filter.type, isJSONType))}
         onChange={(option) => option && onFilterOperatorChange(option.value)}
       />
-      <FilterValueEditor filter={filter} onFilterChange={onFilterValueChange} allColumns={fieldsList} durationFilterContext={durationFilterContext} />
+      <FilterValueEditor
+        // Rows are keyed by index, so a removed filter's loaded suggestions would pass to the next row.
+        key={`${table}.${valueColumn}`}
+        filter={filter}
+        onFilterChange={onFilterValueChange}
+        allColumns={fieldsList}
+        durationFilterContext={durationFilterContext}
+        loadValueOptions={suggestsValues ? loadValueOptions : undefined}
+      />
       <Button
         data-testid="query-builder-filters-remove-button"
         icon="trash-alt"
@@ -404,8 +565,19 @@ export const FiltersEditor = (props: {
   database: string;
   table: string;
   durationFilterContext?: DurationFilterContext;
+  selectedColumns?: SelectedColumn[];
 }) => {
-  const { filters = [], onFiltersChange, allColumns: fieldsList = [], datasource, database, table, durationFilterContext } = props;
+  const {
+    filters = [],
+    onFiltersChange,
+    allColumns: fieldsList = [],
+    datasource,
+    database,
+    table,
+    durationFilterContext,
+    selectedColumns,
+  } = props;
+  const timeColumn = getTimeFilterColumn({ columns: selectedColumns, filters });
   const { label, tooltip, addLabel } = labels.components.FilterEditor;
   const addFilter = () => {
     onFiltersChange([...filters, { ...defaultNewFilter }]);
@@ -468,6 +640,8 @@ export const FiltersEditor = (props: {
               database={database}
               table={table}
               durationFilterContext={durationFilterContext}
+              selectedColumns={selectedColumns}
+              timeColumn={timeColumn}
             />
           </InlineField>
         );
