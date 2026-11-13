@@ -1075,3 +1075,61 @@ func TestBuildClickHouseOptionsRowLimitPushDown(t *testing.T) {
 		assert.False(t, ok, "the limit setting must not be pushed to the server when enableRowLimit is off")
 	})
 }
+
+func TestMutateResponseConvertsJSONFieldsToStrings(t *testing.T) {
+	raw := json.RawMessage(`{"a":[1,2]}`)
+	frame := &data.Frame{
+		Meta: &data.FrameMeta{PreferredVisualization: data.VisTypeGraph},
+		Fields: []*data.Field{
+			data.NewField("time", nil, []time.Time{time.Unix(0, 0), time.Unix(1, 0)}),
+			// The JSON-family converters (Map, Array, Tuple, JSON, ...) emit
+			// FieldTypeJSON values.
+			data.NewField("attrs", nil, []json.RawMessage{json.RawMessage(`{"k":"v"}`), json.RawMessage(`[1,2]`)}),
+			data.NewField("nullable", nil, []*json.RawMessage{&raw, nil}),
+		},
+	}
+
+	frames, err := (&Clickhouse{}).MutateResponse(context.Background(), data.Frames{frame})
+	require.NoError(t, err)
+
+	attrs := frames[0].Fields[1]
+	require.Equal(t, data.FieldTypeNullableString, attrs.Type())
+	require.NotNil(t, attrs.At(0).(*string))
+	assert.Equal(t, `{"k":"v"}`, *attrs.At(0).(*string))
+	assert.Equal(t, `[1,2]`, *attrs.At(1).(*string))
+
+	nullable := frames[0].Fields[2]
+	require.Equal(t, data.FieldTypeNullableString, nullable.Type())
+	require.NotNil(t, nullable.At(0).(*string))
+	assert.Equal(t, `{"a":[1,2]}`, *nullable.At(0).(*string))
+	assert.Nil(t, nullable.At(1).(*string))
+}
+
+func TestClickhouseAddr(t *testing.T) {
+	tests := []struct {
+		host string
+		want string
+	}{
+		{host: "localhost", want: "localhost:9000"},
+		{host: "10.0.0.1", want: "10.0.0.1:9000"},
+		{host: "::1", want: "[::1]:9000"},
+		{host: "[::1]", want: "[::1]:9000"},
+		{host: "2001:db8::10", want: "[2001:db8::10]:9000"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.host, func(t *testing.T) {
+			assert.Equal(t, tc.want, clickhouseAddr(tc.host, 9000))
+		})
+	}
+}
+
+func TestGetTLSConfigServerNameForIPv6(t *testing.T) {
+	cfg, err := getTLSConfig(Settings{Host: "[::1]"})
+	require.NoError(t, err)
+	assert.Equal(t, "::1", cfg.ServerName)
+}
+
+func TestExtractForwardedHeadersRejectsNonStringValues(t *testing.T) {
+	_, err := extractForwardedHeadersFromMessage(json.RawMessage(`{"grafana-http-headers": {"X-Test": [1]}}`))
+	assert.Error(t, err)
+}
