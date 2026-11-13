@@ -43,8 +43,51 @@ npm run watch
 
 #### Running E2E tests locally
 
-1. Install [K6](https://k6.io/docs/get-started/installation/)
-2. Run `npm run test:e2e:local`
+The Playwright suite in `tests/e2e/` runs against the Docker Compose stack in `docker-compose.yml`, which seeds ClickHouse from `tests/e2e/fixtures/`.
+
+1. Build the plugin into `dist/`:
+
+   ```sh
+   npm run build
+   mage buildAll
+   ```
+
+2. Start the stack in one terminal:
+
+   ```sh
+   npm run server
+   ```
+
+   To start another Grafana release, set `GRAFANA_VERSION` first, for example `GRAFANA_VERSION=13.2.3 npm run server`.
+
+3. Run the suite in a second terminal:
+
+   ```sh
+   npm run e2e
+   ```
+
+To run the suite against every Grafana version that CI tests:
+
+```sh
+npm run e2e:matrix
+```
+
+The script resolves the same images as the CI matrix: `grafana-enterprise:nightly` plus the latest patch of each minor release that satisfies `grafanaDependency` in `src/plugin.json`, capped at six. It starts one Compose stack per version on ports from 3100, so the stack from `npm run server` can stay up. It runs the suite with three workers and one retry against each stack. A test that times out under load and passes on the retry counts as flaky, not failed. Each version writes its report to `e2e-results/<version>/report/`.
+
+| Option              | Effect                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------- |
+| `--parallel <n>`    | Stacks to run at once. Default `2`. Each stack needs about 2 GiB of memory in the Docker VM. |
+| `--versions <list>` | Run these versions instead of the resolved matrix, for example `--versions 13.2.3,nightly`.  |
+| `--skip-nightly`    | Leave the nightly image out of the resolved matrix.                                          |
+| `--limit <n>`       | Cap the resolved matrix. `0` removes the cap. Default `6`.                                   |
+| `--build`           | Rebuild the frontend and backend into `dist/` first.                                         |
+| `--port-base <n>`   | First host port for Grafana. Default `3100`.                                                 |
+
+Arguments after a second `--` go to `playwright test`:
+
+```sh
+npm run e2e:matrix -- --versions 13.2.3 -- --grep "config editor"
+```
 
 ## Data Source Configuration Schema
 
@@ -63,12 +106,12 @@ The rest of this section covers only what is specific to this plugin.
 
 ### Layout
 
-| File in `pkg/schema/` | Description                                                                                                                       |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `dsconfig.json`        | Source of truth — **edit this**                                                                                                    |
-| `dsconfig_test.go`     | Wires the schema into the shared conformance suite; also holds `SecureKeys`                                                       |
-| `models/settings.go`   | `ClickHouseSettingsJSON` — the Go struct kept in sync with the schema's `jsonData` fields, purely for conformance-testing purposes |
-| `*.gen.json`           | Generated artifacts — **never hand-edit**                                                                                          |
+| File in `pkg/schema/` | Description                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `dsconfig.json`       | Source of truth — **edit this**                                                                                                    |
+| `dsconfig_test.go`    | Wires the schema into the shared conformance suite; also holds `SecureKeys`                                                        |
+| `models/settings.go`  | `ClickHouseSettingsJSON` — the Go struct kept in sync with the schema's `jsonData` fields, purely for conformance-testing purposes |
+| `*.gen.json`          | Generated artifacts — **never hand-edit**                                                                                          |
 
 Two field shapes in this plugin's schema map to Go in non-obvious ways:
 
