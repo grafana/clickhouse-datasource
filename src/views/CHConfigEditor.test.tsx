@@ -267,6 +267,30 @@ describe('ConfigEditor', () => {
     });
   });
 
+  describe('stop canceled queries on the server switch', () => {
+    it('is off by default for HTTP', () => {
+      render(<ConfigEditor {...mockConfigEditorProps({ protocol: Protocol.Http })} />);
+      expect(screen.getByText(labels.killQueryOnCancel.label)).toBeInTheDocument();
+      expect(screen.getByTestId(labels.killQueryOnCancel.testid)).not.toBeChecked();
+    });
+
+    it('writes true when turned on', () => {
+      const props = mockConfigEditorProps({ protocol: Protocol.Http });
+      render(<ConfigEditor {...props} />);
+
+      fireEvent.click(screen.getByTestId(labels.killQueryOnCancel.testid));
+
+      expect(props.onOptionsChange).toHaveBeenCalledWith(
+        expect.objectContaining({ jsonData: expect.objectContaining({ killQueryOnCancel: true }) })
+      );
+    });
+
+    it('is hidden for Native', () => {
+      render(<ConfigEditor {...mockConfigEditorProps({ protocol: Protocol.Native, killQueryOnCancel: true })} />);
+      expect(screen.queryByTestId(labels.killQueryOnCancel.testid)).not.toBeInTheDocument();
+    });
+  });
+
   it('persists the single-table logs trace correlation setting', () => {
     const props = mockConfigEditorProps({
       configMode: 'single-table',

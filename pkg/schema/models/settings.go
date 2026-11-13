@@ -47,6 +47,7 @@ type ClickHouseSettingsJSON struct {
 
 	HTTPHeaders           []HTTPHeader `json:"httpHeaders,omitempty"`
 	ForwardGrafanaHeaders bool         `json:"forwardGrafanaHeaders,omitempty"`
+	KillQueryOnCancel     bool         `json:"killQueryOnCancel,omitempty"`
 
 	CustomSettings         []CustomSetting `json:"customSettings,omitempty"`
 	EnableSecureSocksProxy bool            `json:"enableSecureSocksProxy,omitempty"`
