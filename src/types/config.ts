@@ -123,6 +123,7 @@ export interface CHLogsConfig {
   selectContextColumns?: boolean;
   contextColumns?: string[];
   showLogLinks?: boolean;
+  traceLinkDatasourceUid?: string;
 
   // Extra top-level columns to select into log queries so they surface as
   // first-class fields (Fields sidebar, flyout, filters). Independent of the

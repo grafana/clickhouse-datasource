@@ -362,6 +362,12 @@ export default {
             label: 'Show "View logs" links',
             tooltip: 'Show "View logs" links on trace_id/traceid fields.',
           },
+          traceLinkDatasource: {
+            label: '"View trace" data source',
+            description:
+              'Tempo data source that "View trace" links open. Traces queries and queries on the default trace table still open ClickHouse. Leave empty to keep the ClickHouse link.',
+            notFound: 'was not found or is not a Tempo data source, so "View trace" links ignore this setting.',
+          },
         },
         contextColumns: {
           title: 'Context columns',
