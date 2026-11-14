@@ -143,11 +143,13 @@ function qualifiedTableName(node: FromQueryNode): string | undefined {
 // FROM is a subquery it descends into that subquery, and only that subquery, so
 // a scalar subquery in the SELECT list or a sibling CTE body is never mistaken
 // for the target. A FROM that references a CTE resolves to the CTE's underlying
-// table. A table-function FROM, or a top-level UNION, resolves to undefined.
+// table. A table-function FROM, or a top-level set operation, resolves to
+// undefined.
 function firstPhysicalTable(node: SelectQueryNode): string | undefined {
-  // A top-level UNION combines several tables; single-table targeting is not
-  // meaningful, so resolve to no table. Per-branch keying is a follow-up.
-  if (node.hasUnion) {
+  // A top-level UNION / INTERSECT / EXCEPT combines several tables; single-table
+  // targeting is not meaningful, so resolve to no table. Per-branch keying is a
+  // follow-up.
+  if (node.hasSetOperation) {
     return undefined;
   }
   const from = node.from;
