@@ -1,5 +1,6 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import { Page, Request } from '@playwright/test';
+import { Components as Selectors } from '../../src/selectors';
 import { createTestDataSources, deleteTestDataSources } from './helpers/datasources';
 import {
   FIXTURE_FROM_ISO,
@@ -316,5 +317,43 @@ test.describe('Switching between single-table data sources in Explore', () => {
     await expect(page.getByPlaceholder('Search log body text...')).toHaveValue('timeout');
     expect(tables).toContain('events');
     expect(tables).not.toContain('trace_links_logs');
+  });
+
+  test('edits in the classic builder fallback update rawSql and run the query', async ({ page, explorePage }) => {
+    // When a single-table data source opens a query whose type does not match its signal (e.g.
+    // a table query on a single-table logs data source), it falls back to the classic builder (#2073).
+    // Edits made in that fallback must propagate through onChange and update rawSql (#2231).
+    const firstQuery = waitForQueryOn(page, SINGLE_LOGS_DATASOURCE_UID, 'events');
+    await page.goto(
+      exploreUrl({
+        datasourceUid: SINGLE_LOGS_DATASOURCE_UID,
+        from: FIXTURE_FROM_ISO,
+        to: FIXTURE_TO_ISO,
+        pluginVersion: BUILDER_PLUGIN_VERSION,
+        rawSql: 'SELECT "message" FROM "e2e_test"."events" LIMIT 100',
+        builderOptions: {
+          database: 'e2e_test',
+          table: 'events',
+          queryType: 'table',
+          columns: [{ name: 'message' }],
+          filters: [],
+          limit: 100,
+        },
+      })
+    );
+    await firstQuery;
+
+    await expect(page.getByText('Query Type', { exact: true })).toBeVisible();
+
+    const limitInput = page.getByTestId(Selectors.QueryBuilder.LimitEditor.input);
+    await expect(limitInput).toHaveValue('100');
+
+    const updated = waitForQueryOn(page, SINGLE_LOGS_DATASOURCE_UID, 'events');
+    await limitInput.fill('250');
+    await limitInput.blur();
+    await explorePage.runQuery();
+
+    const { query } = await updated;
+    expect(query.rawSql).toContain('LIMIT 250');
   });
 });
