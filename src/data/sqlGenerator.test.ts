@@ -247,7 +247,7 @@ describe('SQL Generator', () => {
     const expectedSqlParts = [
       'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
       'FROM "otel"."otel_logs"',
-      'WHERE ( timestamp >= $__fromTime AND timestamp <= $__toTime )',
+      'WHERE ( timestamp >= $__fromTime_ms AND timestamp < $__toTime_ms + INTERVAL 1 MILLISECOND )',
       'ORDER BY timestamp DESC LIMIT 1000',
     ];
 
@@ -289,17 +289,47 @@ describe('SQL Generator', () => {
       ],
     };
 
-    // The FilterTime column (TimestampTime) is used verbatim in the WHERE clause and grouped with
-    // the Time column's alias ("timestamp") in the ORDER BY.
+    // The FilterTime column (TimestampTime) is used verbatim in the WHERE clause, which keeps partition and
+    // primary key pruning. The Time column adds a millisecond bound so a logs page that starts inside a busy
+    // second makes progress. Both are grouped in the ORDER BY via the Time column's alias ("timestamp").
     const expectedSqlParts = [
       'SELECT Timestamp as "timestamp", Body as "body", SeverityText as "level"',
       'FROM "otel"."otel_logs"',
       'WHERE ( TimestampTime >= $__fromTime AND TimestampTime <= $__toTime )',
+      'AND ( timestamp >= $__fromTime_ms AND timestamp < $__toTime_ms + INTERVAL 1 MILLISECOND )',
       'ORDER BY (TimestampTime, timestamp) DESC LIMIT 1000',
     ];
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it('does not add a millisecond bound when the logs time column is only second precision', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [
+        { name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.FilterTime },
+        { name: 'Timestamp', type: 'DateTime', hint: ColumnHint.Time },
+        { name: 'Body', type: 'String', hint: ColumnHint.LogMessage },
+      ],
+      limit: 1000,
+      filters: [
+        {
+          filterType: 'custom',
+          type: 'datetime',
+          key: '',
+          condition: 'AND',
+          hint: ColumnHint.FilterTime,
+          operator: FilterOperator.WithInGrafanaTimeRange,
+        },
+      ],
+    };
+
+    const sql = generateSql(opts);
+    expect(sql).toContain('TimestampTime >= $__fromTime AND TimestampTime <= $__toTime');
+    expect(sql).not.toContain('_ms');
   });
 
   it('generates simple time series query', () => {
@@ -1085,7 +1115,10 @@ describe('getColumnIdentifier', () => {
     // in the Columns selector. See https://github.com/grafana/clickhouse-datasource/issues/2126.
     { input: { name: `Attributes['http.route'] AS http_route` }, expected: `Attributes['http.route'] AS http_route` },
     { input: { name: `Attributes['http.route'] as http_route` }, expected: `Attributes['http.route'] as http_route` },
-    { input: { name: `Attributes['http.route']\tAS\thttp_route` }, expected: `Attributes['http.route']\tAS\thttp_route` },
+    {
+      input: { name: `Attributes['http.route']\tAS\thttp_route` },
+      expected: `Attributes['http.route']\tAS\thttp_route`,
+    },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {

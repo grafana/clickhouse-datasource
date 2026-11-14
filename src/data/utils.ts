@@ -1,4 +1,12 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, FieldType, TimeRange } from '@grafana/data';
+import {
+  CoreApp,
+  DataFrame,
+  DataQueryRequest,
+  DataQueryResponse,
+  FieldConfig,
+  FieldType,
+  TimeRange,
+} from '@grafana/data';
 import {
   BuilderMode,
   ColumnHint,
@@ -334,16 +342,19 @@ const isTimeRangeFilter = (filter: Filter): boolean =>
 
 /**
  * Replaces the plugin's time macros with concrete bounds from the given range, matching
- * the backend's expansion (`toDateTime(<unix seconds>)`); `from` is floored and `to` is
- * ceiled so sub-second edges are never clipped. Data-link queries need this because
+ * the backend's expansion (`toDateTime(<unix seconds>)`, or `fromUnixTimestamp64Milli(<unix ms>)` for the
+ * millisecond macros); `from` is floored and `to` is ceiled so sub-second edges are never clipped. Data-link queries need this because
  * Grafana's link variable check treats `$__fromTime`/`$__toTime` as template variables
  * and hides links whose serialized query contains variables it cannot resolve.
  */
-const bindTimeRangeMacros = (sql: string, range?: TimeRange): string => {
+export const bindTimeRangeMacros = (sql: string, range?: TimeRange): string => {
   if (!range?.from || !range?.to) {
     return sql;
   }
+  // The millisecond macros share a prefix with the seconds ones, so they must be replaced first.
   return sql
+    .replaceAll('$__fromTime_ms', `fromUnixTimestamp64Milli(${range.from.valueOf()})`)
+    .replaceAll('$__toTime_ms', `fromUnixTimestamp64Milli(${range.to.valueOf()})`)
     .replaceAll('$__fromTime', `toDateTime(${Math.floor(range.from.valueOf() / 1000)})`)
     .replaceAll('$__toTime', `toDateTime(${Math.ceil(range.to.valueOf() / 1000)})`);
 };

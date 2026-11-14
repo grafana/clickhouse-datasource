@@ -3,6 +3,7 @@ import {
   BuilderMode,
   ColumnHint,
   DateFilterWithValue,
+  Filter,
   FilterOperator,
   MultiFilter,
   NumberFilter,
@@ -418,7 +419,12 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
   queryParts.push('FROM');
   queryParts.push(getTableIdentifier(database, table));
 
-  const filterParts = getFilters(options);
+  // Logs pages are fetched by moving the end of the time range to the oldest loaded row, so the range
+  // must keep millisecond precision. The seconds-precision $__fromTime/$__toTime macros would re-cover the
+  // whole boundary second on every page and stall infinite scrolling when one second holds more than LIMIT rows.
+  const filterParts = [getFilters(options, { millisecondTimeRange: true }), getLogsMillisecondTimeBound(options)]
+    .filter(Boolean)
+    .join(' AND ');
   const hasLogMessageFilter = logMessage && options.meta?.logMessageLike;
 
   if (filterParts || hasLogMessageFilter) {
@@ -865,7 +871,7 @@ const getLimit = (limit?: number | undefined): string => {
 /**
  * Returns the filters in the WHERE clause, excluding the "WHERE" keyword
  */
-const getFilters = (options: QueryBuilderOptions): string => {
+const getFilters = (options: QueryBuilderOptions, flags: { millisecondTimeRange?: boolean } = {}): string => {
   const filters = options.filters || [];
   const builtFilters: string[] = [];
 
@@ -876,21 +882,9 @@ const getFilters = (options: QueryBuilderOptions): string => {
 
     const filterParts: string[] = [];
 
-    let column = filter.key;
-    let type = filter.type || '';
-    let hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
-
-    // Fall back to Time/FilterTime if column not found
-    if (filter.hint === ColumnHint.Time && !hintedColumn) {
-      hintedColumn = getColumnByHint(options, ColumnHint.FilterTime);
-    } else if (filter.hint === ColumnHint.FilterTime && !hintedColumn) {
-      hintedColumn = getColumnByHint(options, ColumnHint.Time);
-    }
-
-    if (hintedColumn) {
-      column = hintedColumn.alias || hintedColumn.name;
-      type = hintedColumn.type || type;
-    }
+    const resolved = resolveFilterColumn(options, filter);
+    let column = resolved.column;
+    let type = resolved.type;
 
     if (!column) {
       continue;
@@ -947,7 +941,13 @@ const getFilters = (options: QueryBuilderOptions): string => {
     } else if (isDateFilter(type)) {
       if (isDateFilterWithoutValue(type, filter.operator)) {
         if (isDateType(type)) {
-          filterParts.push('>=', '$__fromTime', 'AND', column, '<=', '$__toTime');
+          if (flags.millisecondTimeRange && isDateTime64Type(type)) {
+            // The upper bound includes the whole boundary millisecond, so a page boundary can repeat a row
+            // but never skips one.
+            filterParts.push('>=', '$__fromTime_ms', 'AND', column, '<', '$__toTime_ms + INTERVAL 1 MILLISECOND');
+          } else {
+            filterParts.push('>=', '$__fromTime', 'AND', column, '<=', '$__toTime');
+          }
         }
       } else {
         switch ((filter as DateFilterWithValue).value) {
@@ -998,6 +998,59 @@ const getFilters = (options: QueryBuilderOptions): string => {
   }
 
   return concatQueryParts(builtFilters);
+};
+
+/**
+ * Resolves the column name and type a filter applies to, preferring the hinted column when one is mapped.
+ */
+const resolveFilterColumn = (options: QueryBuilderOptions, filter: Filter): { column: string; type: string } => {
+  let column = filter.key;
+  let type = filter.type || '';
+  let hintedColumn = filter.hint && getColumnByHint(options, filter.hint);
+
+  // Fall back to Time/FilterTime if column not found
+  if (filter.hint === ColumnHint.Time && !hintedColumn) {
+    hintedColumn = getColumnByHint(options, ColumnHint.FilterTime);
+  } else if (filter.hint === ColumnHint.FilterTime && !hintedColumn) {
+    hintedColumn = getColumnByHint(options, ColumnHint.Time);
+  }
+
+  if (hintedColumn) {
+    column = hintedColumn.alias || hintedColumn.name;
+    type = hintedColumn.type || type;
+  }
+
+  return { column, type };
+};
+
+const isDateTime64Type = (type: string): boolean => stripTypeModifiers(type).startsWith('datetime64');
+
+/**
+ * When the "within dashboard time range" filter is on a coarse column (for example the seconds-precision
+ * `TimestampTime` of the OTel logs schema), the filter still prunes data but cannot bound a logs page exactly.
+ * Add a millisecond bound on the log time column so a page that starts inside a busy second makes progress.
+ * Returns an empty string when no extra bound is needed.
+ */
+const getLogsMillisecondTimeBound = (options: QueryBuilderOptions): string => {
+  const timeColumn = getColumnByHint(options, ColumnHint.Time);
+  if (!timeColumn || !isDateTime64Type(timeColumn.type || '')) {
+    return '';
+  }
+
+  const timeColumnName = timeColumn.alias || timeColumn.name;
+  const hasCoarseRangeFilter = (options.filters || []).some((filter) => {
+    if (filter.operator !== FilterOperator.WithInGrafanaTimeRange) {
+      return false;
+    }
+    const { column, type } = resolveFilterColumn(options, filter);
+    return column !== '' && column !== timeColumnName && isDateType(type) && !isDateTime64Type(type);
+  });
+
+  if (!hasCoarseRangeFilter) {
+    return '';
+  }
+
+  return `( ${timeColumnName} >= $__fromTime_ms AND ${timeColumnName} < $__toTime_ms + INTERVAL 1 MILLISECOND )`;
 };
 
 const stripTypeModifiers = (type: string): string => {

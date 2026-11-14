@@ -9,6 +9,7 @@ import {
 } from 'types/queryBuilder';
 import {
   applyTraceSearchFieldConfig,
+  bindTimeRangeMacros,
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
   foldDiscoveredLogFieldsIntoLabels,
@@ -1071,6 +1072,39 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     const links = out?.data[0]?.fields[0]?.config?.links;
     expect(links?.find((link: any) => link.title === 'View trace')).toBeDefined();
     expect(links?.find((link: any) => link.title === 'View logs')).toBeUndefined();
+  });
+});
+
+describe('bindTimeRangeMacros', () => {
+  const range = {
+    from: dateTime(1735689600123),
+    to: dateTime(1735693200456),
+    raw: { from: 'now-1h', to: 'now' },
+  };
+
+  it('binds the seconds macros to toDateTime, flooring from and ceiling to', () => {
+    expect(bindTimeRangeMacros('t >= $__fromTime AND t <= $__toTime', range)).toBe(
+      't >= toDateTime(1735689600) AND t <= toDateTime(1735693201)'
+    );
+  });
+
+  it('binds the millisecond macros to fromUnixTimestamp64Milli without mangling them', () => {
+    expect(bindTimeRangeMacros('t >= $__fromTime_ms AND t < $__toTime_ms + INTERVAL 1 MILLISECOND', range)).toBe(
+      't >= fromUnixTimestamp64Milli(1735689600123) AND t < fromUnixTimestamp64Milli(1735693200456) + INTERVAL 1 MILLISECOND'
+    );
+  });
+
+  it('binds both macro families in one query', () => {
+    const sql = bindTimeRangeMacros('a >= $__fromTime AND a <= $__toTime AND b >= $__fromTime_ms', range);
+    expect(sql).toBe(
+      'a >= toDateTime(1735689600) AND a <= toDateTime(1735693201) AND b >= fromUnixTimestamp64Milli(1735689600123)'
+    );
+    expect(sql).not.toContain('$__');
+    expect(sql).not.toContain(')_ms');
+  });
+
+  it('leaves the sql untouched without a range', () => {
+    expect(bindTimeRangeMacros('t >= $__fromTime_ms', undefined)).toBe('t >= $__fromTime_ms');
   });
 });
 
