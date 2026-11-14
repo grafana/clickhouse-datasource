@@ -37,6 +37,7 @@ export const getBuilderOptions = (query?: CHQuery): QueryBuilderOptions | undefi
  */
 export const isBuilderOptionsRunnable = (builderOptions: QueryBuilderOptions): boolean => {
   return (
+    Boolean(builderOptions.metric?.name) ||
     (builderOptions.columns?.length || 0) > 0 ||
     (builderOptions.filters?.length || 0) > 0 ||
     (builderOptions.orderBy?.length || 0) > 0 ||

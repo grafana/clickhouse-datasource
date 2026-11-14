@@ -23,6 +23,7 @@ import {
   CHCustomSetting,
   CHSecureConfig,
   CHLogsConfig,
+  CHMetricsConfig,
   Protocol,
   CHTracesConfig,
   AliasTableEntry,
@@ -38,6 +39,7 @@ import { DefaultDatabaseTableConfig } from 'components/configEditor/DefaultDatab
 import { QuerySettingsConfig } from 'components/configEditor/QuerySettingsConfig';
 import { LogsConfig } from 'components/configEditor/LogsConfig';
 import { TracesConfig } from 'components/configEditor/TracesConfig';
+import { MetricsConfig } from 'components/configEditor/MetricsConfig';
 import { HttpHeadersConfig } from 'components/configEditor/HttpHeadersConfig';
 import allLabels from '../labels';
 import { createValidationAPI, onHttpHeadersChange, useConfigDefaults } from './CHConfigEditorHooks';
@@ -236,6 +238,18 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
         traces: {
           ...options.jsonData.traces,
           durationUnit: options.jsonData.traces?.durationUnit || TimeUnit.Nanoseconds,
+          [key]: value,
+        },
+      },
+    });
+  };
+  const onMetricsConfigChange = (key: keyof CHMetricsConfig, value: string) => {
+    onOptionsChange({
+      ...options,
+      jsonData: {
+        ...options.jsonData,
+        metrics: {
+          ...options.jsonData.metrics,
           [key]: value,
         },
       },
@@ -576,6 +590,11 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               options={[
                 { label: 'Logs', value: 'logs', description: 'Log search with severity, message, and attributes' },
                 { label: 'Traces', value: 'traces', description: 'Distributed tracing with spans and service maps' },
+                {
+                  label: 'Metrics',
+                  value: 'metrics',
+                  description: 'OTel metrics with rates, quantiles and label grouping',
+                },
               ]}
               value={selectedSignalType}
               onChange={(v) => {
@@ -653,6 +672,12 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onShowTraceLinksChange={(v) => onTracesConfigChange('showTraceLinks', v)}
                 onTraceTimestampTableSuffixChange={(v) => onTracesConfigChange('traceTimestampTableSuffix', v)}
               />
+            </>
+          )}
+          {selectedSignalType === 'metrics' && (
+            <>
+              <Divider />
+              <MetricsConfig metricsConfig={jsonData.metrics} onChange={onMetricsConfigChange} />
             </>
           )}
           <Divider />

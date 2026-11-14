@@ -4,6 +4,9 @@ import { Datasource } from 'data/CHDatasource';
 import {
   BuilderMode,
   ColumnHint,
+  MetricFunction,
+  MetricSeriesAggregation,
+  MetricType,
   QueryBuilderOptions,
   QueryType,
   SelectedColumn,
@@ -48,7 +51,14 @@ export const appendAdditionalLogColumns = (
 };
 
 export const getCompactQueryType = (signalType: SignalType): QueryType => {
-  return signalType === 'logs' ? QueryType.Logs : QueryType.Traces;
+  switch (signalType) {
+    case 'logs':
+      return QueryType.Logs;
+    case 'metrics':
+      return QueryType.TimeSeries;
+    default:
+      return QueryType.Traces;
+  }
 };
 
 export const isDefaultCompactQuery = (builderOptions: QueryBuilderOptions): boolean => {
@@ -74,6 +84,14 @@ export const getSingleTableLocation = (
   datasource: Datasource,
   signalType: SignalType
 ): { database: string; table: string } => {
+  if (signalType === 'metrics') {
+    // Metrics span one table per data point type; the picked metric decides which one is read.
+    return {
+      database: datasource.getDefaultMetricsDatabase(),
+      table: '',
+    };
+  }
+
   if (signalType === 'logs') {
     return {
       database: datasource.getDefaultLogsDatabase() || datasource.getDefaultDatabase(),
@@ -259,10 +277,41 @@ export function buildCompactQueryDefaults(
   fallbackTable = '',
   allColumns: readonly TableColumn[] = []
 ): QueryBuilderOptions {
-  return signalType === 'logs'
-    ? buildCompactLogsDefaults(datasource, fallbackTable, allColumns)
-    : buildCompactTracesDefaults(datasource, fallbackTable);
+  switch (signalType) {
+    case 'logs':
+      return buildCompactLogsDefaults(datasource, fallbackTable, allColumns);
+    case 'metrics':
+      return buildCompactMetricsDefaults(datasource);
+    default:
+      return buildCompactTracesDefaults(datasource, fallbackTable);
+  }
 }
+
+/**
+ * A metrics query with no metric picked yet. It generates no SQL until the metrics editor picks a
+ * metric, which also sets the table holding it.
+ */
+export const buildCompactMetricsDefaults = (datasource: Datasource): QueryBuilderOptions => ({
+  database: datasource.getDefaultMetricsDatabase(),
+  table: '',
+  queryType: QueryType.TimeSeries,
+  metric: {
+    name: '',
+    type: MetricType.Gauge,
+    fn: MetricFunction.Avg,
+    aggregation: MetricSeriesAggregation.Avg,
+    groupBy: [],
+  },
+  filters: [],
+});
+
+/**
+ * True when the metrics editor should show a query: one it built (it has a metric), or a new or
+ * empty one it can take over. Classic time series or table queries authored before the data
+ * source switched to the metrics signal are kept in the classic builder.
+ */
+export const isMetricsEditorQuery = (builderOptions: QueryBuilderOptions): boolean =>
+  Boolean(builderOptions.metric) || isDefaultCompactQuery(builderOptions) || !isBuilderOptionsRunnable(builderOptions);
 
 const buildCompactLogsDefaults = (
   datasource: Datasource,

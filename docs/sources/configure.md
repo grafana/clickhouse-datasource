@@ -173,9 +173,9 @@ Use **Configuration mode** to choose how the data source is used by the query bu
 | Mode              | Description                                                                                                                                                  |
 | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **All databases** | Allows queries against any database and table the ClickHouse user can read. Use this mode for general exploration and dashboards that query multiple tables. |
-| **Single source** | Focuses the data source on one logs or traces table. Choose a **Signal type**, then configure the database, table, and column mappings for that source.      |
+| **Single source** | Focuses the data source on one logs, traces, or metrics source. Choose a **Signal type**, then configure the database and tables for that source.             |
 
-Use **Single source** when the data source is dedicated to one logs or traces table, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query. Single source data sources use the [compact query mode](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#compact-query-mode) in the query editor.
+Use **Single source** when the data source is dedicated to one logs table, traces table, or set of OTel metrics tables, such as an OpenTelemetry table. This keeps the logs or traces schema settings with the selected source and avoids reconfiguring column mappings in each query. Single source data sources use the [compact query mode](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#compact-query-mode) in the query editor.
 
 ### Additional settings
 
@@ -232,6 +232,31 @@ The data source includes a dedicated configuration section for trace queries. Th
 When **Use OTel** is disabled, you can manually configure columns for Trace ID, Span ID, Parent Span ID, Service Name, Operation Name, Start Time, Duration, Tags, Service Tags, Kind, Status Code, Status Message, State, and Instrumentation Library.
 
 When **Configuration mode** is set to **Single source** and **Signal type** is set to **Traces**, these settings define the focused traces source.
+
+### Metrics configuration
+
+When **Configuration mode** is set to **Single source** and **Signal type** is set to **Metrics**, the data source reads OpenTelemetry metrics written by the [OpenTelemetry Collector ClickHouse exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/clickhouseexporter). The exporter writes one table per metric type with a fixed schema, so you only configure where the tables are:
+
+| Setting                         | Default                      | Description                                                  |
+| ------------------------------- | ---------------------------- | ------------------------------------------------------------ |
+| **Metrics database**            | `default`                    | The database holding the metric tables.                      |
+| **Gauge table**                 | `otel_metrics_gauge`         | Exporter option `metrics_tables.gauge.name`.                 |
+| **Sum table**                   | `otel_metrics_sum`           | Exporter option `metrics_tables.sum.name`.                   |
+| **Histogram table**             | `otel_metrics_histogram`     | Exporter option `metrics_tables.histogram.name`.             |
+| **Exponential histogram table** | `otel_metrics_exp_histogram` | Exporter option `metrics_tables.exponential_histogram.name`. |
+| **Summary table**               | `otel_metrics_summary`       | Exporter option `metrics_tables.summary.name`.               |
+
+Leave the table names empty to use the exporter defaults. Tables that don't exist are skipped, and the `otel_metrics_exponential_histogram` table of older exporter versions is found automatically. Both the `Map` and the `JSON` (exporter option `json: true`) attribute column types are supported.
+
+#### Performance on large tables
+
+Metrics queries filter on `MetricName` and the time range, which the exporter's sorting key and daily partitions serve well, and they aggregate per series and time bucket as they read, so memory grows with series × buckets rather than with raw points.
+
+The plugin works with the exporter's tables as they are and needs no schema changes. On large deployments, keep the dashboard time range and the number of series per panel in mind: filtering by service or other labels reduces the data read the most, since `ServiceName` leads the exporter's sorting key.
+
+The metric list and the label key and value suggestions read at most the last 6 hours of the dashboard time range.
+
+The query editor of a metrics data source is described in [Metrics query mode](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/query-editor/#metrics-query-mode).
 
 ### OTel schema versions
 
@@ -333,7 +358,7 @@ datasources:
       protocol: native
       username: grafana_reader
       # configMode: classic          # "classic" for all databases, "single-table" for single source
-      # signalType: logs             # "logs" or "traces"; used when configMode is "single-table"
+      # signalType: logs             # "logs", "traces" or "metrics"; used when configMode is "single-table"
       # defaultDatabase: <string>
       # defaultTable: <string>
       # logs:
@@ -344,6 +369,13 @@ datasources:
       #   defaultDatabase: <string>
       #   defaultTable: <string>
       #   otelEnabled: <bool>
+      # metrics:                     # used when signalType is "metrics"; empty table names use the exporter defaults
+      #   defaultDatabase: <string>
+      #   gaugeTable: <string>
+      #   sumTable: <string>
+      #   histogramTable: <string>
+      #   exponentialHistogramTable: <string>
+      #   summaryTable: <string>
       # secure: <bool>
       # tlsSkipVerify: <bool>
       # tlsAuth: <bool>
@@ -391,7 +423,7 @@ resource "grafana_data_source" "clickhouse" {
     username         = "grafana_reader"
     tlsSkipVerify    = false
     # configMode     = "classic" # or "single-table"
-    # signalType     = "logs"    # or "traces"; used when configMode is "single-table"
+    # signalType     = "logs"    # or "traces" or "metrics"; used when configMode is "single-table"
     # defaultDatabase = "mydb"
     # logs            = {
     #   defaultDatabase = "otel"

@@ -298,6 +298,7 @@ const CHEditorByType = (props: CHQueryEditorProps) => {
       builderOptionsDispatch={builderOptionsDispatch}
       generatedSql={query.rawSql}
       app={app}
+      range={props.range}
       minInterval={query.minInterval}
       onQueryChange={onQueryChange}
       onEditAsSql={onEditAsSql}

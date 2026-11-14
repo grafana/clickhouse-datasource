@@ -153,6 +153,17 @@ export const Components = {
       columnRolesHelp: 'query-builder__trace-query-builder__column-roles-help',
       columnRolesHelpLink: 'query-builder__trace-query-builder__column-roles-help-link',
     },
+    MetricsEditor: {
+      root: 'query-builder__metrics-editor',
+      metricPicker: 'query-builder__metrics-editor__metric-picker',
+      functionPicker: 'query-builder__metrics-editor__function-picker',
+      quantilesPicker: 'query-builder__metrics-editor__quantiles-picker',
+      aggregationPicker: 'query-builder__metrics-editor__aggregation-picker',
+      groupByPicker: 'query-builder__metrics-editor__group-by-picker',
+      addFilterButton: 'query-builder__metrics-editor__add-filter-button',
+      filterEditor: 'query-builder__metrics-editor__filter-editor',
+      identityWarning: 'query-builder__metrics-editor__identity-warning',
+    },
     TimeSeriesQueryBuilder: {
       columnRolesHelp: 'query-builder__time-series-query-builder__column-roles-help',
       columnRolesHelpLink: 'query-builder__time-series-query-builder__column-roles-help-link',

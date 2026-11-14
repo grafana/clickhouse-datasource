@@ -43,6 +43,9 @@ import {
   ColumnHint,
   Filter,
   FilterOperator,
+  MetricLabel,
+  MetricLabelSource,
+  MetricType,
   OrderByDirection,
   QueryBuilderOptions,
   StringFilter,
@@ -54,6 +57,20 @@ import {
 } from 'types/queryBuilder';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
+import {
+  getConfiguredMetricTables,
+  getMetricCatalogSql,
+  getMetricHealthSql,
+  getMetricLabelKeysSql,
+  getMetricTableFeatures,
+  getMetricLabelValuesSql,
+  getSummaryQuantilesSql,
+  MetricCatalogEntry,
+  MetricHealth,
+  MetricTableFeatures,
+  MetricTables,
+  resolveMetricTables,
+} from './metrics';
 import { AdHocFilter } from './adHocFilter';
 import {
   buildLogLevelAggregateExpressions,
@@ -71,7 +88,11 @@ import {
   getTableIdentifier,
   isStringType,
   logAliasToColumnHints,
+  escapeCHStringLiteral,
 } from './sqlGenerator';
+
+// Re-exported for existing imports; the implementation lives with the other SQL escaping helpers.
+export { escapeCHStringLiteral };
 import { buildJSONPathAccess, mintJSONAdhocKey, parseJSONAdhocKey } from './jsonPath';
 import { planSqlLogsVolume } from './logsVolumeSql';
 import {
@@ -80,6 +101,7 @@ import {
   mapGrafanaFormatToQueryType,
   transformQueryResponseWithTraceAndLogLinks,
 } from './utils';
+import { transformMetricHeatmapFrames } from './metricsHeatmap';
 import { CHVariableSupport } from './CHVariableSupport';
 import { createAnnotationSupport } from './CHAnnotationSupport';
 
@@ -1284,6 +1306,143 @@ export class Datasource
     return traceConfig.traceIdColumn;
   }
 
+  getDefaultMetricsDatabase(): string {
+    return this.settings.jsonData.metrics?.defaultDatabase || this.getDefaultDatabase();
+  }
+
+  /** The configured metric table names, with the exporter defaults for unset ones. */
+  getConfiguredMetricTables(): Record<MetricType, string> {
+    return getConfiguredMetricTables(this.settings.jsonData.metrics);
+  }
+
+  /**
+   * Runs a metadata query of the metrics editor as a table. Unlike runQuery, a failed query rejects
+   * instead of resolving with no rows, so the editor shows the error rather than an empty list, and
+   * nothing empty gets cached.
+   */
+  private async fetchMetricsFrame(rawSql: string): Promise<DataFrame> {
+    const response = await firstValueFrom(
+      this.query({
+        targets: [{ rawSql, format: 1, refId: 'metrics-metadata' }],
+        range: (getTemplateSrv() as any).timeRange,
+      } as DataQueryRequest<CHQuery>)
+    );
+    const error = response.errors?.[0];
+    if (error) {
+      throw new Error(error.message || 'Query failed');
+    }
+    return response.data[0] || { fields: [], length: 0 };
+  }
+
+  /** The values of a metadata query's column, by name. */
+  private async fetchMetricsColumns(rawSql: string): Promise<(name: string) => unknown[]> {
+    const frame = await this.fetchMetricsFrame(rawSql);
+    return (name) => frame.fields.find((f) => f.name === name)?.values ?? [];
+  }
+
+  /** Memoized metadata lookups; a failed lookup is dropped so the next call retries it. */
+  private metricsCache = new Map<string, Promise<unknown>>();
+  private cachedMetricsLookup<T>(key: string, load: () => Promise<T>): Promise<T> {
+    let promise = this.metricsCache.get(key) as Promise<T> | undefined;
+    if (!promise) {
+      promise = load();
+      promise.catch(() => this.metricsCache.delete(key));
+      this.metricsCache.set(key, promise);
+    }
+    return promise;
+  }
+
+  /**
+   * The metric tables that exist, by type. Looked up once per data source instance, since the
+   * exporter creates its tables up front.
+   */
+  resolveMetricTables(): Promise<MetricTables> {
+    const database = this.getDefaultMetricsDatabase();
+    return this.cachedMetricsLookup(`tables:${database}`, async () => {
+      const column = await this.fetchMetricsColumns(`SHOW TABLES FROM ${escapeIdentifier(database)}`);
+      const tables = column('name').map(String);
+      return resolveMetricTables(this.getConfiguredMetricTables(), tables);
+    });
+  }
+
+  /** The metrics with data in the dashboard time range, across every metric table. */
+  async fetchMetricCatalog(): Promise<MetricCatalogEntry[]> {
+    const rawSql = getMetricCatalogSql(this.getDefaultMetricsDatabase(), await this.resolveMetricTables());
+    if (!rawSql) {
+      return [];
+    }
+    const column = await this.fetchMetricsColumns(rawSql);
+    const [types, units, descriptions, monotonic] = ['type', 'unit', 'description', 'monotonic'].map(column);
+    return column('name').map((name, i) => ({
+      name: String(name),
+      type: types[i] as MetricType,
+      unit: String(units[i] ?? ''),
+      description: String(descriptions[i] ?? ''),
+      isMonotonic: Boolean(Number(monotonic[i])),
+    }));
+  }
+
+  /** The optional features of a metric table, such as JSON attribute columns. */
+  async getMetricTableFeatures(database: string, table: string): Promise<MetricTableFeatures> {
+    return getMetricTableFeatures(await this.getColumnsCached(database, table));
+  }
+
+  /** The attribute keys a metric has, by source. Empty when key discovery is turned off. */
+  async fetchMetricLabelKeys(
+    database: string,
+    table: string,
+    metricName: string,
+    jsonAttributes?: boolean
+  ): Promise<MetricLabel[]> {
+    if (!this.isMapKeysDiscoveryEnabled()) {
+      return [];
+    }
+    const column = await this.fetchMetricsColumns(getMetricLabelKeysSql(database, table, metricName, jsonAttributes));
+    const sources = column('source');
+    return column('key').map((key, i) => ({ source: sources[i] as MetricLabelSource, key: String(key) }));
+  }
+
+  async fetchMetricLabelValues(
+    database: string,
+    table: string,
+    metricName: string,
+    label: MetricLabel,
+    jsonAttributes?: boolean
+  ): Promise<string[]> {
+    const column = await this.fetchMetricsColumns(
+      getMetricLabelValuesSql(database, table, metricName, label, jsonAttributes)
+    );
+    return column('value').map(String);
+  }
+
+  async fetchSummaryQuantiles(database: string, table: string, metricName: string): Promise<number[]> {
+    const column = await this.fetchMetricsColumns(getSummaryQuantilesSql(database, table, metricName));
+    return column('quantile').map(Number).filter(Number.isFinite);
+  }
+
+  /**
+   * Export interval and shared series of a metric over the last 15 minutes. Cached, since the
+   * editor reads it when a metric is picked and again to show the warning.
+   */
+  fetchMetricHealth(
+    database: string,
+    table: string,
+    metricName: string,
+    type: MetricType,
+    features: MetricTableFeatures = {}
+  ): Promise<MetricHealth> {
+    const key = `health:${database}.${table}:${type}:${metricName}:${JSON.stringify(features)}`;
+    return this.cachedMetricsLookup(key, async () => {
+      const column = await this.fetchMetricsColumns(getMetricHealthSql(database, table, metricName, type, features));
+      const exportInterval = Number(column('export_interval')[0]);
+      return {
+        exportInterval: Number.isFinite(exportInterval) && exportInterval > 0 ? Math.round(exportInterval) : undefined,
+        sharedSeries: Number(column('shared_series')[0] ?? 0),
+        series: Number(column('series')[0] ?? 0),
+      };
+    });
+  }
+
   async fetchDatabases(): Promise<string[]> {
     return this.fetchData('SHOW DATABASES');
   }
@@ -1667,9 +1826,12 @@ export class Datasource
     // an empty statement that ClickHouse rejects with a 400. Skip only that transient case. Every
     // other query type runs as before, so an empty or invalid SQL-editor query still surfaces its
     // error to the user instead of being dropped silently.
-    const isBuilderLogsQuery =
-      query.editorType === EditorType.Builder && (query as CHBuilderQuery).builderOptions?.queryType === QueryType.Logs;
-    if (isBuilderLogsQuery && !(query.rawSql && query.rawSql.trim().length > 0)) {
+    // A metrics builder query likewise has no SQL until a metric is picked.
+    const builderOptions =
+      query.editorType === EditorType.Builder ? (query as CHBuilderQuery).builderOptions : undefined;
+    const isBuilderLogsQuery = builderOptions?.queryType === QueryType.Logs;
+    const isBuilderMetricsQuery = builderOptions?.queryType === QueryType.TimeSeries && Boolean(builderOptions.metric);
+    if ((isBuilderLogsQuery || isBuilderMetricsQuery) && !(query.rawSql && query.rawSql.trim().length > 0)) {
       return false;
     }
 
@@ -1696,6 +1858,7 @@ export class Datasource
         concatMap(async (res: DataQueryResponse) => {
           let transformed = await transformQueryResponseWithTraceAndLogLinks(this, request, res);
           transformed = foldDiscoveredLogFieldsIntoLabels(this, request, transformed);
+          transformed = transformMetricHeatmapFrames(request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
@@ -1864,6 +2027,10 @@ export class Datasource
    * database that getDefaultDatabase coerces to.
    */
   private getDefaultAdhocSource(): string | undefined {
+    if (!this.settings.jsonData.defaultDatabase && this.isSingleTableMode() && this.getSignalType() === 'metrics') {
+      // Metrics span several tables, so ad hoc keys are discovered across the metrics database.
+      return this.getDefaultMetricsDatabase();
+    }
     if (!this.settings.jsonData.defaultDatabase && this.isSingleTableMode()) {
       const isTraces = this.getSignalType() === 'traces';
       const signalDb = isTraces ? this.getDefaultTraceDatabase() : this.getDefaultLogsDatabase();
@@ -2663,14 +2830,6 @@ function isJSONColumnType(type: string | undefined): boolean {
 // Shared empty set returned when a table is known to have no attribute columns
 // of a given kind — avoids per-call allocation.
 const EMPTY_COLUMN_SET: ReadonlySet<string> = new Set();
-
-// Escape a string for embedding inside a single-quoted ClickHouse string
-// literal: backslash and single quote are the only characters that need
-// escaping. Use when interpolating an untrusted identifier (e.g. a Map key
-// from system.columns) into raw SQL.
-export function escapeCHStringLiteral(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-}
 
 enum AdHocFilterStatus {
   none = 0,

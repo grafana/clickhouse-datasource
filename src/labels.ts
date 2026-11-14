@@ -193,6 +193,30 @@ export default {
             'Disable to suppress the probes. You can still type Map keys and JSON paths manually. Defaults to enabled.',
         },
       },
+      MetricsConfig: {
+        title: 'Metrics Tables',
+        description:
+          'OTel metrics written by the OpenTelemetry Collector ClickHouse exporter. Each metric type has its own table; the query editor picks the right one for every metric.',
+        defaultDatabase: {
+          label: 'Metrics database',
+          description: 'The database holding the OTel metric tables',
+          placeholder: 'default',
+        },
+        tables: {
+          title: 'Table names',
+          description:
+            'Leave empty to use the exporter defaults. Set them when the exporter option metrics_tables uses other names.',
+          gaugeTable: { label: 'Gauge table', description: 'Gauge data points' },
+          sumTable: { label: 'Sum table', description: 'Sum data points (counters and up-down counters)' },
+          histogramTable: { label: 'Histogram table', description: 'Histogram data points' },
+          exponentialHistogramTable: {
+            label: 'Exponential histogram table',
+            description:
+              'Exponential histogram data points. Tables of exporters before metrics_tables (otel_metrics_exponential_histogram) are found automatically.',
+          },
+          summaryTable: { label: 'Summary table', description: 'Summary data points' },
+        },
+      },
       TracesConfig: {
         title: 'Traces configuration',
         description: '(Optional) Default settings for trace queries',
