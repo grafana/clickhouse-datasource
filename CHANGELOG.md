@@ -1,5 +1,13 @@
 # Changelog
 
+## [4.23.6](https://github.com/grafana/clickhouse-datasource/compare/v4.23.5...v4.23.6) (2026-11-14)
+
+
+### 🐛 Bug Fixes
+
+* **errorsource:** mark handshake read failures as downstream errors ([#2294](https://github.com/grafana/clickhouse-datasource/issues/2294)) ([46c7a45](https://github.com/grafana/clickhouse-datasource/commit/46c7a45bff88b5c4fdcb5f77af50fdff7e510bd1))
+* settings type checks, non-positive timeouts, UTC time zone and ad-hoc operators ([#2256](https://github.com/grafana/clickhouse-datasource/issues/2256)) ([5d5ca2c](https://github.com/grafana/clickhouse-datasource/commit/5d5ca2c2555c071fc5e1af3db293e9b21d39c582))
+
 ## [4.23.5](https://github.com/grafana/clickhouse-datasource/compare/v4.23.4...v4.23.5) (2026-11-10)
 
 
