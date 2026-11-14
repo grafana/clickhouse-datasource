@@ -19,7 +19,8 @@ test.describe('Switching from the SQL Editor to the Query Builder', () => {
     // The SQL converts to builder options, so the switch asks for confirmation. With a single-value
     // IN list, Continue used to throw before closing this dialog, leaving the SQL Editor selected (#2226).
     await page.getByRole('radio', { name: 'Query Builder' }).click();
-    const confirmDialog = page.getByRole('dialog', { name: 'Are you sure?' });
+    // Grafana 12.3 and earlier give this modal no accessible name, so match the dialog by its text.
+    const confirmDialog = page.getByRole('dialog').filter({ hasText: 'Are you sure?' });
     await confirmDialog.getByRole('button', { name: 'Continue' }).click();
     await expect(confirmDialog).toBeHidden();
     await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
