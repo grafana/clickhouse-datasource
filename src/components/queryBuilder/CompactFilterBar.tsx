@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { css } from '@emotion/css';
-import { GrafanaTheme2 } from '@grafana/data';
+import { GrafanaTheme2, TimeRange } from '@grafana/data';
 import { Button, Tooltip, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { Filter, SelectedColumn, TableColumn } from 'types/queryBuilder';
@@ -8,6 +8,7 @@ import { FilterPopover } from './FilterPopover';
 import { FilterTagBar } from './FilterTagBar';
 
 interface CompactFilterBarProps {
+  timeRange?: TimeRange;
   datasource: Datasource;
   database: string;
   table: string;
@@ -93,6 +94,7 @@ export const CompactFilterBar = (props: CompactFilterBarProps) => {
       </div>
       {showPopover && (
         <FilterPopover
+          timeRange={props.timeRange}
           datasource={datasource}
           database={database}
           table={table}

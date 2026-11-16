@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { css } from '@emotion/css';
-import { GrafanaTheme2 } from '@grafana/data';
+import { GrafanaTheme2, TimeRange } from '@grafana/data';
 import { Button, Combobox, ComboboxOption, useStyles2 } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { Filter, FilterOperator, NumberFilter, StringFilter, TableColumn } from 'types/queryBuilder';
@@ -8,6 +8,7 @@ import { getFilterOperatorOptions } from './filterOperatorOptions';
 import * as utils from './utils';
 
 interface FilterPopoverProps {
+  timeRange?: TimeRange;
   datasource: Datasource;
   database: string;
   table: string;
@@ -105,7 +106,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
 });
 
 export const FilterPopover = (props: FilterPopoverProps) => {
-  const { datasource, database, table, allColumns, onAddFilter, onClose } = props;
+  const { datasource, database, table, allColumns, onAddFilter, onClose, timeRange } = props;
   const styles = useStyles2(getStyles);
 
   const [selectedColumn, setSelectedColumn] = useState('');
@@ -150,9 +151,9 @@ export const FilterPopover = (props: FilterPopoverProps) => {
       try {
         const values =
           isMapColumn && selectedMapKey
-            ? await datasource.fetchDistinctMapValues(selectedColumn, selectedMapKey, database, table)
+            ? await datasource.fetchDistinctMapValues(selectedColumn, selectedMapKey, database, table, timeRange)
             : !isKeyedColumn
-              ? await datasource.fetchDistinctValues(selectedColumn, database, table)
+              ? await datasource.fetchDistinctValues(selectedColumn, database, table, timeRange)
               : [];
 
         const normalizedInput = inputValue.toLowerCase();
@@ -164,7 +165,7 @@ export const FilterPopover = (props: FilterPopoverProps) => {
         return [];
       }
     },
-    [datasource, database, table, selectedColumn, isMapColumn, isKeyedColumn, selectedMapKey]
+    [datasource, database, table, selectedColumn, isMapColumn, isKeyedColumn, selectedMapKey, timeRange]
   );
 
   const noValueNeeded = operator === FilterOperator.IsNull || operator === FilterOperator.IsNotNull;
