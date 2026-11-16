@@ -1085,7 +1085,10 @@ describe('getColumnIdentifier', () => {
     // in the Columns selector. See https://github.com/grafana/clickhouse-datasource/issues/2126.
     { input: { name: `Attributes['http.route'] AS http_route` }, expected: `Attributes['http.route'] AS http_route` },
     { input: { name: `Attributes['http.route'] as http_route` }, expected: `Attributes['http.route'] as http_route` },
-    { input: { name: `Attributes['http.route']\tAS\thttp_route` }, expected: `Attributes['http.route']\tAS\thttp_route` },
+    {
+      input: { name: `Attributes['http.route']\tAS\thttp_route` },
+      expected: `Attributes['http.route']\tAS\thttp_route`,
+    },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {
@@ -1480,6 +1483,38 @@ describe('getFilters', () => {
     } as QueryBuilderOptions;
     const sql = _testExports.getFilters(options);
     expect(sql).toEqual("( LogAttributes.`level`::Nullable(String) NOT IN ('debug', 'trace') )");
+  });
+
+  it.each([
+    "Enum8('x' = 1, 'y' = 2)",
+    "Enum16('x' = 1, 'y' = 2)",
+    "Nullable(Enum8('x' = 1, 'y' = 2))",
+    'LowCardinality(Nullable(String))',
+    'UUID',
+    'Nullable(UUID)',
+    'IPv4',
+    'IPv6',
+    'Bool',
+    'Nullable(Bool)',
+  ])('renders IN / NOT IN as a value list for %s columns', (type) => {
+    for (const [operator, keyword] of [
+      [FilterOperator.In, 'IN'],
+      [FilterOperator.NotIn, 'NOT IN'],
+    ] as const) {
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'c', operator, type, value: ['x', ' y'] }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( c ${keyword} ('x', 'y') )`);
+    }
+  });
+
+  it('keeps multi-value variables unquoted in IN filters on Enum columns', () => {
+    const options = {
+      filters: [
+        { condition: 'AND', filterType: 'custom', key: 'e', operator: FilterOperator.In, type: 'Enum8', value: ['$v'] },
+      ],
+    } as QueryBuilderOptions;
+    expect(_testExports.getFilters(options)).toEqual('( e IN ($v) )');
   });
 
   it('generates LIKE clause for JSON mapKey filter', () => {

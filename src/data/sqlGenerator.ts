@@ -1031,8 +1031,11 @@ const isDateFilterWithoutValue = (type: string, operator: FilterOperator): boole
 const isDateFilter = (type: string): boolean => isDateType(type);
 const isStringFilter = (type: string, operator: FilterOperator): boolean =>
   isStringType(type) && !(operator === FilterOperator.In || operator === FilterOperator.NotIn);
+// The filter editor stores IN / NOT IN values as an array for every type that is not boolean, number or date
+// (Enum, UUID, IPv4, IPv6, Bool, ...), so those must be rendered as a value list, not one comma-joined string.
 const isMultiFilter = (type: string, operator: FilterOperator): boolean =>
-  isStringType(type) && (operator === FilterOperator.In || operator === FilterOperator.NotIn);
+  (operator === FilterOperator.In || operator === FilterOperator.NotIn) &&
+  !(isBooleanType(type) || isNumberType(type) || isDateType(type));
 
 /**
  * When filtering in the logs panel in explore view, we need a way to
