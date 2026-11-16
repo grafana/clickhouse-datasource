@@ -71,8 +71,8 @@ jobs:
             # the decision.
             skip=$(jq -r --arg sha "$sha" '
               if   ([.reviews[] | select(.state == "CHANGES_REQUESTED")] | length) > 0 then "a human requested changes"
-              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login | == "data-sources-bot"))] | length) > 0 then "already approved"
-              elif ([.comments[] | select((.author.login | == "data-sources-bot") and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
+              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login == "data-sources-bot"))] | length) > 0 then "already approved"
+              elif ([.comments[] | select((.author.login == "data-sources-bot") and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
               else "" end' <<<"$pr_data")
             if [ -n "$skip" ]; then
               echo "PR #$pr: skipping, $skip"
@@ -253,7 +253,12 @@ jobs:
           HEAD_SHA: ${{ matrix.pr.sha }}
         run: |
           # Bind the approval to the commit collect evaluated; if renovate pushed
-          # since, the API rejects it and the next sweep re-evaluates.
+          # since, skip and let the next sweep re-evaluate the new head.
+          current=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+          if [ "$current" != "$HEAD_SHA" ]; then
+            echo "Head moved from $HEAD_SHA to $current since collect; not approving."
+            exit 0
+          fi
           gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
             -f commit_id="$HEAD_SHA" -f event=APPROVE \
             -f body="Automated approval: patch, pin, digest or lock file maintenance update with all CI checks green."
@@ -314,7 +319,7 @@ jobs:
           # anyway: only a reviewer's current position should count here.
           reviews=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json latestReviews)
           changes_requested=$(jq '[.latestReviews[] | select(.state == "CHANGES_REQUESTED")] | length' <<<"$reviews")
-          bot_approved=$(jq '[.latestReviews[] | select((.author.login | == "data-sources-bot") and .state == "APPROVED")] | length' <<<"$reviews")
+          bot_approved=$(jq '[.latestReviews[] | select((.author.login == "data-sources-bot") and .state == "APPROVED")] | length' <<<"$reviews")
 
           case "$verdict" in
             "VERDICT: approve"|"VERDICT: approve "*)
@@ -323,6 +328,11 @@ jobs:
               elif [ "$bot_approved" -gt 0 ]; then
                 echo "Bot approval already present; nothing to do."
               else
+                current=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid --jq .headRefOid)
+                if [ "$current" != "$HEAD_SHA" ]; then
+                  echo "Head moved from $HEAD_SHA to $current since Claude reviewed; not approving."
+                  exit 0
+                fi
                 body="${verdict#VERDICT: approve}"
                 # commit_id binds the approval to the SHA Claude reviewed.
                 gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
