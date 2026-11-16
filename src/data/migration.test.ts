@@ -74,6 +74,79 @@ describe('Query Editor Version Migration', () => {
     expect(migratedQuery).toEqual(latestQuery);
   });
 
+  it('does not apply migration to v4 sql query with empty pluginVersion', () => {
+    const v4Query: CHSqlQuery = {
+      pluginVersion: '',
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT now() AS time, 1 AS value',
+      refId: 'A',
+      queryType: QueryType.TimeSeries,
+    };
+
+    const migratedQuery = migrateCHQuery(v4Query);
+    expect(migratedQuery).toBe(v4Query);
+    expect(migratedQuery.queryType).toBe(QueryType.TimeSeries);
+  });
+
+  it('does not apply migration to v4 sql query without pluginVersion', () => {
+    const v4Query = {
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT timestamp, body FROM logs',
+      refId: 'A',
+      queryType: QueryType.Logs,
+    } as CHSqlQuery;
+
+    const migratedQuery = migrateCHQuery(v4Query);
+    expect(migratedQuery).toBe(v4Query);
+    expect(migratedQuery.queryType).toBe(QueryType.Logs);
+  });
+
+  it('does not apply migration to v4 builder query without pluginVersion', () => {
+    const v4Query = {
+      editorType: EditorType.Builder,
+      builderOptions: {
+        database: 'default',
+        table: 'logs',
+        queryType: QueryType.Logs,
+        mode: BuilderMode.List,
+        columns: [{ name: 'timestamp', type: 'DateTime', hint: ColumnHint.Time }],
+        limit: 100,
+      },
+      rawSql: 'SELECT timestamp FROM "default"."logs" LIMIT 100',
+      refId: 'A',
+      format: 2,
+    } as CHBuilderQuery;
+
+    const migratedQuery = migrateCHQuery(v4Query) as CHBuilderQuery;
+    expect(migratedQuery).toBe(v4Query);
+    expect(migratedQuery.editorType).toBe(EditorType.Builder);
+    expect(migratedQuery.builderOptions).toBe(v4Query.builderOptions);
+  });
+
+  it('apply migration for sql query with editorType but no queryType or pluginVersion', () => {
+    // The SQL targets of the bundled OTel dashboards have this shape and rely on the migration to derive
+    // queryType from format.
+    const query = {
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT now() AS time, 1 AS value',
+      refId: 'A',
+      format: 0,
+    } as CHSqlQuery;
+
+    const latestQuery: CHSqlQuery = {
+      pluginVersion,
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT now() AS time, 1 AS value',
+      refId: 'A',
+      queryType: QueryType.TimeSeries,
+      format: mapQueryTypeToGrafanaFormat(QueryType.TimeSeries),
+      meta: {},
+    };
+
+    const migratedQuery = migrateCHQuery(query);
+    expect(migratedQuery).toEqual(latestQuery);
+  });
+
   it('apply migration for v3 builder query', () => {
     const v3Query = {
       refId: 'A',

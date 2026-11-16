@@ -177,7 +177,12 @@ const isV3CHQuery = (savedQuery: AnyCHQuery): boolean => {
   // pluginVersion was added in v4
   const oldPluginVersion = !savedQuery['pluginVersion'] || !isVersionGtOrEq(savedQuery.pluginVersion, '4.0.0');
   const oldQueryType = savedQuery['queryType'] === 'sql' || savedQuery['queryType'] === 'builder';
-  return oldPluginVersion || oldQueryType;
+  // editorType was also added in v4. Provisioned and hand-authored queries can have it without a pluginVersion.
+  // A SQL query without a v4 queryType still takes the v3 path, which derives queryType from format.
+  const v4QueryType = Object.values(QueryType).some((t) => t === savedQuery['queryType']);
+  const v4Query =
+    savedQuery['editorType'] === EditorType.Builder || (savedQuery['editorType'] === EditorType.SQL && v4QueryType);
+  return oldQueryType || (oldPluginVersion && !v4Query);
 };
 
 /**
