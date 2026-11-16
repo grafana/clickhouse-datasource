@@ -976,7 +976,7 @@ const getFilters = (options: QueryBuilderOptions): string => {
       } else {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }
-    } else if (isMultiFilter(type, filter.operator)) {
+    } else if (isMultiFilter(type, filter.operator, (filter as MultiFilter).value)) {
       filterParts.push(`(${(filter as MultiFilter).value?.map((v) => escapeValue(v.trim())).join(', ')})`);
     } else {
       filterParts.push(escapeValue((filter as StringFilter).value || ''));
@@ -1031,8 +1031,12 @@ const isDateFilterWithoutValue = (type: string, operator: FilterOperator): boole
 const isDateFilter = (type: string): boolean => isDateType(type);
 const isStringFilter = (type: string, operator: FilterOperator): boolean =>
   isStringType(type) && !(operator === FilterOperator.In || operator === FilterOperator.NotIn);
-const isMultiFilter = (type: string, operator: FilterOperator): boolean =>
-  isStringType(type) && (operator === FilterOperator.In || operator === FilterOperator.NotIn);
+// The editor stores IN and NOT IN values as an array for every column type that is not boolean,
+// number or date (see isMultiFilter in components/queryBuilder/utils.ts), but isStringType only
+// covers String and FixedString. Treat an array as a list too, so Enum, UUID, IPv4, IPv6 and Bool
+// columns get one literal per value instead of all values in one string (#2225).
+const isMultiFilter = (type: string, operator: FilterOperator, value?: unknown): boolean =>
+  (operator === FilterOperator.In || operator === FilterOperator.NotIn) && (isStringType(type) || Array.isArray(value));
 
 /**
  * When filtering in the logs panel in explore view, we need a way to
