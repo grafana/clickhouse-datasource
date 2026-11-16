@@ -270,8 +270,9 @@ export class Datasource
   // republished to AdHocFilter — JSON keys carry their type in the minted
   // backtick form, so escapeKey renders them statelessly.
   private jsonColumnsByTable: Map<string, Set<string>> = new Map();
-  // Time key column of each table, for bounding value suggestions (see fetchTimeKeyColumn).
-  private timeKeyColumns = new Map<string, Promise<TableColumn | undefined>>();
+  // Identifiers in the partition and sorting keys of each table, for bounding value suggestions
+  // (see fetchTimeKeyColumn).
+  private tableKeyNames = new Map<string, Promise<string[]>>();
   // Bare table names whose Map/JSON column kinds are already resolved — avoids
   // redundant system.columns lookups.
   private attributeSchemaFetched: Set<string> = new Set();
@@ -1500,26 +1501,38 @@ export class Datasource
    * key first, for bounding a scan by time so ClickHouse can skip parts. Undefined when the keys use
    * none: a time column outside the keys would still be read whole, so it bounds nothing.
    */
-  fetchTimeKeyColumn(db: string, table: string, columns: readonly TableColumn[]): Promise<TableColumn | undefined> {
+  async fetchTimeKeyColumn(
+    db: string,
+    table: string,
+    columns: readonly TableColumn[]
+  ): Promise<TableColumn | undefined> {
     const cacheKey = `${db}.${table}`;
-    let found = this.timeKeyColumns.get(cacheKey);
-    if (!found) {
+    // The key identifiers are remembered, not the matched column: the columns may not be loaded yet,
+    // and a table whose keys use no time column is not looked up again.
+    let names = this.tableKeyNames.get(cacheKey);
+    if (!names) {
       const rawSql = `SELECT partition_key, sorting_key FROM system.tables WHERE database = '${escapeCHStringLiteral(db)}' AND name = '${escapeCHStringLiteral(table)}'`;
-      found = this.runQuery({ rawSql })
+      names = this.runQuery({ rawSql })
         .then((frame) => {
-          const keys = (frame.fields || []).map((f) => String(f.values[0] ?? ''));
-          const names = keys.flatMap((key) => key.match(/`[^`]+`|[A-Za-z_][A-Za-z0-9_.]*/g) || []);
-          return names
-            .map((name) => name.replace(/^`|`$/g, ''))
-            .map((name) => columns.find((c) => c.name === name && DATE_COLUMN_TYPE.test(c.type)))
-            .find(Boolean);
+          // A failed query returns no fields; a table without rows here still has both.
+          if (!frame.fields?.length) {
+            throw new Error('table keys lookup failed');
+          }
+          return frame.fields
+            .map((f) => String(f.values[0] ?? ''))
+            .flatMap((key) => key.match(/`[^`]+`|[A-Za-z_][A-Za-z0-9_.]*/g) || [])
+            .map((name) => name.replace(/^`|`$/g, ''));
         })
-        .catch(() => undefined);
-      this.timeKeyColumns.set(cacheKey, found);
-      // A failed lookup is not remembered.
-      found.then((column) => column || this.timeKeyColumns.delete(cacheKey));
+        .catch(() => {
+          // A failed lookup is not remembered.
+          this.tableKeyNames.delete(cacheKey);
+          return [];
+        });
+      this.tableKeyNames.set(cacheKey, names);
     }
-    return found;
+    return (await names)
+      .map((name) => columns.find((c) => c.name === name && DATE_COLUMN_TYPE.test(c.type)))
+      .find(Boolean);
   }
 
   async fetchEntities() {

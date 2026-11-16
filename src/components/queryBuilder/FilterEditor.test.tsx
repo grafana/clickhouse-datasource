@@ -245,6 +245,41 @@ describe('FilterEditor', () => {
       expect(signals[1].aborted).toBe(true);
     });
 
+    it('keeps the newer search when an earlier time key lookup finishes last', async () => {
+      const { result, ds } = renderWithSuggestions(serviceFilter(), ['api']);
+      const timeKeys: Array<(column: undefined) => void> = [];
+      ds.fetchTimeKeyColumn.mockImplementation(() => new Promise((resolve) => timeKeys.push(resolve)));
+      result.rerender(
+        <FilterEditor
+          allColumns={[]}
+          filter={serviceFilter()}
+          index={0}
+          onFilterChange={() => {}}
+          removeFilter={() => {}}
+          datasource={ds}
+          database="db"
+          table="spans"
+          columns={[{ name: 'ServiceName', hint: ColumnHint.TraceServiceName }]}
+        />
+      );
+      const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'a');
+      await waitFor(() => expect(timeKeys).toHaveLength(1));
+      await userEvent.type(input, 'p', { skipClick: true });
+      await waitFor(() => expect(timeKeys).toHaveLength(2));
+      timeKeys[1](undefined);
+      await waitFor(() => expect(ds.fetchDistinctValues).toHaveBeenCalledTimes(1));
+      timeKeys[0](undefined);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      // The superseded search runs no lookup, and the newer one is not aborted.
+      expect(ds.fetchDistinctValues).toHaveBeenCalledTimes(1);
+      const options = ds.fetchDistinctValues.mock.calls[0][3];
+      expect(options.search).toBe('ap');
+      expect(options.signal.aborted).toBe(false);
+    });
+
     it('commits a typed value on blur', async () => {
       const { result, onFilterChange } = renderWithSuggestions(serviceFilter(), []);
       const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;

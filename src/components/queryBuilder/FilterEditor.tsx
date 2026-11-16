@@ -374,19 +374,13 @@ const useValueSuggester = (
     columns.find((c) => c.hint === ColumnHint.FilterTime) || columns.find((c) => c.hint === ColumnHint.Time);
 
   return async (search: string) => {
-    // The time role of the query bounds the scan; without one, a time column in the table keys does.
-    const time = timeRole
-      ? { name: timeRole.name, type: allColumns.find((c) => c.name === timeRole.name)?.type || timeRole.type }
-      : await datasource.fetchTimeKeyColumn(database, table, allColumns);
-    const timeColumn = time?.name;
-    const timeColumnType = time?.type;
     const range = (getTemplateSrv() as any)?.timeRange?.raw;
     const key = JSON.stringify([
       database,
       table,
       column,
       filter.mapKey,
-      timeColumn,
+      timeRole?.name,
       `${range?.from}`,
       `${range?.to}`,
       otherFilters,
@@ -395,17 +389,31 @@ const useValueSuggester = (
     let entry = cache.current.get(key);
     // A relative range moves with time, so cached values expire.
     if (!entry || Date.now() - entry.at > SUGGESTION_CACHE_MS) {
+      // Supersede the previous lookup before anything is awaited, so a slower earlier search
+      // cannot abort this one.
       inFlight.current?.abort();
       const lookup = new AbortController();
       inFlight.current = lookup;
-      const options = { timeColumn, timeColumnType, search, where: otherFilters, signal: lookup.signal };
-      const values = (
-        isMapType
+      const values = (async () => {
+        // The time role of the query bounds the scan; without one, a time column in the table keys does.
+        const time = timeRole
+          ? { name: timeRole.name, type: allColumns.find((c) => c.name === timeRole.name)?.type || timeRole.type }
+          : await datasource.fetchTimeKeyColumn(database, table, allColumns);
+        if (lookup.signal.aborted) {
+          return [];
+        }
+        const options = {
+          timeColumn: time?.name,
+          timeColumnType: time?.type,
+          search,
+          where: otherFilters,
+          signal: lookup.signal,
+        };
+        const found = await (isMapType
           ? datasource.fetchDistinctMapValues(column, filter.mapKey!, database, table, options)
-          : datasource.fetchDistinctValues(column, database, table, options)
-      )
-        .then((found) => found.map(String).filter((v) => v !== ''))
-        .catch(() => []);
+          : datasource.fetchDistinctValues(column, database, table, options));
+        return found.map(String).filter((v) => v !== '');
+      })().catch(() => []);
       entry = { at: Date.now(), values };
       cache.current.set(key, entry);
       // An empty result may be a failed or timed-out lookup: ask again next time.

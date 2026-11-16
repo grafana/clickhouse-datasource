@@ -1569,6 +1569,35 @@ describe('ClickHouseDatasource', () => {
       expect(found).toBeUndefined();
     });
 
+    it('remembers a table whose keys use no time column, and matches columns loaded later', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([{ partition_key: '', sorting_key: 'service, ts' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [])).toBeUndefined();
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [])).toBeUndefined();
+      const ts = { name: 'ts', type: 'DateTime', picklistValues: [] };
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [ts])).toEqual(ts);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('looks the table keys up again after a failed lookup', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([{ partition_key: 'toDate(ts)', sorting_key: '' }]);
+      const spy = jest
+        .spyOn(ds, 'query')
+        // Grafana reports a failed query as a response without fields.
+        .mockImplementationOnce(() => of({ data: [], error: { message: 'timeout' } }))
+        .mockImplementation(() => of({ data: [keys] }));
+      const ts = { name: 'ts', type: 'DateTime', picklistValues: [] };
+
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [ts])).toBeUndefined();
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [ts])).toEqual(ts);
+
+      expect(spy).toHaveBeenCalledTimes(2);
+    });
+
     it('escapes map identifiers and map key literals for distinct map values', async () => {
       const ds = cloneDeep(mockDatasource);
       const frame = arrayToDataFrame([{ value: 'alice' }]);
