@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.51.0
 	github.com/docker/go-units v0.5.0
-	github.com/elazarl/goproxy v1.9.3
+	github.com/elazarl/goproxy v1.9.4
 	github.com/grafana/dsconfig/schema v0.0.13
 	github.com/grafana/grafana-plugin-sdk-go v0.299.0
 	github.com/grafana/macropro v1.1.0
