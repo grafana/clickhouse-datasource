@@ -669,11 +669,12 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs;
 
     if (hasLinkTables) {
-      // Record the tables the links actually open (a copied same-signal builder query wins over
-      // linkTables), but not the datasource defaults, which later links resolve for themselves.
+      // Record the tables both links actually open (a copied same-signal builder query wins over
+      // linkTables), defaults included: an opened query keeps its carried tables only while it is on
+      // its own recorded table, so a dashboard that sets one variable would otherwise lose it.
       const linkedTables: LinkTables = {
-        traces: copiedTraceQuery || linkTables.traces ? toLinkTable(traceIdQuery.builderOptions) : undefined,
-        logs: copiedLogsQuery || linkTables.logs ? toLinkTable(traceLogsQuery.builderOptions) : undefined,
+        traces: toLinkTable(traceIdQuery.builderOptions),
+        logs: toLinkTable(traceLogsQuery.builderOptions),
       };
       traceIdQuery.builderOptions.meta = { ...traceIdQuery.builderOptions.meta, linkTables: linkedTables };
       traceLogsQuery.builderOptions.meta = { ...traceLogsQuery.builderOptions.meta, linkTables: linkedTables };

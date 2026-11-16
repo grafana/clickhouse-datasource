@@ -1748,7 +1748,7 @@ describe('transformQueryResponseWithTraceAndLogLinks link table variables', () =
     });
   });
 
-  it('records only the explicitly chosen tables, not the datasource defaults', async () => {
+  it('records the default table too when a dashboard sets only one variable', async () => {
     const { ds, request, response } = setup(sqlQuery);
     ds.settings.jsonData.logs!.defaultDatabase = 'otel';
     ds.settings.jsonData.logs!.defaultTable = 'otel_logs';
@@ -1759,7 +1759,30 @@ describe('transformQueryResponseWithTraceAndLogLinks link table variables', () =
     const out = await transformQueryResponseWithTraceAndLogLinks(ds, request, response);
 
     expect(linkQuery(out, 'View logs')?.builderOptions).toMatchObject({ database: 'otel', table: 'otel_logs' });
-    expect(linkQuery(out, 'View trace')?.builderOptions.meta?.linkTables).toEqual({ traces: linkTables.traces });
+    expect(linkQuery(out, 'View trace')?.builderOptions.meta?.linkTables).toEqual({
+      traces: linkTables.traces,
+      logs: { database: 'otel', table: 'otel_logs' },
+    });
+  });
+
+  it('keeps the variable table of the other signal on the query a link opened, with one variable set', async () => {
+    // Dashboard: only clickhouse_link_traces_table is set, so View logs opens the default logs table.
+    const { ds, request, response } = setup(sqlQuery);
+    ds.settings.jsonData.traces!.defaultDatabase = 'otel';
+    ds.settings.jsonData.traces!.defaultTable = 'otel_traces';
+    ds.settings.jsonData.logs!.defaultDatabase = 'otel';
+    ds.settings.jsonData.logs!.defaultTable = 'otel_logs';
+    const resolve = jest
+      .spyOn(ds, 'resolveLinkTable')
+      .mockImplementation((signal) => (signal === 'traces' ? linkTables.traces : undefined));
+    const logsQuery = linkQuery(await transformQueryResponseWithTraceAndLogLinks(ds, request, response), 'View logs')!;
+
+    // In Explore the variables do not exist; View trace from the opened logs query.
+    resolve.mockReturnValue(undefined);
+    const explore = setup({ ...logsQuery, refId: 'A' });
+    const out = await transformQueryResponseWithTraceAndLogLinks(ds, explore.request, explore.response);
+
+    expect(linkQuery(out, 'View trace')?.builderOptions).toMatchObject(linkTables.traces);
   });
 
   it('resolves the dashboard variables through the template service', async () => {
