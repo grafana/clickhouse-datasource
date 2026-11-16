@@ -149,7 +149,11 @@ describe('FilterEditor', () => {
       }) as Filter;
     const renderWithSuggestions = (filter: Filter, values: string[]) => {
       const onFilterChange = jest.fn();
-      const ds = { ...mockDatasource, fetchDistinctValues: jest.fn(() => Promise.resolve(values)) } as any;
+      const ds = {
+        ...mockDatasource,
+        fetchDistinctValues: jest.fn(() => Promise.resolve(values)),
+        fetchTimeKeyColumn: jest.fn(() => Promise.resolve(undefined)),
+      } as any;
       const result = render(
         <FilterEditor
           allColumns={[{ name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] }]}
@@ -176,15 +180,69 @@ describe('FilterEditor', () => {
 
       await userEvent.type(input, 'api');
       await waitFor(() =>
-        expect(ds.fetchDistinctValues).toHaveBeenCalledWith('ServiceName', 'db', 'spans', {
-          timeColumn: 'Timestamp',
-          timeColumnType: 'DateTime64(9)',
-          search: 'api',
-        })
+        expect(ds.fetchDistinctValues).toHaveBeenCalledWith(
+          'ServiceName',
+          'db',
+          'spans',
+          expect.objectContaining({ timeColumn: 'Timestamp', timeColumnType: 'DateTime64(9)', search: 'api' })
+        )
       );
       await userEvent.keyboard('{Enter}');
 
       await waitFor(() => expect(onFilterChange).toHaveBeenCalledWith(0, expect.objectContaining({ value: 'api' })));
+    });
+
+    it('bounds the lookup by the time column of the table keys when the query has no time role', async () => {
+      const { result, ds } = renderWithSuggestions(serviceFilter(), ['api']);
+      ds.fetchTimeKeyColumn.mockResolvedValue({ name: 'TimestampTime', type: 'DateTime', picklistValues: [] });
+      result.rerender(
+        <FilterEditor
+          allColumns={[]}
+          filter={serviceFilter()}
+          index={0}
+          onFilterChange={() => {}}
+          removeFilter={() => {}}
+          datasource={ds}
+          database="db"
+          table="spans"
+          columns={[{ name: 'ServiceName', hint: ColumnHint.TraceServiceName }]}
+        />
+      );
+      const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'a');
+
+      await waitFor(() =>
+        expect(ds.fetchDistinctValues).toHaveBeenCalledWith(
+          'ServiceName',
+          'db',
+          'spans',
+          expect.objectContaining({ timeColumn: 'TimestampTime', timeColumnType: 'DateTime' })
+        )
+      );
+    });
+
+    it('aborts the lookup a newer search supersedes', async () => {
+      const signals: AbortSignal[] = [];
+      const { result, ds } = renderWithSuggestions(serviceFilter(), []);
+      // Lookups that never finish, as a slow scan would not.
+      ds.fetchDistinctValues.mockImplementation(
+        (_c: string, _d: string, _t: string, options: { signal: AbortSignal }) => {
+          signals.push(options.signal);
+          return new Promise(() => {});
+        }
+      );
+      const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'a');
+      await waitFor(() => expect(signals).toHaveLength(1));
+      await userEvent.type(input, 'p');
+      await waitFor(() => expect(signals).toHaveLength(2));
+
+      expect(signals[0].aborted).toBe(true);
+      expect(signals[1].aborted).toBe(false);
+      result.unmount();
+      expect(signals[1].aborted).toBe(true);
     });
 
     it('commits a typed value on blur', async () => {
@@ -212,7 +270,11 @@ describe('FilterEditor', () => {
 
     it('narrows suggestions by the other filters, skipping empty ones', async () => {
       const fetchDistinctValues = jest.fn(() => Promise.resolve(['GET /']));
-      const ds = { ...mockDatasource, fetchDistinctValues } as any;
+      const ds = {
+        ...mockDatasource,
+        fetchDistinctValues,
+        fetchTimeKeyColumn: () => Promise.resolve(undefined),
+      } as any;
       const filters: Filter[] = [
         serviceFilter({ value: 'api' }),
         serviceFilter({ hint: undefined, key: 'StatusCode', value: '' }),

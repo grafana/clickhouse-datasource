@@ -17,7 +17,7 @@ import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { lastValueFrom, of, Subject, throwError } from 'rxjs';
+import { lastValueFrom, Observable, of, Subject, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
@@ -1489,11 +1489,10 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
 
-      await ds.fetchDistinctValues('SpanName', 'db', 'spans', { where: "ServiceName = 'api'" });
+      await ds.fetchDistinctValues('SpanName', 'db', 'spans', { timeColumn: 'ts', where: "ServiceName = 'api'" });
 
-      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
-        `SELECT DISTINCT "SpanName" FROM "db"."spans" WHERE "SpanName" IS NOT NULL AND (ServiceName = 'api') LIMIT 1000` +
-          settings
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(
+        `WHERE "SpanName" IS NOT NULL AND (ServiceName = 'api') AND "ts" >= `
       );
     });
 
@@ -1501,12 +1500,73 @@ describe('ClickHouseDatasource', () => {
       const ds = cloneDeep(mockDatasource);
       const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
 
-      await ds.fetchDistinctValues('svc', 'db', 'events', { search: "o'k" });
+      await ds.fetchDistinctValues('svc', 'db', 'events', { timeColumn: 'ts', search: "o'k" });
 
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(
+        `AND positionCaseInsensitiveUTF8(toString("svc"), 'o\\'k') > 0 LIMIT 1000` + settings
+      );
+    });
+
+    it('reads a sample of the table when no time column bounds the scan', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctValues('svc', 'db', 'events', { search: "o'k", where: "level = 'error'" });
+
+      // The filters narrow the sample; the search runs over the sampled values only.
       expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
-        `SELECT DISTINCT "svc" FROM "db"."events" WHERE "svc" IS NOT NULL AND positionCaseInsensitiveUTF8(toString("svc"), 'o\\'k') > 0 LIMIT 1000` +
+        `SELECT DISTINCT __suggested FROM (SELECT "svc" AS __suggested FROM "db"."events" WHERE "svc" IS NOT NULL AND (level = 'error') LIMIT 100000) WHERE 1 AND positionCaseInsensitiveUTF8(toString(__suggested), 'o\\'k') > 0 LIMIT 1000` +
           settings
       );
+    });
+
+    it('cancels a value lookup when its signal aborts', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const unsubscribed = jest.fn();
+      jest.spyOn(ds, 'query').mockImplementation(() => new Observable(() => unsubscribed));
+      const lookup = new AbortController();
+
+      const values = ds.fetchDistinctValues('svc', 'db', 'events', { timeColumn: 'ts', signal: lookup.signal });
+      lookup.abort();
+
+      await expect(values).rejects.toMatchObject({ name: 'AbortError' });
+      expect(unsubscribed).toHaveBeenCalled();
+    });
+
+    it('finds the time column of the table keys, the partition key first', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([
+        { partition_key: 'toDate(TimestampTime)', sorting_key: 'ServiceName, toUnixTimestamp(Timestamp)' },
+      ]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+      const columns = [
+        { name: 'ServiceName', type: 'LowCardinality(String)', picklistValues: [] },
+        { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+        { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+      ];
+
+      expect(await ds.fetchTimeKeyColumn("o'db", 'logs', columns)).toEqual(columns[2]);
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        `SELECT partition_key, sorting_key FROM system.tables WHERE database = 'o\\'db' AND name = 'logs'`
+      );
+      // Looked up once per table.
+      await ds.fetchTimeKeyColumn("o'db", 'logs', columns);
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('finds no time column when the table keys use none', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([{ partition_key: '', sorting_key: 'service, created_at' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+
+      // created_at is a String here, so it does not count.
+      const found = await ds.fetchTimeKeyColumn('db', 'events', [
+        { name: 'service', type: 'String', picklistValues: [] },
+        { name: 'created_at', type: 'String', picklistValues: [] },
+        { name: 'ts', type: 'DateTime', picklistValues: [] },
+      ]);
+
+      expect(found).toBeUndefined();
     });
 
     it('escapes map identifiers and map key literals for distinct map values', async () => {

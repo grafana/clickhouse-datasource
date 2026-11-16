@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getTemplateSrv } from '@grafana/runtime';
 import { SelectableValue } from '@grafana/data';
 import {
@@ -354,6 +354,9 @@ const useValueSuggester = (
 ): ValueSuggester | undefined => {
   const { filter, datasource, database, table, allColumns, columns = [], otherFilters } = props;
   const cache = useRef(new Map<string, { at: number; values: Promise<string[]> }>());
+  // The lookup in flight: a new search supersedes it, and so does closing the field.
+  const inFlight = useRef<AbortController | undefined>(undefined);
+  useEffect(() => () => inFlight.current?.abort(), []);
   const column = filter.hint ? columns.find((c) => c.hint === filter.hint)?.name : filter.key;
   const columnType = allColumns.find((c) => c.name === column)?.type || filter.type;
   if (
@@ -369,10 +372,14 @@ const useValueSuggester = (
 
   const timeRole =
     columns.find((c) => c.hint === ColumnHint.FilterTime) || columns.find((c) => c.hint === ColumnHint.Time);
-  const timeColumn = timeRole?.name;
-  const timeColumnType = allColumns.find((c) => c.name === timeColumn)?.type || timeRole?.type;
 
   return async (search: string) => {
+    // The time role of the query bounds the scan; without one, a time column in the table keys does.
+    const time = timeRole
+      ? { name: timeRole.name, type: allColumns.find((c) => c.name === timeRole.name)?.type || timeRole.type }
+      : await datasource.fetchTimeKeyColumn(database, table, allColumns);
+    const timeColumn = time?.name;
+    const timeColumnType = time?.type;
     const range = (getTemplateSrv() as any)?.timeRange?.raw;
     const key = JSON.stringify([
       database,
@@ -388,7 +395,10 @@ const useValueSuggester = (
     let entry = cache.current.get(key);
     // A relative range moves with time, so cached values expire.
     if (!entry || Date.now() - entry.at > SUGGESTION_CACHE_MS) {
-      const options = { timeColumn, timeColumnType, search, where: otherFilters };
+      inFlight.current?.abort();
+      const lookup = new AbortController();
+      inFlight.current = lookup;
+      const options = { timeColumn, timeColumnType, search, where: otherFilters, signal: lookup.signal };
       const values = (
         isMapType
           ? datasource.fetchDistinctMapValues(column, filter.mapKey!, database, table, options)
