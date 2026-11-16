@@ -174,8 +174,9 @@ function traceSearchOriginUrl(): string {
 // Logs origin with a time filter AND a ServiceName filter: exercises the
 // "copy fields directly from log search" branch. The link must keep the time
 // bound but drop the ServiceName filter (the 'worker' log row proves it).
-// format: 1 renders the result as a table so the traceID cell is clickable
-// the same way as in the trace-search test.
+// The editor runs a Logs builder query in the logs format (2), so the origin
+// renders in the Logs panel, and the test follows the link from the details of
+// a log row.
 function logsOriginUrl(): string {
   return exploreUrl({
     refId: 'A',
@@ -219,7 +220,7 @@ function logsOriginUrl(): string {
       ],
       orderBy: [],
     },
-    format: 1,
+    format: 2,
   });
 }
 
@@ -313,10 +314,13 @@ test.describe('trace→logs "View logs" data link', () => {
 
   test('from a logs query: keeps the time bound but drops the origin non-time filters', async ({ page }) => {
     await page.goto(logsOriginUrl());
-    await expect(page.getByText(TRACE_A, { exact: true }).first()).toBeVisible();
+    // 'request received' is an in-window api log row of trace-a. Its details show the traceID links.
+    await page.getByText('request received', { exact: true }).first().click();
+    const viewLogs = page.getByRole('link', { name: 'View logs' }).first();
+    await expect(viewLogs).toBeVisible();
 
     const traceLogsResponsePromise = waitForQueryWithRefId(page, TRACE_LOGS_REFID);
-    await clickViewLogs(page, TRACE_A);
+    await viewLogs.click();
 
     const traceLogsResponse = await traceLogsResponsePromise;
     expect(traceLogsResponse.ok()).toBe(true);
