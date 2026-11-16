@@ -1427,6 +1427,25 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 
 		assert.Equal(t, nil, err)
 	})
+
+	t.Run("should forward X-Grafana-User from the request user", func(t *testing.T) {
+		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Grafana-User": ""})
+		dsInstance, err := NewDatasource(ctx, settings)
+		assert.Equal(t, nil, err)
+
+		ds, ok := dsInstance.(backend.QueryDataHandler)
+		require.True(t, ok, "instance must implement backend.QueryDataHandler")
+
+		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Grafana-User": "alice"})
+		userReq := &backend.QueryDataRequest{
+			PluginContext: backend.PluginContext{DataSourceInstanceSettings: &settings},
+			Queries:       req.Queries,
+		}
+		_, err = ds.QueryData(backend.WithUser(ctx, &backend.User{Login: "alice"}), userReq)
+
+		assert.Equal(t, nil, err)
+	})
 }
 
 // TestQueryDataMacroExpansion exercises the macropro-driven macro pipeline end to
