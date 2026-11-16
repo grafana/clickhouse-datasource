@@ -4,13 +4,14 @@ name: Renovate approve
 # Reading labels and check status from the API at decision time avoids the races
 # a pull_request payload has: renovate adds the tier labels a moment after
 # creating the PR, and a check cancelled by a runner eviction never fires a new
-# event to retry. This also folds in what renovate-rerun-sweeper.yml used to do,
-# so there is one place that reconciles open renovate PRs.
+# event to retry. It also reruns runs that infrastructure cancelled, so there is
+# one place that reconciles open renovate PRs.
 on:
   schedule:
-    # Hourly across the window renovate is allowed to open PRs in (Mon-Thu,
-    # 08:00-16:59 Europe/Berlin), so an approval lands while someone is around
-    # to catch a bad one.
+    # Hourly on weekdays Mon-Thu, 07:23-17:23 UTC (about 08:23-18:23 Berlin in
+    # winter), so an approval lands while someone is around to catch a bad one.
+    # The shared presets set no renovate schedule, so this is not tied to the
+    # window renovate opens PRs in.
     - cron: '23 7-17 * * 1-4'
   workflow_dispatch:
 
@@ -49,6 +50,10 @@ jobs:
           # Give up after this many attempts per run; if the infrastructure
           # keeps cancelling the same job, a human should look at it.
           MAX_ATTEMPTS: 3
+          # Give up on a gated PR after this many failed verdict attempts for
+          # the same commit, so a stuck gate stops burning a Claude session
+          # every sweep and a human is told.
+          MAX_VERDICT_FAILURES: 3
         run: |
           set -euo pipefail
 
@@ -62,7 +67,7 @@ jobs:
           for pr in "${candidates[@]:-}"; do
             [ -n "$pr" ] || continue
 
-            pr_data=$(gh pr view "$pr" --json headRefOid,labels,reviews,comments)
+            pr_data=$(gh pr view "$pr" --json headRefOid,labels,latestReviews,comments)
             sha=$(jq -r '.headRefOid' <<<"$pr_data")
 
             # Never overrule a person, and never judge the same commit twice:
@@ -70,9 +75,9 @@ jobs:
             # carrying this exact commit. A rebase moves the SHA and reopens
             # the decision.
             skip=$(jq -r --arg sha "$sha" '
-              if   ([.reviews[] | select(.state == "CHANGES_REQUESTED")] | length) > 0 then "a human requested changes"
-              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login == "data-sources-bot"))] | length) > 0 then "already approved"
-              elif ([.comments[] | select((.author.login == "data-sources-bot") and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
+              if   ([.latestReviews[] | select(.state == "CHANGES_REQUESTED")] | length) > 0 then "a human requested changes"
+              elif ([.latestReviews[] | select(.state == "APPROVED" and (.author.login == "data-sources-bot"))] | length) > 0 then "already approved"
+              elif ([.comments[] | select((.author.login == "data-sources-bot") and (.body | contains("renovate-approve: judged " + $sha)))] | length) > 0 then "already judged this commit"
               else "" end' <<<"$pr_data")
             if [ -n "$skip" ]; then
               echo "PR #$pr: skipping, $skip"
@@ -95,22 +100,6 @@ jobs:
               continue
             fi
 
-            if jq -e 'any(.[]; . == "cancel")' >/dev/null <<<"$checks"; then
-              # An eviction cancels a check and nothing re-runs it on its own,
-              # so nudge it here and pick the PR up on a later sweep.
-              runs=$(gh api "repos/$GH_REPO/actions/runs?head_sha=$sha&per_page=100" \
-                --jq '[.workflow_runs[] | {id, status, conclusion, run_attempt}]')
-              jq -r --argjson max "$MAX_ATTEMPTS" \
-                '.[] | select(.status == "completed" and .conclusion == "cancelled" and .run_attempt < $max) | .id' \
-                <<<"$runs" |
-              while read -r id; do
-                echo "PR #$pr: rerunning cancelled run $id"
-                gh api -X POST "repos/$GH_REPO/actions/runs/$id/rerun" || true
-              done
-              echo "PR #$pr: skipping, waiting on the reruns"
-              continue
-            fi
-
             # A failing renovate/artifacts means renovate could not build the
             # lock file, so CI dies at install and the PR can never go green on
             # its own. Hand it to the decide job to be labelled rather than
@@ -118,7 +107,31 @@ jobs:
             if jq -e 'any(.[]; .name == "renovate/artifacts" and .bucket == "fail")' >/dev/null <<<"$checks_json"; then
               echo "PR #$pr: blocked at $sha, renovate could not build the lock file"
               selected=$(jq -c --argjson pr "$pr" --arg sha "$sha" \
-                '. + [{number: $pr, sha: $sha, mode: "blocked"}]' <<<"$selected")
+                '. + [{number: $pr, sha: $sha, mode: "blocked", reason: "renovate could not build the lock file for this update, so CI cannot pass. The renovate/artifacts status has the reason, usually a peer dependency conflict or a major that needs a code change."}]' <<<"$selected")
+              continue
+            fi
+
+            if jq -e 'any(.[]; . == "cancel")' >/dev/null <<<"$checks"; then
+              # An eviction cancels a check and nothing re-runs it on its own,
+              # so nudge it here and pick the PR up on a later sweep. A run that
+              # concluded `failure` with fail-fast cancelling its other legs has
+              # nothing cancelled to rerun, so count what was actually rerun.
+              runs=$(gh api "repos/$GH_REPO/actions/runs?head_sha=$sha&per_page=100" \
+                --jq '[.workflow_runs[] | {id, status, conclusion, run_attempt}]')
+              rerun_ids=$(jq -r --argjson max "$MAX_ATTEMPTS" \
+                '.[] | select(.status == "completed" and .conclusion == "cancelled" and .run_attempt < $max) | .id' \
+                <<<"$runs")
+              if [ -n "$rerun_ids" ]; then
+                while read -r id; do
+                  echo "PR #$pr: rerunning cancelled run $id"
+                  gh api -X POST "repos/$GH_REPO/actions/runs/$id/rerun" || true
+                done <<<"$rerun_ids"
+                echo "PR #$pr: skipping, waiting on the reruns"
+              else
+                echo "PR #$pr: blocked at $sha, checks were cancelled and no rerun is possible"
+                selected=$(jq -c --argjson pr "$pr" --arg sha "$sha" \
+                  '. + [{number: $pr, sha: $sha, mode: "blocked", reason: "some checks were cancelled and cannot be rerun automatically (no cancelled run left under the attempt limit), so CI is stuck."}]' <<<"$selected")
+              fi
               continue
             fi
 
@@ -129,6 +142,15 @@ jobs:
 
             # claude-gate wins when renovate applied both tier labels.
             labels=$(jq -c '[.labels[].name]' <<<"$pr_data")
+            if jq -e 'index("claude-gate")' >/dev/null <<<"$labels"; then
+              failed=$(jq -r --arg sha "$sha" '[.comments[] | select(.author.login == "data-sources-bot" and (.body | contains("renovate-approve: attempt-failed " + $sha)))] | length' <<<"$pr_data")
+              if [ "$failed" -ge "$MAX_VERDICT_FAILURES" ]; then
+                echo "PR #$pr: blocked at $sha, the gate failed $failed times"
+                selected=$(jq -c --argjson pr "$pr" --arg sha "$sha" \
+                  '. + [{number: $pr, sha: $sha, mode: "blocked", reason: "the Claude gate failed to produce a verdict for this commit several times in a row (turn limit, output format, or federation error). Check the Renovate approve workflow runs."}]' <<<"$selected")
+                continue
+              fi
+            fi
             if jq -e 'index("claude-gate")' >/dev/null <<<"$labels"; then
               mode=gated
             elif jq -e 'index("automerge-direct")' >/dev/null <<<"$labels"; then
@@ -245,6 +267,16 @@ jobs:
         with:
           github_app: data-sources-bot
 
+      - name: Ensure needs-manual-review label exists
+        if: matrix.pr.mode != 'direct'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh label create needs-manual-review --repo "$GITHUB_REPOSITORY" --force \
+            --description "Renovate gate: Claude declined to auto-approve, a human must decide" \
+            --color D93F0B
+
       - name: Approve clear-cut update
         if: matrix.pr.mode == 'direct'
         env:
@@ -259,6 +291,11 @@ jobs:
             echo "Head moved from $HEAD_SHA to $current since collect; not approving."
             exit 0
           fi
+          reviews=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json latestReviews)
+          if jq -e '[.latestReviews[] | select(.state == "CHANGES_REQUESTED" or (.state == "APPROVED" and .author.login == "data-sources-bot"))] | length > 0' >/dev/null <<<"$reviews"; then
+            echo "A human requested changes or the bot already approved; nothing to do."
+            exit 0
+          fi
           gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
             -f commit_id="$HEAD_SHA" -f event=APPROVE \
             -f body="Automated approval: patch, pin, digest or lock file maintenance update with all CI checks green."
@@ -268,20 +305,18 @@ jobs:
       # needs-human verdict does, so one filter finds everything waiting on a
       # person. The comment carries the commit, so the next sweep reads it as
       # judged instead of repeating this every hour.
-      - name: Flag update renovate could not build
+      - name: Flag update that cannot be decided
         if: matrix.pr.mode == 'blocked'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR_NUMBER: ${{ matrix.pr.number }}
           HEAD_SHA: ${{ matrix.pr.sha }}
+          REASON: ${{ matrix.pr.reason }}
         run: |
           gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --body "$(printf 'Needs human review: renovate could not build the lock file for this update, so CI cannot pass. The renovate/artifacts status has the reason, usually a peer dependency conflict or a major that needs a code change.\n\n<!-- renovate-approve: judged %s -->' "$HEAD_SHA")"
+            --body "$(printf 'Needs human review: %s\n\n<!-- renovate-approve: judged %s -->' "$REASON" "$HEAD_SHA")"
           # Best-effort, as in the verdict step: a label failure must not fail
           # the job, the comment above is what marks the commit as judged.
-          gh label create needs-manual-review --repo "$GITHUB_REPOSITORY" --force \
-            --description "Renovate gate: Claude declined to auto-approve, a human must decide" \
-            --color D93F0B 2>/dev/null || true
           gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label needs-manual-review ||
             echo "Could not add the needs-manual-review label; continuing."
 
@@ -349,10 +384,31 @@ jobs:
               # Label for filtering (e.g. org-wide `gh search prs --label needs-manual-review`).
               # Best-effort: a label failure must not fail the gate, the comment
               # above is what marks the commit as judged.
-              gh label create needs-manual-review --repo "$GITHUB_REPOSITORY" --force \
-                --description "Renovate gate: Claude declined to auto-approve, a human must decide" \
-                --color D93F0B 2>/dev/null || true
               gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label needs-manual-review ||
                 echo "Could not add the needs-manual-review label; continuing."
               ;;
           esac
+
+      # Record a failed gated attempt on the PR so collect can stop retrying
+      # after MAX_VERDICT_FAILURES and flag it for a human. The marker is
+      # deliberately not the "judged" one, which would end retries at once.
+      # Mints its own token: the earlier one does not exist if Claude failed.
+      - name: Generate bot token for failure record
+        id: failure-token
+        if: failure() && matrix.pr.mode == 'gated'
+        continue-on-error: true
+        uses: grafana/shared-workflows/actions/create-github-app-token@46f48da11e78ebdba7a8747ae456b11062fac83e # create-github-app-token/v0.3.1
+        with:
+          github_app: data-sources-bot
+
+      - name: Record failed gate attempt
+        if: failure() && matrix.pr.mode == 'gated' && steps.failure-token.outputs.token != ''
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ steps.failure-token.outputs.token }}
+          PR_NUMBER: ${{ matrix.pr.number }}
+          HEAD_SHA: ${{ matrix.pr.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --body "$(printf 'The renovate gate failed to produce a verdict for this commit (%s). It will retry on the next sweep and flag the PR for a human after repeated failures.\n\n<!-- renovate-approve: attempt-failed %s -->' "$RUN_URL" "$HEAD_SHA")"
