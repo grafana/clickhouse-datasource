@@ -67,7 +67,7 @@ export class AdHocFilter {
       .map((f, i) => {
         const key = escapeKey(f.key, useJSON, this._mapColumns);
         const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
-        const condition = i !== validFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
+        const condition = i !== validFilters.length - 1 ? toCondition(f.condition) : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
       })
@@ -129,8 +129,40 @@ export class AdHocFilter {
   }
 }
 
+// Operators Grafana's ad-hoc filter UI can send, plus this plugin's own IN / NOT
+// IN. The operator is emitted verbatim into the filter expression and, like the
+// key and value, is URL-settable (`var-filter=key|<op>|value`), so anything
+// outside this list is rejected rather than spliced into the SQL.
+const SUPPORTED_OPERATORS: ReadonlySet<string> = new Set([
+  '=',
+  '!=',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  '=~',
+  '!~',
+  '=|',
+  '!=|',
+  'IN',
+  'NOT IN',
+]);
+
 function isValid(filter: AdHocVariableFilter): boolean {
-  return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
+  return (
+    filter.key !== undefined &&
+    filter.key !== '' &&
+    filter.operator !== undefined &&
+    SUPPORTED_OPERATORS.has(filter.operator) &&
+    filter.value !== undefined
+  );
+}
+
+// The condition joining two filters is emitted verbatim too, so only AND / OR
+// pass through; anything else falls back to the default AND.
+function toCondition(condition: string | undefined): string {
+  const normalized = condition?.trim().toUpperCase();
+  return normalized === 'OR' ? 'OR' : 'AND';
 }
 
 // Escape regex metacharacters so a table name can be interpolated into a

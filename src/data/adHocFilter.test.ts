@@ -176,6 +176,35 @@ describe('AdHocManager', () => {
     expect(result).not.toContain(" ServiceName = 'nginx' OR 1=1");
   });
 
+  it('does not let a crafted ad-hoc filter operator inject SQL', () => {
+    // The operator is URL-settable too (`var-filter=key|<op>|value`) and is
+    // emitted verbatim, so an operator outside the supported set drops the filter.
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'ServiceName', operator: "= 'x' OR 1=1 OR ServiceName =", value: 'x' },
+      { key: 'host', operator: '=', value: 'a' },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" host = \\'a\\' ");
+  });
+
+  it('keeps every supported operator', () => {
+    const ahm = new AdHocFilter();
+    for (const operator of ['=', '!=', '<', '<=', '>', '>=', '=~', '!~', '=|', '!=|', 'IN', 'NOT IN']) {
+      const result = ahm.buildFilterString([{ key: 'col', operator, value: 'x' }] as AdHocVariableFilter[]);
+      expect(result).not.toBe('');
+    }
+  });
+
+  it('does not let a crafted ad-hoc filter condition inject SQL', () => {
+    const ahm = new AdHocFilter();
+    const result = ahm.buildFilterString([
+      { key: 'a', operator: '=', value: 'x', condition: '1=1 OR' },
+      { key: 'b', operator: '=', value: 'y', condition: 'or' },
+      { key: 'c', operator: '=', value: 'z' },
+    ] as AdHocVariableFilter[]);
+    expect(result).toBe(" a = \\'x\\' AND b = \\'y\\' OR c = \\'z\\' ");
+  });
+
   it('leaves a plain column key unchanged (no backtick churn)', () => {
     const ahm = new AdHocFilter();
     const result = ahm.buildFilterString([{ key: 'ServiceName', operator: '=', value: 'x' }] as AdHocVariableFilter[]);
@@ -383,9 +412,9 @@ describe('AdHocManager', () => {
     expect(ahm.buildFilterString([{ key: 'k', operator: '=|', value: '', values: [] }] as AdHocVariableFilter[])).toBe(
       ' k IN (NULL) '
     );
-    expect(
-      ahm.buildFilterString([{ key: 'k', operator: '!=|', value: '', values: [] }] as AdHocVariableFilter[])
-    ).toBe(' k NOT IN (NULL) ');
+    expect(ahm.buildFilterString([{ key: 'k', operator: '!=|', value: '', values: [] }] as AdHocVariableFilter[])).toBe(
+      ' k NOT IN (NULL) '
+    );
   });
 
   it('escapes each "=|" element so a crafted value cannot break out of the filter', () => {

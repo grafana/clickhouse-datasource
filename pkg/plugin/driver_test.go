@@ -448,6 +448,16 @@ func TestMutateQueryError(t *testing.T) {
 			wantSource: backend.ErrorSourceDownstream,
 		},
 		{
+			name:       "handshake EOF is downstream",
+			err:        fmt.Errorf("%w: handshake: failed to read packet from 00.000.00.000:9440 (conn_id=0000, auth_db=usage): read: EOF", sqlds.ErrorQuery),
+			wantSource: backend.ErrorSourceDownstream,
+		},
+		{
+			name:       "bare EOF uses default source",
+			err:        errors.New("read: EOF"),
+			wantSource: backend.DefaultErrorSource,
+		},
+		{
 			name:       "unknown error uses default source",
 			err:        errors.New("something went very wrong"),
 			wantSource: backend.DefaultErrorSource,
@@ -1064,4 +1074,25 @@ func TestBuildClickHouseOptionsRowLimitPushDown(t *testing.T) {
 		_, ok := opts.Settings["limit"]
 		assert.False(t, ok, "the limit setting must not be pushed to the server when enableRowLimit is off")
 	})
+}
+
+func TestQueryLocation(t *testing.T) {
+	lisbon, err := time.LoadLocation("Europe/Lisbon")
+	assert.NoError(t, err)
+
+	tests := []struct {
+		timeZone string
+		want     *time.Location
+	}{
+		// Grafana sends "utc" in lower case when the dashboard time zone is UTC.
+		{timeZone: "utc", want: time.UTC},
+		{timeZone: "UTC", want: time.UTC},
+		{timeZone: "Europe/Lisbon", want: lisbon},
+		{timeZone: "Not/AZone", want: nil},
+	}
+	for _, tc := range tests {
+		t.Run(tc.timeZone, func(t *testing.T) {
+			assert.Equal(t, tc.want, queryLocation(tc.timeZone))
+		})
+	}
 }
