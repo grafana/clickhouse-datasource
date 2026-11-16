@@ -71,8 +71,8 @@ jobs:
             # the decision.
             skip=$(jq -r --arg sha "$sha" '
               if   ([.reviews[] | select(.state == "CHANGES_REQUESTED")] | length) > 0 then "a human requested changes"
-              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login | startswith("data-sources-bot")))] | length) > 0 then "already approved"
-              elif ([.comments[] | select((.author.login | startswith("data-sources-bot")) and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
+              elif ([.reviews[] | select(.state == "APPROVED" and (.author.login | == "data-sources-bot"))] | length) > 0 then "already approved"
+              elif ([.comments[] | select((.author.login | == "data-sources-bot") and (.body | contains($sha)))] | length) > 0 then "already judged this commit"
               else "" end' <<<"$pr_data")
             if [ -n "$skip" ]; then
               echo "PR #$pr: skipping, $skip"
@@ -160,47 +160,11 @@ jobs:
       contents: read
       pull-requests: read
       checks: read
+      # `gh pr view` (used by Claude) also reads commit statuses.
+      statuses: read
       id-token: write
     runs-on: ubuntu-arm64-small
     steps:
-      # Approvals must come from an identity whose review counts toward the
-      # ruleset's required approval; the workflow GITHUB_TOKEN does not.
-      - name: Generate bot token
-        id: app-token
-        uses: grafana/shared-workflows/actions/create-github-app-token@46f48da11e78ebdba7a8747ae456b11062fac83e # create-github-app-token/v0.3.1
-        with:
-          github_app: data-sources-bot
-
-      - name: Approve clear-cut update
-        if: matrix.pr.mode == 'direct'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ matrix.pr.number }}
-        run: |
-          gh pr review "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --approve --body "Automated approval: patch, pin, digest or lock file maintenance update with all CI checks green."
-
-      # renovate/artifacts failed, so renovate could not produce a valid lock
-      # file and no amount of waiting turns this PR green. Mark it the way a
-      # needs-human verdict does, so one filter finds everything waiting on a
-      # person. The comment carries the commit, so the next sweep reads it as
-      # judged instead of repeating this every hour.
-      - name: Flag update renovate could not build
-        if: matrix.pr.mode == 'blocked'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          PR_NUMBER: ${{ matrix.pr.number }}
-          HEAD_SHA: ${{ matrix.pr.sha }}
-        run: |
-          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
-            --body "$(printf 'Needs human review: renovate could not build the lock file for this update, so CI cannot pass. The renovate/artifacts status has the reason, usually a peer dependency conflict or a major that needs a code change.\n\n<!-- renovate-approve: judged %s -->' "$HEAD_SHA")"
-          # Best-effort, as in the verdict step: a label failure must not fail
-          # the job, the comment above is what marks the commit as judged.
-          gh label create needs-manual-review --repo "$GITHUB_REPOSITORY" --force \
-            --description "Renovate gate: Claude declined to auto-approve, a human must decide" \
-            --color D93F0B 2>/dev/null || true
-          gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label needs-manual-review ||
-            echo "Could not add the needs-manual-review label; continuing."
-
       # The default branch, not the PR head: Claude reads the repository's own
       # code to judge how the updated package is used, and gets the diff itself
       # through `gh pr diff`.
@@ -270,6 +234,52 @@ jobs:
             --max-turns 50
             --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh release view:*),Bash(gh release list:*),WebFetch(domain:github.com),WebFetch(domain:raw.githubusercontent.com),WebFetch(domain:registry.npmjs.org),Read,Grep,Glob"
 
+      # Approvals must come from an identity whose review counts toward the
+      # ruleset's required approval; the workflow GITHUB_TOKEN does not.
+      # Minted only AFTER the Claude review step: action outputs sit in runner
+      # temp files that Claude's Read/Grep/Glob could reach, so the write token
+      # must not exist while Claude runs.
+      - name: Generate bot token
+        id: app-token
+        uses: grafana/shared-workflows/actions/create-github-app-token@46f48da11e78ebdba7a8747ae456b11062fac83e # create-github-app-token/v0.3.1
+        with:
+          github_app: data-sources-bot
+
+      - name: Approve clear-cut update
+        if: matrix.pr.mode == 'direct'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ matrix.pr.number }}
+          HEAD_SHA: ${{ matrix.pr.sha }}
+        run: |
+          # Bind the approval to the commit collect evaluated; if renovate pushed
+          # since, the API rejects it and the next sweep re-evaluates.
+          gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
+            -f commit_id="$HEAD_SHA" -f event=APPROVE \
+            -f body="Automated approval: patch, pin, digest or lock file maintenance update with all CI checks green."
+
+      # renovate/artifacts failed, so renovate could not produce a valid lock
+      # file and no amount of waiting turns this PR green. Mark it the way a
+      # needs-human verdict does, so one filter finds everything waiting on a
+      # person. The comment carries the commit, so the next sweep reads it as
+      # judged instead of repeating this every hour.
+      - name: Flag update renovate could not build
+        if: matrix.pr.mode == 'blocked'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR_NUMBER: ${{ matrix.pr.number }}
+          HEAD_SHA: ${{ matrix.pr.sha }}
+        run: |
+          gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
+            --body "$(printf 'Needs human review: renovate could not build the lock file for this update, so CI cannot pass. The renovate/artifacts status has the reason, usually a peer dependency conflict or a major that needs a code change.\n\n<!-- renovate-approve: judged %s -->' "$HEAD_SHA")"
+          # Best-effort, as in the verdict step: a label failure must not fail
+          # the job, the comment above is what marks the commit as judged.
+          gh label create needs-manual-review --repo "$GITHUB_REPOSITORY" --force \
+            --description "Renovate gate: Claude declined to auto-approve, a human must decide" \
+            --color D93F0B 2>/dev/null || true
+          gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --add-label needs-manual-review ||
+            echo "Could not add the needs-manual-review label; continuing."
+
       # The only step that writes, deterministically, with the bot token Claude
       # never sees. A missing or unparseable verdict fails the job and leaves the
       # commit unmarked, so the next sweep retries (the action exits 0 whenever
@@ -285,10 +295,13 @@ jobs:
           HEAD_SHA: ${{ matrix.pr.sha }}
           EXECUTION_FILE: ${{ steps.claude.outputs.execution_file }}
         run: |
+          # Only the last non-empty line counts, and it must be exactly a
+          # verdict followed by a space or end of line. A quoted VERDICT line
+          # earlier in the message (e.g. from an injected changelog) is ignored.
           verdict=$(jq -r '[.[] | select(.type == "result")] | last | .result // ""' "$EXECUTION_FILE" |
-            grep -E '^VERDICT: (approve|needs-human)' | tail -1 || true)
-          if [ -z "$verdict" ]; then
-            echo "No verdict in Claude's output. Failing so the next sweep retries."
+            tr -d '\r' | grep -v '^[[:space:]]*$' | tail -1 || true)
+          if ! grep -qE '^VERDICT: (approve|needs-human)( |$)' <<<"$verdict"; then
+            echo "No valid final verdict line in Claude's output. Failing so the next sweep retries."
             exit 1
           fi
           printf '%s\n' "$verdict"
@@ -301,23 +314,25 @@ jobs:
           # anyway: only a reviewer's current position should count here.
           reviews=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json latestReviews)
           changes_requested=$(jq '[.latestReviews[] | select(.state == "CHANGES_REQUESTED")] | length' <<<"$reviews")
-          bot_approved=$(jq '[.latestReviews[] | select((.author.login | startswith("data-sources-bot")) and .state == "APPROVED")] | length' <<<"$reviews")
+          bot_approved=$(jq '[.latestReviews[] | select((.author.login | == "data-sources-bot") and .state == "APPROVED")] | length' <<<"$reviews")
 
           case "$verdict" in
-            "VERDICT: approve"*)
+            "VERDICT: approve"|"VERDICT: approve "*)
               if [ "$changes_requested" -gt 0 ]; then
                 echo "A human requested changes; not overruling."
               elif [ "$bot_approved" -gt 0 ]; then
                 echo "Bot approval already present; nothing to do."
               else
                 body="${verdict#VERDICT: approve}"
-                gh pr review "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --approve --body "${body# }"
+                # commit_id binds the approval to the SHA Claude reviewed.
+                gh api -X POST "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/reviews" \
+                  -f commit_id="$HEAD_SHA" -f event=APPROVE -f body="${body# }"
               fi
               # A rebase can turn an earlier needs-human into an approve; drop
               # the stale label so the filter only shows PRs still waiting.
               gh pr edit "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --remove-label needs-manual-review 2>/dev/null || true
               ;;
-            "VERDICT: needs-human"*)
+            "VERDICT: needs-human"|"VERDICT: needs-human "*)
               body="${verdict#VERDICT: needs-human}"
               gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" \
                 --body "$(printf 'Needs human review: %s\n\n<!-- renovate-approve: judged %s -->' "${body# }" "$HEAD_SHA")"
