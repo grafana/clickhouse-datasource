@@ -614,6 +614,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onContextColumnsChange={(c) => onLogsConfigChange('contextColumns', c)}
                 onShowLogLinksChange={(v) => onLogsConfigChange('showLogLinks', v)}
                 onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
+                onAttributeColumnsChange={(c) => onLogsConfigChange('attributeColumns', c)}
+                onAttributeColumnExclusionsChange={(c) => onLogsConfigChange('attributeColumnExclusions', c)}
               />
             </>
           )}
@@ -793,6 +795,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onLogsConfigChange('showLogLinks', v);
               }}
               onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
+              onAttributeColumnsChange={(c) => onLogsConfigChange('attributeColumns', c)}
+              onAttributeColumnExclusionsChange={(c) => onLogsConfigChange('attributeColumnExclusions', c)}
             />
 
             <Divider />
