@@ -42,8 +42,8 @@ jobs:
 
   cicd:
     name: CI/CD
-    # Release path only. On pull requests every job in the shared workflow is
-    # skipped, so it is not called at all and CI above is the only PR path.
+    # Release path only. On pull requests and merge groups every job in the shared
+    # workflow is skipped, so it is not called at all and CI above is their only path.
     if: github.ref == 'refs/heads/main'
     # Intentionally pinned to @main: data-sources-ci-workflows does not publish
     # versioned tags for datasource-cicd.yml yet. Allowed by the zizmor policy
