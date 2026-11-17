@@ -405,6 +405,31 @@ describe('transformQueryResponseWithTraceAndLogLinks', () => {
     expect(getDefaultTraceLinksColumnPrefix).toHaveBeenCalled();
   });
 
+  it('leaves events and links out of the View trace query when no prefix is configured (#1715)', async () => {
+    const mockDatasource = newMockDatasource();
+    mockDatasource.settings.jsonData.traces = {
+      defaultDatabase: 'app',
+      defaultTable: 'spans',
+      otelEnabled: false,
+      traceIdColumn: 'trace_id',
+      spanIdColumn: 'span_id',
+      startTimeColumn: 'started_at',
+      durationColumn: 'duration',
+    };
+    jest.spyOn(mockDatasource, 'fetchColumns').mockResolvedValue([]);
+
+    const [request, response] = buildTestRequestResponse({ queryType: QueryType.Logs });
+    const out = await transformQueryResponseWithTraceAndLogLinks(mockDatasource, request, response);
+
+    const links = out?.data[0]?.fields[0]?.config?.links;
+    const traceQuery = links?.find((link: any) => link.title === 'View trace')?.internal?.query as CHBuilderQuery;
+    expect(traceQuery.builderOptions.meta?.traceEventsColumnPrefix).toBe('');
+    expect(traceQuery.builderOptions.meta?.traceLinksColumnPrefix).toBe('');
+    expect(traceQuery.rawSql).toContain('"app"."spans"');
+    expect(traceQuery.rawSql).not.toContain('Events');
+    expect(traceQuery.rawSql).not.toContain('Links');
+  });
+
   it('includes TraceId filter in View logs link query using configured column', async () => {
     const mockDatasource = newMockDatasource();
     // Mock that TraceId is configured

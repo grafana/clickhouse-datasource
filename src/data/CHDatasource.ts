@@ -1169,12 +1169,17 @@ export class Datasource
     return this.settings.jsonData.traces?.flattenNested || false;
   }
 
+  // An empty events or links prefix leaves those columns out of the trace query: only OTel tables are known to have them.
   getDefaultTraceEventsColumnPrefix(): string {
-    return this.settings.jsonData.traces?.traceEventsColumnPrefix || 'Events';
+    const traceConfig = this.settings.jsonData.traces;
+    const otelConfig = traceConfig?.otelEnabled ? otel.getVersion(traceConfig.otelVersion) : undefined;
+    return otelConfig?.traceEventsColumnPrefix ?? traceConfig?.traceEventsColumnPrefix ?? '';
   }
 
   getDefaultTraceLinksColumnPrefix(): string {
-    return this.settings.jsonData.traces?.traceLinksColumnPrefix || 'Links';
+    const traceConfig = this.settings.jsonData.traces;
+    const otelConfig = traceConfig?.otelEnabled ? otel.getVersion(traceConfig.otelVersion) : undefined;
+    return otelConfig?.traceLinksColumnPrefix ?? traceConfig?.traceLinksColumnPrefix ?? '';
   }
 
   /**
