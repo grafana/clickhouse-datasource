@@ -127,6 +127,12 @@ describe('ast', () => {
       ['a top-level UNION (per-branch keying is a follow-up)', 'SELECT a FROM t1 UNION ALL SELECT a FROM t2', ''],
       ['a top-level INTERSECT', 'SELECT a FROM t1 INTERSECT SELECT a FROM t2', ''],
       ['a top-level EXCEPT', 'SELECT a FROM t1 EXCEPT SELECT a FROM t2', ''],
+      [
+        'an INTERSECT after GROUP BY',
+        'SELECT ServiceName FROM otel_logs GROUP BY ServiceName INTERSECT SELECT ServiceName FROM otel_traces',
+        '',
+      ],
+      ['an EXCEPT after a table alias', 'SELECT a FROM t1 AS x EXCEPT SELECT a FROM t2', ''],
       ['a CTE with no underlying table', 'WITH x AS (SELECT 1) SELECT * FROM x', ''],
     ])('returns no table for %s', (_label, sql, expected) => {
       expect(getTable(sql)).toBe(expected);
@@ -159,6 +165,13 @@ describe('ast', () => {
       ],
       ['a double-quoted qualified name', 'SELECT * FROM "default"."otel_logs"', 'default.otel_logs'],
       ['a mixed backtick-quoted name', 'SELECT * FROM db.`weird-table`', 'db.weird-table'],
+      ['an EXCEPT column modifier (not a set operation)', 'SELECT * EXCEPT (secret) FROM otel_logs', 'otel_logs'],
+      [
+        'an EXCEPT modifier on a COLUMNS matcher',
+        "SELECT COLUMNS('^Span') EXCEPT (SpanId) FROM otel_traces",
+        'otel_traces',
+      ],
+      ['a column named except (not a set operation)', 'SELECT a FROM otel_logs WHERE except = 2', 'otel_logs'],
       [
         "the outer FROM's own subquery, not a scalar subquery in the SELECT list",
         'SELECT (SELECT max(ts) FROM other_table) AS m, col FROM (SELECT * FROM main_table) x',

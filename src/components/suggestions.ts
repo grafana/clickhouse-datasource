@@ -105,17 +105,27 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
     }
   }
 
-  // When the cursor is in a FROM/JOIN position on a `$`-prefixed target, surface
-  // that target (the nearest FROM/JOIN before the cursor) so variable
-  // completions are offered for a JOIN target too, not just the first FROM. The
-  // clause guard keeps this from changing a later clause's column context.
-  if (cursorData.clause === ClauseType.From || cursorData.clause === ClauseType.Join) {
+  // In a FROM position the target being typed is the outer FROM or the last JOIN
+  // whose keyword the cursor has passed. The parser reads a JOIN target as a From
+  // node too, as it does a FROM inside a function call (`EXTRACT(DAY FROM ts)`),
+  // which is not a target. When the target is `$`-prefixed (`${t}` or `${db}.`,
+  // as in the typingVariable check below), surface it so a JOIN target gets
+  // variable completions, not just the first FROM. The clause guard keeps this
+  // from changing a later clause's column context.
+  if (cursorData.clause === ClauseType.From) {
+    let target: FromQueryNode | undefined;
     for (const node of root.children) {
-      const fromNode = node as FromQueryNode;
-      if (node.type === QueryNodeType.From && fromNode.table?.startsWith('$') && node.token.begin <= cursorPosition) {
-        cursorData.database = fromNode.database;
-        cursorData.table = fromNode.table;
+      if (
+        node.type === QueryNodeType.From &&
+        (node === root.from || node.token.matchKeyword('JOIN')) &&
+        node.token.end < cursorPosition
+      ) {
+        target = node;
       }
+    }
+    if (target && (target.table || target.database || '').startsWith('$')) {
+      cursorData.database = target.database;
+      cursorData.table = target.table;
     }
   }
 
