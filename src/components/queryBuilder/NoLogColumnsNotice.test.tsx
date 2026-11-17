@@ -1,7 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { BuilderMode, ColumnHint, QueryBuilderOptions, QueryType } from 'types/queryBuilder';
-import { NoLogColumnsNotice, hasNoLogColumns } from './NoLogColumnsNotice';
+import { NO_LOG_COLUMNS_NOTICE_DELAY_MS, NoLogColumnsNotice, hasNoLogColumns } from './NoLogColumnsNotice';
 
 const column = { name: 'c', type: 'String', picklistValues: [] };
 const options = (overrides: Partial<QueryBuilderOptions> = {}): QueryBuilderOptions => ({
@@ -33,9 +33,31 @@ describe('hasNoLogColumns', () => {
 });
 
 describe('NoLogColumnsNotice', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
   it('names the table and links to the logs settings of the datasource', () => {
     render(<NoLogColumnsNotice datasourceUid="a b" table="host_logs" />);
+    act(() => {
+      jest.advanceTimersByTime(NO_LOG_COLUMNS_NOTICE_DELAY_MS);
+    });
     expect(screen.getByTestId('logs-no-columns-notice')).toHaveTextContent('host_logs');
     expect(screen.getByRole('link')).toHaveAttribute('href', '/connections/datasources/edit/a%20b#logs-config');
+  });
+
+  it('does not flash while default columns are still being applied', () => {
+    const { unmount } = render(<NoLogColumnsNotice datasourceUid="uid" table="host_logs" />);
+    expect(screen.queryByTestId('logs-no-columns-notice')).not.toBeInTheDocument();
+    act(() => {
+      jest.advanceTimersByTime(NO_LOG_COLUMNS_NOTICE_DELAY_MS - 1);
+    });
+    expect(screen.queryByTestId('logs-no-columns-notice')).not.toBeInTheDocument();
+
+    // Unmounted before the delay (columns arrived): the notice never shows.
+    unmount();
+    act(() => {
+      jest.advanceTimersByTime(NO_LOG_COLUMNS_NOTICE_DELAY_MS);
+    });
+    expect(screen.queryByTestId('logs-no-columns-notice')).not.toBeInTheDocument();
   });
 });

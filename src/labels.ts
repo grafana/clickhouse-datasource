@@ -488,7 +488,7 @@ export default {
       noColumnsNotice: {
         title: 'No columns selected, so no query is running',
         text: (table: string) =>
-          `No time, message or level column could be matched for table "${table}". Set the log role columns in the`,
+          `No columns are selected for table "${table}", so there is nothing to query. Select columns, or set the log role columns in the`,
         linkText: 'ClickHouse data source settings.',
       },
       columnsHelp: {
