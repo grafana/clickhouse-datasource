@@ -124,6 +124,27 @@ describe('useLogDefaultsOnMount', () => {
       jest.restoreAllMocks();
     }
   });
+
+  it('carries the schema type on the configured role columns once the table columns are loaded', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getLogsOtelVersion').mockReturnValue(undefined);
+    jest.spyOn(mockDatasource, 'getAdditionalLogColumns').mockReturnValue([]);
+    jest
+      .spyOn(mockDatasource, 'getDefaultLogsColumns')
+      .mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'ts']]));
+    const allColumns = [{ name: 'ts', type: 'DateTime64(3)', picklistValues: [] }] as TableColumn[];
+
+    renderHook(() =>
+      useLogDefaultsOnMount(mockDatasource, true, {} as QueryBuilderOptions, builderOptionsDispatch, allColumns)
+    );
+
+    // The millisecond log-time bound reads this type, so a non-OTel table gets the bound too
+    const dispatched = builderOptionsDispatch.mock.calls[0][0].payload.columns as SelectedColumn[];
+    expect(dispatched).toEqual([{ name: 'ts', hint: ColumnHint.Time, type: 'DateTime64(3)' }]);
+
+    jest.restoreAllMocks();
+  });
 });
 
 describe('useOtelColumns', () => {

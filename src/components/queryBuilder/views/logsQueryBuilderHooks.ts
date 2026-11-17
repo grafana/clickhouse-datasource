@@ -19,7 +19,9 @@ export const buildDefaultLogsColumns = (
   const columns: SelectedColumn[] = [];
   const includedColumns = new Set<string>();
   for (let [hint, colName] of datasource.getDefaultLogsColumns()) {
-    columns.push({ name: colName, hint });
+    // Carry the schema type when it is loaded: the millisecond log-time bound reads the time column's type.
+    const type = allColumns.find((c) => c.name === colName)?.type;
+    columns.push(type ? { name: colName, hint, type } : { name: colName, hint });
     includedColumns.add(colName);
   }
 

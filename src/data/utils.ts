@@ -345,7 +345,8 @@ const isTimeRangeFilter = (filter: Filter): boolean =>
 /**
  * Replaces the plugin's time macros with concrete bounds from the given range, matching
  * the backend's expansion (`toDateTime(<unix seconds>)`, or `fromUnixTimestamp64Milli(<unix ms>)` for the
- * millisecond macros); `from` is floored and `to` is ceiled so sub-second edges are never clipped. Data-link queries need this because
+ * millisecond macros). For the seconds macros `from` is floored and `to` is ceiled so sub-second edges are never
+ * clipped; the `_ms` macros bind the exact milliseconds. Data-link queries need this because
  * Grafana's link variable check treats `$__fromTime`/`$__toTime` as template variables
  * and hides links whose serialized query contains variables it cannot resolve.
  */
