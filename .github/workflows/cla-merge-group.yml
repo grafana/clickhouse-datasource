@@ -32,6 +32,7 @@ jobs:
           pr_head_sha=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" --jq .head.sha)
           cla_state=$(gh api "repos/$GITHUB_REPOSITORY/commits/$pr_head_sha/status" \
             --jq '.statuses[] | select(.context == "license/cla") | .state')
+          description="license/cla was ${cla_state:-missing} on #$pr_number head $pr_head_sha"
           if [[ "$cla_state" != success ]]; then
             cla_state=failure
           fi
@@ -39,5 +40,5 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/statuses/$QUEUE_SHA" \
             -f state="$cla_state" \
             -f context=license/cla \
-            -f description="Copied from #$pr_number head commit $pr_head_sha" \
+            -f description="$description" \
             -f target_url="$RUN_URL"
