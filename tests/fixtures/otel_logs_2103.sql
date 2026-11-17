@@ -1,5 +1,5 @@
 -- Fixture for #2103: an otel_logs table that keeps TimestampTime but partitions and sorts on Timestamp,
--- plus a Distributed table over it. tests/e2e/otelLogsTimestampKeys.spec.ts reads both.
+-- plus a Distributed table over it. tests/e2e/logs/otelLogsTimestampKeys.spec.ts reads both.
 
 CREATE DATABASE IF NOT EXISTS e2e_test;
 
