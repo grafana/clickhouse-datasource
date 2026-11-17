@@ -1,10 +1,10 @@
 import { expect, test } from '@grafana/plugin-e2e';
-import { QueryType } from '../../src/types/queryBuilder';
-import { builderFieldRow, pickBuilderSelect, switchToBuilderMode } from './helpers/builder';
-import { FIXTURE_FROM_ISO, FIXTURE_TO_ISO, skipFixtureTestsOnCloud } from './helpers/env';
-import { exploreUrl } from './helpers/explore';
-import { rowCount, waitForQueryDataResponseWithBody } from './helpers/queryResponse';
-import { runQuery } from './helpers/sqlEditor';
+import { QueryType } from '../../../src/types/queryBuilder';
+import { builderFieldRow, pickBuilderSelect, switchToBuilderMode } from '../helpers/builder';
+import { FIXTURE_FROM_ISO, FIXTURE_TO_ISO, skipFixtureTestsOnCloud } from '../helpers/env';
+import { exploreUrl } from '../helpers/explore';
+import { rowCount, waitForQueryDataResponseWithBody } from '../helpers/queryResponse';
+import { runQuery } from '../helpers/sqlEditor';
 
 const FIXTURE_ROW_COUNT = 5;
 
