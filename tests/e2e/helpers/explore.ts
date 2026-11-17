@@ -11,8 +11,8 @@ export interface ExploreUrlOptions {
   /**
    * The query's plugin version. Empty (the default) marks a SQL query without queryType as a v3
    * query: the editor migrates it and sets queryType from format, which is Table here because
-   * SQL queries get no format. Builder queries, and SQL queries with a v4 queryType, load as v4
-   * queries with any version.
+   * SQL queries get no format. Builder queries with builderOptions, and SQL queries with a v4
+   * queryType, load as v4 queries with any version.
    */
   pluginVersion?: string;
 }

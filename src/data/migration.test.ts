@@ -147,6 +147,28 @@ describe('Query Editor Version Migration', () => {
     expect(migratedQuery).toEqual(latestQuery);
   });
 
+  it('apply migration for builder query with editorType but no builderOptions or pluginVersion', () => {
+    // A hand-provisioned query can carry editorType 'builder' without builderOptions. It must keep its rawSql
+    // and open in the SQL editor, not in an empty Query Builder.
+    const query = {
+      editorType: EditorType.Builder,
+      rawSql: 'SELECT 1',
+      refId: 'A',
+    } as unknown as CHSqlQuery;
+
+    const latestQuery: CHSqlQuery = {
+      pluginVersion,
+      editorType: EditorType.SQL,
+      rawSql: 'SELECT 1',
+      refId: 'A',
+      queryType: QueryType.Table,
+      meta: {},
+    };
+
+    const migratedQuery = migrateCHQuery(query);
+    expect(migratedQuery).toEqual(latestQuery);
+  });
+
   it('apply migration for v3 builder query', () => {
     const v3Query = {
       refId: 'A',
