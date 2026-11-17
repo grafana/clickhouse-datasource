@@ -122,9 +122,12 @@ const FIXTURE_TO_ISO = '2024-03-15T10:15:00.000Z';
 const TRACE_A = 'e2e-trace-a';
 // In-window logs for trace-a; excludes the 2024-03-16 row and the trace-b row
 const TRACE_A_IN_WINDOW_LOG_COUNT = 3;
+// The one trace-a row of e2e_test_alt.trace_links_logs, inside the window
+const TRACE_A_ALT_LOG_COUNT = 1;
 
 const TRACE_LOGS_REFID = 'Trace Logs';
 const LINK_TABLE_DASHBOARD_UID = 'e2e-link-table-variables';
+const TIME_RANGE_DASHBOARD_UID = 'e2e-trace-links-time-range';
 const LOGS_VOLUME_REFID = 'log-volume-Trace Logs';
 
 function exploreUrl(query: Record<string, unknown>): string {
@@ -387,15 +390,66 @@ test.describe('trace→logs "View logs" data link', () => {
 
       const traceLogsResponse = await traceLogsResponsePromise;
       expect(traceLogsResponse.ok()).toBe(true);
-      // The link opens the table the variable chose, not the default e2e_test.trace_links_logs. A
-      // dashboard opens the link in a new tab without its time range, so Explore runs it over its
-      // default range and the row count of the fixture window cannot be checked here.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const body: any = await traceLogsResponse.json();
-      expect(body?.results?.[TRACE_LOGS_REFID]?.status).toBe(200);
+      // The link opens the table the variable chose, not the default e2e_test.trace_links_logs,
+      // whose copy in e2e_test_alt holds one row of trace-a in the dashboard time range.
       expect(traceLogsRawSql(traceLogsResponse)).toContain('"e2e_test_alt"."trace_links_logs"');
+      expect(rowCount(await traceLogsResponse.json(), TRACE_LOGS_REFID)).toBe(TRACE_A_ALT_LOG_COUNT);
     } finally {
       await request.delete(`/api/dashboards/uid/${LINK_TABLE_DASHBOARD_UID}`);
+    }
+  });
+
+  test('from a dashboard: opens the logs over the dashboard time range', async ({ page, request }) => {
+    const datasource = { type: PLUGIN_TYPE, uid: DATASOURCE_UID };
+    const dashboard = {
+      uid: TIME_RANGE_DASHBOARD_UID,
+      title: 'E2E trace links time range',
+      schemaVersion: 39,
+      time: { from: FIXTURE_FROM_ISO, to: FIXTURE_TO_ISO },
+      panels: [
+        {
+          id: 1,
+          type: 'table',
+          title: 'spans',
+          gridPos: { x: 0, y: 0, w: 24, h: 8 },
+          datasource,
+          targets: [
+            {
+              refId: 'A',
+              datasource,
+              editorType: 'sql',
+              format: 1,
+              queryType: 'table',
+              rawSql: `SELECT TraceId AS traceID, SpanName FROM e2e_test.trace_spans WHERE TraceId = '${TRACE_A}' LIMIT 1`,
+            },
+          ],
+        },
+      ],
+    };
+    expect((await request.post('/api/dashboards/db', { data: { dashboard, overwrite: true } })).ok()).toBe(true);
+
+    try {
+      await page.goto(`/d/${TIME_RANGE_DASHBOARD_UID}?orgId=1`);
+      await expect(page.getByText(TRACE_A, { exact: true }).first()).toBeVisible();
+
+      // A dashboard opens data links in a new tab, so wait on the whole browser context.
+      const traceLogsResponsePromise = page
+        .context()
+        .waitForEvent(
+          'response',
+          (r) =>
+            r.url().includes('/api/ds/query') &&
+            (r.request().postData() || '').includes(`"refId":"${TRACE_LOGS_REFID}"`)
+        );
+      await clickViewLogs(page, TRACE_A);
+
+      // Explore runs the logs query over the dashboard time range, not its default last hour, which
+      // holds none of the fixture rows.
+      const traceLogsResponse = await traceLogsResponsePromise;
+      expect(traceLogsResponse.ok()).toBe(true);
+      expect(rowCount(await traceLogsResponse.json(), TRACE_LOGS_REFID)).toBe(TRACE_A_IN_WINDOW_LOG_COUNT);
+    } finally {
+      await request.delete(`/api/dashboards/uid/${TIME_RANGE_DASHBOARD_UID}`);
     }
   });
 });
