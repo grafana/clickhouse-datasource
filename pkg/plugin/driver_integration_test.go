@@ -1430,6 +1430,7 @@ func TestHTTPConnectWithHeaders(t *testing.T) {
 
 	t.Run("should forward X-Grafana-User from the request user", func(t *testing.T) {
 		settings := backend.DataSourceInstanceSettings{JSONData: []byte(fmt.Sprintf(`{"server": "localhost", "port": %s, "username": "%s", "protocol": "http", "forwardGrafanaHeaders": true}`, proxyPort, username)), DecryptedSecureJSONData: secure}
+		// The first handler serves the bootstrap ping in NewDatasource, which has no request user. The second serves the query.
 		proxy.NonproxyHandler = proxyHandlerGenerator(t, map[string]string{"X-Grafana-User": ""})
 		dsInstance, err := NewDatasource(ctx, settings)
 		assert.Equal(t, nil, err)
