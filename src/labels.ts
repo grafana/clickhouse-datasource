@@ -485,6 +485,12 @@ export default {
       tooltip: 'Group the results by specific column',
     },
     LogsQueryBuilder: {
+      noColumnsNotice: {
+        title: 'No columns selected, so no query is running',
+        text: (table: string) =>
+          `No time, message or level column could be matched for table "${table}". Set the log role columns in the`,
+        linkText: 'ClickHouse data source settings.',
+      },
       columnsHelp: {
         text: 'Map your table columns to the roles the logs panel expects. Each column is aliased in the generated SQL.',
         linkText: 'Learn about column roles',
