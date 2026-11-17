@@ -64,3 +64,25 @@ jobs:
         env:
           CLICKHOUSE_VERSION: ${{ matrix.clickhouse }}
         run: go test -v -tags=integration ./...
+
+  # Stable, branch-protection-friendly result for the dynamic matrix above.
+  # The `run (<version>)` job names change whenever the upstream SECURITY.md
+  # support table changes, so they can't be required checks. Require this job
+  # instead. `if: always()` makes it report even when `versions` fails (which
+  # skips `run`), and a skipped/cancelled/failed dependency fails it.
+  integration-result:
+    name: Integration tests result
+    if: always()
+    needs: [versions, run]
+    permissions: {}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the version lookup and every matrix job succeeded
+        env:
+          VERSIONS_RESULT: ${{ needs.versions.result }}
+          RUN_RESULT: ${{ needs.run.result }}
+        run: |
+          echo "versions: $VERSIONS_RESULT, run: $RUN_RESULT"
+          if [ "$VERSIONS_RESULT" != "success" ] || [ "$RUN_RESULT" != "success" ]; then
+            exit 1
+          fi
