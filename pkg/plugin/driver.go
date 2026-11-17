@@ -502,7 +502,7 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		ForwardHeaders:      settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
 		RowLimit:            rowLimit,
 		RowCapacityHint:     settings.RowCapacityHint,
-		LongToWideCellLimit: -1,
+		LongToWideCellLimit: -1, // -1 means no limit on the time-series pivot. 0 applies the sqlds default of 10,000,000 cells.
 	}
 }
 
