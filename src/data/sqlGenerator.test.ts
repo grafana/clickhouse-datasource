@@ -16,6 +16,7 @@ import {
   getColumnIndexByHint,
   getColumnsByHints,
   isAggregateQuery,
+  isPlainStringValue,
   JSON_SENTINEL_KEY,
 } from './sqlGenerator';
 
@@ -1085,7 +1086,10 @@ describe('getColumnIdentifier', () => {
     // in the Columns selector. See https://github.com/grafana/clickhouse-datasource/issues/2126.
     { input: { name: `Attributes['http.route'] AS http_route` }, expected: `Attributes['http.route'] AS http_route` },
     { input: { name: `Attributes['http.route'] as http_route` }, expected: `Attributes['http.route'] as http_route` },
-    { input: { name: `Attributes['http.route']\tAS\thttp_route` }, expected: `Attributes['http.route']\tAS\thttp_route` },
+    {
+      input: { name: `Attributes['http.route']\tAS\thttp_route` },
+      expected: `Attributes['http.route']\tAS\thttp_route`,
+    },
   ];
 
   it.each(cases)('returns correct identifier (case %#)', (c) => {
@@ -1579,5 +1583,16 @@ describe('getFilters', () => {
     const sql = _testExports.getFilters(options);
     const expectedSql = "( hinted >= $__fromTime AND hinted <= $__toTime ) AND ( text = '' ) AND ( volume > 0 )";
     expect(sql).toEqual(expectedSql);
+  });
+});
+
+describe('isPlainStringValue', () => {
+  it.each(['api', 'a b', 'a,b', 'café'])('accepts %j, which escapeValue quotes as is', (value) => {
+    expect(isPlainStringValue(value)).toBe(true);
+    expect(_testExports.escapeValue(value)).toBe(`'${value}'`);
+  });
+
+  it.each(['$x', '(', 'x)', "O'Brien", 'say "hi"', 'c\\d', '[[v]]', ' pad', 'pad '])('rejects %j', (value) => {
+    expect(isPlainStringValue(value)).toBe(false);
   });
 });

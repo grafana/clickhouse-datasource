@@ -1569,6 +1569,21 @@ describe('ClickHouseDatasource', () => {
       expect(found).toBeUndefined();
     });
 
+    it('prefers the time column of the query when the table keys use it', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([
+        { partition_key: 'toDate(TimestampTime)', sorting_key: 'toUnixTimestamp(Timestamp)' },
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+      const timestampTime = { name: 'TimestampTime', type: 'DateTime', picklistValues: [] };
+      const timestamp = { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] };
+      const createdAt = { name: 'CreatedAt', type: 'DateTime', picklistValues: [] };
+
+      expect(await ds.fetchTimeKeyColumn('db', 'logs', [timestampTime, timestamp], timestamp)).toEqual(timestamp);
+      // A time column outside the keys bounds nothing, so a key column stands in for it.
+      expect(await ds.fetchTimeKeyColumn('db', 'logs', [timestampTime, createdAt], createdAt)).toEqual(timestampTime);
+    });
+
     it('remembers a table whose keys use no time column, and matches columns loaded later', async () => {
       const ds = cloneDeep(mockDatasource);
       const keys = arrayToDataFrame([{ partition_key: '', sorting_key: 'service, ts' }]);

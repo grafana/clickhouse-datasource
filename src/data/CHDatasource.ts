@@ -1497,14 +1497,16 @@ export class Datasource
   }
 
   /**
-   * A Date or DateTime column of the table that its partition key or sorting key uses, the partition
-   * key first, for bounding a scan by time so ClickHouse can skip parts. Undefined when the keys use
-   * none: a time column outside the keys would still be read whole, so it bounds nothing.
+   * A Date or DateTime column of the table that its partition key or sorting key uses, for bounding a
+   * scan by time so ClickHouse can skip parts: `preferred` (the time column of the query) when the keys
+   * use it, else the first such column, the partition key first. Undefined when the keys use none: a
+   * time column outside the keys would still be read whole, so it bounds nothing.
    */
   async fetchTimeKeyColumn(
     db: string,
     table: string,
-    columns: readonly TableColumn[]
+    columns: readonly TableColumn[],
+    preferred?: TableColumn
   ): Promise<TableColumn | undefined> {
     const cacheKey = `${db}.${table}`;
     // The key identifiers are remembered, not the matched column: the columns may not be loaded yet,
@@ -1530,9 +1532,11 @@ export class Datasource
         });
       this.tableKeyNames.set(cacheKey, names);
     }
-    return (await names)
-      .map((name) => columns.find((c) => c.name === name && DATE_COLUMN_TYPE.test(c.type)))
-      .find(Boolean);
+    const keyNames = await names;
+    if (preferred && keyNames.includes(preferred.name) && DATE_COLUMN_TYPE.test(preferred.type)) {
+      return preferred;
+    }
+    return keyNames.map((name) => columns.find((c) => c.name === name && DATE_COLUMN_TYPE.test(c.type))).find(Boolean);
   }
 
   async fetchEntities() {

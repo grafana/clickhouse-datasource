@@ -1,7 +1,7 @@
 import React from 'react';
-import { fireEvent, render, waitFor } from '@testing-library/react';
+import { fireEvent, render, renderHook, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor } from './FilterEditor';
+import { defaultNewFilter, FilterEditor, FiltersEditor, FilterValueEditor, useValueSuggester } from './FilterEditor';
 import { selectors } from 'selectors';
 import {
   BooleanFilter,
@@ -152,7 +152,10 @@ describe('FilterEditor', () => {
       const ds = {
         ...mockDatasource,
         fetchDistinctValues: jest.fn(() => Promise.resolve(values)),
-        fetchTimeKeyColumn: jest.fn(() => Promise.resolve(undefined)),
+        // The table keys use the time column of the query unless a test says otherwise.
+        fetchTimeKeyColumn: jest.fn((_d: string, _t: string, _c: unknown, preferred?: unknown) =>
+          Promise.resolve(preferred)
+        ),
       } as any;
       const result = render(
         <FilterEditor
@@ -190,6 +193,51 @@ describe('FilterEditor', () => {
       await userEvent.keyboard('{Enter}');
 
       await waitFor(() => expect(onFilterChange).toHaveBeenCalledWith(0, expect.objectContaining({ value: 'api' })));
+    });
+
+    it('reads a sample when the time column of the query is outside the table keys', async () => {
+      const { result, ds } = renderWithSuggestions(serviceFilter(), ['api']);
+      ds.fetchTimeKeyColumn.mockResolvedValue(undefined);
+      const input = result.getByTestId('query-builder-filters-single-string-value-container').querySelector('input')!;
+
+      await userEvent.type(input, 'a');
+
+      await waitFor(() => expect(ds.fetchDistinctValues).toHaveBeenCalled());
+      expect(ds.fetchTimeKeyColumn).toHaveBeenCalledWith(
+        'db',
+        'spans',
+        expect.anything(),
+        expect.objectContaining({ name: 'Timestamp', type: 'DateTime64(9)' })
+      );
+      expect(ds.fetchDistinctValues.mock.calls[0][3].timeColumn).toBeUndefined();
+    });
+
+    it('suggests only values the SQL keeps as plain literals, and looks up no search that none could match', async () => {
+      const ds = {
+        ...mockDatasource,
+        fetchDistinctValues: jest.fn(() =>
+          Promise.resolve(['api', "it's", '$svc', 'f(x)', ' pad', 'a\\b', '[[svc]]', 'a "b"'])
+        ),
+        fetchTimeKeyColumn: jest.fn(() => Promise.resolve(undefined)),
+      } as any;
+      const { result } = renderHook(() =>
+        useValueSuggester(
+          {
+            filter: serviceFilter(),
+            datasource: ds,
+            database: 'db',
+            table: 'spans',
+            allColumns: [],
+            columns: [{ name: 'ServiceName', hint: ColumnHint.TraceServiceName }],
+          },
+          false,
+          false
+        )
+      );
+
+      expect(await result.current!("it'")).toEqual([]);
+      expect(ds.fetchDistinctValues).not.toHaveBeenCalled();
+      expect(await result.current!('a')).toEqual(['api']);
     });
 
     it('bounds the lookup by the time column of the table keys when the query has no time role', async () => {

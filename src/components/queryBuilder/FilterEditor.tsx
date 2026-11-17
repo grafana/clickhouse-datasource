@@ -31,7 +31,7 @@ import useUniqueMapKeys from 'hooks/useUniqueMapKeys';
 import useUniqueJSONPaths from 'hooks/useUniqueJSONPaths';
 import { getFilterOperatorsByType } from './filterOperatorOptions';
 import { DurationFilterInput } from './DurationFilterInput';
-import { getFilters } from 'data/sqlGenerator';
+import { getFilters, isPlainStringValue } from 'data/sqlGenerator';
 
 const boolValues: Array<SelectableValue<boolean>> = [
   { value: true, label: 'True' },
@@ -335,11 +335,13 @@ export const FilterValueEditor = (props: {
 
 /**
  * Suggests the distinct values of the filtered column (for a role filter, the column holding the
- * role) matching the typed search. When the query has a time role, the lookup is bounded by the
- * dashboard time range on it, so large tables are not scanned whole. Exact and prefix matches come
- * first. Not offered for JSON paths, a Map column without a key, or Array/Tuple/Nested columns.
+ * role) matching the typed search, leaving out values the generated SQL would not keep as plain
+ * literals. The lookup is bounded by the dashboard time range on a time column of the table keys
+ * (the time role of the query when the keys use it), else reads a sample, so large tables are not
+ * scanned whole. Exact and prefix matches come first. Not offered for JSON paths, a Map column
+ * without a key, or Array/Tuple/Nested columns.
  */
-const useValueSuggester = (
+export const useValueSuggester = (
   props: {
     filter: Filter;
     datasource: Datasource;
@@ -374,6 +376,10 @@ const useValueSuggester = (
     columns.find((c) => c.hint === ColumnHint.FilterTime) || columns.find((c) => c.hint === ColumnHint.Time);
 
   return async (search: string) => {
+    // No value that contains this search is suggested, and template interpolation would rewrite it.
+    if (!isPlainStringValue(search.trim())) {
+      return [];
+    }
     const range = (getTemplateSrv() as any)?.timeRange?.raw;
     const key = JSON.stringify([
       database,
@@ -395,10 +401,13 @@ const useValueSuggester = (
       const lookup = new AbortController();
       inFlight.current = lookup;
       const values = (async () => {
-        // The time role of the query bounds the scan; without one, a time column in the table keys does.
-        const time = timeRole
-          ? { name: timeRole.name, type: allColumns.find((c) => c.name === timeRole.name)?.type || timeRole.type }
-          : await datasource.fetchTimeKeyColumn(database, table, allColumns);
+        // A time column in the table keys bounds the scan, the time role of the query first.
+        const preferred = timeRole && {
+          name: timeRole.name,
+          type: allColumns.find((c) => c.name === timeRole.name)?.type || timeRole.type || '',
+          picklistValues: [],
+        };
+        const time = await datasource.fetchTimeKeyColumn(database, table, allColumns, preferred);
         if (lookup.signal.aborted) {
           return [];
         }
@@ -412,7 +421,8 @@ const useValueSuggester = (
         const found = await (isMapType
           ? datasource.fetchDistinctMapValues(column, filter.mapKey!, database, table, options)
           : datasource.fetchDistinctValues(column, database, table, options));
-        return found.map(String).filter((v) => v !== '');
+        // Only values the generated SQL keeps as the same quoted literal (see isPlainStringValue).
+        return found.map(String).filter((v) => v !== '' && isPlainStringValue(v));
       })().catch(() => []);
       entry = { at: Date.now(), values };
       cache.current.set(key, entry);
