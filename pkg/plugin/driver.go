@@ -499,9 +499,10 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
-		RowLimit:        rowLimit,
-		RowCapacityHint: settings.RowCapacityHint,
+		ForwardHeaders:      settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
+		RowLimit:            rowLimit,
+		RowCapacityHint:     settings.RowCapacityHint,
+		LongToWideCellLimit: -1,
 	}
 }
 
