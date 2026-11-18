@@ -231,7 +231,7 @@ Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is t
 
 ## Apply ad hoc filters manually with `$__adHocFilters`
 
-By default, ad hoc filters are applied automatically by detecting the target table from your SQL. For queries that use CTEs, subqueries, or ClickHouse-specific syntax (for example `INTERVAL` or parameterized aggregate functions), automatic detection can fail. In those cases, use the `$__adHocFilters('table_name')` macro to specify where to apply the filters.
+By default, ad hoc filters are applied automatically to the table your query reads from: the table in the outer `FROM` clause or, when that `FROM` reads a subquery or a CTE, the table inside it. A query that combines `SELECT` statements with `UNION`, `INTERSECT`, or `EXCEPT`, or that reads from a table function such as `merge()`, has no single target table, so the plugin doesn't add the filters to it. In those cases, use the `$__adHocFilters('table_name')` macro to specify where to apply the filters.
 
 The macro expands to the ClickHouse `additional_table_filters` setting with the currently active ad hoc filter conditions. Place it in the **SETTINGS** clause of your query. The macro applies every active filter to the tables you name, including a filter whose key names a different table, so use it when a panel reads a view, a Distributed table, or a joined table instead of the table the filter keys come from.
 

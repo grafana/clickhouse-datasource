@@ -539,6 +539,8 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
   return concatQueryParts(queryParts);
 };
 
+const isDateTime64Type = (type?: string): boolean => stripTypeModifiers(type || '').startsWith('datetime64');
+
 /**
  * Generates an aggregate time series query.
  */
@@ -552,7 +554,9 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
 
   const timeColumn = getColumnByHint(options, ColumnHint.Time) || getColumnByHint(options, ColumnHint.FilterTime);
   if (timeColumn !== undefined) {
-    timeColumn.name = `$__timeInterval(${timeColumn.name})`;
+    // DateTime64 columns can carry sub-second data, which $__timeInterval would floor to whole seconds
+    const macro = isDateTime64Type(timeColumn.type) ? '$__timeInterval_ms' : '$__timeInterval';
+    timeColumn.name = `${macro}(${timeColumn.name})`;
     timeColumn.alias = 'time';
     selectParts.push(getColumnIdentifier(timeColumn));
   }
