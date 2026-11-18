@@ -367,7 +367,7 @@ export default {
               'Flattened label paths to keep out of the Fields list, matched by subtree: an entry like JsonBody.content.vendor also removes JsonBody.content.vendor.email and any leaf under it. Applies to the attribute columns above and the OTel columns. Leave empty to exclude none.',
             placeholder: 'Column.path prefix (enter key to add)',
             description:
-              'Use this to keep sensitive paths (e.g. emails, cookies, client IPs) out of the flattened fields.',
+              'Use this to keep sensitive paths (e.g. emails, cookies, client IPs) out of the flattened fields. It does not block queries on them.',
           },
         },
         traceIdCorrelation: {
