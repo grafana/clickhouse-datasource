@@ -182,7 +182,6 @@ async function getSuggestionsFromCursorData(
     [ClauseType.With]: 'column',
     [ClauseType.Select]: 'column',
     [ClauseType.From]: 'database_or_table',
-    [ClauseType.Join]: 'database_or_table',
     [ClauseType.Where]: 'column',
     [ClauseType.GroupBy]: 'column',
     [ClauseType.Having]: 'column',
@@ -193,13 +192,10 @@ async function getSuggestionsFromCursorData(
 
   if (data.database && !data.table) {
     mapping[ClauseType.From] = 'table';
-    mapping[ClauseType.Join] = 'table';
   } else if (data.table && !data.database) {
     mapping[ClauseType.From] = 'database_or_table';
-    mapping[ClauseType.Join] = 'database_or_table';
   } else if (data.database && data.table) {
     mapping[ClauseType.From] = 'table';
-    mapping[ClauseType.Join] = 'table';
   }
 
   const contextType = mapping[data.clause];
