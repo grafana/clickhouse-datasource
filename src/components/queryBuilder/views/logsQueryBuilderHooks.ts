@@ -87,6 +87,43 @@ export const useLogDefaultsOnMount = (
 };
 
 /**
+ * Fills in the schema type of role columns (Time, Log Level, Message, ...) that were selected before the
+ * table's columns loaded, such as the configured defaults of a new query. The millisecond log-time bound
+ * reads the time column's type. Only a missing `type` is filled, so columns the user already changed keep
+ * their values. Idempotent: it dispatches nothing once every role column that can be typed has a type.
+ */
+export const useBackfillLogColumnTypes = (
+  allColumns: readonly TableColumn[],
+  columns: readonly SelectedColumn[] | undefined,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
+  useEffect(() => {
+    if (allColumns.length === 0 || !columns?.length) {
+      return;
+    }
+
+    let changed = false;
+    const next = columns.map((column) => {
+      if (!column.hint || column.type) {
+        return column;
+      }
+
+      const type = allColumns.find((c) => c.name === column.name)?.type;
+      if (!type) {
+        return column;
+      }
+
+      changed = true;
+      return { ...column, type };
+    });
+
+    if (changed) {
+      builderOptionsDispatch(setOptions({ columns: next }));
+    }
+  }, [allColumns, columns, builderOptionsDispatch]);
+};
+
+/**
  * Sets OTEL Logs columns automatically when OTEL is enabled.
  * Does not run if OTEL is already enabled, only when the toggle or the
  * selected schema version changes.

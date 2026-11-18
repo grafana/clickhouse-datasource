@@ -3,6 +3,7 @@ import {
   useDefaultFilters,
   useDefaultLogColumnsByName,
   useDefaultTimeColumn,
+  useBackfillLogColumnTypes,
   useLogDefaultsOnMount,
   useOtelColumns,
 } from './logsQueryBuilderHooks';
@@ -675,5 +676,69 @@ describe('useDefaultFilters', () => {
     hook.rerender('other_logs');
 
     expect(builderOptionsDispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBackfillLogColumnTypes', () => {
+  const allColumns: readonly TableColumn[] = [
+    { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+    { name: 'Body', type: 'String', picklistValues: [] },
+  ];
+
+  it('does nothing while the table columns are not loaded', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [{ name: 'Timestamp', hint: ColumnHint.Time }];
+    renderHook(() => useBackfillLogColumnTypes([], columns, dispatch));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('fills missing types on role columns once the table columns arrive', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [
+      { name: 'Timestamp', hint: ColumnHint.Time },
+      { name: 'Body', hint: ColumnHint.LogMessage },
+    ];
+    const hook = renderHook(({ cols }) => useBackfillLogColumnTypes(cols, columns, dispatch), {
+      initialProps: { cols: [] as readonly TableColumn[] },
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+
+    hook.rerender({ cols: allColumns });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(
+      setOptions({
+        columns: [
+          { name: 'Timestamp', hint: ColumnHint.Time, type: 'DateTime64(9)' },
+          { name: 'Body', hint: ColumnHint.LogMessage, type: 'String' },
+        ],
+      })
+    );
+  });
+
+  it('keeps existing types and ignores columns without a role hint', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [
+      { name: 'Timestamp', hint: ColumnHint.Time, type: 'DateTime' },
+      { name: 'Body' },
+    ];
+    renderHook(() => useBackfillLogColumnTypes(allColumns, columns, dispatch));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('only fills the missing type when other columns are already typed', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [
+      { name: 'Timestamp', hint: ColumnHint.Time, type: 'DateTime' },
+      { name: 'Body', hint: ColumnHint.LogMessage, alias: 'msg' },
+    ];
+    renderHook(() => useBackfillLogColumnTypes(allColumns, columns, dispatch));
+    expect(dispatch).toHaveBeenCalledWith(
+      setOptions({
+        columns: [
+          { name: 'Timestamp', hint: ColumnHint.Time, type: 'DateTime' },
+          { name: 'Body', hint: ColumnHint.LogMessage, alias: 'msg', type: 'String' },
+        ],
+      })
+    );
   });
 });
