@@ -25,11 +25,12 @@ test.describe('Switching from the SQL Editor to the Query Builder', () => {
     await expect(confirmDialog).toBeHidden();
     await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
 
-    // The first filter row holds the column and operator comboboxes, then the value input.
+    // The first filter row holds the column and operator comboboxes, then the value picker, which
+    // shows each value of the IN list as a pill.
     const filterRow = builderFieldRow(page, 'Filters');
     await expect(filterRow.getByRole('combobox').nth(0)).toHaveValue('name');
     await expect(filterRow.getByRole('combobox').nth(1)).toHaveValue('IN');
-    await expect(filterRow.getByPlaceholder('comma separated values')).toHaveValue('default');
+    await expect(filterRow.getByTestId('query-builder-filters-multi-string-value-container')).toHaveText('default');
     await expect(builderFieldRow(page, 'SQL Preview')).toContainText("name IN ('default')");
   });
 });

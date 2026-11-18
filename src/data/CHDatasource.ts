@@ -114,6 +114,24 @@ const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
 // with a known time column, so they prune instead of scanning the full column.
 const ADHOC_PROBE_TIME_WINDOW = 'INTERVAL 6 HOUR';
 const JSON_PATH_SUGGESTION_LIMIT = 5000;
+const VALUE_SUGGESTION_TIMEOUT_S = 5;
+
+/** Options for the filter value suggestions of the query builder. */
+export interface DistinctValueOptions {
+  /**
+   * A time column that bounds the scan to the dashboard time range, best one in the table keys (see
+   * fetchTimeKeyColumn). Without one the scan reads a sample of the table instead.
+   */
+  timeColumn?: string;
+  timeColumnType?: string;
+  search?: string;
+  /** SQL condition of the other filters of the query, so suggestions match what the query would return. */
+  where?: string;
+  /** Aborts the lookup: Grafana then cancels the query, so a superseded search stops running. */
+  signal?: AbortSignal;
+}
+
+const DATE_COLUMN_TYPE = /^(Nullable\()?(Date|Date32|DateTime|DateTime64)\b/;
 
 function getAttributeColumnByDisplayPrefix(
   builderOptions: QueryBuilderOptions,
@@ -252,6 +270,9 @@ export class Datasource
   // republished to AdHocFilter — JSON keys carry their type in the minted
   // backtick form, so escapeKey renders them statelessly.
   private jsonColumnsByTable: Map<string, Set<string>> = new Map();
+  // Identifiers in the partition and sorting keys of each table, for bounding value suggestions
+  // (see fetchTimeKeyColumn).
+  private tableKeyNames = new Map<string, Promise<string[]>>();
   // Bare table names whose Map/JSON column kinds are already resolved — avoids
   // redundant system.columns lookups.
   private attributeSchemaFetched: Set<string> = new Set();
@@ -1403,22 +1424,124 @@ export class Datasource
     return this.fetchData(rawSql);
   }
 
-  async fetchDistinctValues(column: string, db: string, table: string): Promise<Array<string | number | boolean>> {
+  /**
+   * The SQL of a value-suggestion scan of `expr`, always bounded: by the dashboard time range on
+   * `timeColumn` (falling back to a recent window), or, with no time column, by reading at most a
+   * sample of the table. The other filters of the query and the typed `search` narrow it, and a time
+   * cap stops it.
+   */
+  private valueSuggestionSql(
+    expr: string,
+    present: string,
+    db: string,
+    table: string,
+    options: DistinctValueOptions = {}
+  ): string {
+    const { timeColumn, timeColumnType, search, where: otherFilters } = options;
+    const source = `${escapeIdentifier(db)}.${escapeIdentifier(table)}`;
+    const filters = otherFilters ? ` AND (${otherFilters})` : '';
+    const matches = (value: string) =>
+      search ? ` AND positionCaseInsensitiveUTF8(toString(${value}), '${escapeCHStringLiteral(search)}') > 0` : '';
+    // Only max_execution_time: the recommended read-only user may change nothing else (docs/sources/configure.md).
+    const settings = ` SETTINGS max_execution_time=${VALUE_SUGGESTION_TIMEOUT_S}`;
+
+    if (!timeColumn) {
+      // The alias names the sampled values only inside this query, apart from any column of the table.
+      const sample = `SELECT ${expr} AS __suggested FROM ${source} WHERE ${present}${filters} LIMIT ${MAP_KEY_PROBE_ROW_SAMPLE}`;
+      return `SELECT DISTINCT __suggested FROM (${sample}) WHERE 1${matches('__suggested')} LIMIT 1000${settings}`;
+    }
+
+    const tc = escapeIdentifier(timeColumn);
+    // A Date column compares at midnight, so bound it by day.
+    const bound = /^(Nullable\()?Date(32)?\)?$/.test(timeColumnType || '')
+      ? (t: string) => `toDate(${t})`
+      : (t: string) => t;
+    const range = (getTemplateSrv() as any).timeRange;
+    const fromMs = Number(range?.from?.valueOf?.());
+    const toMs = Number(range?.to?.valueOf?.());
+    const inRange =
+      Number.isFinite(fromMs) && Number.isFinite(toMs)
+        ? ` AND ${tc} >= ${bound(`fromUnixTimestamp(${Math.floor(fromMs / 1000)})`)} AND ${tc} <= ${bound(`fromUnixTimestamp(${Math.ceil(toMs / 1000)})`)}`
+        : ` AND ${tc} >= ${bound(`now() - ${ADHOC_PROBE_TIME_WINDOW}`)}`;
+    return `SELECT DISTINCT ${expr} FROM ${source} WHERE ${present}${filters}${inRange}${matches(expr)} LIMIT 1000${settings}`;
+  }
+
+  async fetchDistinctValues(
+    column: string,
+    db: string,
+    table: string,
+    options?: DistinctValueOptions
+  ): Promise<Array<string | number | boolean>> {
     const escapedColumn = escapeIdentifier(column);
-    const rawSql = `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`;
-    return this.fetchData(rawSql);
+    if (!options) {
+      return this.fetchData(
+        `SELECT DISTINCT ${escapedColumn} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${escapedColumn} IS NOT NULL LIMIT 1000`
+      );
+    }
+    const rawSql = this.valueSuggestionSql(escapedColumn, `${escapedColumn} IS NOT NULL`, db, table, options);
+    return this.fetchData(rawSql, options.signal);
   }
 
   async fetchDistinctMapValues(
     mapColumn: string,
     mapKey: string,
     db: string,
-    table: string
+    table: string,
+    options?: DistinctValueOptions
   ): Promise<Array<string | number | boolean>> {
     const escapedMapColumn = escapeIdentifier(mapColumn);
     const escapedMapKey = `'${escapeCHStringLiteral(mapKey)}'`;
-    const rawSql = `SELECT DISTINCT ${escapedMapColumn}[${escapedMapKey}] FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE mapContains(${escapedMapColumn}, ${escapedMapKey}) LIMIT 1000`;
-    return this.fetchData(rawSql);
+    const expr = `${escapedMapColumn}[${escapedMapKey}]`;
+    const present = `mapContains(${escapedMapColumn}, ${escapedMapKey})`;
+    if (!options) {
+      return this.fetchData(
+        `SELECT DISTINCT ${expr} FROM ${escapeIdentifier(db)}.${escapeIdentifier(table)} WHERE ${present} LIMIT 1000`
+      );
+    }
+    return this.fetchData(this.valueSuggestionSql(expr, present, db, table, options), options.signal);
+  }
+
+  /**
+   * A Date or DateTime column of the table that its partition key or sorting key uses, for bounding a
+   * scan by time so ClickHouse can skip parts: `preferred` (the time column of the query) when the keys
+   * use it, else the first such column, the partition key first. Undefined when the keys use none: a
+   * time column outside the keys would still be read whole, so it bounds nothing.
+   */
+  async fetchTimeKeyColumn(
+    db: string,
+    table: string,
+    columns: readonly TableColumn[],
+    preferred?: TableColumn
+  ): Promise<TableColumn | undefined> {
+    const cacheKey = `${db}.${table}`;
+    // The key identifiers are remembered, not the matched column: the columns may not be loaded yet,
+    // and a table whose keys use no time column is not looked up again.
+    let names = this.tableKeyNames.get(cacheKey);
+    if (!names) {
+      const rawSql = `SELECT partition_key, sorting_key FROM system.tables WHERE database = '${escapeCHStringLiteral(db)}' AND name = '${escapeCHStringLiteral(table)}'`;
+      names = this.runQuery({ rawSql })
+        .then((frame) => {
+          // A failed query returns no fields; a table without rows here still has both.
+          if (!frame.fields?.length) {
+            throw new Error('table keys lookup failed');
+          }
+          return frame.fields
+            .map((f) => String(f.values[0] ?? ''))
+            .flatMap((key) => key.match(/`[^`]+`|[A-Za-z_][A-Za-z0-9_.]*/g) || [])
+            .map((name) => name.replace(/^`|`$/g, ''));
+        })
+        .catch(() => {
+          // A failed lookup is not remembered.
+          this.tableKeyNames.delete(cacheKey);
+          return [];
+        });
+      this.tableKeyNames.set(cacheKey, names);
+    }
+    const keyNames = await names;
+    if (preferred && keyNames.includes(preferred.name) && DATE_COLUMN_TYPE.test(preferred.type)) {
+      return preferred;
+    }
+    return keyNames.map((name) => columns.find((c) => c.name === name && DATE_COLUMN_TYPE.test(c.type))).find(Boolean);
   }
 
   async fetchEntities() {
@@ -1647,8 +1770,8 @@ export class Datasource
     return columns;
   }
 
-  private async fetchData(rawSql: string) {
-    const frame = await this.runQuery({ rawSql });
+  private async fetchData(rawSql: string, signal?: AbortSignal) {
+    const frame = await this.runQuery({ rawSql }, undefined, signal);
     return this.values(frame);
   }
 
@@ -1719,16 +1842,31 @@ export class Datasource
       );
   }
 
-  private runQuery(request: Partial<CHQuery>, options?: any): Promise<DataFrame> {
-    return new Promise((resolve) => {
+  /**
+   * Runs one query. Aborting `signal` unsubscribes from it, which cancels the request to Grafana and
+   * with it the query, and rejects with an AbortError.
+   */
+  private runQuery(request: Partial<CHQuery>, options?: any, signal?: AbortSignal): Promise<DataFrame> {
+    return new Promise((resolve, reject) => {
+      const aborted = () => reject(new DOMException('The value lookup was superseded', 'AbortError'));
+      if (signal?.aborted) {
+        aborted();
+        return;
+      }
       const req = {
         targets: [{ ...request, refId: String(Math.random()) }],
         range: options ? options.range : (getTemplateSrv() as any).timeRange,
         scopedVars: options?.scopedVars,
       } as DataQueryRequest<CHQuery>;
-      this.query(req).subscribe((res: DataQueryResponse) => {
+      const subscription = this.query(req).subscribe((res: DataQueryResponse) => {
+        signal?.removeEventListener('abort', onAbort);
         resolve(res.data[0] || { fields: [] });
       });
+      const onAbort = () => {
+        subscription.unsubscribe();
+        aborted();
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
     });
   }
 

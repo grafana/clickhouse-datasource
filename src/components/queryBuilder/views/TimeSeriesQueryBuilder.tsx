@@ -166,6 +166,7 @@ export const TimeSeriesQueryBuilder = (props: TimeSeriesQueryBuilderProps) => {
         datasource={datasource}
         database={builderOptions.database}
         table={builderOptions.table}
+        columns={builderOptions.columns}
       />
     </div>
   );
