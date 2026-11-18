@@ -920,13 +920,18 @@ func mergeOpenTelemetryLabels(frame *data.Frame, extraAttributeColumns []string,
 
 			val := field.At(j).(json.RawMessage)
 			if val != nil {
-				var valMap map[string]any
-				err := json.Unmarshal(val, &valMap)
-				if err != nil {
-					return err
+				// Array, Tuple and Dynamic columns are JSON fields too, so a value is
+				// not always an object. A value that is not one stays whole under the
+				// column name rather than failing the query.
+				var parsed any
+				if err := json.Unmarshal(val, &parsed); err != nil {
+					parsed = string(val)
+				}
+				if parsed == nil {
+					continue
 				}
 
-				assignFlattenedPath(currentVal, field.Name, "", valMap)
+				assignFlattenedPath(currentVal, field.Name, "", parsed)
 
 				allLabelsValues[j] = currentVal
 			}
@@ -952,7 +957,9 @@ func mergeOpenTelemetryLabels(frame *data.Frame, extraAttributeColumns []string,
 
 	filteredFields := make([]*data.Field, 0, len(frame.Fields)-len(attrFields))
 	for _, field := range frame.Fields {
-		if isLogAttributeColumn(field.Name, extraAttributeColumns) {
+		// Only the merged fields are dropped. A configured column that is not a
+		// JSON field was not merged, so it stays.
+		if slices.Contains(attrFields, field) {
 			continue
 		}
 

@@ -138,6 +138,63 @@ func TestMergeOpenTelemetryLabels(t *testing.T) {
 		assert.Equal(t, "keep", labelsMap["JsonBody.vendorId"])
 		assert.Equal(t, "200", labelsMap["JsonBody.status"])
 	})
+
+	t.Run("NonObjectAttributeValues", func(t *testing.T) {
+		// Array and Dynamic columns are JSON fields too, so a configured one can
+		// hold values that are not objects. Those stay whole under the column
+		// name instead of failing the query, and objects are still flattened.
+		frame := &data.Frame{
+			Fields: []*data.Field{
+				data.NewField("Tags", nil, []json.RawMessage{
+					json.RawMessage(`["a","b"]`),
+					json.RawMessage(`"plain"`),
+					json.RawMessage(`42`),
+					json.RawMessage(`{"k":"v"}`),
+					json.RawMessage(`null`),
+					nil,
+				}),
+			},
+		}
+		err := mergeOpenTelemetryLabels(frame, []string{"Tags"}, nil)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(frame.Fields))
+		require.Equal(t, "labels", frame.Fields[0].Name)
+
+		labelsAt := func(i int) map[string]any {
+			labelValue, _ := frame.Fields[0].ConcreteAt(i)
+			var labelsMap map[string]any
+			require.NoError(t, json.Unmarshal(labelValue.(json.RawMessage), &labelsMap))
+			return labelsMap
+		}
+		assert.Equal(t, map[string]any{"Tags": []any{"a", "b"}}, labelsAt(0))
+		assert.Equal(t, map[string]any{"Tags": "plain"}, labelsAt(1))
+		assert.Equal(t, map[string]any{"Tags": float64(42)}, labelsAt(2))
+		assert.Equal(t, map[string]any{"Tags.k": "v"}, labelsAt(3))
+		assert.Empty(t, labelsAt(4))
+		assert.Empty(t, labelsAt(5))
+	})
+
+	t.Run("ConfiguredNonJSONColumnKept", func(t *testing.T) {
+		// A configured column that is not a JSON field is not merged, so it stays
+		// in the frame when an OTel attribute column is merged.
+		frame := &data.Frame{
+			Fields: []*data.Field{
+				data.NewField("LogAttributes", nil, []json.RawMessage{json.RawMessage(`{"foo":"bar"}`)}),
+				data.NewField("BodyStr", nil, []string{`{"status":"200"}`}),
+			},
+		}
+		err := mergeOpenTelemetryLabels(frame, []string{"BodyStr"}, nil)
+		require.NoError(t, err)
+		require.Equal(t, 2, len(frame.Fields))
+		assert.Equal(t, "BodyStr", frame.Fields[0].Name)
+		assert.Equal(t, `{"status":"200"}`, frame.Fields[0].At(0))
+		assert.Equal(t, "labels", frame.Fields[1].Name)
+
+		labelValue, _ := frame.Fields[1].ConcreteAt(0)
+		var labelsMap map[string]any
+		require.NoError(t, json.Unmarshal(labelValue.(json.RawMessage), &labelsMap))
+		assert.Equal(t, map[string]any{"LogAttributes.foo": "bar"}, labelsMap)
+	})
 }
 
 func TestIsExcludedPath(t *testing.T) {
