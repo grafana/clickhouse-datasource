@@ -1,6 +1,6 @@
 module github.com/grafana/clickhouse-datasource
 
-go 1.27.3
+go 1.27.4
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.51.0
@@ -9,7 +9,7 @@ require (
 	github.com/grafana/dsconfig/schema v0.0.13
 	github.com/grafana/grafana-plugin-sdk-go v0.300.0
 	github.com/grafana/macropro v1.1.0
-	github.com/grafana/sqlds/v5 v5.4.0
+	github.com/grafana/sqlds/v5 v5.5.0
 	github.com/moby/moby/api v1.57.0
 	github.com/paulmach/orb v0.14.0
 	github.com/shopspring/decimal v1.6.0
@@ -66,7 +66,7 @@ require (
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/grafana/dataplane/sdata v0.0.9 // indirect
+	github.com/grafana/dataplane/sdata v0.0.10 // indirect
 	github.com/grafana/dsconfig/dsconfig v0.0.13 // indirect
 	github.com/grafana/otel-profiling-go v0.7.0 // indirect
 	github.com/grafana/pyroscope-go/godeltaprof v0.1.12 // indirect
