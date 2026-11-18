@@ -165,6 +165,7 @@ describe('ast', () => {
       ],
       ['a double-quoted qualified name', 'SELECT * FROM "default"."otel_logs"', 'default.otel_logs'],
       ['a mixed backtick-quoted name', 'SELECT * FROM db.`weird-table`', 'db.weird-table'],
+      ['a zero-width space before the table name', 'SELECT * FROM\u200Botel_logs', 'otel_logs'],
       ['an EXCEPT column modifier (not a set operation)', 'SELECT * EXCEPT (secret) FROM otel_logs', 'otel_logs'],
       [
         'an EXCEPT modifier on a COLUMNS matcher',
