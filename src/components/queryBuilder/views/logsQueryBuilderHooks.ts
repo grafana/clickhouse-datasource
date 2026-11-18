@@ -1,5 +1,10 @@
 import { Datasource } from 'data/CHDatasource';
-import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import {
+  BuilderOptionsReducerAction,
+  backfillColumnTypes,
+  setColumnByHint,
+  setOptions,
+} from 'hooks/useBuilderOptionsState';
 import { useEffect, useMemo, useRef } from 'react';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import otel from 'otel';
@@ -98,28 +103,13 @@ export const useBackfillLogColumnTypes = (
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
 ) => {
   useEffect(() => {
-    if (allColumns.length === 0 || !columns?.length) {
+    if (allColumns.length === 0 || !columns?.some((c) => c.hint && !c.type)) {
       return;
     }
 
-    let changed = false;
-    const next = columns.map((column) => {
-      if (!column.hint || column.type) {
-        return column;
-      }
-
-      const type = allColumns.find((c) => c.name === column.name)?.type;
-      if (!type) {
-        return column;
-      }
-
-      changed = true;
-      return { ...column, type };
-    });
-
-    if (changed) {
-      builderOptionsDispatch(setOptions({ columns: next }));
-    }
+    // The fill runs in the reducer against its current state, so it cannot overwrite columns that
+    // useOtelColumns sets in the same pass.
+    builderOptionsDispatch(backfillColumnTypes(allColumns));
   }, [allColumns, columns, builderOptionsDispatch]);
 };
 
