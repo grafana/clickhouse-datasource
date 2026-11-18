@@ -355,8 +355,10 @@ describe('AdHocManager', () => {
   it.each([
     ['inside a string literal', "SELECT '; -- x' AS a FROM default.tbl"],
     ['inside a line comment', 'SELECT count() FROM default.tbl -- note;'],
-    // A long dash ruler between the statements must not slow the scan down.
-    ['followed by another statement', `SELECT count() FROM default.tbl;\n${'-'.repeat(40)}\nSELECT 1`],
+    [
+      'followed by a dash-ruler comment and another statement',
+      `SELECT count() FROM default.tbl;\n${'-'.repeat(40)}\nSELECT 1`,
+    ],
   ])('keeps a semicolon %s', (_label, sql) => {
     const ahm = new AdHocFilter();
     const val = ahm.apply(sql, [{ key: 'k', operator: '=', value: 'v' }] as AdHocVariableFilter[]);

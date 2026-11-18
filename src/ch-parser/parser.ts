@@ -133,16 +133,13 @@ function isTableNameToken(token: Token, allowReserved: boolean): boolean {
   return allowReserved || !RESERVED_FROM_KEYWORDS.has(token.text.toUpperCase());
 }
 
-// Whether `token` is a set operator. UNION always is. INTERSECT and EXCEPT are
-// also valid column names, and EXCEPT is a column modifier too
-// (`SELECT * EXCEPT (secret) FROM t`), so they count only when what follows
+// Whether `token` is a set operator. UNION, INTERSECT and EXCEPT are also valid
+// column names, and EXCEPT is a column modifier too
+// (`SELECT * EXCEPT (secret) FROM t`), so each counts only when what follows
 // starts another select: SELECT, WITH, ALL / DISTINCT, or `(` and then SELECT or
 // WITH.
 function isSetOperator(token: Token | undefined, next: Token | undefined, afterNext: Token | undefined): boolean {
-  if (token?.matchKeyword('UNION')) {
-    return true;
-  }
-  if (!token?.matchKeyword('INTERSECT') && !token?.matchKeyword('EXCEPT')) {
+  if (!['UNION', 'INTERSECT', 'EXCEPT'].some((keyword) => token?.matchKeyword(keyword))) {
     return false;
   }
   if (next?.type === TokenType.OpeningRoundBracket) {

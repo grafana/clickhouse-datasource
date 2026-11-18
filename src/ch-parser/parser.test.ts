@@ -113,6 +113,8 @@ describe('parseSelect', () => {
 
   it.each([
     ['UNION ALL', 'SELECT a FROM t1 UNION ALL SELECT a FROM t2'],
+    ['UNION DISTINCT', 'SELECT a FROM t1 UNION DISTINCT SELECT a FROM t2'],
+    ['UNION before a parenthesized select', 'SELECT a FROM t1 UNION (SELECT a FROM t2)'],
     ['INTERSECT', 'SELECT a FROM t1 INTERSECT SELECT a FROM t2'],
     ['EXCEPT', 'SELECT a FROM t1 EXCEPT SELECT a FROM t2'],
     ['EXCEPT DISTINCT', 'SELECT a FROM t1 EXCEPT DISTINCT SELECT a FROM t2'],
@@ -131,6 +133,7 @@ describe('parseSelect', () => {
     ['an EXCEPT modifier on a COLUMNS matcher', "SELECT COLUMNS('^Span') EXCEPT (SpanId) FROM otel_traces"],
     ['a column named intersect', 'SELECT intersect FROM t1'],
     ['a column named except', 'SELECT a FROM t1 WHERE except = 2'],
+    ['a column named union', 'SELECT union FROM t1'],
   ])('does not flag %s as a set operation', (_label, sql) => {
     const node = parseSelect(sql);
     expect(node).not.toBeNull();

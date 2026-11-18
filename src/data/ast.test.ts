@@ -172,6 +172,7 @@ describe('ast', () => {
         'otel_traces',
       ],
       ['a column named except (not a set operation)', 'SELECT a FROM otel_logs WHERE except = 2', 'otel_logs'],
+      ['a column named union (not a set operation)', 'SELECT union FROM otel_logs', 'otel_logs'],
       [
         "the outer FROM's own subquery, not a scalar subquery in the SELECT list",
         'SELECT (SELECT max(ts) FROM other_table) AS m, col FROM (SELECT * FROM main_table) x',
