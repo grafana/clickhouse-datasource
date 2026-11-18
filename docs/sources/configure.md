@@ -219,7 +219,7 @@ When **Configuration mode** is set to **Single source** and **Signal type** is s
 
 In **Single source** mode, the **Columns** field is a picker of the selected table's columns with an **Add all columns** shortcut; other configuration modes accept a typed list. The columns work with both OTel and non-OTel log tables; when **Use OTel** is enabled, they are added on top of the OTel default columns.
 
-**Attribute columns** flatten a JSON or `Map` column into individual log fields the same way the OTel `LogAttributes` column is flattened. This is useful for a non-OTel JSON body: its paths surface as filterable fields in Explore instead of one opaque value. **Excluded paths** removes specific flattened paths (matched by subtree) from the Fields list; use it to keep sensitive or high-cardinality paths, such as emails or client IPs, out of the surfaced fields. Both default to empty, so existing data sources are unaffected.
+**Attribute columns** flatten a JSON or `Map` column into individual log fields the same way the OTel `LogAttributes` column is flattened. This is useful for a non-OTel JSON body: its paths surface as filterable fields in Explore instead of one opaque value. **Excluded paths** removes specific flattened paths (matched by subtree) from the Fields list; use it to keep sensitive or high-cardinality paths, such as emails or client IPs, out of the surfaced fields. Exclusion only applies to the flattened fields: the paths stay in the table, queries can still read them, and the query builder and SQL editor still suggest them. It is not access control; the ClickHouse user's permissions decide what the data source can read. Both default to empty, so existing data sources are unaffected.
 
 ### Traces configuration
 
