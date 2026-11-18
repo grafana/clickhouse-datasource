@@ -24,7 +24,8 @@ import { isCollectionColumnType } from './views/columnNameHeuristics';
 
 /**
  * Appends the datasource's configured extra log columns (`additionalColumns`, an explicit list) so
- * they surface as first-class fields. Mutates `columns` / `includedColumns` in place.
+ * they surface as first-class fields, then its `attributeColumns`, which a query must select for the
+ * backend to flatten their keys into log labels. Mutates `columns` / `includedColumns` in place.
  */
 export const appendAdditionalLogColumns = (
   datasource: Datasource,
@@ -32,7 +33,7 @@ export const appendAdditionalLogColumns = (
   columns: SelectedColumn[],
   includedColumns: Set<string>
 ): void => {
-  for (const columnName of datasource.getAdditionalLogColumns()) {
+  for (const columnName of [...datasource.getAdditionalLogColumns(), ...datasource.getLogAttributeColumns()]) {
     const baseName = columnName.split('[')[0];
     if (includedColumns.has(columnName) || includedColumns.has(baseName)) {
       continue;
@@ -354,18 +355,6 @@ const getLogsDefaultColumns = (datasource: Datasource, allColumns: readonly Tabl
   }
 
   appendAdditionalLogColumns(datasource, allColumns, nextColumns, includedColumns);
-
-  // Attribute columns must be projected too, so the backend can flatten their
-  // JSON keys into log labels (Fields sidebar).
-  for (const columnName of datasource.getLogAttributeColumns()) {
-    const baseName = columnName.split('[')[0];
-    if (includedColumns.has(columnName) || includedColumns.has(baseName)) {
-      continue;
-    }
-    const type = allColumns.find((c) => c.name === columnName || c.name === baseName)?.type;
-    nextColumns.push(type ? { name: columnName, type } : { name: columnName });
-    includedColumns.add(columnName);
-  }
 
   return nextColumns;
 };

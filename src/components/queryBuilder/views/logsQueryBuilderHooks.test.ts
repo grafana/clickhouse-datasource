@@ -102,6 +102,28 @@ describe('useLogDefaultsOnMount', () => {
     // This suite does not auto-restore spies; clean up so getAdditionalLogColumns does not leak.
     jest.restoreAllMocks();
   });
+
+  it('appends the attribute columns on mount, after the additionalColumns list', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getLogsOtelVersion').mockReturnValue(undefined);
+    jest
+      .spyOn(mockDatasource, 'getDefaultLogsColumns')
+      .mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'timestamp']]));
+    jest.spyOn(mockDatasource, 'getAdditionalLogColumns').mockReturnValue(['method']);
+    jest.spyOn(mockDatasource, 'getLogAttributeColumns').mockReturnValue(['JsonBody']);
+
+    try {
+      renderHook(() => useLogDefaultsOnMount(mockDatasource, true, {} as QueryBuilderOptions, builderOptionsDispatch));
+
+      // The backend can only flatten an attribute column that the query selects
+      const dispatched = builderOptionsDispatch.mock.calls[0][0].payload.columns as SelectedColumn[];
+      expect(dispatched.map((c) => c.name)).toEqual(['timestamp', 'method', 'JsonBody']);
+    } finally {
+      // Restore even when an assertion fails, so the spies do not leak into later tests.
+      jest.restoreAllMocks();
+    }
+  });
 });
 
 describe('useOtelColumns', () => {
