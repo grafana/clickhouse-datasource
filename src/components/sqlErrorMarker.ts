@@ -1,4 +1,8 @@
 import { DataQueryError, PanelData } from '@grafana/data';
+import { Lexer } from 'ch-parser/lexer';
+import { unquoteIdentifier } from 'ch-parser/spans';
+import { Token, TokenType } from 'ch-parser/types';
+import { offsetToLineCol } from 'data/validate';
 
 /**
  * Places a ClickHouse query error in the SQL editor. ClickHouse reports a syntax error with the
@@ -8,6 +12,10 @@ import { DataQueryError, PanelData } from '@grafana/data';
  * after variables and macros were expanded, so on a line where one of them precedes the error the
  * column is off. The token is then looked up on that line, and the whole line is marked when it is
  * not there (for example when the error is inside an expanded macro).
+ *
+ * An unknown column, function, table or database has no position, but the error names it, for
+ * example `Unknown expression identifier `ServiceNme`. Maybe you meant: ['ServiceName']`. Every
+ * place the editor text uses that name is marked, outside strings and comments.
  */
 
 export interface QueryErrorPosition {
@@ -189,6 +197,125 @@ function markLastWord(lines: string[], message: string): QueryErrorMarker | unde
   return undefined;
 }
 
+type UnknownNameKind = 'column' | 'column or function' | 'function' | 'table' | 'database';
+
+export interface UnknownNameError {
+  kind: UnknownNameKind;
+  /** The names ClickHouse could not find, as it reports them, for example `otel.otel_logz`. */
+  names: string[];
+  /** ClickHouse's first suggestion, when it has one. */
+  suggestion?: string;
+}
+
+// The analyzer's wording first (ClickHouse 24.3 and later), then the older one.
+const unknownNamePatterns: Array<{ kind: UnknownNameKind; pattern: RegExp }> = [
+  { kind: 'column or function', pattern: /Unknown expression or function identifier `([^`]+)`/ },
+  { kind: 'column', pattern: /Unknown expression identifier `([^`]+)`/ },
+  { kind: 'function', pattern: /Function with name `([^`]+)` does not exist/ },
+  { kind: 'table', pattern: /Unknown table expression identifier '([^']+)'/ },
+  { kind: 'database', pattern: /Database `?([^\s`]+?)`? does(?: not|n't) exist/ },
+  { kind: 'function', pattern: /Unknown function ([\w$]+)/ },
+  { kind: 'table', pattern: /Table `?([^\s`]+?)`? does(?: not|n't) exist/ },
+];
+
+export function parseUnknownName(message: string): UnknownNameError | undefined {
+  // Older servers list every missing column: `Missing columns: 'a' 'b' while processing query`.
+  const missing = /Missing columns: ((?:'[^']+'\s*)+)/.exec(message);
+  if (missing) {
+    const names = Array.from(missing[1].matchAll(/'([^']+)'/g), (m) => m[1]);
+    return { kind: 'column', names, suggestion: names.length === 1 ? parseSuggestion(message) : undefined };
+  }
+
+  for (const { kind, pattern } of unknownNamePatterns) {
+    const match = pattern.exec(message);
+    if (match) {
+      return { kind, names: [match[1].replace(/`/g, '')], suggestion: parseSuggestion(message) };
+    }
+  }
+  return undefined;
+}
+
+// `Maybe you meant: ['ServiceName']` for columns and functions, `Maybe you meant otel.otel_logs?` for tables.
+function parseSuggestion(message: string): string | undefined {
+  const list = /maybe you meant:\s*\[\s*'([^']+)'/i.exec(message);
+  if (list) {
+    return list[1];
+  }
+  const single = /Maybe you meant ([^\s?]+)\?/.exec(message);
+  return single ? single[1] : undefined;
+}
+
+function describeUnknownName(error: UnknownNameError, name: string): string {
+  const suggestion = error.suggestion ? ` Did you mean "${error.suggestion}"?` : '';
+  return `Unknown ${error.kind} "${name}".${suggestion}`;
+}
+
+/**
+ * The [begin, end) offsets of every place `sql` uses `name` as an identifier, quoted or not. A
+ * dotted name such as `db.table` also matches its parts written with dots in between, and is
+ * matched whole when it is one quoted identifier such as `deployment.environment.name`.
+ */
+function findIdentifier(sql: string, name: string): Array<[number, number]> {
+  const tokens: Token[] = [];
+  const lexer = new Lexer(sql);
+  for (let token = lexer.nextToken(); !token.isEnd() && !token.isError(); token = lexer.nextToken()) {
+    if (token.isSignificant()) {
+      tokens.push(token);
+    }
+  }
+
+  const identifierText = (i: number): string | undefined => {
+    const token = tokens[i];
+    if (token?.type === TokenType.BareWord) {
+      return token.text;
+    }
+    return token?.type === TokenType.QuotedIdentifier ? unquoteIdentifier(token.text) : undefined;
+  };
+
+  const parts = name.split('.');
+  const found: Array<[number, number]> = [];
+  for (let i = 0; i < tokens.length; i++) {
+    if (identifierText(i) === name) {
+      found.push([tokens[i].begin, tokens[i].end]);
+      continue;
+    }
+    if (parts.length < 2) {
+      continue;
+    }
+    const last = i + 2 * (parts.length - 1);
+    const matches = parts.every(
+      (part, p) => identifierText(i + 2 * p) === part && (p === 0 || tokens[i + 2 * p - 1]?.type === TokenType.Dot)
+    );
+    if (matches) {
+      found.push([tokens[i].begin, tokens[last].end]);
+      i = last;
+    }
+  }
+  return found;
+}
+
+/** Markers on every use of the names an unknown column, function, table or database error reports. */
+export function getUnknownNameMarkers(message: string, sql: string): QueryErrorMarker[] {
+  const error = parseUnknownName(message);
+  if (!error) {
+    return [];
+  }
+
+  return error.names.flatMap((name) =>
+    findIdentifier(sql, name).map(([begin, end]) => {
+      const start = offsetToLineCol(sql, begin);
+      const stop = offsetToLineCol(sql, end);
+      return {
+        startLineNumber: start.line,
+        startColumn: start.col,
+        endLineNumber: stop.line,
+        endColumn: stop.col,
+        message: describeUnknownName(error, name),
+      };
+    })
+  );
+}
+
 function errorMessages(error: DataQueryError): string[] {
   return [error.message, error.data?.message].filter((m): m is string => typeof m === 'string' && m.length > 0);
 }
@@ -215,6 +342,10 @@ export function getRunErrorMarkers(data: PanelData | undefined, refId: string, s
       const marker = getQueryErrorMarker(message, sql);
       if (marker) {
         return [marker];
+      }
+      const named = getUnknownNameMarkers(message, sql);
+      if (named.length > 0) {
+        return named;
       }
     }
   }
