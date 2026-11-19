@@ -44,6 +44,7 @@ type Settings struct {
 
 	HttpHeaders           map[string]string `json:"-"`
 	ForwardGrafanaHeaders bool              `json:"forwardGrafanaHeaders,omitempty"`
+	KillQueryOnCancel     bool              `json:"killQueryOnCancel,omitempty"`
 	OAuthPassThru         bool              `json:"oauthPassThru,omitempty"`
 	// OAuthPassThruAllowFallback controls what happens when Forward OAuth
 	// Identity is enabled but a data query arrives without a forwarded user
@@ -213,6 +214,10 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		return settings, err
 	}
 	if settings.ForwardGrafanaHeaders, err = boolSetting(jsonData, "forwardGrafanaHeaders"); err != nil {
+		return settings, err
+	}
+
+	if settings.KillQueryOnCancel, err = boolSetting(jsonData, "killQueryOnCancel"); err != nil {
 		return settings, err
 	}
 

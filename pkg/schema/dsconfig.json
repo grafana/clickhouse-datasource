@@ -975,6 +975,19 @@
       }
     },
     {
+      "id": "jsonData_killQueryOnCancel",
+      "key": "killQueryOnCancel",
+      "label": "Stop canceled queries on the server",
+      "description": "Send KILL QUERY when Grafana cancels a running query, so that ClickHouse stops it. The user needs SELECT on system.processes, which lets it read the query text, user name, and client address of every running query on the server. Defaults to false.",
+      "valueType": "boolean",
+      "target": "jsonData",
+      "defaultValue": false,
+      "dependsOn": "jsonData_protocol == 'http'",
+      "ui": {
+        "component": "switch"
+      }
+    },
+    {
       "id": "jsonData_customSettings",
       "key": "customSettings",
       "label": "Custom Settings",
@@ -1139,7 +1152,8 @@
         "jsonData_secure",
         "jsonData_path",
         "jsonData_httpHeaders",
-        "jsonData_forwardGrafanaHeaders"
+        "jsonData_forwardGrafanaHeaders",
+        "jsonData_killQueryOnCancel"
       ]
     },
     {
