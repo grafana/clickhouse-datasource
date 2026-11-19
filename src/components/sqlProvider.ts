@@ -76,6 +76,13 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
     // after `FROM t ` into a suggestion instead of a new line. Typing a letter opens the list anyway.
     triggerCharacters: ['.', '$'],
     provideCompletionItems: async (model: Model, position: Position) => {
+      // Every SQL editor registers a provider for the shared sql language and Monaco asks all of
+      // them, so answer only for this editor's model. Otherwise each open editor repeats every
+      // suggestion, and an editor on another data source adds its own tables and columns.
+      if (model !== editor.getModel()) {
+        return { suggestions: [] };
+      }
+
       const word = model.getWordUntilPosition(position);
       const range: Range = {
         startLineNumber: position.lineNumber,
