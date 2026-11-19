@@ -127,6 +127,36 @@ describe('SQL Editor', () => {
     expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-error', []);
   });
 
+  it('marks an unknown column the last run named', () => {
+    const rawSql = 'SELECT ServiceNme FROM otel_logs';
+    const message =
+      "error querying the database: code: 47, message: Unknown expression identifier `ServiceNme`. Maybe you meant: ['ServiceName']. In scope SELECT ServiceNme FROM otel_logs";
+
+    render(
+      <SqlEditor
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={mockDatasource}
+        data={{
+          state: LoadingState.Error,
+          series: [],
+          timeRange: getDefaultTimeRange(),
+          errors: [{ refId: 'A', message }],
+        }}
+      />
+    );
+
+    expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-error', [
+      expect.objectContaining({
+        startLineNumber: 1,
+        startColumn: 8,
+        endColumn: 18,
+        message: 'Unknown column "ServiceNme". Did you mean "ServiceName"?',
+      }),
+    ]);
+  });
+
   it('Should display sql in the editor', () => {
     const rawSql = 'foo';
     render(
