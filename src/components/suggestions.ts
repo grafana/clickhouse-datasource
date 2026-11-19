@@ -1,10 +1,12 @@
 import { getTemplateSrv } from '@grafana/runtime';
 import { Monaco, monacoTypes } from '@grafana/ui';
 import { Range } from './sqlProvider';
-import { keywords, TokenType } from 'ch-parser/types';
+import { keywords, Token, TokenType } from 'ch-parser/types';
 import { SqlFunction, TableColumn } from 'types/queryBuilder';
 import { pluginMacros } from 'ch-parser/pluginMacros';
 import { quoteColumnIfUnsafe } from 'data/jsonPath';
+import { Lexer } from 'ch-parser/lexer';
+import { unquoteIdentifier } from 'ch-parser/spans';
 import {
   ClauseType,
   FromQueryNode,
@@ -20,6 +22,8 @@ export interface Schema {
   tables: (db?: string) => Promise<string[]>;
   columns: (db: string, table: string) => Promise<TableColumn[]>;
   functions: () => Promise<SqlFunction[]>;
+  /** Keys found in a Map column, for completion inside `column['…']`. */
+  mapKeys?: (db: string, table: string, column: string) => Promise<string[]>;
   defaultDatabase?: string;
 }
 
@@ -142,6 +146,11 @@ export async function getSuggestions(
 
   if (!selectNode) {
     return [];
+  }
+
+  const mapKeys = await getMapKeySuggestions(text, cursorPosition, selectNode, schema, range);
+  if (mapKeys) {
+    return mapKeys;
   }
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
@@ -418,4 +427,94 @@ export function getMacroSuggestions(range: Range, prefix?: string) {
       range,
     };
   });
+}
+
+// The cursor in a Map subscript whose key string is still open, as in `LogAttributes['ser` or,
+// with the closing quote and bracket added by the editor, `LogAttributes['ser|']`.
+interface MapSubscript {
+  column: string;
+  // The key typed so far, unescaped.
+  prefix: string;
+  // Offset of the first character of the key, right after the opening quote.
+  keyBegin: number;
+}
+
+const escapeStringContent = (value: string): string => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+const unescapeStringContent = (value: string): string => value.replace(/\\(.)|''/g, (_m, c?: string) => c ?? "'");
+
+function mapSubscriptAt(text: string, cursorPosition: number): MapSubscript | undefined {
+  const lexer = new Lexer(text.substring(0, cursorPosition));
+  const tokens: Token[] = [];
+  for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
+    if (token.isSignificant()) {
+      tokens.push(token);
+    }
+    if (token.isError()) {
+      break;
+    }
+  }
+
+  const [column, bracket, key] = tokens.slice(-3);
+  const isColumn =
+    column?.type === TokenType.QuotedIdentifier || (column?.type === TokenType.BareWord && !column.isKeyword());
+  if (
+    key?.type !== TokenType.ErrorSingleQuoteIsNotClosed ||
+    bracket?.type !== TokenType.OpeningSquareBracket ||
+    !isColumn
+  ) {
+    return undefined;
+  }
+
+  const typed = text.substring(key.begin + 1, cursorPosition);
+  const name = column.type === TokenType.QuotedIdentifier ? unquoteIdentifier(column.text) : column.text;
+  if (name === undefined || typed.includes('\n')) {
+    return undefined;
+  }
+  return { column: name, prefix: unescapeStringContent(typed), keyBegin: key.begin + 1 };
+}
+
+/**
+ * The keys of the Map column being subscripted at the cursor, for the table the cursor's select
+ * level reads. Undefined when the cursor is not in a Map subscript, so the usual suggestions apply.
+ */
+async function getMapKeySuggestions(
+  text: string,
+  cursorPosition: number,
+  root: SelectQueryNode,
+  schema: Schema,
+  range: Range
+): Promise<monacoTypes.languages.CompletionItem[] | undefined> {
+  const subscript = mapSubscriptAt(text, cursorPosition);
+  if (!subscript || !schema.mapKeys) {
+    return undefined;
+  }
+
+  const { database, table } = getCursorInSelectQueryNode(root, cursorPosition);
+  if (!table) {
+    return undefined;
+  }
+  const tableName = unquoteIdentifier(table) ?? table;
+  const db = (database && (unquoteIdentifier(database) ?? database)) || schema.defaultDatabase || 'default';
+  const columns = await schema.columns(db, tableName);
+  const mapColumn = columns.find((c) => c.name === subscript.column && c.type.startsWith('Map('));
+  if (!mapColumn) {
+    return undefined;
+  }
+
+  const keys = await schema.mapKeys(db, tableName, mapColumn.name);
+  // Monaco replaces only the word at the cursor, and `.` ends a word, but keys such as
+  // `service.name` contain dots, so each item replaces everything typed after the quote.
+  const keyRange: Range = { ...range, startColumn: range.endColumn - (cursorPosition - subscript.keyBegin) };
+  const typed = subscript.prefix.toLowerCase();
+  return keys
+    .filter((key) => key.toLowerCase().startsWith(typed))
+    .map((key) => ({
+      label: key,
+      kind: monaco.languages.CompletionItemKind.Field,
+      detail: `Key of ${mapColumn.name}`,
+      documentation: `Key of ${mapColumn.name} (${mapColumn.type})`,
+      filterText: key,
+      insertText: escapeStringContent(key),
+      range: keyRange,
+    }));
 }
