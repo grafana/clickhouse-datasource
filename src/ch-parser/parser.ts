@@ -29,6 +29,12 @@ export class QueryNodeParser {
     return this.tokens[this.offset];
   }
 
+  // The token `index` places ahead of the read position (0 is the token peek()
+  // returns), or undefined past the end.
+  public peekAt(index: number): Token | undefined {
+    return this.tokens[this.offset + index];
+  }
+
   public nextIs(type: TokenType): boolean {
     const next = this.peek();
     if (next.type === type) {
@@ -95,33 +101,28 @@ export interface SelectQueryNode extends QueryNode {
   // CTE bodies defined in this level's WITH clause, keyed by alias, so a FROM
   // that references a CTE can resolve to the CTE's underlying table.
   withAliases?: Map<string, SelectQueryNode>;
-  // True when a top-level UNION combines several selects; a single-table target
-  // is not meaningful for the whole statement then.
-  hasUnion?: boolean;
+  // True when a top-level set operation (UNION / INTERSECT / EXCEPT) combines
+  // several selects; a single-table target is not meaningful for the whole
+  // statement then.
+  hasSetOperation?: boolean;
 }
 
-// Clause-starting keywords are never a table name in the FROM position.
+// Clause keywords that an unqualified FROM target never takes as the table name.
 // Without this guard `SELECT * FROM  WHERE ...` would take `WHERE` as the table
-// while the user is mid-edit, and no clause node would be created.
-const RESERVED_FROM_KEYWORDS = new Set([
-  'WHERE',
-  'GROUP',
-  'ORDER',
-  'HAVING',
-  'LIMIT',
-  'SETTINGS',
-  'PREWHERE',
-  'JOIN',
-  'FORMAT',
-  'UNION',
-]);
+// while the user is mid-edit, and no clause node would be created. FORMAT and
+// PREWHERE are left out so that `FROM format` and `FROM prewhere` resolve. The
+// parser has no clause branch for either, so no clause node is lost; a mid-edit
+// `FROM  PREWHERE x` takes the keyword as the table, and `FROM format(...)`
+// reads as a table function, like `numbers(...)`.
+const RESERVED_FROM_KEYWORDS = new Set(['WHERE', 'GROUP', 'ORDER', 'HAVING', 'LIMIT', 'SETTINGS', 'JOIN', 'UNION']);
 
 // A table/database name in a FROM clause. Keywords are accepted here because
 // ClickHouse allows keyword-named tables (e.g. `default.values`, `sample`).
-// Only the first (unqualified) segment refuses the clause-starting keywords
-// above, to keep `FROM  WHERE ...` from taking WHERE as the table mid-edit. A
-// segment after a dot can never start a clause, so `db.<keyword>` (e.g.
-// `default.order`) resolves; unqualified keyword tables need backtick quoting.
+// Only the first (unqualified) segment refuses the reserved keywords above, to
+// keep `FROM  WHERE ...` from taking WHERE as the table mid-edit. A segment
+// after a dot can never start a clause, so `db.<keyword>` (e.g. `default.order`)
+// resolves; an unqualified table named after a reserved keyword needs backtick
+// quoting.
 function isTableNameToken(token: Token, allowReserved: boolean): boolean {
   if (token.type === TokenType.QuotedIdentifier) {
     return true;
@@ -130,6 +131,21 @@ function isTableNameToken(token: Token, allowReserved: boolean): boolean {
     return false;
   }
   return allowReserved || !RESERVED_FROM_KEYWORDS.has(token.text.toUpperCase());
+}
+
+// Whether `token` is a set operator. UNION, INTERSECT and EXCEPT are also valid
+// column names, and EXCEPT is a column modifier too
+// (`SELECT * EXCEPT (secret) FROM t`), so each counts only when what follows
+// starts another select: SELECT, WITH, ALL / DISTINCT, or `(` and then SELECT or
+// WITH.
+function isSetOperator(token: Token | undefined, next: Token | undefined, afterNext: Token | undefined): boolean {
+  if (!['UNION', 'INTERSECT', 'EXCEPT'].some((keyword) => token?.matchKeyword(keyword))) {
+    return false;
+  }
+  if (next?.type === TokenType.OpeningRoundBracket) {
+    return Boolean(afterNext?.matchKeyword('SELECT') || afterNext?.matchKeyword('WITH'));
+  }
+  return ['SELECT', 'WITH', 'ALL', 'DISTINCT'].some((keyword) => next?.matchKeyword(keyword));
 }
 
 // A Grafana variable used as (part of) a FROM target, e.g. `${table}`. A
@@ -213,6 +229,13 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
   let endOfNode = false;
   while (!endOfNode && parser.hasNext()) {
     const token = parser.next();
+
+    // A top-level set operation combines several selects, so no single table is
+    // the target. This only sets the flag; the token is still parsed below like
+    // any other.
+    if (parenDepth === 0 && isSetOperator(token, parser.peekAt(0), parser.peekAt(1))) {
+      node.hasSetOperation = true;
+    }
 
     if (token.type === TokenType.Semicolon) {
       // Statement boundary: a query string may contain more than one statement,
@@ -304,16 +327,17 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
     } else if (token.matchKeyword('LIMIT')) {
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Limit });
     } else if (token.matchKeyword('UNION')) {
-      if (parenDepth === 0) {
-        node.hasUnion = true;
-      }
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.None });
     } else if (token.type === TokenType.BareWord && !token.isKeyword()) {
       let fullIdent = token.text;
       let identToken = token;
+      // A set operator ends the identifier: INTERSECT and EXCEPT are not in the
+      // keyword set, so without the check `GROUP BY a INTERSECT SELECT ...`
+      // would read `aINTERSECT` and the operator would never be seen.
       while (
         parser.hasNext() &&
-        (parser.peekIs(TokenType.Dot) || (parser.peekIs(TokenType.BareWord) && !parser.peek().isKeyword()))
+        (parser.peekIs(TokenType.Dot) || (parser.peekIs(TokenType.BareWord) && !parser.peek().isKeyword())) &&
+        !isSetOperator(parser.peek(), parser.peekAt(1), parser.peekAt(2))
       ) {
         identToken = parser.next();
         fullIdent += identToken.text;

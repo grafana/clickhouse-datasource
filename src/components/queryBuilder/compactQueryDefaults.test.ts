@@ -512,6 +512,7 @@ describe('buildCompactQueryDefaults', () => {
     mockDs.shouldSelectLogContextColumns = jest.fn(() => false);
     mockDs.getLogContextColumnNames = jest.fn(() => []);
     mockDs.getAdditionalLogColumns = jest.fn(() => []);
+    mockDs.getLogAttributeColumns = jest.fn(() => []);
     return mockDs;
   };
 
@@ -580,9 +581,10 @@ describe('buildCompactQueryDefaults', () => {
 });
 
 describe('appendAdditionalLogColumns', () => {
-  const makeDatasource = (opts: { additional?: string[] }): Datasource => {
+  const makeDatasource = (opts: { additional?: string[]; attribute?: string[] }): Datasource => {
     const ds = {} as Datasource;
     ds.getAdditionalLogColumns = jest.fn(() => opts.additional ?? []);
+    ds.getLogAttributeColumns = jest.fn(() => opts.attribute ?? []);
     return ds;
   };
 
@@ -606,6 +608,28 @@ describe('appendAdditionalLogColumns', () => {
 
       // method is already present; the map key dedupes against its base ResourceAttributes column
       expect(columns.map((c) => c.name)).toEqual(['method', 'ResourceAttributes']);
+    });
+  });
+
+  describe('attribute columns', () => {
+    it('appends them after the additional columns, with their schema type', () => {
+      const ds = makeDatasource({ additional: ['method'], attribute: ['JsonBody'] });
+      const columns: SelectedColumn[] = [];
+      const included = new Set<string>();
+
+      appendAdditionalLogColumns(ds, [{ name: 'JsonBody', type: 'JSON', picklistValues: [] }], columns, included);
+
+      expect(columns).toEqual([{ name: 'method' }, { name: 'JsonBody', type: 'JSON' }]);
+    });
+
+    it('skips an attribute column that is already selected or also listed in Columns', () => {
+      const ds = makeDatasource({ additional: ['JsonBody'], attribute: ['JsonBody', 'LogAttributes'] });
+      const columns: SelectedColumn[] = [{ name: 'LogAttributes' }];
+      const included = new Set<string>(['LogAttributes']);
+
+      appendAdditionalLogColumns(ds, [], columns, included);
+
+      expect(columns.map((c) => c.name)).toEqual(['LogAttributes', 'JsonBody']);
     });
   });
 });

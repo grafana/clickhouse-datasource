@@ -348,3 +348,88 @@ test.describe('Log details for a labels map', () => {
     await expect(detailsFieldValue(page, 'service', 'db')).toBeVisible();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Attribute columns: a JSON (or Map) column named in logs.attributeColumns is
+// projected into the compact logs query, and the backend
+// (mergeOpenTelemetryLabels in pkg/plugin/driver.go) flattens its keys into
+// `labels`, so each nested path is its own field in the expanded row.
+// logs.attributeColumnExclusions drops a subtree after flattening. Filter-for on
+// a flattened JSON path must regenerate the query with the JSON sub-path cast
+// (`::Nullable(String)`); a bare `attributes.user_id = '...'` works for `=` only
+// and breaks on IN / NOT IN. Uses e2e_test.json_events (tests/fixtures/seed.sql),
+// whose newest row is user_id u-4, level info, http.status_code 200.
+// ---------------------------------------------------------------------------
+
+const ATTRIBUTE_COLUMNS_DATASOURCE: TestDataSource = {
+  uid: 'clickhouse-e2e-logs-attribute-columns',
+  name: 'ClickHouse Logs Attribute Columns (e2e)',
+  jsonData: {
+    database: 'e2e_test',
+    configMode: 'single-table',
+    signalType: 'logs',
+    logs: {
+      defaultDatabase: 'e2e_test',
+      defaultTable: 'json_events',
+      otelEnabled: false,
+      filterTimeColumn: 'timestamp',
+      timeColumn: 'timestamp',
+      messageColumn: 'message',
+      attributeColumns: ['attributes'],
+      attributeColumnExclusions: ['attributes.http'],
+    },
+  },
+};
+
+test.describe('Logs Attribute columns datasource setting', () => {
+  // Serial for the same reason as the Columns suite: one worker owns the
+  // beforeAll/afterAll datasource lifecycle.
+  test.describe.configure({ mode: 'serial' });
+
+  test.beforeAll(async () => {
+    if (isCloudRun) {
+      return;
+    }
+    await deleteTestDataSources([ATTRIBUTE_COLUMNS_DATASOURCE]);
+    await createTestDataSources([ATTRIBUTE_COLUMNS_DATASOURCE]);
+  });
+
+  test.afterAll(async () => {
+    if (isCloudRun) {
+      return;
+    }
+    await deleteTestDataSources([ATTRIBUTE_COLUMNS_DATASOURCE]);
+  });
+
+  test.beforeEach(() => {
+    test.skip(
+      isCloudRun,
+      'Depends on the local e2e_test.json_events fixture (tests/fixtures/seed.sql) loaded via the e2e-data-loader Docker service, which is not available on Cloud.'
+    );
+  });
+
+  test('flattens JSON paths into filterable fields, drops excluded paths, and casts the filter', async ({
+    page,
+    explorePage,
+  }) => {
+    await page.goto(exploreUrl(ATTRIBUTE_COLUMNS_DATASOURCE.uid));
+
+    const { getBody } = await runCompactLogsQuery(page, explorePage);
+    expect(rowCount(getBody())).toBeGreaterThan(0);
+
+    await openFirstLogRowDetails(page);
+    // Each flattened JSON path is its own field, with the newest row's value.
+    await expect(detailsFieldValue(page, 'attributes.user_id', 'u-4')).toBeVisible();
+    await expect(detailsFieldValue(page, 'attributes.level', 'info')).toBeVisible();
+    // The excluded subtree is gone, leaf included.
+    await expect(page.getByText('attributes.http.status_code', { exact: true })).toHaveCount(0);
+
+    const requestPromise = waitForNextQueryRequestBody(page);
+    await filterForButtonForField(page, 'attributes.user_id').click();
+    const body = await requestPromise;
+
+    const q = firstQueryFromBody(body);
+    expect(q?.editorType).toBe('builder');
+    expect(String(q?.rawSql ?? '')).toContain("attributes.`user_id`::Nullable(String) = 'u-4'");
+  });
+});

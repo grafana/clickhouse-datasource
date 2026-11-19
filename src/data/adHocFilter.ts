@@ -1,4 +1,6 @@
 import { AdHocVariableFilter } from '@grafana/data';
+import { Lexer } from 'ch-parser/lexer';
+import { TokenType } from 'ch-parser/types';
 import { getTable } from './ast';
 import { buildJSONPathAccess, parseJSONAdhocKey, quoteColumnIfUnsafe } from './jsonPath';
 
@@ -67,7 +69,7 @@ export class AdHocFilter {
       .map((f, i) => {
         const key = escapeKey(f.key, useJSON, this._mapColumns);
         const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
-        const condition = i !== validFilters.length - 1 ? (f.condition ? f.condition : 'AND') : '';
+        const condition = i !== validFilters.length - 1 ? toCondition(f.condition) : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
         return ` ${key} ${operator} ${value} ${condition}`;
       })
@@ -119,18 +121,69 @@ export class AdHocFilter {
     if (filters === '') {
       return sql;
     }
-    // Strip only a trailing semicolon before appending the settings clause. A
-    // bare replace(';', '') would delete the first semicolon anywhere, e.g.
-    // inside splitByChar(';', col).
-    sql = sql.replace(/;\s*$/, '');
+    // Drop the statement terminator first, or the settings clause lands after
+    // `;` and ClickHouse rejects the query as multiple statements.
+    sql = stripStatementTerminator(sql);
     // Append on a new line so a trailing line comment (`-- ...`) cannot swallow
     // the settings clause and silently drop the filter.
     return `${sql}\nsettings additional_table_filters={'${targetTable}' : '${filters}'}`;
   }
 }
 
+// Operators Grafana's ad-hoc filter UI can send, plus this plugin's own IN / NOT
+// IN. The operator is emitted verbatim into the filter expression and, like the
+// key and value, is URL-settable (`var-filter=key|<op>|value`), so anything
+// outside this list is rejected rather than spliced into the SQL.
+const SUPPORTED_OPERATORS: ReadonlySet<string> = new Set([
+  '=',
+  '!=',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  '=~',
+  '!~',
+  '=|',
+  '!=|',
+  'IN',
+  'NOT IN',
+]);
+
 function isValid(filter: AdHocVariableFilter): boolean {
-  return filter.key !== undefined && filter.key !== '' && filter.operator !== undefined && filter.value !== undefined;
+  return (
+    filter.key !== undefined &&
+    filter.key !== '' &&
+    filter.operator !== undefined &&
+    SUPPORTED_OPERATORS.has(filter.operator) &&
+    filter.value !== undefined
+  );
+}
+
+// The condition joining two filters is emitted verbatim too, so only AND / OR
+// pass through; anything else falls back to the default AND.
+function toCondition(condition: string | undefined): string {
+  const normalized = condition?.trim().toUpperCase();
+  return normalized === 'OR' ? 'OR' : 'AND';
+}
+
+// Cut `sql` at its statement terminator: the final run of `;` tokens, with only
+// whitespace and comments between and after them (`t; -- note`, `t;;`). The
+// lexer reads string literals, quoted identifiers and comments as whole tokens,
+// so a `;` inside one, e.g. splitByChar(';', col), is never taken for the
+// terminator. A `;` followed by another statement is left as it is.
+function stripStatementTerminator(sql: string): string {
+  const lexer = new Lexer(sql);
+  let terminatorBegin = -1;
+  for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
+    if (token.type === TokenType.Semicolon) {
+      if (terminatorBegin === -1) {
+        terminatorBegin = token.begin;
+      }
+    } else if (token.isSignificant()) {
+      terminatorBegin = -1;
+    }
+  }
+  return terminatorBegin === -1 ? sql : sql.slice(0, terminatorBegin);
 }
 
 // Escape regex metacharacters so a table name can be interpolated into a
