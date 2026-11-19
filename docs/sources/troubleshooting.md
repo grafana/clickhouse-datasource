@@ -349,6 +349,36 @@ These issues affect the query builder's schema drop-downs and the SQL editor's a
 3. Verify the ClickHouse user has `SELECT` permission on the `JSON` column.
 4. Type the path manually. The editor accepts any path, suggested or not.
 
+#### Log lines show the level instead of a JSON message
+
+**Symptoms:** The **Log Message column** is a `JSON` column. Log lines show another field, such as the level, instead of the message. Searching the log body text fails with `Illegal type JSON of argument of function like`.
+
+**Cause:** Grafana takes the log line from a text field, and the ClickHouse `LIKE` function does not accept `JSON` values. The query builder returns the `JSON` column as it is.
+
+**Solution:** Add a `String` `ALIAS` column that returns the JSON as text, and set it as the **Log Message column**. To keep the JSON paths as fields, list the `JSON` column itself in **Attribute columns**:
+
+```sql
+ALTER TABLE logs ADD COLUMN BodyText String ALIAS toString(JsonBody);
+```
+
+An `ALIAS` column stores nothing; ClickHouse computes it from `JsonBody` when it is read. In the SQL editor, select `toString(JsonBody) AS body` instead of `JsonBody AS body`.
+
+#### Fields from attribute columns are missing
+
+**Symptoms:** A column is listed in **Attribute columns** in the data source settings, but its paths don't appear in the Fields list or the expanded log row.
+
+**Cause:** The data source flattens a column only when it is a `JSON` or `Map` column and the query returns it under its own name. The query builder returns the **Log Message column** only as the log line (for example `JsonBody as "body"`), so a column that is both the log message and an attribute column is not flattened. A SQL editor query that leaves the column out, or returns it only under another name, has the same result. JSON stored as text in a `String` column is not flattened.
+
+**Solution:**
+
+1. If the column is also the **Log Message column**, set the log message to a `String` copy of it, as described in [Log lines show the level instead of a JSON message](#log-lines-show-the-level-instead-of-a-json-message). The column then flattens under its own name.
+2. In the SQL editor, also select the column under its own name, for example `SELECT Timestamp AS timestamp, toString(JsonBody) AS body, JsonBody FROM logs`.
+3. For JSON stored as text in a `String` column, add an `ALIAS` column that parses it, and list that column in **Attribute columns**. ClickHouse parses the text each time the column is read:
+
+   ```sql
+   ALTER TABLE logs ADD COLUMN BodyFields JSON ALIAS BodyStr::JSON;
+   ```
+
 ## Query errors
 
 These errors occur when a query is sent to ClickHouse but fails during parsing or execution.
