@@ -105,6 +105,30 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
     }
   }
 
+  // In a FROM position the target being typed is the outer FROM or the last JOIN
+  // whose keyword the cursor has passed. The parser reads a JOIN target as a From
+  // node too, as it does a FROM inside a function call (`EXTRACT(DAY FROM ts)`),
+  // which is not a target. When the target is `$`-prefixed (`${t}` or `${db}.`,
+  // as in the typingVariable check below), surface it so a JOIN target gets
+  // variable completions, not just the first FROM. The clause guard keeps this
+  // from changing a later clause's column context.
+  if (cursorData.clause === ClauseType.From) {
+    let target: FromQueryNode | undefined;
+    for (const node of root.children) {
+      if (
+        node.type === QueryNodeType.From &&
+        (node === root.from || node.token.matchKeyword('JOIN')) &&
+        node.token.end < cursorPosition
+      ) {
+        target = node;
+      }
+    }
+    if (target && (target.table || target.database || '').startsWith('$')) {
+      cursorData.database = target.database;
+      cursorData.table = target.table;
+    }
+  }
+
   return cursorData;
 }
 

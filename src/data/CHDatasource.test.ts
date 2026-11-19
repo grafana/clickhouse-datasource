@@ -17,7 +17,7 @@ import { DataSourceWithBackend, HealthCheckError, HealthStatus } from '@grafana/
 import { DataQuery } from '@grafana/schema';
 import { mockDatasource } from '__mocks__/datasource';
 import { cloneDeep } from 'lodash';
-import { lastValueFrom, of, Subject, throwError } from 'rxjs';
+import { lastValueFrom, Observable, of, Subject, throwError } from 'rxjs';
 import {
   BuilderMode,
   ColumnHint,
@@ -99,6 +99,72 @@ describe('ClickHouseDatasource', () => {
 
       expect(ds.getConfigMode()).toBe('single-table');
       expect(ds.isSingleTableMode()).toBe(false);
+    });
+  });
+
+  describe('resolveLinkTable', () => {
+    const resolveWith = (values: Record<string, string>) =>
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((v: string) => values[v] ?? v);
+
+    it('returns undefined when the variable is not defined', () => {
+      const ds = createInstance({});
+      resolveWith({});
+      expect(ds.resolveLinkTable('traces')).toBeUndefined();
+    });
+
+    it('splits a db.table value', () => {
+      const ds = createInstance({});
+      resolveWith({ $clickhouse_link_logs_table: 'obs_staging.otel_logs' });
+      expect(ds.resolveLinkTable('logs')).toEqual({ database: 'obs_staging', table: 'otel_logs' });
+    });
+
+    it('keeps the configured default table for a bare database', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.traces = { defaultTable: 'otel_traces' };
+      resolveWith({ $clickhouse_link_traces_table: 'obs_staging' });
+      expect(ds.resolveLinkTable('traces')).toEqual({ database: 'obs_staging', table: 'otel_traces' });
+    });
+
+    it('returns undefined for a bare database without the signal default table', () => {
+      const ds = createInstance({});
+      ds.settings.jsonData.defaultTable = 'bar';
+      ds.settings.jsonData.traces = {};
+      resolveWith({ $clickhouse_link_traces_table: 'obs_staging' });
+      expect(ds.resolveLinkTable('traces')).toBeUndefined();
+    });
+
+    it('expands variables nested in the value', () => {
+      const ds = createInstance({});
+      resolveWith({
+        $clickhouse_link_traces_table: '${database}.otel_traces',
+        '${database}.otel_traces': 'obs_dev.otel_traces',
+      });
+      expect(ds.resolveLinkTable('traces')).toEqual({ database: 'obs_dev', table: 'otel_traces' });
+    });
+
+    it('returns undefined when a nested variable is not defined', () => {
+      const ds = createInstance({});
+      resolveWith({ $clickhouse_link_traces_table: '${database}.otel_traces' });
+      expect(ds.resolveLinkTable('traces')).toBeUndefined();
+    });
+
+    it('keeps the first value of a multi-value variable', () => {
+      const ds = createInstance({});
+      jest
+        .spyOn(templateSrvMock, 'replace')
+        .mockImplementation((v: string, _scoped: unknown, format: (value: unknown) => string) =>
+          v === '$clickhouse_link_traces_table' ? format(['obs_dev', 'obs_prod']) : v
+        );
+      ds.settings.jsonData.traces = { defaultTable: 'otel_traces' };
+      expect(ds.resolveLinkTable('traces')).toEqual({ database: 'obs_dev', table: 'otel_traces' });
+    });
+
+    it('resolves with the request scoped vars', () => {
+      const ds = createInstance({});
+      const replace = resolveWith({ $clickhouse_link_traces_table: 'db.t' });
+      const scopedVars = { env: { text: 'db', value: 'db' } };
+      ds.resolveLinkTable('traces', scopedVars);
+      expect(replace).toHaveBeenCalledWith('$clickhouse_link_traces_table', scopedVars, expect.any(Function));
     });
   });
 
@@ -1455,6 +1521,162 @@ describe('ClickHouseDatasource', () => {
       expect(result).toEqual([1, 2]);
       const sql = spy.mock.calls[0][0].targets[0].rawSql!;
       expect(sql).toBe('SELECT DISTINCT "some""col" FROM "db""name"."events" WHERE "some""col" IS NOT NULL LIMIT 1000');
+    });
+
+    const settings = ` SETTINGS max_execution_time=5`;
+
+    it('bounds distinct values by the dashboard time range on the time column', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+      (templateSrvMock as any).timeRange = { from: dateTime(1735689600000), to: dateTime(1735693200500) };
+
+      try {
+        await ds.fetchDistinctValues('svc', 'db', 'events', { timeColumn: 'ts', timeColumnType: 'DateTime64(9)' });
+      } finally {
+        delete (templateSrvMock as any).timeRange;
+      }
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        'SELECT DISTINCT "svc" FROM "db"."events" WHERE "svc" IS NOT NULL AND "ts" >= fromUnixTimestamp(1735689600) AND "ts" <= fromUnixTimestamp(1735693201) LIMIT 1000' +
+          settings
+      );
+    });
+
+    it('bounds a Date time column by day, falling back to a recent window', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctMapValues('attrs', 'k', 'db', 'events', { timeColumn: 'd', timeColumnType: 'Date' });
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(`AND "d" >= toDate(now() - INTERVAL 6 HOUR) LIMIT 1000`);
+    });
+
+    it("narrows suggestions by the query's other filters", async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctValues('SpanName', 'db', 'spans', { timeColumn: 'ts', where: "ServiceName = 'api'" });
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(
+        `WHERE "SpanName" IS NOT NULL AND (ServiceName = 'api') AND "ts" >= `
+      );
+    });
+
+    it('searches the typed text case-insensitively', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctValues('svc', 'db', 'events', { timeColumn: 'ts', search: "o'k" });
+
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toContain(
+        `AND positionCaseInsensitiveUTF8(toString("svc"), 'o\\'k') > 0 LIMIT 1000` + settings
+      );
+    });
+
+    it('reads a sample of the table when no time column bounds the scan', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      await ds.fetchDistinctValues('svc', 'db', 'events', { search: "o'k", where: "level = 'error'" });
+
+      // The filters narrow the sample; the search runs over the sampled values only.
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        `SELECT DISTINCT __suggested FROM (SELECT "svc" AS __suggested FROM "db"."events" WHERE "svc" IS NOT NULL AND (level = 'error') LIMIT 100000) WHERE 1 AND positionCaseInsensitiveUTF8(toString(__suggested), 'o\\'k') > 0 LIMIT 1000` +
+          settings
+      );
+    });
+
+    it('cancels a value lookup when its signal aborts', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const unsubscribed = jest.fn();
+      jest.spyOn(ds, 'query').mockImplementation(() => new Observable(() => unsubscribed));
+      const lookup = new AbortController();
+
+      const values = ds.fetchDistinctValues('svc', 'db', 'events', { timeColumn: 'ts', signal: lookup.signal });
+      lookup.abort();
+
+      await expect(values).rejects.toMatchObject({ name: 'AbortError' });
+      expect(unsubscribed).toHaveBeenCalled();
+    });
+
+    it('finds the time column of the table keys, the partition key first', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([
+        { partition_key: 'toDate(TimestampTime)', sorting_key: 'ServiceName, toUnixTimestamp(Timestamp)' },
+      ]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+      const columns = [
+        { name: 'ServiceName', type: 'LowCardinality(String)', picklistValues: [] },
+        { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+        { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+      ];
+
+      expect(await ds.fetchTimeKeyColumn("o'db", 'logs', columns)).toEqual(columns[2]);
+      expect(spy.mock.calls[0][0].targets[0].rawSql).toBe(
+        `SELECT partition_key, sorting_key FROM system.tables WHERE database = 'o\\'db' AND name = 'logs'`
+      );
+      // Looked up once per table.
+      await ds.fetchTimeKeyColumn("o'db", 'logs', columns);
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('finds no time column when the table keys use none', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([{ partition_key: '', sorting_key: 'service, created_at' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+
+      // created_at is a String here, so it does not count.
+      const found = await ds.fetchTimeKeyColumn('db', 'events', [
+        { name: 'service', type: 'String', picklistValues: [] },
+        { name: 'created_at', type: 'String', picklistValues: [] },
+        { name: 'ts', type: 'DateTime', picklistValues: [] },
+      ]);
+
+      expect(found).toBeUndefined();
+    });
+
+    it('prefers the time column of the query when the table keys use it', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([
+        { partition_key: 'toDate(TimestampTime)', sorting_key: 'toUnixTimestamp(Timestamp)' },
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+      const timestampTime = { name: 'TimestampTime', type: 'DateTime', picklistValues: [] };
+      const timestamp = { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] };
+      const createdAt = { name: 'CreatedAt', type: 'DateTime', picklistValues: [] };
+
+      expect(await ds.fetchTimeKeyColumn('db', 'logs', [timestampTime, timestamp], timestamp)).toEqual(timestamp);
+      // A time column outside the keys bounds nothing, so a key column stands in for it.
+      expect(await ds.fetchTimeKeyColumn('db', 'logs', [timestampTime, createdAt], createdAt)).toEqual(timestampTime);
+    });
+
+    it('remembers a table whose keys use no time column, and matches columns loaded later', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([{ partition_key: '', sorting_key: 'service, ts' }]);
+      const spy = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [keys] }));
+
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [])).toBeUndefined();
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [])).toBeUndefined();
+      const ts = { name: 'ts', type: 'DateTime', picklistValues: [] };
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [ts])).toEqual(ts);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+    });
+
+    it('looks the table keys up again after a failed lookup', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const keys = arrayToDataFrame([{ partition_key: 'toDate(ts)', sorting_key: '' }]);
+      const spy = jest
+        .spyOn(ds, 'query')
+        // Grafana reports a failed query as a response without fields.
+        .mockImplementationOnce(() => of({ data: [], error: { message: 'timeout' } }))
+        .mockImplementation(() => of({ data: [keys] }));
+      const ts = { name: 'ts', type: 'DateTime', picklistValues: [] };
+
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [ts])).toBeUndefined();
+      expect(await ds.fetchTimeKeyColumn('db', 'events', [ts])).toEqual(ts);
+
+      expect(spy).toHaveBeenCalledTimes(2);
     });
 
     it('escapes map identifiers and map key literals for distinct map values', async () => {
