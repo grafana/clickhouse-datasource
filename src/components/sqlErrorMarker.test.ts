@@ -80,8 +80,16 @@ describe('getQueryErrorMarker', () => {
       startColumn: 3,
       endLineNumber: 2,
       endColumn: 9,
-      message: 'Syntax error at "concat". Expected one of: token, Comma, FROM, PREWHERE, WHERE, GROUP BY, …',
+      message: 'Syntax error at "concat". Expected one of: ",", FROM, WHERE, GROUP BY, ORDER BY, LIMIT, …',
     });
+  });
+
+  it('names punctuation as it is typed and leaves out internal token names', () => {
+    const message = "Syntax error: failed at position 160 ('WARN'): 'WARN'). Expected one of: token, Comma";
+
+    expect(getQueryErrorMarker(message, "SELECT 1 WHERE x IN ('ERROR' 'WARN')")?.message).toBe(
+      `Syntax error at 'WARN'. Expected ",".`
+    );
   });
 
   it('finds the token on the line when a macro before it shifted the column', () => {

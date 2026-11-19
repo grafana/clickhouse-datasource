@@ -110,17 +110,62 @@ function parseKind(prefix: string): string {
   return kind ? kind[1] : 'Syntax error';
 }
 
+// ClickHouse names some tokens instead of printing them, and lists a few internal ones.
+const tokenSymbols: Record<string, string> = {
+  Comma: ',',
+  OpeningRoundBracket: '(',
+  ClosingRoundBracket: ')',
+  OpeningSquareBracket: '[',
+  ClosingSquareBracket: ']',
+  Dot: '.',
+  DoubleColon: '::',
+  Semicolon: ';',
+  Arrow: '->',
+  Equals: '=',
+};
+const internalTokens = new Set(['token', 'token sequence', 'ParallelWithClause']);
+// What most queries need comes first; the rest keep ClickHouse's order.
+const commonExpected = [
+  '","',
+  '")"',
+  'FROM',
+  'WHERE',
+  'GROUP BY',
+  'ORDER BY',
+  'LIMIT',
+  'AS',
+  'AND',
+  'OR',
+  'ON',
+  'JOIN',
+];
+
+function readableExpected(expected: string[]): string[] {
+  const items = Array.from(
+    new Set(expected.filter((e) => !internalTokens.has(e)).map((e) => (tokenSymbols[e] ? `"${tokenSymbols[e]}"` : e)))
+  );
+  const rank = (item: string) => {
+    const i = commonExpected.indexOf(item);
+    return i < 0 ? commonExpected.length : i;
+  };
+  return items
+    .map((item, i) => ({ item, i }))
+    .sort((a, b) => rank(a.item) - rank(b.item) || a.i - b.i)
+    .map(({ item }) => item);
+}
+
 function describe(error: QueryErrorPosition): string {
   const quoted = /^['"`]/.test(error.token) ? error.token : `"${error.token}"`;
   const where = error.token === endOfQuery ? ' at the end of the query' : error.token ? ` at ${quoted}` : '';
-  const shown = error.expected.slice(0, maxExpected).join(', ') + (error.expected.length > maxExpected ? ', …' : '');
   if (error.detail) {
     return `${error.kind}${where}. ${error.detail}`;
   }
-  if (error.expected.length === 0) {
+  const expected = readableExpected(error.expected);
+  if (expected.length === 0) {
     return `${error.kind}${where}.`;
   }
-  return error.expected.length === 1
+  const shown = expected.slice(0, maxExpected).join(', ') + (expected.length > maxExpected ? ', …' : '');
+  return expected.length === 1
     ? `${error.kind}${where}. Expected ${shown}.`
     : `${error.kind}${where}. Expected one of: ${shown}`;
 }
