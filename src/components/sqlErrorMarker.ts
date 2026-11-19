@@ -80,9 +80,12 @@ export function parseQueryErrorPosition(message: string): QueryErrorPosition | u
 }
 
 function parseDetail(message: string): string | undefined {
-  // Its position is in the expanded SQL, so it is left out.
-  const unmatched = /Unmatched parentheses: ('.') at position \d+ is never closed/.exec(message);
-  return unmatched ? `Unmatched parentheses: ${unmatched[1]} is never closed.` : undefined;
+  // Its position is in the expanded SQL, so it is left out. Multi-line queries add the line and column.
+  const unmatched =
+    /Unmatched parentheses: ('.') at position \d+(?: \(line \d+, col \d+\))? (is never closed|has no matching opening bracket)/.exec(
+      message
+    );
+  return unmatched ? `Unmatched parentheses: ${unmatched[1]} ${unmatched[2]}.` : undefined;
 }
 
 function parseExpected(message: string): string[] {

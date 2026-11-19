@@ -144,6 +144,32 @@ describe('getQueryErrorMarker', () => {
     });
   });
 
+  it('explains an unclosed bracket in a multi-line query', () => {
+    const message =
+      "Code: 62. DB::Exception: Syntax error: failed at position 20 (otel_logs) (line 2, col 6): otel_logs. Unmatched parentheses: '(' at position 13 (line 1, col 13) is never closed. (SYNTAX_ERROR) (version 26.11.1.1102 (official build))";
+
+    expect(getQueryErrorMarker(message, 'SELECT count(\nFROM otel_logs')).toEqual({
+      startLineNumber: 2,
+      startColumn: 6,
+      endLineNumber: 2,
+      endColumn: 15,
+      message: `Syntax error at "otel_logs". Unmatched parentheses: '(' is never closed.`,
+    });
+  });
+
+  it('explains a closing bracket without an opening one', () => {
+    const message =
+      "Code: 62. DB::Exception: Syntax error: failed at position 30 ()) (line 2, col 15): ). Unmatched parentheses: ')' at position 30 (line 2, col 15) has no matching opening bracket. (SYNTAX_ERROR) (version 26.11.1.1102 (official build))";
+
+    expect(getQueryErrorMarker(message, 'SELECT count()\nFROM otel_logs)')).toEqual({
+      startLineNumber: 2,
+      startColumn: 15,
+      endLineNumber: 2,
+      endColumn: 16,
+      message: `Syntax error at ")". Unmatched parentheses: ')' has no matching opening bracket.`,
+    });
+  });
+
   it('skips an error past the end of the editor text', () => {
     const message = 'Syntax error: failed at position 90 (SETTINGS) (line 5, col 1): SETTINGS';
 
