@@ -28,6 +28,14 @@ describe('SQL Formatter', () => {
     expect(actual).not.toContain('$ {');
   });
 
+  it('formats queries with backtick-quoted columns', () => {
+    const input = 'SELECT count() FROM otel_logs WHERE `deployment.environment.name` IN (${env:singlequote})';
+    const expected =
+      'SELECT\n  count()\nFROM\n  otel_logs\nWHERE\n  `deployment.environment.name` IN (${env:singlequote})';
+
+    expect(formatSql(input, 2)).toBe(expected);
+  });
+
   it('keeps variables that are part of a table name', () => {
     const input = 'SELECT * FROM ${database}.otel_${env}_logs WHERE x = 1';
     const expected = 'SELECT\n  *\nFROM\n  ${database}.otel_${env}_logs\nWHERE\n  x = 1';
