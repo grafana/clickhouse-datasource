@@ -37,7 +37,7 @@ export interface Suggestion {
 }
 
 export type Fetcher = {
-  (text: string, range: Range, cursorPosition: number): Promise<SuggestionResponse>;
+  (text: string, range: Range, cursorPosition: number, onlyMapKeys?: boolean): Promise<SuggestionResponse>;
 };
 
 export function formatSql(rawSql: string, tabWidth = 4): string {
@@ -72,8 +72,9 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
 
   // just extend sql for now so we get syntax highlighting
   const completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
-    triggerCharacters: [' ', '.', '$'],
-    provideCompletionItems: async (model: Model, position: Position) => {
+    // A quote opens the key list right after `column['`, and asks for nothing anywhere else.
+    triggerCharacters: [' ', '.', '$', "'"],
+    provideCompletionItems: async (model: Model, position: Position, context?: { triggerCharacter?: string }) => {
       const word = model.getWordUntilPosition(position);
       const range: Range = {
         startLineNumber: position.lineNumber,
@@ -82,7 +83,7 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
         endColumn: word.endColumn,
       };
 
-      return fetchSuggestions(model.getValue(), range, model.getOffsetAt(position));
+      return fetchSuggestions(model.getValue(), range, model.getOffsetAt(position), context?.triggerCharacter === "'");
     },
   });
 

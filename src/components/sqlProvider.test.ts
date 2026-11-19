@@ -58,4 +58,28 @@ describe('registerSQL', () => {
     expect(completionRegister).toHaveBeenCalledTimes(2);
     expect(formattingRegister).toHaveBeenCalledTimes(2);
   });
+
+  it('asks only for Map keys when a typed quote opens the suggestions', async () => {
+    const completionRegister = jest.fn((_lang: string, _provider: any) => ({ dispose: jest.fn() }));
+    (window as any).monaco = {
+      languages: {
+        registerCompletionItemProvider: completionRegister,
+        registerDocumentFormattingEditProvider: jest.fn(() => ({ dispose: jest.fn() })),
+      },
+      editor: {} as any,
+    };
+    const fetcher = jest.fn(async () => ({ suggestions: [] }));
+    registerSQL('sql', { updateOptions: jest.fn() } as any, fetcher);
+    const provider = completionRegister.mock.calls[0][1];
+    const model = {
+      getWordUntilPosition: () => ({ startColumn: 1, endColumn: 1 }),
+      getValue: () => "SELECT LogAttributes['",
+      getOffsetAt: () => 22,
+    };
+
+    expect(provider.triggerCharacters).toContain("'");
+    await provider.provideCompletionItems(model, { lineNumber: 1, column: 23 }, { triggerCharacter: "'" });
+    await provider.provideCompletionItems(model, { lineNumber: 1, column: 23 }, { triggerCharacter: ' ' });
+    expect(fetcher.mock.calls.map((call: unknown[]) => call[3])).toEqual([true, false]);
+  });
 });

@@ -52,8 +52,13 @@ export const SqlEditor = (props: SqlEditorProps) => {
 
   const schema = useSchemaSuggestionsProvider(datasource);
 
-  const _getSuggestions: Fetcher = async (text: string, range: Range, cursorPosition: number) => {
-    const suggestions = await getSuggestions(text, schema, range, cursorPosition);
+  const _getSuggestions: Fetcher = async (
+    text: string,
+    range: Range,
+    cursorPosition: number,
+    onlyMapKeys?: boolean
+  ) => {
+    const suggestions = await getSuggestions(text, schema, range, cursorPosition, onlyMapKeys);
     return { suggestions };
   };
 
