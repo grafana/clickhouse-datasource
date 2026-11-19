@@ -6,6 +6,7 @@ import * as ui from '@grafana/ui';
 import { mockDatasource } from '__mocks__/datasource';
 import { EditorType } from 'types/sql';
 import { selectors } from 'selectors';
+import { getDefaultTimeRange, LoadingState } from '@grafana/data';
 
 const mockCompletionDispose = jest.fn();
 const mockFormattingDispose = jest.fn();
@@ -18,6 +19,12 @@ const mockMonaco = {
   },
   KeyCode: {
     Enter: 3,
+  },
+  MarkerSeverity: {
+    Error: 8,
+  },
+  editor: {
+    setModelMarkers: jest.fn(),
   },
   languages: {
     getLanguages: () => [],
@@ -37,6 +44,7 @@ const mockEditor = (value: string) => ({
   getContentHeight: () => 100,
   layout: jest.fn(),
   onDidContentSizeChange: jest.fn(),
+  onDidChangeModelContent: jest.fn(),
   onKeyUp: jest.fn(),
   addAction: jest.fn(),
   getModel: () => ({
@@ -86,6 +94,37 @@ describe('SQL Editor', () => {
     mockFormattingDispose.mockClear();
     mockMonaco.languages.registerCompletionItemProvider.mockClear();
     mockMonaco.languages.registerDocumentFormattingEditProvider.mockClear();
+    mockMonaco.editor.setModelMarkers.mockClear();
+  });
+
+  it('marks where the last run failed, and clears the marker when the text changes', () => {
+    const rawSql =
+      "SELECT toStartOfInterval(Timestamp, INTERVAL 1 HOUR) AS t\n  concat(ServiceName, ' ', SeverityText) AS s\nFROM otel_logs";
+    const message =
+      "error querying the database: code: 62, message: Syntax error: failed at position 61 (concat) (line 2, col 3): concat(ServiceName, ' ', SeverityText) AS s. Expected one of: token, Comma, FROM";
+
+    render(
+      <SqlEditor
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={mockDatasource}
+        data={{
+          state: LoadingState.Error,
+          series: [],
+          timeRange: getDefaultTimeRange(),
+          errors: [{ refId: 'A', message }],
+        }}
+      />
+    );
+
+    expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-error', [
+      expect.objectContaining({ startLineNumber: 2, startColumn: 3, endColumn: 9, severity: 8, source: 'ClickHouse' }),
+    ]);
+
+    const onContentChange = (mockEditorInstance.onDidChangeModelContent as jest.Mock).mock.calls[0][0];
+    onContentChange();
+    expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-error', []);
   });
 
   it('Should display sql in the editor', () => {
