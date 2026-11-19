@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { PanelData, QueryEditorProps } from '@grafana/data';
+import { getDefaultTimeRange, LoadingState, PanelData, QueryEditorProps } from '@grafana/data';
 import { CodeEditor, InlineFieldRow, monacoTypes } from '@grafana/ui';
 import { Datasource } from 'data/CHDatasource';
 import { registerSQL, Range, Fetcher } from './sqlProvider';
@@ -16,11 +16,16 @@ import { useSchemaSuggestionsProvider } from 'hooks/useSchemaSuggestionsProvider
 import { QueryToolbox } from './QueryToolbox';
 import { MinIntervalEditor } from './MinIntervalEditor';
 import { getRunErrorMarkers } from './sqlErrorMarker';
+import { createSqlServerCheck, SqlServerCheck } from './sqlServerCheck';
 
 type SqlEditorProps = QueryEditorProps<Datasource, CHQuery, CHConfig>;
 
 // Kept apart from the 'clickhouse' owner of the as-you-type validation, so each clears only its own markers.
 const queryErrorOwner = 'clickhouse-query-error';
+// Markers from checking the text with the server while it is edited.
+const queryCheckOwner = 'clickhouse-query-check';
+// How long typing has to pause before the text is checked.
+const queryCheckDelayMs = 800;
 
 function showQueryErrors(
   editor: monacoTypes.editor.IStandaloneCodeEditor | null,
@@ -60,6 +65,14 @@ export const SqlEditor = (props: SqlEditorProps) => {
   const editorRef = useRef<monacoTypes.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof monacoTypes | null>(null);
   const disposeRegistrationRef = useRef<(() => void) | null>(null);
+  const queryCheckRef = useRef<SqlServerCheck | null>(null);
+  const queryCheckTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  // The SQL of the last run that succeeded, which needs no check.
+  const lastGoodRunRef = useRef<string | undefined>(undefined);
+  const rangeRef = useRef(props.range);
+  rangeRef.current = props.range;
+  // On unless the data source turns "Validate SQL" off.
+  const validationEnabled = datasource.settings.jsonData.validateSql !== false;
   const sqlQuery = query as CHSqlQuery;
   const queryType = sqlQuery.queryType || QueryType.Table;
 
@@ -103,24 +116,81 @@ export const SqlEditor = (props: SqlEditorProps) => {
   // Show where the last run failed, for example after Run Query, and again when new results arrive.
   useEffect(() => {
     showQueryErrors(editorRef.current, monacoRef.current, props.data, query.refId);
+    const ran = props.data?.request?.targets.find((target) => target.refId === query.refId);
+    const ranSql = ran && 'rawSql' in ran && typeof ran.rawSql === 'string' ? ran.rawSql : undefined;
+    const failed = (props.data?.errors ?? []).some((error) => !error.refId || error.refId === query.refId);
+    if (ranSql !== undefined && props.data?.state === LoadingState.Done && !failed) {
+      lastGoodRunRef.current = ranSql;
+    }
+    // A run of the current text replaces what the check said about it.
+    const model = editorRef.current?.getModel();
+    if (model && monacoRef.current && ranSql !== undefined && ranSql === editorRef.current?.getValue()) {
+      monacoRef.current.editor.setModelMarkers(model, queryCheckOwner, []);
+    }
   }, [props.data, query.refId]);
+
+  const runQueryCheck = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
+    const queryCheck = queryCheckRef.current;
+    const sql = editor.getValue();
+    if (!queryCheck || !validationEnabled || sql === lastGoodRunRef.current) {
+      return;
+    }
+    queryCheck.check(sql).then((outcome) => {
+      const model = editor.getModel();
+      if (!model || editor.getValue() !== sql) {
+        return;
+      }
+      if (outcome.kind === 'skipped' && outcome.retryInMs) {
+        queryCheckTimerRef.current = setTimeout(() => runQueryCheck(editor, monaco), outcome.retryInMs);
+        return;
+      }
+      if (outcome.kind === 'ok') {
+        monaco.editor.setModelMarkers(model, queryCheckOwner, []);
+      } else if (outcome.kind === 'names') {
+        monaco.editor.setModelMarkers(
+          model,
+          queryCheckOwner,
+          outcome.markers.map((marker) => ({ ...marker, severity: monaco.MarkerSeverity.Error, source: 'ClickHouse' }))
+        );
+      } else if (outcome.kind === 'syntax') {
+        // An error at the end of the query, or ahead of the cursor on its line, is most likely text
+        // still being typed, so it is shown as a warning.
+        const cursor = editor.getPosition();
+        const ahead =
+          !!cursor &&
+          outcome.marker.startLineNumber === cursor.lineNumber &&
+          outcome.marker.startColumn >= cursor.column - 1;
+        const severity = outcome.atEnd || ahead ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error;
+        monaco.editor.setModelMarkers(model, queryCheckOwner, [{ ...outcome.marker, severity, source: 'ClickHouse' }]);
+      }
+    });
+  };
 
   const handleMount = (editor: monacoTypes.editor.IStandaloneCodeEditor, monaco: typeof monacoTypes) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     showQueryErrors(editor, monaco, props.data, query.refId);
-    // The marker belongs to the SQL that ran, so it goes away as soon as the text changes.
+    queryCheckRef.current = createSqlServerCheck(
+      datasource,
+      query.refId,
+      () => rangeRef.current ?? getDefaultTimeRange()
+    );
+    // Markers belong to the text they were made for, so they go away as soon as it changes. Once
+    // typing pauses, the new text is checked; nothing is sent when the editor opens.
     editor.onDidChangeModelContent(() => {
       const model = editor.getModel();
       if (model) {
+        monaco.editor.setModelMarkers(model, queryCheckOwner, []);
         monaco.editor.setModelMarkers(model, queryErrorOwner, []);
       }
+      clearTimeout(queryCheckTimerRef.current);
+      queryCheckTimerRef.current = setTimeout(() => runQueryCheck(editor, monaco), queryCheckDelayMs);
     });
     const registration = registerSQL('sql', editor, _getSuggestions);
     disposeRegistrationRef.current = registration.dispose;
     setupAutoSize(editor);
     editor.onKeyUp((e: any) => {
-      if (datasource.settings.jsonData.validateSql) {
+      if (validationEnabled) {
         const sql = editor.getValue();
         validateSql(sql, editor.getModel(), registration.monacoEditor);
       }
@@ -140,6 +210,9 @@ export const SqlEditor = (props: SqlEditorProps) => {
   };
 
   const onEditorWillUnmount = () => {
+    clearTimeout(queryCheckTimerRef.current);
+    queryCheckRef.current?.cancel();
+    queryCheckRef.current = null;
     disposeRegistrationRef.current?.();
     disposeRegistrationRef.current = null;
     editorRef.current = null;

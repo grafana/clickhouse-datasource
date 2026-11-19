@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { SqlEditor } from './SqlEditor';
 import * as ui from '@grafana/ui';
@@ -7,6 +7,10 @@ import { mockDatasource } from '__mocks__/datasource';
 import { EditorType } from 'types/sql';
 import { selectors } from 'selectors';
 import { getDefaultTimeRange, LoadingState } from '@grafana/data';
+import { CheckOutcome } from './sqlServerCheck';
+
+const mockQueryCheck = { check: jest.fn<Promise<CheckOutcome>, [string]>(), cancel: jest.fn() };
+jest.mock('./sqlServerCheck', () => ({ createSqlServerCheck: () => mockQueryCheck }));
 
 const mockCompletionDispose = jest.fn();
 const mockFormattingDispose = jest.fn();
@@ -22,6 +26,7 @@ const mockMonaco = {
   },
   MarkerSeverity: {
     Error: 8,
+    Warning: 4,
   },
   editor: {
     setModelMarkers: jest.fn(),
@@ -54,6 +59,7 @@ const mockEditor = (value: string) => ({
   updateOptions: jest.fn(),
   setValue: jest.fn(),
   dispose: jest.fn(),
+  getPosition: () => ({ lineNumber: 1, column: 1 }),
 });
 
 // Add monaco to the window object as it's expected by sqlProvider
@@ -95,6 +101,66 @@ describe('SQL Editor', () => {
     mockMonaco.languages.registerCompletionItemProvider.mockClear();
     mockMonaco.languages.registerDocumentFormattingEditProvider.mockClear();
     mockMonaco.editor.setModelMarkers.mockClear();
+    mockQueryCheck.check.mockReset();
+    mockQueryCheck.cancel.mockReset();
+  });
+
+  const renderEditor = (rawSql: string) =>
+    render(
+      <SqlEditor
+        query={{ pluginVersion: '', rawSql, refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={mockDatasource}
+      />
+    );
+  const editText = async () => {
+    const onContentChange = (mockEditorInstance.onDidChangeModelContent as jest.Mock).mock.calls[0][0];
+    onContentChange();
+    await act(async () => {
+      jest.advanceTimersByTime(800);
+    });
+  };
+
+  describe('checking the text with the server', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
+    it('asks once typing pauses, not when the editor opens, and marks what it reports', async () => {
+      const marker = { startLineNumber: 1, startColumn: 8, endLineNumber: 1, endColumn: 18, message: 'Unknown column' };
+      mockQueryCheck.check.mockResolvedValue({ kind: 'names', markers: [marker] });
+
+      renderEditor('SELECT ServiceNme FROM otel_logs');
+      expect(mockQueryCheck.check).not.toHaveBeenCalled();
+
+      await editText();
+      expect(mockQueryCheck.check).toHaveBeenCalledWith('SELECT ServiceNme FROM otel_logs');
+      expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-check', [
+        { ...marker, severity: 8, source: 'ClickHouse' },
+      ]);
+    });
+
+    it('shows a syntax error ahead of the cursor as a warning', async () => {
+      const marker = { startLineNumber: 1, startColumn: 1, endLineNumber: 1, endColumn: 7, message: 'Syntax error' };
+      mockQueryCheck.check.mockResolvedValue({ kind: 'syntax', marker, atEnd: false });
+
+      renderEditor('SELECT');
+      await editText();
+      expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-check', [
+        { ...marker, severity: 4, source: 'ClickHouse' },
+      ]);
+    });
+
+    it('asks nothing when Validate SQL is turned off', async () => {
+      mockDatasource.settings.jsonData.validateSql = false;
+      try {
+        renderEditor('SELECT 1');
+        await editText();
+        expect(mockQueryCheck.check).not.toHaveBeenCalled();
+      } finally {
+        delete mockDatasource.settings.jsonData.validateSql;
+      }
+    });
   });
 
   it('marks where the last run failed, and clears the marker when the text changes', () => {
