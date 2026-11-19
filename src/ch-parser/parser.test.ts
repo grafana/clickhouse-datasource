@@ -111,9 +111,38 @@ describe('parseSelect', () => {
     expect(multi?.withAliases?.get('b')?.from?.table).toBe('t_b');
   });
 
-  it('flags a top-level UNION', () => {
-    expect(parseSelect('SELECT a FROM t1 UNION ALL SELECT a FROM t2')?.hasUnion).toBe(true);
-    expect(parseSelect('SELECT a FROM t1')?.hasUnion).toBeFalsy();
+  it.each([
+    ['UNION ALL', 'SELECT a FROM t1 UNION ALL SELECT a FROM t2'],
+    ['UNION DISTINCT', 'SELECT a FROM t1 UNION DISTINCT SELECT a FROM t2'],
+    ['UNION before a parenthesized select', 'SELECT a FROM t1 UNION (SELECT a FROM t2)'],
+    ['INTERSECT', 'SELECT a FROM t1 INTERSECT SELECT a FROM t2'],
+    ['EXCEPT', 'SELECT a FROM t1 EXCEPT SELECT a FROM t2'],
+    ['EXCEPT DISTINCT', 'SELECT a FROM t1 EXCEPT DISTINCT SELECT a FROM t2'],
+    ['INTERSECT before a parenthesized select', 'SELECT a FROM t1 INTERSECT (SELECT a FROM t2)'],
+    ['INTERSECT after GROUP BY', 'SELECT a FROM t1 GROUP BY a INTERSECT SELECT a FROM t2'],
+    ['EXCEPT after a table alias', 'SELECT a FROM t1 AS x EXCEPT SELECT a FROM t2'],
+    ['EXCEPT after an INTERVAL unit', 'SELECT a FROM t1 WHERE ts > now() - INTERVAL 1 HOUR EXCEPT SELECT a FROM t2'],
+    ['EXCEPT with no FROM before it', 'SELECT 1 EXCEPT SELECT a FROM t2'],
+  ])('flags a top-level %s as a set operation', (_label, sql) => {
+    expect(parseSelect(sql)?.hasSetOperation).toBe(true);
+  });
+
+  it.each([
+    ['a single select', 'SELECT a FROM t1'],
+    ['an EXCEPT column modifier', 'SELECT * EXCEPT (secret) FROM otel_logs'],
+    ['an EXCEPT modifier on a COLUMNS matcher', "SELECT COLUMNS('^Span') EXCEPT (SpanId) FROM otel_traces"],
+    ['a column named intersect', 'SELECT intersect FROM t1'],
+    ['a column named except', 'SELECT a FROM t1 WHERE except = 2'],
+    ['a column named union', 'SELECT union FROM t1'],
+  ])('does not flag %s as a set operation', (_label, sql) => {
+    const node = parseSelect(sql);
+    expect(node).not.toBeNull();
+    expect(node?.hasSetOperation).toBeFalsy();
+  });
+
+  it('resolves unqualified FORMAT and PREWHERE as table names', () => {
+    expect(parseSelect('SELECT * FROM format')?.from?.table).toBe('format');
+    expect(parseSelect('SELECT * FROM prewhere')?.from?.table).toBe('prewhere');
   });
 
   it('keeps the outer table across an ARRAY JOIN', () => {
