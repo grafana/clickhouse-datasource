@@ -10,9 +10,11 @@ import {
   FromQueryNode,
   IdentifierQueryNode,
   parseSelect,
+  QueryNode,
   QueryNodeType,
   SelectQueryNode,
 } from 'ch-parser/parser';
+import { selectListItems, unquoteIdentifier } from 'ch-parser/spans';
 
 declare const monaco: Monaco;
 export interface Schema {
@@ -23,32 +25,53 @@ export interface Schema {
   defaultDatabase?: string;
 }
 
+// A CTE that the FROM of the cursor's select level reads from, with the CTEs visible there.
+interface CursorCte {
+  name: string;
+  body: SelectQueryNode;
+  scope: Map<string, SelectQueryNode>;
+}
+
 interface CursorData {
   clause: ClauseType;
   identifiers: string[];
   database?: string;
   table?: string;
   prefix?: string;
+  cte?: CursorCte;
 
   begin: number;
   end: number;
 }
 
-function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: number): CursorData {
+function getCursorInSelectQueryNode(
+  root: SelectQueryNode,
+  cursorPosition: number,
+  outerScope: Map<string, SelectQueryNode> = new Map()
+): CursorData {
+  // A query that starts with WITH has no SELECT token until its outer SELECT is typed, for example
+  // while the cursor is still in the first CTE body.
+  const head = root.token ?? root.children?.[0]?.token;
   const cursorData: CursorData = {
     clause: ClauseType.None,
     identifiers: [],
-    begin: root.token.begin,
-    end: root.token.end,
+    begin: head?.begin ?? 0,
+    end: head?.end ?? 0,
   };
 
-  if (cursorPosition > root.token.end) {
+  if (root.token && cursorPosition > root.token.end) {
     cursorData.clause = ClauseType.Select;
   }
 
+  // The CTEs defined at this level and the ones around it; an inner name wins.
+  const scope = new Map([...outerScope, ...(root.withAliases ?? [])]);
   if (root.from) {
     cursorData.database = root.from.database;
     cursorData.table = root.from.table;
+    const body = cteNamedBy(root.from, scope);
+    if (body) {
+      cursorData.cte = { name: root.from.table!, body, scope };
+    }
   }
 
   if (!root.children) {
@@ -59,7 +82,7 @@ function getCursorInSelectQueryNode(root: SelectQueryNode, cursorPosition: numbe
     switch (node.type) {
       case QueryNodeType.Select:
         const selectNode = node as SelectQueryNode;
-        const nestedCursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);
+        const nestedCursorData = getCursorInSelectQueryNode(selectNode, cursorPosition, scope);
         // +1/-1 to exclude subquery parenthesis
         if (cursorPosition >= nestedCursorData.begin - 1 && cursorPosition <= nestedCursorData.end + 1) {
           return nestedCursorData;
@@ -150,6 +173,7 @@ export async function getSuggestions(
     cursorData,
     schema,
     range,
+    text,
     typedVariableStart(text, cursorPosition)
   );
   return dedupeSuggestions(results);
@@ -189,6 +213,7 @@ async function getSuggestionsFromCursorData(
   data: CursorData,
   schema: Schema,
   range: Range,
+  text: string,
   typed: TypedVariableStart = { start: '', closed: false }
 ): Promise<monacoTypes.languages.CompletionItem[]> {
   let results: monacoTypes.languages.CompletionItem[] = [];
@@ -277,7 +302,9 @@ async function getSuggestionsFromCursorData(
       const sqlFunctions = await fetchFunctionSuggestions(schema, range);
       results.push(...sqlFunctions);
 
-      if (data.table) {
+      if (data.cte) {
+        results.push(...(await fetchCteFieldSuggestions(schema, range, text, data.cte, data.prefix)));
+      } else if (data.table) {
         const database = data.database || schema.defaultDatabase || 'default';
         const columns = await fetchFieldSuggestions(schema, range, database, data.table, data.prefix);
         results.push(...columns);
@@ -349,7 +376,87 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database: str
 const quoteColumnSegments = (name: string): string => name.split('.').map(quoteColumnIfUnsafe).join('.');
 
 async function fetchFieldSuggestions(schema: Schema, range: Range, db: string, table: string, prefix?: string) {
-  const columns = await schema.columns(db, table);
+  return columnSuggestions(await schema.columns(db, table), range, prefix);
+}
+
+// The CTE an unqualified FROM target names, when one with that name is in scope.
+function cteNamedBy(from: FromQueryNode, scope: Map<string, SelectQueryNode>): SelectQueryNode | undefined {
+  if (!from.table || from.database || from.isTableFunction) {
+    return undefined;
+  }
+  return scope.get(from.table);
+}
+
+// The end offset of the last token under `node`.
+function nodeEnd(node: QueryNode): number {
+  return Math.max(node.token?.end ?? 0, ...(node.children ?? []).map(nodeEnd));
+}
+
+interface CteColumns {
+  // The names the CTE's select list gives: aliases and lone column names.
+  names: string[];
+  // The tables whose columns reach the CTE through `*`.
+  tables: Array<{ database?: string; table: string }>;
+}
+
+// The columns a CTE body exposes. `*` is followed through CTEs and FROM subqueries to the tables
+// they read; `seen` stops a CTE that reads from itself.
+function cteColumns(
+  text: string,
+  body: SelectQueryNode,
+  outerScope: Map<string, SelectQueryNode>,
+  seen = new Set<SelectQueryNode>()
+): CteColumns {
+  const columns: CteColumns = { names: [], tables: [] };
+  if (!body.token || seen.has(body)) {
+    return columns;
+  }
+  seen.add(body);
+
+  const scope = new Map([...outerScope, ...(body.withAliases ?? [])]);
+  const from = body.from;
+  for (const item of selectListItems(text, body.token.end, from?.token.begin ?? nodeEnd(body))) {
+    if (item.outputName) {
+      columns.names.push(item.outputName);
+    }
+    if (!item.wildcard || !from) {
+      continue;
+    }
+    const source = cteNamedBy(from, scope) ?? from.subquery;
+    if (source) {
+      const inner = cteColumns(text, source, scope, seen);
+      columns.names.push(...inner.names);
+      columns.tables.push(...inner.tables);
+    } else if (from.table && !from.isTableFunction) {
+      const table = unquoteIdentifier(from.table);
+      const database = from.database === undefined ? undefined : unquoteIdentifier(from.database);
+      if (table !== undefined && (from.database === undefined || database !== undefined)) {
+        columns.tables.push({ database, table });
+      }
+    }
+  }
+  return columns;
+}
+
+async function fetchCteFieldSuggestions(schema: Schema, range: Range, text: string, cte: CursorCte, prefix?: string) {
+  const { names, tables } = cteColumns(text, cte.body, cte.scope);
+  const suggestions: monacoTypes.languages.CompletionItem[] = [];
+  for (const { database, table } of tables) {
+    const db = database || schema.defaultDatabase || 'default';
+    suggestions.push(...(await fetchFieldSuggestions(schema, range, db, table, prefix)));
+  }
+  // The schema knows no type for a column the CTE computes, so the detail names the CTE instead.
+  const named = names.map((name): TableColumn => ({
+    name,
+    label: name,
+    type: `Column of ${cte.name}`,
+    picklistValues: [],
+  }));
+  suggestions.push(...columnSuggestions(named, range, prefix));
+  return suggestions;
+}
+
+function columnSuggestions(columns: TableColumn[], range: Range, prefix?: string) {
   // Monaco replaces and scores only the word at the cursor, and `.` ends a word,
   // so the insert and filter texts start after the last dot of the prefix.
   const typedSegments = prefix ? prefix.lastIndexOf('.') + 1 : 0;
