@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import {
   useDefaultFilters,
   useDefaultLogColumnsByName,
@@ -7,7 +7,7 @@ import {
   useOtelColumns,
 } from './logsQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
-import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
+import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn, TableKeys } from 'types/queryBuilder';
 import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
 import otel from 'otel';
 
@@ -136,7 +136,9 @@ describe('useOtelColumns', () => {
       { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
     ];
 
-    renderHook(() => useOtelColumns(mockDatasource, allColumns, true, testOtelVersion.version, builderOptionsDispatch));
+    renderHook(() =>
+      useOtelColumns(mockDatasource, allColumns, true, testOtelVersion.version, builderOptionsDispatch, '', '')
+    );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -150,7 +152,9 @@ describe('useOtelColumns', () => {
       { name: 'LogAttributes', type: 'Map(String, String)', picklistValues: [] },
     ];
 
-    renderHook(() => useOtelColumns(mockDatasource, allColumns, true, testOtelVersion.version, builderOptionsDispatch));
+    renderHook(() =>
+      useOtelColumns(mockDatasource, allColumns, true, testOtelVersion.version, builderOptionsDispatch, '', '')
+    );
 
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
   });
@@ -161,7 +165,7 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, [], enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, [], enabled, testOtelVersion.version, builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -179,7 +183,8 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) =>
+        useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -207,7 +212,8 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) =>
+        useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -234,7 +240,7 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, 'latest', builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, 'latest', builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -250,6 +256,79 @@ describe('useOtelColumns', () => {
     expect(builderOptionsDispatch).toHaveBeenCalledWith(expect.objectContaining(setOptions(expectedOptions)));
   });
 
+  describe('with the table keys', () => {
+    const allColumns: readonly TableColumn[] = [
+      { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+      { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+    ];
+    const columnsOf = (version: string): SelectedColumn[] => {
+      const columns: SelectedColumn[] = [];
+      otel.getVersion(version)?.logColumnMap.forEach((v, k) => {
+        columns.push({ name: v, hint: k, type: allColumns.find((c) => c.name === v)?.type });
+      });
+      return columns;
+    };
+    const renderToggledOn = (builderOptionsDispatch: jest.Mock) => {
+      const hook = renderHook(
+        (enabled) =>
+          useOtelColumns(mockDatasource, allColumns, enabled, 'latest', builderOptionsDispatch, 'otel', 'otel_logs'),
+        { initialProps: false }
+      );
+      hook.rerender(true);
+    };
+
+    beforeEach(() => {
+      jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    });
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('should apply the 1.30.0 column map when version is "latest" and the table keys only use Timestamp', async () => {
+      jest.spyOn(mockDatasource, 'fetchTableKeys').mockResolvedValue({
+        sortingKey: 'toStartOfFiveMinutes(Timestamp), ServiceName, Timestamp',
+        partitionKey: 'toDate(Timestamp)',
+      });
+      const builderOptionsDispatch = jest.fn();
+
+      renderToggledOn(builderOptionsDispatch);
+
+      await waitFor(() => expect(builderOptionsDispatch).toHaveBeenCalledTimes(1));
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(
+        expect.objectContaining(setOptions({ columns: columnsOf('1.30.0') }))
+      );
+    });
+
+    it('should wait for the table keys before applying a column map', async () => {
+      let resolveTableKeys: (keys: TableKeys) => void = () => {};
+      jest
+        .spyOn(mockDatasource, 'fetchTableKeys')
+        .mockReturnValue(new Promise((resolve) => (resolveTableKeys = resolve)));
+      const builderOptionsDispatch = jest.fn();
+
+      renderToggledOn(builderOptionsDispatch);
+      await act(async () => {});
+      expect(builderOptionsDispatch).not.toHaveBeenCalled();
+
+      await act(async () =>
+        resolveTableKeys({ sortingKey: 'ServiceName, TimestampTime, Timestamp', partitionKey: 'toDate(TimestampTime)' })
+      );
+      expect(builderOptionsDispatch).toHaveBeenCalledTimes(1);
+      expect(builderOptionsDispatch).toHaveBeenCalledWith(
+        expect.objectContaining(setOptions({ columns: columnsOf('1.29.0') }))
+      );
+    });
+
+    it('should not look up the table keys when OTEL is already enabled', async () => {
+      const fetchTableKeys = jest.spyOn(mockDatasource, 'fetchTableKeys').mockResolvedValue(undefined);
+
+      renderHook(() => useOtelColumns(mockDatasource, allColumns, true, 'latest', jest.fn(), 'otel', 'otel_logs'));
+      await act(async () => {});
+
+      expect(fetchTableKeys).not.toHaveBeenCalled();
+    });
+  });
+
   it('should apply the 1.30.0 column map when version is "latest" and the table has no TimestampTime', async () => {
     jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
     const builderOptionsDispatch = jest.fn();
@@ -260,7 +339,7 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, 'latest', builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, 'latest', builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -287,7 +366,7 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false;
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, '1.30.0', builderOptionsDispatch),
+      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, '1.30.0', builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -312,7 +391,8 @@ describe('useOtelColumns', () => {
 
     let otelEnabled = false; // OTEL is off
     const hook = renderHook(
-      (enabled) => useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch),
+      (enabled) =>
+        useOtelColumns(mockDatasource, allColumns, enabled, testOtelVersion.version, builderOptionsDispatch, '', ''),
       { initialProps: otelEnabled }
     );
     otelEnabled = true;
@@ -334,7 +414,7 @@ describe('useOtelColumns', () => {
 
     // Mount with OTel already enabled (saved query), no dispatch expected
     const hook = renderHook(
-      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch),
+      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch, '', ''),
       { initialProps: '1.29.0' }
     );
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
@@ -362,7 +442,7 @@ describe('useOtelColumns', () => {
     ];
 
     const hook = renderHook(
-      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch),
+      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch, '', ''),
       { initialProps: '1.30.0' }
     );
     expect(builderOptionsDispatch).toHaveBeenCalledTimes(0);
@@ -387,7 +467,7 @@ describe('useOtelColumns', () => {
     ];
 
     const hook = renderHook(
-      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch),
+      (version: string) => useOtelColumns(mockDatasource, allColumns, true, version, builderOptionsDispatch, '', ''),
       { initialProps: '1.29.0' }
     );
     hook.rerender('1.30.0'); // version change applies the new column map
