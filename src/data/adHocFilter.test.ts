@@ -906,4 +906,13 @@ describe('AdHocManager', () => {
       expect(ahm.buildFilterString(filters)).toEqual(" client_asn > \\'0\\' AND host = \\'x\\' ");
     });
   });
+
+  it('keys the filter to the table under a chain of CTEs', () => {
+    const sql =
+      'WITH per_series AS (SELECT t, v FROM otel_metrics_histogram), lagged AS (SELECT t, v FROM per_series) SELECT t FROM lagged';
+    const val = new AdHocFilter().apply(sql, [
+      { key: 'ServiceName', operator: '=', value: 'api' },
+    ] as AdHocVariableFilter[]);
+    expect(val).toContain("additional_table_filters={'otel_metrics_histogram' : ' ServiceName = \\'api\\' '}");
+  });
 });

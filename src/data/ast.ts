@@ -143,9 +143,14 @@ function qualifiedTableName(node: FromQueryNode): string | undefined {
 // FROM is a subquery it descends into that subquery, and only that subquery, so
 // a scalar subquery in the SELECT list or a sibling CTE body is never mistaken
 // for the target. A FROM that references a CTE resolves to the CTE's underlying
-// table. A table-function FROM, or a top-level set operation, resolves to
-// undefined.
-function firstPhysicalTable(node: SelectQueryNode): string | undefined {
+// table, also when the CTE is defined at an outer level: a CTE that reads
+// another CTE, or a FROM subquery that reads one. A table-function FROM, or a
+// top-level set operation, resolves to undefined.
+function firstPhysicalTable(
+  node: SelectQueryNode,
+  outerScope: Map<string, SelectQueryNode> = new Map(),
+  resolving: Set<SelectQueryNode> = new Set()
+): string | undefined {
   // A top-level UNION / INTERSECT / EXCEPT combines several tables; single-table
   // targeting is not meaningful, so resolve to no table. Per-branch keying is a
   // follow-up.
@@ -156,12 +161,16 @@ function firstPhysicalTable(node: SelectQueryNode): string | undefined {
   if (!from) {
     return undefined;
   }
-  // An unqualified FROM target that names a CTE defined at this level resolves
-  // to the CTE body's table, not the alias (which ClickHouse would ignore).
+  // The CTEs visible at this level; one defined here hides an outer one with the same name.
+  const scope = new Map([...outerScope, ...(node.withAliases ?? [])]);
+  // An unqualified FROM target that names a visible CTE resolves to the CTE
+  // body's table, not the alias (which ClickHouse would ignore). A CTE that is
+  // already being resolved names a physical table instead, which also stops
+  // CTEs that read themselves or each other.
   if (from.table && !from.database && !from.isTableFunction) {
-    const cteBody = node.withAliases?.get(from.table);
-    if (cteBody) {
-      return firstPhysicalTable(cteBody);
+    const cteBody = scope.get(from.table);
+    if (cteBody && !resolving.has(cteBody)) {
+      return firstPhysicalTable(cteBody, scope, new Set([...resolving, cteBody]));
     }
   }
   const name = qualifiedTableName(from);
@@ -169,7 +178,7 @@ function firstPhysicalTable(node: SelectQueryNode): string | undefined {
     return name;
   }
   if (from.subquery) {
-    return firstPhysicalTable(from.subquery);
+    return firstPhysicalTable(from.subquery, scope, resolving);
   }
   return undefined;
 }
