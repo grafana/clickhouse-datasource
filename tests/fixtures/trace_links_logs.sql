@@ -47,3 +47,17 @@ INSERT INTO e2e_test.trace_links_logs
     ('2024-03-15 10:00:08.000', 'e2e-trace-a', 'span-log-3', 1, 'INFO',  9,  'api',    'request complete',       '', map(), '', '', '', map(), map(), ''),
     ('2024-03-16 10:00:00.000', 'e2e-trace-a', 'span-log-4', 1, 'INFO',  9,  'api',    'out-of-window row',      '', map(), '', '', '', map(), map(), ''),
     ('2024-03-15 10:00:03.000', 'e2e-trace-b', 'span-log-5', 1, 'INFO',  9,  'api',    'unrelated trace noise',  '', map(), '', '', '', map(), map(), '');
+
+-- A second database with the same layout, for the link table variable test: one in-window
+-- e2e-trace-a row, so a View logs link that opens it returns 1 row where the default table
+-- returns 3.
+
+CREATE DATABASE IF NOT EXISTS e2e_test_alt;
+
+DROP TABLE IF EXISTS e2e_test_alt.trace_links_logs;
+
+CREATE TABLE e2e_test_alt.trace_links_logs AS e2e_test.trace_links_logs;
+
+INSERT INTO e2e_test_alt.trace_links_logs
+    (Timestamp, TraceId, SpanId, TraceFlags, SeverityText, SeverityNumber, ServiceName, Body, ResourceSchemaUrl, ResourceAttributes, ScopeSchemaUrl, ScopeName, ScopeVersion, ScopeAttributes, LogAttributes, EventName) VALUES
+    ('2024-03-15 10:00:02.000', 'e2e-trace-a', 'span-alt-1', 1, 'WARN', 13, 'api', 'row in the second database', '', map(), '', '', '', map(), map(), '');

@@ -16,6 +16,7 @@ import {
   getColumnIndexByHint,
   getColumnsByHints,
   isAggregateQuery,
+  isPlainStringValue,
   JSON_SENTINEL_KEY,
 } from './sqlGenerator';
 
@@ -365,6 +366,30 @@ describe('SQL Generator', () => {
 
     const sql = generateSql(opts);
     expect(sql).toEqual(expectedSqlParts.join(' '));
+  });
+
+  it.each([
+    ['DateTime', '$__timeInterval'],
+    ['Nullable(DateTime)', '$__timeInterval'],
+    ["DateTime('UTC')", '$__timeInterval'],
+    ['Date', '$__timeInterval'],
+    [undefined, '$__timeInterval'],
+    ['DateTime64(3)', '$__timeInterval_ms'],
+    ["DateTime64(9, 'UTC')", '$__timeInterval_ms'],
+    ['Nullable(DateTime64(6))', '$__timeInterval_ms'],
+    ['LowCardinality(Nullable(DateTime64(3)))', '$__timeInterval_ms'],
+  ])('buckets a %s time column in aggregate time series mode with %s', (type, macro) => {
+    const opts: QueryBuilderOptions = {
+      database: 'default',
+      table: 'time_data',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      columns: [{ name: 'ts', type, hint: ColumnHint.Time }],
+      aggregates: [{ aggregateType: AggregateType.Count, column: '*', alias: 'n' }],
+    };
+    expect(generateSql(opts)).toEqual(
+      `SELECT ${macro}(ts) as "time", count(*) as n FROM "default"."time_data" GROUP BY time`
+    );
   });
 
   it('generates trace ID query without OTel enabled', () => {
@@ -1647,5 +1672,16 @@ describe('getFilters', () => {
     const sql = _testExports.getFilters(options);
     const expectedSql = "( hinted >= $__fromTime AND hinted <= $__toTime ) AND ( text = '' ) AND ( volume > 0 )";
     expect(sql).toEqual(expectedSql);
+  });
+});
+
+describe('isPlainStringValue', () => {
+  it.each(['api', 'a b', 'a,b', 'café'])('accepts %j, which escapeValue quotes as is', (value) => {
+    expect(isPlainStringValue(value)).toBe(true);
+    expect(_testExports.escapeValue(value)).toBe(`'${value}'`);
+  });
+
+  it.each(['$x', '(', 'x)', "O'Brien", 'say "hi"', 'c\\d', '[[v]]', ' pad', 'pad '])('rejects %j', (value) => {
+    expect(isPlainStringValue(value)).toBe(false);
   });
 });
