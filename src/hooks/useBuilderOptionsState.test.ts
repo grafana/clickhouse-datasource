@@ -266,7 +266,7 @@ describe('reducer', () => {
       { name: 'Body', type: 'String', picklistValues: [] },
     ];
 
-    it('fills the missing type of hinted columns from the current state, keeping typed and unhinted ones', () => {
+    it('fills the missing type of hinted columns from the current state, keeping typed ones and columns without a hint', () => {
       const state = {
         ...buildInitialState(),
         columns: [
