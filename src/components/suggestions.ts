@@ -172,7 +172,9 @@ export async function getSuggestions(
   text: string,
   schema: Schema,
   range: Range,
-  cursorPosition: number
+  cursorPosition: number,
+  // Set when a typed quote asked for suggestions: only Map keys inside `column['` answer it.
+  onlyMapKeys = false
 ): Promise<monacoTypes.languages.CompletionItem[]> {
   const selectNode = parseSelect(text);
 
@@ -183,6 +185,9 @@ export async function getSuggestions(
   const mapKeys = await getMapKeySuggestions(text, cursorPosition, selectNode, schema, range);
   if (mapKeys) {
     return mapKeys;
+  }
+  if (onlyMapKeys) {
+    return [];
   }
 
   const cursorData = getCursorInSelectQueryNode(selectNode, cursorPosition);

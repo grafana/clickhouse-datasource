@@ -39,7 +39,7 @@ export interface Suggestion {
 }
 
 export type Fetcher = {
-  (text: string, range: Range, cursorPosition: number): Promise<SuggestionResponse>;
+  (text: string, range: Range, cursorPosition: number, onlyMapKeys?: boolean): Promise<SuggestionResponse>;
 };
 
 // Tokens that reach the formatter without placeholders, even when they hold template syntax.
@@ -192,8 +192,9 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
   const completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
     // Not a space: Enter accepts the selected suggestion, so a list that opens on a space turns Enter
     // after `FROM t ` into a suggestion instead of a new line. Typing a letter opens the list anyway.
-    triggerCharacters: ['.', '$'],
-    provideCompletionItems: async (model: Model, position: Position) => {
+    // A quote opens the key list right after `column['`, and asks for nothing anywhere else.
+    triggerCharacters: ['.', '$', "'"],
+    provideCompletionItems: async (model: Model, position: Position, context?: { triggerCharacter?: string }) => {
       // Every SQL editor registers a provider for the shared sql language and Monaco asks all of
       // them, so answer only for this editor's model. Otherwise each open editor repeats every
       // suggestion, and an editor on another data source adds its own tables and columns.
@@ -209,7 +210,7 @@ export function registerSQL(lang: string, editor: MonacoEditor, fetchSuggestions
         endColumn: word.endColumn,
       };
 
-      return fetchSuggestions(model.getValue(), range, model.getOffsetAt(position));
+      return fetchSuggestions(model.getValue(), range, model.getOffsetAt(position), context?.triggerCharacter === "'");
     },
   });
 

@@ -493,11 +493,21 @@ describe('Suggestions for Map keys', () => {
       startColumn: cursorPosition,
       endColumn: cursorPosition + 1,
     };
-    return getSuggestions(sql, schema, range, cursorPosition);
+    return getSuggestions(sql, schema, range, cursorPosition, onlyMapKeys);
   };
+  let onlyMapKeys = false;
   const keys = (items: Array<{ label: unknown; insertText: string }>) => items.map((s) => [s.label, s.insertText]);
 
-  beforeEach(() => mapKeys.mockClear());
+  beforeEach(() => {
+    mapKeys.mockClear();
+    onlyMapKeys = false;
+  });
+
+  it('answers a typed quote with the keys inside a subscript, and with nothing in other strings', async () => {
+    onlyMapKeys = true;
+    expect(await suggest("SELECT count() FROM otel.otel_logs WHERE LogAttributes['")).toHaveLength(4);
+    expect(await suggest("SELECT count() FROM otel.otel_logs WHERE Body = '")).toEqual([]);
+  });
 
   it("lists the keys of the Map column after `column['`", async () => {
     const suggestions = await suggest("SELECT count() FROM otel.otel_logs WHERE LogAttributes['");

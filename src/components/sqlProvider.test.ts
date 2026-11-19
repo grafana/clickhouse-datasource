@@ -210,7 +210,31 @@ describe('registerSQL', () => {
 
     registerSQL('sql', { updateOptions: jest.fn() } as any, jest.fn());
 
-    expect(completionRegister.mock.calls[0][1].triggerCharacters).toEqual(['.', '$']);
+    expect(completionRegister.mock.calls[0][1].triggerCharacters).toEqual(['.', '$', "'"]);
+  });
+
+  it('asks only for Map keys when a typed quote opens the suggestions', async () => {
+    const completionRegister = jest.fn((_lang: string, _provider: any) => ({ dispose: jest.fn() }));
+    (window as any).monaco = {
+      languages: {
+        registerCompletionItemProvider: completionRegister,
+        registerDocumentFormattingEditProvider: jest.fn(() => ({ dispose: jest.fn() })),
+      },
+      editor: {} as any,
+    };
+    const fetcher = jest.fn(async () => ({ suggestions: [] }));
+    const model = {
+      getWordUntilPosition: () => ({ startColumn: 1, endColumn: 1 }),
+      getValue: () => "SELECT LogAttributes['",
+      getOffsetAt: () => 22,
+    };
+    registerSQL('sql', { updateOptions: jest.fn(), getModel: () => model } as any, fetcher);
+    const provider = completionRegister.mock.calls[0][1];
+
+    expect(provider.triggerCharacters).toContain("'");
+    await provider.provideCompletionItems(model, { lineNumber: 1, column: 23 }, { triggerCharacter: "'" });
+    await provider.provideCompletionItems(model, { lineNumber: 1, column: 23 }, { triggerCharacter: '.' });
+    expect(fetcher.mock.calls.map((call: unknown[]) => call[3])).toEqual([true, false]);
   });
 
   it('answers completion requests only for its own editor', async () => {
