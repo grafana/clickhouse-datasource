@@ -21,6 +21,9 @@ interface LogsConfigProps {
   // Datasource uid, used to fetch the configured table's real columns so the Columns field can be a
   // schema-backed multiselect. Absent (or unsaved) datasources fall back to a free-text column list.
   uid?: string;
+  // Saved-settings version of the datasource. It changes after Save & test, so the schema fetch re-runs
+  // once the connection works instead of staying on the result of an earlier failed fetch.
+  savedVersion?: number;
   onDefaultDatabaseChange: (v: string) => void;
   onDefaultTableChange: (v: string) => void;
   onOtelEnabledChange: (v: boolean) => void;
@@ -131,7 +134,7 @@ export const LogsConfig = (props: LogsConfigProps) => {
       ignore = true;
       clearTimeout(handle);
     };
-  }, [isSingleTable, props.uid, defaultDatabase, defaultTable]);
+  }, [isSingleTable, props.uid, props.savedVersion, defaultDatabase, defaultTable]);
 
   // The Columns field manages the extra projected columns (additionalColumns). Role columns
   // (time/level/message) are configured separately and projected via their roles, so Add all skips
