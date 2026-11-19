@@ -336,6 +336,35 @@ describe('AdHocManager', () => {
     expect(val).toContain('-- note\nsettings additional_table_filters=');
   });
 
+  // The `;` and whatever follows it are removed, so the settings clause is not a
+  // second statement, which ClickHouse rejects as "Multi-statements".
+  it.each([
+    ['a line comment', 'SELECT count() FROM default.tbl; -- note'],
+    ['a block comment', 'SELECT count() FROM default.tbl; /* note */'],
+    ['several line comments', 'SELECT count() FROM default.tbl;\n-- a\n-- b'],
+    ['a # comment', 'SELECT count() FROM default.tbl; # note'],
+    ['a second semicolon', 'SELECT count() FROM default.tbl;;'],
+  ])('strips a trailing semicolon followed by %s', (_label, sql) => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply(sql, [{ key: 'k', operator: '=', value: 'v' }] as AdHocVariableFilter[]);
+    expect(val).toEqual(
+      `SELECT count() FROM default.tbl\nsettings additional_table_filters={'default.tbl' : ' k = \\'v\\' '}`
+    );
+  });
+
+  it.each([
+    ['inside a string literal', "SELECT '; -- x' AS a FROM default.tbl"],
+    ['inside a line comment', 'SELECT count() FROM default.tbl -- note;'],
+    [
+      'followed by a dash-ruler comment and another statement',
+      `SELECT count() FROM default.tbl;\n${'-'.repeat(40)}\nSELECT 1`,
+    ],
+  ])('keeps a semicolon %s', (_label, sql) => {
+    const ahm = new AdHocFilter();
+    const val = ahm.apply(sql, [{ key: 'k', operator: '=', value: 'v' }] as AdHocVariableFilter[]);
+    expect(val).toEqual(`${sql}\nsettings additional_table_filters={'default.tbl' : ' k = \\'v\\' '}`);
+  });
+
   it('applies to a query that selects from a CTE, keyed on the underlying table', () => {
     const ahm = new AdHocFilter();
     const sql = 'WITH lookup AS (SELECT id, name FROM dim_services) SELECT * FROM lookup';

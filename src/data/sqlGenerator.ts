@@ -539,6 +539,8 @@ const generateSimpleTimeSeriesQuery = (_options: QueryBuilderOptions): string =>
   return concatQueryParts(queryParts);
 };
 
+const isDateTime64Type = (type?: string): boolean => stripTypeModifiers(type || '').startsWith('datetime64');
+
 /**
  * Generates an aggregate time series query.
  */
@@ -552,7 +554,9 @@ const generateAggregateTimeSeriesQuery = (_options: QueryBuilderOptions): string
 
   const timeColumn = getColumnByHint(options, ColumnHint.Time) || getColumnByHint(options, ColumnHint.FilterTime);
   if (timeColumn !== undefined) {
-    timeColumn.name = `$__timeInterval(${timeColumn.name})`;
+    // DateTime64 columns can carry sub-second data, which $__timeInterval would floor to whole seconds
+    const macro = isDateTime64Type(timeColumn.type) ? '$__timeInterval_ms' : '$__timeInterval';
+    timeColumn.name = `${macro}(${timeColumn.name})`;
     timeColumn.alias = 'time';
     selectParts.push(getColumnIdentifier(timeColumn));
   }
@@ -730,6 +734,9 @@ export const escapeIdentifier = (id: string): string => {
  */
 export const JSON_SENTINEL_KEY = '__ch_json__';
 
+/** Whether getFilters renders the value as the same quoted literal in every value position, with nothing for template interpolation to expand. */
+export const isPlainStringValue = (value: string): boolean => value === value.trim() && !/[$()'"\\]|\[\[/.test(value);
+
 const escapeValue = (value: string | number | boolean): string => {
   // Filter values are typed as strings, but JSON-typed attribute columns can
   // carry numeric/boolean values at runtime. Render those unquoted instead of
@@ -865,7 +872,7 @@ const getLimit = (limit?: number | undefined): string => {
 /**
  * Returns the filters in the WHERE clause, excluding the "WHERE" keyword
  */
-const getFilters = (options: QueryBuilderOptions): string => {
+export const getFilters = (options: QueryBuilderOptions): string => {
   const filters = options.filters || [];
   const builtFilters: string[] = [];
 
