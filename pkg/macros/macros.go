@@ -3,6 +3,7 @@ package macros
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -239,7 +240,7 @@ func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error)
 	col := strings.TrimSpace(args[0])
 	periodStr := strings.Trim(strings.TrimSpace(args[1]), "'\"")
 
-	d, err := time.ParseDuration(periodStr)
+	d, err := parseTimeGroupInterval(periodStr)
 	if err != nil {
 		return "", backend.DownstreamError(fmt.Errorf("$__timeGroup: invalid interval %q: %w", periodStr, err))
 	}
@@ -248,6 +249,33 @@ func TimeGroup(_ macropro.QueryContext[struct{}], args []string) (string, error)
 		return "", backend.DownstreamError(fmt.Errorf("$__timeGroup: interval must be positive, got %q", periodStr))
 	}
 	return fmt.Sprintf("toStartOfInterval(toDateTime(%s), INTERVAL %d second)", col, secs), nil
+}
+
+// dayWeekIntervalRe matches the day and week intervals Grafana produces for
+// $__interval on long time ranges ("1d", "7d", "1w").
+var dayWeekIntervalRe = regexp.MustCompile(`^(\d+)([dw])$`)
+
+// parseTimeGroupInterval parses a Go duration ("90s", "1h30m") or a whole
+// number of days or weeks. time.ParseDuration alone rejects "1d", which is
+// what $__interval interpolates to on long dashboards.
+func parseTimeGroupInterval(s string) (time.Duration, error) {
+	d, err := time.ParseDuration(s)
+	if err == nil {
+		return d, nil
+	}
+	m := dayWeekIntervalRe.FindStringSubmatch(s)
+	if m == nil {
+		return 0, err
+	}
+	n, convErr := strconv.ParseInt(m[1], 10, 64)
+	unit := 24 * time.Hour
+	if m[2] == "w" {
+		unit *= 7
+	}
+	if convErr != nil || n > int64(math.MaxInt64/unit) {
+		return 0, fmt.Errorf("interval out of range")
+	}
+	return time.Duration(n) * unit, nil
 }
 
 // ClickHouseMacros is the complete macro set used by the ClickHouse datasource.
