@@ -67,8 +67,14 @@ function replaceMacroVariables(sql: string): [ReplaceParts, string] {
 
 // TODO: support query parameters: https://clickhouse.com/docs/en/interfaces/cli#cli-queries-with-parameters
 
+/**
+ * The generated logs range filter ends in `$__toTime_ms + INTERVAL 1 MILLISECOND`, which pgsql-ast-parser
+ * cannot parse. Drop the offset so the filter reads like the seconds form (`$__toTime_ms`).
+ */
+const MS_BOUND_SUFFIX = /(\$__toTime_ms)\s*\+\s*INTERVAL\s+1\s+MILLISECOND/gi;
+
 export function sqlToStatement(rawSql: string): Statement {
-  const [replaceVars, variableSql] = replaceMacroVariables(rawSql);
+  const [replaceVars, variableSql] = replaceMacroVariables(rawSql.replace(MS_BOUND_SUFFIX, '$1'));
   const [replaceFuncs, sql] = replaceMacroFunctions(variableSql);
   const replaceParts = replaceVars.concat(replaceFuncs);
 
