@@ -568,28 +568,41 @@ describe('LogsConfig', () => {
     // A failed first fetch (e.g. before credentials are saved) must not stick: when the saved version
     // changes after Save & test, the schema is read again and the Columns picker appears.
     it('re-fetches the schema when savedVersion changes after a failed fetch', async () => {
-      const getColumnsCached = jest.fn().mockRejectedValueOnce(new Error('connection refused')).mockResolvedValue(COLS);
-      mockGetDataSourceSrv.mockReturnValue({ get: async () => ({ getColumnsCached }) });
-      const props = {
-        ...noopHandlers,
-        variant: 'single-table' as const,
-        uid: 'ds-uid',
-        logsConfig: { defaultTable: 'otel_logs', otelEnabled: false },
-      };
+      jest.useFakeTimers();
+      try {
+        const getColumnsCached = jest
+          .fn()
+          .mockRejectedValueOnce(new Error('connection refused'))
+          .mockResolvedValue(COLS);
+        mockGetDataSourceSrv.mockReturnValue({ get: async () => ({ getColumnsCached }) });
+        const props = {
+          ...noopHandlers,
+          variant: 'single-table' as const,
+          uid: 'ds-uid',
+          logsConfig: { defaultTable: 'otel_logs', otelEnabled: false },
+        };
 
-      const result = render(<LogsConfig {...props} savedVersion={1} />);
-      await waitFor(() => expect(getColumnsCached).toHaveBeenCalledTimes(1), { timeout: 2000 });
-      expect(
-        result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
-      ).not.toBeInTheDocument();
+        const result = render(<LogsConfig {...props} savedVersion={1} />);
+        // Fire the debounce and let the rejected fetch settle
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+        });
+        expect(getColumnsCached).toHaveBeenCalledTimes(1);
+        expect(
+          result.queryByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+        ).not.toBeInTheDocument();
 
-      result.rerender(<LogsConfig {...props} savedVersion={2} />);
-      await result.findByTestId(
-        selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper,
-        {},
-        { timeout: 2000 }
-      );
-      expect(getColumnsCached).toHaveBeenCalledTimes(2);
+        result.rerender(<LogsConfig {...props} savedVersion={2} />);
+        await act(async () => {
+          jest.advanceTimersByTime(500);
+        });
+        expect(
+          result.getByTestId(selectors.components.QueryBuilder.ColumnsEditor.multiSelectWrapper)
+        ).toBeInTheDocument();
+        expect(getColumnsCached).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });
