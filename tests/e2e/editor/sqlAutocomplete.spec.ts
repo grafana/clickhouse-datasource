@@ -67,6 +67,23 @@ async function remountSqlEditor(page: Page) {
 }
 
 test.describe('SQL editor autocomplete', () => {
+  test('starts a new line on Enter after a space instead of inserting a suggestion', async ({ page }) => {
+    await page.goto(exploreUrl());
+    const editor = page.getByRole('code');
+    await editor.click();
+    await page.keyboard.press('ControlOrMeta+a');
+    await page.keyboard.type('SELECT * FROM e2e_test.events ');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('WHERE ');
+    await page.keyboard.press('Enter');
+
+    // Monaco renders spaces in its view lines as non-breaking spaces.
+    const lines = (await page.locator('.monaco-editor .view-line').allTextContents()).map((l) =>
+      l.replace(/\u00a0/g, ' ').trimEnd()
+    );
+    expect(lines.slice(0, 3)).toEqual(['SELECT * FROM e2e_test.events', 'WHERE', '']);
+  });
+
   test('does not duplicate suggestions after editor remount', async ({ page }) => {
     await page.goto(exploreUrl());
     // `$` is a registered trigger character; `$__` narrows the popup to plugin macros.
