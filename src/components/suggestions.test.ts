@@ -394,3 +394,119 @@ describe('Suggestions for JSON path columns (#2193)', () => {
     expect(suggestions).toContainEqual(['attributes.weird key', 'attributes.weird key', 'attributes.`weird key`']);
   });
 });
+
+describe('Suggestions in queries with CTEs', () => {
+  const column = (name: string): TableColumn => ({ name, label: name, type: 'String', picklistValues: [] });
+  const tableColumns: Record<string, TableColumn[]> = {
+    'otel.otel_logs': [column('ServiceName'), column('Body'), column('Timestamp')],
+    'telemetry.otel_metrics_histogram': [column('TimeUnix'), column('MetricName'), column('Count')],
+  };
+  const schema: Schema = {
+    databases: async () => ['otel', 'telemetry'],
+    tables: async () => ['otel_logs'],
+    columns: async (db: string, table: string) => tableColumns[`${db}.${table}`] ?? [column('WRONG_TABLE')],
+    functions: async () => [],
+    defaultDatabase: 'default',
+  };
+
+  // `sql` marks the cursor with `|`.
+  const fieldsAt = async (sql: string) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const cursorPosition = sql.indexOf('|');
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+    const suggestions = await getSuggestions(sql.replace('|', ''), schema, range, cursorPosition);
+    return suggestions.filter((s) => s.kind === 3);
+  };
+  const labels = async (sql: string) => (await fieldsAt(sql)).map((s) => s.label);
+
+  it('suggests the table columns inside a CTE body that is still being typed', async () => {
+    expect(await labels('WITH per_series AS (SELECT count() FROM otel.otel_logs WHERE |')).toEqual([
+      'ServiceName',
+      'Body',
+      'Timestamp',
+    ]);
+  });
+
+  it('suggests the table columns inside a finished CTE body', async () => {
+    expect(await labels('WITH x AS (SELECT count() FROM otel.otel_logs WHERE |) SELECT * FROM x')).toContain(
+      'ServiceName'
+    );
+  });
+
+  it('suggests the columns a CTE passes through with *', async () => {
+    expect(await labels('WITH x AS (SELECT * FROM otel.otel_logs) SELECT * FROM x WHERE |')).toEqual([
+      'ServiceName',
+      'Body',
+      'Timestamp',
+    ]);
+  });
+
+  it('suggests only the columns and aliases a CTE selects', async () => {
+    const sql =
+      'WITH x AS (SELECT ServiceName, count() AS n, toStartOfHour(Timestamp) AS h FROM otel.otel_logs GROUP BY ServiceName, h) SELECT * FROM x WHERE |';
+    expect(await labels(sql)).toEqual(['ServiceName', 'n', 'h']);
+  });
+
+  it('follows chained CTEs to the table', async () => {
+    const sql = 'WITH a AS (SELECT * FROM otel.otel_logs), b AS (SELECT *, 1 AS one FROM a) SELECT * FROM b WHERE |';
+    expect(await labels(sql)).toEqual(['ServiceName', 'Body', 'Timestamp', 'one']);
+  });
+
+  it('resolves a CTE named in the FROM of another CTE body', async () => {
+    const sql = 'WITH a AS (SELECT ServiceName AS svc FROM otel.otel_logs), b AS (SELECT * FROM a WHERE |';
+    expect(await labels(sql)).toEqual(['svc']);
+  });
+
+  it('takes the columns of the CTE the FROM names when there are several', async () => {
+    const sql =
+      'WITH a AS (SELECT 1 AS from_a FROM otel.otel_logs), b AS (SELECT 2 AS from_b FROM otel.otel_logs) SELECT * FROM b WHERE |';
+    expect(await labels(sql)).toEqual(['from_b']);
+  });
+
+  it('ranks CTE columns with table columns', async () => {
+    const [first] = await fieldsAt('WITH x AS (SELECT 1 AS n FROM otel.otel_logs) SELECT * FROM x WHERE |');
+    expect(first.sortText).toBe('!!!!n');
+  });
+
+  it('stops at a CTE that reads from itself', async () => {
+    expect(await labels('WITH x AS (SELECT * FROM x) SELECT * FROM x WHERE |')).toEqual([]);
+  });
+
+  describe('in an OTel histogram query built from CTEs', () => {
+    const query = (perSeriesCursor: string, finalCursor: string) => `WITH 60 AS step_s,
+per_series AS (
+  SELECT toStartOfInterval(TimeUnix, INTERVAL step_s SECOND) AS t, SeriesHash AS sh,
+    multiIf(Attributes['success'] = 'false', 'failed', 'success') AS outcome,
+    argMax(toFloat64(Count), TimeUnix) AS v
+  FROM telemetry.otel_metrics_histogram
+  WHERE MetricName = 'm' AND $__conditionalAll(ServiceName IN (\${service:singlequote}), $service) AND ${perSeriesCursor}
+  GROUP BY t, sh, outcome
+),
+lagged AS (
+  SELECT t, outcome, v,
+    lagInFrame(v, 1, toFloat64(-1)) OVER (PARTITION BY sh ORDER BY t ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS pv
+  FROM per_series
+)
+SELECT t AS time, outcome AS series, sum(multiIf(pv < 0, 0, v >= pv, v - pv, v)) / step_s AS value
+FROM lagged WHERE t >= $__fromTime AND ${finalCursor}
+GROUP BY time, series ORDER BY time`;
+
+    it('suggests the histogram table columns in the WHERE of per_series', async () => {
+      expect(await labels(query('|', ''))).toEqual(['TimeUnix', 'MetricName', 'Count']);
+    });
+
+    it('suggests the columns of lagged in the outer WHERE', async () => {
+      expect(await labels(query('', '|'))).toEqual(['t', 'outcome', 'v', 'pv']);
+    });
+  });
+});
