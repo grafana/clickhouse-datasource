@@ -204,6 +204,23 @@ describe('parseSelect', () => {
     expect(parseSelect(sql)?.from?.alias).toBeUndefined();
   });
 
+  it.each([
+    ['with AS', 'SELECT * FROM (SELECT a FROM t) AS s WHERE s.a = 1'],
+    ['without AS', 'SELECT * FROM (SELECT a FROM t) s'],
+  ])('records the alias of a FROM subquery %s', (_label, sql) => {
+    const from = parseSelect(sql)?.from;
+    expect(from?.subquery).toBeDefined();
+    expect(from?.alias).toBe('s');
+  });
+
+  it('records the alias of a JOIN subquery, and none before a keyword', () => {
+    const sql = 'SELECT * FROM (SELECT a FROM t) JOIN (SELECT b FROM v) AS j ON 1';
+    expect(fromNodes(sql).map((f) => [f.subquery !== undefined, f.alias])).toEqual([
+      [true, undefined],
+      [true, 'j'],
+    ]);
+  });
+
   it('marks the JOIN of an ARRAY JOIN', () => {
     const sql = 'SELECT * FROM t ARRAY JOIN Events AS e LEFT ARRAY JOIN Links JOIN u ON 1';
     expect(fromNodes(sql).map((f) => [f.table, f.alias, f.arrayJoin])).toEqual([
