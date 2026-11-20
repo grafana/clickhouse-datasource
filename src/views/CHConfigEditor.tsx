@@ -601,6 +601,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               <LogsConfig
                 variant="single-table"
                 uid={options.uid}
+                savedVersion={options.version}
                 logsConfig={jsonData.logs}
                 onDefaultDatabaseChange={(db) => onLogsConfigChange('defaultDatabase', db)}
                 onDefaultTableChange={(table) => onLogsConfigChange('defaultTable', table)}

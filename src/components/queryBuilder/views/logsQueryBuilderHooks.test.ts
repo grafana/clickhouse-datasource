@@ -3,12 +3,14 @@ import {
   useDefaultFilters,
   useDefaultLogColumnsByName,
   useDefaultTimeColumn,
+  useBackfillLogColumnTypes,
   useLogDefaultsOnMount,
   useOtelColumns,
 } from './logsQueryBuilderHooks';
 import { mockDatasource } from '__mocks__/datasource';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
-import { setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import { backfillColumnTypes, setColumnByHint, setOptions, useBuilderOptionsState } from 'hooks/useBuilderOptionsState';
+import { defaultCHBuilderQuery } from 'types/sql';
 import otel from 'otel';
 
 describe('useLogDefaultsOnMount', () => {
@@ -123,6 +125,27 @@ describe('useLogDefaultsOnMount', () => {
       // Restore even when an assertion fails, so the spies do not leak into later tests.
       jest.restoreAllMocks();
     }
+  });
+
+  it('carries the schema type on the configured role columns once the table columns are loaded', async () => {
+    const builderOptionsDispatch = jest.fn();
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getLogsOtelVersion').mockReturnValue(undefined);
+    jest.spyOn(mockDatasource, 'getAdditionalLogColumns').mockReturnValue([]);
+    jest
+      .spyOn(mockDatasource, 'getDefaultLogsColumns')
+      .mockReturnValue(new Map<ColumnHint, string>([[ColumnHint.Time, 'ts']]));
+    const allColumns = [{ name: 'ts', type: 'DateTime64(3)', picklistValues: [] }] as TableColumn[];
+
+    renderHook(() =>
+      useLogDefaultsOnMount(mockDatasource, true, {} as QueryBuilderOptions, builderOptionsDispatch, allColumns)
+    );
+
+    // The millisecond log-time bound reads this type, so a non-OTel table gets the bound too
+    const dispatched = builderOptionsDispatch.mock.calls[0][0].payload.columns as SelectedColumn[];
+    expect(dispatched).toEqual([{ name: 'ts', hint: ColumnHint.Time, type: 'DateTime64(3)' }]);
+
+    jest.restoreAllMocks();
   });
 });
 
@@ -654,5 +677,79 @@ describe('useDefaultFilters', () => {
     hook.rerender('other_logs');
 
     expect(builderOptionsDispatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('useBackfillLogColumnTypes', () => {
+  const allColumns: readonly TableColumn[] = [
+    { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+    { name: 'Body', type: 'String', picklistValues: [] },
+  ];
+
+  it('does nothing while the table columns are not loaded', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [{ name: 'Timestamp', hint: ColumnHint.Time }];
+    renderHook(() => useBackfillLogColumnTypes([], columns, dispatch));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('dispatches the backfill once the table columns arrive', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [{ name: 'Timestamp', hint: ColumnHint.Time }];
+    const hook = renderHook(({ cols }) => useBackfillLogColumnTypes(cols, columns, dispatch), {
+      initialProps: { cols: [] as readonly TableColumn[] },
+    });
+    expect(dispatch).not.toHaveBeenCalled();
+
+    hook.rerender({ cols: allColumns });
+    expect(dispatch).toHaveBeenCalledTimes(1);
+    expect(dispatch).toHaveBeenCalledWith(backfillColumnTypes(allColumns));
+  });
+
+  it('does nothing when every role column is typed or has no role hint', () => {
+    const dispatch = jest.fn();
+    const columns: SelectedColumn[] = [
+      { name: 'Timestamp', hint: ColumnHint.Time, type: 'DateTime' },
+      { name: 'Body' },
+    ];
+    renderHook(() => useBackfillLogColumnTypes(allColumns, columns, dispatch));
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the TimestampTime filter column when the OTel columns and the backfill apply in the same pass (#1900)', () => {
+    jest.spyOn(mockDatasource, 'shouldSelectLogContextColumns').mockReturnValue(false);
+    jest.spyOn(mockDatasource, 'getDefaultLogsColumns').mockReturnValue(new Map());
+    const tableColumns: readonly TableColumn[] = [
+      { name: 'Timestamp', type: 'DateTime64(9)', picklistValues: [] },
+      { name: 'TimestampTime', type: 'DateTime', picklistValues: [] },
+      { name: 'Body', type: 'String', picklistValues: [] },
+    ];
+    // A new query: its configured role columns were selected before the table's columns loaded.
+    const initial: QueryBuilderOptions = {
+      ...defaultCHBuilderQuery.builderOptions,
+      columns: [{ name: 'Timestamp', hint: ColumnHint.Time }],
+      meta: { otelEnabled: true, otelVersion: 'latest' },
+    };
+
+    const hook = renderHook(
+      ({ cols, otelEnabled }) => {
+        const [state, dispatch] = useBuilderOptionsState(initial);
+        useOtelColumns(mockDatasource, cols, otelEnabled, 'latest', dispatch);
+        useBackfillLogColumnTypes(cols, state.columns, dispatch);
+        return state;
+      },
+      { initialProps: { cols: [] as readonly TableColumn[], otelEnabled: false } }
+    );
+
+    // The columns load as OTel is switched on, so both effects run in the same pass.
+    hook.rerender({ cols: tableColumns, otelEnabled: true });
+
+    const columns = hook.result.current.columns ?? [];
+    expect(columns.find((c) => c.hint === ColumnHint.FilterTime)).toEqual({
+      name: 'TimestampTime',
+      hint: ColumnHint.FilterTime,
+      type: 'DateTime',
+    });
+    expect(columns.find((c) => c.hint === ColumnHint.Time)?.type).toBe('DateTime64(9)');
   });
 });
