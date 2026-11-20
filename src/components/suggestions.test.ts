@@ -270,6 +270,45 @@ describe('Suggestions', () => {
   });
 });
 
+describe('Inserting a Grafana variable', () => {
+  const schema: Schema = {
+    databases: async (): Promise<string[]> => ['otel'],
+    tables: async (): Promise<string[]> => ['otel_logs'],
+    columns: async (): Promise<TableColumn[]> => [],
+    functions: async (): Promise<SqlFunction[]> => [],
+    defaultDatabase: 'otel',
+  };
+
+  // `sql` marks the cursor with `|`. Returns what picking `${table}` would insert.
+  const inserted = async (sql: string) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const cursorPosition = sql.indexOf('|');
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition,
+    };
+    const suggestions = await getSuggestions(sql.replace('|', ''), schema, range, cursorPosition);
+    return suggestions.find((s) => s.label === '${table}');
+  };
+
+  it.each([
+    ['nothing of it is typed', 'SELECT * FROM otel_logs WHERE x = |', '${table}'],
+    ['a `$` is typed', 'SELECT * FROM otel_logs WHERE x = $|', '{table}'],
+    ['part of the name is typed after `$`', 'SELECT * FROM otel_logs WHERE x = $ta|', '{table}'],
+    ['`${` is typed as the FROM table', 'SELECT * FROM ${|', 'table}'],
+    ['the editor closed the brace after `${`', 'SELECT * FROM ${|}', 'table'],
+  ])('inserts only what is missing when %s', async (_label, sql, insertText) => {
+    expect(await inserted(sql)).toMatchObject({ insertText, filterText: 'table' });
+  });
+});
+
 describe('Suggestions for JOIN targets and set operations', () => {
   const column = (name: string): TableColumn => ({ name, label: name, type: 'String', picklistValues: [] });
   const schema: Schema = {
