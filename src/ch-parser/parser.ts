@@ -55,7 +55,6 @@ export enum ClauseType {
   With,
   Select,
   From,
-  Join,
   Where,
   GroupBy,
   Having,
@@ -314,8 +313,6 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
       } else {
         parenDepth--;
       }
-    } else if (token.matchKeyword('JOIN')) {
-      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Join });
     } else if (token.matchKeyword('GROUP') && parser.hasNext() && parser.peek().matchKeyword('BY')) {
       node.children!.push({ type: QueryNodeType.Default, token: parser.next(), clause: ClauseType.GroupBy });
     } else if (token.matchKeyword('WHERE')) {
