@@ -72,6 +72,18 @@ describe('Validate', () => {
       expect(validate('SELECT 1 \u2212 2 FROM t').valid).toBe(true);
     });
 
+    it.each([
+      ['U+0085 NEXT LINE', '\u0085'],
+      ['U+180E MONGOLIAN VOWEL SEPARATOR', '\u180e'],
+      ['U+200B ZERO WIDTH SPACE', '\u200b'],
+      ['U+200C ZERO WIDTH NON-JOINER', '\u200c'],
+      ['U+200D ZERO WIDTH JOINER', '\u200d'],
+      ['U+2060 WORD JOINER', '\u2060'],
+      ['U+FEFF byte order mark', '\ufeff'],
+    ])('handles %s as whitespace, as ClickHouse does', (_label, space) => {
+      expect(validate(`${space}SELECT${space}1${space}FROM t;${space}`).valid).toBe(true);
+    });
+
     it('handles heredoc with word-char tag', () => {
       expect(validate("SELECT $foo$ anything goes 'here' $foo$ FROM t").valid).toBe(true);
     });
@@ -110,6 +122,12 @@ describe('Validate', () => {
       const v = validate('SELECT * FROM t WHERE x ! 1');
       expect(v.valid).toBe(false);
       expect(v.error?.message).toBe('Exclamation mark can only occur in != operator');
+    });
+
+    it('catches U+1680 OGHAM SPACE MARK, which ClickHouse does not treat as whitespace', () => {
+      const v = validate('SELECT 1 FROM t');
+      expect(v.valid).toBe(false);
+      expect(v.error?.message).toBe('Unrecognized token');
     });
 
     it('reports the correct line number for an error on line 2', () => {

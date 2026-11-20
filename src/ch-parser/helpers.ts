@@ -87,8 +87,9 @@ export function findFirstNotSymbols(text: string, pos: number, end: number, ...s
  * Skip UTF-8 whitespaces (including Unicode ones)
  */
 export function skipWhitespacesUTF8(text: string, pos: number, end: number): number {
-  // Skip whitespace characters in Unicode
-  // This is a simplified version that just skips common Unicode whitespace
+  // Skip the same Unicode whitespace that ClickHouse's lexer skips, so a query
+  // pasted with a zero-width space or a byte order mark lexes the way the
+  // server reads it.
   while (pos < end) {
     const code = text.charCodeAt(pos);
 
@@ -98,22 +99,30 @@ export function skipWhitespacesUTF8(text: string, pos: number, end: number): num
       continue;
     }
 
-    // Skip some common Unicode whitespace
+    // U+0085 - NEXT LINE
     // U+00A0 - NO-BREAK SPACE
+    // U+180E - MONGOLIAN VOWEL SEPARATOR
     // U+2000 to U+200A - Various space characters
+    // U+200B to U+200D - ZERO WIDTH SPACE, ZERO WIDTH NON-JOINER, ZERO WIDTH JOINER
     // U+2028 - LINE SEPARATOR
     // U+2029 - PARAGRAPH SEPARATOR
     // U+202F - NARROW NO-BREAK SPACE
     // U+205F - MEDIUM MATHEMATICAL SPACE
+    // U+2060 - WORD JOINER
     // U+3000 - IDEOGRAPHIC SPACE
+    // U+FEFF - ZERO WIDTH NO-BREAK SPACE (byte order mark)
     if (
+      code === 0x0085 ||
       code === 0x00a0 ||
-      (code >= 0x2000 && code <= 0x200a) ||
+      code === 0x180e ||
+      (code >= 0x2000 && code <= 0x200d) ||
       code === 0x2028 ||
       code === 0x2029 ||
       code === 0x202f ||
       code === 0x205f ||
-      code === 0x3000
+      code === 0x2060 ||
+      code === 0x3000 ||
+      code === 0xfeff
     ) {
       pos++;
       continue;

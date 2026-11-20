@@ -344,6 +344,7 @@ describe('AdHocManager', () => {
     ['several line comments', 'SELECT count() FROM default.tbl;\n-- a\n-- b'],
     ['a # comment', 'SELECT count() FROM default.tbl; # note'],
     ['a second semicolon', 'SELECT count() FROM default.tbl;;'],
+    ['a byte order mark', 'SELECT count() FROM default.tbl;\uFEFF'],
   ])('strips a trailing semicolon followed by %s', (_label, sql) => {
     const ahm = new AdHocFilter();
     const val = ahm.apply(sql, [{ key: 'k', operator: '=', value: 'v' }] as AdHocVariableFilter[]);
