@@ -1,4 +1,7 @@
-import { ClauseType, parseSelect } from './parser';
+import { ClauseType, FromQueryNode, parseSelect, QueryNodeType } from './parser';
+
+const fromNodes = (sql: string) =>
+  (parseSelect(sql)?.children?.filter((c) => c.type === QueryNodeType.From) ?? []) as FromQueryNode[];
 
 describe('parseSelect', () => {
   it('sets the outer FROM table for a simple select', () => {
@@ -127,11 +130,15 @@ describe('parseSelect', () => {
     expect(parseSelect(sql)?.hasSetOperation).toBe(true);
   });
 
-  it('keeps the first SELECT and set operator of a set operation', () => {
+  it('keeps the first SELECT and the set operator before each select of a set operation', () => {
     const sql = 'WITH 1 AS n SELECT a FROM t1 UNION ALL SELECT b FROM t2 EXCEPT SELECT c FROM t3';
     const node = parseSelect(sql);
-    expect(node?.firstSelect?.begin).toBe(sql.indexOf('SELECT'));
-    expect(node?.firstSetOperator?.begin).toBe(sql.indexOf('UNION'));
+    expect(node?.branches?.[0].token?.begin).toBe(sql.indexOf('SELECT'));
+    expect(node?.branches?.map((b) => b.operator?.begin)).toEqual([
+      undefined,
+      sql.indexOf('UNION'),
+      sql.indexOf('EXCEPT'),
+    ]);
     expect(node?.token.begin).toBe(sql.lastIndexOf('SELECT'));
   });
 
@@ -182,5 +189,65 @@ describe('parseSelect', () => {
     ]) {
       expect(parseSelect(q)?.from?.isTableFunction).toBe(true);
     }
+  });
+
+  it.each([
+    ['with AS', 'SELECT * FROM otel_logs AS l WHERE l.Body != 1'],
+    ['without AS', 'SELECT * FROM otel_logs l WHERE l.Body != 1'],
+    ['for a qualified table', 'SELECT * FROM otel.otel_logs AS l'],
+  ])('records the alias of the FROM table %s', (_label, sql) => {
+    expect(parseSelect(sql)?.from?.alias).toBe('l');
+  });
+
+  it('records the alias of each JOIN target', () => {
+    const sql = 'SELECT * FROM a AS x JOIN db.b y ON x.id = y.id LEFT JOIN c ON 1';
+    expect(fromNodes(sql).map((f) => [f.database, f.table, f.alias])).toEqual([
+      [undefined, 'a', 'x'],
+      ['db', 'b', 'y'],
+      [undefined, 'c', undefined],
+    ]);
+  });
+
+  it.each([
+    ['a keyword', 'SELECT * FROM otel_logs FINAL WHERE 1'],
+    ['a clause', 'SELECT * FROM otel_logs WHERE 1'],
+    ['a set operator', 'SELECT a FROM t1 EXCEPT SELECT a FROM t2'],
+  ])('records no alias before %s', (_label, sql) => {
+    expect(parseSelect(sql)?.from?.alias).toBeUndefined();
+  });
+
+  it('marks the JOIN of an ARRAY JOIN', () => {
+    const sql = 'SELECT * FROM t ARRAY JOIN Events AS e LEFT ARRAY JOIN Links JOIN u ON 1';
+    expect(fromNodes(sql).map((f) => [f.table, f.alias, f.arrayJoin])).toEqual([
+      ['t', undefined, undefined],
+      ['Events', 'e', true],
+      ['Links', undefined, true],
+      ['u', undefined, undefined],
+    ]);
+  });
+
+  it('reads ON and USING as clauses of a JOIN', () => {
+    const node = parseSelect('SELECT * FROM a JOIN b ON a.id = b.id JOIN c USING (id)');
+    const clauses = node?.children?.filter((c) => [ClauseType.On, ClauseType.Using].includes(c.clause));
+    expect(clauses?.map((c) => [c.token.text, c.clause])).toEqual([
+      ['ON', ClauseType.On],
+      ['USING', ClauseType.Using],
+    ]);
+  });
+
+  it('records the SELECT and FROM of each select in a set operation', () => {
+    const sql = 'WITH x AS (SELECT 1) SELECT a FROM x UNION ALL SELECT b FROM t2 JOIN t3 ON 1 EXCEPT SELECT c FROM t4';
+    const node = parseSelect(sql);
+    expect(node?.branches?.map((b) => [b.begin, b.token?.begin, b.from?.table])).toEqual([
+      [0, sql.indexOf('SELECT a'), 'x'],
+      [sql.indexOf('UNION') + 'UNION'.length, sql.indexOf('SELECT b'), 't2'],
+      [sql.indexOf('EXCEPT') + 'EXCEPT'.length, sql.indexOf('SELECT c'), 't4'],
+    ]);
+    // The statement-wide FROM stays the first one.
+    expect(node?.from?.table).toBe('x');
+  });
+
+  it('records no selects without a set operation', () => {
+    expect(parseSelect('SELECT * EXCEPT (secret) FROM otel_logs')?.branches).toBeUndefined();
   });
 });
