@@ -15,7 +15,7 @@ export interface Validation {
   error?: Error;
 }
 
-function offsetToLineCol(sql: string, offset: number): { line: number; col: number } {
+export function offsetToLineCol(sql: string, offset: number): { line: number; col: number } {
   const lines = sql.substring(0, offset).split('\n');
   return {
     line: lines.length,
