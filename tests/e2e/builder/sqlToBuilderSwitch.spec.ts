@@ -5,11 +5,16 @@
 
 import { expect, test } from '@grafana/plugin-e2e';
 import { builderFieldRow } from '../helpers/builder';
+import { skipFixtureTestsOnCloud } from '../helpers/env';
 import { exploreUrl } from '../helpers/explore';
 import { enterSql } from '../helpers/sqlEditor';
 
 // Every ClickHouse server has system.databases, so the spec needs no fixture data.
 const SINGLE_VALUE_IN_SQL = "SELECT name FROM system.databases WHERE name IN ('default')";
+
+// The trace_spans fixture has the OTel column names, which mix upper and lower case.
+const OTEL_CASED_SQL =
+  'SELECT TraceId, ServiceName FROM e2e_test.trace_spans WHERE SpanName IS NOT NULL ORDER BY Timestamp DESC LIMIT 10';
 
 test.describe('Switching from the SQL Editor to the Query Builder', () => {
   test('keeps a single-value IN filter', async ({ page }) => {
@@ -32,5 +37,28 @@ test.describe('Switching from the SQL Editor to the Query Builder', () => {
     await expect(filterRow.getByRole('combobox').nth(1)).toHaveValue('IN');
     await expect(filterRow.getByTestId('query-builder-filters-multi-string-value-container')).toHaveText('default');
     await expect(builderFieldRow(page, 'SQL Preview')).toContainText("name IN ('default')");
+  });
+
+  test('keeps the letter case of column names and an IS NOT NULL filter', async ({ page }) => {
+    skipFixtureTestsOnCloud('trace_spans.sql');
+    await page.goto(exploreUrl());
+    await enterSql(page, OTEL_CASED_SQL);
+
+    await page.getByRole('radio', { name: 'Query Builder' }).click();
+    const confirmDialog = page.getByRole('dialog').filter({ hasText: 'Are you sure?' });
+    await confirmDialog.getByRole('button', { name: 'Continue' }).click();
+    await expect(confirmDialog).toBeHidden();
+
+    // The IS NOT NULL filter used to arrive without a type, and the builder failed to load.
+    await expect(page.getByText('ClickHouse query editor failed to load')).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: 'Query Builder' })).toBeChecked();
+    const filterRow = builderFieldRow(page, 'Filters');
+    await expect(filterRow.getByRole('combobox').nth(0)).toHaveValue('SpanName');
+    await expect(filterRow.getByRole('combobox').nth(1)).toHaveValue('IS NOT NULL');
+    // ClickHouse names are case-sensitive: `timestamp` would not resolve against `Timestamp`.
+    const preview = builderFieldRow(page, 'SQL Preview');
+    await expect(preview).toContainText('SELECT TraceId, ServiceName FROM');
+    await expect(preview).toContainText('SpanName IS NOT NULL');
+    await expect(preview).toContainText('ORDER BY Timestamp DESC');
   });
 });
