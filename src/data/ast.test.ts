@@ -199,6 +199,15 @@ describe('ast', () => {
         'WITH a AS (SELECT * FROM t_a), b AS (SELECT * FROM t_b) SELECT * FROM b',
         't_b',
       ],
+      ['a CTE that reads another CTE', 'WITH a AS (SELECT * FROM t_a), b AS (SELECT * FROM a) SELECT * FROM b', 't_a'],
+      [
+        'a chain of three CTEs, as OTel metrics queries are written',
+        'WITH per_series AS (SELECT t, v FROM otel.otel_metrics_histogram), lagged AS (SELECT t, v FROM per_series) SELECT t FROM lagged',
+        'otel.otel_metrics_histogram',
+      ],
+      ['a FROM subquery that reads a CTE', 'WITH a AS (SELECT * FROM t_a) SELECT * FROM (SELECT * FROM a)', 't_a'],
+      ['a CTE whose body names itself', 'WITH a AS (SELECT * FROM a) SELECT * FROM a', 'a'],
+      ['two CTEs that name each other', 'WITH a AS (SELECT * FROM b), b AS (SELECT * FROM a) SELECT * FROM a', 'a'],
     ])('resolves the table for %s', (_label, sql, expected) => {
       expect(getTable(sql)).toBe(expected);
     });
