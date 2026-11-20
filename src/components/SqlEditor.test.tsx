@@ -50,6 +50,7 @@ const mockEditor = (value: string) => ({
   layout: jest.fn(),
   onDidContentSizeChange: jest.fn(),
   onDidChangeModelContent: jest.fn(),
+  onDidChangeCursorPosition: jest.fn(),
   onKeyUp: jest.fn(),
   addAction: jest.fn(),
   getModel: () => ({
@@ -138,6 +139,46 @@ describe('SQL Editor', () => {
       expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-check', [
         { ...marker, severity: 8, source: 'ClickHouse' },
       ]);
+    });
+
+    it('marks an unknown name under the cursor once the cursor moves off it', async () => {
+      const typed = { startLineNumber: 1, startColumn: 8, endLineNumber: 1, endColumn: 10, message: 'Unknown "cn"' };
+      const other = { startLineNumber: 1, startColumn: 16, endLineNumber: 1, endColumn: 19, message: 'Unknown "tbl"' };
+      mockQueryCheck.check.mockResolvedValue({ kind: 'names', markers: [typed, other] });
+      renderEditor('SELECT cn FROM tbl');
+      // The cursor sits right after `cn`, which is still being typed.
+      mockEditorInstance.getPosition = () => ({ lineNumber: 1, column: 10 });
+
+      await editText();
+      expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-check', [
+        { ...other, severity: 8, source: 'ClickHouse' },
+      ]);
+
+      // Moving inside the name keeps it held back; moving off it marks it.
+      const onCursorChange = (mockEditorInstance.onDidChangeCursorPosition as jest.Mock).mock.calls[0][0];
+      const callsAfterCheck = mockMonaco.editor.setModelMarkers.mock.calls.length;
+      onCursorChange({ position: { lineNumber: 1, column: 9 } });
+      expect(mockMonaco.editor.setModelMarkers).toHaveBeenCalledTimes(callsAfterCheck);
+      onCursorChange({ position: { lineNumber: 1, column: 12 } });
+      expect(mockMonaco.editor.setModelMarkers).toHaveBeenLastCalledWith(expect.anything(), 'clickhouse-query-check', [
+        { ...typed, severity: 8, source: 'ClickHouse' },
+        { ...other, severity: 8, source: 'ClickHouse' },
+      ]);
+    });
+
+    it('drops a held-back name when the text changes', async () => {
+      const typed = { startLineNumber: 1, startColumn: 8, endLineNumber: 1, endColumn: 10, message: 'Unknown "cn"' };
+      mockQueryCheck.check.mockResolvedValue({ kind: 'names', markers: [typed] });
+      renderEditor('SELECT cn FROM tbl');
+      mockEditorInstance.getPosition = () => ({ lineNumber: 1, column: 10 });
+      await editText();
+
+      const onContentChange = (mockEditorInstance.onDidChangeModelContent as jest.Mock).mock.calls[0][0];
+      onContentChange();
+      mockMonaco.editor.setModelMarkers.mockClear();
+      const onCursorChange = (mockEditorInstance.onDidChangeCursorPosition as jest.Mock).mock.calls[0][0];
+      onCursorChange({ position: { lineNumber: 1, column: 12 } });
+      expect(mockMonaco.editor.setModelMarkers).not.toHaveBeenCalled();
     });
 
     it('shows a syntax error ahead of the cursor as a warning', async () => {

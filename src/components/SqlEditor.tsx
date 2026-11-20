@@ -45,6 +45,16 @@ function showQueryErrors(
   monaco.editor.setModelMarkers(model, queryErrorOwner, markers);
 }
 
+// Whether the cursor is in or right after the text of `marker`, as it is while that name is typed.
+function touchesCursor(marker: monacoTypes.editor.IMarkerData, cursor: monacoTypes.IPosition | null): boolean {
+  return (
+    !!cursor &&
+    marker.startLineNumber === cursor.lineNumber &&
+    cursor.column >= marker.startColumn &&
+    cursor.column <= marker.endColumn
+  );
+}
+
 function setupAutoSize(editor: monacoTypes.editor.IStandaloneCodeEditor) {
   const container = editor.getDomNode();
   const updateHeight = () => {
@@ -69,6 +79,11 @@ export const SqlEditor = (props: SqlEditorProps) => {
   const queryCheckTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // The SQL of the last run that succeeded, which needs no check.
   const lastGoodRunRef = useRef<string | undefined>(undefined);
+  // The unknown names of the last check, and those held back because the cursor was on them.
+  const nameMarkersRef = useRef<{ all: monacoTypes.editor.IMarkerData[]; held: Set<monacoTypes.editor.IMarkerData> }>({
+    all: [],
+    held: new Set(),
+  });
   const rangeRef = useRef(props.range);
   rangeRef.current = props.range;
   // On unless the data source turns "Validate SQL" off.
@@ -126,6 +141,7 @@ export const SqlEditor = (props: SqlEditorProps) => {
     const model = editorRef.current?.getModel();
     if (model && monacoRef.current && ranSql !== undefined && ranSql === editorRef.current?.getValue()) {
       monacoRef.current.editor.setModelMarkers(model, queryCheckOwner, []);
+      nameMarkersRef.current = { all: [], held: new Set() };
     }
   }, [props.data, query.refId]);
 
@@ -147,10 +163,20 @@ export const SqlEditor = (props: SqlEditorProps) => {
       if (outcome.kind === 'ok') {
         monaco.editor.setModelMarkers(model, queryCheckOwner, []);
       } else if (outcome.kind === 'names') {
+        // A name under the cursor is most likely still being typed, with the suggestions open, so it
+        // is marked once the cursor moves off it.
+        const cursor = editor.getPosition();
+        const all = outcome.markers.map((marker) => ({
+          ...marker,
+          severity: monaco.MarkerSeverity.Error,
+          source: 'ClickHouse',
+        }));
+        const held = new Set(all.filter((marker) => touchesCursor(marker, cursor)));
+        nameMarkersRef.current = { all, held };
         monaco.editor.setModelMarkers(
           model,
           queryCheckOwner,
-          outcome.markers.map((marker) => ({ ...marker, severity: monaco.MarkerSeverity.Error, source: 'ClickHouse' }))
+          all.filter((marker) => !held.has(marker))
         );
       } else if (outcome.kind === 'syntax') {
         // An error at the end of the query, or ahead of the cursor on its line, is most likely text
@@ -183,8 +209,24 @@ export const SqlEditor = (props: SqlEditorProps) => {
         monaco.editor.setModelMarkers(model, queryCheckOwner, []);
         monaco.editor.setModelMarkers(model, queryErrorOwner, []);
       }
+      nameMarkersRef.current = { all: [], held: new Set() };
       clearTimeout(queryCheckTimerRef.current);
       queryCheckTimerRef.current = setTimeout(() => runQueryCheck(editor, monaco), queryCheckDelayMs);
+    });
+    // Moving the cursor off a name that was held back marks it, with no new check.
+    editor.onDidChangeCursorPosition((event) => {
+      const { all, held } = nameMarkersRef.current;
+      const model = editor.getModel();
+      const released = [...held].filter((marker) => !touchesCursor(marker, event.position));
+      if (!model || released.length === 0) {
+        return;
+      }
+      released.forEach((marker) => held.delete(marker));
+      monaco.editor.setModelMarkers(
+        model,
+        queryCheckOwner,
+        all.filter((marker) => !held.has(marker))
+      );
     });
     const registration = registerSQL('sql', editor, _getSuggestions);
     disposeRegistrationRef.current = registration.dispose;
