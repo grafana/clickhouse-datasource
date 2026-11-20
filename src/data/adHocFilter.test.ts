@@ -1,5 +1,5 @@
 import { AdHocVariableFilter } from '@grafana/data';
-import { AdHocFilter } from './adHocFilter';
+import { AdHocFilter, leftOutFiltersNotice } from './adHocFilter';
 
 describe('AdHocManager', () => {
   it('apply ad hoc filter with no inner query and existing WHERE', () => {
@@ -804,6 +804,163 @@ describe('AdHocManager', () => {
       ] as AdHocVariableFilter[]);
       expect(val).toContain("ResourceAttributes.`a\\'b`::Nullable(String)");
       expect(val).not.toContain("`a'b`");
+    });
+  });
+  describe('columns a table does not have', () => {
+    // The panels a dashboard "Filter for value" click reaches: a SQL logs panel that aliases
+    // columns the way the docs recommend, and a traces panel on another table.
+    const LOGS_SQL =
+      "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName, ResourceAttributes['k8s.pod.name'] AS pod, LogAttributes FROM otel.otel_logs WHERE ServiceName = 'cart'";
+    const TRACES_SQL = 'SELECT ServiceName, count() AS spans FROM otel.otel_traces GROUP BY ServiceName';
+    const LOGS_COLUMNS = [
+      'Timestamp',
+      'TraceId',
+      'SeverityText',
+      'ServiceName',
+      'Body',
+      'ResourceAttributes',
+      'LogAttributes',
+    ];
+    const TRACES_COLUMNS = [
+      'Timestamp',
+      'TraceId',
+      'ServiceName',
+      'Duration',
+      'ResourceAttributes',
+      'SpanAttributes',
+      'Events.Name',
+    ];
+    const level = { key: 'level', operator: '=', value: 'info' } as AdHocVariableFilter;
+    const eventName = { key: 'LogAttributes.event.name', operator: '=', value: 'proxy.access' } as AdHocVariableFilter;
+    const service = { key: 'ServiceName', operator: '=', value: 'cart' } as AdHocVariableFilter;
+
+    const withColumns = () => {
+      const ahm = new AdHocFilter();
+      ahm.setTableColumns('otel.otel_logs', LOGS_COLUMNS);
+      ahm.setTableColumns('otel.otel_traces', TRACES_COLUMNS);
+      return ahm;
+    };
+
+    it('leaves out the filters whose column the table does not have', () => {
+      const ahm = withColumns();
+      const bracketed = {
+        key: "LogAttributes['event.name']",
+        operator: '=',
+        value: 'proxy.access',
+      } as AdHocVariableFilter;
+      expect(ahm.apply(TRACES_SQL, [level, eventName, bracketed])).toEqual(TRACES_SQL);
+      expect(ahm.apply(TRACES_SQL, [level, service, eventName])).toEqual(
+        `${TRACES_SQL}\nsettings additional_table_filters={'otel.otel_traces' : ' ServiceName = \\'cart\\' '}`
+      );
+    });
+
+    it('leaves a key that only names a SELECT alias out of the table it reads', () => {
+      expect(withColumns().apply(LOGS_SQL, [level, service, eventName])).toEqual(
+        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' ServiceName = \\'cart\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' '}`
+      );
+    });
+
+    it('keeps a filter on a Map key, a Nested column or a path into a column the table has', () => {
+      const val = withColumns().apply(TRACES_SQL, [
+        { key: 'ResourceAttributes.k8s.pod.name', operator: '=', value: 'cart-1' },
+        { key: 'otel_traces.Events.Name', operator: '=', value: 'exception' },
+        { key: 'otel_traces.SpanAttributes.http.method', operator: '=', value: 'GET' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain(
+        "' ResourceAttributes[\\'k8s.pod.name\\'] = \\'cart-1\\' AND Events.Name = \\'exception\\' AND SpanAttributes.http.method = \\'GET\\' '"
+      );
+    });
+
+    it('applies every filter to a table whose columns are not known', () => {
+      expect(new AdHocFilter().apply(TRACES_SQL, [level, eventName])).toContain(
+        "additional_table_filters={'otel.otel_traces' : ' level = \\'info\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' '}"
+      );
+    });
+
+    it('checks the columns of the table under a CTE', () => {
+      const sql = 'WITH spans AS (SELECT * FROM otel.otel_traces) SELECT ServiceName FROM spans';
+      expect(withColumns().apply(sql, [level, service])).toEqual(
+        `${sql}\nsettings additional_table_filters={'otel.otel_traces' : ' ServiceName = \\'cart\\' '}`
+      );
+    });
+
+    it('still scopes a table-qualified key to the table it names', () => {
+      const qualified = { key: 'otel_logs.ServiceName', operator: '=', value: 'cart' } as AdHocVariableFilter;
+      const ahm = withColumns();
+      expect(ahm.apply(TRACES_SQL, [qualified])).toEqual(TRACES_SQL);
+      expect(ahm.apply(LOGS_SQL, [qualified])).toContain("' ServiceName = \\'cart\\' '");
+    });
+
+    it('checks the columns of an explicit tag-source target', () => {
+      const ahm = withColumns();
+      ahm.setTargetTableFromQuery('SELECT * FROM otel.otel_traces');
+      const sql = 'SELECT * FROM otel.otel_traces WHERE Duration > 0';
+      expect(ahm.apply(sql, [level, service])).toEqual(
+        `${sql}\nsettings additional_table_filters={'otel.otel_traces' : ' ServiceName = \\'cart\\' '}`
+      );
+    });
+
+    it('buildFilterString leaves out a column the target table does not have', () => {
+      expect(withColumns().buildFilterString([level, service], false, 'otel.otel_traces')).toEqual(
+        " ServiceName = \\'cart\\' "
+      );
+      expect(withColumns().buildFilterString([level, service])).toEqual(
+        " level = \\'info\\' AND ServiceName = \\'cart\\' "
+      );
+    });
+
+    describe('applicability', () => {
+      it('tells which filters apply to a query and why the others do not', () => {
+        const ahm = withColumns();
+        const otherTable = { key: 'otel_logs.Body', operator: '=', value: 'x' } as AdHocVariableFilter;
+        const incomplete = { key: 'ServiceName', operator: '=' } as AdHocVariableFilter;
+        expect(ahm.applicability(TRACES_SQL, [level, service, eventName, otherTable, incomplete])).toEqual([
+          { applies: false, reason: 'otel.otel_traces has no column level.' },
+          { applies: true },
+          { applies: false, reason: 'otel.otel_traces has no column LogAttributes.' },
+          { applies: false, reason: 'The filter is for table otel_logs, and the query reads otel.otel_traces.' },
+          { applies: false, reason: 'The filter is incomplete or uses an unsupported operator.' },
+        ]);
+        expect(ahm.applicability(LOGS_SQL, [level, eventName])).toEqual([
+          { applies: false, reason: 'otel.otel_logs has no column level.' },
+          { applies: true },
+        ]);
+      });
+
+      it('leaves every filter out of a query without a single table', () => {
+        const sql = 'SELECT ServiceName FROM otel.otel_logs UNION ALL SELECT ServiceName FROM otel.otel_traces';
+        expect(withColumns().applicability(sql, [service])).toEqual([
+          { applies: false, reason: 'The query does not read a single table, so ad hoc filters are not added to it.' },
+        ]);
+      });
+    });
+
+    describe('leftOutFiltersNotice', () => {
+      it('names the filter left out and why', () => {
+        expect(leftOutFiltersNotice([level, service], withColumns().applicability(TRACES_SQL, [level, service]))).toBe(
+          'Filter "level = info" isn\'t applied here: otel.otel_traces has no column level.'
+        );
+      });
+
+      it('gives each reason its own sentence', () => {
+        const filters = [level, service, eventName];
+        expect(leftOutFiltersNotice(filters, withColumns().applicability(TRACES_SQL, filters))).toBe(
+          'Filter "level = info" isn\'t applied here: otel.otel_traces has no column level. Filter "LogAttributes.event.name = proxy.access" isn\'t applied here: otel.otel_traces has no column LogAttributes.'
+        );
+      });
+
+      it('lists the filters that share a reason together', () => {
+        const sql = 'SELECT ServiceName FROM otel.otel_logs UNION ALL SELECT ServiceName FROM otel.otel_traces';
+        const multi = { key: 'level', operator: '=|', value: '', values: ['info', 'warn'] } as AdHocVariableFilter;
+        const filters = [multi, service, eventName];
+        expect(leftOutFiltersNotice(filters, withColumns().applicability(sql, filters))).toBe(
+          'Filters "level =| info, warn", "ServiceName = cart" and "LogAttributes.event.name = proxy.access" aren\'t applied here: the query does not read a single table, so ad hoc filters are not added to it.'
+        );
+      });
+
+      it('has no notice for a query that takes every filter', () => {
+        expect(leftOutFiltersNotice([service], withColumns().applicability(TRACES_SQL, [service]))).toBeUndefined();
+      });
     });
   });
   describe('table-qualified keys apply only to the named table (#2207)', () => {
