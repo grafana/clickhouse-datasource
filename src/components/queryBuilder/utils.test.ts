@@ -697,6 +697,16 @@ describe('getQueryOptionsFromSql', () => {
     expect(builderOptions).not.toBeUndefined();
     expect(typeof builderOptions).not.toBe('string');
   });
+
+  it('reads the millisecond logs range filter back as a Grafana time range filter', () => {
+    const sql =
+      'SELECT Body FROM "db"."logs" WHERE ( Timestamp >= $__fromTime_ms AND Timestamp < $__toTime_ms + INTERVAL 1 MILLISECOND )';
+    const options = getQueryOptionsFromSql(sql);
+    expect(typeof options).not.toBe('string');
+    expect((options as QueryBuilderOptions).filters).toEqual([
+      { key: 'timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
+    ]);
+  });
 });
 
 function testCondition(name: string, sql: string, builder: QueryBuilderOptions, testQueryOptionsFromSql = true) {

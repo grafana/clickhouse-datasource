@@ -76,3 +76,38 @@ test.describe('Ad-hoc filters scoped to the table in the key', () => {
     expect(mapEvents.status()).toBe(200);
   });
 });
+
+// A `;` followed by a comment ends the statement; appending the settings clause
+// after it makes a second statement, which ClickHouse rejects.
+const TRAILING_COMMENT_UID = 'e2e-adhoc-trailing-comment';
+const trailingCommentDashboard = {
+  ...dashboard,
+  uid: TRAILING_COMMENT_UID,
+  title: 'E2E ad-hoc filter on a query ending in a comment',
+  panels: [sqlPanel(1, 'events', `${EVENTS_SQL}; -- note`)],
+};
+
+test.describe('Ad-hoc filters on a query ending in a semicolon and a comment', () => {
+  test.beforeEach(async ({ request }) => {
+    skipFixtureTestsOnCloud('seed.sql');
+    const created = await request.post('/api/dashboards/db', {
+      data: { dashboard: trailingCommentDashboard, overwrite: true },
+    });
+    expect(created.ok()).toBe(true);
+  });
+
+  test.afterEach(async ({ request }) => {
+    await request.delete(`/api/dashboards/uid/${TRAILING_COMMENT_UID}`);
+  });
+
+  test('drops the terminator before the settings clause', async ({ page, gotoDashboardPage }) => {
+    const eventsQuery = waitForPanelQuery(page, 'e2e_test.events');
+    await gotoDashboardPage({ uid: TRAILING_COMMENT_UID });
+    const events = await eventsQuery;
+
+    expect(sentSql(events)).toBe(
+      `${EVENTS_SQL}\nsettings additional_table_filters={'e2e_test.events' : ' level = \\'info\\' '}`
+    );
+    expect(events.status()).toBe(200);
+  });
+});

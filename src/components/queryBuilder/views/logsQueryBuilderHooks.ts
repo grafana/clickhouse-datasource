@@ -1,5 +1,10 @@
 import { Datasource } from 'data/CHDatasource';
-import { BuilderOptionsReducerAction, setColumnByHint, setOptions } from 'hooks/useBuilderOptionsState';
+import {
+  BuilderOptionsReducerAction,
+  backfillColumnTypes,
+  setColumnByHint,
+  setOptions,
+} from 'hooks/useBuilderOptionsState';
 import { useEffect, useMemo, useRef } from 'react';
 import { ColumnHint, QueryBuilderOptions, SelectedColumn, TableColumn } from 'types/queryBuilder';
 import otel from 'otel';
@@ -19,7 +24,9 @@ export const buildDefaultLogsColumns = (
   const columns: SelectedColumn[] = [];
   const includedColumns = new Set<string>();
   for (let [hint, colName] of datasource.getDefaultLogsColumns()) {
-    columns.push({ name: colName, hint });
+    // Carry the schema type when it is loaded: the millisecond log-time bound reads the time column's type.
+    const type = allColumns.find((c) => c.name === colName)?.type;
+    columns.push(type ? { name: colName, hint, type } : { name: colName, hint });
     includedColumns.add(colName);
   }
 
@@ -82,6 +89,28 @@ export const useLogDefaultsOnMount = (
     datasource,
     isNewQuery,
   ]);
+};
+
+/**
+ * Fills in the schema type of role columns (Time, Log Level, Message, ...) that were selected before the
+ * table's columns loaded, such as the configured defaults of a new query. The millisecond log-time bound
+ * reads the time column's type. Only a missing `type` is filled, so columns the user already changed keep
+ * their values. Idempotent: it dispatches nothing once every role column that can be typed has a type.
+ */
+export const useBackfillLogColumnTypes = (
+  allColumns: readonly TableColumn[],
+  columns: readonly SelectedColumn[] | undefined,
+  builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>
+) => {
+  useEffect(() => {
+    if (allColumns.length === 0 || !columns?.some((c) => c.hint && !c.type)) {
+      return;
+    }
+
+    // The fill runs in the reducer against its current state, so it cannot overwrite columns that
+    // useOtelColumns sets in the same pass.
+    builderOptionsDispatch(backfillColumnTypes(allColumns));
+  }, [allColumns, columns, builderOptionsDispatch]);
 };
 
 /**
