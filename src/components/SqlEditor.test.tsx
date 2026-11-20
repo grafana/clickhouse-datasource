@@ -52,6 +52,7 @@ const mockEditor = (value: string) => ({
 (window as any).monaco = mockMonaco;
 
 let mockEditorInstance: ReturnType<typeof mockEditor>;
+let mockCodeEditorWordWrap: boolean | undefined;
 
 jest.mock('@grafana/ui', () => ({
   ...jest.requireActual<typeof ui>('@grafana/ui'),
@@ -59,11 +60,14 @@ jest.mock('@grafana/ui', () => ({
     onEditorDidMount,
     onEditorWillUnmount,
     value,
+    wordWrap,
   }: {
     onEditorDidMount: any;
     onEditorWillUnmount?: () => void;
     value: string;
+    wordWrap?: boolean;
   }) {
+    mockCodeEditorWordWrap = wordWrap;
     React.useEffect(() => {
       if (onEditorDidMount) {
         mockEditorInstance = mockEditor(value);
@@ -86,6 +90,18 @@ describe('SQL Editor', () => {
     mockFormattingDispose.mockClear();
     mockMonaco.languages.registerCompletionItemProvider.mockClear();
     mockMonaco.languages.registerDocumentFormattingEditProvider.mockClear();
+  });
+
+  it('wraps long lines', () => {
+    render(
+      <SqlEditor
+        query={{ pluginVersion: '', rawSql: 'SELECT 1', refId: 'A', editorType: EditorType.SQL }}
+        onChange={jest.fn()}
+        onRunQuery={jest.fn()}
+        datasource={mockDatasource}
+      />
+    );
+    expect(mockCodeEditorWordWrap).toBe(true);
   });
 
   it('Should display sql in the editor', () => {
