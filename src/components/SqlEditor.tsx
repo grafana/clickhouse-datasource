@@ -138,6 +138,8 @@ export const SqlEditor = (props: SqlEditorProps) => {
           onSave={(sql) => saveChanges({ rawSql: sql })}
           showMiniMap={false}
           showLineNumbers={true}
+          // Long one-line queries stay readable without scrolling sideways, as in Grafana's own query editors.
+          wordWrap
           onBlur={(sql) => saveChanges({ rawSql: sql })}
           onEditorDidMount={handleMount}
           onEditorWillUnmount={onEditorWillUnmount}
