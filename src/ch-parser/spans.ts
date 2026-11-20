@@ -237,6 +237,30 @@ function parseSelectItems(tokens: DepthToken[], baseDepth: number): SelectItem[]
   });
 }
 
+/**
+ * The items of the select list between `begin` and `end` of `sql`, read like the top-level select
+ * list above. Unlike scanTopLevelSelect it accepts any shape, since SQL autocomplete runs on
+ * queries the user is still typing.
+ */
+export function selectListItems(sql: string, begin: number, end: number): SelectItem[] {
+  const lexer = new Lexer(sql.substring(begin, end));
+  const tokens: DepthToken[] = [];
+  let depth = 0;
+  for (let token = lexer.nextToken(); !token.isEnd() && !token.isError(); token = lexer.nextToken()) {
+    if (!token.isSignificant()) {
+      continue;
+    }
+    if (CLOSERS.has(token.type)) {
+      depth--;
+    }
+    tokens.push({ token, depth });
+    if (OPENERS.has(token.type)) {
+      depth++;
+    }
+  }
+  return parseSelectItems(tokens, 0);
+}
+
 /** `LIMIT [+|-]n [, m] [WITH TIES] [OFFSET k [ROWS]] [FORMAT name] [;]`, running to end of input. */
 function isCompleteTail(topLevel: DepthToken[], start: number): boolean {
   let i = start;
