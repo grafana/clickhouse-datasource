@@ -806,7 +806,7 @@ describe('AdHocManager', () => {
       expect(val).not.toContain("`a'b`");
     });
   });
-  describe('columns a table does not have', () => {
+  describe('keys that are aliases, and columns a table does not have', () => {
     // The panels a dashboard "Filter for value" click reaches: a SQL logs panel that aliases
     // columns the way the docs recommend, and a traces panel on another table.
     const LOGS_SQL =
@@ -854,10 +854,55 @@ describe('AdHocManager', () => {
       );
     });
 
-    it('leaves a key that only names a SELECT alias out of the table it reads', () => {
+    it('filters the aliased column for a key that is an alias in the SELECT', () => {
       expect(withColumns().apply(LOGS_SQL, [level, service, eventName])).toEqual(
-        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' ServiceName = \\'cart\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' '}`
+        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' SeverityText = \\'info\\' AND ServiceName = \\'cart\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' '}`
       );
+      expect(new AdHocFilter().apply(LOGS_SQL, [level])).toEqual(
+        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' SeverityText = \\'info\\' '}`
+      );
+    });
+
+    it('filters the aliased Map value', () => {
+      const val = new AdHocFilter().apply(LOGS_SQL, [
+        { key: 'pod', operator: '=', value: 'cart-1' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain(
+        "additional_table_filters={'otel.otel_logs' : ' ResourceAttributes[\\'k8s.pod.name\\'] = \\'cart-1\\' '}"
+      );
+    });
+
+    it('wraps an aliased expression in parentheses and escapes its quotes', () => {
+      const sql =
+        "SELECT lower(SeverityText) AS level, if(SeverityNumber > 16, 'error', 'other') AS kind FROM otel_logs";
+      const val = new AdHocFilter().apply(sql, [
+        level,
+        { key: 'kind', operator: '!=', value: 'error' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain(
+        "' (lower(SeverityText)) = \\'info\\' AND (if(SeverityNumber > 16, \\'error\\', \\'other\\')) != \\'error\\' '"
+      );
+    });
+
+    it('drops the FROM alias from the aliased expression', () => {
+      const val = new AdHocFilter().apply('SELECT l.SeverityText AS level FROM otel.otel_logs AS l', [level]);
+      expect(val).toContain("additional_table_filters={'otel.otel_logs' : ' SeverityText = \\'info\\' '}");
+    });
+
+    it('keeps filtering the column for a key that aliases an aggregate', () => {
+      // The Traces Explorer's Trace Search Results selects max(Duration) AS Duration.
+      const sql = 'SELECT TraceId, max(Duration) AS Duration FROM otel_traces GROUP BY TraceId';
+      const val = new AdHocFilter().apply(sql, [
+        { key: 'Duration', operator: '>', value: '1000' },
+      ] as AdHocVariableFilter[]);
+      expect(val).toContain("additional_table_filters={'otel_traces' : ' Duration > \\'1000\\' '}");
+    });
+
+    it('reads aliases only from a SELECT that reads the table itself', () => {
+      // The outer SELECT reads a subquery, so its `level` is not a column of otel_logs.
+      const sql = 'SELECT level FROM (SELECT SeverityText AS level FROM otel.otel_logs)';
+      expect(new AdHocFilter().apply(sql, [level])).toContain("' level = \\'info\\' '");
+      expect(withColumns().apply(sql, [level])).toEqual(sql);
     });
 
     it('keeps a filter on a Map key, a Nested column or a path into a column the table has', () => {
@@ -921,9 +966,19 @@ describe('AdHocManager', () => {
           { applies: false, reason: 'The filter is for table otel_logs, and the query reads otel.otel_traces.' },
           { applies: false, reason: 'The filter is incomplete or uses an unsupported operator.' },
         ]);
-        expect(ahm.applicability(LOGS_SQL, [level, eventName])).toEqual([
-          { applies: false, reason: 'otel.otel_logs has no column level.' },
-          { applies: true },
+        expect(ahm.applicability(LOGS_SQL, [level, eventName])).toEqual([{ applies: true }, { applies: true }]);
+      });
+
+      it('explains an aggregate alias that is not a column', () => {
+        const sql = 'SELECT ServiceName, count() AS spans FROM otel.otel_traces GROUP BY ServiceName';
+        expect(
+          withColumns().applicability(sql, [{ key: 'spans', operator: '>', value: '1' } as AdHocVariableFilter])
+        ).toEqual([
+          {
+            applies: false,
+            reason:
+              'In the query spans is an aggregate or another expression a table filter cannot test, and otel.otel_traces has no column spans.',
+          },
         ]);
       });
 
