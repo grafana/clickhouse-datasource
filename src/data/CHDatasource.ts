@@ -5,6 +5,7 @@ import {
   DataQueryError,
   DataQueryRequest,
   DataQueryResponse,
+  DataSourceGetDrilldownsApplicabilityOptions,
   DataSourceInstanceSettings,
   DataSourceWithLogsContextSupport,
   DataSourceWithLogsLabelTypesSupport,
@@ -12,6 +13,7 @@ import {
   DataSourceWithSupplementaryQueriesSupport,
   DataSourceWithToggleableQueryFiltersSupport,
   dateTime,
+  DrilldownsApplicability,
   Field,
   getTimeZone,
   getTimeZoneInfo,
@@ -35,7 +37,7 @@ import LogsContextPanel from 'components/LogsContextPanel';
 import { cloneDeep, isString } from 'lodash';
 import otel from 'otel';
 import { createElement as createReactElement, ReactNode } from 'react';
-import { catchError, concatMap, firstValueFrom, Observable, of } from 'rxjs';
+import { catchError, concatMap, firstValueFrom, from, mergeMap, Observable, of } from 'rxjs';
 import { CHConfig, ConfigMode, SignalType } from 'types/config';
 import {
   AggregateColumn,
@@ -73,7 +75,7 @@ import {
   MetricTables,
   resolveMetricTables,
 } from './metrics';
-import { AdHocFilter } from './adHocFilter';
+import { AdHocFilter, FilterApplicability, leftOutFiltersNotice } from './adHocFilter';
 import {
   buildLogLevelAggregateExpressions,
   DEFAULT_LOGS_ALIAS,
@@ -157,6 +159,9 @@ const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
 const ADHOC_PROBE_TIME_WINDOW = 'INTERVAL 6 HOUR';
 const JSON_PATH_SUGGESTION_LIMIT = 5000;
 const VALUE_SUGGESTION_TIMEOUT_S = 5;
+// A query that places ad-hoc filters itself with the $__adHocFilters macro; the
+// same test applyTemplateVariables makes.
+const ADHOC_FILTERS_MACRO = /\$__adHocFilters\s*\(\s*['"](.+?)['"]\s*\)/;
 
 /** Options for the filter value suggestions of the query builder. */
 export interface DistinctValueOptions {
@@ -318,6 +323,9 @@ export class Datasource
   // Bare table names whose Map/JSON column kinds are already resolved — avoids
   // redundant system.columns lookups.
   private attributeSchemaFetched: Set<string> = new Set();
+  // Column fetches in flight for ad-hoc filters, keyed by table, so the panels
+  // of a dashboard that read the same table share one DESC TABLE.
+  private readonly adHocColumnFetches = new Map<string, Promise<void>>();
   private static readonly TRACE_TIMESTAMP_TABLE_CACHE_TTL_MS = 30 * 1000;
   // Caches the in-flight or resolved existence check for the `<table>_trace_id_ts`
   // companion, keyed by the qualified companion table name (`${database}.${table}${suffix}`)
@@ -2065,6 +2073,17 @@ export class Datasource
   }
 
   query(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
+    // Ad-hoc filters leave out a column that a query's table does not have, so
+    // the tables' columns have to be known before applyTemplateVariables renders
+    // the filters. Only the first request for a table waits for them.
+    const columnsLoaded = this.loadAdHocFilterColumns(request);
+    if (columnsLoaded) {
+      return from(columnsLoaded).pipe(mergeMap(() => this.runRequest(request)));
+    }
+    return this.runRequest(request);
+  }
+
+  private runRequest(request: DataQueryRequest<CHQuery>): Observable<DataQueryResponse> {
     const targets = request.targets.map((t) => ({
       ...t,
       meta: {
@@ -2087,6 +2106,7 @@ export class Datasource
           transformed = foldSqlLogFieldsIntoLabels(this, request, transformed);
           transformed = transformMetricSeriesNames(request, transformed);
           transformed = transformMetricHeatmapFrames(request, transformed);
+          this.addAdHocFilterNotices(request, transformed);
           if (hasLogsVolumeTargets) {
             return { ...transformed, data: splitLogsVolumeFrames(transformed.data, Datasource.logVolumePrefix) };
           }
@@ -2138,6 +2158,135 @@ export class Datasource
       return [];
     }
     return frame?.fields[0]?.values.map((text) => text);
+  }
+
+  /**
+   * Tells Grafana which ad-hoc filters apply to `queries`, by the rules
+   * applyTemplateVariables applies them with, so a dashboard can show the
+   * filters a panel leaves out. Grafana also asks once with every query on the
+   * dashboard and drops a filter reported as not applicable from all of them,
+   * so a filter is applicable when it applies to at least one of the queries.
+   */
+  async getDrilldownsApplicability(
+    options?: DataSourceGetDrilldownsApplicabilityOptions<CHQuery>
+  ): Promise<DrilldownsApplicability[]> {
+    const filters = options?.filters ?? [];
+    const statements = (options?.queries ?? [])
+      .filter((query) => this.filterQuery(query))
+      .map((query) => this.interpolateForAdHocFilters(query))
+      .filter((sql) => sql !== '');
+    if (filters.length === 0 || statements.length === 0) {
+      return [];
+    }
+    await this.loadTableColumns(statements);
+
+    const perQuery = statements.map((sql) => this.adHocFilterApplicability(sql, filters));
+    return filters.map((filter, i) => {
+      const results = perQuery.map((applicability) => applicability[i]);
+      if (results.some((result) => result.applies)) {
+        return { key: filter.key, origin: filter.origin, applicable: true };
+      }
+      const reasons = [...new Set(results.map((result) => result.reason))];
+      return { key: filter.key, origin: filter.origin, applicable: false, reason: reasons.join(' ') };
+    });
+  }
+
+  // Whether each of `filters` applies to `sql`, by the rules applyTemplateVariables
+  // applies them with. A query that places the filters itself with the
+  // $__adHocFilters macro takes every one.
+  private adHocFilterApplicability(sql: string, filters: AdHocVariableFilter[]): FilterApplicability[] {
+    if (ADHOC_FILTERS_MACRO.test(sql)) {
+      return filters.map(() => ({ applies: true }));
+    }
+    const templateSrvVariables = getTemplateSrv().getVariables() || [];
+    const useJSON = Boolean(templateSrvVariables.find((v) => v.name === 'clickhouse_adhoc_use_json'));
+    const tableQualifiedKeys = !this.settings.jsonData.hideTableNameInAdhocFilters;
+    return this.adHocFilter.applicability(sql, filters, useJSON, tableQualifiedKeys);
+  }
+
+  // Adds a notice to the frames of each query that leaves ad-hoc filters out, so
+  // a panel that shows data without a filter says so. Grafana shows it in the
+  // panel header and in the query editor row.
+  private addAdHocFilterNotices(request: DataQueryRequest<CHQuery>, response: DataQueryResponse) {
+    const filters = request.filters ?? [];
+    if (filters.length === 0) {
+      return;
+    }
+    const notices = new Map<string, string>();
+    for (const target of request.targets) {
+      const sql = this.filterQuery(target) ? this.interpolateForAdHocFilters(target, request.scopedVars) : '';
+      const text = sql === '' ? undefined : leftOutFiltersNotice(filters, this.adHocFilterApplicability(sql, filters));
+      if (text) {
+        notices.set(target.refId, text);
+      }
+    }
+    for (const frame of (response.data as DataFrame[]) || []) {
+      const text = notices.get(frame.refId ?? '');
+      if (text) {
+        frame.meta = { ...frame.meta, notices: [...(frame.meta?.notices ?? []), { severity: 'info', text }] };
+      }
+    }
+  }
+
+  /**
+   * Fetches the columns of the tables the queries of a request with ad-hoc
+   * filters read, when they are not known yet. Undefined when there is nothing
+   * to fetch.
+   */
+  private loadAdHocFilterColumns(request: DataQueryRequest<CHQuery>): Promise<void> | undefined {
+    if (!request.filters?.length || this.adHocFiltersStatus === AdHocFilterStatus.disabled) {
+      return undefined;
+    }
+    const statements = request.targets
+      .filter((target) => this.filterQuery(target))
+      .map((target) => this.interpolateForAdHocFilters(target, request.scopedVars));
+    return this.loadTableColumns(statements);
+  }
+
+  private loadTableColumns(statements: string[]): Promise<void> | undefined {
+    const tables = new Set(
+      statements
+        .filter((sql) => !ADHOC_FILTERS_MACRO.test(sql))
+        .map((sql) => this.adHocFilter.resolveTargetTable(sql))
+        // A table name still holding a variable cannot be described.
+        .filter((table) => table !== '' && !table.includes('$') && !this.adHocFilter.hasTableColumns(table))
+    );
+    if (tables.size === 0) {
+      return undefined;
+    }
+    return Promise.all([...tables].map((table) => this.fetchAdHocTableColumns(table))).then(() => undefined);
+  }
+
+  // Records the columns of `table` on the AdHocFilter. When DESC TABLE fails the
+  // table stays unknown, so its queries keep every filter and the next request
+  // tries again.
+  private fetchAdHocTableColumns(table: string): Promise<void> {
+    let pending = this.adHocColumnFetches.get(table);
+    if (!pending) {
+      const dot = table.indexOf('.');
+      const database = dot === -1 ? undefined : table.slice(0, dot);
+      pending = this.fetchColumnsFromTable(database, table.slice(dot + 1))
+        .then((columns) => {
+          // A failed query comes back as an empty frame, and a table always has columns.
+          if (columns.length > 0) {
+            this.adHocFilter.setTableColumns(
+              table,
+              columns.map((c) => c.name)
+            );
+          }
+        })
+        .catch((err) => console.warn(`Failed to fetch the columns of ${table} for ad hoc filters:`, err))
+        .finally(() => this.adHocColumnFetches.delete(table));
+      this.adHocColumnFetches.set(table, pending);
+    }
+    return pending;
+  }
+
+  // The SQL of `query` interpolated as applyTemplateVariables interpolates it
+  // before adding ad-hoc filters, which is enough to tell the table it reads.
+  private interpolateForAdHocFilters(query: CHQuery, scopedVars: ScopedVars = {}): string {
+    const sql = this.applyConditionalAll(query.rawSql || '', getTemplateSrv().getVariables() || []);
+    return this.replace(sql, scopedVars) || '';
   }
 
   async getTagKeys(): Promise<MetricFindValue[]> {
