@@ -108,6 +108,22 @@ const isAttributeColumnType = (type?: string): boolean => Boolean(type?.startsWi
 // companion actually exposes all of them.
 const TRACE_TIMESTAMP_TABLE_REQUIRED_COLUMNS = ['Start', 'End', 'TraceId'];
 
+// The columns of system.functions that the SQL editor reads.
+const SQL_FUNCTION_COLUMNS = [
+  'name',
+  'is_aggregate',
+  'case_insensitive',
+  'alias_to',
+  'origin',
+  'description',
+  'syntax',
+  'arguments',
+  'returned_value',
+  'examples',
+  'categories',
+] as const;
+type SqlFunctionColumn = (typeof SQL_FUNCTION_COLUMNS)[number];
+
 // Row cap for the Map-key discovery probe on free-form tables (no known time
 // column to prune by). Bounds the scan to a sample instead of the whole column.
 const MAP_KEY_PROBE_ROW_SAMPLE = 100000;
@@ -1671,13 +1687,15 @@ export class Datasource
   }
 
   /**
-   * Fetches SQL functions from server.
+   * Fetches SQL functions from server. The COLUMNS matcher reads only the columns of
+   * system.functions that the server has: ClickHouse 22.8 has no description, syntax,
+   * arguments, returned_value, examples or categories (23.3 has description, 23.8 all of
+   * them), and naming a missing column fails the whole query, which left the editor without
+   * function suggestions.
    */
   async fetchSqlFunctions(): Promise<SqlFunction[]> {
     const rawSql = `
-      SELECT
-        name, is_aggregate, case_insensitive, alias_to, origin, description,
-        syntax, arguments, returned_value, examples, categories
+      SELECT COLUMNS('^(${SQL_FUNCTION_COLUMNS.join('|')})$')
       FROM system.functions
       LIMIT 10000
     `;
@@ -1685,19 +1703,21 @@ export class Datasource
     if (frame.fields?.length === 0) {
       return [];
     }
-    const view = new DataFrameView(frame);
+    const view = new DataFrameView<Partial<Record<SqlFunctionColumn, unknown>>>(frame);
+    const text = (value: unknown) => (value === undefined || value === null ? '' : String(value));
     const sqlFunctions: SqlFunction[] = view.map((item) => ({
-      name: String(item[0]),
-      isAggregate: Boolean(item[1]),
-      caseInsensitive: Boolean(item[2]),
-      aliasTo: String(item[3]),
-      origin: String(item[4]),
-      description: String(item[5]),
-      syntax: String(item[6]),
-      arguments: String(item[7]),
-      returnedValue: String(item[8]),
-      examples: String(item[9]),
-      categories: String(item[10]),
+      name: text(item.name),
+      isAggregate: Boolean(item.is_aggregate),
+      caseInsensitive: Boolean(item.case_insensitive),
+      aliasTo: text(item.alias_to),
+      // A server without the column predates user-defined functions, so all of its functions are system ones.
+      origin: item.origin === undefined ? 'System' : text(item.origin),
+      description: text(item.description),
+      syntax: text(item.syntax),
+      arguments: text(item.arguments),
+      returnedValue: text(item.returned_value),
+      examples: text(item.examples),
+      categories: text(item.categories),
     }));
 
     return sqlFunctions;

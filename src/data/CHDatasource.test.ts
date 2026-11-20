@@ -1860,6 +1860,103 @@ describe('ClickHouseDatasource', () => {
     });
   });
 
+  describe('fetchSqlFunctions', () => {
+    const countIf = {
+      name: 'countIf',
+      is_aggregate: 1,
+      case_insensitive: 0,
+      alias_to: '',
+      origin: 'System',
+      description: 'Counts the rows that match.',
+      syntax: 'countIf(cond)',
+      arguments: '- `cond`: The condition.',
+      returned_value: 'The number of rows.',
+      examples: 'SELECT countIf(x > 1)',
+      categories: 'Aggregate Functions',
+    };
+
+    it('selects only the columns of system.functions that the server has', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const frame = arrayToDataFrame([countIf]);
+      const spyOnQuery = jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      await ds.fetchSqlFunctions();
+
+      const sql = spyOnQuery.mock.calls[0][0].targets[0].rawSql.replace(/\s+/g, ' ').trim();
+      expect(sql).toBe(
+        "SELECT COLUMNS('^(name|is_aggregate|case_insensitive|alias_to|origin|description|syntax|arguments|returned_value|examples|categories)$') FROM system.functions LIMIT 10000"
+      );
+    });
+
+    it('reads every column by its name', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const { categories, ...rest } = countIf;
+      // The same columns in another order than the query names them.
+      const frame = arrayToDataFrame([{ categories, ...rest }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([
+        {
+          name: 'countIf',
+          isAggregate: true,
+          caseInsensitive: false,
+          aliasTo: '',
+          origin: 'System',
+          description: 'Counts the rows that match.',
+          syntax: 'countIf(cond)',
+          arguments: '- `cond`: The condition.',
+          returnedValue: 'The number of rows.',
+          examples: 'SELECT countIf(x > 1)',
+          categories: 'Aggregate Functions',
+        },
+      ]);
+    });
+
+    it('leaves the documentation empty on a server without its columns', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // The columns of system.functions on ClickHouse 23.3.
+      const frame = arrayToDataFrame([
+        { name: 'plus', is_aggregate: 0, case_insensitive: 0, alias_to: '', origin: 'System', description: 'Adds.' },
+      ]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([
+        {
+          name: 'plus',
+          isAggregate: false,
+          caseInsensitive: false,
+          aliasTo: '',
+          origin: 'System',
+          description: 'Adds.',
+          syntax: '',
+          arguments: '',
+          returnedValue: '',
+          examples: '',
+          categories: '',
+        },
+      ]);
+    });
+
+    it('takes every function for a system function on a server without the origin column', async () => {
+      const ds = cloneDeep(mockDatasource);
+      // The columns of system.functions on ClickHouse 21.8.
+      const frame = arrayToDataFrame([{ name: '__getScalar', is_aggregate: 0, case_insensitive: 0, alias_to: '' }]);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [frame] }));
+
+      const [fn] = await ds.fetchSqlFunctions();
+
+      expect(fn.origin).toBe('System');
+      expect(fn.description).toBe('');
+    });
+
+    it('returns no functions when the query fails', async () => {
+      const ds = cloneDeep(mockDatasource);
+      jest.spyOn(ds, 'query').mockImplementation(() => of({ data: [arrayToDataFrame([])] }));
+
+      expect(await ds.fetchSqlFunctions()).toEqual([]);
+    });
+  });
+
   describe('fetchJSONPathColumns', () => {
     const schema: TableColumn[] = [
       { name: 'ts', type: 'DateTime', label: 'ts', picklistValues: [] },
