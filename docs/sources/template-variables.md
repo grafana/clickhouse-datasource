@@ -218,6 +218,12 @@ SELECT DISTINCT $__adhoc_column FROM my_database.my_table
 
 When the user selects a column (for example, `status`) in the ad hoc filter key drop-down, the plugin runs `SELECT DISTINCT status FROM my_database.my_table` to populate the value drop-down. The filter keys themselves are derived from the table's columns in `system.columns`.
 
+## How ad hoc filters apply to each query
+
+The plugin adds ad hoc filters to a query as a filter on the table the query reads. When the table doesn't have the column that a filter key names, the plugin leaves that filter out of the query, so the other panels of the dashboard keep working. For example, a filter on a `LogAttributes` key doesn't apply to a panel that reads the traces table. The plugin reads each table's columns with `DESC TABLE` the first time the dashboard filters it. If it can't read them, it applies every filter to that table.
+
+A panel that leaves filters out shows an info icon in its header. Hover over it to see which filters the panel doesn't apply and why. When Grafana runs with the `perPanelNonApplicableDrilldowns` feature toggle, the panel also lists those filters under its title, struck through.
+
 ## Supported ad hoc filter operators
 
 Ad hoc filters support the following operators:
@@ -236,7 +242,7 @@ Ad hoc filters support the following operators:
 
 ## Hide table name in ad hoc filter keys
 
-By default, ad hoc filter keys are shown as `table.column`, and a filter applies only to queries that read from that table. To show only the column name (without the table prefix), enable the **Hide table name in ad hoc filters** option in the data source settings. Filters then apply to every query, so use this option when all queries target the same table.
+By default, ad hoc filter keys are shown as `table.column`, and a filter applies only to queries that read from that table. To show only the column name (without the table prefix), enable the **Hide table name in ad hoc filters** option in the data source settings. Filters then apply to every query whose table has the filter's column.
 
 ## Map and JSON types (OpenTelemetry)
 
