@@ -703,6 +703,9 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           query: traceIdQuery,
           datasourceUid: traceIdQuery.datasource?.uid!,
           datasourceName: traceIdQuery.datasource?.type!,
+          // A panel opens the link over this range, or over the default range of Explore without it.
+          // Explore opens it over its own range and ignores this.
+          range: req.range,
           panelsState: {
             trace: {
               spanId: '${__value.raw}',
@@ -720,6 +723,7 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
           query: traceLogsQuery,
           datasourceUid: traceLogsQuery.datasource?.uid!,
           datasourceName: traceLogsQuery.datasource?.type!,
+          range: req.range,
         },
       });
     }
