@@ -59,6 +59,8 @@ interface CursorData {
   // The tables and CTEs that the FROM and JOINs of the cursor's select read.
   sources: ColumnSource[];
   arrayJoins: ArrayJoinAlias[];
+  // Where the select list of the cursor's select runs, once its FROM is typed.
+  selectList?: { begin: number; end: number };
 
   begin: number;
   end: number;
@@ -100,6 +102,9 @@ function getCursorInSelectQueryNode(
   if (from) {
     cursorData.database = from.database;
     cursorData.table = from.table;
+  }
+  if (select && from) {
+    cursorData.selectList = { begin: select.end, end: from.token.begin };
   }
 
   if (!root.children) {
@@ -369,6 +374,7 @@ async function getSuggestionsFromCursorData(
 
       const inUsing = data.clause === ClauseType.Using;
       results.push(...(await fetchSourceFieldSuggestions(schema, range, text, data.sources, data.prefix, inUsing)));
+      results.push(...selectAliasSuggestions(text, data, range));
 
       break;
     case 'keyword':
@@ -435,13 +441,23 @@ async function fetchTableSuggestions(schema: Schema, range: Range, database: str
 // JSON path such as payload.`weird key` parses.
 const quoteColumnSegments = (name: string): string => name.split('.').map(quoteColumnIfUnsafe).join('.');
 
-// The table or CTE that a FROM or JOIN target reads, or undefined for a table function, a subquery
-// or a table name that is not typed yet.
+// The table, CTE or subquery that a FROM or JOIN target reads, or undefined for a table function or
+// a table name that is not typed yet.
 function columnSource(
   target: FromQueryNode,
   scope: Map<string, SelectQueryNode>,
   resolving: Set<SelectQueryNode>
 ): ColumnSource | undefined {
+  if (target.subquery) {
+    // A subquery has no table name, so its columns are qualified with its alias, if it has one.
+    const alias = target.alias === undefined ? undefined : unquoteIdentifier(target.alias);
+    return {
+      table: alias ?? '',
+      alias,
+      qualifier: target.alias ?? '',
+      cte: { name: alias ?? 'the subquery', body: target.subquery, scope, resolving },
+    };
+  }
   if (!target.table || target.isTableFunction) {
     return undefined;
   }
@@ -632,6 +648,24 @@ async function cteSourceColumns(schema: Schema, text: string, cte: CursorCte): P
   }));
   columns.push(...named);
   return columns;
+}
+
+// The clauses after the select list, which can name the aliases it defines.
+const ALIAS_CLAUSES = new Set([ClauseType.Where, ClauseType.GroupBy, ClauseType.Having, ClauseType.OrderBy]);
+
+// The aliases that the select list of the cursor's select defines (`count() AS cnt`), in the
+// clauses after it. A lone column, aliased or not, is already offered as a column of its table.
+function selectAliasSuggestions(text: string, data: CursorData, range: Range) {
+  if (!data.selectList || !ALIAS_CLAUSES.has(data.clause)) {
+    return [];
+  }
+  const aliases = selectListItems(text, data.selectList.begin, data.selectList.end).flatMap(
+    ({ outputName, sourceIdentifier }): TableColumn[] =>
+      outputName !== undefined && outputName !== sourceIdentifier
+        ? [{ name: outputName, label: outputName, type: 'Alias in SELECT', picklistValues: [] }]
+        : []
+  );
+  return columnSuggestions(aliases, range, data.prefix);
 }
 
 // `qualifier` prefixes the label and the inserted name, as in `l.TraceId`.

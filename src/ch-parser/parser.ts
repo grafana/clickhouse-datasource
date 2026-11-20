@@ -94,7 +94,8 @@ export interface FromQueryNode extends QueryNode {
   // the subquery that directly follows this FROM, so table resolution can
   // descend into it and nothing else.
   subquery?: SelectQueryNode;
-  // The alias that follows the table, as in `FROM otel_logs AS l` or `JOIN otel_traces t`.
+  // The alias that follows the table or subquery, as in `FROM otel_logs AS l`, `JOIN otel_traces t`
+  // or `FROM (SELECT ...) AS s`.
   alias?: string;
   // True for the JOIN of an ARRAY JOIN, whose target is an array column (e.g.
   // `ARRAY JOIN Events AS e`), not a table.
@@ -359,6 +360,11 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
         node.children!.push(nestedNode);
         if (fromAwaitingSubquery) {
           fromAwaitingSubquery.subquery = nestedNode;
+          // The alias follows the closing bracket: `FROM (SELECT ...) AS s`.
+          const alias = peekTableAlias(parser);
+          if (alias) {
+            fromAwaitingSubquery.alias = alias;
+          }
           fromAwaitingSubquery = undefined;
         }
         // `<name> AS ( <subquery> )` is a CTE definition. Record it so a FROM
