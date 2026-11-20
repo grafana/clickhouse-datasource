@@ -58,4 +58,21 @@ describe('registerSQL', () => {
     expect(completionRegister).toHaveBeenCalledTimes(2);
     expect(formattingRegister).toHaveBeenCalledTimes(2);
   });
+
+  it('does not open suggestions on a space, so Enter after one starts a new line', () => {
+    const completionRegister = jest.fn((_lang: string, _provider: { triggerCharacters: string[] }) => ({
+      dispose: jest.fn(),
+    }));
+    (window as any).monaco = {
+      languages: {
+        registerCompletionItemProvider: completionRegister,
+        registerDocumentFormattingEditProvider: jest.fn(() => ({ dispose: jest.fn() })),
+      },
+      editor: {} as any,
+    };
+
+    registerSQL('sql', { updateOptions: jest.fn() } as any, jest.fn());
+
+    expect(completionRegister.mock.calls[0][1].triggerCharacters).toEqual(['.', '$']);
+  });
 });
