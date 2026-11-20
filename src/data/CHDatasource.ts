@@ -2283,7 +2283,8 @@ export class Datasource
   }
 
   // The SQL of `query` interpolated as applyTemplateVariables interpolates it
-  // before adding ad-hoc filters, which is enough to tell the table it reads.
+  // before adding ad-hoc filters, which is enough to tell the table it reads and
+  // the aliases it defines.
   private interpolateForAdHocFilters(query: CHQuery, scopedVars: ScopedVars = {}): string {
     const sql = this.applyConditionalAll(query.rawSql || '', getTemplateSrv().getVariables() || []);
     return this.replace(sql, scopedVars) || '';

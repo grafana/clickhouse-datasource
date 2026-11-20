@@ -442,11 +442,11 @@ These errors relate to the ad hoc filter variable type, which injects filters in
 
 **Symptoms:** A panel shows data that an ad hoc filter should remove, and an info icon in the panel header says that the filter isn't applied there. Or the panel fails with "Unknown expression or function identifier" naming the filter key, for example `level`, often after **Filter for value** in a logs panel.
 
-**Cause:** The plugin adds ad hoc filters as a filter on the table each query reads, and it leaves a filter out of a query whose table doesn't have the filter's column. A key that is only an alias in the query's `SELECT`, such as `level` for `SeverityText AS level`, isn't a column of the table, so the plugin leaves it out too. When the plugin can't read a table's columns with `DESC TABLE`, it applies every filter, and ClickHouse rejects a filter on a missing column with the error above.
+**Cause:** The plugin adds ad hoc filters as a filter on the table each query reads, and it leaves a filter out of a query whose table doesn't have the filter's column. A key that is an alias in the outer `SELECT`, such as `level` for `SeverityText AS level`, filters the aliased expression. An alias defined in a subquery, a CTE, or a query with a `JOIN`, or an alias of an aggregate, isn't a column of the table, so the plugin leaves that filter out too. When the plugin can't read a table's columns with `DESC TABLE`, it applies every filter, and ClickHouse rejects a filter on a missing column with the error above.
 
 **Solution:**
 
-1. Filter on a column of the table, for example `SeverityText` instead of `level`.
+1. Define the alias in the outer `SELECT` that reads the table, or filter on a column of the table, for example `SeverityText` instead of `level`.
 2. Check that the data source user can run `DESC TABLE` on the table the panel reads.
 3. Use a table-qualified key (`table.column`) so the filter applies only to the table it names. Refer to [How ad hoc filters apply to each query](/docs/plugins/grafana-clickhouse-datasource/<CLICKHOUSE_PLUGIN_VERSION>/template-variables/#how-ad-hoc-filters-apply-to-each-query).
 

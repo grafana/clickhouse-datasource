@@ -233,6 +233,8 @@ When the user selects a column (for example, `status`) in the ad hoc filter key 
 
 The plugin adds ad hoc filters to a query as a filter on the table the query reads. When the table doesn't have the column that a filter key names, the plugin leaves that filter out of the query, so the other panels of the dashboard keep working. For example, a filter on a `LogAttributes` key doesn't apply to a panel that reads the traces table. The plugin reads each table's columns with `DESC TABLE` the first time the dashboard filters it. If it can't read them, it applies every filter to that table.
 
+When a filter key is an alias in the query's `SELECT`, the filter tests the aliased expression instead. For example, with `SELECT SeverityText AS level ...`, the filter `level = info` filters on `SeverityText`. This is the filter that **Filter for value** on the `level` field of a logs panel adds. The plugin reads aliases from the outer `SELECT` when it reads the table directly, without a `JOIN`. An alias of an aggregate or window function, such as `count() AS total`, isn't a value of a table row, so the plugin doesn't use it this way.
+
 A panel that leaves filters out shows an info icon in its header. Hover over it to see which filters the panel doesn't apply and why. When Grafana runs with the `perPanelNonApplicableDrilldowns` feature toggle, the panel also lists those filters under its title, struck through.
 
 ## Supported ad hoc filter operators

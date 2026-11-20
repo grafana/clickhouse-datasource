@@ -1,7 +1,7 @@
 import { AdHocVariableFilter } from '@grafana/data';
 import { Lexer } from 'ch-parser/lexer';
 import { TokenType } from 'ch-parser/types';
-import { getTable } from './ast';
+import { getSelectAliases, getTable, SelectAlias } from './ast';
 import { buildJSONPathAccess, parseJSONAdhocKey, quoteColumnIfUnsafe } from './jsonPath';
 
 // OTel-standard Map columns. Retained as a fallback so behavior does not
@@ -57,6 +57,8 @@ interface FilterScope {
   table: string;
   // Leave out a filter whose key names another table.
   tableQualifiedKeys: boolean;
+  // The aliases the query's SELECT defines over the table.
+  aliases?: ReadonlyMap<string, SelectAlias>;
 }
 
 export class AdHocFilter {
@@ -149,8 +151,9 @@ export class AdHocFilter {
   /**
    * Append the ad-hoc filters to `sql` as an `additional_table_filters`
    * setting on the query's table. With `tableQualifiedKeys`, a filter applies
-   * only to the table its key names. A filter on a column the table is known
-   * not to have is left out.
+   * only to the table its key names. A key that is an alias in the query's
+   * SELECT filters the aliased expression, and a filter on a column the table
+   * is known not to have is left out.
    */
   apply(sql: string, adHocFilters: AdHocVariableFilter[], useJSON = false, tableQualifiedKeys = true): string {
     if (sql === '' || !adHocFilters || adHocFilters.length === 0) {
@@ -221,7 +224,12 @@ export class AdHocFilter {
       return { reason: `The query does not read ${targetTable}, the table ad hoc filters apply to.` };
     }
 
-    return { table: targetTable, tableQualifiedKeys };
+    const select = getSelectAliases(sql);
+    return {
+      table: targetTable,
+      tableQualifiedKeys,
+      aliases: select?.table === targetTable ? select.aliases : undefined,
+    };
   }
 
   private renderFilters(
@@ -268,6 +276,13 @@ export class AdHocFilter {
     if (!scope) {
       return { expression: escapeKey(filter.key, useJSON, this._mapColumns, tableQualified) };
     }
+    // A key the query's SELECT defines as an alias, such as `level` for
+    // `SeverityText AS level`, names a column of the query's result rather than
+    // of the table, so the filter tests the aliased expression instead.
+    const alias = scope.aliases?.get(filter.key);
+    if (alias?.rowValue) {
+      return { expression: aliasExpression(alias.expression) };
+    }
     if (scope.tableQualifiedKeys && !appliesToTable(filter.key, scope.table, this._mapColumns)) {
       const table = tablePrefix(filter.key, this._mapColumns);
       return { reason: `The filter is for table ${table}, and the query reads ${scope.table}.` };
@@ -275,7 +290,11 @@ export class AdHocFilter {
     const columns = this._tableColumns.get(scope.table);
     const column = keyColumn(filter.key, this._mapColumns, tableQualified);
     if (columns && column !== undefined && !hasColumn(columns, column)) {
-      return { reason: `${scope.table} has no column ${column}.` };
+      return {
+        reason: alias
+          ? `In the query ${filter.key} is an aggregate or another expression a table filter cannot test, and ${scope.table} has no column ${column}.`
+          : `${scope.table} has no column ${column}.`,
+      };
     }
     return { expression: escapeKey(filter.key, useJSON, this._mapColumns, tableQualified) };
   }
@@ -444,6 +463,15 @@ function hasColumn(columns: ReadonlySet<string>, column: string): boolean {
     }
   }
   return [...columns].some((c) => c.startsWith(`${column}.`));
+}
+
+// An aliased expression as the left side of a filter: escaped for the
+// single-quoted filter string, and in parentheses unless it is a column or a
+// Map value, so the filter's operator cannot bind into it.
+function aliasExpression(expression: string): string {
+  const escaped = expression.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const columnOrMapValue = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*(\['(?:[^'\\]|\\.)*'\])?$/;
+  return columnOrMapValue.test(expression) ? escaped : `(${escaped})`;
 }
 
 function escapeKey(

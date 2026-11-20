@@ -5186,7 +5186,7 @@ describe('ClickHouseDatasource', () => {
 
       expect(described.sort()).toEqual(['DESC TABLE "otel"."otel_logs"', 'DESC TABLE "otel"."otel_traces"']);
       expect(sent).toEqual([
-        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' LogAttributes[\\'event.name\\'] = \\'proxy.access\\' AND ServiceName = \\'frontend-proxy\\' '}`,
+        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' SeverityText = \\'info\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' AND ServiceName = \\'frontend-proxy\\' '}`,
         `${TRACES_SQL}\nsettings additional_table_filters={'otel.otel_traces' : ' ServiceName = \\'frontend-proxy\\' '}`,
       ]);
 
@@ -5234,12 +5234,7 @@ describe('ClickHouseDatasource', () => {
         const response = await lastValueFrom(cloneDeep(mockDatasource).query(panelRequest(LOGS_SQL, TRACES_SQL)));
 
         expect(noticesByRefId(response)).toEqual({
-          Q0: [
-            {
-              severity: 'info',
-              text: 'Filter "level = info" isn\'t applied here: otel.otel_logs has no column level.',
-            },
-          ],
+          Q0: undefined,
           Q1: [
             {
               severity: 'info',
@@ -5315,15 +5310,7 @@ describe('ClickHouseDatasource', () => {
           queries: [query(LOGS_SQL), query(TRACES_SQL)],
         });
 
-        expect(result).toEqual([
-          {
-            key: 'level',
-            applicable: false,
-            reason: 'otel.otel_logs has no column level. otel.otel_traces has no column level.',
-          },
-          { key: 'LogAttributes.event.name', applicable: true },
-          { key: 'ServiceName', applicable: true },
-        ]);
+        expect(result.map((r) => r.applicable)).toEqual([true, true, true]);
       });
 
       it('keeps the origin of each filter, and skips hidden queries', async () => {
