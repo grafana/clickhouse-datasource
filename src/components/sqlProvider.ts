@@ -83,6 +83,8 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
 
   const lexer = new Lexer(rawSql);
   let pos = 0;
+  // A `^` or `:` right after a dot, held until the name or type that follows it.
+  let pathPart: string | undefined;
   for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
     if (token.isError()) {
       return undefined;
@@ -90,6 +92,20 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
 
     const text = rawSql.substring(pos, token.end);
     pos = token.end;
+    if (pathPart !== undefined) {
+      const held = pathPart;
+      pathPart = undefined;
+      if (token.type === TokenType.BareWord || token.type === TokenType.QuotedIdentifier) {
+        // JSON path syntax the formatter can't parse: json.^a, json.a.:Int64, json.a.:`Array(Int64)`.
+        code += placeholder(held + text, false);
+        continue;
+      }
+      code += held;
+    }
+    if ((token.type === TokenType.Caret || token.type === TokenType.Colon) && code.endsWith('.')) {
+      pathPart = text;
+      continue;
+    }
     if (token.type === TokenType.HereDoc) {
       flushCode();
       sql += placeholder(text, false);
@@ -100,7 +116,7 @@ function protectTemplateSyntax(rawSql: string): TemplateProtection | undefined {
       code += text;
     }
   }
-  code += rawSql.substring(pos);
+  code += (pathPart ?? '') + rawSql.substring(pos);
   flushCode();
 
   const placeholderRegex = new RegExp(`${prefix}(\\d+)_(\\s*\\()?`, 'g');

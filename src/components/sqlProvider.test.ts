@@ -61,6 +61,15 @@ describe('SQL Formatter', () => {
     expect(formatSql(input, 2)).toBe(expected);
   });
 
+  it('formats queries with JSON path syntax', () => {
+    const input =
+      'SELECT json.^a, json.a.b.:Int64, json.c.:`Array(Nullable(Int64))` FROM t WHERE json.^a.b IS NOT NULL';
+    const expected =
+      'SELECT\n  json.^a,\n  json.a.b.:Int64,\n  json.c.:`Array(Nullable(Int64))`\nFROM\n  t\nWHERE\n  json.^a.b IS NOT NULL';
+
+    expect(formatSql(input, 2)).toBe(expected);
+  });
+
   it('keeps here-documents as typed', () => {
     const input = "SELECT $$it's a heredoc$$ AS s, $doc$tagged 'one'$doc$ AS t";
 
