@@ -323,7 +323,6 @@ describe('Suggestions for JOIN targets and set operations', () => {
     // position, so a later clause keeps the FROM table's columns.
     const labels = await labelsAt('SELECT * FROM otel_logs JOIN ${t} ON a = b WHERE ');
     expect(labels).toContain('ServiceName');
-    expect(labels).not.toContain('WRONG_TABLE');
   });
 
   it.each(['INTERSECT', 'EXCEPT'])('suggests columns after a top-level %s', async (operator) => {
@@ -508,5 +507,157 @@ GROUP BY time, series ORDER BY time`;
     it('suggests the columns of lagged in the outer WHERE', async () => {
       expect(await labels(query('', '|'))).toEqual(['t', 'outcome', 'v', 'pv']);
     });
+  });
+});
+
+describe('Suggestions for qualified names, JOINs and set operations', () => {
+  const column = (name: string, type = 'String'): TableColumn => ({ name, label: name, type, picklistValues: [] });
+  const logs = ['Timestamp', 'TraceId', 'ServiceName', 'Body'];
+  const tableColumns: Record<string, TableColumn[]> = {
+    'otel.otel_logs': logs.map((name) => column(name)),
+    'otel.otel_traces': [
+      column('Timestamp'),
+      column('TraceId'),
+      column('ServiceName'),
+      column('SpanName'),
+      column('SpanKind'),
+      column('Events.Name', 'Array(LowCardinality(String))'),
+      column('Events.Timestamp', 'Array(DateTime64(9))'),
+    ],
+  };
+  const schema: Schema = {
+    databases: async () => ['otel'],
+    tables: async () => ['otel_logs', 'otel_traces'],
+    columns: async (db: string, table: string) => tableColumns[`${db}.${table}`] ?? [column('WRONG_TABLE')],
+    functions: async () => [{ name: 'toDateTime', origin: 'System' } as SqlFunction],
+    defaultDatabase: 'otel',
+  };
+  const join = 'FROM otel.otel_logs AS l JOIN otel.otel_traces AS t ON l.TraceId = t.TraceId';
+
+  // `sql` marks the cursor with `|`.
+  const suggestionsAt = async (sql: string) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const cursorPosition = sql.indexOf('|');
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+    return getSuggestions(sql.replace('|', ''), schema, range, cursorPosition);
+  };
+  const fieldsAt = async (sql: string) => (await suggestionsAt(sql)).filter((s) => s.kind === 3);
+  const labels = async (sql: string) => (await fieldsAt(sql)).map((s) => s.label);
+
+  it.each([
+    ['an AS alias', `SELECT l.| ${join}`],
+    ['an alias without AS', 'SELECT l.| FROM otel.otel_logs l JOIN otel.otel_traces t ON l.TraceId = t.TraceId'],
+    ['the table name', 'SELECT otel_logs.| FROM otel.otel_logs'],
+    ['the table name of an aliased table', 'SELECT * FROM otel.otel_logs AS l WHERE otel_logs.|'],
+    ['the database and table', 'SELECT otel.otel_logs.| FROM otel.otel_logs'],
+  ])('offers only the columns of the table that %s names', async (_label, sql) => {
+    expect((await suggestionsAt(sql)).map((s) => [s.label, s.insertText])).toEqual(logs.map((name) => [name, name]));
+  });
+
+  it.each([
+    ['in the select list', `SELECT t.Span| ${join}`],
+    [
+      'in the ON of a JOIN without AS',
+      'SELECT * FROM otel.otel_logs l LEFT JOIN otel.otel_traces t ON l.TraceId = t.Span|',
+    ],
+  ])('offers the columns of a JOIN target after its alias %s', async (_label, sql) => {
+    expect((await suggestionsAt(sql)).map((s) => [s.label, s.insertText])).toEqual([
+      ['SpanName', 'SpanName'],
+      ['SpanKind', 'SpanKind'],
+    ]);
+  });
+
+  it('offers the paths under a column after its table alias', async () => {
+    const fields = await fieldsAt('SELECT t.Events.| FROM otel.otel_traces AS t');
+    expect(fields.map((s) => [s.label, s.insertText])).toEqual([
+      ['Events.Name', 'Name'],
+      ['Events.Timestamp', 'Timestamp'],
+    ]);
+  });
+
+  it.each([
+    ['the select list', `SELECT | ${join}`],
+    ['WHERE', `SELECT * ${join} WHERE |`],
+    ['ON', 'SELECT * FROM otel.otel_logs AS l JOIN otel.otel_traces AS t ON |'],
+    ['GROUP BY', `SELECT count() ${join} GROUP BY |`],
+    ['HAVING', `SELECT count() ${join} GROUP BY ServiceName HAVING |`],
+    ['ORDER BY', `SELECT * ${join} ORDER BY |`],
+  ])('offers the columns of every joined table in %s', async (_label, sql) => {
+    expect(await labels(sql)).toEqual(expect.arrayContaining(['Body', 'SpanName', 'Events.Name']));
+  });
+
+  it('offers a column that both tables have once for each, qualified with its alias', async () => {
+    const fields = await fieldsAt(`SELECT * ${join} WHERE Trace|`);
+    expect(fields.map((s) => [s.label, s.insertText, s.filterText])).toEqual([
+      ['l.TraceId', 'l.TraceId', 'TraceId'],
+      ['t.TraceId', 't.TraceId', 'TraceId'],
+    ]);
+  });
+
+  it('qualifies a shared column with the table name when the tables have no alias', async () => {
+    const offered = await labels('SELECT * FROM otel.otel_logs JOIN otel.otel_traces ON |');
+    expect(offered).toEqual(expect.arrayContaining(['Body', 'SpanName', 'otel_logs.TraceId', 'otel_traces.TraceId']));
+    expect(offered).not.toContain('TraceId');
+  });
+
+  it.each([
+    ['with aliases', 'SELECT * FROM otel.otel_logs AS l JOIN otel.otel_traces AS t USING (|'],
+    ['without aliases', 'SELECT * FROM otel.otel_logs JOIN otel.otel_traces USING (|'],
+  ])('offers bare names in USING %s', async (_label, sql) => {
+    const offered = await labels(sql);
+    expect(offered).toEqual(expect.arrayContaining(['TraceId', 'SpanName']));
+    expect(offered).not.toContain('l.TraceId');
+    expect(offered).not.toContain('otel_logs.TraceId');
+  });
+
+  it('offers the columns of a joined CTE', async () => {
+    const sql =
+      'WITH s AS (SELECT ServiceName AS svc FROM otel.otel_logs) SELECT * FROM otel.otel_traces AS t JOIN s ON t.ServiceName = s.|';
+    expect(await labels(sql)).toEqual(['svc']);
+  });
+
+  it.each(['UNION', 'UNION ALL', 'EXCEPT', 'INTERSECT'])(
+    'reads the second select of %s against its own FROM',
+    async (operator) => {
+      expect(
+        await labels(`SELECT ServiceName FROM otel.otel_logs ${operator} SELECT Span| FROM otel.otel_traces`)
+      ).toEqual(['SpanName', 'SpanKind']);
+    }
+  );
+
+  it('reads the first select of a set operation against its own FROM', async () => {
+    expect(await labels('SELECT | FROM otel.otel_logs UNION ALL SELECT SpanName FROM otel.otel_traces')).toEqual(logs);
+  });
+
+  it('reads a set operation in a subquery against the select the cursor is in', async () => {
+    const sql = 'SELECT * FROM (SELECT Body FROM otel.otel_logs UNION ALL SELECT | FROM otel.otel_traces WHERE 1)';
+    expect(await labels(sql)).toEqual(expect.arrayContaining(['SpanName']));
+    expect(await labels(sql)).not.toContain('Body');
+  });
+
+  it('lends the tables of the select before to one whose FROM is not typed yet', async () => {
+    expect(await labels('SELECT ServiceName FROM otel.otel_logs UNION ALL SELECT |')).toEqual(logs);
+  });
+
+  it('offers the fields of an ARRAY JOIN element after its alias', async () => {
+    const fields = await fieldsAt('SELECT e.| FROM otel.otel_traces ARRAY JOIN Events AS e');
+    expect(fields.map((s) => [s.label, s.insertText, s.detail])).toEqual([
+      ['Name', 'Name', 'LowCardinality(String)'],
+      ['Timestamp', 'Timestamp', 'DateTime64(9)'],
+    ]);
+  });
+
+  it('does not read an ARRAY JOIN column as a table', async () => {
+    expect(await labels('SELECT * FROM otel.otel_traces ARRAY JOIN Events AS e WHERE |')).not.toContain('WRONG_TABLE');
   });
 });

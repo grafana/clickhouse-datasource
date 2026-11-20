@@ -62,6 +62,10 @@ export enum ClauseType {
   OrderBy,
   Limit,
   Identifier,
+  // The ON condition of a JOIN.
+  On,
+  // The USING columns of a JOIN.
+  Using,
 }
 
 export enum QueryNodeType {
@@ -90,6 +94,11 @@ export interface FromQueryNode extends QueryNode {
   // the subquery that directly follows this FROM, so table resolution can
   // descend into it and nothing else.
   subquery?: SelectQueryNode;
+  // The alias that follows the table, as in `FROM otel_logs AS l` or `JOIN otel_traces t`.
+  alias?: string;
+  // True for the JOIN of an ARRAY JOIN, whose target is an array column (e.g.
+  // `ARRAY JOIN Events AS e`), not a table.
+  arrayJoin?: boolean;
 }
 
 export interface IdentifierQueryNode extends QueryNode {
@@ -105,6 +114,19 @@ export interface SelectQueryNode extends QueryNode {
   // several selects; a single-table target is not meaningful for the whole
   // statement then.
   hasSetOperation?: boolean;
+  // The selects that such a set operation combines, in order. Unset without one.
+  branches?: SelectBranch[];
+}
+
+// One of the selects that a top-level set operation combines.
+export interface SelectBranch {
+  // Where the select begins: at the first token for the first one, else at the
+  // end of the set operator before it.
+  begin: number;
+  // Its SELECT, once typed.
+  token?: Token;
+  // Its outer FROM.
+  from?: FromQueryNode;
 }
 
 // Clause keywords that an unqualified FROM target never takes as the table name.
@@ -198,6 +220,22 @@ function readNameSegment(parser: QueryNodeParser, allowReserved: boolean): strin
   return undefined;
 }
 
+// The alias after a FROM or JOIN table (`otel_logs AS l` or `otel_logs l`), read
+// without consuming it. A set operator right after the table
+// (`FROM t EXCEPT SELECT ...`) is not an alias.
+function peekTableAlias(parser: QueryNodeParser): string | undefined {
+  let alias = parser.peekAt(0);
+  if (alias?.matchKeyword('AS')) {
+    alias = parser.peekAt(1);
+  } else if (isSetOperator(alias, parser.peekAt(1), parser.peekAt(2))) {
+    return undefined;
+  }
+  if (alias?.type === TokenType.QuotedIdentifier || (alias?.type === TokenType.BareWord && !alias.isKeyword())) {
+    return alias.text;
+  }
+  return undefined;
+}
+
 export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode | null {
   if (!parser.hasNext()) {
     return null;
@@ -226,15 +264,20 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
   // definition when its subquery opens.
   let prev1: Token | undefined;
   let prev2: Token | undefined;
+  // The select after the last top-level set operator, once there is one.
+  let branch: SelectBranch | undefined;
   let endOfNode = false;
   while (!endOfNode && parser.hasNext()) {
     const token = parser.next();
 
     // A top-level set operation combines several selects, so no single table is
-    // the target. This only sets the flag; the token is still parsed below like
-    // any other.
+    // the target. This only sets the flag and starts the next select; the token
+    // is still parsed below like any other.
     if (parenDepth === 0 && isSetOperator(token, parser.peekAt(0), parser.peekAt(1))) {
       node.hasSetOperation = true;
+      node.branches ??= [{ begin: firstToken.begin, token: node.token, from: node.from }];
+      branch = { begin: token.end };
+      node.branches.push(branch);
     }
 
     if (token.type === TokenType.Semicolon) {
@@ -243,14 +286,23 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
       endOfNode = true;
     } else if (token.matchKeyword('SELECT')) {
       node.token = token;
+      if (branch) {
+        branch.token ??= token;
+      }
     } else if (token.matchKeyword('FROM') || token.matchKeyword('JOIN')) {
       const fromNode: FromQueryNode = { type: QueryNodeType.From, token, clause: ClauseType.From };
+      if (token.matchKeyword('JOIN') && prev1?.matchKeyword('ARRAY')) {
+        fromNode.arrayJoin = true;
+      }
       node.children!.push(fromNode);
       // Only the outer-level FROM sets node.from. A FROM nested inside a
       // function call (e.g. `EXTRACT(part FROM col)`, `trim(BOTH ' ' FROM col)`)
       // is at parenDepth > 0 and must not shadow the real table.
       if (!node.from && parenDepth === 0) {
         node.from = fromNode;
+      }
+      if (branch && !branch.from && parenDepth === 0) {
+        branch.from = fromNode;
       }
 
       if (parser.hasNext() && parser.peek().isError()) {
@@ -280,6 +332,11 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
         // `additional_table_filters` can key on.
         if (fromNode.table && parser.hasNext() && parser.peek().type === TokenType.OpeningRoundBracket) {
           fromNode.isTableFunction = true;
+        } else if (fromNode.table) {
+          const alias = peekTableAlias(parser);
+          if (alias) {
+            fromNode.alias = alias;
+          }
         }
       } else if (parser.hasNext() && parser.peek().type === TokenType.OpeningRoundBracket) {
         // Subquery FROM, e.g. `FROM (SELECT ...)`. Link the subquery that the
@@ -326,6 +383,10 @@ export function parseSelectQueryNode(parser: QueryNodeParser): SelectQueryNode |
       node.children!.push({ type: QueryNodeType.Default, token: parser.next(), clause: ClauseType.OrderBy });
     } else if (token.matchKeyword('LIMIT')) {
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Limit });
+    } else if (token.matchKeyword('ON')) {
+      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.On });
+    } else if (token.matchKeyword('USING')) {
+      node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.Using });
     } else if (token.matchKeyword('UNION')) {
       node.children!.push({ type: QueryNodeType.Default, token, clause: ClauseType.None });
     } else if (token.type === TokenType.BareWord && !token.isKeyword()) {
