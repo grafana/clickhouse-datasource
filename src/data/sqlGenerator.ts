@@ -288,7 +288,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     // `trace_id` column, turning `WHERE traceID = trace_id` into a tautology
     // that returns every span in the time window.
     queryParts.push('WITH');
-    queryParts.push(`'${traceIdValue}' as __gf_trace_id,`);
+    queryParts.push(`'${escapeStringLiteral(traceIdValue || '')}' as __gf_trace_id,`);
     queryParts.push(`(SELECT min(Start) FROM ${timestampTable} WHERE TraceId = __gf_trace_id) as __gf_trace_start,`);
     queryParts.push(`(SELECT max(End) + 1 FROM ${timestampTable} WHERE TraceId = __gf_trace_id) as __gf_trace_end`);
   }
@@ -312,7 +312,7 @@ const generateTraceIdQuery = (options: QueryBuilderOptions): string => {
     queryParts.push(`${escapeIdentifier(traceStartTime.name)} <= __gf_trace_end`);
   } else if (hasTraceIdFilter) {
     const traceId = options.meta!.traceId;
-    queryParts.push(`traceID = '${traceId}'`);
+    queryParts.push(`traceID = '${escapeStringLiteral(traceId || '')}'`);
   }
 
   if (filterParts) {
@@ -440,7 +440,9 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
       queryParts.push('AND');
     }
 
-    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${options.meta!.logMessageLike}%')`);
+    queryParts.push(
+      `(${logMessage.alias || logMessage.name} LIKE '%${escapeStringLiteral(options.meta!.logMessageLike || '')}%')`
+    );
   }
 
   const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
@@ -751,12 +753,33 @@ const escapeValue = (value: string | number | boolean): string => {
     return String(value);
   }
 
-  if (value.includes('$') || value.includes('(') || value.includes(')') || value.includes("'") || value.includes('"')) {
+  if (isRawFilterExpression(value)) {
     return value;
   }
 
   return `'${value}'`;
 };
+
+// escapeValue passes a value through unquoted when it contains any of these
+// characters, so that a filter typed in the builder can hold a variable or an
+// expression (`$var`, `now()`, `'literal'`).
+const isRawFilterExpression = (value: string): boolean => /[$()'"]/.test(value);
+
+/** Escape a string for the body of a single-quoted ClickHouse string literal. */
+export const escapeStringLiteral = (value: string): string => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+/**
+ * Prepare a value taken from query results (a log field, a label) for a
+ * builder filter. escapeValue treats a value with `$`, `(`, `)`, `'` or `"` as
+ * a raw expression, so such a value is stored as an escaped string literal
+ * instead, which escapeValue then passes through unchanged. Other values are
+ * kept as they are, so the builder shows them as before.
+ */
+export const toFilterLiteral = (value: string): string =>
+  isRawFilterExpression(value) ? `'${escapeStringLiteral(value)}'` : value;
+
+/** Escape the LIKE wildcards in a value so it matches literally. */
+export const escapeLikePattern = (value: string): string => value.replace(/[\\%_]/g, '\\$&');
 
 /**
  * Returns the SELECT column for trace duration.
@@ -898,7 +921,7 @@ export const getFilters = (options: QueryBuilderOptions, flags: { millisecondTim
     }
 
     if (filter.mapKey && type.startsWith('Map')) {
-      column += `['${filter.mapKey}']`;
+      column += `['${escapeStringLiteral(filter.mapKey)}']`;
       // Extract the value type from Map(KeyType, ValueType)
       const valueType = type.match(/Map\(\s*.+\s*,\s*(.+)\s*\)/)?.[1]?.trim() || 'String';
       type = valueType;
@@ -979,7 +1002,7 @@ export const getFilters = (options: QueryBuilderOptions, flags: { millisecondTim
         filter.operator === FilterOperator.ILike ||
         filter.operator === FilterOperator.NotILike
       ) {
-        filterParts.push(`'%${filter.value || ''}%'`);
+        filterParts.push(`'%${escapeStringLiteral(String(filter.value || ''))}%'`);
       } else {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }
