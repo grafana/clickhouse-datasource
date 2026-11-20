@@ -440,7 +440,7 @@ const generateLogsQuery = (_options: QueryBuilderOptions): string => {
       queryParts.push('AND');
     }
 
-    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${options.meta!.logMessageLike}%')`);
+    queryParts.push(`(${logMessage.alias || logMessage.name} LIKE '%${escapeLikeValue(options.meta!.logMessageLike!)}%')`);
   }
 
   const hintsToGroup = new Set([ColumnHint.FilterTime, ColumnHint.Time]);
@@ -743,6 +743,16 @@ export const JSON_SENTINEL_KEY = '__ch_json__';
 /** Whether getFilters renders the value as the same quoted literal in every value position, with nothing for template interpolation to expand. */
 export const isPlainStringValue = (value: string): boolean => value === value.trim() && !/[$()'"\\]|\[\[/.test(value);
 
+/**
+ * Makes a value safe to sit inside the single-quoted `'%...%'` literal that LIKE filters build.
+ * A single quote that is not already escaped (`''` or `\\'`) is doubled, so `it's` stays valid SQL
+ * while values that were already escaped by hand keep working.
+ */
+export const escapeLikeValue = (value: string): string =>
+  value.replace(/(\\?)('+)/g, (match, backslash: string, quotes: string) =>
+    backslash || quotes.length % 2 === 0 ? match : `${quotes}'`
+  );
+
 const escapeValue = (value: string | number | boolean): string => {
   // Filter values are typed as strings, but JSON-typed attribute columns can
   // carry numeric/boolean values at runtime. Render those unquoted instead of
@@ -979,7 +989,7 @@ export const getFilters = (options: QueryBuilderOptions, flags: { millisecondTim
         filter.operator === FilterOperator.ILike ||
         filter.operator === FilterOperator.NotILike
       ) {
-        filterParts.push(`'%${filter.value || ''}%'`);
+        filterParts.push(`'%${escapeLikeValue(String(filter.value || ''))}%'`);
       } else {
         filterParts.push(escapeValue((filter as StringFilter).value || ''));
       }

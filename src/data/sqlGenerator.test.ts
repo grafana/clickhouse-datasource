@@ -11,6 +11,7 @@ import {
 } from 'types/queryBuilder';
 import {
   _testExports,
+  escapeLikeValue,
   generateSql,
   getColumnByHint,
   getColumnIndexByHint,
@@ -211,6 +212,47 @@ describe('SQL Generator', () => {
     };
 
     expect(generateSql(opts)).toEqual('');
+  });
+
+  it('escapes single quotes in the logs message search', () => {
+    const opts: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_logs',
+      queryType: QueryType.Logs,
+      columns: [{ name: 'Body', hint: ColumnHint.LogMessage }],
+      meta: { logMessageLike: "it's" },
+    };
+
+    expect(generateSql(opts)).toContain("(body LIKE '%it''s%')");
+  });
+
+  it('escapes single quotes in LIKE filter values', () => {
+    const options = {
+      database: 'db',
+      table: 'tbl',
+      queryType: QueryType.Table,
+      columns: [],
+      filters: [
+        {
+          condition: 'AND',
+          filterType: 'custom',
+          key: 'Body',
+          operator: FilterOperator.Like,
+          type: 'String',
+          value: "it's",
+        },
+      ],
+    } as QueryBuilderOptions;
+
+    expect(_testExports.getFilters(options)).toEqual("( Body LIKE '%it''s%' )");
+  });
+
+  it('leaves already escaped quotes in LIKE values alone', () => {
+    expect(escapeLikeValue("it''s")).toEqual("it''s");
+    expect(escapeLikeValue("it\\'s")).toEqual("it\\'s");
+    expect(escapeLikeValue("it's")).toEqual("it''s");
+    expect(escapeLikeValue("'a' 'b'")).toEqual("''a'' ''b''");
+    expect(escapeLikeValue('plain')).toEqual('plain');
   });
 
   // Regression test for #1882: opentelemetry-collector-contrib clickhouseexporter v0.151.0
