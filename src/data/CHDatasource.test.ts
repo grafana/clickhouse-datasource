@@ -8,6 +8,7 @@ import {
   Field,
   FieldType,
   LoadingState,
+  QueryResultMetaNotice,
   SupplementaryQueryType,
   TimeRange,
   toDataFrame,
@@ -4777,6 +4778,227 @@ describe('ClickHouseDatasource', () => {
         status: 'error',
         message: expect.stringContaining('Auth error'),
         error: expect.any(HealthCheckError),
+      });
+    });
+  });
+
+  // A dashboard "Filter for value" click adds a filter for every panel: here a SQL logs panel
+  // that aliases `SeverityText AS level`, and a traces panel whose table has neither `level`
+  // nor LogAttributes.
+  describe('ad-hoc filters on the columns of each table', () => {
+    const LOGS_SQL =
+      "SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, LogAttributes FROM otel.otel_logs WHERE ServiceName = 'cart'";
+    const TRACES_SQL = 'SELECT ServiceName, count() AS spans FROM otel.otel_traces GROUP BY ServiceName';
+    const DESCRIBED: Record<string, string[]> = {
+      'DESC TABLE "otel"."otel_logs"': ['Timestamp', 'SeverityText', 'ServiceName', 'Body', 'LogAttributes'],
+      'DESC TABLE "otel"."otel_traces"': ['Timestamp', 'ServiceName', 'Duration', 'SpanAttributes'],
+    };
+    const filters = [
+      { key: 'level', operator: '=', value: 'info' },
+      { key: 'LogAttributes.event.name', operator: '=', value: 'proxy.access' },
+      { key: 'ServiceName', operator: '=', value: 'frontend-proxy' },
+    ];
+
+    let described: string[];
+    let sent: string[];
+    let backend: jest.SpyInstance;
+
+    beforeEach(() => {
+      described = [];
+      sent = [];
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+      // Stands in for DataSourceWithBackend.query: renders each target through applyTemplateVariables,
+      // answers DESC TABLE with the table's columns, or with no frame for an unknown table, and any
+      // other query with one empty frame per target.
+      backend = jest.spyOn(DataSourceWithBackend.prototype, 'query').mockImplementation(function (
+        this: Datasource,
+        request: DataQueryRequest<CHQuery>
+      ) {
+        const rendered = request.targets.map((t) =>
+          this.applyTemplateVariables(t, request.scopedVars, request.filters)
+        );
+        if (rendered[0].rawSql.startsWith('DESC TABLE')) {
+          described.push(rendered[0].rawSql);
+          const columns = DESCRIBED[rendered[0].rawSql];
+          return of({ data: columns ? [toDataFrame({ fields: [{ name: 'name', values: columns }] })] : [] });
+        }
+        sent.push(...rendered.map((q) => q.rawSql));
+        return of({ data: request.targets.map((t) => toDataFrame({ refId: t.refId, fields: [] })) });
+      });
+    });
+
+    afterEach(() => backend.mockRestore());
+
+    const panelRequest = (...statements: string[]) =>
+      ({
+        targets: statements.map((rawSql, i) => ({ refId: `Q${i}`, rawSql, editorType: EditorType.SQL })),
+        filters,
+        scopedVars: {},
+        timezone: 'UTC',
+      }) as unknown as DataQueryRequest<CHQuery>;
+
+    it('describes each table once, then leaves out the filters a table has no column for', async () => {
+      const ds = cloneDeep(mockDatasource);
+
+      await lastValueFrom(ds.query(panelRequest(LOGS_SQL, TRACES_SQL)));
+
+      expect(described.sort()).toEqual(['DESC TABLE "otel"."otel_logs"', 'DESC TABLE "otel"."otel_traces"']);
+      expect(sent).toEqual([
+        `${LOGS_SQL}\nsettings additional_table_filters={'otel.otel_logs' : ' SeverityText = \\'info\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' AND ServiceName = \\'frontend-proxy\\' '}`,
+        `${TRACES_SQL}\nsettings additional_table_filters={'otel.otel_traces' : ' ServiceName = \\'frontend-proxy\\' '}`,
+      ]);
+
+      await lastValueFrom(ds.query(panelRequest(TRACES_SQL)));
+      expect(described).toHaveLength(2);
+    });
+
+    it('shares one DESC TABLE between panels that read the same table', async () => {
+      const ds = cloneDeep(mockDatasource);
+
+      await Promise.all([
+        lastValueFrom(ds.query(panelRequest(TRACES_SQL))),
+        lastValueFrom(ds.query(panelRequest(TRACES_SQL))),
+      ]);
+
+      expect(described).toEqual(['DESC TABLE "otel"."otel_traces"']);
+      expect(sent).toHaveLength(2);
+    });
+
+    it('keeps every filter on a table it could not describe, and describes it again next time', async () => {
+      const ds = cloneDeep(mockDatasource);
+      const sql = 'SELECT ServiceName FROM otel.otel_unknown';
+
+      await lastValueFrom(ds.query(panelRequest(sql)));
+      await lastValueFrom(ds.query(panelRequest(sql)));
+
+      expect(described).toEqual(['DESC TABLE "otel"."otel_unknown"', 'DESC TABLE "otel"."otel_unknown"']);
+      expect(sent[1]).toContain(
+        "' level = \\'info\\' AND LogAttributes[\\'event.name\\'] = \\'proxy.access\\' AND ServiceName = \\'frontend-proxy\\' '"
+      );
+    });
+
+    it('does not describe tables for a request without ad-hoc filters', async () => {
+      await lastValueFrom(cloneDeep(mockDatasource).query({ ...panelRequest(TRACES_SQL), filters: [] }));
+
+      expect(described).toEqual([]);
+      expect(sent).toEqual([TRACES_SQL]);
+    });
+
+    describe('notices', () => {
+      const noticesByRefId = (response: DataQueryResponse): Record<string, QueryResultMetaNotice[] | undefined> =>
+        Object.fromEntries((response.data as DataFrame[]).map((frame) => [frame.refId ?? '', frame.meta?.notices]));
+
+      it('adds one notice to the frames of each query that leaves filters out', async () => {
+        const response = await lastValueFrom(cloneDeep(mockDatasource).query(panelRequest(LOGS_SQL, TRACES_SQL)));
+
+        expect(noticesByRefId(response)).toEqual({
+          Q0: undefined,
+          Q1: [
+            {
+              severity: 'info',
+              text: 'Filter "level = info" isn\'t applied here: otel.otel_traces has no column level. Filter "LogAttributes.event.name = proxy.access" isn\'t applied here: otel.otel_traces has no column LogAttributes.',
+            },
+          ],
+        });
+      });
+
+      it('keeps the notices a frame already has', async () => {
+        backend.mockImplementation((request: DataQueryRequest<CHQuery>) =>
+          of({
+            data: request.targets.map((t) =>
+              t.rawSql?.startsWith('DESC TABLE')
+                ? toDataFrame({ fields: [{ name: 'name', values: DESCRIBED[t.rawSql] }] })
+                : {
+                    ...toDataFrame({ refId: t.refId, fields: [] }),
+                    meta: { notices: [{ severity: 'warning', text: 'x' }] },
+                  }
+            ),
+          })
+        );
+
+        const response = await lastValueFrom(cloneDeep(mockDatasource).query(panelRequest(TRACES_SQL)));
+
+        expect(noticesByRefId(response).Q0?.map((n) => n.severity)).toEqual(['warning', 'info']);
+      });
+
+      it('adds no notice when the query takes every filter or there are no filters', async () => {
+        const ds = cloneDeep(mockDatasource);
+        const service = [{ key: 'ServiceName', operator: '=', value: 'cart' }];
+
+        const filtered = await lastValueFrom(ds.query({ ...panelRequest(LOGS_SQL, TRACES_SQL), filters: service }));
+        const unfiltered = await lastValueFrom(ds.query({ ...panelRequest(LOGS_SQL, TRACES_SQL), filters: [] }));
+
+        expect(noticesByRefId(filtered)).toEqual({ Q0: undefined, Q1: undefined });
+        expect(noticesByRefId(unfiltered)).toEqual({ Q0: undefined, Q1: undefined });
+      });
+
+      it('adds no notice to a query that places the filters with $__adHocFilters', async () => {
+        const sql = "SELECT * FROM otel.otel_traces SETTINGS $__adHocFilters('otel.otel_traces')";
+
+        const response = await lastValueFrom(cloneDeep(mockDatasource).query(panelRequest(sql)));
+
+        expect(noticesByRefId(response)).toEqual({ Q0: undefined });
+      });
+    });
+
+    describe('getDrilldownsApplicability', () => {
+      const query = (rawSql: string, extra: Partial<CHQuery> = {}) =>
+        ({ refId: 'A', rawSql, editorType: EditorType.SQL, ...extra }) as CHQuery;
+
+      it('reports the filters a panel leaves out, with the reason', async () => {
+        const result = await cloneDeep(mockDatasource).getDrilldownsApplicability({
+          filters,
+          queries: [query(TRACES_SQL)],
+        });
+
+        expect(result).toEqual([
+          { key: 'level', applicable: false, reason: 'otel.otel_traces has no column level.' },
+          {
+            key: 'LogAttributes.event.name',
+            applicable: false,
+            reason: 'otel.otel_traces has no column LogAttributes.',
+          },
+          { key: 'ServiceName', applicable: true },
+        ]);
+      });
+
+      it('counts a filter as applicable when one of the queries takes it', async () => {
+        const result = await cloneDeep(mockDatasource).getDrilldownsApplicability({
+          filters,
+          queries: [query(LOGS_SQL), query(TRACES_SQL)],
+        });
+
+        expect(result.map((r) => r.applicable)).toEqual([true, true, true]);
+      });
+
+      it('keeps the origin of each filter, and skips hidden queries', async () => {
+        const result = await cloneDeep(mockDatasource).getDrilldownsApplicability({
+          filters: [{ key: 'level', operator: '=', value: 'info', origin: 'dashboard' }],
+          queries: [query(LOGS_SQL, { hide: true }), query(TRACES_SQL)],
+        });
+
+        expect(result).toEqual([
+          { key: 'level', origin: 'dashboard', applicable: false, reason: 'otel.otel_traces has no column level.' },
+        ]);
+      });
+
+      it('takes every filter for a query that places them with $__adHocFilters', async () => {
+        const result = await cloneDeep(mockDatasource).getDrilldownsApplicability({
+          filters,
+          queries: [query("SELECT * FROM otel.otel_traces SETTINGS $__adHocFilters('otel.otel_traces')")],
+        });
+
+        expect(result.map((r) => r.applicable)).toEqual([true, true, true]);
+        expect(described).toEqual([]);
+      });
+
+      it('has nothing to report without filters or queries', async () => {
+        const ds = cloneDeep(mockDatasource);
+
+        expect(await ds.getDrilldownsApplicability({ filters: [], queries: [query(TRACES_SQL)] })).toEqual([]);
+        expect(await ds.getDrilldownsApplicability({ filters, queries: [] })).toEqual([]);
+        expect(await ds.getDrilldownsApplicability()).toEqual([]);
       });
     });
   });

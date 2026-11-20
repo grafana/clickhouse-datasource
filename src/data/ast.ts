@@ -1,5 +1,8 @@
 import { parseFirst, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
-import { FromQueryNode, parseSelect, SelectQueryNode } from 'ch-parser/parser';
+import { Lexer } from 'ch-parser/lexer';
+import { FromQueryNode, parseSelect, QueryNodeType, SelectQueryNode } from 'ch-parser/parser';
+import { unquoteIdentifier as unquoteName } from 'ch-parser/spans';
+import { Token, TokenType } from 'ch-parser/types';
 
 interface ReplacePart {
   startIndex: number;
@@ -199,6 +202,248 @@ export function getTable(sql: string): string {
     return '';
   }
   return firstPhysicalTable(root) ?? '';
+}
+
+/** An alias the outer SELECT defines, as an ad-hoc filter on the table can use it. */
+export interface SelectAlias {
+  /**
+   * The aliased expression, rebuilt from its tokens without comments, so a line comment cannot
+   * swallow what follows it, and without the qualifier that names the table, which a filter on
+   * the table cannot see.
+   */
+  expression: string;
+  /**
+   * Whether the expression is a value of the table's rows. An aggregate or window function, a
+   * subquery, `arrayJoin` or a macro is not, so a filter on the table cannot evaluate it.
+   */
+  rowValue: boolean;
+}
+
+/**
+ * The aliases (`SeverityText AS level`) the outer SELECT of `sql` defines, keyed by alias, with
+ * the table that SELECT reads. Undefined unless the outer SELECT reads a single table directly:
+ * over a subquery or a CTE its aliases name the subquery's columns, and with a JOIN an alias may
+ * name the joined table's columns.
+ */
+export function getSelectAliases(sql: string): { table: string; aliases: Map<string, SelectAlias> } | undefined {
+  const root = parseSelect(sql);
+  const from = root?.from;
+  if (!root?.token || !from || root.hasSetOperation || root.token.end > from.token.begin) {
+    return undefined;
+  }
+  if (from.table && !from.database && !from.isTableFunction && root.withAliases?.has(from.table)) {
+    return undefined;
+  }
+  const table = qualifiedTableName(from);
+  const joins = root.children?.some((child) => child.type === QueryNodeType.From && child.token.matchKeyword('JOIN'));
+  if (!table || joins) {
+    return undefined;
+  }
+
+  const tokens: Token[] = [];
+  const lexer = new Lexer(sql);
+  for (let token = lexer.nextToken(); !token.isEnd(); token = lexer.nextToken()) {
+    if (token.isSignificant()) {
+      tokens.push(token);
+    }
+  }
+  const fromIndex = tokens.findIndex((token) => token.begin === from.token.begin);
+  const tableAlias = fromTableAlias(tokens, fromIndex);
+  const selectList = tokens.filter((token) => token.begin >= root.token.end && token.end <= from.token.begin);
+
+  const aliases = new Map<string, SelectAlias>();
+  splitAtTopLevelCommas(selectList).forEach((item, index) => {
+    const selectItem = index === 0 ? dropSelectModifiers(item) : item;
+    const asIndex = lastTopLevelAs(selectItem);
+    // `<expression> AS <alias>`, with nothing after the alias.
+    if (asIndex < 1 || asIndex !== selectItem.length - 2 || !isAliasName(selectItem[asIndex + 1])) {
+      return;
+    }
+    const name = unquoteName(selectItem[asIndex + 1].text);
+    if (name === undefined || aliases.has(name)) {
+      return;
+    }
+    const expression = selectItem.slice(0, asIndex);
+    aliases.set(name, { expression: renderExpression(expression, tableAlias), rowValue: isRowValue(expression) });
+  });
+  return { table, aliases };
+}
+
+const OPENING_BRACKETS = new Set([
+  TokenType.OpeningRoundBracket,
+  TokenType.OpeningSquareBracket,
+  TokenType.OpeningCurlyBrace,
+]);
+const CLOSING_BRACKETS = new Set([
+  TokenType.ClosingRoundBracket,
+  TokenType.ClosingSquareBracket,
+  TokenType.ClosingCurlyBrace,
+]);
+
+function splitAtTopLevelCommas(tokens: Token[]): Token[][] {
+  const items: Token[][] = [[]];
+  let depth = 0;
+  for (const token of tokens) {
+    if (OPENING_BRACKETS.has(token.type)) {
+      depth++;
+    } else if (CLOSING_BRACKETS.has(token.type)) {
+      depth--;
+    } else if (token.type === TokenType.Comma && depth === 0) {
+      items.push([]);
+      continue;
+    }
+    items[items.length - 1].push(token);
+  }
+  return items;
+}
+
+// The index of the last AS outside brackets, or -1. An AS inside brackets belongs to the
+// expression, as in CAST(x AS String).
+function lastTopLevelAs(tokens: Token[]): number {
+  let depth = 0;
+  let index = -1;
+  tokens.forEach((token, i) => {
+    if (OPENING_BRACKETS.has(token.type)) {
+      depth++;
+    } else if (CLOSING_BRACKETS.has(token.type)) {
+      depth--;
+    } else if (depth === 0 && token.matchKeyword('AS')) {
+      index = i;
+    }
+  });
+  return index;
+}
+
+// The first select item without the DISTINCT [ON (...)], ALL or TOP n [WITH TIES] that can
+// precede it.
+function dropSelectModifiers(tokens: Token[]): Token[] {
+  let i = 0;
+  if (tokens[i]?.matchKeyword('DISTINCT') && tokens[i + 1]?.matchKeyword('ON')) {
+    i = closingBracketIndex(tokens, i + 2) + 1;
+  } else if (tokens[i]?.matchKeyword('DISTINCT') || tokens[i]?.matchKeyword('ALL')) {
+    i++;
+  }
+  if (tokens[i]?.matchKeyword('TOP') && tokens[i + 1]?.type === TokenType.Number) {
+    i += 2;
+    if (tokens[i]?.matchKeyword('WITH') && tokens[i + 1]?.matchKeyword('TIES')) {
+      i += 2;
+    }
+  }
+  return tokens.slice(i);
+}
+
+// The index of the bracket that closes the one at `open`, or the last index when it is not closed.
+function closingBracketIndex(tokens: Token[], open: number): number {
+  let depth = 0;
+  for (let i = open; i < tokens.length; i++) {
+    if (OPENING_BRACKETS.has(tokens[i].type)) {
+      depth++;
+    } else if (CLOSING_BRACKETS.has(tokens[i].type) && --depth === 0) {
+      return i;
+    }
+  }
+  return tokens.length - 1;
+}
+
+function isAliasName(token: Token): boolean {
+  return token.type === TokenType.QuotedIdentifier || (token.type === TokenType.BareWord && !token.isKeyword());
+}
+
+// The alias the FROM gives its table: `FROM otel.otel_logs AS l` or `FROM otel_logs l`.
+function fromTableAlias(tokens: Token[], fromIndex: number): string | undefined {
+  if (fromIndex === -1) {
+    return undefined;
+  }
+  let i = fromIndex + 1;
+  while (tokens[i]?.type === TokenType.BareWord || tokens[i]?.type === TokenType.QuotedIdentifier) {
+    i++;
+    if (tokens[i]?.type !== TokenType.Dot) {
+      break;
+    }
+    i++;
+  }
+  if (tokens[i]?.matchKeyword('AS')) {
+    i++;
+  }
+  return tokens[i] && isAliasName(tokens[i]) ? unquoteName(tokens[i].text) : undefined;
+}
+
+// `tokens` as SQL text, with one space where the source had whitespace or a comment, and the
+// `<tableAlias>.` qualifier dropped.
+function renderExpression(tokens: Token[], tableAlias: string | undefined): string {
+  let text = '';
+  let space = false;
+  for (let i = 0; i < tokens.length; i++) {
+    space ||= i > 0 && tokens[i].begin > tokens[i - 1].end;
+    const qualifier =
+      tableAlias !== undefined &&
+      isAliasName(tokens[i]) &&
+      unquoteName(tokens[i].text) === tableAlias &&
+      tokens[i + 1]?.type === TokenType.Dot &&
+      tokens[i - 1]?.type !== TokenType.Dot;
+    if (qualifier) {
+      i++;
+      continue;
+    }
+    text += (space && text !== '' ? ' ' : '') + tokens[i].text;
+    space = false;
+  }
+  return text;
+}
+
+function isRowValue(tokens: Token[]): boolean {
+  return tokens.every((token, i) => {
+    // The lexer reads a macro such as $__timeInterval as one word, and the `$` of ${var} on its own.
+    if (token.matchKeyword('OVER') || token.matchKeyword('SELECT') || token.text.startsWith('$')) {
+      return false;
+    }
+    if (token.type !== TokenType.BareWord || tokens[i + 1]?.type !== TokenType.OpeningRoundBracket) {
+      return true;
+    }
+    // A parametric aggregate takes two argument lists, as in quantile(0.9)(Duration).
+    const twoArgumentLists = tokens[closingBracketIndex(tokens, i + 1) + 1]?.type === TokenType.OpeningRoundBracket;
+    return !twoArgumentLists && !isAggregateFunction(token.text) && !/^arrayJoin$/i.test(token.text);
+  });
+}
+
+// cspell:ignore uniq Kahan sparkbar Corr covar
+const lowercased = (names: string) =>
+  names
+    .trim()
+    .split(/\s+/)
+    .map((name) => name.toLowerCase());
+
+// Aggregate functions in common use, compared without case. Each name also matches with
+// ClickHouse's suffixes appended, as in countIf, sumArray or avgMergeState, and a name that
+// starts with one of the family prefixes is an aggregate too (quantileExact, uniqCombined64,
+// groupArrayMovingSum). A rarer aggregate is taken for a row value, so a filter through its
+// alias fails in ClickHouse the way a filter on an unknown column does.
+const AGGREGATE_FUNCTIONS = new Set(
+  lowercased(`count sum avg min max any anyLast anyHeavy any_value first_value last_value argMin argMax
+    avgWeighted sumKahan sumWithOverflow sumCount deltaSum deltaSumTimestamp entropy histogram groupConcat
+    groupUniqArray array_agg retention windowFunnel simpleLinearRegression maxMap minMap maxIntersections
+    boundingRatio intervalLengthSum singleValueOrNull var_pop var_samp sparkbar rankCorr
+    exponentialMovingAverage nonNegativeDerivative largestTriangleThreeBuckets`)
+);
+const AGGREGATE_FAMILIES = lowercased(`quantile median uniq groupArray groupBit topK stddev varPop varSamp covar corr
+  kurt skew sequence sumMap exponentialTimeDecayed`);
+// Longest first, so OrNull is not read as Null and SimpleState not as State.
+const AGGREGATE_SUFFIXES = lowercased(
+  'SimpleState OrDefault Resample Distinct ForEach ArgMin ArgMax OrNull Array Merge State Tuple Null Map If'
+);
+
+function isAggregateFunction(name: string): boolean {
+  let base = name.toLowerCase();
+  while (true) {
+    if (AGGREGATE_FUNCTIONS.has(base) || AGGREGATE_FAMILIES.some((family) => base.startsWith(family))) {
+      return true;
+    }
+    const suffix = AGGREGATE_SUFFIXES.find((s) => base.length > s.length && base.endsWith(s));
+    if (suffix === undefined) {
+      return false;
+    }
+    base = base.slice(0, -suffix.length);
+  }
 }
 
 export function getFields(sql: string): string[] {
