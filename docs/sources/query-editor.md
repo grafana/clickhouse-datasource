@@ -168,7 +168,7 @@ When the plugin cannot guarantee a correct count it declines, and Grafana draws 
 - No log timestamp column is configured, so there is nothing to bucket on. A data source configured with only a lower-precision _filter_ timestamp declines too.
 - The query does not select the configured timestamp column first, or selects it as an expression.
 - A `SELECT *` query reads anything other than the configured logs table, including a CTE that shadows its name.
-- The query uses a construct that changes which rows exist: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, `UNION`, an interval macro, or more than one statement.
+- The query uses a construct that changes which rows exist: `SETTINGS`, `LIMIT n BY`, `WITH FILL`, `WITH TOTALS`, a set operation (`UNION`, `INTERSECT`, or `EXCEPT`), an interval macro, or more than one statement.
 - The query ends in a row limit the plugin cannot parse, such as `LIMIT (500)` or `LIMIT ${maxRows}`.
 
 Grafana renders one histogram per panel, so a single query that cannot be aggregated makes every query in that panel fall back, including query builder queries.
