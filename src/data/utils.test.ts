@@ -13,6 +13,7 @@ import {
   columnLabelToPlaceholder,
   dataFrameHasLogLabelWithName,
   foldDiscoveredLogFieldsIntoLabels,
+  foldSqlLogFieldsIntoLabels,
   getBuilderOptions,
   isBuilderOptionsRunnable,
   labelsFieldName,
@@ -21,7 +22,16 @@ import {
   tryApplyColumnHints,
 } from './utils';
 import { newMockDatasource } from '__mocks__/datasource';
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, dateTime, Field, FieldType } from '@grafana/data';
+import {
+  CoreApp,
+  DataFrame,
+  DataQueryRequest,
+  DataQueryResponse,
+  dateTime,
+  Field,
+  FieldType,
+  PreferredVisualisationType,
+} from '@grafana/data';
 import { CHBuilderQuery, CHQuery, EditorType } from 'types/sql';
 import { Datasource } from './CHDatasource';
 import otel from 'otel';
@@ -1611,6 +1621,227 @@ describe('foldDiscoveredLogFieldsIntoLabels', () => {
       SpanId: 'abc',
     });
   });
+});
+
+describe('foldSqlLogFieldsIntoLabels', () => {
+  const buildSqlLogsRequestResponse = (
+    frameFields: Field[],
+    editorType = EditorType.SQL,
+    preferredVisualisationType: PreferredVisualisationType = 'logs'
+  ): [DataQueryRequest<CHQuery>, DataQueryResponse] => {
+    const query = { refId: 'A', editorType, rawSql: 'SELECT 1', pluginVersion: '' } as CHQuery;
+    const request = { targets: [query] } as any as DataQueryRequest<CHQuery>;
+    const data: DataFrame[] = [
+      {
+        refId: 'A',
+        fields: frameFields,
+        length: frameFields[0]?.values.length ?? 0,
+        meta: { preferredVisualisationType },
+      },
+    ];
+    return [request, { data }];
+  };
+
+  const field = (name: string, values: any[], type = FieldType.string, config: Field['config'] = {}): Field => ({
+    name,
+    type,
+    config,
+    values,
+  });
+  const fieldNames = (res: DataQueryResponse) => (res.data[0] as DataFrame).fields.map((f) => f.name);
+  const labelValues = (res: DataQueryResponse) =>
+    (res.data[0] as DataFrame).fields.find((f) => f.name === labelsFieldName)!.values;
+
+  // Keys the backend merges into `labels` from the ResourceAttributes and LogAttributes Map columns.
+  const attributes = { 'ResourceAttributes.k8s.pod.name': 'pod-1', 'LogAttributes.event.name': 'proxy.access' };
+
+  it('folds plain columns into labels next to the OTel attributes and keeps the role fields', () => {
+    // SELECT Timestamp AS timestamp, Body AS body, SeverityText AS level, ServiceName,
+    //   ResourceAttributes['k8s.pod.name'] AS pod, LogAttributes, ResourceAttributes
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('timestamp', [1], FieldType.time),
+      field('body', ['GET /cart']),
+      field('level', ['info']),
+      field('ServiceName', ['cart']),
+      field('pod', ['pod-1']),
+      field(labelsFieldName, [{ ...attributes }], FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual(['timestamp', 'body', 'level', labelsFieldName]);
+    const labels = labelValues(res)[0];
+    expect(labels).toEqual({ ...attributes, ServiceName: 'cart', pod: 'pod-1' });
+    // The folded keys are the ungrouped labels next to which Grafana renders the plain fields (level).
+    const frame = res.data[0] as DataFrame;
+    expect(Object.keys(labels).filter((key) => ds.getLabelDisplayTypeFromFrame(key, frame, 0) === null)).toEqual([
+      'ServiceName',
+      'pod',
+    ]);
+  });
+
+  it('keeps role, trace ID, linked, time, object and context fields standalone', () => {
+    const ds = newMockDatasource();
+    ds.settings.jsonData.logs = { contextColumns: ['host'] };
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('timestamp', [1], FieldType.time),
+      field('body', ['hi']),
+      field('level', ['warn']),
+      field('detected_level', ['warn']),
+      field('id', ['row-1']),
+      field('tsNs', ['1000000']),
+      field('TraceId', ['abc']),
+      field('trace_id', ['abc']),
+      field('span', ['def'], FieldType.string, { links: [{ title: 'Open span', url: 'https://example.com' }] }),
+      field('ObservedTimestamp', [2], FieldType.time),
+      field('Events', [[{ name: 'retry' }]], FieldType.other),
+      field('host', ['node-1']),
+      field('ServiceName', ['cart']),
+      field(labelsFieldName, [{ ...attributes }], FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual([
+      'timestamp',
+      'body',
+      'level',
+      'detected_level',
+      'id',
+      'tsNs',
+      'TraceId',
+      'trace_id',
+      'span',
+      'ObservedTimestamp',
+      'Events',
+      'host',
+      labelsFieldName,
+    ]);
+    expect(labelValues(res)[0]).toEqual({ ...attributes, ServiceName: 'cart' });
+  });
+
+  it('keeps the first string field, which Grafana shows as the log line, when the query has no body alias', () => {
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('Timestamp', [1], FieldType.time),
+      field('Body', ['hi']),
+      field('ServiceName', ['cart']),
+      field(labelsFieldName, [{ ...attributes }], FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual(['Timestamp', 'Body', labelsFieldName]);
+    expect(labelValues(res)[0]).toEqual({ ...attributes, ServiceName: 'cart' });
+  });
+
+  it('keeps the log line when a column is selected twice', () => {
+    // SELECT Body, Timestamp, * returns Body twice; only the second copy folds.
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('Body', ['hi']),
+      field('Timestamp', [1], FieldType.time),
+      field('Body', ['hi']),
+      field(labelsFieldName, [{ ...attributes }], FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual(['Body', 'Timestamp', labelsFieldName]);
+    expect(labelValues(res)[0]).toEqual({ ...attributes, Body: 'hi' });
+  });
+
+  it('folds every row, stores numbers and booleans as strings, and skips empty values', () => {
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('timestamp', [1, 2, 3], FieldType.time),
+      field('body', ['a', 'b', 'c']),
+      field('SeverityNumber', [9, 13, null], FieldType.number),
+      field('sampled', [true, false, true], FieldType.boolean),
+      field('pod', ['pod-1', '', null]),
+      field(labelsFieldName, [{ ...attributes }, { ...attributes }, {}], FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual(['timestamp', 'body', labelsFieldName]);
+    expect(labelValues(res)).toEqual([
+      { ...attributes, SeverityNumber: '9', sampled: 'true', pod: 'pod-1' },
+      { ...attributes, SeverityNumber: '13', sampled: 'false' },
+      { sampled: 'true' },
+    ]);
+  });
+
+  it('parses and rewrites a JSON-string labels value', () => {
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('timestamp', [1], FieldType.time),
+      field('body', ['hi']),
+      field('ServiceName', ['cart']),
+      field(labelsFieldName, [JSON.stringify(attributes)], FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(JSON.parse(labelValues(res)[0])).toEqual({ ...attributes, ServiceName: 'cart' });
+  });
+
+  it.each([
+    ['a Map aliased AS labels', [{ region: 'eu' }]],
+    ['empty attribute maps', [{}]],
+  ])('leaves the frame as is when its labels hold no OTel attribute: %s', (_, labels) => {
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('timestamp', [1], FieldType.time),
+      field('body', ['hi']),
+      field('ServiceName', ['cart']),
+      field(labelsFieldName, labels, FieldType.other),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual(['timestamp', 'body', 'ServiceName', labelsFieldName]);
+    expect(labelValues(res)).toEqual(labels);
+  });
+
+  it('leaves a frame without a labels field as is', () => {
+    const ds = newMockDatasource();
+    const [req, res] = buildSqlLogsRequestResponse([
+      field('timestamp', [1], FieldType.time),
+      field('body', ['hi']),
+      field('ServiceName', ['cart']),
+    ]);
+
+    foldSqlLogFieldsIntoLabels(ds, req, res);
+
+    expect(fieldNames(res)).toEqual(['timestamp', 'body', 'ServiceName']);
+  });
+
+  it.each([
+    ['a query builder frame', EditorType.Builder, 'logs'],
+    ['a SQL table frame', EditorType.SQL, 'table'],
+  ] as Array<[string, EditorType, PreferredVisualisationType]>)(
+    'leaves %s as is',
+    (_, editorType, preferredVisualisationType) => {
+      const ds = newMockDatasource();
+      const [req, res] = buildSqlLogsRequestResponse(
+        [
+          field('timestamp', [1], FieldType.time),
+          field('body', ['hi']),
+          field('ServiceName', ['cart']),
+          field(labelsFieldName, [{ ...attributes }], FieldType.other),
+        ],
+        editorType,
+        preferredVisualisationType
+      );
+
+      foldSqlLogFieldsIntoLabels(ds, req, res);
+
+      expect(fieldNames(res)).toEqual(['timestamp', 'body', 'ServiceName', labelsFieldName]);
+      expect(labelValues(res)).toEqual([attributes]);
+    }
+  );
 });
 
 describe('transformQueryResponseWithTraceAndLogLinks link table variables', () => {
