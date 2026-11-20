@@ -1,15 +1,17 @@
 import { DataQueryError, DataQueryRequest, DataQueryResponse, LoadingState, TimeRange } from '@grafana/data';
 import { Subscription } from 'rxjs';
 import { Lexer } from 'ch-parser/lexer';
+import { pluginMacros } from 'ch-parser/pluginMacros';
 import { Token, TokenType } from 'ch-parser/types';
 import { Datasource } from 'data/CHDatasource';
-import { validate } from 'data/validate';
+import { offsetToLineCol, validate } from 'data/validate';
 import { mapQueryTypeToGrafanaFormat } from 'data/utils';
 import { QueryType } from 'types/queryBuilder';
 import { CHQuery, EditorType } from 'types/sql';
 import { pluginVersion } from 'utils/version';
 import {
   QueryErrorMarker,
+  findIdentifier,
   getQueryErrorMarker,
   getUnknownNameMarkers,
   parseQueryErrorPosition,
@@ -141,6 +143,64 @@ function messagesOf(response: DataQueryResponse): string[] {
     .filter((m): m is string => typeof m === 'string' && m.length > 0);
 }
 
+function markRange(sql: string, begin: number, end: number, message: string): QueryErrorMarker {
+  const start = offsetToLineCol(sql, begin);
+  const stop = offsetToLineCol(sql, end);
+  return {
+    startLineNumber: start.line,
+    startColumn: start.col,
+    endLineNumber: stop.line,
+    endColumn: stop.col,
+    message,
+  };
+}
+
+/**
+ * Markers for a macro the plugin could not expand, for example
+ * `Could not apply macros: macro $__timeFilter(): unexpected number of arguments: $__timeFilter expected 1
+ * argument(s), received 0, usage: $__timeFilter(timeColumn)`. Marks the call whose arguments match, or every
+ * use of the macro when none does.
+ */
+export function getMacroErrorMarkers(message: string, sql: string): QueryErrorMarker[] {
+  const match = /Could not apply macros: macro (\$__\w+)\((.*?)\): (.*)/s.exec(message);
+  if (!match) {
+    return [];
+  }
+  const [, name, args, detail] = match;
+  const text = detail
+    .replace(/^unexpected number of arguments: /, '')
+    .replace(/, usage: /, '. Usage: ')
+    .trim();
+  const uses = findIdentifier(sql, name);
+  const exact = uses.filter(([, end]) => sql.substring(end).replace(/^\s*/, '').startsWith(`(${args})`));
+  return (exact.length > 0 ? exact : uses).map(([begin, end]) => markRange(sql, begin, end, text));
+}
+
+function editDistance(a: string, b: string): number {
+  let previous = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const current = [i];
+    for (let j = 1; j <= b.length; j++) {
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+/** What to say about a `$__` name ClickHouse reports as an unknown function. */
+export function describeUnknownMacro(name: string): string {
+  if (pluginMacros.some((macro) => macro.name === name)) {
+    return `"${name}" was not expanded, so ClickHouse read it as a function. Check its arguments.`;
+  }
+  const closest = pluginMacros
+    .map((macro) => ({ name: macro.name, distance: editDistance(name, macro.name) }))
+    .sort((a, b) => a.distance - b.distance)[0];
+  return closest && closest.distance <= 3
+    ? `Unknown macro "${name}". Did you mean "${closest.name}"?`
+    : `Unknown macro "${name}".`;
+}
+
 function errorCode(message: string): number | undefined {
   const match = /\bcode: (\d+)|\bCode: (\d+)\./.exec(message);
   return match ? Number(match[1] ?? match[2]) : undefined;
@@ -170,10 +230,21 @@ export function classify(response: DataQueryResponse, sql: string, mode: Mode): 
     return { kind: 'syntax', marker, atEnd: position.token === 'end of query' };
   }
 
+  for (const message of messages) {
+    const markers = getMacroErrorMarkers(message, sql);
+    if (markers.length > 0) {
+      return { kind: 'names', markers };
+    }
+  }
+
   if (mode === 'tree') {
     for (const message of messages) {
-      if (parseUnknownName(message)) {
-        const markers = getUnknownNameMarkers(message, sql);
+      const unknown = parseUnknownName(message);
+      if (unknown) {
+        const macro = unknown.names.length === 1 && unknown.names[0].startsWith('$__') ? unknown.names[0] : undefined;
+        const markers = getUnknownNameMarkers(message, sql).map((marker) =>
+          macro ? { ...marker, message: describeUnknownMacro(macro) } : marker
+        );
         // A name that is not in the editor text came from a variable or a macro.
         return markers.length > 0
           ? { kind: 'names', markers }

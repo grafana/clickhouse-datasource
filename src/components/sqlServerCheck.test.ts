@@ -73,6 +73,48 @@ describe('classify', () => {
     expect(outcome.kind === 'names' && outcome.markers.map((m) => m.startColumn)).toEqual([8, 43]);
   });
 
+  it('marks the macro call the plugin could not expand, with its usage', () => {
+    const sql = 'SELECT * FROM otel.otel_logs WHERE $__timeFilter()';
+    const message =
+      'Could not apply macros: macro $__timeFilter(): unexpected number of arguments: $__timeFilter expected 1 argument(s), received 0, usage: $__timeFilter(timeColumn)';
+    expect(classify(failed(message), sql, 'tree')).toEqual({
+      kind: 'names',
+      markers: [
+        {
+          startLineNumber: 1,
+          startColumn: 36,
+          endLineNumber: 1,
+          endColumn: 49,
+          message: '$__timeFilter expected 1 argument(s), received 0. Usage: $__timeFilter(timeColumn)',
+        },
+      ],
+    });
+  });
+
+  it('marks only the call whose arguments the plugin rejected', () => {
+    const sql = 'SELECT $__timeInterval(Timestamp) AS t, $__timeInterval(Timestamp, 5) AS u FROM otel.otel_logs';
+    const message =
+      'Could not apply macros: macro $__timeInterval(Timestamp, 5): unexpected number of arguments: $__timeInterval expected 1 argument(s), received 2, usage: $__timeInterval(timeColumn)';
+    const outcome = classify(failed(message), sql, 'ast');
+    expect(outcome.kind === 'names' && outcome.markers.map((m) => m.startColumn)).toEqual([41]);
+  });
+
+  it('suggests the macro a misspelled one was meant to be', () => {
+    const message = 'code: 46, message: Function with name `$__timeFilters` does not exist. In scope SELECT';
+    const outcome = classify(failed(message), 'SELECT * FROM otel.otel_logs WHERE $__timeFilters(Timestamp)', 'tree');
+    expect(outcome.kind === 'names' && outcome.markers.map((m) => m.message)).toEqual([
+      'Unknown macro "$__timeFilters". Did you mean "$__timeFilter"?',
+    ]);
+  });
+
+  it('says when a real macro reached ClickHouse unexpanded', () => {
+    const message = 'code: 46, message: Function with name `$__conditionalAll` does not exist. In scope SELECT';
+    const outcome = classify(failed(message), 'SELECT * FROM t WHERE $__conditionalAll(ServiceName = 1)', 'tree');
+    expect(outcome.kind === 'names' && outcome.markers.map((m) => m.message)).toEqual([
+      '"$__conditionalAll" was not expanded, so ClickHouse read it as a function. Check its arguments.',
+    ]);
+  });
+
   it('skips a variable this editor cannot resolve', () => {
     const message =
       'code: 62, message: Syntax error: failed at position 65 ($) (line 2, col 46): ${service}. Expected one of: CAST operator';

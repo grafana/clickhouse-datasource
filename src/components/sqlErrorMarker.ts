@@ -303,7 +303,8 @@ function describeUnknownName(error: UnknownNameError, name: string): string {
  * dotted name such as `db.table` also matches its parts written with dots in between, and is
  * matched whole when it is one quoted identifier such as `deployment.environment.name`.
  */
-function findIdentifier(sql: string, name: string): Array<[number, number]> {
+/** The [begin, end) offsets of every use of `name` in `sql`, outside strings and comments. */
+export function findIdentifier(sql: string, name: string): Array<[number, number]> {
   const tokens: Token[] = [];
   const lexer = new Lexer(sql);
   for (let token = lexer.nextToken(); !token.isEnd() && !token.isError(); token = lexer.nextToken()) {
