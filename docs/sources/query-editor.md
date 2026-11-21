@@ -208,6 +208,8 @@ GROUP BY machine_group, log_time
 ORDER BY log_time
 ```
 
+The plugin converts this result into one series for each group. The converted result can have at most 100,000,000 cells, which is the number of distinct timestamps multiplied by the number of series. A larger result fails with an error that asks you to add filters or aggregation. To stay under the limit, bucket the time column with `$__timeInterval` or reduce the number of groups.
+
 ## Tables
 
 Table visualizations are available for any valid ClickHouse query. Select **Table** in the panel visualization options to view results in tabular form.
