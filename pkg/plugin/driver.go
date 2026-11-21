@@ -499,9 +499,10 @@ func (h *Clickhouse) Settings(ctx context.Context, config backend.DataSourceInst
 		FillMode: &data.FillMissing{
 			Mode: data.FillModeNull,
 		},
-		ForwardHeaders:  settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
-		RowLimit:        rowLimit,
-		RowCapacityHint: settings.RowCapacityHint,
+		ForwardHeaders:      settings.ForwardGrafanaHeaders || settings.OAuthPassThru,
+		RowLimit:            rowLimit,
+		RowCapacityHint:     settings.RowCapacityHint,
+		LongToWideCellLimit: 100_000_000, // Time-series pivots past 100M wide cells (about 1.4 GiB) fail with a downstream error.
 	}
 }
 
