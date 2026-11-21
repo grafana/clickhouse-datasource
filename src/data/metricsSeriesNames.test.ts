@@ -88,6 +88,13 @@ describe('transformMetricSeriesNames', () => {
     expect(after.data[1].fields[1].config.displayNameFromDS).toBeUndefined();
   });
 
+  it('leaves the response untouched when no series needs a name', () => {
+    const response = { data: [frame('A', [{ ServiceName: 'checkout' }])] };
+    expect(transformMetricSeriesNames(request(query('A', MetricFunction.Avg, ['ServiceName'])), response)).toBe(
+      response
+    );
+  });
+
   it('leaves frames and fields of other queries alone', () => {
     const sqlFrame = toDataFrame({ fields: [{ name: 'count()', type: FieldType.number, values: [1] }] });
     const after = transformMetricSeriesNames(request(query('A', MetricFunction.Avg, ['ServiceName'])), {

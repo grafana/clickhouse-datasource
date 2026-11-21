@@ -1,4 +1,4 @@
-import { DataFrame, DataQueryRequest, DataQueryResponse, Field, FieldType } from '@grafana/data';
+import { DataQueryRequest, DataQueryResponse, Field, FieldType } from '@grafana/data';
 import { CHQuery } from 'types/sql';
 import { MetricFunction } from 'types/queryBuilder';
 import { getMetricLabelAliases } from './metrics';
@@ -13,8 +13,17 @@ import { getBuilderOptions } from './utils';
 const nameWithEmptyLabels = (name: string, aliases: readonly string[]): string =>
   `${name} {${aliases.map((alias) => `${alias}=""`).join(', ')}}`;
 
-const hasLabelValue = (field: Field): boolean =>
-  Boolean(field.labels && Object.values(field.labels).some((value) => value.length > 0));
+const hasLabelValue = (field: Field): boolean => {
+  if (!field.labels) {
+    return false;
+  }
+  for (const label in field.labels) {
+    if (field.labels[label]) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /**
  * Resolves the group by label names of each metric query, keyed by refId. Heatmap frames are
@@ -42,25 +51,28 @@ export const transformMetricSeriesNames = (
     return response;
   }
 
-  return {
-    ...response,
-    data: response.data.map((frame: DataFrame) => {
-      const aliases = aliasesByRefId.get(frame.refId!);
-      if (!aliases) {
-        return frame;
+  let changed = false;
+  const data = response.data.map((frame) => {
+    const aliases = aliasesByRefId.get(frame.refId!);
+    if (!aliases) {
+      return frame;
+    }
+    let frameChanged = false;
+    const fields = frame.fields.map((field: Field) => {
+      if (field.type !== FieldType.number || hasLabelValue(field)) {
+        return field;
       }
+      frameChanged = true;
       return {
-        ...frame,
-        fields: frame.fields.map((field) => {
-          if (field.type !== FieldType.number || hasLabelValue(field)) {
-            return field;
-          }
-          return {
-            ...field,
-            config: { ...field.config, displayNameFromDS: nameWithEmptyLabels(field.name, aliases) },
-          };
-        }),
+        ...field,
+        config: { ...field.config, displayNameFromDS: nameWithEmptyLabels(field.name, aliases) },
       };
-    }),
-  };
+    });
+    if (!frameChanged) {
+      return frame;
+    }
+    changed = true;
+    return { ...frame, fields };
+  });
+  return changed ? { ...response, data } : response;
 };
