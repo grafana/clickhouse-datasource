@@ -620,6 +620,7 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
               <LogsConfig
                 variant="single-table"
                 uid={options.uid}
+                savedVersion={options.version}
                 logsConfig={jsonData.logs}
                 onDefaultDatabaseChange={(db) => onLogsConfigChange('defaultDatabase', db)}
                 onDefaultTableChange={(table) => onLogsConfigChange('defaultTable', table)}
@@ -633,6 +634,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onContextColumnsChange={(c) => onLogsConfigChange('contextColumns', c)}
                 onShowLogLinksChange={(v) => onLogsConfigChange('showLogLinks', v)}
                 onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
+                onAttributeColumnsChange={(c) => onLogsConfigChange('attributeColumns', c)}
+                onAttributeColumnExclusionsChange={(c) => onLogsConfigChange('attributeColumnExclusions', c)}
               />
             </>
           )}
@@ -818,6 +821,8 @@ export const ConfigEditor: React.FC<ConfigEditorProps> = (props) => {
                 onLogsConfigChange('showLogLinks', v);
               }}
               onAdditionalColumnsChange={(c) => onLogsConfigChange('additionalColumns', c)}
+              onAttributeColumnsChange={(c) => onLogsConfigChange('attributeColumns', c)}
+              onAttributeColumnExclusionsChange={(c) => onLogsConfigChange('attributeColumnExclusions', c)}
             />
 
             <Divider />

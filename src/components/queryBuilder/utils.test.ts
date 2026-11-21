@@ -389,6 +389,28 @@ describe('getQueryOptionsFromSql', () => {
   );
 
   testCondition(
+    'handles aggregation with a single-value IN filter',
+    `SELECT count(id) FROM "db"."foo" WHERE ( stagename IN ('Deal Won') )`,
+    {
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      database: 'db',
+      table: 'foo',
+      columns: [],
+      aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
+      filters: [
+        {
+          key: 'stagename',
+          operator: FilterOperator.In,
+          value: ['Deal Won'],
+          type: 'string',
+        } as MultiFilter,
+      ],
+      limit: undefined,
+    }
+  );
+
+  testCondition(
     'handles aggregation with a NOT IN filter',
     `SELECT count(id) FROM "db"."foo" WHERE ( stagename NOT IN ('Deal Won', 'Deal Lost') )`,
     {
@@ -403,6 +425,28 @@ describe('getQueryOptionsFromSql', () => {
           key: 'stagename',
           operator: FilterOperator.NotIn,
           value: ['Deal Won', 'Deal Lost'],
+          type: 'string',
+        } as MultiFilter,
+      ],
+      limit: undefined,
+    }
+  );
+
+  testCondition(
+    'handles aggregation with a single-value NOT IN filter',
+    `SELECT count(id) FROM "db"."foo" WHERE ( stagename NOT IN ('Deal Lost') )`,
+    {
+      queryType: QueryType.Table,
+      mode: BuilderMode.Aggregate,
+      database: 'db',
+      table: 'foo',
+      columns: [],
+      aggregates: [{ column: 'id', aggregateType: AggregateType.Count, alias: undefined }],
+      filters: [
+        {
+          key: 'stagename',
+          operator: FilterOperator.NotIn,
+          value: ['Deal Lost'],
           type: 'string',
         } as MultiFilter,
       ],
@@ -652,6 +696,16 @@ describe('getQueryOptionsFromSql', () => {
     const builderOptions = getQueryOptionsFromSql(sql);
     expect(builderOptions).not.toBeUndefined();
     expect(typeof builderOptions).not.toBe('string');
+  });
+
+  it('reads the millisecond logs range filter back as a Grafana time range filter', () => {
+    const sql =
+      'SELECT Body FROM "db"."logs" WHERE ( Timestamp >= $__fromTime_ms AND Timestamp < $__toTime_ms + INTERVAL 1 MILLISECOND )';
+    const options = getQueryOptionsFromSql(sql);
+    expect(typeof options).not.toBe('string');
+    expect((options as QueryBuilderOptions).filters).toEqual([
+      { key: 'timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
+    ]);
   });
 });
 

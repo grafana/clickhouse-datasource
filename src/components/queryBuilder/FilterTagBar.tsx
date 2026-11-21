@@ -1,13 +1,14 @@
 import React from 'react';
 import { css } from '@emotion/css';
 import { GrafanaTheme2 } from '@grafana/data';
-import { Icon, Tooltip, useStyles2 } from '@grafana/ui';
+import { IconButton, Tooltip, useStyles2 } from '@grafana/ui';
 import { Filter, FilterOperator, SelectedColumn } from 'types/queryBuilder';
 
 interface FilterTagBarProps {
   filters: Filter[];
   selectedColumns?: readonly SelectedColumn[];
   onRemoveFilter: (index: number) => void;
+  onEditFilter?: (index: number) => void;
   /** Shows the "Filters:" label in front of the chips. Off where the surrounding field is labelled already. */
   showLabel?: boolean;
   /** Overrides how a filter's column is named in its chip. */
@@ -126,7 +127,7 @@ const getOperatorDisplay = (operator: FilterOperator): string => {
 };
 
 export const FilterTagBar = (props: FilterTagBarProps) => {
-  const { filters, selectedColumns, onRemoveFilter, showLabel = true, getDisplayName } = props;
+  const { filters, selectedColumns, onRemoveFilter, onEditFilter, showLabel = true, getDisplayName } = props;
   const styles = useStyles2(getStyles);
 
   const activeFilters = filters.filter(
@@ -159,18 +160,45 @@ export const FilterTagBar = (props: FilterTagBarProps) => {
         const value = getFilterDisplayValue(filter);
 
         return (
-          <Tooltip key={index} content={`${name} ${operator} ${value}`.trim()} placement="top">
-            <span className={styles.tag}>
+          <span
+            key={index}
+            className={styles.tag}
+            role={onEditFilter ? 'button' : undefined}
+            tabIndex={onEditFilter ? 0 : undefined}
+            aria-label={onEditFilter ? `Edit filter ${name} ${operator} ${value}`.trim() : undefined}
+            onClick={onEditFilter ? () => onEditFilter(index) : undefined}
+            onKeyDown={
+              onEditFilter
+                ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onEditFilter(index);
+                    }
+                  }
+                : undefined
+            }
+          >
+            {/* Tooltip clones its child and spreads its own handlers over it, which would drop the
+                chip's onKeyDown, so it wraps the content instead of the chip. */}
+            <Tooltip content={`${name} ${operator} ${value}`.trim()} placement="top">
               <span className={styles.tagContent}>
                 <span className={styles.tagKey}>{name}</span>
                 <span className={styles.tagOperator}> {operator} </span>
                 {value && <span className={styles.tagValue}>{value}</span>}
               </span>
-              <span className={styles.removeBtn} onClick={() => onRemoveFilter(index)} role="button" tabIndex={0}>
-                <Icon name="times" size="sm" />
-              </span>
-            </span>
-          </Tooltip>
+            </Tooltip>
+            <IconButton
+              className={styles.removeBtn}
+              name="times"
+              size="sm"
+              aria-label={`Remove filter ${name} ${operator} ${value}`.trim()}
+              onKeyDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemoveFilter(index);
+              }}
+            />
+          </span>
         );
       })}
     </div>

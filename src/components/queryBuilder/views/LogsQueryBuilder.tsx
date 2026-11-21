@@ -26,6 +26,7 @@ import useIsNewQuery from 'hooks/useIsNewQuery';
 import {
   useDefaultFilters,
   useDefaultLogColumnsByName,
+  useBackfillLogColumnTypes,
   useDefaultTimeColumn,
   useLogDefaultsOnMount,
   useOtelColumns,
@@ -118,6 +119,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
 
   useLogDefaultsOnMount(datasource, isNewQuery, builderOptions, builderOptionsDispatch, allColumns);
   useOtelColumns(datasource, allColumns, builderState.otelEnabled, builderState.otelVersion, builderOptionsDispatch);
+  useBackfillLogColumnTypes(allColumns, builderOptions.columns, builderOptionsDispatch);
   useDefaultTimeColumn(
     datasource,
     allColumns,
@@ -227,6 +229,7 @@ export const LogsQueryBuilder = (props: LogsQueryBuilderProps) => {
         datasource={datasource}
         database={builderOptions.database}
         table={builderOptions.table}
+        columns={builderOptions.columns}
       />
       <LogMessageLikeInput logMessageLike={builderState.logMessageLike} onChange={onOptionChange('logMessageLike')} />
     </div>

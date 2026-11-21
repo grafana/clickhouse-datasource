@@ -16,6 +16,7 @@ enum BuilderOptionsActionType {
   SetBuilderMinimized = 'set_builder_minimized',
   FillMissingRoles = 'fill_missing_roles',
   FitToTable = 'fit_to_table',
+  BackfillColumnTypes = 'backfill_column_types',
 }
 
 type QueryBuilderOptionsReducerAction = {
@@ -69,6 +70,12 @@ export const fillMissingRoles = (
 /** Fits the query to the columns of `database`.`table`, if it is still on that table (see `fitQueryToTable`). */
 export const fitToTable = (database: string, table: string, columns: readonly TableColumn[]): GenericReducerAction =>
   createGenericAction(BuilderOptionsActionType.FitToTable, { database, table, columns });
+/**
+ * Fills the missing `type` of role-hinted columns from `columns` (the table's columns), against the
+ * state the reducer holds when it runs, so it cannot overwrite a concurrent update to `columns`.
+ */
+export const backfillColumnTypes = (columns: readonly TableColumn[]): GenericReducerAction =>
+  createGenericAction(BuilderOptionsActionType.BackfillColumnTypes, { columns });
 
 // A query with no limit gets the default one when its type, database or table changes (#2163).
 const keptLimit = (state: QueryBuilderOptions) => state.limit || defaultCHBuilderQuery.builderOptions.limit;
@@ -229,6 +236,29 @@ const actions = new Map<BuilderOptionsActionType, Reducer<QueryBuilderOptions, B
         (k) => JSON.stringify(fitted[k]) === JSON.stringify(state[k] ?? [])
       );
       return unchanged ? state : mergeBuilderOptionsState(state, fitted);
+    },
+  ],
+  [
+    BuilderOptionsActionType.BackfillColumnTypes,
+    (state: QueryBuilderOptions, action: GenericReducerAction): QueryBuilderOptions => {
+      const tableColumns = action.payload.columns as readonly TableColumn[];
+      if (!state.columns?.length || tableColumns.length === 0) {
+        return state;
+      }
+
+      let changed = false;
+      const columns = state.columns.map((column) => {
+        if (!column.hint || column.type) {
+          return column;
+        }
+        const type = tableColumns.find((c) => c.name === column.name)?.type;
+        if (!type) {
+          return column;
+        }
+        changed = true;
+        return { ...column, type };
+      });
+      return changed ? mergeBuilderOptionsState(state, { columns }) : state;
     },
   ],
   [

@@ -430,12 +430,12 @@ These errors relate to the ad hoc filter variable type, which injects filters in
 
 **Error message:** "Failed to get table from adhoc query."
 
-**Cause:** The plugin could not determine which table to apply ad hoc filters to from the query.
+**Cause:** The plugin could not determine which table to apply ad hoc filters to from the query in the `clickhouse_adhoc_query` variable. A query that combines `SELECT` statements with `UNION`, `INTERSECT`, or `EXCEPT`, or that reads from a table function, has no single table.
 
 **Solution:**
 
 1. Ensure your query contains a valid `FROM` clause with a table name.
-2. If using a complex query with subqueries or CTEs, consider using a simpler query structure.
+2. If the query combines `SELECT` statements or reads from a table function, change it to read from one table.
 3. Explicitly specify the table in the ad hoc filter configuration variable.
 
 #### Ad hoc filters produce incorrect or missing results

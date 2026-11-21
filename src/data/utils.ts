@@ -1,9 +1,19 @@
-import { CoreApp, DataFrame, DataQueryRequest, DataQueryResponse, FieldConfig, FieldType, TimeRange } from '@grafana/data';
+import {
+  CoreApp,
+  DataFrame,
+  DataQueryRequest,
+  DataQueryResponse,
+  FieldConfig,
+  FieldType,
+  TimeRange,
+} from '@grafana/data';
 import {
   BuilderMode,
   ColumnHint,
   Filter,
   FilterOperator,
+  LinkTable,
+  LinkTables,
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
@@ -335,16 +345,20 @@ const isTimeRangeFilter = (filter: Filter): boolean =>
 
 /**
  * Replaces the plugin's time macros with concrete bounds from the given range, matching
- * the backend's expansion (`toDateTime(<unix seconds>)`); `from` is floored and `to` is
- * ceiled so sub-second edges are never clipped. Data-link queries need this because
+ * the backend's expansion (`toDateTime(<unix seconds>)`, or `fromUnixTimestamp64Milli(<unix ms>)` for the
+ * millisecond macros). For the seconds macros `from` is floored and `to` is ceiled so sub-second edges are never
+ * clipped; the `_ms` macros bind the exact milliseconds. Data-link queries need this because
  * Grafana's link variable check treats `$__fromTime`/`$__toTime` as template variables
  * and hides links whose serialized query contains variables it cannot resolve.
  */
-const bindTimeRangeMacros = (sql: string, range?: TimeRange): string => {
+export const bindTimeRangeMacros = (sql: string, range?: TimeRange): string => {
   if (!range?.from || !range?.to) {
     return sql;
   }
+  // The millisecond macros share a prefix with the seconds ones, so they must be replaced first.
   return sql
+    .replaceAll('$__fromTime_ms', `fromUnixTimestamp64Milli(${range.from.valueOf()})`)
+    .replaceAll('$__toTime_ms', `fromUnixTimestamp64Milli(${range.to.valueOf()})`)
     .replaceAll('$__fromTime', `toDateTime(${Math.floor(range.from.valueOf() / 1000)})`)
     .replaceAll('$__toTime', `toDateTime(${Math.ceil(range.to.valueOf() / 1000)})`);
 };
@@ -402,6 +416,14 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     if (!traceField) {
       continue;
     }
+
+    // Dashboard variables win; queries opened from a link carry the tables they were resolved to.
+    const carriedLinkTables = getCarriedLinkTables(originalQuery);
+    const linkTables: LinkTables = {
+      traces: datasource.resolveLinkTable('traces', req.scopedVars) || carriedLinkTables?.traces,
+      logs: datasource.resolveLinkTable('logs', req.scopedVars) || carriedLinkTables?.logs,
+    };
+    const hasLinkTables = Boolean(linkTables.traces || linkTables.logs);
 
     // Get the configured TraceId column name for use in both trace and logs queries
     const defaultLogsColumns = datasource.getDefaultLogsColumns();
@@ -499,12 +521,17 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       const traceEventsColumnPrefix = datasource.getDefaultTraceEventsColumnPrefix();
       const traceLinksColumnPrefix = datasource.getDefaultTraceLinksColumnPrefix();
       const traceDatabase =
+        linkTables.traces?.database ||
         datasource.getDefaultTraceDatabase() ||
         traceIdQuery.builderOptions.database ||
         datasource.getDefaultDatabase() ||
         '';
       const traceTable =
-        datasource.getDefaultTraceTable() || datasource.getDefaultTable() || traceIdQuery.builderOptions.table || '';
+        linkTables.traces?.table ||
+        datasource.getDefaultTraceTable() ||
+        datasource.getDefaultTable() ||
+        traceIdQuery.builderOptions.table ||
+        '';
       const hasTraceTimestampTable = await datasource.hasTraceTimestampTable(traceDatabase, traceTable);
       const options: QueryBuilderOptions = {
         database: traceDatabase,
@@ -605,10 +632,15 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       const otelVersion = datasource.getLogsOtelVersion();
       const options: QueryBuilderOptions = {
         database:
+          linkTables.logs?.database ||
           datasource.getDefaultLogsDatabase() ||
           traceLogsQuery.builderOptions.database ||
           datasource.getDefaultDatabase(),
-        table: datasource.getDefaultLogsTable() || datasource.getDefaultTable() || traceLogsQuery.builderOptions.table,
+        table:
+          linkTables.logs?.table ||
+          datasource.getDefaultLogsTable() ||
+          datasource.getDefaultTable() ||
+          traceLogsQuery.builderOptions.table,
         queryType: QueryType.Logs,
         // List mode is required by getSupplementaryLogsVolumeQuery; without it the
         // logs volume histogram is skipped until the editor merges query defaults
@@ -636,6 +668,23 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
       traceLogsQuery.builderOptions = options;
     }
 
+    const copiedTraceQuery =
+      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Traces;
+    const copiedLogsQuery =
+      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs;
+
+    if (hasLinkTables) {
+      // Record the tables both links actually open (a copied same-signal builder query wins over
+      // linkTables), defaults included: an opened query keeps its carried tables only while it is on
+      // its own recorded table, so a dashboard that sets one variable would otherwise lose it.
+      const linkedTables: LinkTables = {
+        traces: toLinkTable(traceIdQuery.builderOptions),
+        logs: toLinkTable(traceLogsQuery.builderOptions),
+      };
+      traceIdQuery.builderOptions.meta = { ...traceIdQuery.builderOptions.meta, linkTables: linkedTables };
+      traceLogsQuery.builderOptions.meta = { ...traceLogsQuery.builderOptions.meta, linkTables: linkedTables };
+    }
+
     const openInNewWindow = req.app !== CoreApp.Explore;
     // Pre-generate rawSql so the first auto-run executes immediately.
     traceLogsQuery.rawSql = quoteTraceIdValueToken(
@@ -643,14 +692,8 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
     );
     traceLogsQuery.format = mapQueryBuilderOptionsToGrafanaFormat(traceLogsQuery.builderOptions);
     traceField.config.links = [];
-    const canLinkToTraces =
-      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Traces
-        ? true
-        : canBuildTraceLink(datasource);
-    const canLinkToLogs =
-      originalQuery.editorType === EditorType.Builder && originalQuery.builderOptions.queryType === QueryType.Logs
-        ? true
-        : canBuildLogsLink(datasource);
+    const canLinkToTraces = copiedTraceQuery || canBuildTraceLink(datasource, linkTables.traces);
+    const canLinkToLogs = copiedLogsQuery || canBuildLogsLink(datasource, linkTables.logs);
 
     if (datasource.settings.jsonData.traces?.showTraceLinks !== false && canLinkToTraces) {
       traceField.config.links!.push({
@@ -686,14 +729,38 @@ export const transformQueryResponseWithTraceAndLogLinks = async (
   return res;
 };
 
-const canBuildTraceLink = (datasource: Datasource): boolean => {
-  const traceColumns = datasource.getDefaultTraceColumns();
-  return Boolean(datasource.getDefaultTraceTable() && traceColumns.get(ColumnHint.TraceId));
+const toLinkTable = ({ database, table }: QueryBuilderOptions): LinkTable | undefined =>
+  database && table ? { database, table } : undefined;
+
+/**
+ * Link tables carried on a query that a data link opened. They apply only while the query still
+ * targets the table the link wrote, so a query the user re-pointed or rewrote as SQL drops them.
+ */
+const getCarriedLinkTables = (query: CHQuery): LinkTables | undefined => {
+  if (query.editorType !== EditorType.Builder) {
+    return undefined;
+  }
+  const { queryType, meta } = query.builderOptions;
+  const own =
+    queryType === QueryType.Traces
+      ? meta?.linkTables?.traces
+      : queryType === QueryType.Logs
+        ? meta?.linkTables?.logs
+        : undefined;
+  const current = toLinkTable(query.builderOptions);
+  return own && current && own.database === current.database && own.table === current.table
+    ? meta?.linkTables
+    : undefined;
 };
 
-const canBuildLogsLink = (datasource: Datasource): boolean => {
+const canBuildTraceLink = (datasource: Datasource, linkTable?: LinkTable): boolean => {
+  const traceColumns = datasource.getDefaultTraceColumns();
+  return Boolean((linkTable || datasource.getDefaultTraceTable()) && traceColumns.get(ColumnHint.TraceId));
+};
+
+const canBuildLogsLink = (datasource: Datasource, linkTable?: LinkTable): boolean => {
   const logColumns = datasource.getDefaultLogsColumns();
-  return Boolean(datasource.getDefaultLogsTable() && logColumns.get(ColumnHint.TraceId));
+  return Boolean((linkTable || datasource.getDefaultLogsTable()) && logColumns.get(ColumnHint.TraceId));
 };
 
 // The name of the dataframe field containing labels

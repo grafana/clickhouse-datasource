@@ -27,7 +27,8 @@ import { isCollectionColumnType } from './views/columnNameHeuristics';
 
 /**
  * Appends the datasource's configured extra log columns (`additionalColumns`, an explicit list) so
- * they surface as first-class fields. Mutates `columns` / `includedColumns` in place.
+ * they surface as first-class fields, then its `attributeColumns`, which a query must select for the
+ * backend to flatten their keys into log labels. Mutates `columns` / `includedColumns` in place.
  */
 export const appendAdditionalLogColumns = (
   datasource: Datasource,
@@ -35,7 +36,7 @@ export const appendAdditionalLogColumns = (
   columns: SelectedColumn[],
   includedColumns: Set<string>
 ): void => {
-  for (const columnName of datasource.getAdditionalLogColumns()) {
+  for (const columnName of [...datasource.getAdditionalLogColumns(), ...datasource.getLogAttributeColumns()]) {
     const baseName = columnName.split('[')[0];
     if (includedColumns.has(columnName) || includedColumns.has(baseName)) {
       continue;

@@ -153,6 +153,7 @@ export const ConfigurationModeSection = (props: Props) => {
             <LogsConfig
               variant="single-table"
               uid={options.uid}
+              savedVersion={options.version}
               logsConfig={jsonData.logs}
               onDefaultDatabaseChange={(db) => onUpdateLogsConfig('defaultDatabase', db)}
               onDefaultTableChange={(table) => onUpdateLogsConfig('defaultTable', table)}
@@ -166,6 +167,8 @@ export const ConfigurationModeSection = (props: Props) => {
               onContextColumnsChange={(c) => onUpdateLogsConfig('contextColumns', c)}
               onShowLogLinksChange={(v) => onUpdateLogsConfig('showLogLinks', v)}
               onAdditionalColumnsChange={(c) => onUpdateLogsConfig('additionalColumns', c)}
+              onAttributeColumnsChange={(c) => onUpdateLogsConfig('attributeColumns', c)}
+              onAttributeColumnExclusionsChange={(c) => onUpdateLogsConfig('attributeColumnExclusions', c)}
             />
           </>
         )}

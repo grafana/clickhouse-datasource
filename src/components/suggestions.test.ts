@@ -270,6 +270,69 @@ describe('Suggestions', () => {
   });
 });
 
+describe('Suggestions for JOIN targets and set operations', () => {
+  const column = (name: string): TableColumn => ({ name, label: name, type: 'String', picklistValues: [] });
+  const schema: Schema = {
+    databases: async () => ['default'],
+    tables: async () => ['otel_logs', 'otel_traces'],
+    columns: async (_db: string, table: string) =>
+      table === 'otel_logs' ? [column('ServiceName')] : [column('WRONG_TABLE')],
+    functions: async () => [],
+    defaultDatabase: 'default',
+  };
+
+  const labelsAt = async (sql: string, cursorPosition = sql.length) => {
+    (window as any).monaco = {
+      languages: {
+        CompletionItemKind: { Function: 1, Field: 3, Variable: 4, Class: 5, Module: 8, Keyword: 13 },
+        CompletionItemInsertTextRule: { InsertAsSnippet: 4 },
+      },
+    };
+    const range: Range = {
+      startLineNumber: 0,
+      endLineNumber: 0,
+      startColumn: cursorPosition,
+      endColumn: cursorPosition + 1,
+    };
+    const suggestions = await getSuggestions(sql, schema, range, cursorPosition);
+    return suggestions.map((s) => (typeof s.label === 'string' ? s.label : s.label.label));
+  };
+
+  it.each([
+    ['a variable', 'SELECT * FROM otel_logs JOIN ${'],
+    ['a variable database', 'SELECT * FROM otel_logs JOIN ${db}.'],
+  ])('offers Grafana variables when %s is typed as a JOIN target', async (_label, sql) => {
+    const labels = await labelsAt(sql);
+    expect(labels).toContain('${table}');
+    expect(labels).toContain('${database}');
+  });
+
+  it('offers no Grafana variables before the cursor reaches a variable JOIN target', async () => {
+    const sql = 'SELECT * FROM otel_logs JOIN ${t}';
+    const labels = await labelsAt(sql, sql.indexOf('JOIN'));
+    expect(labels).not.toContain('${table}');
+  });
+
+  it('does not take a FROM inside a function call for the target being typed', async () => {
+    const labels = await labelsAt('SELECT * FROM otel_logs WHERE EXTRACT(DAY FROM ${ts}) = 1');
+    expect(labels).not.toContain('${table}');
+  });
+
+  it('takes columns from the FROM table in a clause after a variable JOIN target', async () => {
+    // A `$`-prefixed JOIN target only stands in while the cursor is in a FROM
+    // position, so a later clause keeps the FROM table's columns.
+    const labels = await labelsAt('SELECT * FROM otel_logs JOIN ${t} ON a = b WHERE ');
+    expect(labels).toContain('ServiceName');
+    expect(labels).not.toContain('WRONG_TABLE');
+  });
+
+  it.each(['INTERSECT', 'EXCEPT'])('suggests columns after a top-level %s', async (operator) => {
+    // Detecting a set operation must keep the column context after it.
+    const labels = await labelsAt(`SELECT ServiceName FROM otel_logs ${operator} SELECT `);
+    expect(labels).toContain('ServiceName');
+  });
+});
+
 describe('Suggestions for JSON path columns (#2193)', () => {
   const column = (name: string, type: string): TableColumn => ({ name, label: name, type, picklistValues: [] });
   const schema: Schema = {
