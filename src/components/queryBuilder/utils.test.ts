@@ -704,8 +704,60 @@ describe('getQueryOptionsFromSql', () => {
     const options = getQueryOptionsFromSql(sql);
     expect(typeof options).not.toBe('string');
     expect((options as QueryBuilderOptions).filters).toEqual([
-      { key: 'timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
+      { key: 'Timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
     ]);
+  });
+
+  describe('letter case of names, which ClickHouse compares exactly', () => {
+    it('keeps unquoted column names as written', () => {
+      const options = getQueryOptionsFromSql(
+        `SELECT Timestamp, ServiceName FROM "otel"."otel_logs" WHERE ServiceName = 'cart' ORDER BY Timestamp DESC LIMIT 10`
+      );
+      expect(options.columns?.map((c) => c.name)).toEqual(['Timestamp', 'ServiceName']);
+      expect(options.filters?.map((f) => f.key)).toEqual(['ServiceName']);
+      expect(options.orderBy).toEqual([{ name: 'Timestamp', dir: 'DESC' }]);
+    });
+
+    it('keeps aliases as written, quoted or not', () => {
+      const options = getQueryOptionsFromSql(
+        'SELECT Timestamp AS "timestamp", Body AS body, "TraceId" AS traceID FROM "otel"."otel_logs"'
+      );
+      expect(options.columns?.map((c) => [c.name, c.alias])).toEqual([
+        ['Timestamp', 'timestamp'],
+        ['Body', 'body'],
+        ['TraceId', 'traceID'],
+      ]);
+    });
+
+    it('keeps the names of aggregates and GROUP BY', () => {
+      const options = getQueryOptionsFromSql(
+        'SELECT ServiceName, count(*) AS Total FROM "otel"."otel_logs" GROUP BY ServiceName'
+      );
+      expect(options.aggregates).toEqual([{ aggregateType: 'count', column: '*', alias: 'Total' }]);
+      expect(options.groupBy).toEqual(['ServiceName']);
+    });
+
+    it('builds the SQL it was read from again', () => {
+      const sql = `SELECT Timestamp, ServiceName FROM "otel"."otel_logs" WHERE ( ServiceName = 'cart' ) ORDER BY Timestamp DESC LIMIT 10`;
+      expect(generateSql(getQueryOptionsFromSql(sql))).toBe(sql);
+    });
+  });
+
+  describe('IS NULL and IS NOT NULL', () => {
+    it('gives the filter its column and a type', () => {
+      const options = getQueryOptionsFromSql('SELECT Body FROM "otel"."otel_logs" WHERE SeverityText IS NOT NULL');
+      expect(options.filters).toEqual([{ key: 'SeverityText', operator: FilterOperator.IsNotNull, type: 'string' }]);
+    });
+
+    it('starts a new filter after IS NULL', () => {
+      const options = getQueryOptionsFromSql(
+        `SELECT Body FROM "otel"."otel_logs" WHERE TraceId IS NULL AND ServiceName = 'cart'`
+      );
+      expect(options.filters?.map((f) => [f.key, f.operator, 'value' in f ? f.value : undefined])).toEqual([
+        ['TraceId', FilterOperator.IsNull, undefined],
+        ['ServiceName', FilterOperator.Equals, 'cart'],
+      ]);
+    });
   });
 });
 

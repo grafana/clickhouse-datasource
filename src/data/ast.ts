@@ -1,4 +1,4 @@
-import { parseFirst, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
+import { parse, Statement, SelectFromStatement, astMapper, ExprRef } from 'pgsql-ast-parser';
 import { FromQueryNode, parseSelect, SelectQueryNode } from 'ch-parser/parser';
 
 interface ReplacePart {
@@ -73,6 +73,24 @@ function replaceMacroVariables(sql: string): [ReplaceParts, string] {
  */
 const MS_BOUND_SUFFIX = /(\$__toTime_ms)\s*\+\s*INTERVAL\s+1\s+MILLISECOND/gi;
 
+/**
+ * The name at `node` as `sql` spells it. pgsql-ast-parser folds an unquoted name to lower case, as
+ * Postgres does, but ClickHouse names are case-sensitive, so `Timestamp` has to stay `Timestamp`.
+ * A quoted name is already kept as written.
+ */
+function writtenName(sql: string, node: { _location?: { start: number; end: number } }, folded: string): string {
+  if (!node._location) {
+    return folded;
+  }
+  const text = sql.substring(node._location.start, node._location.end);
+  if (text.endsWith('"')) {
+    return folded;
+  }
+  // A qualified name (`l.ServiceName`) ends with the name itself.
+  const name = text.substring(text.lastIndexOf('.') + 1);
+  return name.toLowerCase() === folded ? name : folded;
+}
+
 export function sqlToStatement(rawSql: string): Statement {
   const [replaceVars, variableSql] = replaceMacroVariables(rawSql.replace(MS_BOUND_SUFFIX, '$1'));
   const [replaceFuncs, sql] = replaceMacroFunctions(variableSql);
@@ -80,7 +98,8 @@ export function sqlToStatement(rawSql: string): Statement {
 
   let ast: Statement;
   try {
-    ast = parseFirst(sql);
+    // Locations let the mapper below read each name back as written.
+    ast = parse(sql, { locationTracking: true })[0];
   } catch (err) {
     console.error(`Failed to parse SQL statement into an AST: ${err}`);
     return {} as Statement;
@@ -104,7 +123,14 @@ export function sqlToStatement(rawSql: string): Statement {
         const d = r.name.replace(rf.replacementName, rf.name);
         return { ...r, name: d };
       }
-      return map.super().ref(r);
+      return map.super().ref({ ...r, name: writtenName(sql, r, r.name) });
+    },
+    selectionColumn: (c) => {
+      const column = map.super().selectionColumn(c);
+      if (!column?.alias || !c.alias) {
+        return column;
+      }
+      return { ...column, alias: { ...column.alias, name: writtenName(sql, c.alias, column.alias.name) } };
     },
     expr: (e) => {
       if (!e || e.type !== 'string') {

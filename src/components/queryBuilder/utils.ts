@@ -235,7 +235,10 @@ function getRefFilter(e: ExprRef, filters: Filter[], i: number, notFlag: boolean
   }
   if (!filters[i].key) {
     filters[i].key = e.name;
-    if (filters[i].operator === FilterOperator.IsNotNull) {
+    // IS NULL and IS NOT NULL take no value, so the filter is complete at its column. It still needs a
+    // type, as the other converted filters have, because the filter editor reads it.
+    if (isNullFilter(filters[i])) {
+      filters[i].type = 'string';
       i++;
     }
     return { i, notFlag };
