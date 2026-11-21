@@ -238,6 +238,8 @@ Ad hoc filters support the following operators:
 
 By default, ad hoc filter keys are shown as `table.column`, and a filter applies only to queries that read from that table. To show only the column name (without the table prefix), enable the **Hide table name in ad hoc filters** option in the data source settings. Filters then apply to every query, so use this option when all queries target the same table.
 
+With the option enabled, a key is read as a column name, dots included: `k8s.cluster.name` filters the column named `k8s.cluster.name`. A filter saved as `table.column` before you enabled the option no longer matches a column, so remove it and add the filter again.
+
 ## Map and JSON types (OpenTelemetry)
 
 Ad hoc filters work with Map and JSON types for OpenTelemetry data. **Map** is the default and turns merged labels into a filter. To use **JSON** syntax for the filter logic, add a dashboard variable of type **Constant** named `clickhouse_adhoc_use_json`. The variable’s value is ignored; it only needs to exist.

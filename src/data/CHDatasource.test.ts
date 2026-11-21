@@ -536,7 +536,7 @@ describe('ClickHouseDatasource', () => {
       expect(result.rawSql).toEqual('SELECT * FROM web_by_useragent');
     });
 
-    it('applies a table-qualified key to another table when the table name is hidden from keys', async () => {
+    it('applies a key to every table, read as a column name, when the table name is hidden from keys', async () => {
       const query = { rawSql: 'SELECT * FROM web_by_useragent', editorType: EditorType.SQL } as CHQuery;
 
       jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
@@ -547,7 +547,37 @@ describe('ClickHouseDatasource', () => {
       const result = ds.applyTemplateVariables(query, {}, [{ key: 'web.client_asn', operator: '>', value: '0' }]);
 
       expect(result.rawSql).toEqual(
-        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}"
+        "SELECT * FROM web_by_useragent\nsettings additional_table_filters={'web_by_useragent' : ' web.client_asn > \\'0\\' '}"
+      );
+    });
+
+    it('keeps a dotted column name whole when the table name is hidden from keys (#2096)', async () => {
+      jest.spyOn(templateSrvMock, 'replace').mockImplementation((x) => x);
+      jest.spyOn(templateSrvMock, 'getVariables').mockImplementation(() => []);
+
+      const ds = createInstance({});
+      ds.settings.jsonData.hideTableNameInAdhocFilters = true;
+      const filters = [{ key: '__otel_materialized_k8s.cluster.name', operator: '=', value: 'prod' }];
+
+      const automatic = ds.applyTemplateVariables(
+        { rawSql: 'SELECT * FROM otel_logs', editorType: EditorType.SQL } as CHQuery,
+        {},
+        filters
+      );
+      expect(automatic.rawSql).toEqual(
+        "SELECT * FROM otel_logs\nsettings additional_table_filters={'otel_logs' : ' __otel_materialized_k8s.cluster.name = \\'prod\\' '}"
+      );
+
+      const macro = ds.applyTemplateVariables(
+        {
+          rawSql: "SELECT * FROM logs_view settings $__adHocFilters('otel_logs')",
+          editorType: EditorType.SQL,
+        } as CHQuery,
+        {},
+        filters
+      );
+      expect(macro.rawSql).toEqual(
+        "SELECT * FROM logs_view settings additional_table_filters={'otel_logs': ' __otel_materialized_k8s.cluster.name = \\'prod\\' '}"
       );
     });
 

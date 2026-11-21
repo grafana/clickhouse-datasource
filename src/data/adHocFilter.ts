@@ -49,8 +49,15 @@ export class AdHocFilter {
   /**
    * Render the filters as the body of an `additional_table_filters` entry. With
    * `targetTable`, filters whose key names a different table are left out.
+   * Without `tableQualifiedKeys`, a dotted key that is no Map or JSON access is
+   * a column whose name has dots, and is kept whole.
    */
-  buildFilterString(adHocFilters: AdHocVariableFilter[], useJSON = false, targetTable?: string): string {
+  buildFilterString(
+    adHocFilters: AdHocVariableFilter[],
+    useJSON = false,
+    targetTable?: string,
+    tableQualifiedKeys = true
+  ): string {
     if (!adHocFilters || adHocFilters.length === 0) {
       return '';
     }
@@ -67,7 +74,7 @@ export class AdHocFilter {
 
     const filters = validFilters
       .map((f, i) => {
-        const key = escapeKey(f.key, useJSON, this._mapColumns);
+        const key = escapeKey(f.key, useJSON, this._mapColumns, tableQualifiedKeys);
         const value = escapeValueBasedOnOperator(f.value, f.operator, f.values);
         const condition = i !== validFilters.length - 1 ? toCondition(f.condition) : '';
         const operator = convertOperatorToClickHouseOperator(f.operator);
@@ -116,7 +123,12 @@ export class AdHocFilter {
       return sql;
     }
 
-    const filters = this.buildFilterString(adHocFilters, useJSON, tableQualifiedKeys ? targetTable : undefined);
+    const filters = this.buildFilterString(
+      adHocFilters,
+      useJSON,
+      tableQualifiedKeys ? targetTable : undefined,
+      tableQualifiedKeys
+    );
 
     if (filters === '') {
       return sql;
@@ -256,7 +268,12 @@ function tablePrefix(key: string, mapColumns: ReadonlySet<string>): string | und
   return rest.length > 0 && !mapColumns.has(first) ? first : undefined;
 }
 
-function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS): string {
+function escapeKey(
+  s: string,
+  isJSON = false,
+  mapColumns: ReadonlySet<string> = DEFAULT_MAP_COLUMNS,
+  tableQualified = true
+): string {
   // Convert arrayElement(col, 'key') → col['key']. Handled up front so the
   // dotted-path logic below doesn't see synthetic function syntax.
   if (s.startsWith('arrayElement(') && s.endsWith(')')) {
@@ -295,7 +312,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
   // We only treat `parts[1]` as the Map column when parts[0] is not itself a
   // known Map column — otherwise `MapCol.a.b` would be misread as having `a`
   // as the Map column.
-  if (parts.length >= 3 && !mapColumns.has(parts[0]) && mapColumns.has(parts[1])) {
+  if (tableQualified && parts.length >= 3 && !mapColumns.has(parts[0]) && mapColumns.has(parts[1])) {
     const mapCol = parts[1];
     const mapKey = parts.slice(2).join('.');
     if (isJSON) {
@@ -318,7 +335,7 @@ function escapeKey(s: string, isJSON = false, mapColumns: ReadonlySet<string> = 
 
   // Default: bare column, or `table.col` reference where col isn't a Map.
   // Strip the leading table prefix if present.
-  return safeColumnRef(s.includes('.') ? s.split('.').slice(1).join('.') : s);
+  return safeColumnRef(tableQualified && s.includes('.') ? s.split('.').slice(1).join('.') : s);
 }
 
 function escapeValueBasedOnOperator(s: string, operator: string, values?: string[]): string {

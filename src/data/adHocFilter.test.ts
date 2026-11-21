@@ -895,7 +895,38 @@ describe('AdHocManager', () => {
 
     it('applies every key when keys carry no table name', () => {
       const val = new AdHocFilter().apply('SELECT * FROM web_by_useragent', [asnFilter], false, false);
-      expect(val).toContain("additional_table_filters={'web_by_useragent' : ' client_asn > \\'0\\' '}");
+      expect(val).toContain("additional_table_filters={'web_by_useragent' : ' web.client_asn > \\'0\\' '}");
+    });
+
+    it('keeps a dotted column name whole when keys carry no table name (#2096)', () => {
+      const filters = [
+        { key: '__otel_materialized_k8s.cluster.name', operator: '=', value: 'prod' },
+      ] as AdHocVariableFilter[];
+      const ahm = new AdHocFilter();
+      expect(ahm.apply('SELECT * FROM otel_logs', filters, false, false)).toContain(
+        "additional_table_filters={'otel_logs' : ' __otel_materialized_k8s.cluster.name = \\'prod\\' '}"
+      );
+      expect(ahm.buildFilterString(filters, false, undefined, false)).toEqual(
+        " __otel_materialized_k8s.cluster.name = \\'prod\\' "
+      );
+    });
+
+    it('keeps a dotted column name whole when its second part names a Map column', () => {
+      const ahm = new AdHocFilter();
+      ahm.setMapColumns(['labels']);
+      const filters = [{ key: 'k8s.labels.app', operator: '=', value: 'web' }] as AdHocVariableFilter[];
+      expect(ahm.buildFilterString(filters, false, undefined, false)).toEqual(" k8s.labels.app = \\'web\\' ");
+      expect(ahm.buildFilterString(filters, false)).toEqual(" labels[\\'app\\'] = \\'web\\' ");
+    });
+
+    it('still reads a dotted key as a Map key when keys carry no table name', () => {
+      const val = new AdHocFilter().apply(
+        'SELECT * FROM otel_logs',
+        [{ key: 'ResourceAttributes.k8s.cluster.name', operator: '=', value: 'prod' }] as AdHocVariableFilter[],
+        false,
+        false
+      );
+      expect(val).toContain(" ResourceAttributes[\\'k8s.cluster.name\\'] = \\'prod\\' ");
     });
 
     it('buildFilterString scopes to the given target table', () => {
