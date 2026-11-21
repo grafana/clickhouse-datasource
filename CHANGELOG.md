@@ -1,5 +1,39 @@
 # Changelog
 
+## [4.24.0](https://github.com/grafana/clickhouse-datasource/compare/v4.23.5...v4.24.0) (2026-11-20)
+
+
+### 🎉 Features
+
+* **links:** let dashboards choose the tables trace and log links open ([#2197](https://github.com/grafana/clickhouse-datasource/issues/2197)) ([5d08e4d](https://github.com/grafana/clickhouse-datasource/commit/5d08e4d55039b71adfbc3ebfcb812f2f1180b7e2))
+* **logs:** flatten JSON/Map columns into log fields with path exclusions ([#2312](https://github.com/grafana/clickhouse-datasource/issues/2312)) ([11cf85f](https://github.com/grafana/clickhouse-datasource/commit/11cf85fc846d15b1f59789afea7214b9adefa332))
+* **query-builder:** suggest filter values from the column ([#2202](https://github.com/grafana/clickhouse-datasource/issues/2202)) ([b91a4fd](https://github.com/grafana/clickhouse-datasource/commit/b91a4fd635a867805483a65116d09a0c215d0dad))
+* **queryBuilder:** add filter chip edit mode ([#2118](https://github.com/grafana/clickhouse-datasource/issues/2118)) ([4c11771](https://github.com/grafana/clickhouse-datasource/commit/4c11771567c0296ee5290a7008dcc79d8c69db1d))
+* **queryBuilder:** bucket DateTime64 time columns with $__timeInterval_ms in aggregate time series ([#2301](https://github.com/grafana/clickhouse-datasource/issues/2301)) ([c401cc7](https://github.com/grafana/clickhouse-datasource/commit/c401cc739aa1b55666d8c076705b1fcfd1c43c3d))
+
+
+### 🐛 Bug Fixes
+
+* **adhoc:** handle trailing comments, set operations and keyword table names in ad-hoc filters ([#2177](https://github.com/grafana/clickhouse-datasource/issues/2177)) ([e6debc1](https://github.com/grafana/clickhouse-datasource/commit/e6debc1c338f3da95437cf7579f2f49ba04cde98))
+* **errorsource:** mark handshake read failures as downstream errors ([#2294](https://github.com/grafana/clickhouse-datasource/issues/2294)) ([46c7a45](https://github.com/grafana/clickhouse-datasource/commit/46c7a45bff88b5c4fdcb5f77af50fdff7e510bd1))
+* **logs:** stop infinite scrolling from stalling on busy tables ([#2297](https://github.com/grafana/clickhouse-datasource/issues/2297)) ([2c25a9f](https://github.com/grafana/clickhouse-datasource/commit/2c25a9fa8c6ae916358af2fc0436a83c283acaed))
+* **queryBuilder:** apply edits in the classic builder fallback in single-table mode ([#2266](https://github.com/grafana/clickhouse-datasource/issues/2266)) ([50610af](https://github.com/grafana/clickhouse-datasource/commit/50610affa207c509c70f8b15ed51aaeb1eaf9db9))
+* **queryBuilder:** handle single-value IN filters ([#2251](https://github.com/grafana/clickhouse-datasource/issues/2251)) ([8dd44cc](https://github.com/grafana/clickhouse-datasource/commit/8dd44cca460df1f4ad44da93d1a72fd71755605b))
+* retry logs config schema fetch after Save & test ([#2308](https://github.com/grafana/clickhouse-datasource/issues/2308)) ([65c80ca](https://github.com/grafana/clickhouse-datasource/commit/65c80caacfe85e2c07b248c32a7ff12656880317))
+* settings type checks, non-positive timeouts, UTC time zone and ad-hoc operators ([#2256](https://github.com/grafana/clickhouse-datasource/issues/2256)) ([5d5ca2c](https://github.com/grafana/clickhouse-datasource/commit/5d5ca2c2555c071fc5e1af3db293e9b21d39c582))
+
+
+### ✅ Tests
+
+* **e2e:** check pool settings reach the backend through Save & test ([#2185](https://github.com/grafana/clickhouse-datasource/issues/2185)) ([5c194a8](https://github.com/grafana/clickhouse-datasource/commit/5c194a832cd76697eff9e1921c2928cda0d132c6))
+
+
+### 🤖 Continuous Integration
+
+* add stable aggregate result job for the integration matrix ([#2305](https://github.com/grafana/clickhouse-datasource/issues/2305)) ([7bf2e87](https://github.com/grafana/clickhouse-datasource/commit/7bf2e87187b39e56e884b5c09dbc60818aaeb756))
+* build the dev catalog publish with go 1.27.4 ([#2311](https://github.com/grafana/clickhouse-datasource/issues/2311)) ([0333ec7](https://github.com/grafana/clickhouse-datasource/commit/0333ec7b9da9310a2f7522215c7355206cfdb753))
+* report required checks on merge queue groups ([#2203](https://github.com/grafana/clickhouse-datasource/issues/2203)) ([5e639a2](https://github.com/grafana/clickhouse-datasource/commit/5e639a260a0ee0e000b6875e3e32a1c6011c1e69))
+
 ## [4.23.5](https://github.com/grafana/clickhouse-datasource/compare/v4.23.4...v4.23.5) (2026-11-10)
 
 
