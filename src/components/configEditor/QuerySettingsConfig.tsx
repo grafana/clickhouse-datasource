@@ -122,7 +122,7 @@ export const QuerySettingsConfig = (props: QuerySettingsConfigProps) => {
 
       <Field label={labels.validateSql.label} description={labels.validateSql.tooltip}>
         <Switch
-          value={validateSql || false}
+          value={validateSql ?? true}
           onChange={onValidateSqlChange}
           role="checkbox"
         />

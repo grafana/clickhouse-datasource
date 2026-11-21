@@ -181,7 +181,10 @@ export default {
         },
         validateSql: {
           label: 'Validate SQL',
-          tooltip: 'Validate SQL in the editor.',
+          tooltip:
+            'While you edit a query in the SQL editor, marks syntax errors and unknown columns, functions and tables ' +
+            'before it runs. After a pause in typing, the editor asks ClickHouse to explain the query, which reads no ' +
+            'data. Dashboards run their queries as before. Defaults to enabled.',
         },
         enableMapKeysDiscovery: {
           label: 'Suggest Map keys and JSON paths',
