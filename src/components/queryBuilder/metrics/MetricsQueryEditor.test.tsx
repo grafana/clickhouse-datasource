@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { CoreApp } from '@grafana/data';
 import { Datasource } from 'data/CHDatasource';
 import {
   FilterOperator,
@@ -11,8 +12,13 @@ import {
   QueryType,
 } from 'types/queryBuilder';
 import { selectors } from 'selectors';
-import { keepSharedLabels, MetricsQueryEditor, parseQuantile, pickSummaryQuantiles } from './MetricsQueryEditor';
-import { toMetricLabelFilter, getMetricLabelOptions } from './MetricLabelFilterEditor';
+import {
+  getSelectableFunctions,
+  keepSharedLabels,
+  MetricsQueryEditor,
+  parseQuantile,
+  pickSummaryQuantiles,
+} from './MetricsQueryEditor';import { toMetricLabelFilter, getMetricLabelOptions } from './MetricLabelFilterEditor';
 
 const editorSelectors = selectors.components.QueryBuilder.MetricsEditor;
 
@@ -47,12 +53,13 @@ const createDatasource = (): Datasource => {
 
 const emptyQuery: QueryBuilderOptions = { database: '', table: '', queryType: QueryType.Table };
 
-const renderEditor = (builderOptions: QueryBuilderOptions, datasource = createDatasource()) => {
+const renderEditor = (builderOptions: QueryBuilderOptions, datasource = createDatasource(), app?: CoreApp) => {
   const onQueryChange = jest.fn();
   const onRunQuery = jest.fn();
   const dispatch = jest.fn();
   const utils = render(
     <MetricsQueryEditor
+      app={app}
       datasource={datasource}
       builderOptions={builderOptions}
       builderOptionsDispatch={dispatch}
@@ -178,6 +185,60 @@ describe('MetricsQueryEditor', () => {
     expect(screen.queryByTestId(editorSelectors.aggregationPicker)).not.toBeInTheDocument();
     expect(screen.queryByTestId(editorSelectors.groupByPicker)).not.toBeInTheDocument();
     expect(screen.getByTestId(editorSelectors.addFilterButton)).toBeInTheDocument();
+  });
+
+  it('replaces a heatmap with quantiles in Explore and says why', async () => {
+    const options: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_metrics_histogram',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: 'http.server.duration',
+        type: MetricType.Histogram,
+        fn: MetricFunction.Heatmap,
+        aggregation: MetricSeriesAggregation.Sum,
+        groupBy: [],
+      },
+    };
+    const { onQueryChange, onRunQuery } = renderEditor(options, createDatasource(), CoreApp.Explore);
+
+    await waitFor(() => expect(screen.getByTestId(editorSelectors.heatmapNotice)).toBeInTheDocument());
+    const next = onQueryChange.mock.calls[onQueryChange.mock.calls.length - 1][0] as QueryBuilderOptions;
+    expect(next.metric).toMatchObject({
+      fn: MetricFunction.Quantile,
+      quantiles: [0.95],
+      aggregation: MetricSeriesAggregation.Avg,
+    });
+    expect(onRunQuery).not.toHaveBeenCalled();
+  });
+
+  it('keeps a heatmap in a dashboard', async () => {
+    const options: QueryBuilderOptions = {
+      database: 'otel',
+      table: 'otel_metrics_histogram',
+      queryType: QueryType.TimeSeries,
+      metric: {
+        name: 'http.server.duration',
+        type: MetricType.Histogram,
+        fn: MetricFunction.Heatmap,
+        aggregation: MetricSeriesAggregation.Sum,
+        groupBy: [],
+      },
+    };
+    const { onQueryChange } = renderEditor(options, createDatasource(), CoreApp.Dashboard);
+
+    await waitFor(() => expect(onQueryChange).not.toHaveBeenCalled());
+    expect(screen.queryByTestId(editorSelectors.heatmapNotice)).not.toBeInTheDocument();
+    expect(screen.queryByTestId(editorSelectors.quantilesPicker)).not.toBeInTheDocument();
+  });
+
+  it('does not offer a heatmap in Explore', () => {
+    const inExplore = getSelectableFunctions(MetricType.Histogram, false, CoreApp.Explore);
+    expect(inExplore).not.toContain(MetricFunction.Heatmap);
+    expect(inExplore[0]).toBe(MetricFunction.Quantile);
+
+    const inDashboard = getSelectableFunctions(MetricType.Histogram, false, CoreApp.Dashboard);
+    expect(inDashboard).toContain(MetricFunction.Heatmap);
   });
 
   it('opens the label filter editor', async () => {

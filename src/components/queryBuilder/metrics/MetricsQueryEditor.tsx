@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { css } from '@emotion/css';
-import { GrafanaTheme2, TimeRange } from '@grafana/data';
+import { CoreApp, GrafanaTheme2, TimeRange } from '@grafana/data';
 import {
   Alert,
   Badge,
@@ -64,6 +64,7 @@ import {
 const editorSelectors = selectors.components.QueryBuilder.MetricsEditor;
 
 interface MetricsQueryEditorProps {
+  app?: CoreApp;
   datasource: Datasource;
   builderOptions: QueryBuilderOptions;
   builderOptionsDispatch: React.Dispatch<BuilderOptionsReducerAction>;
@@ -85,6 +86,19 @@ const aggregationOptions: Array<{ label: string; value: MetricSeriesAggregation;
 ];
 
 const metricOptionValue = (entry: Pick<MetricCatalogEntry, 'type' | 'name'>) => `${entry.type}:${entry.name}`;
+
+/**
+ * The functions a metric offers in the editor. Explore has no heatmap view, and at its fine step a
+ * heatmap returns a row per bucket and interval, which exceeds the result limit, so it is left out.
+ */
+export const getSelectableFunctions = (
+  type: MetricType,
+  isMonotonic: boolean | undefined,
+  app: CoreApp | undefined
+): MetricFunction[] => {
+  const functions = getMetricFunctions(type, isMonotonic);
+  return app === CoreApp.Explore ? functions.filter((fn) => fn !== MetricFunction.Heatmap) : functions;
+};
 
 const parseMetricOptionValue = (value: string): { type: MetricType; name: string } => {
   const separator = value.indexOf(':');
@@ -173,6 +187,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
  */
 export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
   const {
+    app,
     datasource,
     builderOptions,
     builderOptionsDispatch,
@@ -252,10 +267,35 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
     apply({ ...builderOptions, metric: { ...metric, ...changes } }, run);
   };
 
+  // Explore has no heatmap view, so a query carried over from a dashboard heatmap panel is turned
+  // into quantiles, which Explore renders, and a notice explains the change.
+  const isExplore = app === CoreApp.Explore;
+  const [heatmapReplaced, setHeatmapReplaced] = useState(false);
+  const heatmapInExplore = isExplore && metric?.fn === MetricFunction.Heatmap;
+  useEffect(() => {
+    if (!heatmapInExplore || heatmapReplaced) {
+      return;
+    }
+    setHeatmapReplaced(true);
+    apply(
+      {
+        ...builderOptions,
+        metric: {
+          ...metric!,
+          fn: MetricFunction.Quantile,
+          quantiles: metric!.quantiles?.length ? metric!.quantiles : [0.95],
+          aggregation: getDefaultSeriesAggregation(metric!.type, MetricFunction.Quantile),
+        },
+      },
+      false
+    );
+  }, [apply, builderOptions, heatmapInExplore, heatmapReplaced, metric]);
+
   // Picking a metric runs a few lookups for it. Only the latest pick is applied, on top of any
   // edits made while the lookups ran.
   const lastPick = useRef(0);
   const onMetricChange = async (value: string) => {
+    setHeatmapReplaced(false);
     const pick = ++lastPick.current;
     const { type, name } = parseMetricOptionValue(value);
     const entry = catalog.value.find((e) => e.type === type && e.name === name) ?? {
@@ -325,7 +365,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
     return null;
   }
 
-  const functions = metric.name ? getMetricFunctions(metric.type, metric.isMonotonic) : [];
+  const functions = metric.name ? getSelectableFunctions(metric.type, metric.isMonotonic, app) : [];
   const functionOptions = functions.map((fn) => ({
     label: metricFunctionLabels[fn].label,
     value: fn,
@@ -341,6 +381,7 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
   const noTables = !tables.loading && !tables.error && Object.keys(tables.value).length === 0;
 
   const onFunctionChange = (fn: MetricFunction) => {
+    setHeatmapReplaced(false);
     const quantiles =
       fn === MetricFunction.Quantile
         ? metric.quantiles?.length
@@ -378,6 +419,16 @@ export const MetricsQueryEditor = (props: MetricsQueryEditorProps) => {
         {catalog.error && (
           <Alert severity="error" title="Could not list the metrics">
             {catalog.error}
+          </Alert>
+        )}
+        {heatmapReplaced && (
+          <Alert
+            severity="info"
+            title="Heatmap is not available in Explore"
+            data-testid={editorSelectors.heatmapNotice}
+          >
+            Explore has no heatmap view, and a heatmap returns a row per bucket and interval, which can exceed the
+            result limit. This query shows quantiles here; use a dashboard Heatmap panel for the bucket distribution.
           </Alert>
         )}
 

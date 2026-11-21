@@ -138,6 +138,7 @@ export const QueryBuilder = (props: QueryBuilderProps) => {
   if (builderOptions.metric || (isMetricsSource && isMetricsEditorQuery(builderOptions))) {
     return (
       <MetricsQueryEditor
+        app={app}
         datasource={datasource}
         builderOptions={builderOptions}
         builderOptionsDispatch={builderOptionsDispatch}
