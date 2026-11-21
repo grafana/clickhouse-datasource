@@ -1,0 +1,80 @@
+{
+  "uid": "e2e-variables-dash",
+  "title": "E2E variable interpolation",
+  "description": "Imported by tests/e2e/variables/variableInterpolation.spec.ts via POST /api/dashboards/db. Exercises $__conditionalAll and ${service:sqlstring} interpolation against e2e_test.events seeded by tests/e2e/fixtures/seed.sql.",
+  "tags": ["e2e"],
+  "timezone": "utc",
+  "editable": true,
+  "schemaVersion": 41,
+  "version": 0,
+  "refresh": "",
+  "time": {
+    "from": "2024-03-15T09:45:00.000Z",
+    "to": "2024-03-15T10:15:00.000Z"
+  },
+  "annotations": { "list": [] },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "custom",
+        "description": "Distinct values of the service column in e2e_test.events (seed.sql)",
+        "multi": true,
+        "includeAll": true,
+        "query": "api,worker,cache,scheduler,db",
+        "options": [
+          { "selected": true, "text": "All", "value": "$__all" },
+          { "selected": false, "text": "api", "value": "api" },
+          { "selected": false, "text": "worker", "value": "worker" },
+          { "selected": false, "text": "cache", "value": "cache" },
+          { "selected": false, "text": "scheduler", "value": "scheduler" },
+          { "selected": false, "text": "db", "value": "db" }
+        ],
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "table",
+      "title": "Events by service",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-e2e" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {},
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-e2e" },
+          "editorType": "sql",
+          "pluginVersion": "",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT timestamp, level, message, service FROM e2e_test.events WHERE $__conditionalAll(service IN ($service), $service) ORDER BY timestamp"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Events by service (sqlstring)",
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 7 },
+      "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-e2e" },
+      "fieldConfig": { "defaults": {}, "overrides": [] },
+      "options": {},
+      "targets": [
+        {
+          "refId": "B",
+          "datasource": { "type": "grafana-clickhouse-datasource", "uid": "clickhouse-e2e" },
+          "editorType": "sql",
+          "pluginVersion": "",
+          "queryType": "table",
+          "format": 1,
+          "rawSql": "SELECT timestamp, level, message, service FROM e2e_test.events WHERE service IN (${service:sqlstring}) ORDER BY timestamp"
+        }
+      ]
+    }
+  ]
+}
