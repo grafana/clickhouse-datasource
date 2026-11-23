@@ -4,6 +4,7 @@
     "github>grafana/grafana-renovate-config//presets/data-sources/base",
     "github>grafana/grafana-renovate-config//presets/data-sources/renovate-gate"
   ],
+  "prConcurrentLimit": 10,
   "packageRules": [
     {
       "description": "Drop the base preset's blanket per-manager groups so each update gets its own PR and tier label. A group mixes update types, so claude-gate would win over patches and one major would block the rest",
