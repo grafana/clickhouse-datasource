@@ -1396,6 +1396,48 @@ describe('getFilters', () => {
     expect(sql).toEqual(expectedSql);
   });
 
+  // The editor stores IN and NOT IN values as an array for every column type that is not
+  // boolean, number or date, not only for String and FixedString (#2225).
+  describe.each([FilterOperator.In, FilterOperator.NotIn])('%s filter', (operator) => {
+    it.each<{ type: string; value: string[]; list: string }>([
+      { type: "Enum8('x' = 1, 'y' = 2, 'z' = 3)", value: ['x', 'y'], list: "('x', 'y')" },
+      { type: "Nullable(Enum8('x' = 1, 'y' = 2, 'z' = 3))", value: ['x', 'y'], list: "('x', 'y')" },
+      { type: "Enum16('x' = 1, 'y' = 2, 'z' = 3)", value: ['x', 'y'], list: "('x', 'y')" },
+      {
+        type: 'UUID',
+        value: ['61f0c404-5cb3-11e7-907b-a6006ad3dba0', '00000000-0000-0000-0000-000000000000'],
+        list: "('61f0c404-5cb3-11e7-907b-a6006ad3dba0', '00000000-0000-0000-0000-000000000000')",
+      },
+      { type: 'IPv4', value: ['10.0.0.1', '10.0.0.2'], list: "('10.0.0.1', '10.0.0.2')" },
+      { type: 'IPv6', value: ['::1', '2001:db8::1'], list: "('::1', '2001:db8::1')" },
+      { type: 'Bool', value: ['true', 'false'], list: "('true', 'false')" },
+      { type: 'LowCardinality(String)', value: ['x', 'y'], list: "('x', 'y')" },
+    ])('renders the values as a list for $type', ({ type, value, list }) => {
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'col', operator, type, value }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( col ${operator} ${list} )`);
+    });
+
+    const enumType = "Enum8('x' = 1, 'y' = 2)";
+
+    it('wraps a multi-value variable in parentheses on an Enum column', () => {
+      // A multi-value variable interpolates to 'x','y', which is only valid inside the parentheses.
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'col', operator, type: enumType, value: ['$v'] }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( col ${operator} ($v) )`);
+    });
+
+    it('keeps a single string value on an Enum column as one value', () => {
+      // The editor always stores an array, but a query saved by hand can hold a plain string.
+      const options = {
+        filters: [{ condition: 'AND', filterType: 'custom', key: 'col', operator, type: enumType, value: 'x' }],
+      } as QueryBuilderOptions;
+      expect(_testExports.getFilters(options)).toEqual(`( col ${operator} 'x' )`);
+    });
+  });
+
   it('extracts Map value type for mapKey filter with Map(String, String)', () => {
     const options = {
       filters: [
