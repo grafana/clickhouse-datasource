@@ -208,7 +208,7 @@ GROUP BY machine_group, log_time
 ORDER BY log_time
 ```
 
-The plugin converts this result into one series for each group. The converted result can have at most 100,000,000 cells, which is the number of distinct timestamps multiplied by the number of series. A larger result fails with an error that asks you to add filters or aggregation. To stay under the limit, bucket the time column with `$__timeInterval` or reduce the number of groups.
+The plugin converts this result into one series for each group. By default, the converted result can have at most 100,000,000 cells, which is the number of distinct timestamps multiplied by the number of series. A larger result fails with an error that asks you to add filters or aggregation. To stay under the limit, bucket the time column with `$__timeInterval` or reduce the number of groups. An administrator can change the limit with `long_to_wide_cell_limit` in the `[plugin.grafana-clickhouse-datasource]` section of the Grafana configuration. A value of 0 removes the limit.
 
 ## Tables
 
