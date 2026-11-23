@@ -10,6 +10,7 @@ import {
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
+  StringFilter,
 } from 'types/queryBuilder';
 import { Datasource } from 'data/CHDatasource';
 import otel from 'otel';
@@ -704,8 +705,155 @@ describe('getQueryOptionsFromSql', () => {
     const options = getQueryOptionsFromSql(sql);
     expect(typeof options).not.toBe('string');
     expect((options as QueryBuilderOptions).filters).toEqual([
-      { key: 'timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
+      { key: 'Timestamp', operator: FilterOperator.WithInGrafanaTimeRange, type: 'datetime' },
     ]);
+  });
+
+  describe('letter case of names, which ClickHouse compares exactly', () => {
+    it('keeps unquoted column names as written', () => {
+      const options = getQueryOptionsFromSql(
+        `SELECT Timestamp, ServiceName FROM "otel"."otel_logs" WHERE ServiceName = 'cart' ORDER BY Timestamp DESC LIMIT 10`
+      );
+      expect(options.columns?.map((c) => c.name)).toEqual(['Timestamp', 'ServiceName']);
+      expect(options.filters?.map((f) => f.key)).toEqual(['ServiceName']);
+      expect(options.orderBy).toEqual([{ name: 'Timestamp', dir: 'DESC' }]);
+    });
+
+    it('keeps aliases as written, quoted or not', () => {
+      const options = getQueryOptionsFromSql(
+        'SELECT Timestamp AS "timestamp", Body AS body, "TraceId" AS traceID FROM "otel"."otel_logs"'
+      );
+      expect(options.columns?.map((c) => [c.name, c.alias])).toEqual([
+        ['Timestamp', 'timestamp'],
+        ['Body', 'body'],
+        ['TraceId', 'traceID'],
+      ]);
+    });
+
+    it('keeps the names of aggregates and GROUP BY', () => {
+      const options = getQueryOptionsFromSql(
+        'SELECT ServiceName, count(*) AS Total FROM "otel"."otel_logs" GROUP BY ServiceName'
+      );
+      expect(options.aggregates).toEqual([{ aggregateType: 'count', column: '*', alias: 'Total' }]);
+      expect(options.groupBy).toEqual(['ServiceName']);
+    });
+
+    it('builds the SQL it was read from again', () => {
+      const sql = `SELECT Timestamp, ServiceName FROM "otel"."otel_logs" WHERE ( ServiceName = 'cart' ) ORDER BY Timestamp DESC LIMIT 10`;
+      expect(generateSql(getQueryOptionsFromSql(sql))).toBe(sql);
+    });
+
+    it('keeps the names inside macro calls', () => {
+      const filtered = getQueryOptionsFromSql('SELECT Body FROM "otel"."otel_logs" WHERE $__timeFilter(Timestamp)');
+      expect(filtered.filters).toEqual([
+        expect.objectContaining({ key: 'Timestamp', operator: FilterOperator.WithInGrafanaTimeRange }),
+      ]);
+      const bucketed = getQueryOptionsFromSql(
+        'SELECT $__timeInterval(Timestamp) as "time", count(*) FROM "otel"."otel_logs" GROUP BY time',
+        QueryType.TimeSeries
+      );
+      expect(bucketed.columns?.[0]).toEqual(expect.objectContaining({ name: 'Timestamp', alias: 'time' }));
+    });
+  });
+
+  describe('IS NULL and IS NOT NULL', () => {
+    it('gives the filter its column and a type', () => {
+      const options = getQueryOptionsFromSql('SELECT Body FROM "otel"."otel_logs" WHERE SeverityText IS NOT NULL');
+      expect(options.filters).toEqual([{ key: 'SeverityText', operator: FilterOperator.IsNotNull, type: 'string' }]);
+    });
+
+    it('starts a new filter after IS NULL', () => {
+      const options = getQueryOptionsFromSql(
+        `SELECT Body FROM "otel"."otel_logs" WHERE TraceId IS NULL AND ServiceName = 'cart'`
+      );
+      expect(options.filters?.map((f) => [f.key, f.operator, 'value' in f ? f.value : undefined])).toEqual([
+        ['TraceId', FilterOperator.IsNull, undefined],
+        ['ServiceName', FilterOperator.Equals, 'cart'],
+      ]);
+    });
+  });
+
+  describe('a time series query taken to SQL and back', () => {
+    const timeRange: DateFilterWithoutValue = {
+      filterType: 'custom',
+      condition: 'AND',
+      key: '',
+      hint: ColumnHint.Time,
+      type: 'datetime',
+      operator: FilterOperator.WithInGrafanaTimeRange,
+    };
+    const statusIsError: StringFilter = {
+      filterType: 'custom',
+      condition: 'AND',
+      key: 'StatusCode',
+      type: 'LowCardinality(String)',
+      operator: FilterOperator.Equals,
+      value: 'Error',
+    };
+    const trend = (options: Partial<QueryBuilderOptions>): QueryBuilderOptions => ({
+      database: 'otel',
+      table: 'otel_traces',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      columns: [{ name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+      filters: [timeRange],
+      ...options,
+    });
+
+    it.each<[string, QueryBuilderOptions]>([
+      [
+        'bucketed by milliseconds and grouped',
+        trend({
+          aggregates: [{ aggregateType: AggregateType.Count, column: '*' }],
+          groupBy: ['ServiceName'],
+          orderBy: [{ name: 'time', dir: OrderByDirection.ASC }],
+          limit: 1000,
+        }),
+      ],
+      [
+        'bucketed by seconds, with two aggregates and no grouping',
+        trend({
+          columns: [{ name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.Time }],
+          aggregates: [
+            { aggregateType: AggregateType.Average, column: 'Duration', alias: 'AvgDuration' },
+            { aggregateType: AggregateType.Max, column: 'Duration' },
+          ],
+        }),
+      ],
+      [
+        'grouped by two columns, with a filter',
+        trend({
+          aggregates: [{ aggregateType: AggregateType.Sum, column: 'Duration', alias: 'TotalDuration' }],
+          groupBy: ['ServiceName', 'SpanKind'],
+          filters: [timeRange, statusIsError],
+          orderBy: [{ name: 'time', dir: OrderByDirection.ASC }],
+          limit: 500,
+        }),
+      ],
+      [
+        'without aggregates',
+        trend({
+          mode: BuilderMode.Aggregate,
+          columns: [{ name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time }, { name: 'Duration' }],
+          limit: 100,
+        }),
+      ],
+    ])('builds the query it was read from again: %s', (_name, builder) => {
+      const sql = generateSql(builder);
+      expect(generateSql(getQueryOptionsFromSql(sql, QueryType.TimeSeries))).toBe(sql);
+    });
+
+    it('reads a bucketed query back in trend mode, without grouping by the time column twice', () => {
+      const options = getQueryOptionsFromSql(
+        'SELECT $__timeInterval_ms(Timestamp) as "time", SeverityText, count(*) FROM "otel"."otel_logs" GROUP BY SeverityText, time ORDER BY time ASC',
+        QueryType.TimeSeries
+      );
+      expect(options.mode).toBe(BuilderMode.Trend);
+      expect(options.groupBy).toEqual(['SeverityText']);
+      expect(options.columns?.[0]).toEqual(
+        expect.objectContaining({ name: 'Timestamp', alias: 'time', type: 'DateTime64(3)', hint: ColumnHint.Time })
+      );
+    });
   });
 });
 

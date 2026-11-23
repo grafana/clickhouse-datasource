@@ -451,8 +451,10 @@ export const FilterEditor = (props: {
   otherFilters?: string;
 }) => {
   const { index, filter, allColumns: fieldsList, onFilterChange, removeFilter, durationFilterContext } = props;
-  const isMapType = filter.type.startsWith('Map');
-  const isJSONType = filter.type.startsWith('JSON');
+  // A filter that an earlier version converted from SQL can lack a type; the editor must still open.
+  const filterType: string = filter.type ?? '';
+  const isMapType = filterType.startsWith('Map');
+  const isJSONType = filterType.startsWith('JSON');
   const mapKeys = useUniqueMapKeys(props.datasource, isMapType ? filter.key : '', props.database, props.table);
   const keysColumnName = isJSONType ? props.allColumns.find((c) => c.name === filter.key + 'Keys')?.name : undefined;
   const jsonPaths = useUniqueJSONPaths(

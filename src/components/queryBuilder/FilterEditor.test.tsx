@@ -136,6 +136,25 @@ describe('FilterEditor', () => {
       );
       expect(result.container.firstChild).not.toBeNull();
     });
+    it('opens a filter without a type, as an earlier version saved one after switching from SQL', () => {
+      // Read from JSON, as a saved query is.
+      const filter = JSON.parse(
+        '{"key":"SeverityText","operator":"IS NOT NULL","condition":"AND","filterType":"custom"}'
+      );
+      const result = render(
+        <FilterEditor
+          allColumns={[]}
+          filter={filter}
+          index={0}
+          onFilterChange={() => {}}
+          removeFilter={() => {}}
+          datasource={mockDatasource}
+          database=""
+          table=""
+        />
+      );
+      expect(result.getByDisplayValue('SeverityText')).toBeInTheDocument();
+    });
     const serviceFilter = (overrides: Partial<Filter> = {}) =>
       ({
         key: '',
