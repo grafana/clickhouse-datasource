@@ -133,7 +133,7 @@ export function getQueryOptionsFromSql(
   }
 
   const timeColumn = getColumnByHint(builderOptions, ColumnHint.Time);
-  if (!queryType && timeColumn) {
+  if (timeColumn && (!queryType || queryType === QueryType.TimeSeries)) {
     builderOptions.queryType = QueryType.TimeSeries;
     if (builderOptions.aggregates?.length || 0) {
       builderOptions.mode = BuilderMode.Trend;
@@ -159,6 +159,9 @@ export function getQueryOptionsFromSql(
 
   builderOptions.limit = ast.limit?.limit?.type === 'integer' ? ast.limit?.limit.value : undefined;
 
+  // A trend query groups by its time column on its own, so the `GROUP BY ..., time` it generated is
+  // read back without it; otherwise the next generation selects and groups by `time` twice.
+  const trendTime = builderOptions.mode === BuilderMode.Trend ? timeColumn?.alias : undefined;
   const groupBy = ast.groupBy
     ?.map((gb) => {
       if (gb.type !== 'ref') {
@@ -166,7 +169,7 @@ export function getQueryOptionsFromSql(
       }
       return gb.name;
     })
-    .filter((x) => x !== '');
+    .filter((x) => x !== '' && x !== trendTime);
   if (groupBy && groupBy.length > 0) {
     builderOptions.groupBy = groupBy;
   }
@@ -387,7 +390,10 @@ function getAggregatesFromAst(selectClauses: SelectedColumn[] | null): {
         }
 
         if (isString(columnOrAggregate)) {
-          columns.push({ name: columnOrAggregate, type: 'datetime', alias, hint: ColumnHint.Time });
+          // $__timeInterval_ms buckets a DateTime64 column by milliseconds. Keeping the type makes the
+          // builder generate it again instead of $__timeInterval, which floors to whole seconds.
+          const type = s.expr.function.name.toLowerCase().endsWith('_ms') ? 'DateTime64(3)' : 'datetime';
+          columns.push({ name: columnOrAggregate, type, alias, hint: ColumnHint.Time });
         } else {
           aggregates.push(columnOrAggregate);
         }

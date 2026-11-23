@@ -10,6 +10,7 @@ import {
   OrderByDirection,
   QueryBuilderOptions,
   QueryType,
+  StringFilter,
 } from 'types/queryBuilder';
 import { Datasource } from 'data/CHDatasource';
 import otel from 'otel';
@@ -769,6 +770,89 @@ describe('getQueryOptionsFromSql', () => {
         ['TraceId', FilterOperator.IsNull, undefined],
         ['ServiceName', FilterOperator.Equals, 'cart'],
       ]);
+    });
+  });
+
+  describe('a time series query taken to SQL and back', () => {
+    const timeRange: DateFilterWithoutValue = {
+      filterType: 'custom',
+      condition: 'AND',
+      key: '',
+      hint: ColumnHint.Time,
+      type: 'datetime',
+      operator: FilterOperator.WithInGrafanaTimeRange,
+    };
+    const statusIsError: StringFilter = {
+      filterType: 'custom',
+      condition: 'AND',
+      key: 'StatusCode',
+      type: 'LowCardinality(String)',
+      operator: FilterOperator.Equals,
+      value: 'Error',
+    };
+    const trend = (options: Partial<QueryBuilderOptions>): QueryBuilderOptions => ({
+      database: 'otel',
+      table: 'otel_traces',
+      queryType: QueryType.TimeSeries,
+      mode: BuilderMode.Trend,
+      columns: [{ name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time }],
+      filters: [timeRange],
+      ...options,
+    });
+
+    it.each<[string, QueryBuilderOptions]>([
+      [
+        'bucketed by milliseconds and grouped',
+        trend({
+          aggregates: [{ aggregateType: AggregateType.Count, column: '*' }],
+          groupBy: ['ServiceName'],
+          orderBy: [{ name: 'time', dir: OrderByDirection.ASC }],
+          limit: 1000,
+        }),
+      ],
+      [
+        'bucketed by seconds, with two aggregates and no grouping',
+        trend({
+          columns: [{ name: 'TimestampTime', type: 'DateTime', hint: ColumnHint.Time }],
+          aggregates: [
+            { aggregateType: AggregateType.Average, column: 'Duration', alias: 'AvgDuration' },
+            { aggregateType: AggregateType.Max, column: 'Duration' },
+          ],
+        }),
+      ],
+      [
+        'grouped by two columns, with a filter',
+        trend({
+          aggregates: [{ aggregateType: AggregateType.Sum, column: 'Duration', alias: 'TotalDuration' }],
+          groupBy: ['ServiceName', 'SpanKind'],
+          filters: [timeRange, statusIsError],
+          orderBy: [{ name: 'time', dir: OrderByDirection.ASC }],
+          limit: 500,
+        }),
+      ],
+      [
+        'without aggregates',
+        trend({
+          mode: BuilderMode.Aggregate,
+          columns: [{ name: 'Timestamp', type: 'DateTime64(9)', hint: ColumnHint.Time }, { name: 'Duration' }],
+          limit: 100,
+        }),
+      ],
+    ])('builds the query it was read from again: %s', (_name, builder) => {
+      const sql = generateSql(builder);
+      expect(generateSql(getQueryOptionsFromSql(sql, QueryType.TimeSeries))).toBe(sql);
+    });
+
+    it('reads a bucketed query back in trend mode, without grouping by the time column twice', () => {
+      const options = getQueryOptionsFromSql(
+        'SELECT $__timeInterval_ms(Timestamp) as "time", SeverityText, count(*) FROM "otel"."otel_logs" GROUP BY SeverityText, time ORDER BY time ASC',
+        QueryType.TimeSeries
+      );
+      expect(options.mode).toBe(BuilderMode.Trend);
+      expect(options.groupBy).toEqual(['SeverityText']);
+      expect(options.columns?.[0]).toEqual(
+        expect.objectContaining({ name: 'Timestamp', alias: 'time', type: 'DateTime64(3)', hint: ColumnHint.Time })
+      );
     });
   });
 });
