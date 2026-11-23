@@ -9,8 +9,10 @@ export interface ExploreUrlOptions {
   rawSql?: string;
   builderOptions?: Record<string, unknown>;
   /**
-   * The query's plugin version. Empty (the default) marks it as a v3 query, which the editor
-   * migrates to a SQL query. Pass a 4.x version to open builderOptions in the Query Builder.
+   * The query's plugin version. Empty (the default) marks a SQL query without queryType as a v3
+   * query: the editor migrates it and sets queryType from format, which is Table here because
+   * SQL queries get no format. Builder queries with builderOptions, and SQL queries with a v4
+   * queryType, load as v4 queries with any version.
    */
   pluginVersion?: string;
 }
@@ -46,7 +48,8 @@ export function exploreUrl(opts: ExploreUrlOptions = {}): string {
   }
   if (builderOptions !== undefined) {
     query.builderOptions = builderOptions;
-    // format keeps a builder query running the supplied rawSql on load instead of re-generating it.
+    // When builderOptions can run, the editor replaces rawSql and format with its own on load.
+    // Otherwise the query runs the supplied rawSql in the Table format.
     query.format = 1;
   }
 
