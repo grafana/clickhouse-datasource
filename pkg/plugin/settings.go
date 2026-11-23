@@ -90,6 +90,21 @@ type Settings struct {
 	// jsonData.logs.attributeColumnExclusions. Empty by default, so nothing is
 	// dropped unless a path is listed.
 	LogsAttributeColumnExclusions []string `json:"-"`
+
+	// SingleSourceTable is the table a Single source logs or traces data source reads, resolved
+	// the way the query builder resolves it, so the health check can confirm that it exists. Nil
+	// in All databases mode and when no table is set. Parsed from jsonData.configMode,
+	// jsonData.signalType, jsonData.defaultDatabase, jsonData.defaultTable and the logs or traces
+	// defaults.
+	SingleSourceTable *SourceTable `json:"-"`
+}
+
+// SourceTable is a database and table the data source is configured to read.
+type SourceTable struct {
+	// Signal is the signal type the table holds: "logs" or "traces".
+	Signal   string
+	Database string
+	Table    string
 }
 
 type CustomSetting struct {
@@ -336,7 +351,42 @@ func LoadSettings(ctx context.Context, config backend.DataSourceInstanceSettings
 		}
 	}
 
+	settings.SingleSourceTable = singleSourceTable(jsonData, settings.DefaultDatabase)
+
 	return settings, settings.isValid()
+}
+
+// singleSourceTable resolves the table of a Single source data source as the frontend does
+// (getConfigMode and getSingleTableLocation): the signal's default database and table, falling
+// back to the data source's default database and table, and to the database "default". It
+// returns nil in All databases mode, for a signal type other than logs and traces, and when no
+// table is set.
+func singleSourceTable(jsonData map[string]interface{}, defaultDatabase string) *SourceTable {
+	configMode, _ := jsonData["configMode"].(string)
+	signal, _ := jsonData["signalType"].(string)
+	if configMode == "" && signal != "" {
+		configMode = "single-table"
+	}
+	if configMode != "single-table" || (signal != "logs" && signal != "traces") {
+		return nil
+	}
+
+	section, _ := jsonData[signal].(map[string]interface{})
+	database, _ := section["defaultDatabase"].(string)
+	table, _ := section["defaultTable"].(string)
+	if database == "" {
+		database = defaultDatabase
+	}
+	if database == "" {
+		database = "default"
+	}
+	if table == "" {
+		table, _ = jsonData["defaultTable"].(string)
+	}
+	if table == "" {
+		return nil
+	}
+	return &SourceTable{Signal: signal, Database: database, Table: table}
 }
 
 // loadHttpHeaders loads secure and plain text headers from the config

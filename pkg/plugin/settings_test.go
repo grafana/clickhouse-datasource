@@ -560,7 +560,11 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 			"customSettings": [{ "setting": "max_execution_time", "value": "10" }],
 			"enableSecureSocksProxy": true, "enableRowLimit": true, "rowCapacityHint": 50000,
 			"enableSchemaCache": false, "schemaCacheTTLSeconds": 120,
-			"logs": { "attributeColumns": ["JsonBody"], "attributeColumnExclusions": ["JsonBody.client"] }
+			"configMode": "single-table", "signalType": "logs",
+			"logs": {
+				"attributeColumns": ["JsonBody"], "attributeColumnExclusions": ["JsonBody.client"],
+				"defaultDatabase": "otel", "defaultTable": "otel_logs"
+			}
 		}`),
 		DecryptedSecureJSONData: map[string]string{
 			"password":                 "bar",
@@ -579,6 +583,65 @@ func TestLoadSettingsSetsEveryField(t *testing.T) {
 		if reflect.DeepEqual(everyValue.Field(i).Interface(), noneValue.Field(i).Interface()) {
 			t.Errorf("Settings.%s = %v with every key set, the same as with none: add its key to this fixture or a parsing branch to LoadSettings", name, everyValue.Field(i).Interface())
 		}
+	}
+}
+
+func TestLoadSettingsSingleSourceTable(t *testing.T) {
+	tests := []struct {
+		name     string
+		jsonData string
+		want     *SourceTable
+	}{
+		{
+			name:     "logs table and database",
+			jsonData: `"configMode": "single-table", "signalType": "logs", "logs": { "defaultDatabase": "otel", "defaultTable": "otel_logs" }`,
+			want:     &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"},
+		},
+		{
+			name:     "traces table and database",
+			jsonData: `"configMode": "single-table", "signalType": "traces", "traces": { "defaultDatabase": "otel", "defaultTable": "otel_traces" }`,
+			want:     &SourceTable{Signal: "traces", Database: "otel", Table: "otel_traces"},
+		},
+		{
+			name:     "falls back to the default database and table of the data source",
+			jsonData: `"configMode": "single-table", "signalType": "logs", "defaultDatabase": "otel", "defaultTable": "otel_logs", "logs": {}`,
+			want:     &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"},
+		},
+		{
+			name:     "falls back to the database named default",
+			jsonData: `"configMode": "single-table", "signalType": "traces", "traces": { "defaultTable": "otel_traces" }`,
+			want:     &SourceTable{Signal: "traces", Database: "default", Table: "otel_traces"},
+		},
+		{
+			name:     "a signal type without a configuration mode is single source",
+			jsonData: `"signalType": "logs", "logs": { "defaultDatabase": "otel", "defaultTable": "otel_logs" }`,
+			want:     &SourceTable{Signal: "logs", Database: "otel", Table: "otel_logs"},
+		},
+		{
+			name:     "all databases mode keeps its defaults out of the check",
+			jsonData: `"configMode": "classic", "signalType": "logs", "logs": { "defaultDatabase": "otel", "defaultTable": "otel_logs" }`,
+		},
+		{
+			name:     "no table set",
+			jsonData: `"configMode": "single-table", "signalType": "logs", "logs": { "defaultDatabase": "otel" }`,
+		},
+		{
+			name:     "another signal type",
+			jsonData: `"configMode": "single-table", "signalType": "profiles", "profiles": { "defaultTable": "otel_profiles" }`,
+		},
+		{
+			name:     "a malformed section is ignored",
+			jsonData: `"configMode": "single-table", "signalType": "logs", "logs": "otel_logs"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			settings, err := LoadSettings(context.Background(), backend.DataSourceInstanceSettings{
+				JSONData: []byte(fmt.Sprintf(`{ "host": "test", "port": 9000, %s }`, tt.jsonData)),
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, settings.SingleSourceTable)
+		})
 	}
 }
 

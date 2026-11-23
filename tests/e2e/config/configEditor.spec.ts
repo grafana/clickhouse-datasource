@@ -1,7 +1,8 @@
 import { expect, test } from '@grafana/plugin-e2e';
 import type { Page } from '@playwright/test';
 import { CHConfig } from '../../../src/types/config';
-import { isCloudRun, PLUGIN_TYPE } from '../helpers/env';
+import { createTestDataSources, deleteTestDataSources } from '../helpers/datasources';
+import { isCloudRun, PLUGIN_TYPE, SINGLE_LOGS_DATASOURCE_UID, SINGLE_TRACES_DATASOURCE_UID } from '../helpers/env';
 
 // E2E coverage for the datasource config editor: section rendering across the
 // V1 and V2 (newClickhouseConfigPageDesign) layouts, provisioned values, and
@@ -343,5 +344,61 @@ test.describe('Config editor', () => {
       await configPage.saveAndTest();
       await expect(configPage).toHaveAlert('success', { hasNotText: 'Datasource updated' });
     });
+  });
+
+  test.describe('single source table', () => {
+    // Save & test of a Single source data source also looks its table up. The data sources with a
+    // wrong name are created through the API, inheriting the connection of the base e2e data
+    // source, which needs a passwordless ClickHouse; the provisioned ones read the tables seeded
+    // by tests/fixtures. Neither is available on the shared Cloud instance. cspell:ignore eventz tset
+    test.skip(isCloudRun, 'Needs API-created data sources and the seeded e2e_test tables, not available on Cloud.');
+
+    const WRONG_NAMES = [
+      {
+        uid: 'clickhouse-e2e-logs-missing-table',
+        name: 'ClickHouse Single Logs, missing table (e2e)',
+        jsonData: {
+          configMode: 'single-table',
+          signalType: 'logs',
+          logs: { defaultDatabase: 'e2e_test', defaultTable: 'eventz' },
+        },
+        error: 'Table e2e_test.eventz does not exist',
+      },
+      {
+        uid: 'clickhouse-e2e-traces-missing-db',
+        name: 'ClickHouse Single Traces, missing database (e2e)',
+        jsonData: {
+          configMode: 'single-table',
+          signalType: 'traces',
+          traces: { defaultDatabase: 'e2e_tset', defaultTable: 'trace_spans' },
+        },
+        error: 'Database e2e_tset does not exist',
+      },
+    ];
+
+    test.beforeAll(async () => {
+      await createTestDataSources(WRONG_NAMES);
+    });
+
+    test.afterAll(async () => {
+      await deleteTestDataSources(WRONG_NAMES);
+    });
+
+    for (const { uid, name, error } of WRONG_NAMES) {
+      test(`${name} fails Save & test with the name ClickHouse reports`, async ({ gotoDataSourceConfigPage }) => {
+        const configPage = await gotoDataSourceConfigPage(uid);
+        await expect(configPage.saveAndTest()).not.toBeOK();
+        await expect(configPage).toHaveAlert('error', { hasText: error });
+      });
+    }
+
+    for (const uid of [SINGLE_LOGS_DATASOURCE_UID, SINGLE_TRACES_DATASOURCE_UID]) {
+      test(`provisioned ${uid} passes the health check`, async ({ gotoDataSourceConfigPage, page }) => {
+        // Provisioned data sources show a read-only "Test" button instead of "Save & test".
+        await gotoDataSourceConfigPage(uid);
+        await page.getByRole('button', { name: 'Test' }).click();
+        await expect(page.getByText('Data source is working')).toBeVisible();
+      });
+    }
   });
 });
